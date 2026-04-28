@@ -1,0 +1,113 @@
+import { ChevronRight, Users, Layers } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useHierarchy } from "@/components/hierarchy/HierarchyContext";
+import SquadronList from "./SquadronList";
+
+/**
+ * GroupAccordion
+ * Level 3 — Group node. Expands to show SquadronList.
+ *
+ * @param {{ group: Group }} props
+ */
+export default function GroupAccordion({ group }) {
+  const { expandedGroupId, toggleGroup } = useHierarchy();
+  const isOpen = expandedGroupId === group.id;
+
+  const activeCount   = group.squadrons.filter((s) => s.status === "active").length;
+  const inactiveCount = group.squadrons.length - activeCount;
+
+  return (
+    <div className={cn(
+      "rounded-lg border overflow-hidden",
+      "transition-colors duration-150",
+      isOpen
+        ? "border-blue-200 dark:border-blue-500/30"
+        : "border-neutral-200 dark:border-neutral-800"
+    )}>
+      {/* ── Group header button ──────────────────────────────── */}
+      <button
+        onClick={() => toggleGroup(group.id)}
+        aria-expanded={isOpen}
+        className={cn(
+          "flex w-full items-center gap-3 px-3 py-2.5 text-left",
+          "transition-all duration-150",
+          "outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-inset",
+          isOpen
+            ? "bg-blue-50 dark:bg-blue-500/10"
+            : "bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800/60"
+        )}
+      >
+        {/* Chevron */}
+        <ChevronRight
+          size={13}
+          className={cn(
+            "shrink-0 text-neutral-400 dark:text-neutral-600",
+            "transition-transform duration-200",
+            isOpen && "rotate-90 text-blue-500 dark:text-blue-400"
+          )}
+        />
+
+        {/* Icon */}
+        <span className={cn(
+          "flex h-6 w-6 shrink-0 items-center justify-center rounded",
+          isOpen
+            ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
+            : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-500"
+        )}>
+          <Layers size={12} strokeWidth={1.8} />
+        </span>
+
+        {/* Name + code */}
+        <div className="flex flex-1 items-center gap-2 min-w-0">
+          <span className={cn(
+            "text-[12px] font-semibold truncate",
+            isOpen
+              ? "text-blue-700 dark:text-blue-300"
+              : "text-neutral-700 dark:text-neutral-300"
+          )}>
+            {group.name}
+          </span>
+          <span className="shrink-0 rounded bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 font-mono text-[9px] text-neutral-500 dark:text-neutral-500">
+            {group.code}
+          </span>
+          <span className="shrink-0 text-[10px] text-neutral-400 dark:text-neutral-600">
+            {group.type}
+          </span>
+        </div>
+
+        {/* Squadron stats */}
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="flex items-center gap-1 text-[10px] text-neutral-500 dark:text-neutral-500">
+            <Users size={10} /> {group.reservists}
+          </span>
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+            {activeCount} active
+          </span>
+          {inactiveCount > 0 && (
+            <span className="text-[10px] text-neutral-400">
+              · {inactiveCount} inactive
+            </span>
+          )}
+          <span className="text-[10px] text-neutral-400 dark:text-neutral-600">
+            {group.squadrons.length} sqdn
+          </span>
+        </div>
+      </button>
+
+      {/* ── Squadron list ────────────────────────────────────── */}
+      <div className={cn(
+        "overflow-hidden transition-all duration-200 ease-out",
+        isOpen ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+      )}>
+        <div className="border-t border-blue-100 dark:border-blue-500/20 bg-blue-50/40 dark:bg-blue-500/5 px-3 py-3">
+          {/* Level label */}
+          <p className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-widest text-blue-400 dark:text-blue-500">
+            <span className="inline-block h-px w-3 bg-blue-300 dark:bg-blue-600" />
+            Squadrons ({group.squadrons.length})
+          </p>
+          <SquadronList squadrons={group.squadrons} />
+        </div>
+      </div>
+    </div>
+  );
+}
