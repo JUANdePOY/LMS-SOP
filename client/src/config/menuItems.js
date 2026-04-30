@@ -1,13 +1,16 @@
 import {
   LayoutDashboard,
-  CalendarCheck,
-  Users,
+  UserSquare,
   MapPin,
   Dumbbell,
   ClipboardList,
   BarChart3,
   Package,
   FileText,
+  Shield,
+  Users,
+  Layers,
+  PlaneTakeoff,
 } from "lucide-react";
 
 export const menuItems = [
@@ -17,23 +20,44 @@ export const menuItems = [
     icon: LayoutDashboard,
     description: "Overview & summary",
   },
-    {
-      name: "Reservists",
-      path: "/reservations",
-      icon: CalendarCheck,
-      description: "Manage reservists",
-    },
   {
-    name: "Groups & Units",
-    path: "/groups",
-    icon: Users,
-    description: "Teams & units",
+    name: "Reservists",
+    path: "/reservists",
+    icon: UserSquare,
+    description: "Manage reservists",
   },
   {
-    name: "Areas",
-    path: "/areas",
-    icon: MapPin,
-    description: "Location management",
+    name: "Airbase",
+    path: "/airbase",
+    icon: PlaneTakeoff,
+    description: "Airbase hierarchy management",
+    children: [
+      {
+        name: "Overview",
+        path: "/airbase",
+        icon: MapPin,
+        description: "Hierarchy drill-down",
+        end: true,
+      },
+      {
+        name: "Manage ARCENs",
+        path: "/airbase/arcens",
+        icon: Shield,
+        description: "ARCEN units management",
+      },
+      {
+        name: "Manage Groups",
+        path: "/airbase/groups",
+        icon: Users,
+        description: "Reserve groups management",
+      },
+      {
+        name: "Manage Squadrons",
+        path: "/airbase/squadrons",
+        icon: Layers,
+        description: "Squadron management",
+      },
+    ],
   },
   {
     name: "Trainings & Activities",

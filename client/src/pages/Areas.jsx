@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { MapPin, Search, X, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { HierarchyProvider, useHierarchy } from "@/components/hierarchy/HierarchyContext";
+import { HierarchyProvider, useHierarchy } from "@/context/HierarchyContext";
 import AreaAccordion from "@/components/hierarchy/AreaAccordion";
 import SelectedSquadronPanel from "@/components/hierarchy/SelectedSquadronPanel";
 import { hierarchyData } from "@/data/hierarchyData";

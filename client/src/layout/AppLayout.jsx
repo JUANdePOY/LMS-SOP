@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Sidebar from "@/components/sidebar/Sidebar";
+import Sidebar from "@/components/navigation/sidebar/Sidebar";
 import { useTheme } from "@/hooks/useTheme";
 
 /**

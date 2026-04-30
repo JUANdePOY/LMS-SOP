@@ -1,20 +1,22 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import AppLayout from "@/layout/AppLayout";
-
-// Pages — lazy-loaded for performance
 import { lazy, Suspense } from "react";
 
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const Reservations = lazy(() => import("@/pages/Reservations"));
-const Groups = lazy(() => import("@/pages/Groups"));
-const Areas = lazy(() => import("@/pages/Areas"));
-const Trainings = lazy(() => import("@/pages/Trainings"));
+// ── Pages ─────────────────────────────────────────────────────
+const Dashboard  = lazy(() => import("@/pages/Dashboard"));
+const Reservists = lazy(() => import("@/pages/Reservists")); // ← renamed
+const Trainings  = lazy(() => import("@/pages/Trainings"));
 const Attendance = lazy(() => import("@/pages/Attendance"));
-const Analytics = lazy(() => import("@/pages/Analytics"));
-const Logistics = lazy(() => import("@/pages/Logistics"));
-const Reports = lazy(() => import("@/pages/Reports"));
+const Analytics  = lazy(() => import("@/pages/Analytics"));
+const Logistics  = lazy(() => import("@/pages/Logistics"));
+const Reports    = lazy(() => import("@/pages/Reports"));
 
-// Simple fallback while lazy chunks load
+// ── Airbase pages ──────────────────────────────────────────────
+const AirbaseOverview = lazy(() => import("@/pages/airbase/AirbaseOverview"));
+const ManageArcens    = lazy(() => import("@/pages/airbase/ManageArcens"));
+const ManageGroups    = lazy(() => import("@/pages/airbase/ManageGroups"));
+const ManageSquadrons = lazy(() => import("@/pages/airbase/ManageSquadrons"));
+
 function PageLoader() {
   return (
     <div className="flex h-screen items-center justify-center">
@@ -23,83 +25,32 @@ function PageLoader() {
   );
 }
 
+function wrap(Component) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Component />
+    </Suspense>
+  );
+}
+
 const router = createBrowserRouter([
   {
     path: "/",
     element: <AppLayout />,
     children: [
-      {
-        index: true,
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Dashboard />
-          </Suspense>
-        ),
-      },
-      {
-        path: "reservations",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Reservations />
-          </Suspense>
-        ),
-      },
-      {
-        path: "groups",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Groups />
-          </Suspense>
-        ),
-      },
-      {
-        path: "areas",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Areas />
-          </Suspense>
-        ),
-      },
-      {
-        path: "trainings",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Trainings />
-          </Suspense>
-        ),
-      },
-      {
-        path: "attendance",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Attendance />
-          </Suspense>
-        ),
-      },
-      {
-        path: "analytics",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Analytics />
-          </Suspense>
-        ),
-      },
-      {
-        path: "logistics",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Logistics />
-          </Suspense>
-        ),
-      },
-      {
-        path: "reports",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Reports />
-          </Suspense>
-        ),
-      },
+      { index: true,           element: wrap(Dashboard)       },
+      { path: "reservists",    element: wrap(Reservists)      }, // ← fixed path
+      { path: "trainings",     element: wrap(Trainings)       },
+      { path: "attendance",    element: wrap(Attendance)      },
+      { path: "analytics",     element: wrap(Analytics)       },
+      { path: "logistics",     element: wrap(Logistics)       },
+      { path: "reports",       element: wrap(Reports)         },
+
+      // ── Airbase nested routes ────────────────────────────────
+      { path: "airbase",           element: wrap(AirbaseOverview) },
+      { path: "airbase/arcens",    element: wrap(ManageArcens)    },
+      { path: "airbase/groups",    element: wrap(ManageGroups)    },
+      { path: "airbase/squadrons", element: wrap(ManageSquadrons) },
     ],
   },
 ]);
