@@ -1,32 +1,36 @@
 import { useState, useMemo } from "react";
-import { Users, Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Users, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
 import ManagementTable from "@/components/airbase/ManagementTable";
-import { StatusBadge, TypeBadge, ActionButton, MonoCode, PrimaryButton, FilterSelect } from "@/components/airbase/AirbaseUI";
+import { StatusBadge, TypeBadge, MonoCode, PrimaryButton, FilterSelect } from "@/components/airbase/AirbaseUI";
 import AddEditModal, { FormField, FormInput, FormSelect } from "@/components/airbase/AddEditModal";
+import DetailModal, { DetailSection, DetailRow, DetailStatCard } from "@/components/airbase/DetailModal";
 import { hierarchyData } from "@/data/hierarchyData";
 
 const GROUP_TYPES = ["Combat Support", "Logistics", "Air Defense", "Intelligence", "Medical"];
 
-// Flatten all groups from hierarchyData
 function flattenGroups() {
   const rows = [];
   hierarchyData.forEach((area) => {
     area.arcens.forEach((arcen) => {
       arcen.groups.forEach((group) => {
+        const totalMembers = group.squadrons.reduce((a, s) => a + s.members, 0);
+        const activeSquadrons = group.squadrons.filter((s) => s.status === "active").length;
         rows.push({
-          id:         group.id,
-          name:       group.name,
-          code:       group.code,
-          type:       group.type,
-          commander:  group.commander,
-          reservists: group.reservists,
-          squadrons:  group.squadrons.length,
-          arcenId:    arcen.id,
-          arcenName:  arcen.name,
-          arcenFull:  arcen.fullName,
-          status:     "active",
+          id:              group.id,
+          name:            group.name,
+          code:            group.code,
+          type:            group.type,
+          commander:       group.commander,
+          reservists:      group.reservists,
+          squadrons:       group.squadrons.length,
+          activeSquadrons,
+          members:         totalMembers,
+          arcenId:         arcen.id,
+          arcenName:       arcen.name,
+          arcenFull:       arcen.fullName,
+          status:          "active",
         });
       });
     });
@@ -34,46 +38,41 @@ function flattenGroups() {
   return rows;
 }
 
-// Build ARCEN options for filter + form
 function buildArcenOptions() {
-  const list = [];
-  hierarchyData.forEach((area) => {
-    area.arcens.forEach((arcen) => {
-      list.push({
-        value: arcen.id,
-        label: `${arcen.name} — ${arcen.fullName}`,
-        arcenName: arcen.name,
-        arcenFull: arcen.fullName,
-      });
-    });
-  });
-  return list;
+  return hierarchyData.flatMap((area) =>
+    area.arcens.map((arcen) => ({
+      value:     arcen.id,
+      label:     `${arcen.name} — ${arcen.fullName}`,
+      arcenName: arcen.name,
+      arcenFull: arcen.fullName,
+    }))
+  );
 }
 
-const INITIAL_DATA   = flattenGroups();
-const ARCEN_OPTIONS  = buildArcenOptions();
-const EMPTY_FORM     = { name: "", code: "", type: "", commander: "", arcenId: "", status: "active" };
+const INITIAL_DATA  = flattenGroups();
+const ARCEN_OPTIONS = buildArcenOptions();
+const EMPTY_FORM    = { name: "", code: "", type: "", commander: "", arcenId: "", status: "active" };
 
 const COLUMNS = [
-  { key: "name",      label: "Group Name",  sortable: true  },
-  { key: "code",      label: "Code",        sortable: true  },
-  { key: "arcenName", label: "ARCEN",       sortable: true  },
-  { key: "type",      label: "Type",        sortable: true  },
-  { key: "commander", label: "Commander",   sortable: true  },
-  { key: "reservists",label: "Reservists",  sortable: true  },
-  { key: "squadrons", label: "Squadrons",   sortable: true  },
-  { key: "status",    label: "Status",      sortable: false },
-  { key: "actions",   label: "",            sortable: false, className: "w-24" },
+  { key: "name",      label: "Group",      sortable: true },
+  { key: "code",      label: "Code",       sortable: true },
+  { key: "arcenName", label: "ARCEN",      sortable: true },
+  { key: "type",      label: "Type",       sortable: true },
+  { key: "commander", label: "Commander",  sortable: true },
+  { key: "squadrons", label: "Squadrons",  sortable: true },
+  { key: "reservists",label: "Reservists", sortable: true },
+  { key: "status",    label: "Status",     sortable: false },
 ];
 
 export default function ManageGroups() {
   const [data,        setData]        = useState(INITIAL_DATA);
-  const [modal,       setModal]       = useState({ open: false, mode: "add", row: null });
+  const [detail,      setDetail]      = useState(null);
+  const [editModal,   setEditModal]   = useState(false);
+  const [editMode,    setEditMode]    = useState("add");
   const [form,        setForm]        = useState(EMPTY_FORM);
   const [arcenFilter, setArcenFilter] = useState("");
   const [typeFilter,  setTypeFilter]  = useState("");
 
-  // Apply filters
   const filteredData = useMemo(() => {
     let d = data;
     if (arcenFilter) d = d.filter((r) => r.arcenId === arcenFilter);
@@ -81,47 +80,50 @@ export default function ManageGroups() {
     return d;
   }, [data, arcenFilter, typeFilter]);
 
-  const openAdd  = () => { setForm(EMPTY_FORM); setModal({ open: true, mode: "add", row: null }); };
+  const openAdd = () => { setForm(EMPTY_FORM); setEditMode("add"); setEditModal(true); };
   const openEdit = (row) => {
     setForm({ name: row.name, code: row.code, type: row.type, commander: row.commander, arcenId: row.arcenId, status: row.status });
-    setModal({ open: true, mode: "edit", row });
+    setEditMode("edit");
+    setEditModal(true);
+    setDetail(null);
   };
-  const closeModal = () => setModal((m) => ({ ...m, open: false }));
+  const closeEdit = () => setEditModal(false);
 
   const handleSubmit = () => {
     const arcen = ARCEN_OPTIONS.find((a) => a.value === form.arcenId);
-    if (modal.mode === "add") {
+    if (editMode === "add") {
       setData((prev) => [...prev, {
-        id: `group-${Date.now()}`,
-        ...form,
-        arcenName: arcen?.arcenName ?? "",
-        arcenFull: arcen?.arcenFull ?? "",
-        reservists: 0,
-        squadrons: 0,
+        id: `group-${Date.now()}`, ...form,
+        arcenName: arcen?.arcenName ?? "", arcenFull: arcen?.arcenFull ?? "",
+        reservists: 0, squadrons: 0, activeSquadrons: 0, members: 0,
       }]);
-    } else {
-      setData((prev) => prev.map((r) =>
-        r.id === modal.row.id
-          ? { ...r, ...form, arcenName: arcen?.arcenName ?? r.arcenName, arcenFull: arcen?.arcenFull ?? r.arcenFull }
-          : r
-      ));
+    } else if (detail) {
+      const updated = { ...detail, ...form, arcenName: arcen?.arcenName ?? detail.arcenName, arcenFull: arcen?.arcenFull ?? detail.arcenFull };
+      setData((prev) => prev.map((r) => r.id === detail.id ? updated : r));
+      setDetail(updated);
     }
-    closeModal();
+    closeEdit();
   };
 
-  const handleDelete = (id) => { if (!confirm("Delete this Group?")) return; setData((p) => p.filter((r) => r.id !== id)); };
-  const toggleStatus = (id) => setData((p) => p.map((r) => r.id === id ? { ...r, status: r.status === "active" ? "inactive" : "active" } : r));
+  const handleDelete = (row) => {
+    if (!confirm(`Delete ${row.name}?`)) return;
+    setData((prev) => prev.filter((r) => r.id !== row.id));
+    setDetail(null);
+  };
+
+  const toggleStatus = (row) => {
+    const updated = { ...row, status: row.status === "active" ? "inactive" : "active" };
+    setData((prev) => prev.map((r) => r.id === row.id ? updated : r));
+    setDetail(updated);
+  };
 
   return (
     <div className="flex flex-col gap-6 pb-10">
       <AirbasePageHeader
         icon={Users}
         title="Manage Groups"
-        description="Add, edit, and manage reserve groups (e.g. 509, TOGR 10) assigned to ARCENs."
-        breadcrumbs={[
-          { label: "Airbase", path: "/airbase" },
-          { label: "Manage Groups" },
-        ]}
+        description="Click any row to view details. Add, edit, or manage reserve groups."
+        breadcrumbs={[{ label: "Airbase", path: "/airbase" }, { label: "Manage Groups" }]}
         actions={<PrimaryButton icon={Plus} onClick={openAdd}>Add Group</PrimaryButton>}
       />
 
@@ -134,7 +136,7 @@ export default function ManageGroups() {
           { label: "Total Reservists", value: data.reduce((a, r) => a + r.reservists, 0).toLocaleString() },
         ].map((s) => (
           <div key={s.label} className={cn(
-            "flex flex-col rounded-xl border px-4 py-2.5 min-w-[110px]",
+            "flex flex-col rounded-xl border px-4 py-2.5 min-w-[120px]",
             "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800"
           )}>
             <span className={cn("text-xl font-bold leading-none", s.color ?? "text-neutral-900 dark:text-neutral-50")}>{s.value}</span>
@@ -147,66 +149,105 @@ export default function ManageGroups() {
         columns={COLUMNS}
         data={filteredData}
         searchKeys={["name", "code", "arcenName", "type", "commander"]}
-        searchPlaceholder="Search group name, code, ARCEN, commander…"
+        searchPlaceholder="Search group name, code, ARCEN…"
         emptyMessage="No groups found."
         filterSlot={
           <>
-            <FilterSelect
-              value={arcenFilter}
-              onChange={setArcenFilter}
-              options={ARCEN_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
-              placeholder="All ARCENs"
-            />
-            <FilterSelect
-              value={typeFilter}
-              onChange={setTypeFilter}
-              options={GROUP_TYPES}
-              placeholder="All Types"
-            />
+            <FilterSelect value={arcenFilter} onChange={setArcenFilter} options={ARCEN_OPTIONS.map((o) => ({ value: o.value, label: o.label }))} placeholder="All ARCENs" />
+            <FilterSelect value={typeFilter}  onChange={setTypeFilter}  options={GROUP_TYPES} placeholder="All Types" />
           </>
         }
         renderRow={(row) => (
-          <tr key={row.id} className="group hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors duration-100">
+          <tr
+            key={row.id}
+            onClick={() => setDetail(row)}
+            className="group cursor-pointer hover:bg-indigo-50/60 dark:hover:bg-indigo-500/5 transition-colors duration-100"
+          >
             <td className="px-4 py-3">
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[13px] font-bold text-neutral-800 dark:text-neutral-200">{row.name}</span>
-              </div>
+              <span className="text-[13px] font-bold text-neutral-800 dark:text-neutral-200 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors">
+                {row.name}
+              </span>
             </td>
             <td className="px-4 py-3"><MonoCode>{row.code}</MonoCode></td>
             <td className="px-4 py-3">
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{row.arcenName}</span>
-                <span className="text-[10px] text-neutral-400 dark:text-neutral-600">{row.arcenFull}</span>
+                <span className="text-[10px] text-neutral-400">{row.arcenFull}</span>
               </div>
             </td>
             <td className="px-4 py-3"><TypeBadge type={row.type} /></td>
             <td className="px-4 py-3 text-xs text-neutral-600 dark:text-neutral-400">{row.commander}</td>
-            <td className="px-4 py-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">{row.reservists.toLocaleString()}</td>
-            <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">{row.squadrons}</td>
-            <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
-            <td className="px-4 py-3">
-              <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <ActionButton icon={row.status === "active" ? ToggleRight : ToggleLeft} label="Toggle" onClick={() => toggleStatus(row.id)} />
-                <ActionButton icon={Pencil} label="Edit"   onClick={() => openEdit(row)} />
-                <ActionButton icon={Trash2} label="Delete" onClick={() => handleDelete(row.id)} variant="danger" />
-              </div>
+            <td className="px-4 py-3 text-sm text-neutral-600 dark:text-neutral-400">
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">{row.activeSquadrons}</span>
+              <span className="text-neutral-400">/{row.squadrons}</span>
             </td>
+            <td className="px-4 py-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">{row.reservists.toLocaleString()}</td>
+            <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
           </tr>
         )}
       />
 
+      {/* ── Detail Modal ─────────────────────────────────────── */}
+      {detail && (
+        <DetailModal
+          open={!!detail}
+          onClose={() => setDetail(null)}
+          icon={Users}
+          iconColor="bg-blue-600"
+          title={detail.name}
+          subtitle={`${detail.arcenName} · ${detail.arcenFull}`}
+          badge={detail.code}
+          size="lg"
+          footer={
+            <div className="flex items-center justify-between w-full">
+              <button onClick={() => handleDelete(detail)} className={cn("flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all duration-150")}>
+                <Trash2 size={14} /> Delete
+              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => toggleStatus(detail)} className={cn("flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-all duration-150")}>
+                  {detail.status === "active" ? <><ToggleRight size={14} className="text-emerald-500" /> Deactivate</> : <><ToggleLeft size={14} /> Activate</>}
+                </button>
+                <button onClick={() => openEdit(detail)} className={cn("flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm shadow-indigo-200 dark:shadow-indigo-900/30 transition-all duration-150")}>
+                  <Pencil size={14} /> Edit Group
+                </button>
+              </div>
+            </div>
+          }
+        >
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
+            <DetailStatCard label="Reservists"       value={detail.reservists.toLocaleString()} color="text-indigo-600 dark:text-indigo-400" />
+            <DetailStatCard label="Total Squadrons"  value={detail.squadrons}                   color="text-blue-600 dark:text-blue-400" />
+            <DetailStatCard label="Active Squadrons" value={detail.activeSquadrons}              color="text-emerald-600 dark:text-emerald-400" />
+            <DetailStatCard label="Status"           value={detail.status === "active" ? "Active" : "Inactive"}
+              color={detail.status === "active" ? "text-emerald-600 dark:text-emerald-400" : "text-neutral-400"} />
+          </div>
+
+          <DetailSection title="Group Information">
+            <DetailRow label="Group Name"  value={detail.name}      />
+            <DetailRow label="Code"        value={detail.code}      />
+            <DetailRow label="Type"        value={detail.type}      />
+            <DetailRow label="Commander"   value={detail.commander} />
+          </DetailSection>
+
+          <DetailSection title="Assignment">
+            <DetailRow label="ARCEN"       value={detail.arcenName} />
+            <DetailRow label="ARCEN Full"  value={detail.arcenFull} />
+          </DetailSection>
+        </DetailModal>
+      )}
+
       <AddEditModal
-        open={modal.open}
-        title={modal.mode === "add" ? "Add New Group" : "Edit Group"}
-        onClose={closeModal}
+        open={editModal}
+        title={editMode === "add" ? "Add New Group" : `Edit ${detail?.name ?? "Group"}`}
+        onClose={closeEdit}
         onSubmit={handleSubmit}
-        submitLabel={modal.mode === "add" ? "Add Group" : "Save Changes"}
+        submitLabel={editMode === "add" ? "Add Group" : "Save Changes"}
       >
         <FormField label="Group Name" required>
           <FormInput value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. 509 or TOGR 10" />
         </FormField>
         <FormField label="Code" required>
-          <FormInput value={form.code} onChange={(v) => setForm((f) => ({ ...f, code: v }))} placeholder="e.g. 509RG or TOGR10" />
+          <FormInput value={form.code} onChange={(v) => setForm((f) => ({ ...f, code: v }))} placeholder="e.g. 509RG" />
         </FormField>
         <FormField label="ARCEN" required>
           <FormSelect value={form.arcenId} onChange={(v) => setForm((f) => ({ ...f, arcenId: v }))}>
