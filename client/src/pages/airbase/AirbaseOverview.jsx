@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { HierarchyProvider, useHierarchy } from "@/context/HierarchyContext";
 import AreaAccordion from "@/components/hierarchy/AreaAccordion";
-import SelectedSquadronPanel from "@/components/hierarchy/SelectedSquadronPanel";
 import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
 import { hierarchyData } from "@/data/hierarchyData";
 import { useState } from "react";
@@ -27,7 +26,7 @@ function SummaryCard({ label, value, sub }) {
 
 function OverviewContent() {
   const [search, setSearch] = useState("");
-  const { resetAll, selectedSquadron } = useHierarchy();
+  const { resetAll } = useHierarchy();
 
   const totalReservists = hierarchyData.reduce((a, area) => a + area.reservists, 0);
   const totalArcens     = hierarchyData.reduce((a, area) => a + area.arcens.length, 0);
@@ -168,8 +167,6 @@ function OverviewContent() {
           {filtered.map((area) => <AreaAccordion key={area.id} area={area} />)}
         </div>
       )}
-
-      {selectedSquadron && <SelectedSquadronPanel />}
     </div>
   );
 }

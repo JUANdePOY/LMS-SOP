@@ -17,23 +17,17 @@ const EMPTY_FORM = {
   readinessScore: 0, attendanceRate: 0, trainingsCompleted: 0,
 };
 
-/**
- * Reservists page
- * Full CRUD management: search, multi-level filter, sortable table,
- * add/edit modal, detail slide panel, status toggle, delete.
- */
 export default function Reservists() {
-  const [data,          setData]          = useState(INITIAL_DATA);
-  const [search,        setSearch]        = useState("");
-  const [filters,       setFilters]       = useState(DEFAULT_FILTERS);
-  const [modal,         setModal]         = useState({ open: false, mode: "add", row: null });
-  const [form,          setForm]          = useState(EMPTY_FORM);
-  const [detailRow,     setDetailRow]     = useState(null);
+  const [data,      setData]      = useState(INITIAL_DATA);
+  const [search,    setSearch]    = useState("");
+  const [filters,   setFilters]   = useState(DEFAULT_FILTERS);
+  const [modal,     setModal]     = useState({ open: false, mode: "add", row: null });
+  const [form,      setForm]      = useState(EMPTY_FORM);
+  const [detailRow, setDetailRow] = useState(null);
 
-  // ── Apply search + filters ────────────────────────────────────
+  // ── Filtering ─────────────────────────────────────────────────
   const filteredData = useMemo(() => {
     return data.filter((r) => {
-      // Search
       if (search.trim()) {
         const q = search.toLowerCase();
         const match =
@@ -44,7 +38,6 @@ export default function Reservists() {
           r.squadron.toLowerCase().includes(q);
         if (!match) return false;
       }
-      // Filters
       if (filters.airbase        && r.airbase        !== filters.airbase)        return false;
       if (filters.arcen          && r.arcen          !== filters.arcen)          return false;
       if (filters.group          && r.group          !== filters.group)          return false;
@@ -56,7 +49,7 @@ export default function Reservists() {
     });
   }, [data, search, filters]);
 
-  // ── Modal helpers ──────────────────────────────────────────────
+  // ── Modal helpers ─────────────────────────────────────────────
   const openAdd = () => {
     setForm(EMPTY_FORM);
     setModal({ open: true, mode: "add", row: null });
@@ -95,7 +88,6 @@ export default function Reservists() {
       setData((prev) =>
         prev.map((r) => r.id === modal.row.id ? { ...r, ...form } : r)
       );
-      // Update detail panel if open
       if (detailRow?.id === modal.row.id) {
         setDetailRow((prev) => ({ ...prev, ...form }));
       }
@@ -106,17 +98,16 @@ export default function Reservists() {
   const handleDelete = (id) => {
     if (!confirm("Delete this reservist? This action cannot be undone.")) return;
     setData((prev) => prev.filter((r) => r.id !== id));
-    if (detailRow?.id === id) setDetailRow(null);
+    setDetailRow(null);
   };
 
-  const toggleStatus = (id) => {
+  const handleToggleStatus = (id) => {
     setData((prev) =>
       prev.map((r) =>
-        r.id === id
-          ? { ...r, status: r.status === "active" ? "inactive" : "active" }
-          : r
+        r.id === id ? { ...r, status: r.status === "active" ? "inactive" : "active" } : r
       )
     );
+    // Keep detail panel in sync
     if (detailRow?.id === id) {
       setDetailRow((prev) => ({
         ...prev,
@@ -127,7 +118,7 @@ export default function Reservists() {
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      {/* ── Page header ─────────────────────────────────────── */}
+      {/* Header */}
       <AirbasePageHeader
         icon={UserSquare}
         title="Reservists"
@@ -136,10 +127,10 @@ export default function Reservists() {
         actions={<PrimaryButton icon={Plus} onClick={openAdd}>Add Reservist</PrimaryButton>}
       />
 
-      {/* ── Stats ───────────────────────────────────────────── */}
+      {/* Stats */}
       <ReservistStatsBar data={data} />
 
-      {/* ── Search bar ──────────────────────────────────────── */}
+      {/* Search */}
       <div className="relative max-w-sm">
         <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
         <input
@@ -167,19 +158,16 @@ export default function Reservists() {
         )}
       </div>
 
-      {/* ── Filters ─────────────────────────────────────────── */}
+      {/* Filters */}
       <ReservistFilters filters={filters} onChange={setFilters} />
 
-      {/* ── Table ───────────────────────────────────────────── */}
+      {/* Table — only needs onView now */}
       <ReservistTable
         data={filteredData}
         onView={setDetailRow}
-        onEdit={openEdit}
-        onDelete={handleDelete}
-        onToggleStatus={toggleStatus}
       />
 
-      {/* ── Add / Edit Modal ─────────────────────────────────── */}
+      {/* Add / Edit modal */}
       <ReservistModal
         open={modal.open}
         mode={modal.mode}
@@ -189,12 +177,14 @@ export default function Reservists() {
         onSubmit={handleSubmit}
       />
 
-      {/* ── Detail slide panel ───────────────────────────────── */}
+      {/* Detail modal — actions live here */}
       {detailRow && (
         <ReservistDetailPanel
           reservist={detailRow}
           onClose={() => setDetailRow(null)}
           onEdit={() => openEdit(detailRow)}
+          onDelete={handleDelete}
+          onToggleStatus={handleToggleStatus}
         />
       )}
     </div>

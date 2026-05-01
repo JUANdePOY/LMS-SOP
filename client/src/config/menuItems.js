@@ -33,13 +33,6 @@ export const menuItems = [
     description: "Airbase hierarchy management",
     children: [
       {
-        name: "Overview",
-        path: "/airbase",
-        icon: MapPin,
-        description: "Hierarchy drill-down",
-        end: true,
-      },
-      {
         name: "Manage ARCENs",
         path: "/airbase/arcens",
         icon: Shield,

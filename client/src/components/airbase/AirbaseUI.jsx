@@ -1,16 +1,15 @@
-import { CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * StatusBadge — active / inactive / standby
+ * StatusBadge — active / standby
  */
 export function StatusBadge({ status }) {
   const map = {
-    active:   { icon: CheckCircle2, label: "Active",   classes: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20" },
-    inactive: { icon: XCircle,      label: "Inactive", classes: "bg-neutral-100 text-neutral-500 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-500 dark:border-neutral-700" },
-    standby:  { icon: AlertCircle,  label: "Standby",  classes: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20" },
+    active:  { icon: CheckCircle2, label: "Active",  classes: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20" },
+    standby: { icon: AlertCircle,  label: "Standby", classes: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20" },
   };
-  const { icon: Icon, label, classes } = map[status] ?? map.inactive;
+  const { icon: Icon, label, classes } = map[status] ?? map.standby;
   return (
     <span className={cn(
       "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
