@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -7,17 +7,12 @@ import { useTheme } from "@/hooks/useTheme";
 
 /**
  * AppLayout
- * - Sidebar collapses to 64px when mouse leaves
- * - Sidebar expands to 260px when mouse enters
- * - Main content margin syncs automatically
- * - No manual toggle button needed
+ * - Owns collapse state so both Sidebar AND <main> react to it
+ * - ml-[260px] expanded → ml-[64px] collapsed, transitions in sync
  */
 export default function AppLayout() {
   const { isDark, toggleTheme } = useTheme();
-  const [expanded, setExpanded] = useState(false);
-
-  const handleMouseEnter = useCallback(() => setExpanded(true),  []);
-  const handleMouseLeave = useCallback(() => setExpanded(false), []);
+  const [collapsed, setCollapsed] = useState(false);
 
   return (
     <div
@@ -28,20 +23,16 @@ export default function AppLayout() {
         "transition-colors duration-300"
       )}
     >
-      {/* Sidebar */}
-      <Sidebar
-        expanded={expanded}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      />
+      {/* Sidebar — controlled collapse owned here */}
+      <Sidebar collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
 
-      {/* Main — margin syncs with sidebar width */}
+      {/* Main — margin synced with sidebar width */}
       <main
         id="main-content"
         className={cn(
           "flex-1 min-h-screen flex flex-col",
-          "transition-all duration-300 ease-out",
-          expanded ? "ml-[260px]" : "ml-[64px]"
+          "transition-all duration-200 ease-out",
+          collapsed ? "ml-[64px]" : "ml-[260px]"
         )}
       >
         {/* Top bar */}
@@ -68,9 +59,17 @@ export default function AppLayout() {
             )}
           >
             {isDark ? (
-              <Sun size={16} strokeWidth={1.8} className="transition-transform duration-300 group-hover:rotate-45" />
+              <Sun
+                size={16}
+                strokeWidth={1.8}
+                className="transition-transform duration-300 group-hover:rotate-45"
+              />
             ) : (
-              <Moon size={16} strokeWidth={1.8} className="transition-transform duration-300 group-hover:-rotate-12" />
+              <Moon
+                size={16}
+                strokeWidth={1.8}
+                className="transition-transform duration-300 group-hover:-rotate-12"
+              />
             )}
           </button>
         </header>

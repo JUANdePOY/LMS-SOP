@@ -62,6 +62,7 @@ export default function ReservistFilters({ filters, onChange }) {
           onChange={set("status")}
           options={[
             { value: "active",   label: "Active"   },
+            { value: "inactive", label: "Inactive" },
             { value: "standby",  label: "Standby"  },
           ]}
           placeholder="All Status"

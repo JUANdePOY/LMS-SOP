@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { Eye, Pencil, Trash2, ToggleLeft, ToggleRight, ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { StatusBadge, MonoCode } from "@/components/airbase/AirbaseUI";
+import { StatusBadge, ActionButton, MonoCode } from "@/components/airbase/AirbaseUI";
 
 const COLUMNS = [
   { key: "serialNo",        label: "Serial No.",      sortable: true  },
@@ -13,6 +13,7 @@ const COLUMNS = [
   { key: "readinessScore",  label: "Readiness",       sortable: true  },
   { key: "attendanceRate",  label: "Attendance",      sortable: true  },
   { key: "status",          label: "Status",          sortable: false },
+  { key: "actions",         label: "",                sortable: false, className: "w-28" },
 ];
 
 function SortIcon({ field, sortField, sortDir }) {
@@ -39,10 +40,9 @@ function ReadinessBar({ value }) {
 
 /**
  * ReservistTable
- * Sortable table — clicking any row opens the detail modal.
- * Actions (edit/delete/toggle) have been moved to the modal footer.
+ * Sortable table with per-row view/edit/delete/toggle actions.
  */
-export default function ReservistTable({ data, onView }) {
+export default function ReservistTable({ data, onView, onEdit, onDelete, onToggleStatus }) {
   const [sortField, setSortField] = useState("lastName");
   const [sortDir,   setSortDir]   = useState("asc");
 
@@ -97,8 +97,8 @@ export default function ReservistTable({ data, onView }) {
               sorted.map((row) => (
                 <tr
                   key={row.id}
-                  onClick={() => onView(row)}
                   className="group hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors duration-100 cursor-pointer"
+                  onClick={() => onView(row)}
                 >
                   <td className="px-4 py-3">
                     <MonoCode>{row.serialNo}</MonoCode>
@@ -146,6 +146,20 @@ export default function ReservistTable({ data, onView }) {
 
                   <td className="px-4 py-3">
                     <StatusBadge status={row.status} />
+                  </td>
+
+                  {/* Actions — stop propagation so row click doesn't fire */}
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                      <ActionButton icon={Eye}    label="View"   onClick={() => onView(row)} />
+                      <ActionButton icon={Pencil} label="Edit"   onClick={() => onEdit(row)} />
+                      <ActionButton
+                        icon={row.status === "active" ? ToggleRight : ToggleLeft}
+                        label="Toggle Status"
+                        onClick={() => onToggleStatus(row.id)}
+                      />
+                      <ActionButton icon={Trash2} label="Delete" onClick={() => onDelete(row.id)} variant="danger" />
+                    </div>
                   </td>
                 </tr>
               ))

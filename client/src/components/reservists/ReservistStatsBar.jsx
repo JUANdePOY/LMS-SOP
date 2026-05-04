@@ -8,7 +8,7 @@ import { Users, UserCheck, UserX, TrendingUp, Award } from "lucide-react";
 export default function ReservistStatsBar({ data }) {
   const total    = data.length;
   const active   = data.filter((r) => r.status === "active").length;
-  const inactive = data.filter((r) => r.status === "standby").length;
+  const inactive = data.filter((r) => r.status === "inactive").length;
   const standby  = data.filter((r) => r.status === "standby").length;
 
   const avgReadiness  = total
@@ -34,7 +34,7 @@ export default function ReservistStatsBar({ data }) {
       bg:    "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100 dark:border-emerald-500/20",
     },
     {
-      label: "Standby",
+      label: "Inactive",
       value: inactive.toLocaleString(),
       icon: UserX,
       color: "text-red-500 dark:text-red-400",

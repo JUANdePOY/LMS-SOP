@@ -53,72 +53,49 @@ export default function SidebarItem({ item, isCollapsed }) {
   const isChildActive = hasChildren &&
     item.children.some((child) => location.pathname === child.path || location.pathname.startsWith(child.path + "/"));
 
-  const isParentPathActive = location.pathname === item.path ||
-    (item.path !== "/" && location.pathname.startsWith(item.path));
-
-  const isParentActive = isParentPathActive || isChildActive;
+  const isParentPathActive = location.pathname === item.path;
 
   const [open, setOpen] = useState(isChildActive);
 
-  // ── Parent item with children ──────────────────────────────────────────────
   if (hasChildren) {
+    const isParentActive = isParentPathActive || isChildActive;
+
     return (
       <SidebarTooltip label={item.name} description={item.description} enabled={isCollapsed}>
         <div className="w-full">
-          <div className={cn(
-            "relative flex w-full items-center rounded-lg",
-            "transition-all duration-200 ease-out",
-            isParentActive
-              ? [
-                  "text-neutral-900 bg-neutral-100 dark:text-neutral-50 dark:bg-neutral-800",
-                  "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
-                  "before:h-[18px] before:w-0.5 before:rounded-full before:rounded-lg",
-                  "before:bg-indigo-500 dark:before:bg-indigo-400",
-                ]
-              : [
-                  "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100",
-                  "dark:text-neutral-400 dark:hover:text-neutral-50 dark:hover:bg-neutral-800",
-                ],
-            isCollapsed && "justify-center"
-          )}>
-            {/* Clicking the label/icon navigates to item.path */}
-            <NavLink
-              to={item.path}
-              end={item.path === "/"}
-              className={cn(
-                "flex flex-1 items-center gap-3 px-3 py-2.5",
-                "text-sm font-medium leading-none tracking-[-0.01em]",
-                "outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60",
-                isCollapsed && "justify-center px-0"
-              )}
-            >
-              <span className={cn(
-                "flex h-[18px] w-[18px] shrink-0 items-center justify-center transition-colors duration-200",
-                isParentActive ? "text-indigo-600 dark:text-indigo-400" : "text-neutral-400 dark:text-neutral-500"
-              )}>
-                <Icon size={17} strokeWidth={isParentActive ? 2.2 : 1.8} />
-              </span>
+          <button
+            onClick={() => !isCollapsed && setOpen((v) => !v)}
+            aria-expanded={open}
+            className={cn(
+              "relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5",
+              "text-sm font-medium leading-none tracking-[-0.01em]",
+              "transition-all duration-200 ease-out",
+              "outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60",
+              isParentActive
+                ? [
+                    "text-neutral-900 bg-neutral-100 dark:text-neutral-50 dark:bg-neutral-800",
+                    "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
+                    "before:h-[18px] before:w-0.5 before:rounded-full",
+                    "before:bg-indigo-500 dark:before:bg-indigo-400",
+                  ]
+                : [
+                    "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100",
+                    "dark:text-neutral-400 dark:hover:text-neutral-50 dark:hover:bg-neutral-800",
+                    "hover:scale-[1.015]",
+                  ],
+              isCollapsed && "justify-center px-0"
+            )}
+          >
+            <span className={cn(
+              "flex h-[18px] w-[18px] shrink-0 items-center justify-center transition-colors duration-200",
+              isParentActive ? "text-indigo-600 dark:text-indigo-400" : "text-neutral-400 dark:text-neutral-500"
+            )}>
+              <Icon size={17} strokeWidth={isParentActive ? 2.2 : 1.8} />
+            </span>
 
-              {!isCollapsed && (
-                <span className="flex-1 truncate text-left">{item.name}</span>
-              )}
-
-              {isCollapsed && isParentActive && (
-                <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />
-              )}
-            </NavLink>
-
-            {/* Chevron toggle — separate from the NavLink */}
             {!isCollapsed && (
-              <button
-                onClick={() => setOpen((v) => !v)}
-                aria-expanded={open}
-                aria-label={`${open ? "Collapse" : "Expand"} ${item.name}`}
-                className={cn(
-                  "flex h-full items-center pr-3 pl-1 py-2.5",
-                  "outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
-                )}
-              >
+              <>
+                <span className="flex-1 truncate text-left">{item.name}</span>
                 <ChevronDown
                   size={13}
                   className={cn(
@@ -127,11 +104,14 @@ export default function SidebarItem({ item, isCollapsed }) {
                     open && "rotate-180"
                   )}
                 />
-              </button>
+              </>
             )}
-          </div>
 
-          {/* Sub-items */}
+            {isCollapsed && isParentActive && (
+              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />
+            )}
+          </button>
+
           {!isCollapsed && (
             <div className={cn(
               "overflow-hidden transition-all duration-200 ease-out",
@@ -153,7 +133,6 @@ export default function SidebarItem({ item, isCollapsed }) {
     );
   }
 
-  // ── Leaf item (no children) ────────────────────────────────────────────────
   return (
     <SidebarTooltip label={item.name} description={item.description} enabled={isCollapsed}>
       <NavLink

@@ -82,7 +82,7 @@ export default function ReservistModal({ open, mode, form, onChange, onClose, on
         <FormField label="Status">
           <FormSelect value={form.status} onChange={set("status")}>
             <option value="active">Active</option>
-            <option value="standby">Standby</option>
+            <option value="inactive">Inactive</option>
             <option value="standby">Standby</option>
           </FormSelect>
         </FormField>

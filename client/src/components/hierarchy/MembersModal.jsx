@@ -16,7 +16,7 @@ function StatusBadge({ status }) {
         : "bg-neutral-100 text-neutral-500 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-500 dark:border-neutral-700"
     )}>
       {isActive ? <CheckCircle2 size={9} /> : <XCircle size={9} />}
-      {isActive ? "Active" : "Standby"}
+      {isActive ? "Active" : "Inactive"}
     </span>
   );
 }
@@ -53,7 +53,7 @@ function generateMembers(node, nodeType) {
       lastName:       lastNames[li],
       rank:           ranks[ri],
       specialization: specs[si],
-      status:         i % 5 === 0 ? "standby" : "active",
+      status:         i % 5 === 0 ? "inactive" : "active",
       dateEnlisted:   `${yr}-${String((i % 12) + 1).padStart(2, "0")}-${String((i % 28) + 1).padStart(2, "0")}`,
       attendanceRate: 55 + ((seed + i * 13) % 45),
     };
@@ -141,7 +141,7 @@ export default function MembersModal({ open, node, nodeType, onClose }) {
   };
 
   const activeCount   = members.filter((m) => m.status === "active").length;
-  const standbyCount = members.filter((m) => m.status === "standby").length;
+  const inactiveCount = members.filter((m) => m.status === "inactive").length;
 
   return (
     <div
@@ -202,7 +202,7 @@ export default function MembersModal({ open, node, nodeType, onClose }) {
           {[
             { label: "Total Members", value: members.length, color: "text-neutral-800 dark:text-neutral-200" },
             { label: "Active",        value: activeCount,    color: "text-emerald-600 dark:text-emerald-400" },
-            { label: "Standby",      value: standbyCount,  color: "text-neutral-400 dark:text-neutral-600" },
+            { label: "Inactive",      value: inactiveCount,  color: "text-neutral-400 dark:text-neutral-600" },
           ].map((s) => (
             <div key={s.label} className="flex items-center gap-1.5">
               <span className={cn("text-[15px] font-black leading-none", s.color)}>{s.value}</span>
@@ -249,7 +249,7 @@ export default function MembersModal({ open, node, nodeType, onClose }) {
           >
             <option value="">All Status</option>
             <option value="active">Active</option>
-            <option value="standby">Standby</option>
+            <option value="inactive">Inactive</option>
           </select>
 
           {/* Result count */}

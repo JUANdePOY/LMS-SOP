@@ -24,7 +24,7 @@ function StatusBadge({ status }) {
  * Each card is clickable → opens MembersModal for that squadron.
  */
 export default function SquadronList({ squadrons }) {
-  const { selectedSquadron } = useHierarchy();
+  const { selectedSquadron, selectSquadron } = useHierarchy();
   const [modalNode, setModalNode] = useState(null);
 
   if (!squadrons?.length) {
@@ -41,6 +41,7 @@ export default function SquadronList({ squadrons }) {
             <button
               key={sq.id}
               onClick={() => {
+                selectSquadron(sq);
                 setModalNode(sq);
               }}
               title="Click to view members"
