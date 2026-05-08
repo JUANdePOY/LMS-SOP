@@ -37,17 +37,44 @@ CREATE TABLE reservists (
     `rank` VARCHAR(50) NOT NULL,
     service_number VARCHAR(100) UNIQUE NOT NULL,
     date_of_birth DATE NULL,
+    place_of_birth VARCHAR(200) NULL,
+    age INT GENERATED ALWAYS AS (YEAR(CURDATE()) - YEAR(date_of_birth)) STORED,
+    sex ENUM('Male', 'Female', 'Other') NULL,
+    civil_status ENUM('Single', 'Married', 'Widowed', 'Separated', 'Divorced') NULL,
+    citizenship VARCHAR(100) DEFAULT 'Filipino',
+    height DECIMAL(5,2) NULL,
+    weight DECIMAL(5,2) NULL,
+    blood_type ENUM('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown') DEFAULT 'Unknown',
     phone_number VARCHAR(20) NULL,
+    address TEXT NULL,
+    reserve_center VARCHAR(200) NULL,
+    category ENUM('1st Category', '2nd Category', '3rd Category') NULL,
+    date_enlisted DATE NULL,
+    source_of_commission ENUM('ROTC', 'BCMT', 'MOTC', 'Direct Commission') NULL,
+    rank_date_appointment DATE NULL,
+    specialization VARCHAR(200) NULL,
+    reserve_status ENUM('Ready Reserve', 'Standby Reserve', 'Retired') DEFAULT 'Ready Reserve',
+    highest_education VARCHAR(100) NULL,
+    course_degree VARCHAR(200) NULL,
+    school VARCHAR(300) NULL,
+    year_graduated INT NULL,
+    occupation VARCHAR(200) NULL,
+    employer VARCHAR(200) NULL,
+    office_address TEXT NULL,
+    basic_training_completed VARCHAR(100) NULL,
+    basic_training_date DATE NULL,
     emergency_contact_name VARCHAR(200) NULL,
     emergency_contact_phone VARCHAR(20) NULL,
-    address TEXT NULL,
+    emergency_contact_address TEXT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_service_number (service_number),
     INDEX idx_name (last_name, first_name),
-    INDEX idx_active (is_active)
+    INDEX idx_active (is_active),
+    INDEX idx_rank (`rank`),
+    INDEX idx_reserve_status (reserve_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------
@@ -84,20 +111,19 @@ CREATE TABLE `groups` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------
--- Table cities
+-- Table squadron
 -- -----------------------------------------------------
-CREATE TABLE cities (
+CREATE TABLE squadron (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     group_id BIGINT NOT NULL,
-    name VARCHAR(200) NOT NULL,
-    province VARCHAR(100) NOT NULL,
-    postal_code VARCHAR(20) NULL,
+    squadron_name VARCHAR(200) NOT NULL,
+    location VARCHAR(100) NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE CASCADE,
     INDEX idx_group (group_id),
-    INDEX idx_province (province)
+    INDEX idx_location (location)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------
@@ -107,7 +133,7 @@ CREATE TABLE reservist_assignments (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     reservist_id BIGINT NOT NULL,
     group_id BIGINT NOT NULL,
-    city_id BIGINT NOT NULL,
+    squadron_id BIGINT NOT NULL,
     assigned_date DATE NOT NULL,
     is_primary BOOLEAN NOT NULL DEFAULT TRUE,
     notes TEXT NULL,
@@ -115,8 +141,8 @@ CREATE TABLE reservist_assignments (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (reservist_id) REFERENCES reservists(id) ON DELETE CASCADE,
     FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE CASCADE,
-    FOREIGN KEY (city_id) REFERENCES cities(id) ON DELETE CASCADE,
-    INDEX idx_group_city (group_id, city_id),
+    FOREIGN KEY (squadron_id) REFERENCES squadron(id) ON DELETE CASCADE,
+    INDEX idx_group_squadron (group_id, squadron_id),
     INDEX idx_reservist (reservist_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -331,7 +357,7 @@ CREATE TABLE alerts (
     message TEXT NOT NULL,
     target_role ENUM('admin', 'reservist', 'all') NOT NULL DEFAULT 'all',
     target_group_id BIGINT NULL,
-    target_city_id BIGINT NULL,
+    target_squadron_id BIGINT NULL,
     target_area_id BIGINT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     start_date DATE NOT NULL DEFAULT (CURRENT_DATE),
@@ -340,10 +366,10 @@ CREATE TABLE alerts (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (target_group_id) REFERENCES `groups`(id) ON DELETE SET NULL,
-    FOREIGN KEY (target_city_id) REFERENCES cities(id) ON DELETE SET NULL,
+    FOREIGN KEY (target_squadron_id) REFERENCES squadron(id) ON DELETE SET NULL,
     FOREIGN KEY (target_area_id) REFERENCES areas(id) ON DELETE SET NULL,
     FOREIGN KEY (created_by) REFERENCES users(id),
-    INDEX idx_target (target_role, target_group_id, target_city_id),
+    INDEX idx_target (target_role, target_group_id, target_squadron_id),
     INDEX idx_active_dates (is_active, start_date, end_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -399,7 +425,7 @@ CREATE TABLE audit_logs (
 -- -----------------------------------------------------
 -- Recommended Additional Indexes
 -- -----------------------------------------------------
-CREATE INDEX idx_reservist_active_assignments ON reservist_assignments(reservist_id, is_primary, group_id, city_id);
+CREATE INDEX idx_reservist_active_assignments ON reservist_assignments(reservist_id, is_primary, group_id, squadron_id);
 CREATE INDEX idx_attendance_training_reservist ON attendance(training_id, reservist_id, status);
 CREATE INDEX idx_readiness_reservist_date ON readiness(reservist_id, assessment_date DESC);
 CREATE INDEX idx_issuances_reservist_due ON supply_issuances(reservist_id, returned_date, due_return_date);
