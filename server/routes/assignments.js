@@ -16,7 +16,7 @@ router.get('/', authenticateToken, authorize('admin'), [
     query('limit').optional().isInt({ min: 1, max: 100 }),
     query('reservist_id').optional().isInt({ min: 1 }),
     query('group_id').optional().isInt({ min: 1 }),
-    query('city_id').optional().isInt({ min: 1 }),
+    query('squadron_id').optional().isInt({ min: 1 }),
     query('is_primary').optional().isBoolean()
 ], (req, res) => {
     try {
@@ -35,19 +35,19 @@ router.get('/', authenticateToken, authorize('admin'), [
         const offset = (page - 1) * limit;
         const reservistId = req.query.reservist_id;
         const groupId = req.query.group_id;
-        const cityId = req.query.city_id;
+        const squadronId = req.query.squadron_id;
         const isPrimary = req.query.is_primary;
 
         let query = `
             SELECT ra.id, ra.assigned_date, ra.is_primary, ra.notes, ra.created_at,
                    r.id as reservist_id, r.first_name, r.last_name, r.rank, r.service_number,
-                   g.id as group_id, g.name as group_name, g.code as group_code,
-                   c.id as city_id, c.name as city_name, c.province,
+                    g.id as group_id, g.name as group_name, g.code as group_code,
+                    s.id as squadron_id, s.squadron_name, s.location,
                    a.id as arsen_id, a.name as arsen_name
             FROM reservist_assignments ra
             LEFT JOIN reservists r ON ra.reservist_id = r.id
             LEFT JOIN groups g ON ra.group_id = g.id
-            LEFT JOIN cities c ON ra.city_id = c.id
+             LEFT JOIN squadron s ON ra.squadron_id = s.id
             LEFT JOIN arsens a ON g.arsen_id = a.id
             WHERE 1=1
         `;
@@ -69,11 +69,11 @@ router.get('/', authenticateToken, authorize('admin'), [
             countParams.push(groupId);
         }
 
-        if (cityId) {
-            query += ' AND ra.city_id = ?';
-            countQuery += ' AND ra.city_id = ?';
-            queryParams.push(cityId);
-            countParams.push(cityId);
+        if (squadronId) {
+            query += ' AND ra.squadron_id = ?';
+            countQuery += ' AND ra.squadron_id = ?';
+            queryParams.push(squadronId);
+            countParams.push(squadronId);
         }
 
         if (isPrimary !== undefined) {
@@ -155,12 +155,12 @@ router.get('/:id', authenticateToken, [
             SELECT ra.*, 
                    r.first_name, r.last_name, r.rank, r.service_number,
                    g.name as group_name, g.code as group_code,
-                   c.name as city_name, c.province,
+                    s.squadron_name, s.location,
                    a.name as arsen_name
             FROM reservist_assignments ra
             LEFT JOIN reservists r ON ra.reservist_id = r.id
             LEFT JOIN groups g ON ra.group_id = g.id
-            LEFT JOIN cities c ON ra.city_id = c.id
+             LEFT JOIN squadron s ON ra.squadron_id = s.id
             LEFT JOIN arsens a ON g.arsen_id = a.id
             WHERE ra.id = ?
         `;
@@ -203,7 +203,7 @@ router.get('/:id', authenticateToken, [
 router.post('/', authenticateToken, authorize('admin'), [
     body('reservist_id').isInt({ min: 1 }).withMessage('Valid reservist ID is required'),
     body('group_id').isInt({ min: 1 }).withMessage('Valid group ID is required'),
-    body('city_id').isInt({ min: 1 }).withMessage('Valid city ID is required'),
+    body('squadron_id').isInt({ min: 1 }).withMessage('Valid squadron ID is required'),
     body('assigned_date').isDate().withMessage('Valid assigned date is required'),
     body('is_primary').optional().isBoolean().withMessage('is_primary must be boolean'),
     body('notes').optional().trim()
@@ -219,7 +219,7 @@ router.post('/', authenticateToken, authorize('admin'), [
             });
         }
 
-        const { reservist_id, group_id, city_id, assigned_date, is_primary = false, notes } = req.body;
+        const { reservist_id, group_id, squadron_id, assigned_date, is_primary = false, notes } = req.body;
 
         db.query('SELECT id FROM reservists WHERE id = ?', [reservist_id], (reservistErr, reservistResults) => {
             if (reservistErr) {
@@ -253,7 +253,7 @@ router.post('/', authenticateToken, authorize('admin'), [
                     });
                 }
 
-                db.query('SELECT id FROM cities WHERE id = ?', [city_id], (cityErr, cityResults) => {
+                 db.query('SELECT id FROM squadron WHERE id = ?', [squadron_id], (cityErr, cityResults) => {
                     if (cityErr) {
                         return res.status(500).json({
                             status: 'error',
@@ -264,8 +264,8 @@ router.post('/', authenticateToken, authorize('admin'), [
                     if (!cityResults || cityResults.length === 0) {
                         return res.status(404).json({
                             status: 'error',
-                            message: 'City not found',
-                            code: 'CITY_NOT_FOUND'
+                            message: 'Squadron not found',
+                            code: 'SQUADRON_NOT_FOUND'
                         });
                     }
 
@@ -294,10 +294,10 @@ router.post('/', authenticateToken, authorize('admin'), [
 
                     function insertAssignment() {
                         db.query(
-                            `INSERT INTO reservist_assignments 
-                             (reservist_id, group_id, city_id, assigned_date, is_primary, notes) 
-                             VALUES (?, ?, ?, ?, ?, ?)`,
-                            [reservist_id, group_id, city_id, assigned_date, is_primary ? 1 : 0, notes || null],
+                             `INSERT INTO reservist_assignments 
+                              (reservist_id, group_id, squadron_id, assigned_date, is_primary, notes) 
+                              VALUES (?, ?, ?, ?, ?, ?)`,
+                             [reservist_id, group_id, squadron_id, assigned_date, is_primary ? 1 : 0, notes || null],
                             (insertErr, insertResults) => {
                                 if (insertErr) {
                                     return res.status(500).json({
@@ -312,18 +312,18 @@ router.post('/', authenticateToken, authorize('admin'), [
                                     action: 'assignment.created',
                                     entity_type: 'assignment',
                                     entity_id: insertResults.insertId,
-                                    new_values: { reservist_id, group_id, city_id, assigned_date, is_primary, notes }
+                                     new_values: { reservist_id, group_id, squadron_id, assigned_date, is_primary, notes }
                                 });
 
                                 res.status(201).json({
                                     status: 'success',
                                     message: 'Assignment created successfully',
-                                    data: {
-                                        assignmentId: insertResults.insertId,
-                                        reservist_id,
-                                        group_id,
-                                        city_id
-                                    }
+                                     data: {
+                                         assignmentId: insertResults.insertId,
+                                         reservist_id,
+                                         group_id,
+                                         squadron_id
+                                     }
                                 });
                             }
                         );
@@ -348,7 +348,7 @@ router.put('/:id', authenticateToken, authorize('admin'), [
     param('id').isInt({ min: 1 }).withMessage('Valid assignment ID is required'),
     body('reservist_id').optional().isInt({ min: 1 }),
     body('group_id').optional().isInt({ min: 1 }),
-    body('city_id').optional().isInt({ min: 1 }),
+    body('squadron_id').optional().isInt({ min: 1 }),
     body('assigned_date').optional().isDate(),
     body('is_primary').optional().isBoolean(),
     body('notes').optional().trim()
@@ -365,7 +365,7 @@ router.put('/:id', authenticateToken, authorize('admin'), [
         }
 
         const assignmentId = req.params.id;
-        const { reservist_id, group_id, city_id, assigned_date, is_primary, notes } = req.body;
+        const { reservist_id, group_id, squadron_id, assigned_date, is_primary, notes } = req.body;
 
         db.query('SELECT * FROM reservist_assignments WHERE id = ?', [assignmentId], (checkErr, checkResults) => {
             if (checkErr) {
@@ -415,18 +415,18 @@ router.put('/:id', authenticateToken, authorize('admin'), [
                 params.push(group_id);
             }
 
-            if (city_id !== undefined) {
-                db.query('SELECT id FROM cities WHERE id = ?', [city_id], (cityErr, cityResults) => {
+            if (squadron_id !== undefined) {
+                 db.query('SELECT id FROM squadron WHERE id = ?', [squadron_id], (cityErr, cityResults) => {
                     if (cityErr || !cityResults || cityResults.length === 0) {
                         return res.status(404).json({
                             status: 'error',
-                            message: 'City not found',
-                            code: 'CITY_NOT_FOUND'
+                            message: 'Squadron not found',
+                            code: 'SQUADRON_NOT_FOUND'
                         });
                     }
                 });
-                updates.push('city_id = ?');
-                params.push(city_id);
+                updates.push('squadron_id = ?');
+                params.push(squadron_id);
             }
 
             if (assigned_date !== undefined) {

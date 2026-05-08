@@ -38,7 +38,7 @@ CREATE TABLE reservists (
     service_number VARCHAR(100) UNIQUE NOT NULL,
     date_of_birth DATE NULL,
     place_of_birth VARCHAR(200) NULL,
-    age INT GENERATED ALWAYS AS (YEAR(CURDATE()) - YEAR(date_of_birth)) STORED,
+    age INT NULL,
     sex ENUM('Male', 'Female', 'Other') NULL,
     civil_status ENUM('Single', 'Married', 'Widowed', 'Separated', 'Divorced') NULL,
     citizenship VARCHAR(100) DEFAULT 'Filipino',
@@ -116,14 +116,14 @@ CREATE TABLE `groups` (
 CREATE TABLE squadron (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     group_id BIGINT NOT NULL,
-    squadron_name VARCHAR(200) NOT NULL,
-    location VARCHAR(100) NOT NULL,
+    name VARCHAR(200) NOT NULL,
+    province VARCHAR(100) NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE CASCADE,
     INDEX idx_group (group_id),
-    INDEX idx_location (location)
+    INDEX idx_province (province)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------
