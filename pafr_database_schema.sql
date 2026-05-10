@@ -117,13 +117,16 @@ CREATE TABLE squadron (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     group_id BIGINT NOT NULL,
     name VARCHAR(200) NOT NULL,
-    province VARCHAR(100) NULL,
+    code VARCHAR(50) NULL,
+    location VARCHAR(200) NULL,
+    specialization VARCHAR(100) NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE CASCADE,
     INDEX idx_group (group_id),
-    INDEX idx_province (province)
+    INDEX idx_location (location),
+    INDEX idx_specialization (specialization)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------
