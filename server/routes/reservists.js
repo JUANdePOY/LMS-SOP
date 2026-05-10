@@ -486,13 +486,18 @@ router.put(
       }
 
       // Update reservist
-      const updateColumns = Object.keys(updateFields).map(col => `${col} = ?`).join(',');
+      const updateColumns = Object.keys(updateFields).map(col => `\`${col}\` = ?`).join(',');
       const values = [...Object.values(updateFields), id];
 
-      await db.execute(
-        `UPDATE reservists SET ${updateColumns} WHERE id = ?`,
-        values
-      );
+      console.log(`[UPDATE RESERVIST] Starting update for ID ${id}. Fields: ${Object.keys(updateFields).join(', ')}`);
+      
+      const updateQuery = `UPDATE reservists SET ${updateColumns} WHERE id = ?`;
+      console.log(`[UPDATE RESERVIST] Query: ${updateQuery}`);
+      console.log(`[UPDATE RESERVIST] Values: ${JSON.stringify(values)}`);
+
+      await db.execute(updateQuery, values);
+      
+      console.log(`[UPDATE RESERVIST] Update complete for ID ${id}`);
 
       // Log audit
       logAudit({
@@ -507,10 +512,12 @@ router.put(
       });
 
       // Fetch updated reservist
+      console.log(`[UPDATE RESERVIST] Fetching updated reservist data for ID ${id}`);
       const [updated] = await db.execute(
         'SELECT r.*, u.email FROM reservists r JOIN users u ON r.user_id = u.id WHERE r.id = ?',
         [id]
       );
+      console.log(`[UPDATE RESERVIST] Data fetched. Sending response for ID ${id}`);
 
       res.json({
         status: 'success',

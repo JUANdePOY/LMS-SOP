@@ -17,8 +17,17 @@ const arsentsRoutes = require('./routes/arsents');
 const groupsRoutes = require('./routes/groups');
 const squadronRoutes = require('./routes/squadron');
 const areasRoutes = require('./routes/areas');
-// const suppliesRoutes = require('./routes/supplies');
-// const issuancesRoutes = require('./routes/issuances');
+const suppliesRoutes = require('./routes/supplies');
+const issuancesRoutes = require('./routes/issuances');
+const trainingsRoutes = require('./routes/trainings');
+const attendanceRoutes = require('./routes/attendance');
+const readinessRoutes = require('./routes/readiness');
+const reportsRoutes = require('./routes/reports');
+const alertsRoutes = require('./routes/alerts');
+const auditLogsRoutes = require('./routes/audit-logs');
+const settingsRoutes = require('./routes/settings');
+const dashboardRoutes = require('./routes/dashboard');
+const assignmentsRoutes = require('./routes/assignments');
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -27,8 +36,17 @@ app.use('/api/arsens', arsentsRoutes);
 app.use('/api/groups', groupsRoutes);
 app.use('/api/squadron', squadronRoutes);
 app.use('/api/areas', areasRoutes);
-// app.use('/api/supplies', suppliesRoutes);
-// app.use('/api/issuances', issuancesRoutes);
+app.use('/api/supplies', suppliesRoutes);
+app.use('/api/issuances', issuancesRoutes);
+app.use('/api/trainings', trainingsRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/readiness', readinessRoutes);
+app.use('/api/reports', reportsRoutes);
+app.use('/api/alerts', alertsRoutes);
+app.use('/api/audit-logs', auditLogsRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/assignments', assignmentsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
