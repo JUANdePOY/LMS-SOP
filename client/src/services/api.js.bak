@@ -22,7 +22,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if ((error.response?.status === 401 || error.response?.status === 403) && !error.config?.skipAuthRedirect) {
+    if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
@@ -82,27 +82,18 @@ export const getAreas = (params = {}) => api.get('/areas', { params });
 export const getArea = (id) => api.get(`/areas/${id}`);
 
 // Groups
-export const getGroups = (params = {}, config = {}) => api.get('/hierarchy', { params, ...config });
-
-// ARSENs
-export const getArcens = (params = {}) => api.get('/arsens', { params });
-export const getArsen = (id) => api.get(`/arsens/${id}`);
-export const createArsen = (data) => api.post('/arsens', data);
-export const updateArsen = (id, data) => api.put(`/arsens/${id}`, data);
-export const deleteArsen = (id) => api.delete(`/arsens/${id}`);
-
-// Groups (management)
-export const getGroupsList = (params = {}) => api.get('/groups', { params });
+export const getGroups = (params = {}) => api.get('/groups', { params });
 export const getGroup = (id) => api.get(`/groups/${id}`);
-export const createGroup = (data) => api.post('/groups', data);
-export const updateGroup = (id, data) => api.put(`/groups/${id}`, data);
-export const deleteGroup = (id) => api.delete(`/groups/${id}`);
 
-// Squadrons (management)
+// Squadrons
 export const getSquadrons = (params = {}) => api.get('/squadron', { params });
 export const getSquadron = (id) => api.get(`/squadron/${id}`);
-export const createSquadron = (data) => api.post('/squadron', data);
-export const updateSquadron = (id, data) => api.put(`/squadron/${id}`, data);
-export const deleteSquadron = (id) => api.delete(`/squadron/${id}`);
+
+// ARCENs
+export const getArcens = (params = {}) => api.get('/arsens', { params });
+export const getArcen = (id) => api.get(`/arsens/${id}`);
+
+// Hierarchy
+export const getHierarchy = () => api.get('/hierarchy');
 
 export default api;

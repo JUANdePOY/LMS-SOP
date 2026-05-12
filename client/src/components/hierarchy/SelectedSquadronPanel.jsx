@@ -1,21 +1,27 @@
 import { X, Users, Tag, CheckCircle2, XCircle, MapPin, Shield, Layers, PlaneTakeoff } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useHierarchy } from "@/context/HierarchyContext";
-import { hierarchyData } from "@/data/hierarchyData";
+import { useHierarchy } from "./HierarchyContext";
 
-function resolveBreadcrumb(squadronId) {
-  for (const area of hierarchyData) {
-    for (const arcen of area.arcens) {
-      for (const group of arcen.groups) {
-        const sq = group.squadrons.find((s) => s.id === squadronId);
-        if (sq) return {
-          airbase: area.name,
-          arcen: arcen.name,
-          arcenFull: arcen.fullName,
-          group: group.name,
-        };
-      }
-    }
+/**
+ * Resolve breadcrumb from the squadron's own parent properties.
+ * Works with both mock data and API data.
+ */
+function resolveBreadcrumb(squadron) {
+  // API/data v2: squadron has group_name, arsen_name directly
+  if (squadron.group_name && squadron.arsen_name) {
+    return {
+      arcen: squadron.arsen_name,
+      arcenFull: squadron.arsen_name,
+      group: squadron.group_name,
+    };
+  }
+  // Legacy mock-style: squadron has group with arcen nested
+  if (squadron.group && squadron.group.arcen) {
+    return {
+      arcen: squadron.group.arcen.name,
+      arcenFull: squadron.group.arcen.fullName || squadron.group.arcen.name,
+      group: squadron.group.name,
+    };
   }
   return null;
 }
@@ -24,8 +30,8 @@ export default function SelectedSquadronPanel() {
   const { selectedSquadron, selectSquadron } = useHierarchy();
   if (!selectedSquadron) return null;
 
-  const bc = resolveBreadcrumb(selectedSquadron.id);
-  const isActive = selectedSquadron.status === "active";
+  const bc = resolveBreadcrumb(selectedSquadron);
+  const isActive = selectedSquadron.status === "active" || selectedSquadron.status === true;
 
   return (
     <div className={cn(
@@ -72,14 +78,14 @@ export default function SelectedSquadronPanel() {
         <div className="flex flex-col gap-1">
           <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400">Members</span>
           <span className="flex items-center gap-1.5 text-[12px] font-semibold text-neutral-800 dark:text-neutral-200">
-            <Users size={12} className="text-indigo-500" /> {selectedSquadron.members}
+            <Users size={12} className="text-indigo-500" /> {selectedSquadron.members ?? 0}
           </span>
         </div>
 
         <div className="flex flex-col gap-1">
           <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400">Specialization</span>
           <span className="flex items-center gap-1.5 text-[12px] font-semibold text-neutral-800 dark:text-neutral-200">
-            <Tag size={12} className="text-indigo-500" /> {selectedSquadron.specialization}
+            <Tag size={12} className="text-indigo-500" /> {selectedSquadron.specialization || '—'}
           </span>
         </div>
 
@@ -87,7 +93,7 @@ export default function SelectedSquadronPanel() {
           <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400">Location</span>
           <span className="flex items-center gap-1 text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
             <MapPin size={11} className="text-indigo-500 shrink-0" />
-            <span className="truncate">{selectedSquadron.location}</span>
+            <span className="truncate">{selectedSquadron.location || '—'}</span>
           </span>
         </div>
       </div>
@@ -96,11 +102,13 @@ export default function SelectedSquadronPanel() {
       {bc && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-neutral-100 dark:border-neutral-800 px-5 py-2.5 text-[10px] text-neutral-400 dark:text-neutral-600">
           <PlaneTakeoff size={9} />
-          <span>{bc.airbase}</span>
+          <span>PAFR Airbase</span>
           <span>›</span>
           <Shield size={9} />
           <span className="font-medium">{bc.arcen}</span>
-          <span className="text-neutral-300 dark:text-neutral-700">({bc.arcenFull})</span>
+          {bc.arcenFull && bc.arcenFull !== bc.arcen && (
+            <span className="text-neutral-300 dark:text-neutral-700">({bc.arcenFull})</span>
+          )}
           <span>›</span>
           <Layers size={9} />
           <span className="font-medium">{bc.group}</span>

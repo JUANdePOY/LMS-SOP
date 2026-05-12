@@ -1,21 +1,26 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import AppLayout from "@/layout/AppLayout";
 import { lazy, Suspense } from "react";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ToastProvider } from "@/components/Toast";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
-// ── Pages ─────────────────────────────────────────────────────
-const Dashboard  = lazy(() => import("@/pages/Dashboard"));
-const Reservists = lazy(() => import("@/pages/Reservists")); // ← renamed
-const Trainings  = lazy(() => import("@/pages/Trainings"));
-const Attendance = lazy(() => import("@/pages/Attendance"));
-const Analytics  = lazy(() => import("@/pages/Analytics"));
-const Logistics  = lazy(() => import("@/pages/Logistics"));
-const Reports    = lazy(() => import("@/pages/Reports"));
+// Pages
+const Dashboard         = lazy(() => import("@/pages/Dashboard"));
+const Reservists        = lazy(() => import("@/pages/Reservists"));
+const Trainings         = lazy(() => import("@/pages/Trainings"));
+const Attendance        = lazy(() => import("@/pages/Attendance"));
+const Analytics         = lazy(() => import("@/pages/Analytics"));
+const Logistics         = lazy(() => import("@/pages/Logistics"));
+const Reports           = lazy(() => import("@/pages/Reports"));
+const Login             = lazy(() => import("@/pages/Login"));
 
-// ── Airbase pages ──────────────────────────────────────────────
-const AirbaseOverview = lazy(() => import("@/pages/airbase/AirbaseOverview"));
-const ManageArcens    = lazy(() => import("@/pages/airbase/ManageArcens"));
-const ManageGroups    = lazy(() => import("@/pages/airbase/ManageGroups"));
-const ManageSquadrons = lazy(() => import("@/pages/airbase/ManageSquadrons"));
+// Airbase pages
+const AirbaseOverview   = lazy(() => import("@/pages/airbase/AirbaseOverview"));
+const ManageArcens      = lazy(() => import("@/pages/airbase/ManageArcens"));
+const ManageGroups      = lazy(() => import("@/pages/airbase/ManageGroups"));
+const ManageSquadrons   = lazy(() => import("@/pages/airbase/ManageSquadrons"));
 
 function PageLoader() {
   return (
@@ -33,28 +38,50 @@ function wrap(Component) {
   );
 }
 
+function ProtectedWrapper(Component) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ProtectedRoute>
+        <Component />
+      </ProtectedRoute>
+    </Suspense>
+  );
+}
+
 const router = createBrowserRouter([
   {
+    path: "/login",
+    element: wrap(Login),
+  },
+  {
     path: "/",
-    element: <AppLayout />,
+    element: (
+      <ErrorBoundary>
+        <ToastProvider>
+          <AppLayout />
+        </ToastProvider>
+      </ErrorBoundary>
+    ),
     children: [
-      { index: true,           element: wrap(Dashboard)       },
-      { path: "reservists",    element: wrap(Reservists)      }, // ← fixed path
-      { path: "trainings",     element: wrap(Trainings)       },
-      { path: "attendance",    element: wrap(Attendance)      },
-      { path: "analytics",     element: wrap(Analytics)       },
-      { path: "logistics",     element: wrap(Logistics)       },
-      { path: "reports",       element: wrap(Reports)         },
-
-      // ── Airbase nested routes ────────────────────────────────
-      { path: "airbase",           element: wrap(AirbaseOverview) },
-      { path: "airbase/arcens",    element: wrap(ManageArcens)    },
-      { path: "airbase/groups",    element: wrap(ManageGroups)    },
-      { path: "airbase/squadrons", element: wrap(ManageSquadrons) },
+      { index: true,           element: ProtectedWrapper(Dashboard)       },
+      { path: "reservists",    element: ProtectedWrapper(Reservists)      },
+      { path: "trainings",     element: ProtectedWrapper(Trainings)       },
+      { path: "attendance",    element: ProtectedWrapper(Attendance)      },
+      { path: "analytics",     element: ProtectedWrapper(Analytics)       },
+      { path: "logistics",     element: ProtectedWrapper(Logistics)       },
+      { path: "reports",       element: ProtectedWrapper(Reports)         },
+      { path: "airbase",      element: ProtectedWrapper(AirbaseOverview) },
+      { path: "airbase/arcens",   element: ProtectedWrapper(ManageArcens) },
+      { path: "airbase/groups",   element: ProtectedWrapper(ManageGroups) },
+      { path: "airbase/squadrons",element: ProtectedWrapper(ManageSquadrons) },
     ],
   },
 ]);
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
+  );
 }

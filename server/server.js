@@ -3,6 +3,8 @@ const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+console.log('SERVER STARTING - Loading updated code...');
+
 const app = express();
 
 // Middleware
@@ -28,6 +30,7 @@ const auditLogsRoutes = require('./routes/audit-logs');
 const settingsRoutes = require('./routes/settings');
 const dashboardRoutes = require('./routes/dashboard');
 const assignmentsRoutes = require('./routes/assignments');
+const hierarchyRoutes = require('./routes/hierarchy');
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -47,6 +50,7 @@ app.use('/api/audit-logs', auditLogsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/assignments', assignmentsRoutes);
+app.use('/api/hierarchy', hierarchyRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

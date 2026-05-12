@@ -40,14 +40,17 @@ function ScoreBadge({ label, value, color }) {
 export default function ReservistDetailPanel({ reservist, onClose }) {
   if (!reservist) return null;
 
+  const readinessScore = reservist.readinessScore || 0;
+  const attendanceRate = reservist.attendanceRate || 0;
+
   const readinessColor =
-    reservist.readinessScore >= 80 ? "text-emerald-600 dark:text-emerald-400" :
-    reservist.readinessScore >= 60 ? "text-amber-600 dark:text-amber-400"     :
+    readinessScore >= 80 ? "text-emerald-600 dark:text-emerald-400" :
+    readinessScore >= 60 ? "text-amber-600 dark:text-amber-400"     :
     "text-red-500 dark:text-red-400";
 
   const attendanceColor =
-    reservist.attendanceRate >= 80 ? "text-emerald-600 dark:text-emerald-400" :
-    reservist.attendanceRate >= 60 ? "text-amber-600 dark:text-amber-400"     :
+    attendanceRate >= 80 ? "text-emerald-600 dark:text-emerald-400" :
+    attendanceRate >= 60 ? "text-amber-600 dark:text-amber-400"     :
     "text-red-500 dark:text-red-400";
 
   return (
@@ -105,17 +108,17 @@ export default function ReservistDetailPanel({ reservist, onClose }) {
           <div className="grid grid-cols-3 gap-2 mb-4">
             <ScoreBadge
               label="Readiness Score"
-              value={`${reservist.readinessScore}%`}
+              value={`${readinessScore}%`}
               color={readinessColor}
             />
             <ScoreBadge
               label="Attendance Rate"
-              value={`${reservist.attendanceRate}%`}
+              value={`${attendanceRate}%`}
               color={attendanceColor}
             />
             <ScoreBadge
               label="Trainings Done"
-              value={reservist.trainingsCompleted}
+              value={reservist.trainingsCompleted || 0}
               color="text-neutral-800 dark:text-neutral-200"
             />
           </div>

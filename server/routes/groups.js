@@ -65,7 +65,7 @@ router.get('/', [
 
     // Get total count
     const countQuery = `SELECT COUNT(*) as total FROM \`groups\` g ${whereClause}`;
-    const [countResult] = await db.execute(countQuery, queryParams);
+    const [countResult] = await db.query(countQuery, queryParams);
     const total = countResult[0].total;
 
     // Get groups with related data and squadron count
@@ -91,7 +91,7 @@ router.get('/', [
       LIMIT ? OFFSET ?
     `;
 
-    const [groups] = await db.execute(dataQuery, [...queryParams, limit, offset]);
+    const [groups] = await db.query(dataQuery, [...queryParams, limit, offset]);
 
     res.json({
       status: 'success',
@@ -127,7 +127,7 @@ router.get('/:id', validateId, authenticateToken, async (req, res) => {
     }
 
     // Get group details with related ARSEN data
-    const [groups] = await db.execute(`
+    const [groups] = await db.query(`
       SELECT 
         g.id,
         g.arsen_id,
@@ -155,7 +155,7 @@ router.get('/:id', validateId, authenticateToken, async (req, res) => {
     const group = groups[0];
 
     // Get statistics (squadrons, assignments)
-    const [stats] = await db.execute(`
+    const [stats] = await db.query(`
       SELECT 
         COUNT(DISTINCT s.id) as total_squadrons,
         COUNT(DISTINCT ra.reservist_id) as total_reservists
@@ -198,7 +198,7 @@ router.post('/', validateGroup, authenticateToken, requireAdmin, async (req, res
     const { arsen_id, code, name, commander_name } = req.body;
 
     // Verify ARSEN exists
-    const [arsen] = await db.execute('SELECT id FROM arsens WHERE id = ?', [arsen_id]);
+    const [arsen] = await db.query('SELECT id FROM arsens WHERE id = ?', [arsen_id]);
     if (arsen.length === 0) {
       return res.status(404).json({
         status: 'error',
@@ -208,7 +208,7 @@ router.post('/', validateGroup, authenticateToken, requireAdmin, async (req, res
     }
 
     // Check for duplicate code within this ARSEN (unique constraint on arsen_id, code)
-    const [existingGroup] = await db.execute(
+    const [existingGroup] = await db.query(
       'SELECT id FROM `groups` WHERE arsen_id = ? AND code = ?',
       [arsen_id, code]
     );
@@ -221,12 +221,12 @@ router.post('/', validateGroup, authenticateToken, requireAdmin, async (req, res
       });
     }
 
-    const [result] = await db.execute(
+    const [result] = await db.query(
       'INSERT INTO `groups` (arsen_id, code, name, commander_name) VALUES (?, ?, ?, ?)',
       [arsen_id, code, name, commander_name || null]
     );
 
-    const [newGroup] = await db.execute(`
+    const [newGroup] = await db.query(`
       SELECT 
         g.*,
         a.name as arsen_name,
@@ -277,7 +277,7 @@ router.put('/:id', [...validateId, ...validateGroup], authenticateToken, require
     const { arsen_id, code, name, commander_name } = req.body;
 
     // Get current group for audit
-    const [currentGroup] = await db.execute('SELECT * FROM `groups` WHERE id = ?', [req.params.id]);
+    const [currentGroup] = await db.query('SELECT * FROM `groups` WHERE id = ?', [req.params.id]);
 
     if (currentGroup.length === 0) {
       return res.status(404).json({
@@ -288,7 +288,7 @@ router.put('/:id', [...validateId, ...validateGroup], authenticateToken, require
     }
 
     // Verify ARSEN exists
-    const [arsen] = await db.execute('SELECT id FROM arsens WHERE id = ?', [arsen_id]);
+    const [arsen] = await db.query('SELECT id FROM arsens WHERE id = ?', [arsen_id]);
     if (arsen.length === 0) {
       return res.status(404).json({
         status: 'error',
@@ -298,7 +298,7 @@ router.put('/:id', [...validateId, ...validateGroup], authenticateToken, require
     }
 
     // Check for duplicate code within this ARSEN (excluding current record)
-    const [duplicateCode] = await db.execute(
+    const [duplicateCode] = await db.query(
       'SELECT id FROM `groups` WHERE arsen_id = ? AND code = ? AND id != ?',
       [arsen_id, code, req.params.id]
     );
@@ -311,7 +311,7 @@ router.put('/:id', [...validateId, ...validateGroup], authenticateToken, require
       });
     }
 
-    const [result] = await db.execute(
+    const [result] = await db.query(
       'UPDATE `groups` SET arsen_id = ?, code = ?, name = ?, commander_name = ? WHERE id = ?',
       [arsen_id, code, name, commander_name || null, req.params.id]
     );
@@ -324,7 +324,7 @@ router.put('/:id', [...validateId, ...validateGroup], authenticateToken, require
       });
     }
 
-    const [updatedGroup] = await db.execute(`
+    const [updatedGroup] = await db.query(`
       SELECT 
         g.*,
         a.name as arsen_name,
@@ -374,7 +374,7 @@ router.delete('/:id', validateId, authenticateToken, requireAdmin, async (req, r
     }
 
     // Get current group for audit
-    const [currentGroup] = await db.execute('SELECT * FROM `groups` WHERE id = ? AND is_active = TRUE', [req.params.id]);
+    const [currentGroup] = await db.query('SELECT * FROM `groups` WHERE id = ? AND is_active = TRUE', [req.params.id]);
 
     if (currentGroup.length === 0) {
       return res.status(404).json({
@@ -385,7 +385,7 @@ router.delete('/:id', validateId, authenticateToken, requireAdmin, async (req, r
     }
 
     // Check if group has active squadrons or assignments
-    const [activeResources] = await db.execute(
+    const [activeResources] = await db.query(
       'SELECT COUNT(*) as count FROM squadron WHERE group_id = ? AND is_active = TRUE',
       [req.params.id]
     );
@@ -398,7 +398,7 @@ router.delete('/:id', validateId, authenticateToken, requireAdmin, async (req, r
       });
     }
 
-    const [result] = await db.execute(
+    const [result] = await db.query(
       'UPDATE `groups` SET is_active = FALSE WHERE id = ?',
       [req.params.id]
     );
@@ -456,7 +456,7 @@ router.get('/:id/squadron', [
     }
 
     // Verify group exists
-    const [group] = await db.execute('SELECT id FROM `groups` WHERE id = ?', [req.params.id]);
+    const [group] = await db.query('SELECT id FROM `groups` WHERE id = ?', [req.params.id]);
     if (group.length === 0) {
       return res.status(404).json({
         status: 'error',
@@ -487,7 +487,7 @@ router.get('/:id/squadron', [
 
     // Get total count
     const countQuery = `SELECT COUNT(*) as total FROM squadron s ${whereClause}`;
-    const [countResult] = await db.execute(countQuery, queryParams);
+    const [countResult] = await db.query(countQuery, queryParams);
     const total = countResult[0].total;
 
     // Get squadrons
@@ -506,7 +506,7 @@ router.get('/:id/squadron', [
       LIMIT ? OFFSET ?
     `;
 
-    const [squadrons] = await db.execute(dataQuery, [...queryParams, limit, offset]);
+    const [squadrons] = await db.query(dataQuery, [...queryParams, limit, offset]);
 
     res.json({
       status: 'success',

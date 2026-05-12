@@ -5,7 +5,7 @@ const HierarchyContext = createContext(null);
 /**
  * HierarchyProvider
  * Centralized state for the Area → ARCEN → Group → Squadron drill-down.
- * Wrap Areas.jsx (or its route) with this provider.
+ * Wrap any component with this provider.
  */
 export function HierarchyProvider({ children }) {
   const [expandedAreaId,   setExpandedAreaId]   = useState(null);

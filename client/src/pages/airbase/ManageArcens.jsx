@@ -1,7 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import {
   Shield, Plus, Pencil, Trash2, ToggleLeft, ToggleRight,
-  MapPin, Users, Layers, ChevronsUpDown, ChevronUp, ChevronDown,
+  MapPin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
@@ -9,36 +9,9 @@ import ManagementTable from "@/components/airbase/ManagementTable";
 import { StatusBadge, MonoCode, PrimaryButton } from "@/components/airbase/AirbaseUI";
 import AddEditModal, { FormField, FormInput, FormSelect } from "@/components/airbase/AddEditModal";
 import DetailModal, { DetailSection, DetailRow, DetailStatCard } from "@/components/airbase/DetailModal";
-import { hierarchyData } from "@/data/hierarchyData";
+import { getGroups, createArsen, updateArsen, deleteArsen } from "@/services/api";
 
-// ── Flatten ARCENs ────────────────────────────────────────────
-function flattenArcens() {
-  const rows = [];
-  hierarchyData.forEach((area) => {
-    area.arcens.forEach((arcen) => {
-      const totalSquadrons = arcen.groups.reduce((a, g) => a + g.squadrons.length, 0);
-      const totalMembers   = arcen.groups.reduce((a, g) =>
-        a + g.squadrons.reduce((b, s) => b + s.members, 0), 0);
-      rows.push({
-        id:             arcen.id,
-        name:           arcen.name,
-        fullName:       arcen.fullName,
-        code:           arcen.code,
-        commander:      arcen.commander,
-        location:       arcen.location,
-        reservists:     arcen.reservists,
-        groups:         arcen.groups.length,
-        squadrons:      totalSquadrons,
-        members:        totalMembers,
-        status:         arcen.status ?? "active",
-      });
-    });
-  });
-  return rows;
-}
-
-const INITIAL_DATA = flattenArcens();
-const EMPTY_FORM   = { name: "", fullName: "", code: "", commander: "", location: "", status: "active" };
+const EMPTY_FORM = { name: "", fullName: "", code: "", commander: "", location: "", status: "active" };
 
 const COLUMNS = [
   { key: "name",       label: "ARCEN",      sortable: true },
@@ -52,13 +25,49 @@ const COLUMNS = [
 ];
 
 export default function ManageArcens() {
-  const [data,    setData]    = useState(INITIAL_DATA);
-  const [detail,  setDetail]  = useState(null);          // selected row for detail modal
-  const [editModal, setEditModal] = useState(false);     // add/edit modal
+  const [data,    setData]    = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [detail,  setDetail]  = useState(null);
+  const [editModal, setEditModal] = useState(false);
   const [editMode,  setEditMode]  = useState("add");
   const [form,    setForm]    = useState(EMPTY_FORM);
 
-  // ── Handlers ──────────────────────────────────────────────
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const response = await getGroups({ hierarchical: true });
+      if (response.data.status === 'success') {
+        const transformed = transformApiData(response.data.data);
+        setData(transformed);
+      }
+    } catch (err) {
+      console.error('Failed to fetch hierarchy:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  function transformApiData(apiData) {
+    if (!apiData?.airbase?.arcens) return [];
+    return apiData.airbase.arcens.map(arcen => ({
+      id: `arcen-${arcen.id}`,
+      dbId: arcen.id,
+      name: arcen.name,
+      fullName: arcen.name,
+      code: arcen.code,
+      commander: arcen.commander || '',
+      location: arcen.location || '',
+      reservists: arcen.reservists || 0,
+      groups: arcen.groups?.length || 0,
+      squadrons: arcen.groups?.reduce((a, g) => a + (g.squadrons?.length || 0), 0) || 0,
+      status: arcen.is_active ? "active" : "inactive",
+    }));
+  }
+
   const openDetail = (row) => setDetail(row);
   const closeDetail = () => setDetail(null);
 
@@ -77,30 +86,64 @@ export default function ManageArcens() {
 
   const closeEdit = () => setEditModal(false);
 
-  const handleSubmit = () => {
-    if (editMode === "add") {
-      setData((prev) => [...prev, {
-        id: `arcen-${Date.now()}`, ...form,
-        reservists: 0, groups: 0, squadrons: 0, members: 0,
-      }]);
-    } else if (detail) {
-      const updated = { ...detail, ...form };
-      setData((prev) => prev.map((r) => r.id === detail.id ? updated : r));
-      setDetail(updated);
+  const handleSubmit = async () => {
+    try {
+      if (editMode === "add") {
+        const response = await createArsen({
+          code: form.code,
+          name: form.name,
+          location: form.location,
+          commander_name: form.commander,
+        });
+        if (response.data.status === 'success') {
+          await fetchData();
+        }
+      } else if (detail) {
+        const response = await updateArsen(detail.dbId, {
+          code: form.code,
+          name: form.name,
+          location: form.location,
+          commander_name: form.commander,
+        });
+        if (response.data.status === 'success') {
+          await fetchData();
+        }
+      }
+      closeEdit();
+    } catch (err) {
+      console.error('Failed to save ARCEN:', err);
     }
-    closeEdit();
   };
 
-  const handleDelete = (row) => {
+  const handleDelete = async (row) => {
     if (!confirm(`Delete ${row.name}? This cannot be undone.`)) return;
-    setData((prev) => prev.filter((r) => r.id !== row.id));
-    closeDetail();
+    try {
+      const response = await deleteArsen(row.dbId);
+      if (response.data.status === 'success') {
+        setData((prev) => prev.filter((r) => r.id !== row.id));
+        closeDetail();
+      }
+    } catch (err) {
+      console.error('Failed to delete ARCEN:', err);
+    }
   };
 
-  const toggleStatus = (row) => {
-    const updated = { ...row, status: row.status === "active" ? "inactive" : "active" };
-    setData((prev) => prev.map((r) => r.id === row.id ? updated : r));
-    setDetail(updated);
+  const toggleStatus = async (row) => {
+    try {
+      const response = await updateArsen(row.dbId, {
+        code: row.code,
+        name: row.name,
+        location: row.location,
+        commander_name: row.commander,
+      });
+      if (response.data.status === 'success') {
+        const updated = { ...row, status: row.status === "active" ? "inactive" : "active" };
+        setData((prev) => prev.map((r) => r.id === row.id ? updated : r));
+        setDetail(updated);
+      }
+    } catch (err) {
+      console.error('Failed to toggle status:', err);
+    }
   };
 
   return (

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getDashboard } from "@/services/api";
 import DashboardFilters     from "@/components/dashboard/DashboardFilters";
 import KPIStatsGrid         from "@/components/dashboard/KPIStatsGrid";
 import ForceDistributionChart  from "@/components/dashboard/ForceDistributionChart";
@@ -7,6 +8,7 @@ import AttendanceAnalytics     from "@/components/dashboard/AttendanceAnalytics"
 import ReadinessScoreChart     from "@/components/dashboard/ReadinessScoreChart";
 import ReservistProfileOverview from "@/components/dashboard/ReservistProfileOverview";
 import { LowPerformingAreas, AlertsInsights } from "@/components/dashboard/AlertsPanels";
+import { Loader } from "lucide-react";
 
 const DEFAULT_FILTERS = {
   dateRange: "May 1 – May 31, 2025",
@@ -21,6 +23,44 @@ const DEFAULT_FILTERS = {
  */
 export default function Dashboard() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getDashboard();
+      if (response.data.status === 'success') {
+        setDashboardData(response.data.data);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader className="h-8 w-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-md bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-800 dark:text-red-200">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 pb-10">
@@ -41,27 +81,27 @@ export default function Dashboard() {
       </div>
 
       {/* ── KPI Stats ─────────────────────────────────────── */}
-      <KPIStatsGrid />
+      <KPIStatsGrid data={dashboardData} />
 
       {/* ── Row 2: Force Distribution + Training Activity ── */}
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <ForceDistributionChart />
-        <TrainingActivityChart />
+        <ForceDistributionChart data={dashboardData?.distribution} />
+        <TrainingActivityChart data={dashboardData?.trainings} />
       </div>
 
       {/* ── Row 3: Attendance + Readiness ─────────────────── */}
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <AttendanceAnalytics />
-        <ReadinessScoreChart />
+        <AttendanceAnalytics data={dashboardData?.attendance} />
+        <ReadinessScoreChart data={dashboardData?.readiness} />
       </div>
 
       {/* ── Row 4: Reservist Profile (full width) ──────────── */}
-      <ReservistProfileOverview />
+      <ReservistProfileOverview data={dashboardData?.reservists} />
 
       {/* ── Row 5: Low Performing + Alerts ────────────────── */}
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <LowPerformingAreas />
-        <AlertsInsights />
+        <LowPerformingAreas data={dashboardData?.lowPerforming} />
+        <AlertsInsights data={dashboardData?.alerts} />
       </div>
 
     </div>

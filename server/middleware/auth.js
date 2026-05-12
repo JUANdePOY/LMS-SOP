@@ -23,10 +23,19 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     // Verify user still exists and is active
-    const [users] = await db.execute(
-      'SELECT id, role, is_active FROM users WHERE id = ?',
-      [decoded.userId]
-    );
+    let users;
+    try {
+      [users] = await db.query(
+        'SELECT id, role, is_active FROM users WHERE id = ?',
+        [decoded.userId]
+      );
+    } catch (dbError) {
+      return res.status(500).json({
+        status: 'error',
+        message: 'Database error',
+        code: 'DB_ERROR'
+      });
+    }
 
     if (users.length === 0) {
       return res.status(401).json({

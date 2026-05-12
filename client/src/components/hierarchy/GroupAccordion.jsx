@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronRight, Users, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useHierarchy } from "@/context/HierarchyContext";
+import { useHierarchy } from "./HierarchyContext";
 import SquadronList from "./SquadronList";
 import MembersModal from "./MembersModal";
 

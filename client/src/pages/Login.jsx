@@ -6,8 +6,8 @@ import { AlertCircle, Loader } from 'lucide-react';
 export default function Login() {
   const navigate = useNavigate();
   const { login, isAuthenticated, loading: authLoading } = useAuth();
-  
-  const [email, setEmail] = useState('');
+
+  const [id_number, setIdNumber] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -24,14 +24,14 @@ export default function Login() {
     setError('');
     setLoading(true);
 
-    if (!email || !password) {
-      setError('Please enter email and password');
+    if (!id_number || !password) {
+      setError('Please enter ID Number and password');
       setLoading(false);
       return;
     }
 
-    const result = await login(email, password);
-    
+    const result = await login(id_number, password);
+
     if (result.success) {
       navigate('/', { replace: true });
     } else {
@@ -65,17 +65,17 @@ export default function Login() {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
+            {/* ID Number */}
             <div>
               <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
-                Email Address
+                ID Number
               </label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={id_number}
+                onChange={(e) => setIdNumber(e.target.value)}
                 disabled={loading}
-                placeholder="admin@example.com"
+                placeholder="Enter your ID Number"
                 className="w-full rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-4 py-2.5 text-neutral-900 dark:text-white placeholder-neutral-500 dark:placeholder-neutral-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
               />
             </div>
@@ -115,13 +115,13 @@ export default function Login() {
           {/* Help Text */}
           <div className="mt-8 border-t border-neutral-200 dark:border-neutral-700 pt-6">
             <p className="text-xs text-neutral-600 dark:text-neutral-400 text-center">
-              Default credentials for testing:
+              Development credentials:
             </p>
             <p className="mt-2 text-xs text-neutral-700 dark:text-neutral-300 text-center font-mono">
-              Email: admin@example.com
+              ID Number: ADMIN-001
             </p>
             <p className="text-xs text-neutral-700 dark:text-neutral-300 text-center font-mono">
-              Password: password123
+              Password: AdminPass123!
             </p>
           </div>
         </div>

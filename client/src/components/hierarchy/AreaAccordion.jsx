@@ -1,126 +1,285 @@
-import { ChevronRight, PlaneTakeoff, Users, Activity } from "lucide-react";
+import { useState } from "react";
+import { ChevronRight, Users, Layers, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useHierarchy } from "@/context/HierarchyContext";
-import ArcenAccordion from "./ArcenAccordion";
+import { useHierarchy } from "./HierarchyContext";
+import SquadronList from "./SquadronList";
 
-function ReadinessBar({ score }) {
-  const color =
-    score >= 80 ? "bg-emerald-400" :
-    score >= 65 ? "bg-amber-400"   : "bg-red-400";
-  const textColor =
-    score >= 80 ? "text-emerald-600 dark:text-emerald-400" :
-    score >= 65 ? "text-amber-600 dark:text-amber-400"     : "text-red-500 dark:text-red-400";
+/**
+ * AreaAccordion
+ * Renders an Area (top-level) containing nested ARCEN → Group → Squadron
+ * with expand/collapse accordion behavior.
+ */
+export default function AreaAccordion({ area }) {
+  const [open, setOpen] = useState(false);
+  const { expandedAreaId, toggleArea } = useHierarchy();
+  const isOpen = expandedAreaId === area.id;
+
+  const totalReservists = area.reservists || 0;
+  const totalGroups = area.arcens?.reduce((sum, arc) => sum + (arc.groups?.length || 0), 0) || 0;
+  const totalSquadrons = area.arcens?.reduce((sum, arc) =>
+    sum + (arc.groups?.reduce((s, g) => s + (g.squadrons?.length || 0), 0) || 0), 0) || 0;
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="w-20 h-1 rounded-full bg-neutral-200 dark:bg-neutral-800">
-        <div className={cn("h-full rounded-full transition-all duration-500", color)} style={{ width: `${score}%` }} />
+    <>
+      {/* Area header */}
+      <div className={cn(
+        "rounded-lg border overflow-hidden transition-colors duration-150",
+        isOpen
+          ? "border-indigo-200 dark:border-indigo-500/30"
+          : "border-neutral-200 dark:border-neutral-800"
+      )}>
+        <div
+          onClick={() => toggleArea(area.id)}
+          className={cn(
+            "flex w-full items-center gap-3 px-4 py-3 cursor-pointer",
+            "transition-all duration-150",
+            isOpen
+              ? "bg-indigo-50 dark:bg-indigo-500/10"
+              : "bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800/60"
+          )}
+        >
+          {/* Expand toggle */}
+          <ChevronRight
+            size={14}
+            className={cn(
+              "shrink-0 text-neutral-400 dark:text-neutral-600 transition-transform duration-200",
+              isOpen && "rotate-90 text-indigo-500 dark:text-indigo-400"
+            )}
+          />
+
+          {/* Area icon */}
+          <span className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded",
+            isOpen
+              ? "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400"
+              : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"
+          )}>
+            <MapPin size={14} strokeWidth={1.8} />
+          </span>
+
+          {/* Area name + code */}
+          <div className="flex flex-1 items-center gap-2 min-w-0">
+            <span className={cn(
+              "text-[14px] font-bold truncate",
+              isOpen ? "text-indigo-700 dark:text-indigo-300" : "text-neutral-800 dark:text-neutral-200"
+            )}>
+              {area.name}
+            </span>
+            <span className="shrink-0 rounded bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 font-mono text-[9px] text-neutral-500">
+              {area.code}
+            </span>
+            {area.region && (
+              <span className="shrink-0 text-[10px] text-neutral-400 dark:text-neutral-600">
+                {area.region}
+              </span>
+            )}
+          </div>
+
+          {/* Stats pills */}
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="flex items-center gap-1 text-[10px] text-neutral-500">
+              <Users size={9} /> {totalReservists}
+            </span>
+            <span className="text-[9px] text-neutral-400">
+              {totalSquadrons} sqdn · {totalGroups} grp
+            </span>
+          </div>
+        </div>
+
+        {/* ── ARCEN list (nested) ─────────────────────────────── */}
+        <div className={cn(
+          "overflow-hidden transition-all duration-200 ease-out",
+          isOpen ? "max-h-[2000px] opacity-100" : "max-h-0 opacity-0"
+        )}>
+          <div className="border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-950/40 px-3 py-3">
+            {area.arcens && area.arcens.length > 0 ? (
+              <div className="flex flex-col gap-3">
+                {area.arcens.map((arcen) => (
+                  <ArsenBlock key={arcen.id} arcen={arcen} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-400 text-center py-4">
+                No ARCENs configured for this area.
+              </p>
+            )}
+          </div>
+        </div>
       </div>
-      <span className={cn("text-[11px] font-semibold", textColor)}>{score}%</span>
+    </>
+  );
+}
+
+/**
+ * ArsenBlock — displays a single ARCEN with its nested Groups and Squadrons.
+ */
+function ArsenBlock({ arcen }) {
+  const [open, setOpen] = useState(false);
+
+  const totalReservists = arcen.reservists || 0;
+  const totalSquadrons = arcen.groups?.reduce((sum, g) => sum + (g.squadrons?.length || 0), 0) || 0;
+  const activeSquadrons = arcen.groups?.reduce((sum, g) =>
+    sum + (g.squadrons?.filter(s => s.status === "active").length || 0), 0) || 0;
+
+  return (
+    <div className={cn(
+      "rounded-lg border overflow-hidden",
+      "border-neutral-200 dark:border-neutral-800",
+      "bg-white dark:bg-neutral-900"
+    )}>
+      {/* ARCEN header */}
+      <div
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center gap-3 px-3 py-2.5 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/60 transition-colors"
+      >
+        <ChevronRight
+          size={12}
+          className={cn(
+            "shrink-0 text-neutral-400 dark:text-neutral-600 transition-transform duration-200",
+            open && "rotate-90 text-indigo-500 dark:text-indigo-400"
+          )}
+        />
+
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+          <Layers size={12} strokeWidth={1.8} />
+        </span>
+
+        <div className="flex flex-1 items-center gap-2 min-w-0">
+          <span className="text-[13px] font-bold text-neutral-800 dark:text-neutral-200 truncate">
+            {arcen.name}
+          </span>
+          <span className="shrink-0 rounded bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 font-mono text-[9px] text-neutral-500">
+            {arcen.code}
+          </span>
+          {arcen.commander && (
+            <span className="truncate text-[10px] text-neutral-400 dark:text-neutral-600">
+              {arcen.commander}
+            </span>
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="flex items-center gap-1 text-[10px] text-neutral-500">
+            <Users size={9} /> {totalReservists}
+          </span>
+          <span className="text-[9px] text-neutral-400">
+            {activeSquadrons}/{totalSquadrons} active
+          </span>
+        </div>
+      </div>
+
+      {/* Groups + Squadrons */}
+      <div className={cn(
+        "overflow-hidden transition-all duration-200 ease-out",
+        open ? "max-h-[800px] opacity-100" : "max-h-0 opacity-0"
+      )}>
+        <div className="border-t border-neutral-100 dark:border-neutral-800 px-3 py-2">
+          {arcen.groups && arcen.groups.length > 0 ? (
+            arcen.groups.map((group) => (
+              <GroupBlock key={group.id} group={group} />
+            ))
+          ) : (
+            <p className="text-xs text-neutral-400 text-center py-3">
+              No groups under this ARCEN.
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
 /**
- * AreaAccordion — Level 1 (Airbase / PAFR root)
- * Expands to show ARCEN list.
+ * GroupBlock — displays a single Group with its nested Squadrons.
  */
-export default function AreaAccordion({ area }) {
-  const { expandedAreaId, toggleArea } = useHierarchy();
-  const isOpen = expandedAreaId === area.id;
+function GroupBlock({ group }) {
+  const [open, setOpen] = useState(false);
+  const { expandedGroupId, toggleGroup } = useHierarchy();
+  const isOpen = expandedGroupId === group.id;
 
-  const totalGroups = area.arcens.reduce((acc, a) => acc + a.groups.length, 0);
-  const totalSquadrons = area.arcens.reduce((acc, a) =>
-    acc + a.groups.reduce((b, g) => b + g.squadrons.length, 0), 0
-  );
+  const activeCount = group.squadrons?.filter(s => s.status === "active").length || 0;
+  const inactiveCount = (group.squadrons?.length || 0) - activeCount;
 
   return (
-    <div className={cn(
-      "rounded-2xl border overflow-hidden transition-all duration-200",
-      isOpen
-        ? "border-neutral-300 dark:border-neutral-700 shadow-md shadow-black/5 dark:shadow-black/20"
-        : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700"
-    )}>
-      {/* ── Header ──────────────────────────────────────────── */}
-      <button
-        onClick={() => toggleArea(area.id)}
-        aria-expanded={isOpen}
+    <div className="mb-1">
+      <div
+        onClick={() => toggleGroup(group.id)}
         className={cn(
-          "flex w-full items-center gap-4 px-5 py-4 text-left",
-          "transition-all duration-150 outline-none",
-          "focus-visible:ring-2 focus-visible:ring-indigo-500/50 focus-visible:ring-inset",
+          "rounded-lg border overflow-hidden transition-colors duration-150 cursor-pointer",
           isOpen
-            ? "bg-white dark:bg-neutral-900"
-            : "bg-white hover:bg-neutral-50/80 dark:bg-neutral-900 dark:hover:bg-neutral-800/40"
+            ? "border-blue-200 dark:border-blue-500/30"
+            : "border-neutral-100 dark:border-neutral-800",
+          isOpen
+            ? "bg-blue-50 dark:bg-blue-500/10"
+            : "bg-white hover:bg-neutral-50 dark:bg-neutral-900 dark:hover:bg-neutral-800/60"
         )}
       >
-        <ChevronRight
-          size={16}
-          className={cn(
-            "shrink-0 text-neutral-400 dark:text-neutral-600 transition-transform duration-200",
-            isOpen && "rotate-90"
-          )}
-        />
+        <div className="flex items-center gap-2 px-3 py-2">
+          <ChevronRight
+            size={11}
+            className={cn(
+              "shrink-0 text-neutral-400 dark:text-neutral-600 transition-transform duration-200",
+              isOpen && "rotate-90 text-blue-500 dark:text-blue-400"
+            )}
+          />
 
-        {/* Icon */}
-        <span className={cn(
-          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-          isOpen
-            ? "bg-indigo-600 text-white shadow-md shadow-indigo-200 dark:shadow-indigo-900/40"
-            : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400"
-        )}>
-          <PlaneTakeoff size={16} strokeWidth={1.8} />
-        </span>
-
-        {/* Name */}
-        <div className="flex flex-1 flex-col gap-0.5 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={cn(
-              "text-[15px] font-bold tracking-tight truncate",
-              isOpen ? "text-neutral-900 dark:text-neutral-50" : "text-neutral-800 dark:text-neutral-200"
-            )}>
-              {area.name}
-            </span>
-            <span className="shrink-0 rounded-md border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 font-mono text-[10px] text-neutral-500">
-              {area.code}
-            </span>
-          </div>
-          <span className="text-[11px] text-neutral-400 dark:text-neutral-600">
-            {area.arcens.length} ARCENs · {totalGroups} Groups · {totalSquadrons} Squadrons
+          <span className={cn(
+            "flex h-5 w-5 shrink-0 items-center justify-center rounded",
+            isOpen
+              ? "bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400"
+              : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"
+          )}>
+            <Layers size={10} strokeWidth={1.8} />
           </span>
+
+          <div className="flex flex-1 items-center gap-2 min-w-0">
+            <span className={cn(
+              "text-[12px] font-bold truncate",
+              isOpen ? "text-blue-700 dark:text-blue-300" : "text-neutral-700 dark:text-neutral-300"
+            )}>
+              {group.name}
+            </span>
+            <span className="shrink-0 rounded bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 font-mono text-[8px] text-neutral-500">
+              {group.code}
+            </span>
+            {group.type && (
+              <span className="shrink-0 text-[9px] text-neutral-400 dark:text-neutral-600">
+                {group.type}
+              </span>
+            )}
+            {group.commander && (
+              <span className="truncate text-[9px] text-neutral-400 dark:text-neutral-600">
+                {group.commander}
+              </span>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            <span className="flex items-center gap-1 text-[9px] text-neutral-500">
+              <Users size={8} /> {group.reservists}
+            </span>
+            <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">
+              {activeCount} active
+            </span>
+            {inactiveCount > 0 && (
+              <span className="text-[9px] text-neutral-400 dark:text-neutral-600">
+                · {inactiveCount} inact
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Stats */}
-        <div className="hidden sm:flex shrink-0 items-center gap-5">
-          <div className="flex flex-col items-end gap-0.5">
-            <span className="flex items-center gap-1 text-[11px] text-neutral-500">
-              <Users size={11} /> {area.reservists.toLocaleString()} reservists
-            </span>
-          </div>
-          <div className="flex flex-col items-end gap-0.5">
-            <span className="text-[10px] text-neutral-400 dark:text-neutral-600 flex items-center gap-1">
-              <Activity size={10} /> Readiness
-            </span>
-            <ReadinessBar score={area.readiness} />
-          </div>
-        </div>
-      </button>
-
-      {/* ── ARCEN list ───────────────────────────────────────── */}
-      <div className={cn(
-        "overflow-hidden transition-all duration-250 ease-out",
-        isOpen ? "max-h-[4000px] opacity-100" : "max-h-0 opacity-0"
-      )}>
-        <div className="border-t border-neutral-200 dark:border-neutral-800" />
-        <div className="bg-neutral-50 dark:bg-neutral-950 px-5 py-4">
-          <p className="mb-3 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-600">
-            <span className="inline-block h-px w-4 bg-neutral-300 dark:bg-neutral-700" />
-            ARCEN Units ({area.arcens.length})
-          </p>
-          <div className="flex flex-col gap-2">
-            {area.arcens.map((arcen) => (
-              <ArcenAccordion key={arcen.id} arcen={arcen} />
-            ))}
+        {/* Squadrons */}
+        <div className={cn(
+          "overflow-hidden transition-all duration-200 ease-out",
+          isOpen ? "max-h-[600px] opacity-100" : "max-h-0 opacity-0"
+        )}>
+          <div className="border-t border-blue-100 dark:border-blue-500/20 bg-blue-50/40 dark:bg-blue-500/5 px-3 py-2">
+            <p className="mb-1.5 flex items-center gap-1.5 text-[9px] font-semibold uppercase tracking-widest text-blue-400 dark:text-blue-500">
+              <span className="inline-block h-px w-2 bg-blue-300 dark:bg-blue-600" />
+              Squadrons ({group.squadrons?.length || 0})
+            </p>
+            <SquadronList squadrons={group.squadrons || []} />
           </div>
         </div>
       </div>

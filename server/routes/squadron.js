@@ -66,7 +66,7 @@ router.get('/', [
 
     // Get total count
     const countQuery = `SELECT COUNT(*) as total FROM squadron s ${whereClause}`;
-    const [countResult] = await db.execute(countQuery, queryParams);
+    const [countResult] = await db.query(countQuery, queryParams);
     const total = countResult[0].total;
 
     // Get squadrons with group and arsen names, plus member count
@@ -98,7 +98,7 @@ router.get('/', [
       LIMIT ? OFFSET ?
     `;
 
-    const [squadrons] = await db.execute(dataQuery, [...queryParams, limit, offset]);
+    const [squadrons] = await db.query(dataQuery, [...queryParams, limit, offset]);
 
     res.json({
       status: 'success',
@@ -133,7 +133,7 @@ router.get('/:id', validateId, authenticateToken, async (req, res) => {
       });
     }
 
-    const [squadrons] = await db.execute(
+    const [squadrons] = await db.query(
       `SELECT 
         s.*,
         g.name as group_name,
@@ -190,7 +190,7 @@ router.post('/', [...validateSquadron, authenticateToken, requireAdmin], async (
     const { group_id, name, code, location, specialization } = req.body;
 
     // Verify group exists
-    const [group] = await db.execute(
+    const [group] = await db.query(
       'SELECT g.id, a.id as arsen_id FROM \`groups\` g LEFT JOIN arsens a ON g.arsen_id = a.id WHERE g.id = ?',
       [group_id]
     );
@@ -202,12 +202,12 @@ router.post('/', [...validateSquadron, authenticateToken, requireAdmin], async (
       });
     }
 
-    const [result] = await db.execute(
+    const [result] = await db.query(
       'INSERT INTO squadron (group_id, name, code, location, specialization) VALUES (?, ?, ?, ?, ?)',
       [group_id, name, code || null, location || null, specialization || null]
     );
 
-    const [newSquadron] = await db.execute(
+    const [newSquadron] = await db.query(
       `SELECT 
         s.*,
         g.name as group_name,
@@ -263,7 +263,7 @@ router.put('/:id', [...validateId, ...validateSquadron, authenticateToken, requi
     const { group_id, name, code, location, specialization } = req.body;
 
     // Get current squadron for audit
-    const [currentSquadron] = await db.execute('SELECT * FROM squadron WHERE id = ?', [req.params.id]);
+    const [currentSquadron] = await db.query('SELECT * FROM squadron WHERE id = ?', [req.params.id]);
 
     if (currentSquadron.length === 0) {
       return res.status(404).json({
@@ -274,7 +274,7 @@ router.put('/:id', [...validateId, ...validateSquadron, authenticateToken, requi
     }
 
     // Verify group exists
-    const [group] = await db.execute('SELECT id FROM \`groups\` WHERE id = ?', [group_id]);
+    const [group] = await db.query('SELECT id FROM \`groups\` WHERE id = ?', [group_id]);
     if (group.length === 0) {
       return res.status(404).json({
         status: 'error',
@@ -283,7 +283,7 @@ router.put('/:id', [...validateId, ...validateSquadron, authenticateToken, requi
       });
     }
 
-    const [result] = await db.execute(
+    const [result] = await db.query(
       'UPDATE squadron SET group_id = ?, name = ?, code = ?, location = ?, specialization = ? WHERE id = ?',
       [group_id, name, code || null, location || null, specialization || null, req.params.id]
     );
@@ -296,7 +296,7 @@ router.put('/:id', [...validateId, ...validateSquadron, authenticateToken, requi
       });
     }
 
-    const [updatedSquadron] = await db.execute(
+    const [updatedSquadron] = await db.query(
       `SELECT 
         s.*,
         g.name as group_name,
@@ -355,7 +355,7 @@ router.delete('/:id', [...validateId, authenticateToken, requireAdmin], async (r
     }
 
     // Get current squadron for audit
-    const [currentSquadron] = await db.execute('SELECT * FROM squadron WHERE id = ? AND is_active = TRUE', [req.params.id]);
+    const [currentSquadron] = await db.query('SELECT * FROM squadron WHERE id = ? AND is_active = TRUE', [req.params.id]);
 
     if (currentSquadron.length === 0) {
       return res.status(404).json({
@@ -366,7 +366,7 @@ router.delete('/:id', [...validateId, authenticateToken, requireAdmin], async (r
     }
 
     // Check if squadron has active assignments
-    const [activeAssignments] = await db.execute(
+    const [activeAssignments] = await db.query(
       'SELECT COUNT(*) as count FROM reservist_assignments WHERE squadron_id = ?',
       [req.params.id]
     );
@@ -379,7 +379,7 @@ router.delete('/:id', [...validateId, authenticateToken, requireAdmin], async (r
       });
     }
 
-    const [result] = await db.execute(
+    const [result] = await db.query(
       'UPDATE squadron SET is_active = FALSE WHERE id = ?',
       [req.params.id]
     );

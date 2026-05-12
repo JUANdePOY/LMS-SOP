@@ -6,22 +6,23 @@ import { hierarchyData } from "@/data/hierarchyData";
 
 // Build unique options from hierarchy
 function buildOptions() {
-  const airbases  = hierarchyData.map((a) => a.name);
+  const airbases  = [];
   const arcens    = [];
   const groups    = [];
   const squadrons = [];
 
   hierarchyData.forEach((area) => {
+    airbases.push(area.name);
     area.arcens.forEach((arcen) => {
       arcens.push(arcen.name);
       arcen.groups.forEach((group) => {
-        groups.push(group.name);
-        group.squadrons.forEach((sq) => squadrons.push(sq.name));
+        groups.push({ value: group.name, label: group.name });
+        group.squadrons.forEach((sq) => squadrons.push({ value: sq.name, label: sq.name }));
       });
     });
   });
 
-  return { airbases, arcens, groups, squadrons };
+  return { airbases, arcens, groups, squadrons: [...new Map(squadrons.map(s => [s.value, s])).values()] };
 }
 
 const { airbases, arcens, groups, squadrons } = buildOptions();

@@ -26,8 +26,16 @@ const buildFilterQuery = (filters) => {
   const params = [];
 
   if (filters.status !== undefined) {
-    conditions.push('r.is_active = ?');
-    params.push(filters.status === 'active' ? 1 : 0);
+    if (filters.status === 'active') {
+      conditions.push('r.is_active = ?');
+      params.push(1);
+    } else if (filters.status === 'inactive') {
+      conditions.push('r.is_active = ?');
+      params.push(0);
+    } else if (filters.status === 'standby') {
+      conditions.push('r.reserve_status = ?');
+      params.push('Standby Reserve');
+    }
   }
 
   if (filters.group_id) {
@@ -74,7 +82,7 @@ router.get(
     query('limit').optional().isInt({ min: 1, max: 100 }),
     query('sort_by').optional().isIn(['first_name', 'last_name', 'rank', 'service_number', 'created_at']),
     query('sort_order').optional().isIn(['asc', 'desc']),
-    query('status').optional().isIn(['active', 'inactive']),
+    query('status').optional().isIn(['active', 'inactive', 'standby']),
     query('group_id').optional().isInt(),
     query('squadron_id').optional().isInt(),
     query('rank').optional(),
@@ -104,39 +112,38 @@ router.get(
 
       const filter = buildFilterQuery(req.query);
 
-      // Count total records
-      const countQuery = `
-        SELECT COUNT(DISTINCT r.id) as total
-        FROM reservists r
-        LEFT JOIN users u ON r.user_id = u.id
-        LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id
-        ${filter.whereClause}
-      `;
+const countQuery = `
+         SELECT COUNT(DISTINCT r.id) as total
+         FROM reservists r
+         LEFT JOIN users u ON r.user_id = u.id
+         LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id
+         ${filter.whereClause}
+       `;
 
-      const [countResult] = await db.execute(countQuery, filter.params);
-      const total = countResult[0].total;
+       const [countResult] = await db.query(countQuery, filter.params);
+       const total = countResult[0].total;
 
-      // Fetch paginated records
-      const query = `
-        SELECT 
-          r.id, r.user_id, r.first_name, r.last_name, r.\`rank\`, 
-          r.service_number, r.date_of_birth, r.sex, r.phone_number,
-          r.reserve_status, r.is_active, r.created_at, r.updated_at,
-          u.email, u.role,
-          ra.id as assignment_id, ra.group_id, ra.squadron_id, 
-          g.name as group_name, s.squadron_name
-        FROM reservists r
-        LEFT JOIN users u ON r.user_id = u.id
-        LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
-        LEFT JOIN \`groups\` g ON ra.group_id = g.id
-        LEFT JOIN squadron s ON ra.squadron_id = s.id
-        ${filter.whereClause}
-        ORDER BY r.${sortBy} ${sortOrder}
-        LIMIT ? OFFSET ?
-      `;
+       // Fetch paginated records
+       const query = `
+         SELECT 
+           r.id, r.user_id, r.first_name, r.last_name, r.rank, 
+           r.service_number, r.date_of_birth, r.sex, r.phone_number,
+           r.reserve_status, r.is_active, r.created_at, r.updated_at,
+           u.email, u.role,
+           ra.id as assignment_id, ra.group_id, ra.squadron_id, 
+           g.name as group_name, s.name as squadron_name
+         FROM reservists r
+         LEFT JOIN users u ON r.user_id = u.id
+         LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+         LEFT JOIN \`groups\` g ON ra.group_id = g.id
+         LEFT JOIN squadron s ON ra.squadron_id = s.id
+         ${filter.whereClause}
+         ORDER BY r.${sortBy} ${sortOrder}
+         LIMIT ? OFFSET ?
+       `;
 
       const params = [...filter.params, limit, offset];
-      const [rows] = await db.execute(query, params);
+      const [rows] = await db.query(query, params);
 
       res.json({
         status: 'success',
@@ -176,12 +183,12 @@ router.get('/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    const query = `
+const query = `
       SELECT 
         r.*, u.email, u.role, u.is_active as user_active,
         ra.id as assignment_id, ra.group_id, ra.squadron_id, ra.assigned_date,
         g.name as group_name, g.code as group_code,
-        s.squadron_name, s.location
+        s.name as squadron_name, s.location
       FROM reservists r
       LEFT JOIN users u ON r.user_id = u.id
       LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
@@ -190,7 +197,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
       WHERE r.id = ?
     `;
 
-    const [rows] = await db.execute(query, [id]);
+    const [rows] = await db.query(query, [id]);
 
     if (rows.length === 0) {
       return res.status(404).json({
@@ -259,7 +266,7 @@ router.post(
       } = req.body;
 
       // Check if email or service number already exists
-      const [existing] = await db.execute(
+      const [existing] = await db.query(
         'SELECT id FROM users WHERE email = ? UNION SELECT r.user_id FROM reservists r WHERE r.service_number = ?',
         [email, service_number]
       );
@@ -282,11 +289,11 @@ router.post(
           });
         }
 
-        const [groupData] = await db.execute(
+        const [groupData] = await db.query(
           'SELECT id FROM `groups` WHERE id = ? AND is_active = TRUE',
           [group_id]
         );
-        const [squadronData] = await db.execute(
+        const [squadronData] = await db.query(
           'SELECT id FROM squadron WHERE id = ? AND is_active = TRUE',
           [squadron_id]
         );
@@ -389,7 +396,7 @@ router.post(
         });
 
         // Fetch created reservist
-        const [created] = await db.execute(
+        const [created] = await db.query(
           'SELECT r.*, u.email FROM reservists r JOIN users u ON r.user_id = u.id WHERE r.id = ?',
           [reservistId]
         );
@@ -444,7 +451,7 @@ router.put(
       const { id } = req.params;
 
       // Fetch current reservist
-      const [current] = await db.execute(
+      const [current] = await db.query(
         'SELECT * FROM reservists WHERE id = ?',
         [id]
       );
@@ -495,7 +502,7 @@ router.put(
       console.log(`[UPDATE RESERVIST] Query: ${updateQuery}`);
       console.log(`[UPDATE RESERVIST] Values: ${JSON.stringify(values)}`);
 
-      await db.execute(updateQuery, values);
+      await db.query(updateQuery, values);
       
       console.log(`[UPDATE RESERVIST] Update complete for ID ${id}`);
 
@@ -513,7 +520,7 @@ router.put(
 
       // Fetch updated reservist
       console.log(`[UPDATE RESERVIST] Fetching updated reservist data for ID ${id}`);
-      const [updated] = await db.execute(
+      const [updated] = await db.query(
         'SELECT r.*, u.email FROM reservists r JOIN users u ON r.user_id = u.id WHERE r.id = ?',
         [id]
       );
@@ -543,7 +550,7 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [current] = await db.execute(
+    const [current] = await db.query(
       'SELECT * FROM reservists WHERE id = ?',
       [id]
     );
@@ -557,14 +564,14 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
     }
 
     // Soft delete by setting is_active to false
-    await db.execute(
+    await db.query(
       'UPDATE reservists SET is_active = FALSE WHERE id = ?',
       [id]
     );
 
     // Also deactivate associated user
     const [reservist] = current;
-    await db.execute(
+    await db.query(
       'UPDATE users SET is_active = FALSE WHERE id = ?',
       [reservist.user_id]
     );
@@ -613,7 +620,7 @@ router.get('/:id/assignments', authenticateToken, async (req, res) => {
     }
 
     // Check if reservist exists
-    const [reservist] = await db.execute(
+    const [reservist] = await db.query(
       'SELECT id FROM reservists WHERE id = ?',
       [id]
     );
@@ -626,19 +633,19 @@ router.get('/:id/assignments', authenticateToken, async (req, res) => {
       });
     }
 
-    const query = `
-      SELECT 
-        ra.id, ra.group_id, ra.squadron_id, ra.assigned_date, ra.is_primary,
-        g.name as group_name, g.code as group_code,
-        s.squadron_name, s.location
-      FROM reservist_assignments ra
-      LEFT JOIN \`groups\` g ON ra.group_id = g.id
-      LEFT JOIN squadron s ON ra.squadron_id = s.id
-      WHERE ra.reservist_id = ?
-      ORDER BY ra.assigned_date DESC
-    `;
+const query = `
+       SELECT 
+         ra.id, ra.group_id, ra.squadron_id, ra.assigned_date, ra.is_primary,
+         g.name as group_name, g.code as group_code,
+         s.name as squadron_name, s.location
+       FROM reservist_assignments ra
+       LEFT JOIN \`groups\` g ON ra.group_id = g.id
+       LEFT JOIN squadron s ON ra.squadron_id = s.id
+       WHERE ra.reservist_id = ?
+       ORDER BY ra.assigned_date DESC
+     `;
 
-    const [assignments] = await db.execute(query, [id]);
+    const [assignments] = await db.query(query, [id]);
 
     res.json({
       status: 'success',
@@ -677,7 +684,7 @@ router.post(
       const { group_id, squadron_id } = req.body;
 
       // Check if reservist exists
-      const [reservist] = await db.execute(
+      const [reservist] = await db.query(
         'SELECT id FROM reservists WHERE id = ?',
         [id]
       );
@@ -691,11 +698,11 @@ router.post(
       }
 
       // Validate group and squadron
-      const [groupData] = await db.execute(
+      const [groupData] = await db.query(
         'SELECT id FROM `groups` WHERE id = ? AND is_active = TRUE',
         [group_id]
       );
-      const [squadronData] = await db.execute(
+      const [squadronData] = await db.query(
         'SELECT id FROM squadron WHERE id = ? AND is_active = TRUE',
         [squadron_id]
       );
@@ -709,7 +716,7 @@ router.post(
       }
 
       // Check if squadron belongs to group
-      const [squadronCheck] = await db.execute(
+      const [squadronCheck] = await db.query(
         'SELECT id FROM squadron WHERE id = ? AND group_id = ?',
         [squadron_id, group_id]
       );
@@ -723,7 +730,7 @@ router.post(
       }
 
       // Check if already assigned (primary)
-      const [existing] = await db.execute(
+      const [existing] = await db.query(
         'SELECT id FROM reservist_assignments WHERE reservist_id = ? AND group_id = ? AND squadron_id = ? AND is_primary = TRUE',
         [id, group_id, squadron_id]
       );
@@ -737,13 +744,13 @@ router.post(
       }
 
       // Update primary assignment (set others to non-primary)
-      await db.execute(
+      await db.query(
         'UPDATE reservist_assignments SET is_primary = FALSE WHERE reservist_id = ? AND is_primary = TRUE',
         [id]
       );
 
       // Create new assignment
-      const [result] = await db.execute(
+      const [result] = await db.query(
         'INSERT INTO reservist_assignments (reservist_id, group_id, squadron_id, assigned_date, is_primary) VALUES (?, ?, ?, CURDATE(), TRUE)',
         [id, group_id, squadron_id]
       );
@@ -802,7 +809,7 @@ router.post(
       const { new_password } = req.body;
 
       // Get reservist and associated user
-      const [reservist] = await db.execute(
+      const [reservist] = await db.query(
         'SELECT user_id FROM reservists WHERE id = ?',
         [id]
       );
@@ -821,7 +828,7 @@ router.post(
       const hashedPassword = await hashPassword(new_password);
 
       // Update password
-      await db.execute(
+      await db.query(
         'UPDATE users SET password_hash = ? WHERE id = ?',
         [hashedPassword, userId]
       );
@@ -874,7 +881,7 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
         r.date_of_birth, r.sex, r.phone_number, r.reserve_status,
         r.is_active, r.created_at,
         u.email,
-        g.name as group_name, s.squadron_name
+        g.name as group_name, s.name as squadron_name
       FROM reservists r
       LEFT JOIN users u ON r.user_id = u.id
       LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
@@ -897,7 +904,7 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
 
     query += ' ORDER BY r.last_name, r.first_name';
 
-    const [rows] = await db.execute(query, params);
+    const [rows] = await db.query(query, params);
 
     if (format === 'json') {
       res.json({

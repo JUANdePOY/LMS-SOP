@@ -1,13 +1,14 @@
-import { MapPin, PlaneTakeoff } from "lucide-react";
+import { PlaneTakeoff } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { HierarchyProvider, useHierarchy } from "@/context/HierarchyContext";
+import { HierarchyProvider, useHierarchy } from "@/components/hierarchy/HierarchyContext";
 import AreaAccordion from "@/components/hierarchy/AreaAccordion";
 import SelectedSquadronPanel from "@/components/hierarchy/SelectedSquadronPanel";
 import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
-import { hierarchyData } from "@/data/hierarchyData";
-import { useState } from "react";
+import { getGroups } from "@/services/api";
+import { useState, useEffect } from "react";
 import { Search, X, RotateCcw } from "lucide-react";
+import { Loader } from "lucide-react";
 
 function SummaryCard({ label, value, sub }) {
   return (
@@ -20,14 +21,103 @@ function SummaryCard({ label, value, sub }) {
         {value}
       </span>
       <span className="mt-0.5 text-[11px] font-medium text-neutral-500 dark:text-neutral-500">{label}</span>
-      {sub && <span className="mt-0.5 text-[10px] text-neutral-400 dark:text-neutral-600">{sub}</span>}
     </div>
   );
 }
 
+/**
+ * Transform API hierarchy response into the internal format
+ * expected by AreaAccordion / HierarchyContext components.
+ */
+function transformApiData(apiData) {
+  if (!apiData?.airbase) return null;
+
+  const { airbase } = apiData;
+
+  return [
+    {
+      id: `airbase-${airbase.id || 'pafr'}`,
+      name: airbase.name || 'PAFR Airbase',
+      code: airbase.code || 'PAFR',
+      region: airbase.region || 'National',
+      reservists: airbase.total_reservists || 0,
+      arcens: (airbase.arcens || []).map((arsen) => ({
+        id: `arsen-${arsen.id}`,
+        name: arsen.name || '',
+        fullName: arsen.name || '',
+        code: arsen.code || '',
+        commander: arsen.commander || '',
+        location: arsen.location || '',
+        reservists: arsen.reservists || 0,
+        groups: (arsen.groups || []).map((group) => ({
+          id: `group-${group.id}`,
+          name: group.name || '',
+          code: group.code || '',
+          commander: group.commander || '',
+          reservists: group.reservists || 0,
+          squadrons: (group.squadrons || []).map((sq) => ({
+            id: `sq-${sq.id}`,
+            name: sq.name || '',
+            code: sq.code || '',
+            status: sq.status || 'active',
+            members: sq.members || 0,
+            specialization: sq.specialization || '',
+            location: sq.location || '',
+          })),
+        })),
+      })),
+    },
+  ];
+}
+
 function OverviewContent() {
   const [search, setSearch] = useState("");
+  const [hierarchyData, setHierarchyData] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState(null);
   const { resetAll, selectedSquadron } = useHierarchy();
+
+  useEffect(() => {
+    fetchHierarchy();
+  }, []);
+
+  useEffect(() => {
+    if (authError) {
+      // Show error for 3 seconds before redirecting
+      const timer = setTimeout(() => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [authError]);
+
+  const fetchHierarchy = async () => {
+    setLoading(true);
+
+    try {
+      const response = await getGroups({ hierarchical: true }, { skipAuthRedirect: true });
+      if (response.data.status === 'success') {
+        const apiData = response.data.data;
+        const transformed = transformApiData(apiData);
+        if (transformed) {
+          setHierarchyData(transformed);
+        }
+        setSummary(apiData.summary || null);
+      }
+    } catch (err) {
+      const status = err.response?.status;
+      if (status === 401 || status === 403) {
+        setAuthError(err.message);
+        return;
+      }
+      console.warn('Could not load hierarchy from API:', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const totalReservists = hierarchyData.reduce((a, area) => a + area.reservists, 0);
   const totalArcens     = hierarchyData.reduce((a, area) => a + area.arcens.length, 0);
@@ -97,11 +187,11 @@ function OverviewContent() {
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-        <SummaryCard label="Airbases"   value={hierarchyData.length} />
-        <SummaryCard label="ARCENs"     value={totalArcens} />
-        <SummaryCard label="Groups"     value={totalGroups} />
-        <SummaryCard label="Squadrons"  value={totalSquadrons} />
-        <SummaryCard label="Reservists" value={totalReservists.toLocaleString()} />
+        <SummaryCard label="Airbases"   value={summary?.total_arcens ?? totalArcens} />
+        <SummaryCard label="ARCENs"     value={summary?.total_arcens ?? totalArcens} />
+        <SummaryCard label="Groups"     value={summary?.total_groups ?? totalGroups} />
+        <SummaryCard label="Squadrons"  value={summary?.total_squadrons ?? totalSquadrons} />
+        <SummaryCard label="Reservists" value={(summary?.total_reservists ?? totalReservists).toLocaleString()} />
       </div>
 
       {/* Search + collapse */}
@@ -158,9 +248,19 @@ function OverviewContent() {
       </div>
 
       {/* Accordion list */}
-      {filtered.length === 0 ? (
+      {authError ? (
+        <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-6 text-center">
+          <div className="text-red-600 dark:text-red-400 mb-2">
+            <p className="font-medium">Authentication Error</p>
+            <p className="text-sm mt-1">{authError}</p>
+          </div>
+          <p className="text-xs text-red-500 dark:text-red-500 mt-2">
+            Redirecting to login page in a few seconds...
+          </p>
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-neutral-200 dark:border-neutral-800 py-12 text-center">
-          <p className="text-sm text-neutral-400">No areas match your search.</p>
+          <p className="text-sm text-neutral-400">No data available. Please log in to view hierarchy.</p>
           <button onClick={() => setSearch("")} className="mt-2 text-xs text-indigo-500 hover:underline">Clear search</button>
         </div>
       ) : (

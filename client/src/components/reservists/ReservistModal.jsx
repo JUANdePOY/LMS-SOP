@@ -53,6 +53,18 @@ export default function ReservistModal({ open, mode, form, onChange, onClose, on
       onSubmit={onSubmit}
       submitLabel={mode === "add" ? "Add Reservist" : "Save Changes"}
     >
+      {/* Login credentials - only for add mode */}
+      {mode === "add" && (
+        <div className="grid grid-cols-2 gap-3">
+          <FormField label="Email" required>
+            <FormInput type="email" value={form.email} onChange={set("email")} placeholder="juan@example.com" />
+          </FormField>
+          <FormField label="Password" required>
+            <FormInput type="password" value={form.password} onChange={set("password")} placeholder="Minimum 6 characters" />
+          </FormField>
+        </div>
+      )}
+
       {/* Personal info */}
       <div className="grid grid-cols-2 gap-3">
         <FormField label="First Name" required>

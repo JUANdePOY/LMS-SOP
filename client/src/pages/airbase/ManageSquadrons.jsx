@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Layers, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
@@ -6,7 +6,7 @@ import ManagementTable from "@/components/airbase/ManagementTable";
 import { StatusBadge, MonoCode, PrimaryButton, FilterSelect } from "@/components/airbase/AirbaseUI";
 import AddEditModal, { FormField, FormInput, FormSelect } from "@/components/airbase/AddEditModal";
 import DetailModal, { DetailSection, DetailRow, DetailStatCard } from "@/components/airbase/DetailModal";
-import { hierarchyData } from "@/data/hierarchyData";
+import { getSquadrons, getArcens, getGroupsList, createSquadron, updateSquadron, deleteSquadron } from "@/services/api";
 
 const SPECIALIZATIONS = [
   "Security", "Engineering", "Communications", "Medical", "Supply",
@@ -14,106 +14,110 @@ const SPECIALIZATIONS = [
   "Surveillance", "Cyber", "Dental", "Nursing", "Administrative",
 ];
 
-function flattenSquadrons() {
-  const rows = [];
-  hierarchyData.forEach((area) => {
-    area.arcens.forEach((arcen) => {
-      arcen.groups.forEach((group) => {
-        group.squadrons.forEach((sq) => {
-          rows.push({
-            id:             sq.id,
-            name:           sq.name,
-            code:           sq.code,
-            status:         sq.status,
-            members:        sq.members,
-            specialization: sq.specialization,
-            location:       sq.location,
-            groupId:        group.id,
-            groupName:      group.name,
-            groupCode:      group.code,
-            groupType:      group.type,
-            arcenId:        arcen.id,
-            arcenName:      arcen.name,
-            arcenFull:      arcen.fullName,
-          });
-        });
-      });
-    });
-  });
-  return rows;
-}
-
-function buildGroupOptions() {
-  const list = [];
-  hierarchyData.forEach((area) => {
-    area.arcens.forEach((arcen) => {
-      arcen.groups.forEach((group) => {
-        list.push({
-          value:     group.id,
-          label:     `${group.name} — ${arcen.name}`,
-          groupName: group.name,
-          groupCode: group.code,
-          groupType: group.type,
-          arcenId:   arcen.id,
-          arcenName: arcen.name,
-          arcenFull: arcen.fullName,
-        });
-      });
-    });
-  });
-  return list;
-}
-
-function buildArcenOptions() {
-  return hierarchyData.flatMap((area) =>
-    area.arcens.map((arcen) => ({ value: arcen.id, label: arcen.name }))
-  );
-}
-
-const INITIAL_DATA  = flattenSquadrons();
-const GROUP_OPTIONS = buildGroupOptions();
-const ARCEN_OPTIONS = buildArcenOptions();
-const EMPTY_FORM    = { name: "", code: "", groupId: "", specialization: "", location: "", members: "", status: "active" };
-
-const COLUMNS = [
-  { key: "name",           label: "Squadron",       sortable: true  },
-  { key: "code",           label: "Code",           sortable: true  },
-  { key: "groupName",      label: "Group",          sortable: true  },
-  { key: "arcenName",      label: "ARCEN",          sortable: true  },
-  { key: "location",       label: "Location",       sortable: true  },
-  { key: "specialization", label: "Specialization", sortable: true  },
-  { key: "members",        label: "Members",        sortable: true  },
-  { key: "status",         label: "Status",         sortable: false },
-];
-
 export default function ManageSquadrons() {
-  const [data,         setData]         = useState(INITIAL_DATA);
+  const [data,         setData]         = useState([]);
+  const [groupOptions, setGroupOptions] = useState([]);
+  const [arcenOptions, setArcenOptions] = useState([]);
+  const [loading,      setLoading]      = useState(false);
   const [detail,       setDetail]       = useState(null);
   const [editModal,    setEditModal]    = useState(false);
   const [editMode,     setEditMode]     = useState("add");
-  const [form,         setForm]         = useState(EMPTY_FORM);
+  const [form,         setForm]         = useState({ name: "", code: "", groupId: "", specialization: "", location: "", members: "", status: "active" });
   const [arcenFilter,  setArcenFilter]  = useState("");
   const [groupFilter,  setGroupFilter]  = useState("");
   const [specFilter,   setSpecFilter]   = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
+  useEffect(() => {
+    fetchArcenOptions();
+    fetchGroupOptions();
+    fetchSquadrons();
+  }, []);
+
+  const fetchArcenOptions = async () => {
+    try {
+      const response = await getArcens();
+      if (response.data.status === 'success') {
+        const options = response.data.data.map(arcen => ({
+          value: String(arcen.id),
+          label: arcen.name,
+        }));
+        setArcenOptions(options);
+      }
+    } catch (err) {
+      console.error('Failed to fetch ARCENs:', err);
+    }
+  };
+
+  const fetchGroupOptions = async () => {
+    try {
+      const response = await getGroupsList();
+      if (response.data.status === 'success') {
+        const options = response.data.data.map(group => ({
+          value: String(group.id),
+          label: `${group.name} — ${group.arsen_name}`,
+          groupName: group.name,
+          groupCode: group.code,
+          groupType: group.type || 'Combat Support',
+          arcenId: String(group.arsen_id),
+          arcenName: group.arsen_name || '',
+          arcenFull: group.arsen_code || '',
+        }));
+        setGroupOptions(options);
+      }
+    } catch (err) {
+      console.error('Failed to fetch groups:', err);
+    }
+  };
+
+  const fetchSquadrons = async () => {
+    setLoading(true);
+    try {
+      const response = await getSquadrons();
+      if (response.data.status === 'success') {
+        const transformed = response.data.data.map(sq => ({
+          id: `sq-${sq.id}`,
+          dbId: sq.id,
+          name: sq.name,
+          code: sq.code,
+          status: sq.is_active ? 'active' : 'inactive',
+          members: sq.members || 0,
+          specialization: sq.specialization || '',
+          location: sq.location || '',
+          groupId: String(sq.group_id),
+          groupName: sq.group_name || '',
+          groupCode: sq.group_code || '',
+          groupType: 'Combat Support',
+          arcenId: '',
+          arcenName: sq.arsen_name || '',
+          arcenFull: '',
+        }));
+        setData(transformed);
+      }
+    } catch (err) {
+      console.error('Failed to fetch squadrons:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredGroupOptions = useMemo(() =>
-    arcenFilter ? GROUP_OPTIONS.filter((g) => g.arcenId === arcenFilter) : GROUP_OPTIONS,
-    [arcenFilter]
+    arcenFilter ? groupOptions.filter((g) => g.arcenId === arcenFilter) : groupOptions,
+    [arcenFilter, groupOptions]
   );
 
   const filteredData = useMemo(() => {
     let d = data;
-    if (arcenFilter)  d = d.filter((r) => r.arcenId        === arcenFilter);
-    if (groupFilter)  d = d.filter((r) => r.groupId        === groupFilter);
+    if (arcenFilter)  d = d.filter((r) => r.arcenName === arcenFilter || (r.arcenId && r.arcenId === arcenFilter));
+    if (groupFilter)  d = d.filter((r) => r.groupId === groupFilter);
     if (specFilter)   d = d.filter((r) => r.specialization === specFilter);
-    if (statusFilter) d = d.filter((r) => r.status         === statusFilter);
+    if (statusFilter) d = d.filter((r) => r.status === statusFilter);
     return d;
   }, [data, arcenFilter, groupFilter, specFilter, statusFilter]);
 
   const handleArcenFilter = (val) => { setArcenFilter(val); setGroupFilter(""); };
 
-  const openAdd = () => { setForm(EMPTY_FORM); setEditMode("add"); setEditModal(true); };
+  const openAdd = () => { setForm({ name: "", code: "", groupId: "", specialization: "", location: "", members: "", status: "active" }); setEditMode("add"); setEditModal(true); };
   const openEdit = (row) => {
     setForm({ name: row.name, code: row.code, groupId: row.groupId, specialization: row.specialization, location: row.location, members: String(row.members), status: row.status });
     setEditMode("edit");
@@ -122,39 +126,68 @@ export default function ManageSquadrons() {
   };
   const closeEdit = () => setEditModal(false);
 
-  const handleSubmit = () => {
-    const grp = GROUP_OPTIONS.find((g) => g.value === form.groupId);
-    if (editMode === "add") {
-      setData((prev) => [...prev, {
-        id: `sq-${Date.now()}`, ...form,
-        groupName: grp?.groupName ?? "", groupCode: grp?.groupCode ?? "", groupType: grp?.groupType ?? "",
-        arcenId: grp?.arcenId ?? "", arcenName: grp?.arcenName ?? "", arcenFull: grp?.arcenFull ?? "",
-        members: Number(form.members) || 0,
-      }]);
-    } else if (detail) {
-      const updated = {
-        ...detail, ...form,
-        groupName: grp?.groupName ?? detail.groupName, groupCode: grp?.groupCode ?? detail.groupCode,
-        groupType: grp?.groupType ?? detail.groupType, arcenId: grp?.arcenId ?? detail.arcenId,
-        arcenName: grp?.arcenName ?? detail.arcenName, arcenFull: grp?.arcenFull ?? detail.arcenFull,
-        members: Number(form.members) || detail.members,
-      };
-      setData((prev) => prev.map((r) => r.id === detail.id ? updated : r));
-      setDetail(updated);
+  const handleSubmit = async () => {
+    try {
+      const grp = groupOptions.find((g) => g.value === form.groupId);
+      if (editMode === "add") {
+        const response = await createSquadron({
+          group_id: parseInt(form.groupId),
+          name: form.name,
+          code: form.code,
+          location: form.location,
+          specialization: form.specialization,
+        });
+        if (response.data.status === 'success') {
+          await fetchSquadrons();
+        }
+      } else if (detail) {
+        const response = await updateSquadron(detail.dbId, {
+          group_id: parseInt(form.groupId),
+          name: form.name,
+          code: form.code,
+          location: form.location,
+          specialization: form.specialization,
+        });
+        if (response.data.status === 'success') {
+          await fetchSquadrons();
+        }
+      }
+      closeEdit();
+    } catch (err) {
+      console.error('Failed to save squadron:', err);
     }
-    closeEdit();
   };
 
-  const handleDelete = (row) => {
+  const handleDelete = async (row) => {
     if (!confirm(`Delete ${row.name} Squadron?`)) return;
-    setData((prev) => prev.filter((r) => r.id !== row.id));
-    setDetail(null);
+    try {
+      const response = await deleteSquadron(row.dbId);
+      if (response.data.status === 'success') {
+        setData((prev) => prev.filter((r) => r.id !== row.id));
+        setDetail(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete squadron:', err);
+    }
   };
 
-  const toggleStatus = (row) => {
-    const updated = { ...row, status: row.status === "active" ? "inactive" : "active" };
-    setData((prev) => prev.map((r) => r.id === row.id ? updated : r));
-    setDetail(updated);
+  const toggleStatus = async (row) => {
+    try {
+      const response = await updateSquadron(row.dbId, {
+        group_id: parseInt(row.groupId),
+        name: row.name,
+        code: row.code,
+        location: row.location,
+        specialization: row.specialization,
+      });
+      if (response.data.status === 'success') {
+        const updated = { ...row, status: row.status === "active" ? "inactive" : "active" };
+        setData((prev) => prev.map((r) => r.id === row.id ? updated : r));
+        setDetail(updated);
+      }
+    } catch (err) {
+      console.error('Failed to toggle status:', err);
+    }
   };
 
   return (
@@ -186,17 +219,26 @@ export default function ManageSquadrons() {
       </div>
 
       <ManagementTable
-        columns={COLUMNS}
+        columns={[
+          { key: "name",           label: "Squadron",       sortable: true  },
+          { key: "code",           label: "Code",           sortable: true  },
+          { key: "groupName",      label: "Group",          sortable: true  },
+          { key: "arcenName",      label: "ARCEN",          sortable: true  },
+          { key: "location",       label: "Location",       sortable: true  },
+          { key: "specialization", label: "Specialization", sortable: true  },
+          { key: "members",        label: "Members",        sortable: true  },
+          { key: "status",         label: "Status",         sortable: false },
+        ]}
         data={filteredData}
         searchKeys={["name", "code", "groupName", "arcenName", "location", "specialization"]}
         searchPlaceholder="Search squadron, location, group…"
         emptyMessage="No squadrons found."
         filterSlot={
           <>
-            <FilterSelect value={arcenFilter}  onChange={handleArcenFilter}  options={ARCEN_OPTIONS}  placeholder="All ARCENs" />
-            <FilterSelect value={groupFilter}   onChange={setGroupFilter}     options={filteredGroupOptions.map((g) => ({ value: g.value, label: g.label }))} placeholder="All Groups" />
-            <FilterSelect value={specFilter}    onChange={setSpecFilter}      options={SPECIALIZATIONS} placeholder="All Spec." />
-            <FilterSelect value={statusFilter}  onChange={setStatusFilter}    options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} placeholder="All Status" />
+            <FilterSelect value={arcenFilter}  onChange={handleArcenFilter}  options={arcenOptions}  placeholder="All ARCENs" />
+            <FilterSelect value={groupFilter}  onChange={setGroupFilter}      options={filteredGroupOptions.map((g) => ({ value: g.value, label: g.label }))} placeholder="All Groups" />
+            <FilterSelect value={specFilter}   onChange={setSpecFilter}       options={SPECIALIZATIONS} placeholder="All Spec." />
+            <FilterSelect value={statusFilter} onChange={setStatusFilter}     options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]} placeholder="All Status" />
           </>
         }
         renderRow={(row) => (
@@ -297,7 +339,7 @@ export default function ManageSquadrons() {
         <FormField label="Group" required>
           <FormSelect value={form.groupId} onChange={(v) => setForm((f) => ({ ...f, groupId: v }))}>
             <option value="">Select Group…</option>
-            {GROUP_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            {groupOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </FormSelect>
         </FormField>
         <FormField label="Location">

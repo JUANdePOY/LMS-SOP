@@ -24,16 +24,17 @@ function SortIcon({ field, sortField, sortDir }) {
 }
 
 function ReadinessBar({ value }) {
-  const color = value >= 80 ? "bg-emerald-400" : value >= 60 ? "bg-amber-400" : "bg-red-400";
-  const text  = value >= 80 ? "text-emerald-600 dark:text-emerald-400"
-              : value >= 60 ? "text-amber-600 dark:text-amber-400"
-              : "text-red-500 dark:text-red-400";
+  const score = value || 0;
+  const color = score >= 80 ? "bg-emerald-400" : score >= 60 ? "bg-amber-400" : "bg-red-400";
+  const text  = score >= 80 ? "text-emerald-600 dark:text-emerald-400"
+               : score >= 60 ? "text-amber-600 dark:text-amber-400"
+               : "text-red-500 dark:text-red-400";
   return (
     <div className="flex items-center gap-2 min-w-[80px]">
       <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800">
-        <div className={cn("h-full rounded-full", color)} style={{ width: `${value}%` }} />
+        <div className={cn("h-full rounded-full", color)} style={{ width: `${score}%` }} />
       </div>
-      <span className={cn("text-[11px] font-semibold w-8 text-right", text)}>{value}%</span>
+      <span className={cn("text-[11px] font-semibold w-8 text-right", text)}>{score}%</span>
     </div>
   );
 }

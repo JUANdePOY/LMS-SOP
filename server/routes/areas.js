@@ -79,7 +79,7 @@ router.get('/', [
 
     // Get total count
     const countQuery = `SELECT COUNT(*) as total FROM areas a ${whereClause}`;
-    const [countResult] = await db.execute(countQuery, queryParams);
+    const [countResult] = await db.query(countQuery, queryParams);
     const total = countResult[0].total;
 
     // Get areas with children count
@@ -106,7 +106,7 @@ router.get('/', [
       LIMIT ? OFFSET ?
     `;
 
-    const [areas] = await db.execute(dataQuery, [...queryParams, limit, offset]);
+    const [areas] = await db.query(dataQuery, [...queryParams, limit, offset]);
 
     // Parse geographic_boundary JSON if present
     const parsedAreas = areas.map(area => ({
@@ -153,7 +153,7 @@ router.get('/:id', validateId, authenticateToken, async (req, res) => {
       });
     }
 
-    const [areas] = await db.execute(`
+    const [areas] = await db.query(`
       SELECT
         a.id,
         a.parent_area_id,
@@ -217,7 +217,7 @@ router.post('/', validateArea, authenticateToken, requireAdmin, async (req, res)
     const { name, code, parent_area_id, description, geographic_boundary } = req.body;
 
     // Verify code is unique
-    const [existingArea] = await db.execute(
+    const [existingArea] = await db.query(
       'SELECT id FROM areas WHERE code = ?',
       [code]
     );
@@ -232,7 +232,7 @@ router.post('/', validateArea, authenticateToken, requireAdmin, async (req, res)
 
     // Verify parent area exists if provided
     if (parent_area_id) {
-      const [parentArea] = await db.execute(
+      const [parentArea] = await db.query(
         'SELECT id FROM areas WHERE id = ?',
         [parent_area_id]
       );
@@ -248,7 +248,7 @@ router.post('/', validateArea, authenticateToken, requireAdmin, async (req, res)
 
     // Check for circular reference (prevent parent from being a descendant of this area)
     if (parent_area_id) {
-      const [circularCheck] = await db.execute(`
+      const [circularCheck] = await db.query(`
         WITH RECURSIVE area_tree AS (
           SELECT id, parent_area_id FROM areas WHERE id = ?
           UNION ALL
@@ -271,12 +271,12 @@ router.post('/', validateArea, authenticateToken, requireAdmin, async (req, res)
       (typeof geographic_boundary === 'string' ? geographic_boundary : JSON.stringify(geographic_boundary))
       : null;
 
-    const [result] = await db.execute(
+    const [result] = await db.query(
       'INSERT INTO areas (parent_area_id, name, code, description, geographic_boundary) VALUES (?, ?, ?, ?, ?)',
       [parent_area_id || null, name, code, description || null, geoBoundary]
     );
 
-    const [newArea] = await db.execute(`
+    const [newArea] = await db.query(`
       SELECT
         a.id,
         a.parent_area_id,
@@ -340,7 +340,7 @@ router.put('/:id', [...validateId, ...validateArea], authenticateToken, requireA
     const { name, code, parent_area_id, description, geographic_boundary } = req.body;
 
     // Get current area for audit
-    const [currentArea] = await db.execute('SELECT * FROM areas WHERE id = ?', [req.params.id]);
+    const [currentArea] = await db.query('SELECT * FROM areas WHERE id = ?', [req.params.id]);
 
     if (currentArea.length === 0) {
       return res.status(404).json({
@@ -351,7 +351,7 @@ router.put('/:id', [...validateId, ...validateArea], authenticateToken, requireA
     }
 
     // Verify code is unique (excluding current record)
-    const [duplicateCode] = await db.execute(
+    const [duplicateCode] = await db.query(
       'SELECT id FROM areas WHERE code = ? AND id != ?',
       [code, req.params.id]
     );
@@ -366,7 +366,7 @@ router.put('/:id', [...validateId, ...validateArea], authenticateToken, requireA
 
     // Verify parent area exists if provided and different
     if (parent_area_id && parent_area_id !== currentArea[0].parent_area_id) {
-      const [parentArea] = await db.execute(
+      const [parentArea] = await db.query(
         'SELECT id FROM areas WHERE id = ?',
         [parent_area_id]
       );
@@ -380,7 +380,7 @@ router.put('/:id', [...validateId, ...validateArea], authenticateToken, requireA
       }
 
       // Check for circular reference
-      const [circularCheck] = await db.execute(`
+      const [circularCheck] = await db.query(`
         WITH RECURSIVE area_tree AS (
           SELECT id, parent_area_id FROM areas WHERE id = ?
           UNION ALL
@@ -403,7 +403,7 @@ router.put('/:id', [...validateId, ...validateArea], authenticateToken, requireA
       (typeof geographic_boundary === 'string' ? geographic_boundary : JSON.stringify(geographic_boundary))
       : (currentArea[0].geographic_boundary);
 
-    const [result] = await db.execute(
+    const [result] = await db.query(
       'UPDATE areas SET parent_area_id = ?, name = ?, code = ?, description = ?, geographic_boundary = ? WHERE id = ?',
       [parent_area_id || null, name, code, description || null, geoBoundary, req.params.id]
     );
@@ -416,7 +416,7 @@ router.put('/:id', [...validateId, ...validateArea], authenticateToken, requireA
       });
     }
 
-    const [updatedArea] = await db.execute(`
+    const [updatedArea] = await db.query(`
       SELECT
         a.id,
         a.parent_area_id,
@@ -479,7 +479,7 @@ router.delete('/:id', validateId, authenticateToken, requireAdmin, async (req, r
     }
 
     // Get current area for audit
-    const [currentArea] = await db.execute(
+    const [currentArea] = await db.query(
       'SELECT * FROM areas WHERE id = ? AND is_active = TRUE',
       [req.params.id]
     );
@@ -493,7 +493,7 @@ router.delete('/:id', validateId, authenticateToken, requireAdmin, async (req, r
     }
 
     // Check if area has active children
-    const [activeChildren] = await db.execute(
+    const [activeChildren] = await db.query(
       'SELECT COUNT(*) as count FROM areas WHERE parent_area_id = ? AND is_active = TRUE',
       [req.params.id]
     );
@@ -507,7 +507,7 @@ router.delete('/:id', validateId, authenticateToken, requireAdmin, async (req, r
       });
     }
 
-    const [result] = await db.execute(
+    const [result] = await db.query(
       'UPDATE areas SET is_active = FALSE WHERE id = ?',
       [req.params.id]
     );
@@ -567,7 +567,7 @@ router.get('/:id/descendants', [
     const includeInactive = include_inactive === true || include_inactive === 'true';
 
     // Verify parent area exists
-    const [parentArea] = await db.execute(
+    const [parentArea] = await db.query(
       'SELECT id, name, code FROM areas WHERE id = ?',
       [req.params.id]
     );
@@ -582,7 +582,7 @@ router.get('/:id/descendants', [
 
     // Get all descendants using recursive CTE
     const activeCondition = includeInactive ? '' : 'AND a.is_active = TRUE';
-    const [descendants] = await db.execute(`
+    const [descendants] = await db.query(`
       WITH RECURSIVE area_tree AS (
         SELECT
           a.id,

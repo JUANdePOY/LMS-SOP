@@ -12,10 +12,10 @@ export default function ReservistStatsBar({ data }) {
   const standby  = data.filter((r) => r.status === "standby").length;
 
   const avgReadiness  = total
-    ? Math.round(data.reduce((a, r) => a + r.readinessScore, 0)  / total)
+    ? Math.round(data.reduce((a, r) => a + (r.readinessScore || 0), 0)  / total)
     : 0;
   const avgAttendance = total
-    ? Math.round(data.reduce((a, r) => a + r.attendanceRate, 0) / total)
+    ? Math.round(data.reduce((a, r) => a + (r.attendanceRate || 0), 0) / total)
     : 0;
 
   const stats = [

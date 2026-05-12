@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { CheckCircle2, XCircle, Users, Tag, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useHierarchy } from "@/context/HierarchyContext";
+import { useHierarchy } from "./HierarchyContext";
 import MembersModal from "./MembersModal";
 
 function StatusBadge({ status }) {

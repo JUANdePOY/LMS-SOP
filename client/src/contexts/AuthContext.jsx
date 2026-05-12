@@ -28,20 +28,20 @@ export function AuthProvider({ children }) {
     setLoading(false);
   }, []);
 
-  const login = useCallback(async (email, password) => {
+  const login = useCallback(async (id_number, password) => {
     setError(null);
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/login', { email, password });
-      
+      const response = await api.post('/auth/login', { id_number, password });
+
       if (response.data.status === 'success') {
         const { token, user: userData } = response.data.data;
-        
+
         // Store token and user data
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(userData));
-        
+
         setUser(userData);
         return { success: true, user: userData };
       } else {
