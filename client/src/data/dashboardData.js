@@ -71,7 +71,7 @@ export const trainingActivityData = [
   { area: "Surigao",    trainings: 26 },
   { area: "Tandag",     trainings: 20 },
   { area: "Bayugan",    trainings: 16 },
-  { area: "Cab.",       trainings: 16 },
+  { area: "Cabadbaran",       trainings: 16 },
   { area: "Others",     trainings: 10 },
 ];
 

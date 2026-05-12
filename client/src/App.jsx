@@ -1,20 +1,27 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import AppLayout from "@/layout/AppLayout";
-
-// Pages — lazy-loaded for performance
 import { lazy, Suspense } from "react";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ToastProvider } from "@/components/Toast";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import ProtectedRoute from "@/components/ProtectedRoute";
 
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const Reservations = lazy(() => import("@/pages/Reservations"));
-const Groups = lazy(() => import("@/pages/Groups"));
-const Areas = lazy(() => import("@/pages/Areas"));
-const Trainings = lazy(() => import("@/pages/Trainings"));
-const Attendance = lazy(() => import("@/pages/Attendance"));
-const Analytics = lazy(() => import("@/pages/Analytics"));
-const Logistics = lazy(() => import("@/pages/Logistics"));
-const Reports = lazy(() => import("@/pages/Reports"));
+// Pages
+const Dashboard         = lazy(() => import("@/pages/Dashboard"));
+const Reservists        = lazy(() => import("@/pages/Reservists"));
+const Trainings         = lazy(() => import("@/pages/Trainings"));
+const Attendance        = lazy(() => import("@/pages/Attendance"));
+const Analytics         = lazy(() => import("@/pages/Analytics"));
+const Logistics         = lazy(() => import("@/pages/Logistics"));
+const Reports           = lazy(() => import("@/pages/Reports"));
+const Login             = lazy(() => import("@/pages/Login"));
 
-// Simple fallback while lazy chunks load
+// Airbase pages
+const AirbaseOverview   = lazy(() => import("@/pages/airbase/AirbaseOverview"));
+const ManageArcens      = lazy(() => import("@/pages/airbase/ManageArcens"));
+const ManageGroups      = lazy(() => import("@/pages/airbase/ManageGroups"));
+const ManageSquadrons   = lazy(() => import("@/pages/airbase/ManageSquadrons"));
+
 function PageLoader() {
   return (
     <div className="flex h-screen items-center justify-center">
@@ -23,87 +30,58 @@ function PageLoader() {
   );
 }
 
+function wrap(Component) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Component />
+    </Suspense>
+  );
+}
+
+function ProtectedWrapper(Component) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ProtectedRoute>
+        <Component />
+      </ProtectedRoute>
+    </Suspense>
+  );
+}
+
 const router = createBrowserRouter([
   {
+    path: "/login",
+    element: wrap(Login),
+  },
+  {
     path: "/",
-    element: <AppLayout />,
+    element: (
+      <ErrorBoundary>
+        <ToastProvider>
+          <AppLayout />
+        </ToastProvider>
+      </ErrorBoundary>
+    ),
     children: [
-      {
-        index: true,
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Dashboard />
-          </Suspense>
-        ),
-      },
-      {
-        path: "reservations",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Reservations />
-          </Suspense>
-        ),
-      },
-      {
-        path: "groups",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Groups />
-          </Suspense>
-        ),
-      },
-      {
-        path: "areas",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Areas />
-          </Suspense>
-        ),
-      },
-      {
-        path: "trainings",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Trainings />
-          </Suspense>
-        ),
-      },
-      {
-        path: "attendance",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Attendance />
-          </Suspense>
-        ),
-      },
-      {
-        path: "analytics",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Analytics />
-          </Suspense>
-        ),
-      },
-      {
-        path: "logistics",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Logistics />
-          </Suspense>
-        ),
-      },
-      {
-        path: "reports",
-        element: (
-          <Suspense fallback={<PageLoader />}>
-            <Reports />
-          </Suspense>
-        ),
-      },
+      { index: true,           element: ProtectedWrapper(Dashboard)       },
+      { path: "reservists",    element: ProtectedWrapper(Reservists)      },
+      { path: "trainings",     element: ProtectedWrapper(Trainings)       },
+      { path: "attendance",    element: ProtectedWrapper(Attendance)      },
+      { path: "analytics",     element: ProtectedWrapper(Analytics)       },
+      { path: "logistics",     element: ProtectedWrapper(Logistics)       },
+      { path: "reports",       element: ProtectedWrapper(Reports)         },
+      { path: "airbase",      element: ProtectedWrapper(AirbaseOverview) },
+      { path: "airbase/arcens",   element: ProtectedWrapper(ManageArcens) },
+      { path: "airbase/groups",   element: ProtectedWrapper(ManageGroups) },
+      { path: "airbase/squadrons",element: ProtectedWrapper(ManageSquadrons) },
     ],
   },
 ]);
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <AuthProvider>
+      <RouterProvider router={router} />
+    </AuthProvider>
+  );
 }

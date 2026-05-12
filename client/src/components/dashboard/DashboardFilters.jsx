@@ -1,166 +1,116 @@
-import { useState } from "react";
-import { Calendar, ChevronDown, SlidersHorizontal, X } from "lucide-react";
+import { Filter, ChevronDown, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { filterOptions } from "@/data/dashboardData";
 
-function FilterSelect({ icon: Icon, value, options, onChange, className }) {
-  const [open, setOpen] = useState(false);
-
+/**
+ * FilterSelect
+ * Reusable styled <select> wrapper.
+ */
+function FilterSelect({ label, value, options, onChange }) {
   return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={cn(
-          "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium",
-          "border border-neutral-200 dark:border-neutral-700",
-          "bg-white dark:bg-neutral-800",
-          "text-neutral-700 dark:text-neutral-200",
-          "hover:border-neutral-300 dark:hover:border-neutral-600",
-          "hover:bg-neutral-50 dark:hover:bg-neutral-750",
-          "transition-all duration-150",
-          className
-        )}
-      >
-        {Icon && <Icon size={14} className="text-neutral-400 dark:text-neutral-500 shrink-0" />}
-        <span className="max-w-[140px] truncate">{value}</span>
-        <ChevronDown
-          size={13}
+    <div className="flex flex-col gap-1">
+      <label className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-600 px-0.5">
+        {label}
+      </label>
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
           className={cn(
-            "text-neutral-400 shrink-0 transition-transform duration-150",
-            open && "rotate-180"
+            "appearance-none rounded-lg border pr-7 pl-3 py-2 text-xs font-medium",
+            "border-neutral-200 dark:border-neutral-700",
+            "bg-white dark:bg-neutral-900",
+            "text-neutral-700 dark:text-neutral-300",
+            "outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400",
+            "transition-all duration-150 cursor-pointer min-w-[140px]"
           )}
+        >
+          {options.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+        <ChevronDown
+          size={12}
+          className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 dark:text-neutral-600"
         />
-      </button>
-
-      {open && (
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          {/* Dropdown */}
-          <div className={cn(
-            "absolute top-full left-0 mt-1.5 z-50 min-w-[180px]",
-            "rounded-lg border border-neutral-200 dark:border-neutral-700",
-            "bg-white dark:bg-neutral-800 shadow-lg shadow-black/10 dark:shadow-black/40",
-            "overflow-hidden"
-          )}>
-            {options.map((opt) => (
-              <button
-                key={opt}
-                onClick={() => { onChange(opt); setOpen(false); }}
-                className={cn(
-                  "w-full text-left px-3 py-2 text-sm",
-                  "hover:bg-neutral-50 dark:hover:bg-neutral-700",
-                  "transition-colors duration-100",
-                  value === opt
-                    ? "text-indigo-600 dark:text-indigo-400 font-medium bg-indigo-50 dark:bg-indigo-500/10"
-                    : "text-neutral-700 dark:text-neutral-300"
-                )}
-              >
-                {opt}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
+      </div>
     </div>
   );
 }
 
 /**
  * DashboardFilters
- * Smart filter bar: date range, group/unit, area, status + active filter chips
+ * Smart filter bar — owns display; parent owns state.
+ *
+ * @param {{ filters: object, onChange: (patch: object) => void }} props
  */
 export default function DashboardFilters({ filters, onChange }) {
-  const activeFilters = Object.entries(filters).filter(
-    ([k, v]) => !v.startsWith("All") && k !== "dateRange"
-  );
+  const patch = (key) => (val) => onChange({ ...filters, [key]: val });
+
+  const handleReset = () =>
+    onChange({
+      dateRange: filterOptions.dateRanges[0],
+      group:     filterOptions.groups[0],
+      area:      filterOptions.areas[0],
+      status:    filterOptions.statuses[0],
+    });
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* ── Filter row ──────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <FilterSelect
-          icon={Calendar}
-          value={filters.dateRange}
-          options={filterOptions.dateRanges}
-          onChange={(v) => onChange({ ...filters, dateRange: v })}
-        />
-        <FilterSelect
-          value={filters.group}
-          options={filterOptions.groups}
-          onChange={(v) => onChange({ ...filters, group: v })}
-        />
-        <FilterSelect
-          value={filters.area}
-          options={filterOptions.areas}
-          onChange={(v) => onChange({ ...filters, area: v })}
-        />
-        <FilterSelect
-          value={filters.status}
-          options={filterOptions.statuses}
-          onChange={(v) => onChange({ ...filters, status: v })}
-        />
-
-        {/* Filter icon button */}
-        <button className={cn(
-          "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium",
-          "border border-neutral-200 dark:border-neutral-700",
-          "bg-white dark:bg-neutral-800",
-          "text-neutral-600 dark:text-neutral-300",
-          "hover:bg-neutral-50 dark:hover:bg-neutral-700",
-          "transition-all duration-150"
-        )}>
-          <SlidersHorizontal size={14} />
-          <span>Filters</span>
-          {activeFilters.length > 0 && (
-            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
-              {activeFilters.length}
-            </span>
-          )}
-        </button>
+    <div className={cn(
+      "flex flex-wrap items-end gap-3 rounded-xl border px-4 py-3",
+      "border-neutral-200 dark:border-neutral-800",
+      "bg-white dark:bg-neutral-900"
+    )}>
+      {/* Label */}
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-400 dark:text-neutral-600 self-end pb-2 mr-1">
+        <Filter size={12} />
+        Filters
       </div>
 
-      {/* ── Active filter chips ──────────────────────────────── */}
-      {activeFilters.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {activeFilters.map(([key, val]) => (
-            <span
-              key={key}
-              className={cn(
-                "flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
-                "bg-indigo-50 dark:bg-indigo-500/10",
-                "text-indigo-700 dark:text-indigo-300",
-                "border border-indigo-200 dark:border-indigo-500/30"
-              )}
-            >
-              {val}
-              <button
-                onClick={() => {
-                  const reset = key === "group" ? "All Groups"
-                    : key === "area" ? "All Areas"
-                    : "All Status";
-                  onChange({ ...filters, [key]: reset });
-                }}
-                className="hover:text-indigo-900 dark:hover:text-indigo-100"
-              >
-                <X size={11} />
-              </button>
-            </span>
-          ))}
+      <FilterSelect
+        label="Date Range"
+        value={filters.dateRange}
+        options={filterOptions.dateRanges}
+        onChange={patch("dateRange")}
+      />
+      <FilterSelect
+        label="Group"
+        value={filters.group}
+        options={filterOptions.groups}
+        onChange={patch("group")}
+      />
+      <FilterSelect
+        label="Area"
+        value={filters.area}
+        options={filterOptions.areas}
+        onChange={patch("area")}
+      />
+      <FilterSelect
+        label="Status"
+        value={filters.status}
+        options={filterOptions.statuses}
+        onChange={patch("status")}
+      />
 
-          <button
-            onClick={() => onChange({
-              dateRange: filters.dateRange,
-              group: "All Groups",
-              area: "All Areas",
-              status: "All Status",
-            })}
-            className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 underline underline-offset-2 transition-colors"
-          >
-            Clear all
-          </button>
-        </div>
-      )}
+      {/* Reset */}
+      <div className="flex flex-col gap-1 self-end">
+        <div className="h-[14px]" /> {/* spacer for label row */}
+        <button
+          onClick={handleReset}
+          className={cn(
+            "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium",
+            "border-neutral-200 dark:border-neutral-700",
+            "text-neutral-500 dark:text-neutral-400",
+            "hover:text-neutral-800 dark:hover:text-neutral-200",
+            "hover:bg-neutral-50 dark:hover:bg-neutral-800",
+            "hover:border-neutral-300 dark:hover:border-neutral-600",
+            "transition-all duration-150"
+          )}
+        >
+          <RefreshCw size={11} />
+          Reset
+        </button>
+      </div>
     </div>
   );
 }
