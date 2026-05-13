@@ -149,23 +149,31 @@ const openEdit = (row) => {
   const closeModal = () => setModal((m) => ({ ...m, open: false }));
 
 const handleSubmit = async () => {
-     try {
-       if (modal.mode === "add") {
-         const response = await createReservist({
-           email: form.email || `${form.firstName.toLowerCase()}.${form.lastName.toLowerCase()}@example.com`,
-           password: form.password || 'password123',
-           first_name: form.firstName,
-           last_name: form.lastName,
-           service_number: form.serialNo,
-           rank: form.rank,
-           ...(form.squadron && { squadron_id: parseInt(form.squadron) }),
-           ...(form.group && { group_id: parseInt(form.group) }),
-           date_enlisted: form.dateEnlisted,
-           phone_number: form.contact,
-           address: form.address,
-           specialization: form.specialization,
-           occupation: form.civilOccupation,
-         });
+      try {
+        if (modal.mode === "add") {
+          // Build request - squadron and group are now actual IDs from the dropdown
+          const requestData = {
+            email: form.email || `${form.firstName.toLowerCase()}.${form.lastName.toLowerCase()}@example.com`,
+            password: form.password || 'password123',
+            first_name: form.firstName,
+            last_name: form.lastName,
+            service_number: form.serialNo,
+            rank: form.rank,
+          };
+          
+          // Add assignment IDs if both squadron and group are provided
+          if (form.squadron && form.group) {
+            requestData.squadron_id = parseInt(form.squadron, 10);
+            requestData.group_id = parseInt(form.group, 10);
+          }
+          
+          requestData.date_enlisted = form.dateEnlisted;
+          requestData.phone_number = form.contact;
+          requestData.address = form.address;
+          requestData.specialization = form.specialization;
+          requestData.occupation = form.civilOccupation;
+          
+          const response = await createReservist(requestData);
          if (response.data.status === 'success') {
            setData((prev) => [...prev, transformReservistData([response.data.data])[0]]);
          }

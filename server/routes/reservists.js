@@ -265,7 +265,7 @@ router.post(
         ...otherFields
       } = req.body;
 
-      // Check if email or service number already exists
+// Check if email or service number already exists
       const [existing] = await db.query(
         'SELECT id FROM users WHERE email = ? UNION SELECT r.user_id FROM reservists r WHERE r.service_number = ?',
         [email, service_number]
@@ -280,22 +280,31 @@ router.post(
       }
 
       // Validate group and squadron if provided
-      if (group_id || squadron_id) {
-        if (!group_id || !squadron_id) {
+      let group_id_int = null;
+      let squadron_id_int = null;
+      
+      if (group_id && squadron_id) {
+        const hasGroupId = !isNaN(parseInt(group_id));
+        const hasSquadronId = !isNaN(parseInt(squadron_id));
+        
+        if (!hasGroupId || !hasSquadronId) {
           return res.status(400).json({
             status: 'error',
-            message: 'Both group_id and squadron_id must be provided for assignment',
+            message: 'Both group_id and squadron_id must be valid integers',
             code: 'INVALID_ASSIGNMENT'
           });
         }
+        
+        group_id_int = parseInt(group_id);
+        squadron_id_int = parseInt(squadron_id);
 
         const [groupData] = await db.query(
           'SELECT id FROM `groups` WHERE id = ? AND is_active = TRUE',
-          [group_id]
+          [group_id_int]
         );
         const [squadronData] = await db.query(
           'SELECT id FROM squadron WHERE id = ? AND is_active = TRUE',
-          [squadron_id]
+          [squadron_id_int]
         );
 
         if (groupData.length === 0 || squadronData.length === 0) {
@@ -363,7 +372,7 @@ router.post(
           ...otherFields
         };
 
-        const columns = Object.keys(reservistData);
+        const columns = Object.keys(reservistData).map(col => `\`${col}\``);
         const values = Object.values(reservistData);
         const placeholders = columns.map(() => '?').join(',');
 
@@ -375,10 +384,10 @@ router.post(
         const reservistId = reservistResult.insertId;
 
         // Create assignment if provided
-        if (group_id && squadron_id) {
+        if (group_id_int && squadron_id_int) {
           await connection.execute(
             'INSERT INTO reservist_assignments (reservist_id, group_id, squadron_id, assigned_date, is_primary) VALUES (?, ?, ?, CURDATE(), TRUE)',
-            [reservistId, group_id, squadron_id]
+            [reservistId, group_id_int, squadron_id_int]
           );
         }
 
@@ -1043,7 +1052,7 @@ router.post(
               is_active: true
             };
 
-            const columns = Object.keys(reservistData);
+            const columns = Object.keys(reservistData).map(col => `\`${col}\``);
             const values = Object.values(reservistData);
             const placeholders = columns.map(() => '?').join(',');
 

@@ -1,47 +1,43 @@
 import AddEditModal, { FormField, FormInput, FormSelect } from "@/components/airbase/AddEditModal";
 import { RANKS, SPECIALIZATIONS, CIVIL_OCCUPATIONS } from "@/data/reservistsData";
-
-// All unique airbases, arcens, groups, squadrons from hierarchy
-import { hierarchyData } from "@/data/hierarchyData";
-
-function flatOptions() {
-  const squadrons = [];
-  hierarchyData.forEach((area) => {
-    area.arcens.forEach((arcen) => {
-      arcen.groups.forEach((group) => {
-        group.squadrons.forEach((sq) => {
-          squadrons.push({
-            value: sq.name,
-            label: `${sq.name} — ${group.name}`,
-            group: group.name,
-            arcen: arcen.name,
-            airbase: area.name,
-          });
-        });
-      });
-    });
-  });
-  return squadrons;
-}
-
-const SQUADRON_OPTIONS = flatOptions();
+import { useState, useEffect } from "react";
+import { getSquadrons, getGroupsList } from "@/services/api";
 
 /**
  * ReservistModal
  * Add / Edit modal for a single reservist record.
  */
 export default function ReservistModal({ open, mode, form, onChange, onClose, onSubmit }) {
+  const [squadronOptions, setSquadronOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
   const set = (key) => (val) => onChange({ ...form, [key]: val });
 
-  // Auto-fill group/arcen/airbase when squadron is selected
+  // Fetch squadrons from API when modal opens in add mode
+  useEffect(() => {
+    if (open && mode === "add") {
+      setLoading(true);
+      getSquadrons()
+        .then(res => {
+          if (res.data.status === 'success') {
+            setSquadronOptions(res.data.data.map(sq => ({
+              value: sq.id,
+              label: `${sq.name} — ${sq.group_name}`,
+              groupId: sq.group_id,
+            })));
+          }
+        })
+        .catch(err => console.error('Failed to load squadrons:', err))
+        .finally(() => setLoading(false));
+    }
+  }, [open, mode]);
+
+  // Auto-fill group when squadron is selected
   const handleSquadronChange = (val) => {
-    const sq = SQUADRON_OPTIONS.find((s) => s.value === val);
+    const sq = squadronOptions.find((s) => s.value === val);
     onChange({
       ...form,
       squadron: val,
-      group:    sq?.group   ?? form.group,
-      arcen:    sq?.arcen   ?? form.arcen,
-      airbase:  sq?.airbase ?? form.airbase,
+      group: sq?.groupId ?? form.group,
     });
   };
 
@@ -102,9 +98,9 @@ export default function ReservistModal({ open, mode, form, onChange, onClose, on
 
       {/* Assignment */}
       <FormField label="Squadron" required>
-        <FormSelect value={form.squadron} onChange={handleSquadronChange}>
-          <option value="">Select Squadron…</option>
-          {SQUADRON_OPTIONS.map((o) => (
+        <FormSelect value={form.squadron} onChange={handleSquadronChange} disabled={loading}>
+          <option value="">{loading ? "Loading squadrons..." : "Select Squadron…"}</option>
+          {squadronOptions.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </FormSelect>
