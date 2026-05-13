@@ -1,5 +1,5 @@
 const express = require('express');
-const { body, param, validationResult } = require('express-validator');
+const { body, query, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
@@ -12,8 +12,8 @@ const router = express.Router();
  * List all trainings with pagination and filtering
  */
 router.get('/', authenticateToken, [
-    param('page').optional().isInt({ min: 1 }),
-    param('limit').optional().isInt({ min: 1, max: 100 })
+    query('page').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 100 })
 ], (req, res) => {
     try {
         const errors = validationResult(req);
