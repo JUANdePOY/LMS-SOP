@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, Bell, Settings } from "lucide-react";
+import { ChevronLeft, Bell, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
 import { menuItems } from "@/config/menuItems";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const { logout } = useAuth();
 
   const isCollapsed =
     controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
@@ -179,6 +181,29 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
             </span>
           </div>
         )}
+      </div>
+
+      {/* ── Logout button ──────────────────────────────────────── */}
+      <div
+        className={cn(
+          "flex shrink-0 items-center",
+          "border-t border-neutral-200 dark:border-neutral-800",
+          isCollapsed ? "justify-center p-3" : "gap-3 px-4 py-3"
+        )}
+      >
+        <button
+          onClick={logout}
+          className={cn(
+            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium",
+            "text-red-600 hover:text-red-700",
+            "hover:bg-red-50 dark:hover:bg-red-950/20",
+            "transition-colors duration-150",
+            isCollapsed && "px-2"
+          )}
+        >
+          <LogOut size={18} />
+          {!isCollapsed && <span>Logout</span>}
+        </button>
       </div>
     </aside>
   );

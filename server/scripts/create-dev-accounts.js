@@ -32,23 +32,13 @@ const accounts = [
   }
 ];
 
-// Promisify db.query for async/await support
-function query(sql, params) {
-  return new Promise((resolve, reject) => {
-    db.query(sql, params, (err, results) => {
-      if (err) reject(err);
-      else resolve(results);
-    });
-  });
-}
-
 async function createAccounts() {
   console.log('Creating development accounts...\n');
 
   for (const account of accounts) {
     try {
       // Check if user already exists in reservists table
-      const existing = await query(
+      const [existing] = await db.query(
         'SELECT r.id, u.id as user_id FROM reservists r JOIN users u ON r.user_id = u.id WHERE r.service_number = ?',
         [account.service_number]
       );
@@ -63,7 +53,7 @@ async function createAccounts() {
       console.log(`Creating account: ${account.id_number}`);
 
       // Insert into users table
-      const userResult = await query(
+      const [userResult] = await db.query(
         'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
         [account.service_number, passwordHash, account.role]
       );
@@ -72,7 +62,7 @@ async function createAccounts() {
       console.log(`  Created user with ID: ${userId}`);
 
       // Insert into reservists table
-      await query(
+      await db.query(
         'INSERT INTO reservists (user_id, first_name, last_name, `rank`, service_number, is_active) VALUES (?, ?, ?, ?, ?, ?)',
         [userId, account.first_name, account.last_name, account.rank, account.service_number, true]
       );

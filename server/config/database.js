@@ -25,7 +25,27 @@ pool.getConnection((err, connection) => {
   connection.release();
 });
 
-// Promisify for async/await usage
+// Export the promise-based pool for async/await support
 const db = pool.promise();
+
+// Add getConnection method for transactions - returns connection with promise-based execute
+db.getConnection = function() {
+  return new Promise((resolve, reject) => {
+    pool.getConnection((err, connection) => {
+      if (err) return reject(err);
+      // Convert connection to promise-based
+      const oldExecute = connection.execute.bind(connection);
+      connection.execute = (...args) => {
+        return new Promise((resolve, reject) => {
+          oldExecute(...args, (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+          });
+        });
+      };
+      resolve(connection);
+    });
+  });
+};
 
 module.exports = db;

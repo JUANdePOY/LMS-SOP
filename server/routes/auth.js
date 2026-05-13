@@ -37,100 +37,86 @@ router.post('/login', [
         const { id_number, password } = req.body;
 
         // Find user by ID Number (service_number in reservists table)
-        db.query(
+        const [results] = await db.query(
             `SELECT u.id, u.password_hash, u.role, u.is_active, r.service_number as id_number 
              FROM users u
              JOIN reservists r ON u.id = r.user_id
              WHERE r.service_number = ?`,
-            [id_number],
-            async (err, results) => {
-                if (err) {
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Database error',
-                        code: 'DB_ERROR'
-                    });
-                }
+            [id_number]
+        );
 
-                // Check if user exists
-                if (!results || results.length === 0) {
-                    return res.status(401).json({
-                        status: 'error',
-                        message: 'Invalid ID Number or password',
-                        code: 'INVALID_CREDENTIALS'
-                    });
-                }
+        // Check if user exists
+        if (!results || results.length === 0) {
+            return res.status(401).json({
+                status: 'error',
+                message: 'Invalid ID Number or password',
+                code: 'INVALID_CREDENTIALS'
+            });
+        }
 
-                const user = results[0];
+        const user = results[0];
 
-                // Check if user is active
-                if (!user.is_active) {
-                    return res.status(403).json({
-                        status: 'error',
-                        message: 'User account is deactivated',
-                        code: 'ACCOUNT_DEACTIVATED'
-                    });
-                }
+        // Check if user is active
+        if (!user.is_active) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'User account is deactivated',
+                code: 'ACCOUNT_DEACTIVATED'
+            });
+        }
 
-                try {
-                    // Compare password
-                    const isPasswordValid = await comparePassword(password, user.password_hash);
+        try {
+            // Compare password
+            const isPasswordValid = await comparePassword(password, user.password_hash);
 
-                    if (!isPasswordValid) {
-                        return res.status(401).json({
-                            status: 'error',
-                            message: 'Invalid ID Number or password',
-                            code: 'INVALID_CREDENTIALS'
-                        });
-                    }
+            if (!isPasswordValid) {
+                return res.status(401).json({
+                    status: 'error',
+                    message: 'Invalid ID Number or password',
+                    code: 'INVALID_CREDENTIALS'
+                });
+            }
 
-                    // Generate JWT token
-                    const token = generateToken({
-                        userId: user.id,
+            // Generate JWT token
+            const token = generateToken({
+                userId: user.id,
+                id_number: user.id_number,
+                role: user.role
+            });
+
+            // Update last login timestamp
+            db.query(
+                'UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?',
+                [user.id]
+            ).catch(err => console.error('Failed to update last_login_at:', err));
+
+            logAudit({
+                user_id: user.id,
+                action: 'user.login',
+                entity_type: 'user',
+                entity_id: user.id,
+                new_values: { id_number: user.id_number, role: user.role }
+            });
+
+            return res.status(200).json({
+                status: 'success',
+                message: 'Login successful',
+                data: {
+                    token,
+                    user: {
+                        id: user.id,
                         id_number: user.id_number,
                         role: user.role
-                    });
-
-                    // Update last login timestamp
-                    db.query(
-                        'UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?',
-                        [user.id],
-                        (updateErr) => {
-                            if (updateErr) {
-                                console.error('Failed to update last_login_at:', updateErr);
-                            }
-                        }
-                    );
-
-                    logAudit({
-                        user_id: user.id,
-                        action: 'user.login',
-                        entity_type: 'user',
-                        entity_id: user.id,
-                        new_values: { id_number: user.id_number, role: user.role }
-                    });
-
-                    return res.status(200).json({
-                        status: 'success',
-                        message: 'Login successful',
-                        data: {
-                            token,
-                            user: {
-                                id: user.id,
-                                id_number: user.id_number,
-                                role: user.role
-                            }
-                        }
-                    });
-                } catch (error) {
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Authentication failed',
-                        code: 'AUTH_ERROR'
-                    });
+                    }
                 }
-            }
-        );
+            });
+        } catch (error) {
+            return res.status(500).json({
+                status: 'error',
+                message: 'Authentication failed',
+                code: 'AUTH_ERROR'
+            });
+        }
     } catch (error) {
         console.error('Login error:', error);
         res.status(500).json({
@@ -210,72 +196,53 @@ router.post('/register', authenticateToken, [
         const { email, password, role } = req.body;
 
         // Check if email already exists
-        db.query(
+        const [results] = await db.query(
             'SELECT id FROM users WHERE email = ?',
-            [email],
-            async (err, results) => {
-                if (err) {
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Database error',
-                        code: 'DB_ERROR'
-                    });
-                }
-
-                if (results && results.length > 0) {
-                    return res.status(409).json({
-                        status: 'error',
-                        message: 'Email already registered',
-                        code: 'EMAIL_EXISTS'
-                    });
-                }
-
-                try {
-                    // Hash password
-                    const passwordHash = await hashPassword(password);
-
-                    // Create user
-                    db.query(
-                        'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
-                        [email, passwordHash, role],
-                        (insertErr, insertResults) => {
-                            if (insertErr) {
-                                console.error('User creation error:', insertErr);
-                                return res.status(500).json({
-                                    status: 'error',
-                                    message: 'Failed to create user',
-                                    code: 'DB_ERROR'
-                                });
-                            }
-
-                            logAudit({
-                                user_id: req.user.userId,
-                                action: 'user.created',
-                                entity_type: 'user',
-                                entity_id: insertResults.insertId,
-                                new_values: { email, role }
-                            });
-
-                            res.status(201).json({
-                                status: 'success',
-                                message: 'User created successfully',
-                                data: {
-                                    userId: insertResults.insertId,
-                                    email,
-                                    role
-                                }
-                            });
-                        }
-                    );
-                } catch (error) {
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Password hashing failed',
-                        code: 'AUTH_ERROR'
-                    });
-                }
-            }
+            [email]
         );
+
+        if (results && results.length > 0) {
+            return res.status(409).json({
+                status: 'error',
+                message: 'Email already registered',
+                code: 'EMAIL_EXISTS'
+            });
+        }
+
+        try {
+            // Hash password
+            const passwordHash = await hashPassword(password);
+
+            // Create user
+            const [insertResults] = await db.query(
+                'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
+                [email, passwordHash, role]
+            );
+
+            logAudit({
+                user_id: req.user.userId,
+                action: 'user.created',
+                entity_type: 'user',
+                entity_id: insertResults.insertId,
+                new_values: { email, role }
+            });
+
+            res.status(201).json({
+                status: 'success',
+                message: 'User created successfully',
+                data: {
+                    userId: insertResults.insertId,
+                    email,
+                    role
+                }
+            });
+        } catch (error) {
+            return res.status(500).json({
+                status: 'error',
+                message: 'Password hashing failed',
+                code: 'AUTH_ERROR'
+            });
+        }
     } catch (error) {
         console.error('Register error:', error);
         res.status(500).json({
@@ -290,42 +257,41 @@ router.post('/register', authenticateToken, [
  * GET /auth/profile
  * Get current user profile information
  */
-router.get('/profile', authenticateToken, (req, res) => {
-    // Get user's ID Number from reservists table
-    db.query(
-        `SELECT u.id, u.role, r.service_number as id_number 
-         FROM users u
-         JOIN reservists r ON u.id = r.user_id
-         WHERE u.id = ?`,
-        [req.user.userId],
-        (err, results) => {
-            if (err) {
-                return res.status(500).json({
-                    status: 'error',
-                    message: 'Database error',
-                    code: 'DB_ERROR'
-                });
-            }
+router.get('/profile', authenticateToken, async (req, res) => {
+    try {
+        const [results] = await db.query(
+            `SELECT u.id, u.role, r.service_number as id_number 
+             FROM users u
+             JOIN reservists r ON u.id = r.user_id
+             WHERE u.id = ?`,
+            [req.user.userId]
+        );
 
-            if (!results || results.length === 0) {
-                return res.status(404).json({
-                    status: 'error',
-                    message: 'User not found',
-                    code: 'NOT_FOUND'
-                });
-            }
-
-            const user = results[0];
-            res.status(200).json({
-                status: 'success',
-                data: {
-                    userId: user.id,
-                    id_number: user.id_number,
-                    role: user.role
-                }
+        if (!results || results.length === 0) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'User not found',
+                code: 'NOT_FOUND'
             });
         }
-    );
+
+        const user = results[0];
+        res.status(200).json({
+            status: 'success',
+            data: {
+                userId: user.id,
+                id_number: user.id_number,
+                role: user.role
+            }
+        });
+    } catch (error) {
+        console.error('Profile error:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Database error',
+            code: 'DB_ERROR'
+        });
+    }
 });
 
 module.exports = router;
