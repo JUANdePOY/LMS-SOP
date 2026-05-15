@@ -1,105 +1,192 @@
 const express = require('express');
-const { body, query, validationResult } = require('express-validator');
-const db = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const { query, param, body, validationResult } = require('express-validator');
+const trainingsController = require('../controllers/trainingsController');
+const { authenticateToken, optionalAuthenticateToken } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
-const { logAudit } = require('../utils/auditLogger');
+const { letterOrderUploadMiddleware } = require('../middleware/trainingUpload');
 
 const router = express.Router();
 
-/**
- * GET /api/trainings
- * List all trainings with pagination and filtering
- */
-router.get('/', authenticateToken, [
-    query('page').optional().isInt({ min: 1 }),
-    query('limit').optional().isInt({ min: 1, max: 100 })
-], (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Validation failed',
-                code: 'VALIDATION_ERROR',
-                errors: errors.array()
-            });
-        }
+const rejectInvalid = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
+  }
+  return next();
+};
 
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const offset = (page - 1) * limit;
-        const status = req.query.status;
+const pageLimitValidators = [
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+];
 
-        let query = `
-            SELECT t.id, t.title, t.description, 
-                   t.start_datetime, t.end_datetime, t.venue, t.capacity,
-                   t.status, t.is_mandatory, t.created_at, t.updated_at
-            FROM trainings t
-            WHERE 1=1
-        `;
-        let countQuery = 'SELECT COUNT(*) as total FROM trainings t WHERE 1=1';
-        const queryParams = [];
-        const countParams = [];
+const idParam = [param('id').isInt({ min: 1 })];
+const trainingIdParam = [param('trainingId').isInt({ min: 1 })];
+const activityIdParam = [param('activityId').isInt({ min: 1 })];
+const attachmentIdParam = [param('attachmentId').isInt({ min: 1 })];
 
-        if (status) {
-            query += ' AND t.status = ?';
-            countQuery += ' AND t.status = ?';
-            queryParams.push(status);
-            countParams.push(status);
-        }
+// ── Internal trainings ───────────────────────────────────────────────────────
 
-        query += ' ORDER BY t.start_datetime ASC LIMIT ? OFFSET ?';
-        queryParams.push(limit, offset);
+router.get(
+  '/internal',
+  optionalAuthenticateToken,
+  pageLimitValidators,
+  rejectInvalid,
+  trainingsController.listInternal
+);
 
-        db.query(countQuery, countParams, (countErr, countResults) => {
-            if (countErr) {
-                console.error('Trainings count query error:', countErr);
-                return res.status(500).json({
-                    status: 'error',
-                    message: 'Database error',
-                    code: 'DB_ERROR',
-                    debug: countErr.message
-                });
-            }
+router.get(
+  '/internal/:trainingId/activities',
+  optionalAuthenticateToken,
+  [...trainingIdParam],
+  rejectInvalid,
+  trainingsController.listActivities
+);
 
-            const total = countResults[0].total;
-            const totalPages = Math.ceil(total / limit);
+router.get('/internal/:id', optionalAuthenticateToken, [...idParam], rejectInvalid, trainingsController.getInternal);
 
-            db.query(query, queryParams, (err, results) => {
-                if (err) {
-                    console.error('Trainings query error:', err);
-                    console.error('Query:', query);
-                    console.error('Params:', queryParams);
-                    return res.status(500).json({
-                        status: 'error',
-                        message: 'Database error',
-                        code: 'DB_ERROR',
-                        debug: err.message
-                    });
-                }
+router.post(
+  '/internal',
+  authenticateToken,
+  authorize('admin'),
+  [
+    body('title').trim().notEmpty().isLength({ max: 500 }),
+    body('start_datetime').optional().isString(),
+    body('start_date').optional().isString(),
+    body('status').optional().isString(),
+    body('is_mandatory').optional().isBoolean(),
+    body('activity_is_mandatory').optional().isBoolean(),
+  ],
+  rejectInvalid,
+  trainingsController.createInternal
+);
 
-                res.status(200).json({
-                    status: 'success',
-                    data: {
-                        trainings: results,
-                        pagination: {
-                            currentPage: page,
-                            totalPages,
-                            totalItems: total,
-                            itemsPerPage: limit
-                        }
-                    }
-                });
-            });
-        });
-    } catch (error) {
-        res.status(500).json({
-            status: 'error',
-            message: 'Server error',
-            code: 'SERVER_ERROR'
-        });
-    }
-});
+router.patch(
+  '/internal/:id',
+  authenticateToken,
+  authorize('admin'),
+  [
+    ...idParam,
+    body('is_mandatory').optional().isBoolean(),
+    body('activity_is_mandatory').optional().isBoolean(),
+  ],
+  rejectInvalid,
+  trainingsController.updateInternal
+);
+
+router.delete(
+  '/internal/:id',
+  authenticateToken,
+  authorize('admin'),
+  [...idParam],
+  rejectInvalid,
+  trainingsController.deleteInternal
+);
+
+router.post(
+  '/internal/:trainingId/activities',
+  authenticateToken,
+  authorize('admin'),
+  [...trainingIdParam, body('title').trim().notEmpty()],
+  rejectInvalid,
+  trainingsController.createActivity
+);
+
+router.patch(
+  '/internal/:trainingId/activities/:activityId',
+  authenticateToken,
+  authorize('admin'),
+  [...trainingIdParam, ...activityIdParam],
+  rejectInvalid,
+  trainingsController.updateActivity
+);
+
+router.delete(
+  '/internal/:trainingId/activities/:activityId',
+  authenticateToken,
+  authorize('admin'),
+  [...trainingIdParam, ...activityIdParam],
+  rejectInvalid,
+  trainingsController.deleteActivity
+);
+
+router.post(
+  '/internal/:trainingId/attachments/letter-order',
+  authenticateToken,
+  authorize('admin'),
+  [...trainingIdParam],
+  rejectInvalid,
+  letterOrderUploadMiddleware,
+  trainingsController.uploadLetterOrder
+);
+
+router.get(
+  '/internal/:trainingId/attachments/:attachmentId/file',
+  authenticateToken,
+  authorize('admin'),
+  [...trainingIdParam, ...attachmentIdParam],
+  rejectInvalid,
+  trainingsController.downloadTrainingAttachment
+);
+
+// ── External trainings ───────────────────────────────────────────────────────
+
+router.get(
+  '/external',
+  optionalAuthenticateToken,
+  pageLimitValidators,
+  rejectInvalid,
+  trainingsController.listExternal
+);
+
+router.get('/external/:id', optionalAuthenticateToken, [...idParam], rejectInvalid, trainingsController.getExternal);
+
+router.post(
+  '/external',
+  authenticateToken,
+  authorize('admin'),
+  [
+    body('title').trim().notEmpty(),
+    body('start_date').notEmpty(),
+    body('is_mandatory').optional().isBoolean(),
+  ],
+  rejectInvalid,
+  trainingsController.createExternal
+);
+
+router.patch(
+  '/external/:id',
+  authenticateToken,
+  authorize('admin'),
+  [...idParam, body('is_mandatory').optional().isBoolean()],
+  rejectInvalid,
+  trainingsController.updateExternal
+);
+
+router.delete(
+  '/external/:id',
+  authenticateToken,
+  authorize('admin'),
+  [...idParam],
+  rejectInvalid,
+  trainingsController.deleteExternal
+);
+
+router.post(
+  '/external/:id/register',
+  optionalAuthenticateToken,
+  [...idParam],
+  rejectInvalid,
+  trainingsController.registerExternal
+);
+
+router.get(
+  '/external/:id/registrations',
+  authenticateToken,
+  authorize('admin'),
+  [...idParam],
+  rejectInvalid,
+  trainingsController.listRegistrations
+);
 
 module.exports = router;

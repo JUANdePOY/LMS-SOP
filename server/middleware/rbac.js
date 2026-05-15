@@ -1,23 +1,21 @@
 const authorize = (...roles) => {
-    return (req, res, next) => {
-        if (!req.user) {
-            return res.status(401).json({
-                status: 'error',
-                message: 'Authentication required',
-                code: 'AUTH_REQUIRED'
-            });
-        }
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required',
+      });
+    }
 
-        if (!roles.includes(req.user.role)) {
-            return res.status(403).json({
-                status: 'error',
-                message: 'Insufficient permissions',
-                code: 'FORBIDDEN'
-            });
-        }
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Insufficient permissions',
+      });
+    }
 
-        next();
-    };
+    next();
+  };
 };
 
 module.exports = { authorize };
