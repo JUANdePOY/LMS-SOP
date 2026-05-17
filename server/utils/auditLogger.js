@@ -1,4 +1,4 @@
-const db = require('../config/database');
+﻿const db = require('../config/database');
 
 /**
  * Log an audit entry to the audit_logs table
@@ -13,13 +13,13 @@ const db = require('../config/database');
  * @param {string|null} params.user_agent - Client user agent
  * @param {Function} [callback] - Optional callback (err, insertId)
  */
-function logAudit(params, callback) {
+function logAuditEntry(params, callback) {
     const query = `
         INSERT INTO audit_logs 
         (user_id, action, entity_type, entity_id, old_values, new_values, ip_address, user_agent) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    
+
     const values = [
         params.user_id || null,
         params.action,
@@ -38,6 +38,20 @@ function logAudit(params, callback) {
         if (callback) {
             callback(err, results ? results.insertId : null);
         }
+    });
+}
+
+/** Supports object params or shorthand (action, userId, details) from trainings module. */
+function logAudit(actionOrParams, userId, details) {
+    if (typeof actionOrParams === 'object' && actionOrParams !== null) {
+        return logAuditEntry(actionOrParams, userId);
+    }
+
+    return logAuditEntry({
+        user_id: userId,
+        action: actionOrParams,
+        entity_type: 'training',
+        new_values: details || null
     });
 }
 

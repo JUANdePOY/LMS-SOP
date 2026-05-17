@@ -1,4 +1,4 @@
-const jwt = require('jsonwebtoken');
+﻿const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 
 // JWT secret from environment
@@ -80,6 +80,38 @@ const authenticateToken = async (req, res, next) => {
 };
 
 /**
+ * Sets req.user when a valid token is present; never blocks the request.
+ */
+const optionalAuthenticateToken = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const [users] = await db.query(
+      'SELECT id, role, is_active FROM users WHERE id = ?',
+      [decoded.userId]
+    );
+
+    if (users.length > 0 && users[0].is_active) {
+      req.user = {
+        id: users[0].id,
+        role: users[0].role,
+        id_number: decoded.id_number
+      };
+    }
+  } catch {
+    // Optional auth: invalid token is ignored
+  }
+
+  next();
+};
+
+/**
  * Middleware to check if user is admin
  */
 const requireAdmin = (req, res, next) => {
@@ -109,6 +141,7 @@ const requireAdminOrOwner = (req, res, next) => {
 
 module.exports = {
   authenticateToken,
+  optionalAuthenticateToken,
   requireAdmin,
   requireAdminOrOwner,
   JWT_SECRET
