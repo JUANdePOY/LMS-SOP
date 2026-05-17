@@ -1,5 +1,4 @@
-const db = require('../config/database');
-const pool = db.promise();
+const pool = require('../config/database');
 
 async function deleteByTrainingId(conn, trainingId) {
   const executor = conn || pool;

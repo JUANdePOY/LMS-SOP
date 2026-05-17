@@ -1,5 +1,4 @@
-const db = require('../config/database');
-const pool = db.promise();
+const pool = require('../config/database');
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;

@@ -1,5 +1,4 @@
-const db = require('../config/database');
-const pool = db.promise();
+const pool = require('../config/database');
 
 const KIND_LETTER_ORDER = 'letter_order';
 

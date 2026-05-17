@@ -1,5 +1,4 @@
-const db = require('../config/database');
-const pool = db.promise();
+const pool = require('../config/database');
 
 const INTERNAL_STATUSES = ['draft', 'published', 'ongoing', 'completed', 'cancelled'];
 
