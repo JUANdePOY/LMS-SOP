@@ -52,6 +52,7 @@ CREATE TABLE reservists (
     date_enlisted DATE NULL,
     source_of_commission ENUM('ROTC', 'BCMT', 'MOTC', 'Direct Commission') NULL,
     rank_date_appointment DATE NULL,
+    position VARCHAR(200) NULL,
     specialization VARCHAR(200) NULL,
     reserve_status ENUM('Ready Reserve', 'Standby Reserve', 'Retired') DEFAULT 'Ready Reserve',
     highest_education VARCHAR(100) NULL,
@@ -73,8 +74,9 @@ CREATE TABLE reservists (
     INDEX idx_service_number (service_number),
     INDEX idx_name (last_name, first_name),
     INDEX idx_active (is_active),
-    INDEX idx_rank (`rank`),
-    INDEX idx_reserve_status (reserve_status)
+INDEX idx_rank (`rank`),
+     INDEX idx_position (position),
+     INDEX idx_reserve_status (reserve_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------
