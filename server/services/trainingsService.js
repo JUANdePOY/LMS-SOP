@@ -37,7 +37,12 @@ function normalizeParticipantBlocks(input) {
 
 async function replaceInternalParticipants(conn, trainingId, participantsInput) {
   if (participantsInput === undefined) return;
-  await internalParticipantModel.deleteByTrainingId(conn, trainingId);
+  try {
+    await internalParticipantModel.deleteByTrainingId(conn, trainingId);
+  } catch (e) {
+    if (e.code === 'ER_NO_SUCH_TABLE' || e.errno === 1146) return;
+    throw e;
+  }
   const blocks = normalizeParticipantBlocks(participantsInput);
   if (!blocks || !blocks.length) return;
 
@@ -76,14 +81,15 @@ function resolveInternalRange(body, existing) {
   let start = existing.start_datetime;
   let end = existing.end_datetime;
 
-  if (body.start_datetime != null || body.start_date != null) {
-    start = trainingModel.toDatetime(body.start_datetime ?? body.start_date, false);
+  const rawStart = body.start_datetime ?? body.start_date;
+  if (rawStart != null && String(rawStart).trim() !== '') {
+    start = trainingModel.toDatetime(rawStart, false);
   }
 
-  const hasExplicitEnd = body.end_datetime != null || body.end_date != null;
-  if (hasExplicitEnd) {
-    end = trainingModel.toDatetime(body.end_datetime ?? body.end_date, true);
-  } else if (body.start_datetime != null || body.start_date != null) {
+  const rawEnd = body.end_datetime ?? body.end_date;
+  if (rawEnd != null && String(rawEnd).trim() !== '') {
+    end = trainingModel.toDatetime(rawEnd, true);
+  } else if (rawStart != null && String(rawStart).trim() !== '') {
     end = start;
   }
 
@@ -222,8 +228,8 @@ async function updateInternalTraining(id, body) {
     body.end_datetime != null ||
     body.end_date != null
   ) {
-    trainingPatch.start_datetime = start;
-    trainingPatch.end_datetime = end;
+    if (start != null) trainingPatch.start_datetime = start;
+    if (end != null) trainingPatch.end_datetime = end;
   }
   if (body.venue !== undefined || body.location !== undefined) {
     trainingPatch.venue = normalizeVenue(body.venue ?? body.location ?? existing.venue);
@@ -306,7 +312,12 @@ async function loadPrimaryMeta(trainingId) {
 
 async function deleteInternalTraining(trainingId) {
   await trainingAttachmentService.removeAllFilesForTraining(trainingId);
-  await internalParticipantModel.deleteByTrainingId(null, trainingId);
+  try {
+    await internalParticipantModel.deleteByTrainingId(null, trainingId);
+  } catch (e) {
+    if (e.code === 'ER_NO_SUCH_TABLE' || e.errno === 1146) { /* ignore */ }
+    else throw e;
+  }
   const n = await trainingModel.deleteInternal(trainingId);
   return n > 0;
 }

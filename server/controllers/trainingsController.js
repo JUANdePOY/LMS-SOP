@@ -13,6 +13,9 @@ function sendError(res, err, fallback = 'Request failed') {
     if (err.sqlMessage) body.sqlMessage = err.sqlMessage;
     if (err.code) body.code = err.code;
   }
+  if (code === 500) {
+    console.error('[Training Controller Error]', err);
+  }
   return res.status(code).json(body);
 }
 
