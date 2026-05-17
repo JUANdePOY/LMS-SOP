@@ -32,7 +32,7 @@ async function countInternal({ search, status, type }) {
     params.push(q, q);
   }
   if (type) {
-    sql += ` AND JSON_UNQUOTE(JSON_EXTRACT(a.description, '$.activityType')) = ?`;
+    sql += ` AND JSON_VALID(a.description) AND JSON_UNQUOTE(JSON_EXTRACT(a.description, '$.activityType')) = ?`;
     params.push(type);
   }
 
@@ -58,9 +58,9 @@ async function findInternalMany({ page, limit, search, status, type }) {
       t.updated_at,
       t.venue AS location,
       TIMESTAMPDIFF(HOUR, t.start_datetime, t.end_datetime) AS duration_hours,
-      JSON_UNQUOTE(JSON_EXTRACT(a.description, '$.activityType')) AS type,
+      CASE WHEN JSON_VALID(a.description) THEN JSON_UNQUOTE(JSON_EXTRACT(a.description, '$.activityType')) ELSE NULL END AS type,
       a.instructor AS instructor,
-      JSON_UNQUOTE(JSON_EXTRACT(a.description, '$.requirements')) AS requirements
+      CASE WHEN JSON_VALID(a.description) THEN JSON_UNQUOTE(JSON_EXTRACT(a.description, '$.requirements')) ELSE NULL END AS requirements
     FROM trainings t
     LEFT JOIN activities a ON a.training_id = t.id AND a.id = (
       SELECT MIN(a2.id) FROM activities a2 WHERE a2.training_id = t.id
@@ -79,7 +79,7 @@ async function findInternalMany({ page, limit, search, status, type }) {
     params.push(q, q);
   }
   if (type) {
-    sql += ` AND JSON_UNQUOTE(JSON_EXTRACT(a.description, '$.activityType')) = ?`;
+    sql += ` AND JSON_VALID(a.description) AND JSON_UNQUOTE(JSON_EXTRACT(a.description, '$.activityType')) = ?`;
     params.push(type);
   }
 
