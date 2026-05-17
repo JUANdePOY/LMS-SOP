@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { UserSquare, Plus, Search, X, Loader } from "lucide-react";
+import { UserSquare, Plus, Search, X, Loader, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getReservists, createReservist, updateReservist, deleteReservist } from "@/services/api";
 import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
@@ -9,6 +9,7 @@ import ReservistFilters, { DEFAULT_FILTERS } from "@/components/reservists/Reser
 import ReservistTable       from "@/components/reservists/ReservistTable";
 import ReservistModal       from "@/components/reservists/ReservistModal";
 import ReservistDetailPanel from "@/components/reservists/ReservistDetailPanel";
+import BulkUploadModal from "@/components/reservists/BulkUploadModal";
 
 const EMPTY_FORM = {
   firstName: "", lastName: "", serialNo: "", dateEnlisted: "",
@@ -16,6 +17,25 @@ const EMPTY_FORM = {
   specialization: "", civilOccupation: "", contact: "", address: "",
   readinessScore: 0, attendanceRate: 0, trainingsCompleted: 0,
   email: "", password: "",
+  // Personal Information
+  dateOfBirth: "", placeOfBirth: "", age: "", sex: "", civilStatus: "",
+  citizenship: "Filipino", height: "", weight: "", bloodType: "",
+  homeAddress: "", emailAddress: "",
+  // Military Information
+  reserveCenter: "", groupCommand: "", category: "", rankDateOfAppointment: "",
+  sourceOfCommission: [], reserveStatus: [],
+  // Educational Background
+  highestEducation: "", courseDegree: "", school: "", yearGraduated: "",
+  // Civilian Information
+  employerCompany: "", officeAddress: "",
+  // Military Training
+  basicTraining: "", basicTrainingDateCompleted: "",
+  militaryCourses: [],
+  // Awards and Decorations
+  awardsDecorations: [],
+  // Emergency Contact
+  emergencyContactName: "", emergencyContactRelationship: "",
+  emergencyContactNumber: "", emergencyContactAddress: "",
 };
 
 /**
@@ -32,33 +52,64 @@ export default function Reservists() {
   const [modal,         setModal]         = useState({ open: false, mode: "add", row: null });
   const [form,          setForm]          = useState(EMPTY_FORM);
   const [detailRow,     setDetailRow]     = useState(null);
+  const [bulkUploadModal, setBulkUploadModal] = useState(false);
 
 // Transform API data to frontend format
    const transformReservistData = (apiData) => {
-     return apiData.map(r => ({
-       id: r.id,
-       firstName: r.first_name || '',
-       lastName: r.last_name || '',
-       serialNo: r.service_number || '',
-       rank: r.rank || '',
-       status: r.is_active ? 'active' : 'inactive',
-       reserveStatus: r.reserve_status || 'Ready Reserve',
-       squadron: r.squadron_name || '',
-       squadronId: r.squadron_id || '',
-       group: r.group_name || '',
-       groupId: r.group_id || '',
-       arcen: r.arcen || '',
-       airbase: r.airbase || '',
-       specialization: r.specialization || '',
-       civilOccupation: r.occupation || '',
-       contact: r.phone_number || '',
-       address: r.address || '',
-       dateEnlisted: r.date_enlisted || '',
-       readinessScore: r.readiness_score || 0,
-       attendanceRate: r.attendance_rate || 0,
-       trainingsCompleted: r.trainings_completed || 0,
-     }));
-   };
+      return apiData.map(r => ({
+        id: r.id,
+        firstName: r.first_name || '',
+        lastName: r.last_name || '',
+        serialNo: r.service_number || '',
+        rank: r.rank || '',
+        status: r.is_active ? 'active' : 'inactive',
+        reserveStatus: r.reserve_status || 'Ready Reserve',
+        squadron: r.squadron_name || '',
+        squadronId: r.squadron_id || '',
+        group: r.group_name || '',
+        groupId: r.group_id || '',
+        arcen: r.arcen || '',
+        airbase: r.airbase || '',
+        specialization: r.specialization || '',
+        civilOccupation: r.occupation || '',
+        contact: r.phone_number || '',
+        address: r.address || '',
+        dateEnlisted: r.date_enlisted || '',
+        readinessScore: r.readiness_score || 0,
+        attendanceRate: r.attendance_rate || 0,
+        trainingsCompleted: r.trainings_completed || 0,
+        dateOfBirth: r.date_of_birth || '',
+        placeOfBirth: r.place_of_birth || '',
+        age: r.age || '',
+        sex: r.sex || '',
+        civilStatus: r.civil_status || '',
+        citizenship: r.citizenship || 'Filipino',
+        height: r.height || '',
+        weight: r.weight || '',
+        bloodType: r.blood_type || '',
+        homeAddress: r.home_address || '',
+        emailAddress: r.email_address || '',
+        reserveCenter: r.arcen_id || r.arcen || '',
+        groupCommand: r.group_id || '',
+        category: r.category || '',
+        rankDateOfAppointment: r.rank_date_of_appointment || '',
+        sourceOfCommission: r.source_of_commission || [],
+        highestEducation: r.highest_education || '',
+        courseDegree: r.course_degree || '',
+        school: r.school || '',
+        yearGraduated: r.year_graduated || '',
+        employerCompany: r.employer_company || '',
+        officeAddress: r.office_address || '',
+        basicTraining: r.basic_training || '',
+        basicTrainingDateCompleted: r.basic_training_date_completed || '',
+        militaryCourses: r.military_courses || [],
+        awardsDecorations: r.awards_decorations || [],
+        emergencyContactName: r.emergency_contact_name || '',
+        emergencyContactRelationship: r.emergency_contact_relationship || '',
+        emergencyContactNumber: r.emergency_contact_number || '',
+        emergencyContactAddress: r.emergency_contact_address || '',
+      }));
+    };
 
    // Load reservists from API
    useEffect(() => {
@@ -123,81 +174,180 @@ const loadReservists = async () => {
   };
 
 const openEdit = (row) => {
-     setForm({
-       firstName: row.firstName,
-       lastName: row.lastName,
-       serialNo: row.serialNo,
-       dateEnlisted: row.dateEnlisted,
-       rank: row.rank,
-       status: row.status || 'active',
-       squadron: row.squadronId || '',
-       group: row.groupId || '',
-       arcen: row.arcen || '',
-       airbase: row.airbase || '',
-       specialization: row.specialization || '',
-       civilOccupation: row.civilOccupation || '',
-       contact: row.contact || '',
-       address: row.address || '',
-       readinessScore: row.readinessScore || 0,
-       attendanceRate: row.attendanceRate || 0,
-       trainingsCompleted: row.trainingsCompleted || 0,
-     });
-     setModal({ open: true, mode: "edit", row });
-     setDetailRow(null);
-   };
+      setForm({
+        firstName: row.firstName,
+        lastName: row.lastName,
+        serialNo: row.serialNo,
+        dateEnlisted: row.dateEnlisted,
+        rank: row.rank,
+        status: row.status || 'active',
+        squadron: row.squadronId || '',
+        group: row.groupId || '',
+        arcen: row.arcen || '',
+        airbase: row.airbase || '',
+        specialization: row.specialization || '',
+        civilOccupation: row.civilOccupation || '',
+        contact: row.contact || '',
+        address: row.address || '',
+        readinessScore: row.readinessScore || 0,
+        attendanceRate: row.attendanceRate || 0,
+        trainingsCompleted: row.trainingsCompleted || 0,
+        // Personal Information
+        dateOfBirth: row.dateOfBirth || '',
+        placeOfBirth: row.placeOfBirth || '',
+        age: row.age || '',
+        sex: row.sex || '',
+        civilStatus: row.civilStatus || '',
+        citizenship: row.citizenship || 'Filipino',
+        height: row.height || '',
+        weight: row.weight || '',
+        bloodType: row.bloodType || '',
+        homeAddress: row.homeAddress || '',
+        emailAddress: row.emailAddress || '',
+        // Military Information
+        reserveCenter: row.reserveCenter || '',
+        groupCommand: row.groupCommand || '',
+        category: row.category || '',
+        rankDateOfAppointment: row.rankDateOfAppointment || '',
+        sourceOfCommission: row.sourceOfCommission || [],
+        reserveStatus: row.reserveStatus || [],
+        // Educational Background
+        highestEducation: row.highestEducation || '',
+        courseDegree: row.courseDegree || '',
+        school: row.school || '',
+        yearGraduated: row.yearGraduated || '',
+        // Civilian Information
+        employerCompany: row.employerCompany || '',
+        officeAddress: row.officeAddress || '',
+        // Military Training
+        basicTraining: row.basicTraining || '',
+        basicTrainingDateCompleted: row.basicTrainingDateCompleted || '',
+        militaryCourses: row.militaryCourses || [],
+        // Awards and Decorations
+        awardsDecorations: row.awardsDecorations || [],
+        // Emergency Contact
+        emergencyContactName: row.emergencyContactName || '',
+        emergencyContactRelationship: row.emergencyContactRelationship || '',
+        emergencyContactNumber: row.emergencyContactNumber || '',
+        emergencyContactAddress: row.emergencyContactAddress || '',
+      });
+      setModal({ open: true, mode: "edit", row });
+      setDetailRow(null);
+    };
 
   const closeModal = () => setModal((m) => ({ ...m, open: false }));
 
 const handleSubmit = async () => {
-      try {
-        if (modal.mode === "add") {
-          // Build request - squadron and group are now actual IDs from the dropdown
-          const requestData = {
-            email: form.email || `${form.firstName.toLowerCase()}.${form.lastName.toLowerCase()}@example.com`,
-            password: form.password || 'password123',
-            first_name: form.firstName,
-            last_name: form.lastName,
-            service_number: form.serialNo,
-            rank: form.rank,
-          };
-          
-          // Add assignment IDs if both squadron and group are provided
-          if (form.squadron && form.group) {
-            requestData.squadron_id = parseInt(form.squadron, 10);
-            requestData.group_id = parseInt(form.group, 10);
+    try {
+      if (modal.mode === "add") {
+        const requestData = {
+          email: form.email || `${form.firstName.toLowerCase()}.${form.lastName.toLowerCase()}@example.com`,
+          password: form.password || 'password123',
+          first_name: form.firstName,
+          last_name: form.lastName,
+          service_number: form.serialNo,
+          rank: form.rank,
+          squadron_id: form.squadron ? parseInt(form.squadron, 10) : null,
+          date_enlisted: form.dateEnlisted,
+          phone_number: form.contact,
+          address: form.address,
+          specialization: form.specialization,
+          occupation: form.civilOccupation,
+          date_of_birth: form.dateOfBirth,
+          place_of_birth: form.placeOfBirth,
+          age: form.age ? parseInt(form.age, 10) : null,
+          sex: form.sex,
+          civil_status: form.civilStatus,
+          citizenship: form.citizenship,
+          height: form.height ? parseFloat(form.height) : null,
+          weight: form.weight ? parseFloat(form.weight) : null,
+          blood_type: form.bloodType,
+          home_address: form.homeAddress,
+          email_address: form.emailAddress,
+          arcen_id: form.reserveCenter ? parseInt(form.reserveCenter, 10) : null,
+          group_id: form.groupCommand ? parseInt(form.groupCommand, 10) : null,
+          category: form.category,
+          rank_date_of_appointment: form.rankDateOfAppointment,
+          source_of_commission: form.sourceOfCommission,
+          reserve_status: form.reserveStatus,
+          highest_education: form.highestEducation,
+          course_degree: form.courseDegree,
+          school: form.school,
+          year_graduated: form.yearGraduated ? parseInt(form.yearGraduated, 10) : null,
+          employer_company: form.employerCompany,
+          office_address: form.officeAddress,
+          basic_training: form.basicTraining,
+          basic_training_date_completed: form.basicTrainingDateCompleted,
+          military_courses: form.militaryCourses,
+          awards_decorations: form.awardsDecorations,
+          emergency_contact_name: form.emergencyContactName,
+          emergency_contact_relationship: form.emergencyContactRelationship,
+          emergency_contact_number: form.emergencyContactNumber,
+          emergency_contact_address: form.emergencyContactAddress,
+        };
+
+        const response = await createReservist(requestData);
+        if (response.data.status === 'success') {
+          setData((prev) => [...prev, transformReservistData([response.data.data])[0]]);
+        }
+      } else {
+        const response = await updateReservist(modal.row.id, {
+          first_name: form.firstName,
+          last_name: form.lastName,
+          rank: form.rank,
+          squadron_id: form.squadron ? parseInt(form.squadron, 10) : null,
+          date_enlisted: form.dateEnlisted,
+          phone_number: form.contact,
+          address: form.address,
+          specialization: form.specialization,
+          occupation: form.civilOccupation,
+          date_of_birth: form.dateOfBirth,
+          place_of_birth: form.placeOfBirth,
+          age: form.age ? parseInt(form.age, 10) : null,
+          sex: form.sex,
+          civil_status: form.civilStatus,
+          citizenship: form.citizenship,
+          height: form.height ? parseFloat(form.height) : null,
+          weight: form.weight ? parseFloat(form.weight) : null,
+          blood_type: form.bloodType,
+          home_address: form.homeAddress,
+          email_address: form.emailAddress,
+          arcen_id: form.reserveCenter ? parseInt(form.reserveCenter, 10) : null,
+          group_id: form.groupCommand ? parseInt(form.groupCommand, 10) : null,
+          category: form.category,
+          rank_date_of_appointment: form.rankDateOfAppointment,
+          source_of_commission: form.sourceOfCommission,
+          reserve_status: form.reserveStatus,
+          highest_education: form.highestEducation,
+          course_degree: form.courseDegree,
+          school: form.school,
+          year_graduated: form.yearGraduated ? parseInt(form.yearGraduated, 10) : null,
+          employer_company: form.employerCompany,
+          office_address: form.officeAddress,
+          basic_training: form.basicTraining,
+          basic_training_date_completed: form.basicTrainingDateCompleted,
+          military_courses: form.militaryCourses,
+          awards_decorations: form.awardsDecorations,
+          emergency_contact_name: form.emergencyContactName,
+          emergency_contact_relationship: form.emergencyContactRelationship,
+          emergency_contact_number: form.emergencyContactNumber,
+          emergency_contact_address: form.emergencyContactAddress,
+        });
+        if (response.data.status === 'success') {
+          const updatedReservist = transformReservistData([response.data.data])[0];
+          setData((prev) =>
+            prev.map((r) => r.id === modal.row.id ? updatedReservist : r)
+          );
+          if (detailRow?.id === modal.row.id) {
+            setDetailRow(updatedReservist);
           }
-          
-          requestData.date_enlisted = form.dateEnlisted;
-          requestData.phone_number = form.contact;
-          requestData.address = form.address;
-          requestData.specialization = form.specialization;
-          requestData.occupation = form.civilOccupation;
-          
-          const response = await createReservist(requestData);
-         if (response.data.status === 'success') {
-           setData((prev) => [...prev, transformReservistData([response.data.data])[0]]);
-         }
-       } else {
-         const response = await updateReservist(modal.row.id, {
-           first_name: form.firstName,
-           last_name: form.lastName,
-           rank: form.rank,
-         });
-         if (response.data.status === 'success') {
-           const updatedReservist = transformReservistData([response.data.data])[0];
-           setData((prev) =>
-             prev.map((r) => r.id === modal.row.id ? updatedReservist : r)
-           );
-           if (detailRow?.id === modal.row.id) {
-             setDetailRow(updatedReservist);
-           }
-         }
-       }
-       closeModal();
-     } catch (err) {
-       setError(err.response?.data?.message || 'Operation failed');
-     }
-   };
+        }
+      }
+      closeModal();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Operation failed');
+    }
+  };
 
   const handleDelete = async (id) => {
     if (!confirm("Delete this reservist? This action cannot be undone.")) return;
@@ -251,13 +401,22 @@ const toggleStatus = async (id) => {
       {!loading && (
         <>
           {/* ── Page header ─────────────────────────────────────── */}
-          <AirbasePageHeader
-            icon={UserSquare}
-            title="Reservists"
-            description="Manage all Philippine Air Force reservist records, assignments, and status."
-            breadcrumbs={[{ label: "Reservists" }]}
-            actions={<PrimaryButton icon={Plus} onClick={openAdd}>Add Reservist</PrimaryButton>}
-          />
+          <div className="flex items-center justify-between">
+            <AirbasePageHeader
+              icon={UserSquare}
+              title="Reservists"
+              description="Manage all Philippine Air Force reservist records, assignments, and status."
+              breadcrumbs={[{ label: "Reservists" }]}
+            />
+            <div className="flex gap-2">
+              <PrimaryButton icon={Upload} onClick={() => setBulkUploadModal(true)} variant="secondary">
+                Bulk Upload
+              </PrimaryButton>
+              <PrimaryButton icon={Plus} onClick={openAdd}>
+                Add Reservist
+              </PrimaryButton>
+            </div>
+          </div>
 
           {/* ── Stats ───────────────────────────────────────────── */}
           <ReservistStatsBar data={data} />
@@ -310,6 +469,13 @@ const toggleStatus = async (id) => {
             onChange={setForm}
             onClose={closeModal}
             onSubmit={handleSubmit}
+          />
+
+          {/* ── Bulk Upload Modal ───────────────────────────────── */}
+          <BulkUploadModal
+            isOpen={bulkUploadModal}
+            onClose={() => setBulkUploadModal(false)}
+            onSuccess={loadReservists}
           />
 
           {/* ── Detail slide panel ───────────────────────────────── */}

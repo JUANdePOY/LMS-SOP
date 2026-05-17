@@ -124,15 +124,15 @@ const countQuery = `
        const total = countResult[0].total;
 
        // Fetch paginated records
-       const query = `
-         SELECT 
-           r.id, r.user_id, r.first_name, r.last_name, r.rank, 
-           r.service_number, r.date_of_birth, r.sex, r.phone_number,
-           r.reserve_status, r.is_active, r.created_at, r.updated_at,
-           u.email, u.role,
-           ra.id as assignment_id, ra.group_id, ra.squadron_id, 
-           g.name as group_name, s.name as squadron_name
-         FROM reservists r
+const query = `
+          SELECT 
+            r.id, r.user_id, r.first_name, r.last_name, r.rank, 
+            r.service_number, r.position, r.date_of_birth, r.sex, r.phone_number,
+            r.reserve_status, r.is_active, r.created_at, r.updated_at,
+            u.email, u.role,
+            ra.id as assignment_id, ra.group_id, ra.squadron_id, 
+            g.name as group_name, s.name as squadron_name
+          FROM reservists r
          LEFT JOIN users u ON r.user_id = u.id
          LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
          LEFT JOIN \`groups\` g ON ra.group_id = g.id
@@ -240,9 +240,11 @@ router.post(
     body('sex').optional().isIn(['Male', 'Female', 'Other']),
     body('blood_type').optional().isIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown']),
     body('phone_number').optional().trim(),
-    body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Retired']),
-    body('group_id').optional().isInt(),
-    body('squadron_id').optional().isInt()
+body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Retired']),
+     body('group_id').optional().isInt(),
+     body('squadron_id').optional().isInt(),
+     body('position').optional().trim(),
+     body('specialization').optional().trim()
   ],
   async (req, res) => {
     try {
@@ -257,7 +259,7 @@ router.post(
         group_id, squadron_id,
         place_of_birth, civil_status, citizenship, height, weight,
         address, reserve_center, category, date_enlisted,
-        source_of_commission, rank_date_appointment, specialization,
+        source_of_commission, rank_date_appointment, position, specialization,
         highest_education, course_degree, school, year_graduated,
         occupation, employer, office_address,
         basic_training_completed, basic_training_date,
@@ -332,45 +334,46 @@ router.post(
 
         const userId = userResult.insertId;
 
-        // Create reservist with all fields
-        const reservistData = {
-          user_id: userId,
-          first_name,
-          last_name,
-          rank,
-          service_number,
-          date_of_birth: date_of_birth || null,
-          sex: sex || null,
-          blood_type: blood_type || 'Unknown',
-          phone_number: phone_number || null,
-          reserve_status: reserve_status || 'Ready Reserve',
-          is_active: true,
-          place_of_birth: place_of_birth || null,
-          civil_status: civil_status || null,
-          citizenship: citizenship || 'Filipino',
-          height: height || null,
-          weight: weight || null,
-          address: address || null,
-          reserve_center: reserve_center || null,
-          category: category || null,
-          date_enlisted: date_enlisted || null,
-          source_of_commission: source_of_commission || null,
-          rank_date_appointment: rank_date_appointment || null,
-          specialization: specialization || null,
-          highest_education: highest_education || null,
-          course_degree: course_degree || null,
-          school: school || null,
-          year_graduated: year_graduated || null,
-          occupation: occupation || null,
-          employer: employer || null,
-          office_address: office_address || null,
-          basic_training_completed: basic_training_completed || null,
-          basic_training_date: basic_training_date || null,
-          emergency_contact_name: emergency_contact_name || null,
-          emergency_contact_phone: emergency_contact_phone || null,
-          emergency_contact_address: emergency_contact_address || null,
-          ...otherFields
-        };
+// Create reservist with all fields
+         const reservistData = {
+           user_id: userId,
+           first_name,
+           last_name,
+           rank,
+           service_number,
+           date_of_birth: date_of_birth || null,
+           sex: sex || null,
+           blood_type: blood_type || 'Unknown',
+           phone_number: phone_number || null,
+           reserve_status: reserve_status || 'Ready Reserve',
+           is_active: true,
+           place_of_birth: place_of_birth || null,
+           civil_status: civil_status || null,
+           citizenship: citizenship || 'Filipino',
+           height: height || null,
+           weight: weight || null,
+           address: address || null,
+           reserve_center: reserve_center || null,
+           category: category || null,
+           date_enlisted: date_enlisted || null,
+           source_of_commission: source_of_commission || null,
+           rank_date_appointment: rank_date_appointment || null,
+           position: position || null,
+           specialization: specialization || null,
+           highest_education: highest_education || null,
+           course_degree: course_degree || null,
+           school: school || null,
+           year_graduated: year_graduated || null,
+           occupation: occupation || null,
+           employer: employer || null,
+           office_address: office_address || null,
+           basic_training_completed: basic_training_completed || null,
+           basic_training_date: basic_training_date || null,
+           emergency_contact_name: emergency_contact_name || null,
+           emergency_contact_phone: emergency_contact_phone || null,
+           emergency_contact_address: emergency_contact_address || null,
+           ...otherFields
+         };
 
         const columns = Object.keys(reservistData).map(col => `\`${col}\``);
         const values = Object.values(reservistData);
@@ -480,7 +483,7 @@ router.put(
         'blood_type', 'phone_number', 'reserve_status', 'address',
         'place_of_birth', 'civil_status', 'citizenship', 'height', 'weight',
         'reserve_center', 'category', 'date_enlisted', 'source_of_commission',
-        'rank_date_appointment', 'specialization',
+        'rank_date_appointment', 'position', 'specialization',
         'highest_education', 'course_degree', 'school', 'year_graduated',
         'occupation', 'employer', 'office_address',
         'basic_training_completed', 'basic_training_date',
@@ -505,15 +508,9 @@ router.put(
       const updateColumns = Object.keys(updateFields).map(col => `\`${col}\` = ?`).join(',');
       const values = [...Object.values(updateFields), id];
 
-      console.log(`[UPDATE RESERVIST] Starting update for ID ${id}. Fields: ${Object.keys(updateFields).join(', ')}`);
-      
       const updateQuery = `UPDATE reservists SET ${updateColumns} WHERE id = ?`;
-      console.log(`[UPDATE RESERVIST] Query: ${updateQuery}`);
-      console.log(`[UPDATE RESERVIST] Values: ${JSON.stringify(values)}`);
 
       await db.query(updateQuery, values);
-      
-      console.log(`[UPDATE RESERVIST] Update complete for ID ${id}`);
 
       // Log audit
       logAudit({
@@ -528,12 +525,10 @@ router.put(
       });
 
       // Fetch updated reservist
-      console.log(`[UPDATE RESERVIST] Fetching updated reservist data for ID ${id}`);
       const [updated] = await db.query(
         'SELECT r.*, u.email FROM reservists r JOIN users u ON r.user_id = u.id WHERE r.id = ?',
         [id]
       );
-      console.log(`[UPDATE RESERVIST] Data fetched. Sending response for ID ${id}`);
 
       res.json({
         status: 'success',
@@ -884,14 +879,14 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
       });
     }
 
-    let query = `
-      SELECT 
-        r.id, r.first_name, r.last_name, r.rank, r.service_number,
-        r.date_of_birth, r.sex, r.phone_number, r.reserve_status,
-        r.is_active, r.created_at,
-        u.email,
-        g.name as group_name, s.name as squadron_name
-      FROM reservists r
+let query = `
+       SELECT 
+         r.id, r.first_name, r.last_name, r.rank, r.service_number,
+         r.position, r.date_of_birth, r.sex, r.phone_number, r.reserve_status,
+         r.is_active, r.created_at,
+         u.email,
+         g.name as group_name, s.name as squadron_name
+       FROM reservists r
       LEFT JOIN users u ON r.user_id = u.id
       LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
       LEFT JOIN \`groups\` g ON ra.group_id = g.id
@@ -1037,20 +1032,21 @@ router.post(
               [email, hashedPassword, 'reservist']
             );
 
-            // Create reservist
-            const reservistData = {
-              user_id: userResult.insertId,
-              first_name: record.first_name,
-              last_name: record.last_name,
-              rank: record.rank,
-              service_number: record.service_number,
-              date_of_birth: record.date_of_birth || null,
-              sex: record.sex || null,
-              blood_type: record.blood_type || 'Unknown',
-              phone_number: record.phone_number || null,
-              reserve_status: record.reserve_status || 'Ready Reserve',
-              is_active: true
-            };
+// Create reservist
+             const reservistData = {
+               user_id: userResult.insertId,
+               first_name: record.first_name,
+               last_name: record.last_name,
+               rank: record.rank,
+               service_number: record.service_number,
+               date_of_birth: record.date_of_birth || null,
+               sex: record.sex || null,
+               blood_type: record.blood_type || 'Unknown',
+               phone_number: record.phone_number || null,
+               position: record.position || null,
+               reserve_status: record.reserve_status || 'Ready Reserve',
+               is_active: true
+             };
 
             const columns = Object.keys(reservistData).map(col => `\`${col}\``);
             const values = Object.values(reservistData);
@@ -1095,6 +1091,334 @@ router.post(
         message: 'Failed to import reservists',
         code: 'IMPORT_ERROR'
       });
+    }
+  }
+);
+
+/**
+ * POST /api/reservists/bulk-upload
+ * Bulk upload reservists from Excel file
+ * First sheet: Group positions
+ * Other sheets: Squadron positions
+ */
+const multer = require('multer');
+const XLSX = require('xlsx');
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv'
+    ];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only Excel files are allowed'));
+    }
+  }
+});
+
+router.post(
+  '/bulk-upload',
+  authenticateToken,
+  requireAdmin,
+  upload.single('file'),
+  async (req, res) => {
+    let connection;
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'No file provided',
+          code: 'NO_FILE'
+        });
+      }
+
+      // Get and validate ARSEN ID
+      const arsen_id = parseInt(req.body.arsen_id);
+      if (!arsen_id || isNaN(arsen_id)) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Valid ARSEN ID is required',
+          code: 'INVALID_ARSEN'
+        });
+      }
+
+      // Parse Excel file
+      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      const sheetNames = workbook.SheetNames;
+
+      if (sheetNames.length === 0) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Excel file has no sheets',
+          code: 'INVALID_FILE'
+        });
+      }
+
+      // Get database connection with transaction
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      let successCount = 0;
+      let failureCount = 0;
+      const errors = [];
+      let firstSheetGroupId = null;
+
+// Process each sheet
+       for (let sheetIndex = 0; sheetIndex < sheetNames.length; sheetIndex++) {
+         const sheetName = sheetNames[sheetIndex];
+         const worksheet = workbook.Sheets[sheetName];
+         
+          // Find the correct header row by looking for expected column names
+          const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          let headerRowIndex = 0;
+          for (let i = 0; i < rawRows.length; i++) {
+            const row = rawRows[i];
+            if (row && row.some(cell => 
+              cell && typeof cell === 'string' && 
+              (cell === 'DESCRIPTION/POSITION' || cell === 'GRADE' || cell === 'AFSC' || 
+               cell === 'REQUIRED' || cell === 'NAME' || cell === 'Position' || cell === 'Name')
+            )) {
+              headerRowIndex = i;
+              break;
+            }
+          }
+
+          // Extract header names from the detected header row and build data rows manually
+          const headers = rawRows[headerRowIndex] || [];
+          const dataRows = rawRows.slice(headerRowIndex + 1);
+          const rows = dataRows.map(row => {
+            const obj = {};
+            headers.forEach((key, idx) => {
+              if (key != null) obj[key] = row[idx];
+            });
+            return obj;
+          });
+
+          // Skip empty sheets
+          if (rows.length === 0) continue;
+
+          let groupId = null;
+          let squadronId = null;
+
+// First sheet is the group level
+          if (sheetIndex === 0) {
+          // Extract group name from sheet name or use first row reference
+          // Try to find or create the group
+          const groupName = sheetName.trim();
+          
+          // Check if group exists
+          const [existingGroups] = await connection.query(
+            'SELECT id FROM `groups` WHERE name = ?',
+            [groupName]
+          );
+
+          if (existingGroups.length > 0) {
+            firstSheetGroupId = existingGroups[0].id;
+            groupId = firstSheetGroupId;
+          } else {
+            // Create new group with the provided ARSEN ID
+            const [result] = await connection.query(
+              'INSERT INTO `groups` (arsen_id, code, name, is_active) VALUES (?, ?, ?, TRUE)',
+              [arsen_id, groupName.substring(0, 50), groupName]
+            );
+
+            firstSheetGroupId = result.insertId;
+            groupId = firstSheetGroupId;
+          }
+        } else {
+          // Other sheets are squadrons
+          const squadronName = sheetName.trim();
+          groupId = firstSheetGroupId;
+
+          // Check if squadron exists for this group
+          const [existingSquadrons] = await connection.query(
+            'SELECT id FROM squadron WHERE group_id = ? AND name = ?',
+            [groupId, squadronName]
+          );
+
+          if (existingSquadrons.length > 0) {
+            squadronId = existingSquadrons[0].id;
+          } else {
+            // Create new squadron
+            const [result] = await connection.query(
+              'INSERT INTO squadron (group_id, name, is_active) VALUES (?, ?, TRUE)',
+              [groupId, squadronName]
+            );
+            squadronId = result.insertId;
+          }
+        }
+
+        // Process each row in the sheet
+        for (const row of rows) {
+          try {
+            const position = row['DESCRIPTION/POSITION'] || row['Position'] || '';
+            const grade = row['GRADE'] || row['Grade'] || '';
+            const afsc = row['AFSC'] || '';
+            const required = row['REQUIRED'] || row['Required'] || '';
+            const name = row['NAME'] || row['Name'] || '';
+
+            // Skip rows with no name
+            if (!name || name.trim() === '') continue;
+
+            // Parse name - handle various formats:
+            // "LTC RAUL A DECHOSA O-153218 PAF (GSC) (RES)"
+            // "Sgt Angelyn J Bass MN-T21-024171 PAF(Res)"
+            // Extract service number first (MN-XXXXX or O-XXXXX pattern)
+            const serviceNumberMatch = name.match(/(MN-\w+|O-\w+)/);
+            const serviceNumber = serviceNumberMatch ? serviceNumberMatch[1] : `${Date.now()}-${Math.random()}`;
+            
+            // Remove service number from name for parsing
+            let cleanName = name.replace(/\s*(MN-\w+|O-\w+)\s*/i, '').trim();
+            
+            // Remove PAF(RES) or PAF (RES) suffix
+            cleanName = cleanName.replace(/\s*PAF\s*\(.*?\)\s*$/i, '').trim();
+            
+            // Extract rank (first word if it's a known rank pattern)
+            const rankPattern = /^(LTC|LTCOL|COL|CAPT|CPT|1LT|2LT|MSGT|SSGT|SGT|Sgt|Cpl|CPL|PVT|LTC|LTG|MAJ|MAJGEN|BGEN|GEN|A1C|AB|AIRMAN|ADO|AMN|ENS|LTJG|LT|LCDR|CDR|RADM|VADM|ADM|ADM|ADM)/i;
+            const rankMatch = cleanName.match(rankPattern);
+            const rank = rankMatch ? rankMatch[1] : grade || 'Unknown';
+            
+            // Remove rank from name
+            let fullName = cleanName.replace(rankPattern, '').trim();
+            
+            // If no name left after removing rank, use the whole cleaned name
+            if (!fullName) {
+              fullName = cleanName;
+            }
+
+            // Split into first and last names
+            const nameParts = fullName.trim().split(/\s+/);
+            const firstName = nameParts[0] || 'Unknown';
+            const lastName = nameParts.slice(1).join(' ') || nameParts[0] || 'Unknown';
+
+            // Check if reservist exists by service number
+            const [existingReservists] = await connection.query(
+              'SELECT id FROM reservists WHERE service_number = ?',
+              [serviceNumber]
+            );
+
+            let reservistId;
+
+if (existingReservists.length > 0) {
+               // Update existing reservist
+               reservistId = existingReservists[0].id;
+               await connection.query(
+                 'UPDATE reservists SET rank = ?, position = ? WHERE id = ?',
+                 [rank, position, reservistId]
+               );
+             } else {
+              // Create new reservist
+              // First create a user account
+              const email = `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@pafr.mil`;
+              const tempPassword = 'TempPassword123!';
+              const passwordHash = await hashPassword(tempPassword);
+
+              // Check if user exists
+              const [existingUsers] = await connection.query(
+                'SELECT id FROM users WHERE email = ?',
+                [email]
+              );
+
+              let userId;
+
+              if (existingUsers.length > 0) {
+                userId = existingUsers[0].id;
+              } else {
+                const [userResult] = await connection.query(
+                  'INSERT INTO users (email, password_hash, role, is_active) VALUES (?, ?, ?, TRUE)',
+                  [email, passwordHash, 'reservist']
+                );
+                userId = userResult.insertId;
+              }
+
+// Create reservist
+               const [reservistResult] = await connection.query(
+                 `INSERT INTO reservists (
+                   user_id, first_name, last_name, rank, service_number,
+                   position, reserve_status, is_active
+                 ) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)`,
+                 [userId, firstName, lastName, rank, serviceNumber, position, 'Ready Reserve']
+               );
+
+              reservistId = reservistResult.insertId;
+            }
+
+            // Create or update assignment
+            const [existingAssignments] = await connection.query(
+              'SELECT id FROM reservist_assignments WHERE reservist_id = ? AND group_id = ? AND squadron_id = ?',
+              [reservistId, groupId, squadronId]
+            );
+
+            if (existingAssignments.length === 0) {
+              // Set other assignments to non-primary
+              await connection.query(
+                'UPDATE reservist_assignments SET is_primary = FALSE WHERE reservist_id = ? AND is_primary = TRUE',
+                [reservistId]
+              );
+
+              // Create new assignment
+              await connection.query(
+                `INSERT INTO reservist_assignments (
+                  reservist_id, group_id, squadron_id, assigned_date, is_primary
+                ) VALUES (?, ?, ?, CURDATE(), TRUE)`,
+                [reservistId, groupId, squadronId]
+              );
+            }
+
+            successCount++;
+          } catch (error) {
+            errors.push(`Row "${name}" in sheet "${sheetName}": ${error.message}`);
+            failureCount++;
+          }
+        }
+      }
+
+      await connection.commit();
+
+      // Log audit
+      logAudit({
+        user_id: req.user.id,
+        action: 'reservist.bulk_upload',
+        entity_type: 'reservist',
+        new_values: { successful: successCount, failed: failureCount },
+        ip_address: getClientIp(req),
+        user_agent: req.headers['user-agent']
+      });
+
+      res.json({
+        status: 'success',
+        message: 'Bulk upload completed',
+        data: {
+          successful: successCount,
+          failed: failureCount,
+          total: successCount + failureCount,
+          errors: errors
+        }
+      });
+    } catch (error) {
+      if (connection) {
+        try {
+          await connection.rollback();
+        } catch (rollbackError) {
+          console.error('Rollback error:', rollbackError);
+        }
+      }
+
+      console.error('Error in bulk upload:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Bulk upload failed: ' + error.message,
+        code: 'BULK_UPLOAD_ERROR'
+      });
+    } finally {
+      if (connection) {
+        connection.release();
+      }
     }
   }
 );

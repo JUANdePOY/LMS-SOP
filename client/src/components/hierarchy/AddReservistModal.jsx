@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   X, UserPlus, ChevronDown, CheckCircle2,
   Phone, Shield, Layers, MapPin, Tag, User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { rankOptions, statusOptions } from "@/data/reservistsData";
+import { getArcens, getGroupsList } from "@/services/api";
 
 // ─────────────────────────────────────────────────────────────
 // Sub-components
@@ -212,6 +213,8 @@ const EMPTY_FORM = {
   rank:     "",
   contact:  "",
   status:   "active",
+  arcen:    "",
+  group:    "",
 };
 
 /**
@@ -233,7 +236,42 @@ export default function AddReservistModal({ isOpen, onClose, context = {}, onSub
   const [errors, setErrors]   = useState({});
   const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [arcenOptions, setArcenOptions] = useState([]);
+  const [groupOptions, setGroupOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
   const firstInputRef = useRef(null);
+
+  // Filter groups based on selected ARSEN
+  const filteredGroupOptions = useMemo(() => {
+    if (!groupOptions.length || !fields.arcen) return [];
+    const selectedArsen = parseInt(fields.arcen, 10);
+    return groupOptions.filter(g => {
+      const arsenId = g.arsen_id != null ? parseInt(g.arsen_id, 10) : null;
+      return arsenId === selectedArsen;
+    });
+  }, [fields.arcen, groupOptions]);
+
+  // Load ARCEN and Group options on open
+  useEffect(() => {
+    if (isOpen) {
+      setLoading(true);
+      Promise.all([getArcens(), getGroupsList()])
+        .then(([arRes, grRes]) => {
+          if (arRes.data.status === 'success') {
+            setArcenOptions(arRes.data.data.map(a => ({ value: a.id, label: a.name })));
+          }
+          if (grRes.data.status === 'success') {
+            setGroupOptions(grRes.data.data.map(g => ({
+              value: g.id,
+              label: g.name,
+              arsen_id: g.arsen_id
+            })));
+          }
+        })
+        .catch(err => console.error('Failed to load options:', err))
+        .finally(() => setLoading(false));
+    }
+  }, [isOpen]);
 
   // Reset form when modal opens
   useEffect(() => {
@@ -259,6 +297,16 @@ export default function AddReservistModal({ isOpen, onClose, context = {}, onSub
     setErrors((prev) => { const next = { ...prev }; delete next[key]; return next; });
   }, []);
 
+  const handleArcenChange = (e) => {
+    const val = e.target.value;
+    setFields((prev) => ({ ...prev, arcen: val, group: '' }));
+  };
+
+  const handleGroupChange = (e) => {
+    const val = e.target.value;
+    setFields((prev) => ({ ...prev, group: val }));
+  };
+
   const handleSubmit = () => {
     const errs = validate(fields);
     if (Object.keys(errs).length) { setErrors(errs); return; }
@@ -272,11 +320,11 @@ export default function AddReservistModal({ isOpen, onClose, context = {}, onSub
         rank:           fields.rank,
         contact:        fields.contact.trim(),
         status:         fields.status,
-        specialization: context.squadron ?? "Unassigned",
+        specialization: fields.group ?? context.squadron ?? "Unassigned",
         joined:         new Date().toISOString().split("T")[0],
         _meta: {
-          arcen:    context.arcen    ?? null,
-          group:    context.group    ?? null,
+          arcen:    fields.arcen ?? context.arcen    ?? null,
+          group:    fields.group ?? context.group    ?? null,
           squadron: context.squadron ?? null,
         },
       };

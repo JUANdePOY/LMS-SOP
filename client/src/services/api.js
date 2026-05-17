@@ -50,6 +50,14 @@ export const updateReservist = (id, data) => api.put(`/reservists/${id}`, data);
 export const deleteReservist = (id) => api.delete(`/reservists/${id}`);
 export const assignReservist = (id, data) => api.post(`/reservists/${id}/assign`, data);
 export const resetReservistPassword = (id, data) => api.post(`/reservists/${id}/reset-password`, data);
+export const bulkUploadReservists = (formData) => 
+  api.post('/reservists/bulk-upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+export const bulkPreviewReservists = (formData) =>
+  api.post('/reservists/bulk-preview', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
 
 // Trainings
 export const getTrainings = (params = {}) => api.get('/trainings', { params });

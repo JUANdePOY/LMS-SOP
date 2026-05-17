@@ -15,10 +15,9 @@ import { cn } from "@/lib/utils";
  *   children: React.ReactNode,
  * }} props
  */
-export default function AddEditModal({ open, title, onClose, onSubmit, submitLabel = "Save", children }) {
+export default function AddEditModal({ open, title, onClose, onSubmit, submitLabel = "Save", children, maxWidth }) {
   const overlayRef = useRef(null);
 
-  // Close on Escape
   useEffect(() => {
     if (!open) return;
     const handler = (e) => e.key === "Escape" && onClose();
@@ -26,13 +25,14 @@ export default function AddEditModal({ open, title, onClose, onSubmit, submitLab
     return () => window.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  // Lock body scroll
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [open]);
 
   if (!open) return null;
+
+  const widthClass = maxWidth || "max-w-lg";
 
   return (
     <div
@@ -45,7 +45,8 @@ export default function AddEditModal({ open, title, onClose, onSubmit, submitLab
 
       {/* Panel */}
       <div className={cn(
-        "relative z-10 w-full max-w-lg rounded-2xl shadow-2xl",
+        "relative z-10 w-full rounded-2xl shadow-2xl",
+        widthClass,
         "bg-white dark:bg-neutral-900",
         "border border-neutral-200 dark:border-neutral-800",
         "animate-in fade-in zoom-in-95 duration-150"
@@ -65,7 +66,7 @@ export default function AddEditModal({ open, title, onClose, onSubmit, submitLab
         </div>
 
         {/* Body */}
-        <div className="px-6 py-5 flex flex-col gap-4">
+        <div className="px-6 py-4 flex flex-col gap-2 max-h-[65vh] overflow-y-auto">
           {children}
         </div>
 
@@ -107,8 +108,8 @@ export default function AddEditModal({ open, title, onClose, onSubmit, submitLab
  */
 export function FormField({ label, required, children }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-[12px] font-semibold text-neutral-700 dark:text-neutral-300">
+    <div className="flex flex-col gap-0.5">
+      <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       {children}
@@ -119,7 +120,7 @@ export function FormField({ label, required, children }) {
 /**
  * FormInput — styled text input
  */
-export function FormInput({ value, onChange, placeholder, type = "text", ...props }) {
+export function FormInput({ value, onChange, placeholder, type = "text", className, ...props }) {
   return (
     <input
       type={type}
@@ -127,13 +128,14 @@ export function FormInput({ value, onChange, placeholder, type = "text", ...prop
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       className={cn(
-        "rounded-lg border px-3 py-2 text-sm",
+        "rounded-lg border px-2.5 py-1.5 text-sm",
         "border-neutral-200 dark:border-neutral-700",
         "bg-white dark:bg-neutral-800",
         "text-neutral-800 dark:text-neutral-200",
         "placeholder:text-neutral-400 dark:placeholder:text-neutral-600",
         "outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400",
-        "transition-all duration-150"
+        "transition-all duration-150",
+        className
       )}
       {...props}
     />
@@ -149,7 +151,7 @@ export function FormSelect({ value, onChange, children, ...props }) {
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={cn(
-        "rounded-lg border px-3 py-2 text-sm",
+        "rounded-lg border px-2.5 py-1.5 text-sm",
         "border-neutral-200 dark:border-neutral-700",
         "bg-white dark:bg-neutral-800",
         "text-neutral-800 dark:text-neutral-200",
