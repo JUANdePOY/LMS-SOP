@@ -74,9 +74,9 @@ CREATE TABLE reservists (
     INDEX idx_service_number (service_number),
     INDEX idx_name (last_name, first_name),
     INDEX idx_active (is_active),
-INDEX idx_rank (`rank`),
-     INDEX idx_position (position),
-     INDEX idx_reserve_status (reserve_status)
+    INDEX idx_rank (`rank`),
+    INDEX idx_position (position),
+    INDEX idx_reserve_status (reserve_status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------
@@ -213,6 +213,94 @@ CREATE TABLE activities (
     CHECK (end_time > start_time),
     INDEX idx_training (training_id),
     INDEX idx_timing (start_time, end_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------
+-- Table internal_training_participants
+-- -----------------------------------------------------
+CREATE TABLE internal_training_participants (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    training_id BIGINT NOT NULL,
+    reservist_id BIGINT NOT NULL,
+    squadron_id BIGINT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (training_id) REFERENCES trainings(id) ON DELETE CASCADE,
+    FOREIGN KEY (reservist_id) REFERENCES reservists(id) ON DELETE CASCADE,
+    FOREIGN KEY (squadron_id) REFERENCES squadron(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_training_reservist (training_id, reservist_id),
+    INDEX idx_training (training_id),
+    INDEX idx_squadron (squadron_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------
+-- Table internal_training_attachments
+-- -----------------------------------------------------
+CREATE TABLE internal_training_attachments (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    training_id BIGINT NOT NULL,
+    kind VARCHAR(50) NOT NULL DEFAULT 'letter_order',
+    stored_filename VARCHAR(500) NOT NULL,
+    original_filename VARCHAR(500) NOT NULL,
+    mime_type VARCHAR(100) NULL,
+    size_bytes INT NULL,
+    storage_backend VARCHAR(50) NOT NULL DEFAULT 'local',
+    relative_path VARCHAR(1000) NULL,
+    uploaded_by BIGINT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (training_id) REFERENCES trainings(id) ON DELETE CASCADE,
+    FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_training_kind (training_id, kind)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------
+-- Table external_trainings
+-- -----------------------------------------------------
+CREATE TABLE external_trainings (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    title VARCHAR(500) NOT NULL,
+    description TEXT NULL,
+    start_date DATE NOT NULL,
+    start_time TIME NULL,
+    venue VARCHAR(500) NULL,
+    status ENUM('draft', 'open', 'closed', 'completed') NOT NULL DEFAULT 'draft',
+    capacity INT NULL,
+    registration_fields JSON NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_status (status),
+    INDEX idx_start_date (start_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------
+-- Table external_training_attachments
+-- -----------------------------------------------------
+CREATE TABLE external_training_attachments (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    external_training_id BIGINT NOT NULL,
+    kind VARCHAR(50) NOT NULL DEFAULT 'letter_order',
+    stored_filename VARCHAR(500) NOT NULL,
+    original_filename VARCHAR(500) NOT NULL,
+    mime_type VARCHAR(100) NULL,
+    size_bytes INT NULL,
+    storage_backend VARCHAR(50) NOT NULL DEFAULT 'local',
+    relative_path VARCHAR(1000) NULL,
+    uploaded_by BIGINT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (external_training_id) REFERENCES external_trainings(id) ON DELETE CASCADE,
+    FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_external_training_kind (external_training_id, kind)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------
+-- Table training_registrations
+-- -----------------------------------------------------
+CREATE TABLE training_registrations (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    training_id BIGINT NOT NULL,
+    participant_data JSON NULL,
+    registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (training_id) REFERENCES external_trainings(id) ON DELETE CASCADE,
+    INDEX idx_training (training_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------

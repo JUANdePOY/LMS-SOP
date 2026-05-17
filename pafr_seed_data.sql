@@ -164,36 +164,37 @@ INSERT INTO trainings (id, title, description, start_datetime, end_datetime, ven
 
 -- ============================================================
 -- 9. ACTIVITIES (within trainings)
+-- Description format: JSON with activityType and requirements fields
 -- ============================================================
 INSERT INTO activities (id, training_id, title, description, start_time, end_time, location, instructor, is_mandatory) VALUES
   -- Training 1 activities
-  (1, 1, 'Orientation & Safety Briefing', 'Introduction to camp rules and safety protocols', '2026-06-01 08:00:00', '2026-06-01 10:00:00', 'Camp Aguinaldo HQ', 'Capt. Garcia', TRUE),
-  (2, 1, 'Squad Drill Fundamentals', 'Basic squad formations and movement', '2026-06-01 13:00:00', '2026-06-02 17:00:00', 'Training Field Alpha', '1LT Santos', TRUE),
-  (3, 1, 'Weapons Familiarization', 'Rifle assembly, cleaning, and function checks', '2026-06-03 08:00:00', '2026-06-04 17:00:00', 'Armory Building', 'SSG Reyes', TRUE),
-  (4, 1, 'Field Exercise FTX-1', 'Squad-level tactical exercise', '2026-06-08 06:00:00', '2026-06-10 18:00:00', 'Tactical Training Area', 'Capt. Garcia', TRUE),
-  (5, 1, 'After Action Review', 'Debrief and lessons learned', '2026-06-14 08:00:00', '2026-06-15 12:00:00', 'Training Room 1', 'Capt. Garcia', TRUE),
+  (1, 1, 'Orientation & Safety Briefing', '{"activityType":"orientation","requirements":"None"}', '2026-06-01 08:00:00', '2026-06-01 10:00:00', 'Camp Aguinaldo HQ', 'Capt. Garcia', TRUE),
+  (2, 1, 'Squad Drill Fundamentals', '{"activityType":"drill","requirements":"Combat uniform, boots"}', '2026-06-01 13:00:00', '2026-06-02 17:00:00', 'Training Field Alpha', '1LT Santos', TRUE),
+  (3, 1, 'Weapons Familiarization', '{"activityType":"weapons","requirements":"Safety gear"}', '2026-06-03 08:00:00', '2026-06-04 17:00:00', 'Armory Building', 'SSG Reyes', TRUE),
+  (4, 1, 'Field Exercise FTX-1', '{"activityType":"field_exercise","requirements":"Full combat load, 72hr pack"}', '2026-06-08 06:00:00', '2026-06-10 18:00:00', 'Tactical Training Area', 'Capt. Garcia', TRUE),
+  (5, 1, 'After Action Review', '{"activityType":"review","requirements":"None"}', '2026-06-14 08:00:00', '2026-06-15 12:00:00', 'Training Room 1', 'Capt. Garcia', TRUE),
   -- Training 2 activities
-  (6, 2, 'Weapons Safety & Rules', 'Range safety briefing and rules', '2026-06-20 07:00:00', '2026-06-20 09:00:00', 'Firing Range Safety Area', 'SMSgt Peralto', TRUE),
-  (7, 2, 'Marksmanship - Rifle Qualification', 'Qualifying fire with M16/M4', '2026-06-20 10:00:00', '2026-06-21 17:00:00', 'Firing Range', 'SMSgt Peralto', TRUE),
-  (8, 2, 'Marksmanship - Pistol Qualification', 'Sidearm qualification course', '2026-06-22 07:00:00', '2026-06-22 17:00:00', 'Pistol Range', 'SSG Pasion', FALSE),
+  (6, 2, 'Weapons Safety & Rules', '{"activityType":"weapons","requirements":"Eye and ear protection"}', '2026-06-20 07:00:00', '2026-06-20 09:00:00', 'Firing Range Safety Area', 'SMSgt Peralto', TRUE),
+  (7, 2, 'Marksmanship - Rifle Qualification', '{"activityType":"weapons","requirements":"M16/M4 rifle, 40 rounds"}', '2026-06-20 10:00:00', '2026-06-21 17:00:00', 'Firing Range', 'SMSgt Peralto', TRUE),
+  (8, 2, 'Marksmanship - Pistol Qualification', '{"activityType":"weapons","requirements":"9mm pistol, 30 rounds"}', '2026-06-22 07:00:00', '2026-06-22 17:00:00', 'Pistol Range', 'SSG Pasion', FALSE),
   -- Training 3 activities
-  (9, 3, 'Radio Fundamentals', 'Analog and digital radio operation', '2026-07-01 08:00:00', '2026-07-02 17:00:00', 'Comms Room', '1LT Oban', TRUE),
-  (10, 3, 'Encrypted Communications', 'Satellite and encrypted message protocols', '2026-07-03 08:00:00', '2026-07-04 17:00:00', 'Comms Room', '1LT Oban', TRUE),
-  (11, 3, 'Field Exercise COMEX', 'Communications exercise under field conditions', '2026-07-05 06:00:00', '2026-07-05 17:00:00', 'Field Training Area', 'Capt. Garcia', TRUE),
+  (9, 3, 'Radio Fundamentals', '{"activityType":"communications","requirements":"PRC-152 radio"}', '2026-07-01 08:00:00', '2026-07-02 17:00:00', 'Comms Room', '1LT Oban', TRUE),
+  (10, 3, 'Encrypted Communications', '{"activityType":"communications","requirements":"Crypto key material"}', '2026-07-03 08:00:00', '2026-07-04 17:00:00', 'Comms Room', '1LT Oban', TRUE),
+  (11, 3, 'Field Exercise COMEX', '{"activityType":"field_exercise","requirements":"Full comms kit"}', '2026-07-05 06:00:00', '2026-07-05 17:00:00', 'Field Training Area', 'Capt. Garcia', TRUE),
   -- Training 4 activities
-  (12, 4, 'TCCC Level A', 'Tactical Combat Casualty Care basics', '2026-07-15 08:00:00', '2026-07-15 17:00:00', 'Medical Training Hall', 'Nurse Santos', TRUE),
-  (13, 4, 'Casualty Evacuation Drill', 'MEDEVAC procedures and litter carries', '2026-07-16 08:00:00', '2026-07-16 17:00:00', 'Field Training Area', 'Nurse Santos', TRUE),
-  (14, 4, 'Mass Casualty Exercise', 'Large-scale triage simulation', '2026-07-17 08:00:00', '2026-07-17 17:00:00', 'Multi-Purpose Hall', 'Capt. Mapagu', TRUE),
+  (12, 4, 'TCCC Level A', '{"activityType":"medical","requirements":"IFAK, tourniquet"}', '2026-07-15 08:00:00', '2026-07-15 17:00:00', 'Medical Training Hall', 'Nurse Santos', TRUE),
+  (13, 4, 'Casualty Evacuation Drill', '{"activityType":"medical","requirements":"Litter, stretcher"}', '2026-07-16 08:00:00', '2026-07-16 17:00:00', 'Field Training Area', 'Nurse Santos', TRUE),
+  (14, 4, 'Mass Casualty Exercise', '{"activityType":"medical","requirements":"Full medical kit, triage tags"}', '2026-07-17 08:00:00', '2026-07-17 17:00:00', 'Multi-Purpose Hall', 'Capt. Mapagu', TRUE),
   -- Training 5 activities (Physical Fitness)
-  (15, 5, 'APFT Administration', 'Army Physical Fitness Test', '2026-05-15 06:00:00', '2026-05-15 09:00:00', 'PT Field', '1LT Tolentino', TRUE),
-  (16, 5, 'Cross-Country Run', '5km endurance run', '2026-05-15 10:00:00', '2026-05-15 12:00:00', 'Camp Grounds', '1LT Tolentino', TRUE),
+  (15, 5, 'APFT Administration', '{"activityType":"fitness","requirements":"PT uniform, running shoes"}', '2026-05-15 06:00:00', '2026-05-15 09:00:00', 'PT Field', '1LT Tolentino', TRUE),
+  (16, 5, 'Cross-Country Run', '{"activityType":"fitness","requirements":"Running shoes, hydration"}', '2026-05-15 10:00:00', '2026-05-15 12:00:00', 'Camp Grounds', '1LT Tolentino', TRUE),
   -- Training 7 activities
-  (17, 7, 'COIN Classroom Instruction', 'Counter-insurgency doctrine and case studies', '2026-08-10 08:00:00', '2026-08-11 17:00:00', 'Lecture Hall', 'Col. Oban', TRUE),
-  (18, 7, 'Civil-Military Operations', 'Community engagement and development', '2026-08-12 08:00:00', '2026-08-12 17:00:00', 'Community Center', 'Capt. Mapagu', TRUE),
-  (19, 7, 'Patrol Exercise', 'Small unit patrol in rural environment', '2026-08-13 06:00:00', '2026-08-14 18:00:00', 'Rural Training Area', 'Col. Oban', TRUE),
+  (17, 7, 'COIN Classroom Instruction', '{"activityType":"classroom","requirements":"None"}', '2026-08-10 08:00:00', '2026-08-11 17:00:00', 'Lecture Hall', 'Col. Oban', TRUE),
+  (18, 7, 'Civil-Military Operations', '{"activityType":"classroom","requirements":"None"}', '2026-08-12 08:00:00', '2026-08-12 17:00:00', 'Community Center', 'Capt. Mapagu', TRUE),
+  (19, 7, 'Patrol Exercise', '{"activityType":"field_exercise","requirements":"Full combat load"}', '2026-08-13 06:00:00', '2026-08-14 18:00:00', 'Rural Training Area', 'Col. Oban', TRUE),
   -- Training 9 activities
-  (20, 9, 'Qualification Zeroing', 'Zeroing weapons at known distance', '2026-06-25 07:00:00', '2026-06-25 10:00:00', 'Firing Range', 'SSG Sendong', TRUE),
-  (21, 9, 'Marksmanship Record Fire', 'Record fire for qualification score', '2026-06-25 10:30:00', '2026-06-26 17:00:00', 'Firing Range', 'SSG Sendong', TRUE);
+  (20, 9, 'Qualification Zeroing', '{"activityType":"weapons","requirements":"M16/M4 rifle, 10 rounds"}', '2026-06-25 07:00:00', '2026-06-25 10:00:00', 'Firing Range', 'SSG Sendong', TRUE),
+  (21, 9, 'Marksmanship Record Fire', '{"activityType":"weapons","requirements":"M16/M4 rifle, 40 rounds"}', '2026-06-25 10:30:00', '2026-06-26 17:00:00', 'Firing Range', 'SSG Sendong', TRUE);
 
 -- ============================================================
 -- 10. ATTENDANCE (recording reservist training participation)
@@ -347,26 +348,76 @@ INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, old_values,
 -- ============================================================
 
 -- ============================================================
+-- 19. INTERNAL TRAINING PARTICIPANTS
+-- ============================================================
+INSERT INTO internal_training_participants (training_id, reservist_id, squadron_id) VALUES
+  -- Training 1 (Basic Infantry) - participants from Alpha and Bravo squadrons
+  (1, 2, 1),  -- Juan Dela Cruz (Alpha)
+  (1, 3, 2),  -- Pedro Santos (Bravo)
+  -- Training 2 (Weapons Qual) - participants from Delta and Echo squadrons
+  (2, 4, 4),  -- Jose Reyes (Delta)
+  (2, 5, 5),  -- Maria Santos (Echo)
+  -- Training 5 (Physical Fitness) - mixed squadrons
+  (5, 2, 1),
+  (5, 3, 2),
+  (5, 4, 4),
+  (5, 6, 6),  -- Carlos Reyes (Foxtrot)
+  -- Training 7 (COIN) - from Juliet squadron
+  (7, 7, 10), -- Eduardo Oban (Juliet)
+  -- Training 9 (Marksmanship Refresher) - from Lima and November
+  (9, 8, 12), -- Reynaldo Mapagu (Lima)
+  (9, 9, 14); -- Cirilo Peralto (November)
+
+-- ============================================================
+-- 20. EXTERNAL TRAININGS
+-- ============================================================
+INSERT INTO external_trainings (id, title, description, start_date, start_time, venue, status, capacity, registration_fields, created_at) VALUES
+  (1, 'Emergency Medical Responder Course', 'Certified EMR course open to civilian and military participants', '2026-07-01', '08:00:00', 'Philippine Red Cross Training Center, Manila', 'open', 30, '{"fields":[{"name":"full_name","type":"text","required":true},{"name":"email","type":"email","required":true},{"name":"phone","type":"tel","required":true},{"name":"organization","type":"text","required":false},{"name":"previous_training","type":"select","options":["None","First Aid","EMR","EMT"],"required":false}]}', '2026-05-10 09:00:00'),
+  (2, 'Cybersecurity Awareness Seminar', 'Introduction to cybersecurity threats and best practices for reservists', '2026-08-15', '09:00:00', 'Camp Aguinaldo, Multi-Purpose Hall', 'open', 100, '{"fields":[{"name":"full_name","type":"text","required":true},{"name":"email","type":"email","required":true},{"name":"service_number","type":"text","required":true},{"name":"unit","type":"text","required":false}]}', '2026-05-12 10:00:00'),
+  (3, 'Disaster Risk Reduction Workshop', 'Community-based disaster preparedness and response planning', '2026-09-20', '08:30:00', 'Cebu City Disaster Risk Reduction Office', 'draft', 50, '{"fields":[{"name":"full_name","type":"text","required":true},{"name":"email","type":"email","required":true},{"name":"phone","type":"tel","required":true},{"name":"barangay","type":"text","required":true}]}', '2026-05-14 11:00:00'),
+  (4, 'Women in Leadership Conference', 'Leadership development and networking for female reservists', '2026-10-05', '09:00:00', 'AFP General Headquarters, Camp Aguinaldo', 'open', 80, '{"fields":[{"name":"full_name","type":"text","required":true},{"name":"email","type":"email","required":true},{"name":"rank","type":"text","required":true},{"name":"unit_assignment","type":"text","required":true}]}', '2026-05-15 08:00:00'),
+  (5, 'Advanced Drone Operations Training', 'UAV reconnaissance and surveillance techniques - invitation only', '2026-11-10', '07:00:00', 'Camp Panacan, Davao', 'draft', 20, '{"fields":[{"name":"full_name","type":"text","required":true},{"name":"service_number","type":"text","required":true},{"name":"email","type":"email","required":true},{"name":"drone_experience","type":"select","options":["None","Basic","Intermediate","Advanced"],"required":true}]}', '2026-05-16 09:00:00');
+
+-- ============================================================
+-- 21. TRAINING REGISTRATIONS (external training sign-ups)
+-- ============================================================
+INSERT INTO training_registrations (training_id, participant_data, registered_at) VALUES
+  -- EMR Course registrations
+  (1, '{"full_name":"Maria Santos","email":"maria.santos@example.com","phone":"09171234567","organization":"St. Lukes Medical Center","previous_training":"First Aid"}', '2026-05-11 10:00:00'),
+  (1, '{"full_name":"Ana Reyes","email":"ana.reyes@example.com","phone":"09182345678","organization":"Red Cross","previous_training":"EMR"}', '2026-05-11 14:30:00'),
+  (1, '{"full_name":"Roberto Garcia","email":"roberto.garcia@example.com","phone":"09193456789","organization":"None","previous_training":"None"}', '2026-05-12 09:15:00'),
+  -- Cybersecurity Seminar registrations
+  (2, '{"full_name":"Carlos Reyes","email":"carlos.reyes@example.com","service_number":"RES-005","unit":"3rd Infantry Group"}', '2026-05-13 08:00:00'),
+  (2, '{"full_name":"Eduardo Oban","email":"eduardo.oban@example.com","service_number":"RES-006","unit":"1st Infantry Battalion (EastMin)"}', '2026-05-13 10:30:00'),
+  -- Women in Leadership registrations
+  (4, '{"full_name":"Maria Santos","email":"maria.santos@example.com","rank":"Corporal","unit_assignment":"Echo Squadron, 2nd Infantry Group"}', '2026-05-16 09:00:00'),
+  (4, '{"full_name":"Liza Gomez","email":"liza.gomez@example.com","rank":"Sergeant","unit_assignment":"Alpha Flight Squadron"}', '2026-05-16 11:00:00'),
+  (4, '{"full_name":"Nina Ramos","email":"nina.ramos@example.com","rank":"Corporal","unit_assignment":"Juliet Squadron"}', '2026-05-17 08:30:00');
+
+-- ============================================================
 -- SEED DATA SUMMARY
 -- ============================================================
 -- Tables populated:
---   - areas:         13 records (3 root areas + 10 child areas)
---   - arsens:         5 records
---   - groups:        12 records
---   - squadron:      25 records
---   - users:        12 records (1 admin + 11 reservists, 1 deactivated)
---   - reservists:    12 records
---   - reservist_assignments: 11 records
---   - trainings:     10 records
---   - activities:    21 records
---   - attendance:    17 records
---   - readiness:     11 records
---   - supplies:      15 records
---   - supply_issuances: 8 records
---   - alerts:         5 records
---   - user_alerts:   11 records
---   - system_settings: 12 records
---   - audit_logs:    13 records
+--   - areas:                       13 records (3 root areas + 10 child areas)
+--   - arsens:                       5 records
+--   - groups:                      12 records
+--   - squadron:                    25 records
+--   - users:                      12 records (1 admin + 11 reservists, 1 deactivated)
+--   - reservists:                  12 records
+--   - reservist_assignments:       11 records
+--   - trainings:                   10 records
+--   - activities:                  21 records
+--   - attendance:                  17 records
+--   - readiness:                   11 records
+--   - supplies:                    15 records
+--   - supply_issuances:             8 records
+--   - alerts:                       5 records
+--   - user_alerts:                 11 records
+--   - system_settings:             12 records
+--   - audit_logs:                  13 records
+--   - internal_training_participants: 10 records
+--   - external_trainings:           5 records
+--   - training_registrations:       8 records
 --
 -- TEST CREDENTIALS:
 --   Admin  -> email: ADMIN-001  password: AdminPass123!
