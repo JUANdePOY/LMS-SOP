@@ -1,8 +1,18 @@
 import { useState, useRef } from 'react';
 import { X, Upload, FileText, Image, File, Trash2 } from 'lucide-react';
-import { createInternalTraining, createExternalTraining, updateInternalTraining, updateExternalTraining, uploadLetterOrder } from '@/services/trainingsService';
+import {
+  createInternalTraining,
+  createExternalTraining,
+  updateInternalTraining,
+  updateExternalTraining,
+  uploadLetterOrder,
+  uploadExternalLetterOrder,
+  downloadInternalAttachment,
+  downloadExternalAttachment,
+} from '@/services/trainingsService';
 import { useToast } from '@/components/ui/Toast';
 import RegistrationBuilder from './RegistrationBuilder';
+import SquadronParticipantBlocks from './SquadronParticipantBlocks';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -49,6 +59,23 @@ const inputCls =
 // ─── Safe string helper — converts null/undefined/number → string ──────────────
 const str = (v) => (v == null ? '' : String(v));
 
+/** Map API participant_groups to UI blocks for internal training edit. */
+function buildParticipantBlocksFromGroups(groups) {
+  if (!Array.isArray(groups) || !groups.length) return [];
+  return groups.map((grp) => ({
+    localId: `h-${grp.squadron_id}-${Math.random().toString(36).slice(2)}`,
+    squadronId: grp.squadron_id ?? null,
+    squadronName: grp.squadron_name || '',
+    selectedReservists: (grp.reservists || []).map((r) => ({
+      id: r.id,
+      first_name: r.first_name,
+      last_name: r.last_name,
+      rank: r.rank,
+      service_number: r.service_number,
+    })),
+  }));
+}
+
 // ─── Helper: extract YYYY-MM-DD from a datetime value ─────────────────────────
 function toDateString(value) {
   if (!value) return '';
@@ -74,10 +101,11 @@ function FormGroup({ label, required, hint, children, error }) {
 }
 
 // ─── Letter Order Upload ────────────────────────────────────────────────────────
-function LetterOrderUpload({ file, onFileChange }) {
+function LetterOrderUpload({ file, onFileChange, existingAttachments = [], trainingId, isExternal }) {
   const inputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
   const [fileError, setFileError] = useState('');
+  const [downloadingId, setDownloadingId] = useState(null);
 
   const processFile = (f) => {
     setFileError('');
@@ -107,21 +135,86 @@ function LetterOrderUpload({ file, onFileChange }) {
   };
 
   const formatSize = (bytes) => {
+    if (bytes == null) return '';
     if (bytes < 1024)        return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const mimeIcon = (mime) => {
+    const m = String(mime || '').toLowerCase();
+    if (m === 'application/pdf') return <FileText size={16} className="text-red-500" />;
+    if (m.startsWith('image/')) return <Image size={16} className="text-indigo-500" />;
+    return <File size={16} className="text-blue-500" />;
+  };
+
+  const handleDownloadExisting = async (att) => {
+    if (!trainingId || !att?.id) return;
+    setDownloadingId(att.id);
+    try {
+      const blob = isExternal
+        ? await downloadExternalAttachment(trainingId, att.id)
+        : await downloadInternalAttachment(trainingId, att.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = att.original_filename || 'attachment';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setFileError('Could not download file.');
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
         <label className="text-[11px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-          Letter Order
+          Attachments
         </label>
         <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
           PDF, DOCX, or Image — max {MAX_FILE_MB}MB
         </span>
       </div>
+
+      {Array.isArray(existingAttachments) && existingAttachments.length > 0 && (
+        <div className="space-y-2 mb-3">
+          <p className="text-[10px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
+            Uploaded files
+          </p>
+          {existingAttachments.map((att) => (
+            <div
+              key={att.id}
+              className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg"
+            >
+              <div className="w-8 h-8 rounded-lg bg-white dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 flex items-center justify-center shrink-0">
+                {mimeIcon(att.mime_type)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100 truncate">
+                  {att.original_filename || 'Attachment'}
+                </p>
+                <p className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5">
+                  {formatSize(att.size_bytes)}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={!trainingId || downloadingId === att.id}
+                onClick={() => handleDownloadExisting(att)}
+                className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50 shrink-0"
+              >
+                {downloadingId === att.id ? 'Downloading…' : 'Download'}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {file ? (
         <div className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg">
@@ -170,7 +263,7 @@ function LetterOrderUpload({ file, onFileChange }) {
           </div>
           <div className="text-center">
             <p className="text-sm font-semibold text-neutral-600 dark:text-neutral-300">
-              {dragOver ? 'Drop to attach' : 'Attach Letter Order'}
+              {dragOver ? 'Drop to attach' : 'Attach Attachments'}
             </p>
             <p className="text-[11px] text-neutral-400 dark:text-neutral-500 mt-0.5">
               Drag & drop or{' '}
@@ -200,7 +293,7 @@ function LetterOrderUpload({ file, onFileChange }) {
 }
 
 // ─── Internal Training Fields ──────────────────────────────────────────────────
-function InternalFields({ form, onChange, onFileChange, errors }) {
+function InternalFields({ form, onChange, onFileChange, errors, disabled, trainingId, existingAttachments }) {
   return (
     <div className="space-y-4">
       <FormGroup label="Training Title" required error={errors.title}>
@@ -242,42 +335,18 @@ function InternalFields({ form, onChange, onFileChange, errors }) {
           <input type="text" value={form.location} onChange={e => onChange('location', e.target.value)}
             className={inputCls} placeholder="Training venue..." />
         </FormGroup>
-        <FormGroup label="Instructor">
+        <FormGroup label="Facilitator">
           <input type="text" value={form.instructor} onChange={e => onChange('instructor', e.target.value)}
-            className={inputCls} placeholder="Instructor name..." />
+            className={inputCls} placeholder="Facilitator name..." />
         </FormGroup>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <FormGroup label="Max Participants">
-          <input type="number" value={form.maxParticipants} onChange={e => onChange('maxParticipants', e.target.value)}
-            className={inputCls} placeholder="e.g. 50" min={1} />
-        </FormGroup>
-        <FormGroup label="Duration (hours)">
-          <input type="number" value={form.durationHours} onChange={e => onChange('durationHours', e.target.value)}
-            className={inputCls} placeholder="e.g. 8" min={0} step={0.5} />
-        </FormGroup>
-      </div>
-
-      <div className="flex flex-col gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={!!form.isMandatory}
-            onChange={(e) => onChange('isMandatory', e.target.checked)}
-            className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
-          />
-          <span>Mandatory for all participants (training record)</span>
-        </label>
-        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={!!form.activityMandatory}
-            onChange={(e) => onChange('activityMandatory', e.target.checked)}
-            className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
-          />
-          <span>Primary activity session is mandatory</span>
-        </label>
+      <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">
+        <SquadronParticipantBlocks
+          blocks={form.participantBlocks || []}
+          onChange={(blocks) => onChange('participantBlocks', blocks)}
+          disabled={disabled}
+        />
       </div>
 
       <FormGroup label="Requirements">
@@ -289,6 +358,9 @@ function InternalFields({ form, onChange, onFileChange, errors }) {
         <LetterOrderUpload
           file={form.letterOrderFile}
           onFileChange={(f) => onFileChange('letterOrderFile', f)}
+          existingAttachments={existingAttachments}
+          trainingId={trainingId}
+          isExternal={false}
         />
       </div>
     </div>
@@ -296,7 +368,7 @@ function InternalFields({ form, onChange, onFileChange, errors }) {
 }
 
 // ─── External Training Fields ──────────────────────────────────────────────────
-function ExternalFields({ form, onChange, errors }) {
+function ExternalFields({ form, onChange, errors, trainingId, existingAttachments }) {
   return (
     <div className="space-y-4">
       <FormGroup label="Training Title" required error={errors.title}>
@@ -336,15 +408,15 @@ function ExternalFields({ form, onChange, errors }) {
         </FormGroup>
       </div>
 
-      <label className="inline-flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-300 cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={!!form.isMandatory}
-          onChange={(e) => onChange('isMandatory', e.target.checked)}
-          className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
+      <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">
+        <LetterOrderUpload
+          file={form.letterOrderFile}
+          onFileChange={(f) => onChange('letterOrderFile', f)}
+          existingAttachments={existingAttachments}
+          trainingId={trainingId}
+          isExternal
         />
-        <span>Mandatory for all registrants</span>
-      </label>
+      </div>
     </div>
   );
 }
@@ -353,15 +425,14 @@ function ExternalFields({ form, onChange, errors }) {
 const defaultInternal = {
   title: '', description: '', startDate: '', endDate: '',
   activityType: '', status: 'published', location: '',
-  instructor: '', maxParticipants: '', durationHours: '',
+  instructor: '',
   requirements: '', letterOrderFile: null,
-  isMandatory: false,
-  activityMandatory: true,
+  participantBlocks: [],
 };
 const defaultExternal = {
   title: '', description: '', startDate: '', startTime: '',
   venue: '', status: 'draft', capacity: '',
-  isMandatory: false,
+  letterOrderFile: null,
 };
 
 // ─── Main TrainingForm ─────────────────────────────────────────────────────────
@@ -399,16 +470,9 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
       // backend aliases venue -> location in the SELECT
       location:        str(training.location || training.venue),
       instructor:      str(training.instructor),
-      // backend stores capacity, not max_participants
-      maxParticipants: str(training.capacity ?? training.max_participants ?? ''),
-      durationHours:   str(training.duration_hours ?? ''),
       requirements:    str(training.requirements),
       letterOrderFile: null,
-      isMandatory:     !!(training.is_mandatory === 1 || training.is_mandatory === true),
-      activityMandatory: (() => {
-        const a = training.activities?.[0];
-        return a ? !!a.is_mandatory : true;
-      })(),
+      participantBlocks: buildParticipantBlocksFromGroups(training.participant_groups),
     } : {}),
   });
 
@@ -422,7 +486,7 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
       venue:       str(training.venue || training.location),
       status:      training.status || 'draft',
       capacity:    str(training.capacity ?? training.max_participants ?? ''),
-      isMandatory: !!(training.is_mandatory === 1 || training.is_mandatory === true),
+      letterOrderFile: null,
     } : {}),
   });
 
@@ -467,13 +531,15 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
           // BUG FIX: str() guard so null venue doesn't crash .trim()
           venue:          str(internalForm.location).trim() || null,
           status:         internalForm.status,
-          capacity:       internalForm.maxParticipants ? Number(internalForm.maxParticipants) : null,
-          is_mandatory:   !!internalForm.isMandatory,
-          activity_is_mandatory: internalForm.activityMandatory !== false,
           activity_type:  internalForm.activityType || null,
-          duration_hours: internalForm.durationHours ? Number(internalForm.durationHours) : null,
           instructor:     str(internalForm.instructor).trim() || null,
           requirements:   str(internalForm.requirements).trim() || null,
+          participants: (internalForm.participantBlocks || [])
+            .filter((b) => b.squadronId && (b.selectedReservists?.length ?? 0) > 0)
+            .map((b) => ({
+              squadron_id: Number(b.squadronId),
+              reservist_ids: b.selectedReservists.map((r) => r.id),
+            })),
         };
       } else {
         payload = {
@@ -485,7 +551,6 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
           venue:       str(externalForm.venue).trim() || null,
           status:      externalForm.status,
           capacity:    externalForm.capacity ? Number(externalForm.capacity) : null,
-          is_mandatory: !!externalForm.isMandatory,
           registration_fields: registrationFields,
         };
       }
@@ -510,6 +575,21 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
         const trainingId = result.data?.id ?? training?.id;
         if (trainingId) {
           const uploadResult = await uploadLetterOrder(internalForm.letterOrderFile, trainingId);
+          if (!uploadResult?.success) {
+            setErrors({
+              submit:
+                uploadResult?.message ||
+                'Training was saved, but the letter order upload failed. You can try again from edit.',
+            });
+            return;
+          }
+        }
+      }
+
+      if (trainingType === TRAINING_TYPES.EXTERNAL && externalForm.letterOrderFile) {
+        const externalId = result.data?.id ?? training?.id;
+        if (externalId) {
+          const uploadResult = await uploadExternalLetterOrder(externalForm.letterOrderFile, externalId);
           if (!uploadResult?.success) {
             setErrors({
               submit:
@@ -596,11 +676,20 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
                 onChange={handleInternalChange}
                 onFileChange={handleInternalChange}
                 errors={errors}
+                disabled={submitting}
+                trainingId={training?.id}
+                existingAttachments={training?.attachments}
               />
             )}
 
             {isExternal && activeTab === 'details' && (
-              <ExternalFields form={externalForm} onChange={handleExternalChange} errors={errors} />
+              <ExternalFields
+                form={externalForm}
+                onChange={handleExternalChange}
+                errors={errors}
+                trainingId={training?.id}
+                existingAttachments={training?.attachments}
+              />
             )}
 
             {isExternal && activeTab === 'registration' && (

@@ -1,14 +1,14 @@
 const fs = require('fs/promises');
 const path = require('path');
-const trainingModel = require('../models/trainingModel');
-const attachmentModel = require('../models/trainingAttachmentModel');
+const externalTrainingModel = require('../models/externalTrainingModel');
+const attachmentModel = require('../models/externalTrainingAttachmentModel');
 const {
-  getUploadRoot,
   isAllowedMime,
   safeExtFromOriginal,
-  trainingDir,
+  externalTrainingDir,
   absolutePathFromRelative,
 } = require('../config/uploads');
+const trainingModel = require('../models/trainingModel');
 
 function mapPublicRow(row) {
   if (!row) return null;
@@ -22,9 +22,9 @@ function mapPublicRow(row) {
   };
 }
 
-async function listPublicForTraining(trainingId) {
+async function listPublicForExternalTraining(externalTrainingId) {
   try {
-    const rows = await attachmentModel.listByTrainingId(trainingId);
+    const rows = await attachmentModel.listByExternalTrainingId(externalTrainingId);
     return rows.map(mapPublicRow);
   } catch (e) {
     if (e.code === 'ER_NO_SUCH_TABLE' || e.errno === 1146) {
@@ -41,19 +41,14 @@ async function unlinkQuiet(absPath) {
 }
 
 async function unlinkRelativePaths(relativePaths) {
-  const root = getUploadRoot();
   for (const rel of relativePaths) {
     const abs = absolutePathFromRelative(rel);
     if (abs) await unlinkQuiet(abs);
   }
 }
 
-/**
- * Replace existing letter_order rows for this training, insert new metadata, remove old files from disk.
- * Caller must have already written `diskAbsolutePath` (e.g. via multer).
- */
-async function registerLetterOrderUpload(trainingId, file, userId) {
-  const training = await trainingModel.findInternalById(trainingId);
+async function registerLetterOrderUpload(externalTrainingId, file, userId) {
+  const training = await externalTrainingModel.findExternalById(externalTrainingId);
   if (!training) {
     const err = new Error('Training not found');
     err.statusCode = 404;
@@ -80,10 +75,10 @@ async function registerLetterOrderUpload(trainingId, file, userId) {
     throw err;
   }
 
-  const relativePath = path.join('trainings', String(trainingId), file.filename).replace(/\\/g, '/');
+  const relativePath = path.join('external-trainings', String(externalTrainingId), file.filename).replace(/\\/g, '/');
   const absNew = absolutePathFromRelative(relativePath);
   const resolvedFile = path.resolve(file.path);
-  const trainingAbsDir = path.resolve(trainingDir(trainingId));
+  const trainingAbsDir = path.resolve(externalTrainingDir(externalTrainingId));
   const relFromDir = path.relative(trainingAbsDir, resolvedFile);
   if (
     !absNew ||
@@ -101,15 +96,15 @@ async function registerLetterOrderUpload(trainingId, file, userId) {
   let insertId;
   try {
     const [existing] = await conn.query(
-      `SELECT relative_path FROM internal_training_attachments WHERE training_id = ? AND kind = ?`,
-      [trainingId, attachmentModel.KIND_LETTER_ORDER]
+      `SELECT relative_path FROM external_training_attachments WHERE external_training_id = ? AND kind = ?`,
+      [externalTrainingId, attachmentModel.KIND_LETTER_ORDER]
     );
     oldPaths = existing.map((r) => r.relative_path);
 
     await conn.beginTransaction();
-    await attachmentModel.deleteByTrainingAndKind(conn, trainingId, attachmentModel.KIND_LETTER_ORDER);
+    await attachmentModel.deleteByExternalTrainingAndKind(conn, externalTrainingId, attachmentModel.KIND_LETTER_ORDER);
     insertId = await attachmentModel.insert(conn, {
-      training_id: trainingId,
+      external_training_id: externalTrainingId,
       kind: attachmentModel.KIND_LETTER_ORDER,
       stored_filename: file.filename,
       original_filename: String(file.originalname || 'document').slice(0, 500),
@@ -129,12 +124,12 @@ async function registerLetterOrderUpload(trainingId, file, userId) {
   }
 
   await unlinkRelativePaths(oldPaths);
-  const row = await attachmentModel.findByIdForTraining(insertId, trainingId);
+  const row = await attachmentModel.findByIdForExternalTraining(insertId, externalTrainingId);
   return mapPublicRow(row);
 }
 
-async function getDownloadStreamContext(attachmentId, trainingId) {
-  const row = await attachmentModel.findByIdForTraining(attachmentId, trainingId);
+async function getDownloadStreamContext(attachmentId, externalTrainingId) {
+  const row = await attachmentModel.findByIdForExternalTraining(attachmentId, externalTrainingId);
   if (!row) {
     const err = new Error('Attachment not found');
     err.statusCode = 404;
@@ -160,11 +155,10 @@ async function getDownloadStreamContext(attachmentId, trainingId) {
   };
 }
 
-/** Before deleting a training row, remove files from disk (DB CASCADE removes metadata). */
-async function removeAllFilesForTraining(trainingId) {
+async function removeAllFilesForExternalTraining(externalTrainingId) {
   let paths = [];
   try {
-    paths = await attachmentModel.listAllRelativePathsForTraining(trainingId);
+    paths = await attachmentModel.listAllRelativePathsForExternalTraining(externalTrainingId);
   } catch (e) {
     if (e.code === 'ER_NO_SUCH_TABLE' || e.errno === 1146) {
       return;
@@ -175,9 +169,9 @@ async function removeAllFilesForTraining(trainingId) {
 }
 
 module.exports = {
-  listPublicForTraining,
+  listPublicForExternalTraining,
   registerLetterOrderUpload,
   getDownloadStreamContext,
-  removeAllFilesForTraining,
+  removeAllFilesForExternalTraining,
   mapPublicRow,
 };

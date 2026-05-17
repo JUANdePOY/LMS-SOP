@@ -54,7 +54,6 @@ async function findInternalMany({ page, limit, search, status, type }) {
       t.area_id,
       t.status,
       t.capacity,
-      t.is_mandatory,
       t.created_by,
       t.created_at,
       t.updated_at,
@@ -104,7 +103,6 @@ async function findInternalById(id) {
        t.area_id,
        t.status,
        t.capacity,
-       t.is_mandatory,
        t.created_by,
        t.created_at,
        t.updated_at,
@@ -121,8 +119,8 @@ async function insertInternal(conn, row) {
   const sql = `
     INSERT INTO trainings (
       title, description, start_datetime, end_datetime, venue, area_id,
-      status, capacity, is_mandatory, created_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      status, capacity, created_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
   const params = [
     row.title,
@@ -133,7 +131,6 @@ async function insertInternal(conn, row) {
     row.area_id ?? null,
     row.status,
     row.capacity ?? null,
-    row.is_mandatory ? 1 : 0,
     row.created_by,
   ];
   const executor = conn || pool;
@@ -151,7 +148,6 @@ async function updateInternal(id, patch, conn = null) {
     'area_id',
     'status',
     'capacity',
-    'is_mandatory',
   ];
   const sets = [];
   const params = [];

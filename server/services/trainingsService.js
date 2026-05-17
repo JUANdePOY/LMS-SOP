@@ -2,6 +2,8 @@ const trainingModel = require('../models/trainingModel');
 const activityModel = require('../models/activityModel');
 const externalModel = require('../models/externalTrainingModel');
 const trainingAttachmentService = require('./trainingAttachmentService');
+const externalTrainingAttachmentService = require('./externalTrainingAttachmentService');
+const internalParticipantModel = require('../models/internalTrainingParticipantModel');
 const { buildActivityDescription, parseActivityMeta } = require('../utils/activityMeta');
 
 const DEFAULT_PAGE = 1;
@@ -14,14 +16,60 @@ function clampPagination(page, limit) {
   return { page: p, limit: l };
 }
 
-function computeEndFromDuration(startDt, durationHours) {
-  const start = new Date(startDt);
-  if (Number.isNaN(start.getTime())) return startDt;
-  const h = Number(durationHours);
-  if (Number.isNaN(h)) return startDt;
-  const end = new Date(start.getTime() + h * 3600 * 1000);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())} ${pad(end.getHours())}:${pad(end.getMinutes())}:${pad(end.getSeconds())}`;
+function normalizeParticipantBlocks(input) {
+  if (!Array.isArray(input)) {
+    const err = new Error('participants must be an array');
+    err.statusCode = 400;
+    throw err;
+  }
+  const out = [];
+  for (const p of input) {
+    const sid = Number(p?.squadron_id);
+    if (!sid) continue;
+    const ids = Array.isArray(p?.reservist_ids)
+      ? p.reservist_ids.map((x) => Number(x)).filter((n) => Number.isInteger(n) && n > 0)
+      : [];
+    if (!ids.length) continue;
+    out.push({ squadron_id: sid, reservist_ids: ids });
+  }
+  return out;
+}
+
+async function replaceInternalParticipants(conn, trainingId, participantsInput) {
+  if (participantsInput === undefined) return;
+  await internalParticipantModel.deleteByTrainingId(conn, trainingId);
+  const blocks = normalizeParticipantBlocks(participantsInput);
+  if (!blocks || !blocks.length) return;
+
+  const rowTuples = [];
+  const seenReservist = new Set();
+
+  for (const b of blocks) {
+    const { squadron_id: sid, reservist_ids: ids } = b;
+    for (const rid of ids) {
+      if (seenReservist.has(rid)) continue;
+      const ok = await internalParticipantModel.hasAssignment(conn, rid, sid);
+      if (!ok) {
+        const err = new Error('One or more reservists are not assigned to the selected squadron');
+        err.statusCode = 400;
+        throw err;
+      }
+      seenReservist.add(rid);
+      rowTuples.push({ reservist_id: rid, squadron_id: sid });
+    }
+  }
+
+  await internalParticipantModel.insertMany(conn, trainingId, rowTuples);
+}
+
+async function loadParticipantGroups(trainingId) {
+  try {
+    const flat = await internalParticipantModel.listFlatWithLabels(trainingId);
+    return internalParticipantModel.groupBySquadron(flat);
+  } catch (e) {
+    if (e.code === 'ER_NO_SUCH_TABLE' || e.errno === 1146) return [];
+    throw e;
+  }
 }
 
 function resolveInternalRange(body, existing) {
@@ -35,8 +83,6 @@ function resolveInternalRange(body, existing) {
   const hasExplicitEnd = body.end_datetime != null || body.end_date != null;
   if (hasExplicitEnd) {
     end = trainingModel.toDatetime(body.end_datetime ?? body.end_date, true);
-  } else if (body.duration_hours != null && body.duration_hours !== '') {
-    end = computeEndFromDuration(start, body.duration_hours);
   } else if (body.start_datetime != null || body.start_date != null) {
     end = start;
   }
@@ -52,14 +98,10 @@ function normalizeVenue(venue) {
 async function listInternalTrainings(query) {
   const { page, limit } = clampPagination(query.page, query.limit);
   const search = query.search ? String(query.search).trim() : '';
-  const status = query.status && query.status !== 'all' ? query.status : null;
+  const status = query.status && query.status !== 'all' && trainingModel.isValidInternalStatus(query.status)
+    ? query.status
+    : null;
   const type = query.type && query.type !== 'all' ? query.type : null;
-
-  if (status && !trainingModel.isValidInternalStatus(status)) {
-    const err = new Error('Invalid status filter');
-    err.statusCode = 400;
-    throw err;
-  }
 
   const [total, rows] = await Promise.all([
     trainingModel.countInternal({ search: search || null, status, type }),
@@ -80,11 +122,12 @@ async function listInternalTrainings(query) {
 async function getInternalTrainingById(id) {
   const training = await trainingModel.findInternalById(id);
   if (!training) return null;
-  const [activities, attachments] = await Promise.all([
+  const [activities, attachments, participant_groups] = await Promise.all([
     activityModel.listByTrainingId(id, training.status),
     trainingAttachmentService.listPublicForTraining(id),
+    loadParticipantGroups(id),
   ]);
-  return { ...training, activities, attachments };
+  return { ...training, activities, attachments, participant_groups };
 }
 
 async function createInternalTraining(body, createdByUserId) {
@@ -118,8 +161,7 @@ async function createInternalTraining(body, createdByUserId) {
       venue,
       area_id: body.area_id ?? null,
       status,
-      capacity: body.capacity != null ? Number(body.capacity) : null,
-      is_mandatory: !!body.is_mandatory,
+      capacity: null,
       created_by: createdByUserId,
     });
 
@@ -136,8 +178,11 @@ async function createInternalTraining(body, createdByUserId) {
       end_time: endF,
       location: venue.slice(0, 500),
       instructor: body.instructor ? String(body.instructor).slice(0, 200) : null,
-      is_mandatory: body.activity_is_mandatory !== false,
     });
+
+    if (body.participants !== undefined) {
+      await replaceInternalParticipants(conn, trainingId, body.participants);
+    }
 
     await conn.commit();
     return getInternalTrainingById(trainingId);
@@ -171,15 +216,11 @@ async function updateInternalTraining(id, body) {
     }
     trainingPatch.status = body.status;
   }
-  if (body.capacity !== undefined) trainingPatch.capacity = body.capacity != null ? Number(body.capacity) : null;
-  if (body.is_mandatory !== undefined) trainingPatch.is_mandatory = !!body.is_mandatory;
-
   if (
     body.start_datetime != null ||
     body.start_date != null ||
     body.end_datetime != null ||
-    body.end_date != null ||
-    body.duration_hours !== undefined
+    body.end_date != null
   ) {
     trainingPatch.start_datetime = start;
     trainingPatch.end_datetime = end;
@@ -215,9 +256,6 @@ async function updateInternalTraining(id, body) {
         actPatch.instructor = body.instructor ? String(body.instructor).slice(0, 200) : null;
       }
       if (body.title != null) actPatch.title = String(body.title).trim().slice(0, 500);
-      if (body.activity_is_mandatory !== undefined) {
-        actPatch.is_mandatory = body.activity_is_mandatory ? 1 : 0;
-      }
       if (
         body.activity_type !== undefined ||
         body.requirements !== undefined ||
@@ -225,7 +263,6 @@ async function updateInternalTraining(id, body) {
         body.start_date != null ||
         body.end_datetime != null ||
         body.end_date != null ||
-        body.duration_hours !== undefined ||
         body.venue !== undefined ||
         body.location !== undefined
       ) {
@@ -241,8 +278,11 @@ async function updateInternalTraining(id, body) {
         end_time: end,
         location: venue ? String(venue).slice(0, 500) : null,
         instructor: body.instructor != null ? String(body.instructor).slice(0, 200) : null,
-        is_mandatory: body.activity_is_mandatory !== false ? 1 : 0,
       });
+    }
+
+    if (body.participants !== undefined) {
+      await replaceInternalParticipants(conn, id, body.participants);
     }
 
     await conn.commit();
@@ -266,6 +306,7 @@ async function loadPrimaryMeta(trainingId) {
 
 async function deleteInternalTraining(trainingId) {
   await trainingAttachmentService.removeAllFilesForTraining(trainingId);
+  await internalParticipantModel.deleteByTrainingId(null, trainingId);
   const n = await trainingModel.deleteInternal(trainingId);
   return n > 0;
 }
@@ -312,7 +353,6 @@ async function createActivity(trainingId, body) {
     end_time: end,
     location: body.location ? String(body.location).slice(0, 500) : null,
     instructor: body.instructor ? String(body.instructor).slice(0, 200) : null,
-    is_mandatory: body.is_mandatory !== false,
   });
   return listActivities(trainingId);
 }
@@ -334,7 +374,6 @@ async function updateActivity(trainingId, activityId, body) {
   }
   if (body.location !== undefined) patch.location = body.location ? String(body.location).slice(0, 500) : null;
   if (body.instructor !== undefined) patch.instructor = body.instructor ? String(body.instructor).slice(0, 200) : null;
-  if (body.is_mandatory !== undefined) patch.is_mandatory = body.is_mandatory ? 1 : 0;
 
   if (body.activity_type !== undefined || body.type !== undefined || body.requirements !== undefined) {
     const meta = parseActivityMeta(row.description);
@@ -371,13 +410,9 @@ async function deleteActivity(trainingId, activityId) {
 async function listExternalTrainings(query) {
   const { page, limit } = clampPagination(query.page, query.limit);
   const search = query.search ? String(query.search).trim() : '';
-  const status = query.status && query.status !== 'all' ? query.status : null;
-
-  if (status && !externalModel.isValidExternalStatus(status)) {
-    const err = new Error('Invalid status filter');
-    err.statusCode = 400;
-    throw err;
-  }
+  const status = query.status && query.status !== 'all' && externalModel.isValidExternalStatus(query.status)
+    ? query.status
+    : null;
 
   const [total, rows] = await Promise.all([
     externalModel.countExternal({ search: search || null, status }),
@@ -396,7 +431,10 @@ async function listExternalTrainings(query) {
 }
 
 async function getExternalTrainingById(id) {
-  return externalModel.findExternalById(id);
+  const training = await externalModel.findExternalById(id);
+  if (!training) return null;
+  const attachments = await externalTrainingAttachmentService.listPublicForExternalTraining(id);
+  return { ...training, attachments };
 }
 
 async function createExternalTraining(body) {
@@ -420,10 +458,9 @@ async function createExternalTraining(body) {
     venue: body.venue ?? null,
     status,
     capacity: body.capacity != null ? Number(body.capacity) : null,
-    is_mandatory: !!body.is_mandatory,
     registration_fields: body.registration_fields ?? null,
   });
-  return externalModel.findExternalById(newId);
+  return getExternalTrainingById(newId);
 }
 
 async function updateExternalTraining(id, body) {
@@ -440,7 +477,6 @@ async function updateExternalTraining(id, body) {
   if (body.start_time !== undefined) patch.start_time = body.start_time;
   if (body.venue !== undefined) patch.venue = body.venue;
   if (body.capacity !== undefined) patch.capacity = body.capacity != null ? Number(body.capacity) : null;
-  if (body.is_mandatory !== undefined) patch.is_mandatory = !!body.is_mandatory;
   if (body.registration_fields !== undefined) patch.registration_fields = body.registration_fields;
   if (body.status !== undefined) {
     if (!externalModel.isValidExternalStatus(body.status)) {
@@ -451,10 +487,11 @@ async function updateExternalTraining(id, body) {
     patch.status = body.status;
   }
   await externalModel.updateExternal(id, patch);
-  return externalModel.findExternalById(id);
+  return getExternalTrainingById(id);
 }
 
 async function deleteExternalTraining(id) {
+  await externalTrainingAttachmentService.removeAllFilesForExternalTraining(id);
   const n = await externalModel.deleteExternal(id);
   return n > 0;
 }

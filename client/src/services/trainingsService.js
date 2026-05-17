@@ -231,13 +231,56 @@ const trainingsService = {
     }
   },
 
-  // Upload letter order (internal training only; metadata in DB, file under server/uploads)
+  // Upload letter order (internal training)
   uploadLetterOrder: async (file, trainingId) => {
     try {
       const formData = new FormData();
       formData.append('letter_order', file);
       const response = await api.post(
         `/trainings/internal/${trainingId}/attachments/letter-order`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      );
+      const body = response.data;
+      return {
+        success: body.success !== false,
+        message: body.message,
+        data: body.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to upload letter order',
+      };
+    }
+  },
+
+  downloadInternalAttachment: async (trainingId, attachmentId) => {
+    const response = await api.get(
+      `/trainings/internal/${trainingId}/attachments/${attachmentId}/file`,
+      { responseType: 'blob' }
+    );
+    return response.data;
+  },
+
+  downloadExternalAttachment: async (trainingId, attachmentId) => {
+    const response = await api.get(
+      `/trainings/external/${trainingId}/attachments/${attachmentId}/file`,
+      { responseType: 'blob' }
+    );
+    return response.data;
+  },
+
+  uploadExternalLetterOrder: async (file, externalTrainingId) => {
+    try {
+      const formData = new FormData();
+      formData.append('letter_order', file);
+      const response = await api.post(
+        `/trainings/external/${externalTrainingId}/attachments/letter-order`,
         formData,
         {
           headers: {
@@ -271,9 +314,13 @@ export const updateInternalTraining = trainingsService.updateInternalTraining;
 export const createRegistration = trainingsService.createRegistration;
 export const getRegistrationsByTrainingId = trainingsService.getRegistrationsByTrainingId;
 export const uploadLetterOrder = trainingsService.uploadLetterOrder;
+export const uploadExternalLetterOrder = trainingsService.uploadExternalLetterOrder;
 export const createExternalTraining = trainingsService.createExternalTraining;
 export const updateExternalTraining = trainingsService.updateExternalTraining;
 export const deleteExternalTraining = trainingsService.deleteExternalTraining;
 export const getExternalTrainingById = trainingsService.getExternalTrainingById;
+export const getInternalTrainingById = trainingsService.getInternalTrainingById;
+export const downloadInternalAttachment = trainingsService.downloadInternalAttachment;
+export const downloadExternalAttachment = trainingsService.downloadExternalAttachment;
 
 export default trainingsService;

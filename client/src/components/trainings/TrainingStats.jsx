@@ -3,10 +3,11 @@ import React from 'react';
 const TrainingStats = ({ trainings = [] }) => {
   // Calculate statistics
   const totalTrainings = trainings.length;
-  const activeTrainings = trainings.filter(t => t.status === 'active').length;
-  const completedTrainings = trainings.filter(t => t.status === 'completed').length;
-  const plannedTrainings = trainings.filter(t => t.status === 'planned').length;
-  const cancelledTrainings = trainings.filter(t => t.status === 'cancelled').length;
+  const inProgressStatuses = new Set(['published', 'ongoing', 'open']);
+  const inProgressTrainings = trainings.filter((t) => inProgressStatuses.has(t.status)).length;
+  const completedTrainings = trainings.filter((t) => t.status === 'completed').length;
+  const draftTrainings = trainings.filter((t) => t.status === 'draft').length;
+  const cancelledTrainings = trainings.filter((t) => t.status === 'cancelled').length;
   
   // Calculate total participants across all trainings
   const totalParticipants = trainings.reduce((sum, training) => {
@@ -15,7 +16,7 @@ const TrainingStats = ({ trainings = [] }) => {
   
   // Calculate average participation rate
   const totalMaxCapacity = trainings.reduce((sum, training) => {
-    return sum + (training.maxParticipants || 0);
+    return sum + (training.maxParticipants || training.capacity || 0);
   }, 0);
   
   const avgParticipationRate = totalMaxCapacity > 0 
@@ -42,8 +43,8 @@ const TrainingStats = ({ trainings = [] }) => {
             <i className="fas fa-play-circle"></i>
           </div>
           <div className="stat-content">
-            <p className="stat-label">Active Trainings</p>
-            <p className="stat-value">{activeTrainings}</p>
+            <p className="stat-label">In Progress</p>
+            <p className="stat-value">{inProgressTrainings}</p>
           </div>
         </div>
         
@@ -64,8 +65,8 @@ const TrainingStats = ({ trainings = [] }) => {
             <i className="fas fa-calendar-alt"></i>
           </div>
           <div className="stat-content">
-            <p className="stat-label">Planned Trainings</p>
-            <p className="stat-value">{plannedTrainings}</p>
+            <p className="stat-label">Draft</p>
+            <p className="stat-value">{draftTrainings}</p>
           </div>
         </div>
         

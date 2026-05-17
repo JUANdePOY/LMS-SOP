@@ -17,7 +17,6 @@ function mapActivityRow(row, trainingStatus) {
     location: row.location,
     venue: row.location,
     instructor: row.instructor,
-    is_mandatory: !!row.is_mandatory,
     type: meta.activityType || null,
     requirements: meta.requirements || null,
     status: trainingStatus || null,
@@ -29,7 +28,7 @@ function mapActivityRow(row, trainingStatus) {
 async function listByTrainingId(trainingId, trainingStatus = null) {
   const [rows] = await pool.query(
     `SELECT id, training_id, title, description, start_time, end_time, location, instructor,
-            is_mandatory, created_at, updated_at
+            created_at, updated_at
      FROM activities
      WHERE training_id = ?
      ORDER BY start_time ASC, id ASC`,
@@ -41,7 +40,7 @@ async function listByTrainingId(trainingId, trainingStatus = null) {
 async function findById(activityId, trainingId) {
   const [rows] = await pool.query(
     `SELECT id, training_id, title, description, start_time, end_time, location, instructor,
-            is_mandatory, created_at, updated_at
+            created_at, updated_at
      FROM activities WHERE id = ? AND training_id = ?`,
     [activityId, trainingId]
   );
@@ -51,8 +50,8 @@ async function findById(activityId, trainingId) {
 async function insertActivity(conn, row) {
   const sql = `
     INSERT INTO activities (
-      training_id, title, description, start_time, end_time, location, instructor, is_mandatory
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      training_id, title, description, start_time, end_time, location, instructor
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
   const params = [
     row.training_id,
@@ -62,7 +61,6 @@ async function insertActivity(conn, row) {
     row.end_time,
     row.location ?? null,
     row.instructor ?? null,
-    row.is_mandatory ? 1 : 0,
   ];
   const executor = conn || pool;
   const [result] = await executor.query(sql, params);
@@ -70,7 +68,7 @@ async function insertActivity(conn, row) {
 }
 
 async function updateActivity(activityId, trainingId, patch, conn = null) {
-  const allowed = ['title', 'description', 'start_time', 'end_time', 'location', 'instructor', 'is_mandatory'];
+  const allowed = ['title', 'description', 'start_time', 'end_time', 'location', 'instructor'];
   const sets = [];
   const params = [];
   for (const key of allowed) {

@@ -1,22 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+
+export const INITIAL_TRAINING_FILTERS = {
+  search: '',
+  status: 'all',
+  activityType: 'all',
+  source: 'all',
+};
 
 const useTrainingFilters = () => {
-  const [filters, setFilters] = useState({
-    status: 'all',
-    type: 'all',
-    search: '',
-    dateRange: null
-  });
+  const [filters, setFilters] = useState(INITIAL_TRAINING_FILTERS);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  // Optionally, persist filters to localStorage or update URL parameters
   useEffect(() => {
-    // Example: Save filters to localStorage
-    // localStorage.setItem('trainingFilters', JSON.stringify(filters));
-  }, [filters]);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(filters.search.trim());
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  const resetFilters = useCallback(() => {
+    setFilters(INITIAL_TRAINING_FILTERS);
+    setDebouncedSearch('');
+  }, []);
 
   return {
     filters,
-    setFilters
+    setFilters,
+    resetFilters,
+    debouncedSearch,
   };
 };
 

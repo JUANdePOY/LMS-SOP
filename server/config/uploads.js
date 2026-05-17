@@ -29,6 +29,10 @@ function trainingDir(trainingId) {
   return path.join(getUploadRoot(), 'trainings', String(trainingId));
 }
 
+function externalTrainingDir(externalTrainingId) {
+  return path.join(getUploadRoot(), 'external-trainings', String(externalTrainingId));
+}
+
 function absolutePathFromRelative(relativePath) {
   const root = path.resolve(getUploadRoot());
   const resolved = path.resolve(root, relativePath);
@@ -47,5 +51,6 @@ module.exports = {
   isAllowedMime,
   safeExtFromOriginal,
   trainingDir,
+  externalTrainingDir,
   absolutePathFromRelative,
 };

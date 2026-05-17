@@ -6,7 +6,7 @@ const KIND_LETTER_ORDER = 'letter_order';
 async function listByTrainingId(trainingId) {
   const [rows] = await pool.query(
     `SELECT id, training_id, kind, original_filename, mime_type, size_bytes, storage_backend, created_at, uploaded_by
-     FROM training_attachments
+     FROM internal_training_attachments
      WHERE training_id = ?
      ORDER BY created_at DESC, id DESC`,
     [trainingId]
@@ -17,7 +17,7 @@ async function listByTrainingId(trainingId) {
 async function findByIdForTraining(attachmentId, trainingId) {
   const [rows] = await pool.query(
     `SELECT id, training_id, kind, stored_filename, original_filename, mime_type, size_bytes, storage_backend, relative_path, created_at, uploaded_by
-     FROM training_attachments
+     FROM internal_training_attachments
      WHERE id = ? AND training_id = ?`,
     [attachmentId, trainingId]
   );
@@ -25,14 +25,14 @@ async function findByIdForTraining(attachmentId, trainingId) {
 }
 
 async function listAllRelativePathsForTraining(trainingId) {
-  const [rows] = await pool.query(`SELECT relative_path FROM training_attachments WHERE training_id = ?`, [
+  const [rows] = await pool.query(`SELECT relative_path FROM internal_training_attachments WHERE training_id = ?`, [
     trainingId,
   ]);
   return rows.map((r) => r.relative_path);
 }
 
 async function deleteByTrainingAndKind(conn, trainingId, kind) {
-  const sql = 'DELETE FROM training_attachments WHERE training_id = ? AND kind = ?';
+  const sql = 'DELETE FROM internal_training_attachments WHERE training_id = ? AND kind = ?';
   const executor = conn || pool;
   const [result] = await executor.query(sql, [trainingId, kind]);
   return result.affectedRows;
@@ -40,7 +40,7 @@ async function deleteByTrainingAndKind(conn, trainingId, kind) {
 
 async function insert(conn, row) {
   const sql = `
-    INSERT INTO training_attachments (
+    INSERT INTO internal_training_attachments (
       training_id, kind, stored_filename, original_filename, mime_type, size_bytes, storage_backend, relative_path, uploaded_by
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;

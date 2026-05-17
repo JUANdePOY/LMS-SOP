@@ -37,7 +37,6 @@ CREATE TABLE IF NOT EXISTS `activities` (
   `end_time` datetime NOT NULL,
   `location` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `instructor` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `is_mandatory` tinyint(1) NOT NULL DEFAULT '1',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -180,6 +179,7 @@ CREATE TABLE IF NOT EXISTS `audit_logs` (
 -- Table structure for table `external_trainings`
 --
 
+DROP TABLE IF EXISTS `external_training_attachments`;
 DROP TABLE IF EXISTS `external_trainings`;
 CREATE TABLE IF NOT EXISTS `external_trainings` (
   `id` int UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -190,7 +190,6 @@ CREATE TABLE IF NOT EXISTS `external_trainings` (
   `venue` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `status` enum('draft','open','closed','completed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `capacity` int UNSIGNED DEFAULT NULL,
-  `is_mandatory` tinyint(1) NOT NULL DEFAULT '0',
   `registration_fields` json DEFAULT NULL COMMENT 'Dynamic form field schema (array of field configs)',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -463,6 +462,8 @@ CREATE TABLE IF NOT EXISTS `system_settings` (
 -- Table structure for table `trainings`
 --
 
+DROP TABLE IF EXISTS `internal_training_participants`;
+DROP TABLE IF EXISTS `internal_training_attachments`;
 DROP TABLE IF EXISTS `trainings`;
 CREATE TABLE IF NOT EXISTS `trainings` (
   `id` bigint NOT NULL AUTO_INCREMENT,
@@ -474,7 +475,6 @@ CREATE TABLE IF NOT EXISTS `trainings` (
   `area_id` bigint DEFAULT NULL,
   `status` enum('draft','published','ongoing','completed','cancelled') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `capacity` int DEFAULT NULL,
-  `is_mandatory` tinyint(1) NOT NULL DEFAULT '0',
   `created_by` bigint NOT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -489,11 +489,26 @@ CREATE TABLE IF NOT EXISTS `trainings` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `training_attachments` (file metadata; bytes on disk or object storage)
+-- Table structure for table `internal_training_participants` (admin-targeted attendees by squadron)
 --
 
-DROP TABLE IF EXISTS `training_attachments`;
-CREATE TABLE IF NOT EXISTS `training_attachments` (
+CREATE TABLE IF NOT EXISTS `internal_training_participants` (
+  `training_id` bigint NOT NULL,
+  `reservist_id` bigint NOT NULL,
+  `squadron_id` bigint NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`training_id`,`reservist_id`),
+  KEY `idx_itp_training_squadron` (`training_id`,`squadron_id`),
+  KEY `idx_itp_squadron` (`squadron_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `internal_training_attachments` (internal trainings; file metadata)
+--
+
+CREATE TABLE IF NOT EXISTS `internal_training_attachments` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `training_id` bigint NOT NULL,
   `kind` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'letter_order',
@@ -506,8 +521,31 @@ CREATE TABLE IF NOT EXISTS `training_attachments` (
   `uploaded_by` bigint DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_training_kind` (`training_id`,`kind`),
-  KEY `idx_training_created` (`training_id`,`created_at`)
+  KEY `idx_internal_training_kind` (`training_id`,`kind`),
+  KEY `idx_internal_training_created` (`training_id`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `external_training_attachments`
+--
+
+CREATE TABLE IF NOT EXISTS `external_training_attachments` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `external_training_id` int UNSIGNED NOT NULL,
+  `kind` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'letter_order',
+  `stored_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `original_filename` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mime_type` varchar(127) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `size_bytes` bigint UNSIGNED NOT NULL,
+  `storage_backend` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'local',
+  `relative_path` varchar(1024) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `uploaded_by` bigint DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_external_training_kind` (`external_training_id`,`kind`),
+  KEY `idx_external_training_created` (`external_training_id`,`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -671,10 +709,16 @@ ALTER TABLE `trainings`
   ADD CONSTRAINT `trainings_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
 
 --
--- Constraints for table `training_attachments`
+-- Constraints for table `internal_training_attachments`
 --
-ALTER TABLE `training_attachments`
-  ADD CONSTRAINT `training_attachments_ibfk_1` FOREIGN KEY (`training_id`) REFERENCES `trainings` (`id`) ON DELETE CASCADE;
+ALTER TABLE `internal_training_attachments`
+  ADD CONSTRAINT `internal_training_attachments_ibfk_1` FOREIGN KEY (`training_id`) REFERENCES `trainings` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `external_training_attachments`
+--
+ALTER TABLE `external_training_attachments`
+  ADD CONSTRAINT `external_training_attachments_ibfk_1` FOREIGN KEY (`external_training_id`) REFERENCES `external_trainings` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `training_registrations`

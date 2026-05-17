@@ -1,10 +1,44 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Search, Edit, Trash2, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/ui/Toast';
-import { getTrainings, getExternalTrainings, deleteTraining, deleteExternalTraining } from '@/services/trainingsService';
+import {
+  getTrainings,
+  getExternalTrainings,
+  getInternalTrainingById,
+  getExternalTrainingById,
+  deleteTraining,
+  deleteExternalTraining,
+} from '@/services/trainingsService';
 import TrainingForm from '@/components/trainings/TrainingForm';
+import TrainingFilters from '@/components/trainings/TrainingFilters';
+import useTrainingFilters from '@/hooks/useTrainingFilters';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
+
+const INTERNAL_STATUSES = new Set(['draft', 'published', 'ongoing', 'completed', 'cancelled']);
+const EXTERNAL_STATUSES = new Set(['draft', 'open', 'closed', 'completed']);
+const INTERNAL_ONLY_STATUSES = new Set(['published', 'ongoing', 'cancelled']);
+const EXTERNAL_ONLY_STATUSES = new Set(['open', 'closed']);
+
+function applyFilterUpdates(current, updates) {
+  const next = { ...current, ...updates };
+  if (updates.source === 'internal' && EXTERNAL_ONLY_STATUSES.has(next.status)) {
+    next.status = 'all';
+  }
+  if (updates.source === 'external') {
+    if (INTERNAL_ONLY_STATUSES.has(next.status)) next.status = 'all';
+    next.activityType = 'all';
+  }
+  const source = next.source;
+  if (updates.status && source === 'internal' && EXTERNAL_ONLY_STATUSES.has(next.status)) {
+    next.status = 'all';
+  }
+  if (updates.status && source === 'external' && INTERNAL_ONLY_STATUSES.has(next.status)) {
+    next.status = 'all';
+  }
+  return next;
+}
 
 export default function Trainings() {
   const { isAdmin } = useAuth();
@@ -14,11 +48,7 @@ export default function Trainings() {
   const [error, setError]             = useState('');
   const [totalCount, setTotalCount]   = useState(0);
 
-  // Filters
-  const [search, setSearch]                       = useState('');
-  const [statusFilter, setStatusFilter]           = useState('all');
-  const [activityTypeFilter, setActivityTypeFilter] = useState('all');
-  const [sourceFilter, setSourceFilter]           = useState('all');
+  const { filters, setFilters, resetFilters, debouncedSearch } = useTrainingFilters();
 
   // Pagination
   const [page, setPage]   = useState(1);
@@ -27,7 +57,11 @@ export default function Trainings() {
   // Modal
   const [showForm, setShowForm]             = useState(false);
   const [editingTraining, setEditingTraining] = useState(null);
+  const [formLoading, setFormLoading]         = useState(false);
   const [newScheduleKind, setNewScheduleKind] = useState('internal');
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const fetchTrainings = useCallback(async () => {
     setLoading(true);
@@ -39,24 +73,32 @@ export default function Trainings() {
       //   /trainings/internal  → trainings table
       //   /trainings/external  → external_trainings table
       // We must call both when sourceFilter is 'all', or the matching one only.
+      const { source: sourceFilter, status: statusFilter, activityType: activityTypeFilter } = filters;
+
       const fetchInternal = sourceFilter === 'all' || sourceFilter === 'internal';
       const fetchExternal = sourceFilter === 'all' || sourceFilter === 'external';
+      const isMerged = sourceFilter === 'all';
+
+      const rawStatus = statusFilter !== 'all' ? statusFilter : undefined;
+      const internalStatus = rawStatus && INTERNAL_STATUSES.has(rawStatus) ? rawStatus : undefined;
+      const externalStatus = rawStatus && EXTERNAL_STATUSES.has(rawStatus) ? rawStatus : undefined;
+
+      const apiPage = isMerged ? 1 : page;
+      const apiLimit = isMerged ? page * limit : limit;
 
       const internalParams = {
-        page,
-        limit,
-        search: search || undefined,
-        // Internal statuses: draft | published | ongoing | completed | cancelled
-        status: statusFilter !== 'all' ? statusFilter : undefined,
-        type:   activityTypeFilter !== 'all' ? activityTypeFilter : undefined,
+        page: apiPage,
+        limit: apiLimit,
+        search: debouncedSearch || undefined,
+        status: internalStatus,
+        type: activityTypeFilter !== 'all' ? activityTypeFilter : undefined,
       };
 
       const externalParams = {
-        page,
-        limit,
-        search: search || undefined,
-        // External statuses: draft | open | closed | completed
-        status: statusFilter !== 'all' ? statusFilter : undefined,
+        page: apiPage,
+        limit: apiLimit,
+        search: debouncedSearch || undefined,
+        status: externalStatus,
       };
 
       // Fetch in parallel — only what we need
@@ -97,36 +139,53 @@ export default function Trainings() {
       const internalTotal = internalResult?.data?.pagination?.total || 0;
       const externalTotal = externalResult?.data?.pagination?.total || 0;
 
-      setTrainings(merged);
-      setTotalCount(internalTotal + externalTotal);
+      const pageRows = isMerged
+        ? merged.slice((page - 1) * limit, page * limit)
+        : merged;
+
+      setTrainings(pageRows);
+      setTotalCount(isMerged ? internalTotal + externalTotal : (internalTotal || externalTotal));
     } catch {
       setError('Network error. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [page, limit, search, statusFilter, activityTypeFilter, sourceFilter]);
+  }, [page, limit, debouncedSearch, filters]);
 
   useEffect(() => {
     fetchTrainings();
   }, [fetchTrainings]);
 
-  const handleDelete = async (training) => {
-    if (!confirm('Are you sure you want to delete this training?')) return;
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
 
+  const openDeleteDialog = (training) => setDeleteTarget(training);
+
+  const cancelDelete = () => {
+    if (!deleteLoading) setDeleteTarget(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    setDeleteLoading(true);
     try {
-      // Use the correct delete endpoint based on the tagged source
-      const result = training._source === 'external'
-        ? await deleteExternalTraining(training.id)
-        : await deleteTraining(training.id);
+      const result = deleteTarget._source === 'external'
+        ? await deleteExternalTraining(deleteTarget.id)
+        : await deleteTraining(deleteTarget.id);
 
       if (result.success) {
         addToast('Training deleted successfully', 'success');
+        setDeleteTarget(null);
         fetchTrainings();
       } else {
         addToast(result.message || 'Failed to delete training', 'error');
       }
     } catch {
       addToast('Network error. Please try again.', 'error');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -134,8 +193,60 @@ export default function Trainings() {
     const wasEditing = !!editingTraining;
     setShowForm(false);
     setEditingTraining(null);
+    setFormLoading(false);
     addToast(wasEditing ? 'Training updated successfully' : 'Training created successfully', 'success');
     fetchTrainings();
+  };
+
+  const handleEditTraining = async (training) => {
+    setShowForm(true);
+    setFormLoading(true);
+    setEditingTraining(null);
+
+    try {
+      const result =
+        training._source === 'external'
+          ? await getExternalTrainingById(training.id)
+          : await getInternalTrainingById(training.id);
+
+      if (!result.success || !result.data) {
+        addToast(result.message || 'Failed to load training details', 'error');
+        setShowForm(false);
+        return;
+      }
+
+      const full = { ...result.data, _source: training._source };
+      if (training._source !== 'external') {
+        full.type = full.type ?? training.type;
+        full.instructor = full.instructor ?? training.instructor;
+        full.requirements = full.requirements ?? training.requirements;
+        const act = full.activities?.[0];
+        if (act) {
+          full.instructor = full.instructor ?? act.instructor;
+          if (act.description) {
+            try {
+              const meta = JSON.parse(act.description);
+              full.type = full.type ?? meta.activityType;
+              full.requirements = full.requirements ?? meta.requirements;
+            } catch {
+              /* plain text description */
+            }
+          }
+        }
+      }
+      setEditingTraining(full);
+    } catch {
+      addToast('Network error. Could not load training details.', 'error');
+      setShowForm(false);
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setEditingTraining(null);
+    setFormLoading(false);
   };
 
   const totalPages = Math.ceil(totalCount / limit);
@@ -184,64 +295,26 @@ export default function Trainings() {
         )}
       </div>
 
-      {/* ── Filters ── */}
-      <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-
-          {/* Search */}
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-            <input
-              type="text"
-              placeholder="Search trainings..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full pl-10 pr-4 py-2 text-sm bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/60"
-            />
-          </div>
-
-          {/* Status — shows superset of both internal + external statuses */}
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="px-3 py-2 text-sm bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/60"
-          >
-            <option value="all">All Status</option>
-            <option value="draft">Draft</option>
-            <option value="published">Published (Internal)</option>
-            <option value="open">Open (External)</option>
-            <option value="ongoing">Ongoing</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled (Internal)</option>
-            <option value="closed">Closed (External)</option>
-          </select>
-
-          {/* Activity Type — only relevant for internal */}
-          <select
-            value={activityTypeFilter}
-            onChange={(e) => { setActivityTypeFilter(e.target.value); setPage(1); }}
-            className="px-3 py-2 text-sm bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/60"
-          >
-            <option value="all">All Types</option>
-            <option value="physical">Physical</option>
-            <option value="classroom">Classroom</option>
-            <option value="field">Field</option>
-            <option value="simulation">Simulation</option>
-          </select>
-
-          {/* Source */}
-          <select
-            value={sourceFilter}
-            onChange={(e) => { setSourceFilter(e.target.value); setPage(1); }}
-            className="px-3 py-2 text-sm bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/60"
-          >
-            <option value="all">All Sources</option>
-            <option value="internal">Internal</option>
-            <option value="external">External</option>
-          </select>
-        </div>
-      </div>
-
+      <TrainingFilters
+        filters={filters}
+        onChange={(next) => {
+          setFilters((f) => {
+            const patch = {};
+            if (next.search !== f.search) patch.search = next.search;
+            if (next.status !== f.status) patch.status = next.status;
+            if (next.activityType !== f.activityType) patch.activityType = next.activityType;
+            if (next.source !== f.source) patch.source = next.source;
+            if (Object.keys(patch).length === 0) return f;
+            const updated = applyFilterUpdates(f, patch);
+            if (patch.status || patch.activityType || patch.source) setPage(1);
+            return updated;
+          });
+        }}
+        onReset={() => {
+          resetFilters();
+          setPage(1);
+        }}
+      />
       {/* ── Error ── */}
       {error && (
         <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-800">
@@ -273,8 +346,8 @@ export default function Trainings() {
                   key={`${training._source}-${training.id}`}
                   training={training}
                   isAdmin={isAdmin}
-                  onEdit={() => { setEditingTraining(training); setShowForm(true); }}
-                  onDelete={() => handleDelete(training)}
+                  onEdit={() => handleEditTraining(training)}
+                  onDelete={() => openDeleteDialog(training)}
                 />
               ))
             )}
@@ -309,7 +382,37 @@ export default function Trainings() {
       )}
 
       {/* ── Form Modal ── */}
-      {showForm && (
+      {showForm && formLoading && (
+        <div
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ zIndex: 9999, backgroundColor: 'rgba(0, 0, 0, 0.55)' }}
+        >
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-white dark:bg-neutral-900 px-8 py-6 border border-neutral-200 dark:border-neutral-800 shadow-2xl">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+            <p className="text-sm text-neutral-600 dark:text-neutral-300">Loading training…</p>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete training?"
+        description={
+          deleteTarget
+            ? `“${deleteTarget.title}” (${
+                deleteTarget._source === 'external' ? 'external' : 'internal'
+              }) will be permanently removed. This action cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete training"
+        cancelLabel="Keep training"
+        destructive
+        loading={deleteLoading}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
+
+      {showForm && !formLoading && (
         <TrainingForm
           key={
             editingTraining
@@ -318,7 +421,7 @@ export default function Trainings() {
           }
           training={editingTraining}
           initialKind={editingTraining ? undefined : newScheduleKind}
-          onClose={() => { setShowForm(false); setEditingTraining(null); }}
+          onClose={handleCloseForm}
           onSubmit={handleFormSubmit}
         />
       )}
@@ -390,16 +493,10 @@ function TrainingCard({ training, isAdmin, onEdit, onDelete }) {
         )}>
           {training.status || 'Unknown'}
         </span>
-
-        {(training.is_mandatory === 1 || training.is_mandatory === true) && (
-          <span className="inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium border bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/25">
-            Mandatory
-          </span>
-        )}
       </div>
 
-      {/* Date + Duration / Capacity */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Date (+ capacity for external) */}
+      <div className={cn('gap-3', isExternal && 'grid grid-cols-2')}>
         <div className="flex items-start gap-2 text-sm">
           <Calendar size={14} className="text-neutral-400 mt-0.5 shrink-0" />
           <div>
@@ -410,26 +507,17 @@ function TrainingCard({ training, isAdmin, onEdit, onDelete }) {
           </div>
         </div>
 
-        <div className="flex items-start gap-2 text-sm">
-          <Calendar size={14} className="text-neutral-400 mt-0.5 shrink-0" />
-          <div>
-            {isExternal ? (
-              <>
-                <span className="text-neutral-500 dark:text-neutral-400 block text-xs">Capacity</span>
-                <span className="text-neutral-700 dark:text-neutral-300">
-                  {training.capacity ? `${training.capacity} slots` : 'Unlimited'}
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="text-neutral-500 dark:text-neutral-400 block text-xs">Duration</span>
-                <span className="text-neutral-700 dark:text-neutral-300">
-                  {training.duration_hours ? `${training.duration_hours} hrs` : 'N/A'}
-                </span>
-              </>
-            )}
+        {isExternal && (
+          <div className="flex items-start gap-2 text-sm">
+            <Calendar size={14} className="text-neutral-400 mt-0.5 shrink-0" />
+            <div>
+              <span className="text-neutral-500 dark:text-neutral-400 block text-xs">Capacity</span>
+              <span className="text-neutral-700 dark:text-neutral-300">
+                {training.capacity ? `${training.capacity} slots` : 'Unlimited'}
+              </span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Actions */}

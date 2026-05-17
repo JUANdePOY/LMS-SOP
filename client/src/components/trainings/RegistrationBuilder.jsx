@@ -5,7 +5,7 @@ import RegistrationPreview from "./RegistrationPreview";
 import { FIELD_TYPES } from "@/lib/registrationUtils";
 
 // ─── Add Field Dropdown ────────────────────────────────────────────────────────
-function AddFieldMenu({ onAdd, onClose }) {
+function AddFieldMenu({ addField, onClose }) {
   return (
     <div className="absolute top-full right-0 mt-2 w-52 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl shadow-lg shadow-neutral-900/10 dark:shadow-black/40 z-50 overflow-hidden">
       <div className="px-3 py-2 border-b border-neutral-100 dark:border-neutral-800">
@@ -18,7 +18,7 @@ function AddFieldMenu({ onAdd, onClose }) {
           <button
             key={type.value}
             type="button"
-            onClick={() => { onAdd(type.value); onClose(); }}
+            onClick={() => { addField(type.value); onClose(); }}
             className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left hover:bg-neutral-50 dark:hover:bg-neutral-800/70 transition-colors group"
           >
             <span className="text-[11px] font-bold font-mono text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded px-1.5 py-0.5 min-w-[26px] text-center shrink-0">
@@ -66,12 +66,7 @@ export default function RegistrationBuilder({
     addField, updateField, removeField,
     toggleRequired, addOption, updateOption,
     removeOption, moveField, clearFields,
-  } = useRegistrationBuilder(initialFields);
-
-  const handleAddField = (type) => {
-    addField(type);
-    onChange?.(fields);
-  };
+  } = useRegistrationBuilder(initialFields, onChange);
 
   return (
     <div className="flex flex-col gap-3 h-full">
@@ -121,7 +116,7 @@ export default function RegistrationBuilder({
             {showAddMenu && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowAddMenu(false)} />
-                <AddFieldMenu onAdd={handleAddField} onClose={() => setShowAddMenu(false)} />
+                <AddFieldMenu addField={addField} onClose={() => setShowAddMenu(false)} />
               </>
             )}
           </div>

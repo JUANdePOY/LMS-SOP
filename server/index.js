@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const trainingsRouter = require('./routes/trainings');
+const organizationRouter = require('./routes/organization');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -11,6 +12,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
+app.use('/api', organizationRouter);
 app.use('/api/trainings', trainingsRouter);
 
 // Health check

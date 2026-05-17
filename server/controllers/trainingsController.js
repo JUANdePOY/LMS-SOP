@@ -1,11 +1,19 @@
 const trainingsService = require('../services/trainingsService');
 const trainingAttachmentService = require('../services/trainingAttachmentService');
+const externalTrainingAttachmentService = require('../services/externalTrainingAttachmentService');
 const { logAudit } = require('../utils/auditLogger');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
   const message = err.statusCode ? err.message : fallback;
-  return res.status(code).json({ success: false, message });
+  const body = { success: false, message };
+  // Non-production: surface driver/SQL errors so misconfigured or stale API processes are obvious in Network tab.
+  if (process.env.NODE_ENV !== 'production' && code === 500 && err && typeof err === 'object') {
+    if (err.message && err.message !== message) body.details = err.message;
+    if (err.sqlMessage) body.sqlMessage = err.sqlMessage;
+    if (err.code) body.code = err.code;
+  }
+  return res.status(code).json(body);
 }
 
 function listInternal(req, res) {
@@ -202,6 +210,33 @@ function downloadTrainingAttachment(req, res) {
     .catch((err) => sendError(res, err, 'Download failed'));
 }
 
+function downloadExternalTrainingAttachment(req, res) {
+  const externalTrainingId = Number(req.params.id);
+  const attachmentId = Number(req.params.attachmentId);
+  externalTrainingAttachmentService
+    .getDownloadStreamContext(attachmentId, externalTrainingId)
+    .then((ctx) => {
+      res.download(ctx.absolutePath, ctx.originalFilename, (err) => {
+        if (err && !res.headersSent) {
+          res.status(404).json({ success: false, message: 'File not available' });
+        }
+      });
+    })
+    .catch((err) => sendError(res, err, 'Download failed'));
+}
+
+function uploadExternalLetterOrder(req, res) {
+  const userId = req.user?.id;
+  const externalTrainingId = Number(req.params.id);
+  externalTrainingAttachmentService
+    .registerLetterOrderUpload(externalTrainingId, req.file, userId)
+    .then((data) => {
+      logAudit('external_training.letter_order.upload', userId, { externalTrainingId, attachmentId: data?.id });
+      return res.status(201).json({ success: true, message: 'Letter order saved', data });
+    })
+    .catch((err) => sendError(res, err, 'Upload failed'));
+}
+
 module.exports = {
   listInternal,
   getInternal,
@@ -221,4 +256,6 @@ module.exports = {
   listRegistrations,
   uploadLetterOrder,
   downloadTrainingAttachment,
+  uploadExternalLetterOrder,
+  downloadExternalTrainingAttachment,
 };

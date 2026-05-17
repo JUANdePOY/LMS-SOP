@@ -3,7 +3,7 @@ const { query, param, body, validationResult } = require('express-validator');
 const trainingsController = require('../controllers/trainingsController');
 const { authenticateToken, optionalAuthenticateToken } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
-const { letterOrderUploadMiddleware } = require('../middleware/trainingUpload');
+const { letterOrderUploadMiddleware, externalLetterOrderUploadMiddleware } = require('../middleware/trainingUpload');
 
 const router = express.Router();
 
@@ -54,8 +54,7 @@ router.post(
     body('start_datetime').optional().isString(),
     body('start_date').optional().isString(),
     body('status').optional().isString(),
-    body('is_mandatory').optional().isBoolean(),
-    body('activity_is_mandatory').optional().isBoolean(),
+    body('participants').optional().isArray(),
   ],
   rejectInvalid,
   trainingsController.createInternal
@@ -65,11 +64,7 @@ router.patch(
   '/internal/:id',
   authenticateToken,
   authorize('admin'),
-  [
-    ...idParam,
-    body('is_mandatory').optional().isBoolean(),
-    body('activity_is_mandatory').optional().isBoolean(),
-  ],
+  [...idParam, body('participants').optional().isArray()],
   rejectInvalid,
   trainingsController.updateInternal
 );
@@ -139,6 +134,25 @@ router.get(
   trainingsController.listExternal
 );
 
+router.post(
+  '/external/:id/attachments/letter-order',
+  authenticateToken,
+  authorize('admin'),
+  [...idParam],
+  rejectInvalid,
+  externalLetterOrderUploadMiddleware,
+  trainingsController.uploadExternalLetterOrder
+);
+
+router.get(
+  '/external/:id/attachments/:attachmentId/file',
+  authenticateToken,
+  authorize('admin'),
+  [...idParam, ...attachmentIdParam],
+  rejectInvalid,
+  trainingsController.downloadExternalTrainingAttachment
+);
+
 router.get('/external/:id', optionalAuthenticateToken, [...idParam], rejectInvalid, trainingsController.getExternal);
 
 router.post(
@@ -148,7 +162,6 @@ router.post(
   [
     body('title').trim().notEmpty(),
     body('start_date').notEmpty(),
-    body('is_mandatory').optional().isBoolean(),
   ],
   rejectInvalid,
   trainingsController.createExternal
@@ -158,7 +171,7 @@ router.patch(
   '/external/:id',
   authenticateToken,
   authorize('admin'),
-  [...idParam, body('is_mandatory').optional().isBoolean()],
+  [...idParam],
   rejectInvalid,
   trainingsController.updateExternal
 );

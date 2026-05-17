@@ -178,8 +178,12 @@ Example:
 uploads/
  ┣ letter-orders/
  ┣ certificates/
+ ┣ trainings/            (internal training attachments; metadata in internal_training_attachments)
+ ┣ external-trainings/   (external training attachments; metadata in external_training_attachments)
  ┗ attachments/
 ```
+
+Database tables: `internal_training_attachments` (FK `trainings`), `external_training_attachments` (FK `external_trainings`). Legacy `training_attachments` was renamed via `server/sql/rename_training_attachments_to_internal.up.sql`.
 
 Rules:
 - Validate file type

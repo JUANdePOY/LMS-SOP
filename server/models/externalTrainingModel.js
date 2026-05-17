@@ -22,7 +22,7 @@ async function countExternal({ search, status }) {
 async function findExternalMany({ page, limit, search, status }) {
   const offset = (page - 1) * limit;
   let sql = `
-    SELECT id, title, description, start_date, start_time, venue, status, capacity, is_mandatory,
+    SELECT id, title, description, start_date, start_time, venue, status, capacity,
            registration_fields, created_at, updated_at
     FROM external_trainings
     WHERE 1 = 1
@@ -59,7 +59,7 @@ function safeJsonParse(s) {
 
 async function findExternalById(id) {
   const [rows] = await pool.query(
-    `SELECT id, title, description, start_date, start_time, venue, status, capacity, is_mandatory,
+    `SELECT id, title, description, start_date, start_time, venue, status, capacity,
             registration_fields, created_at, updated_at
      FROM external_trainings WHERE id = ?`,
     [id]
@@ -85,8 +85,8 @@ async function insertExternal(row) {
 
   const [result] = await pool.query(
     `INSERT INTO external_trainings (
-      title, description, start_date, start_time, venue, status, capacity, is_mandatory, registration_fields
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      title, description, start_date, start_time, venue, status, capacity, registration_fields
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.title,
       row.description ?? null,
@@ -95,7 +95,6 @@ async function insertExternal(row) {
       row.venue ?? null,
       row.status,
       row.capacity ?? null,
-      row.is_mandatory ? 1 : 0,
       rf,
     ]
   );
@@ -113,7 +112,6 @@ async function updateExternal(id, patch) {
     venue: patch.venue,
     status: patch.status,
     capacity: patch.capacity,
-    is_mandatory: patch.is_mandatory != null ? (patch.is_mandatory ? 1 : 0) : undefined,
   };
   for (const [k, v] of Object.entries(map)) {
     if (Object.prototype.hasOwnProperty.call(patch, k)) {

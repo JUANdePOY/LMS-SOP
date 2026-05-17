@@ -1,7 +1,7 @@
--- Run once on existing databases (safe to re-run if table exists).
-CREATE TABLE IF NOT EXISTS `training_attachments` (
+-- External training file metadata. Bytes under uploads/external-trainings/{id}/.
+CREATE TABLE IF NOT EXISTS `external_training_attachments` (
   `id` bigint NOT NULL AUTO_INCREMENT,
-  `training_id` bigint NOT NULL,
+  `external_training_id` int UNSIGNED NOT NULL,
   `kind` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'letter_order',
   `stored_filename` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
   `original_filename` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS `training_attachments` (
   `uploaded_by` bigint DEFAULT NULL,
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_training_kind` (`training_id`,`kind`),
-  KEY `idx_training_created` (`training_id`,`created_at`),
-  CONSTRAINT `training_attachments_ibfk_1` FOREIGN KEY (`training_id`) REFERENCES `trainings` (`id`) ON DELETE CASCADE
+  KEY `idx_external_training_kind` (`external_training_id`,`kind`),
+  KEY `idx_external_training_created` (`external_training_id`,`created_at`),
+  CONSTRAINT `external_training_attachments_ibfk_1` FOREIGN KEY (`external_training_id`) REFERENCES `external_trainings` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
