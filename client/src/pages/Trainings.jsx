@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2, Calendar } from 'lucide-react';
+import { Plus, Edit, Trash2, Calendar, ClipboardCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -348,6 +348,10 @@ export default function Trainings() {
                   isAdmin={isAdmin}
                   onEdit={() => handleEditTraining(training)}
                   onDelete={() => openDeleteDialog(training)}
+                  onAttendance={() => {
+                    const type = training._source === 'external' ? 'external' : 'internal';
+                    window.location.href = `/attendance?type=${type}&trainingId=${training.id}`;
+                  }}
                 />
               ))
             )}
@@ -430,7 +434,7 @@ export default function Trainings() {
 }
 
 // ─── Training Card ─────────────────────────────────────────────────────────────
-function TrainingCard({ training, isAdmin, onEdit, onDelete }) {
+function TrainingCard({ training, isAdmin, onEdit, onDelete, onAttendance }) {
   const isExternal = training._source === 'external';
 
   // Resolve the display date — internal uses start_datetime, external uses start_date
@@ -529,6 +533,16 @@ function TrainingCard({ training, isAdmin, onEdit, onDelete }) {
             title="Edit"
           >
             <Edit size={14} className="text-neutral-500" />
+          </button>
+        )}
+
+        {isAdmin && (
+          <button
+            onClick={onAttendance}
+            className="p-1.5 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+            title="Take Attendance"
+          >
+            <ClipboardCheck size={14} className="text-indigo-500" />
           </button>
         )}
 
