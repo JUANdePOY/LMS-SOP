@@ -532,6 +532,8 @@ export default function ReportForm({ report, onClose, onSubmit }) {
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventSearch, setEventSearch] = useState('');
+  const [showEventDropdown, setShowEventDropdown] = useState(false);
+  const eventDropdownRef = useRef(null);
 
   const [form, setForm] = useState({
     title: str(report?.title || ''),
@@ -601,9 +603,10 @@ export default function ReportForm({ report, onClose, onSubmit }) {
     });
   }, []);
 
-  const filteredEvents = eventSearch
-    ? events.filter((e) => e.displayTitle.toLowerCase().includes(eventSearch.toLowerCase()))
-    : events;
+  const activeQuery = (eventSearch || form.title || '').trim().toLowerCase();
+  const filteredEvents = activeQuery
+    ? events.filter((e) => e.displayTitle.toLowerCase().includes(activeQuery))
+    : [];
 
   const selectedEvent = form.event_source_id
     ? events.find((e) => String(e.id) === String(form.event_source_id) && e._source === form.event_type)
@@ -620,9 +623,10 @@ export default function ReportForm({ report, onClose, onSubmit }) {
       event_type: evt._source,
       event_source_id: String(evt.id),
       event_date: evt.displayDate ? String(evt.displayDate).slice(0, 10) : prev.event_date,
-      title: prev.title || evt.displayTitle,
+      title: evt.displayTitle,
     }));
-    setEventSearch('');
+    setEventSearch(evt.displayTitle);
+    setShowEventDropdown(false);
   };
 
   const validate = () => {
@@ -719,13 +723,54 @@ export default function ReportForm({ report, onClose, onSubmit }) {
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
             <FormGroup label="Event Name" required error={errors.title}>
-              <input
-                type="text"
-                value={form.title}
-                onChange={(e) => handleChange('title', e.target.value)}
-                className={inputCls}
-                placeholder="Enter report / event title..."
-              />
+              <div className="relative" ref={eventDropdownRef}>
+                <input
+                  type="text"
+                  role="combobox"
+                  aria-expanded={showEventDropdown && activeQuery.length > 0}
+                  value={form.title}
+                  onChange={(e) => {
+                    handleChange('title', e.target.value);
+                    setEventSearch(e.target.value);
+                    setShowEventDropdown(true);
+                  }}
+                  onFocus={() => {
+                    if (activeQuery.length > 0) setShowEventDropdown(true);
+                  }}
+                  onBlur={() => setTimeout(() => setShowEventDropdown(false), 150)}
+                  className={inputCls}
+                  placeholder="Search completed events or enter a custom title..."
+                />
+                {showEventDropdown && activeQuery.length > 0 && (
+                  <div className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg text-sm">
+                    {eventsLoading ? (
+                      <p className="px-3 py-2 text-xs text-neutral-500">Loading events...</p>
+                    ) : filteredEvents.filter((e) => e._source === form.event_type).length === 0 ? (
+                      <p className="px-3 py-2 text-xs text-neutral-500">No completed events found.</p>
+                    ) : (
+                      filteredEvents
+                        .filter((e) => e._source === form.event_type)
+                        .map((evt) => (
+                          <button
+                            key={`name-${evt._source}-${evt.id}`}
+                            type="button"
+                            className={cn(
+                              'w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800',
+                              String(evt.id) === String(form.event_source_id) && evt._source === form.event_type && 'bg-indigo-50 dark:bg-indigo-950/50'
+                            )}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => handleEventSelect(evt)}
+                          >
+                            <span className="font-medium text-neutral-900 dark:text-neutral-100 block">{evt.displayTitle}</span>
+                            {evt.displayDate && (
+                              <span className="text-neutral-500 text-xs">{new Date(evt.displayDate).toLocaleDateString()}</span>
+                            )}
+                          </button>
+                        ))
+                    )}
+                  </div>
+                )}
+              </div>
             </FormGroup>
 
             <FormGroup label="Event Source" hint="Select a completed training or event">
@@ -755,44 +800,6 @@ export default function ReportForm({ report, onClose, onSubmit }) {
                   >
                     External Training
                   </button>
-                </div>
-
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={eventSearch}
-                    onChange={(e) => setEventSearch(e.target.value)}
-                    className={inputCls}
-                    placeholder={form.event_type === 'internal' ? 'Search completed internal trainings...' : 'Search completed external trainings...'}
-                  />
-                  {(eventSearch || filteredEvents.length > 0) && (
-                    <div className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg text-sm">
-                      {eventsLoading ? (
-                        <p className="px-3 py-2 text-xs text-neutral-500">Loading events...</p>
-                      ) : filteredEvents.filter((e) => e._source === form.event_type).length === 0 ? (
-                        <p className="px-3 py-2 text-xs text-neutral-500">No completed events found.</p>
-                      ) : (
-                        filteredEvents
-                          .filter((e) => e._source === form.event_type)
-                          .map((evt) => (
-                            <button
-                              key={`${evt._source}-${evt.id}`}
-                              type="button"
-                              className={cn(
-                                'w-full text-left px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800',
-                                String(evt.id) === String(form.event_source_id) && evt._source === form.event_type && 'bg-indigo-50 dark:bg-indigo-950/50'
-                              )}
-                              onClick={() => handleEventSelect(evt)}
-                            >
-                              <span className="font-medium text-neutral-900 dark:text-neutral-100 block">{evt.displayTitle}</span>
-                              {evt.displayDate && (
-                                <span className="text-neutral-500 text-xs">{new Date(evt.displayDate).toLocaleDateString()}</span>
-                              )}
-                            </button>
-                          ))
-                      )}
-                    </div>
-                  )}
                 </div>
 
                 {selectedEvent && (
