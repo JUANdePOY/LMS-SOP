@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Calendar, MapPin, Users, Loader, AlertCircle, ScanLine } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Loader, AlertCircle, ScanLine, ClipboardList, Search } from 'lucide-react';
 import AttendanceScanner from '@/components/trainings/AttendanceScanner';
 import AttendanceList from '@/components/trainings/AttendanceList';
 import {
@@ -11,6 +11,7 @@ import {
   getExternalAttendance,
   updateAttendanceStatus,
 } from '@/services/attendanceApiService';
+import { getTrainings, getExternalTrainings } from '@/services/trainingsService';
 
 export default function Attendance() {
   const [eventType, setEventType] = useState('internal');

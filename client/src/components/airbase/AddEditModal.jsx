@@ -37,7 +37,7 @@ export default function AddEditModal({ open, title, onClose, onSubmit, submitLab
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4"
       onClick={(e) => e.target === overlayRef.current && onClose()}
     >
       {/* Backdrop */}
@@ -52,8 +52,8 @@ export default function AddEditModal({ open, title, onClose, onSubmit, submitLab
         "animate-in fade-in zoom-in-95 duration-150"
       )}>
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
-          <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-50 tracking-tight">
+        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-4 sm:px-6 py-4">
+          <h2 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-neutral-50 tracking-tight pr-4">
             {title}
           </h2>
           <button
@@ -66,12 +66,12 @@ export default function AddEditModal({ open, title, onClose, onSubmit, submitLab
         </div>
 
         {/* Body */}
-        <div className="px-6 py-4 flex flex-col gap-2 max-h-[65vh] overflow-y-auto">
+        <div className="px-4 sm:px-6 py-4 flex flex-col gap-2 max-h-[65vh] overflow-y-auto">
           {children}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+        <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-4 sm:px-6 py-4">
           <button
             onClick={onClose}
             className={cn(

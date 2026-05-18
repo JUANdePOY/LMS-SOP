@@ -123,24 +123,34 @@ const countQuery = `
        const [countResult] = await db.query(countQuery, filter.params);
        const total = countResult[0].total;
 
-       // Fetch paginated records
+        // Fetch paginated records
 const query = `
-          SELECT 
-            r.id, r.user_id, r.first_name, r.last_name, r.rank, 
-            r.service_number, r.position, r.date_of_birth, r.sex, r.phone_number,
-            r.reserve_status, r.is_active, r.created_at, r.updated_at,
-            u.email, u.role,
-            ra.id as assignment_id, ra.group_id, ra.squadron_id, 
-            g.name as group_name, s.name as squadron_name
-          FROM reservists r
-         LEFT JOIN users u ON r.user_id = u.id
-         LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
-         LEFT JOIN \`groups\` g ON ra.group_id = g.id
-         LEFT JOIN squadron s ON ra.squadron_id = s.id
-         ${filter.whereClause}
-         ORDER BY r.${sortBy} ${sortOrder}
-         LIMIT ? OFFSET ?
-       `;
+           SELECT 
+             r.id, r.user_id, r.first_name, r.last_name, r.rank, 
+             r.service_number, r.position, r.date_of_birth, r.place_of_birth,
+             r.age, r.sex, r.civil_status, r.citizenship, r.height, r.weight,
+             r.blood_type, r.phone_number, r.address,
+             r.reserve_center, r.category, r.date_enlisted, r.source_of_commission,
+             r.rank_date_appointment, r.specialization, r.reserve_status,
+             r.highest_education, r.course_degree, r.school, r.year_graduated,
+             r.occupation, r.employer, r.office_address,
+             r.basic_training_completed, r.basic_training_date,
+             r.emergency_contact_name, r.emergency_contact_phone, r.emergency_contact_address,
+             r.is_active, r.created_at, r.updated_at,
+             u.email,
+             ra.id as assignment_id, ra.group_id, ra.squadron_id, 
+             g.name as group_name, a.name as arcen_name,
+             s.name as squadron_name, s.location as squadron_location
+           FROM reservists r
+          LEFT JOIN users u ON r.user_id = u.id
+          LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+          LEFT JOIN \`groups\` g ON ra.group_id = g.id
+          LEFT JOIN arsens a ON g.arsen_id = a.id
+          LEFT JOIN squadron s ON ra.squadron_id = s.id
+          ${filter.whereClause}
+          ORDER BY r.${sortBy} ${sortOrder}
+          LIMIT ? OFFSET ?
+        `;
 
       const params = [...filter.params, limit, offset];
       const [rows] = await db.query(query, params);

@@ -8,34 +8,28 @@ import ReservistStatsBar    from "@/components/reservists/ReservistStatsBar";
 import ReservistFilters, { DEFAULT_FILTERS } from "@/components/reservists/ReservistFilters";
 import ReservistTable       from "@/components/reservists/ReservistTable";
 import ReservistModal       from "@/components/reservists/ReservistModal";
-import ReservistDetailPanel from "@/components/reservists/ReservistDetailPanel";
+import ReservistViewModal from "@/components/reservists/ReservistViewModal";
 import BulkUploadModal from "@/components/reservists/BulkUploadModal";
 
 const EMPTY_FORM = {
   firstName: "", lastName: "", serialNo: "", dateEnlisted: "",
-  rank: "", status: "active", squadron: "", group: "", arcen: "", airbase: "",
+  rank: "", status: "active", squadronId: "", groupId: "", arcen: "", airbase: "",
   specialization: "", civilOccupation: "", contact: "", address: "",
-  readinessScore: 0, attendanceRate: 0, trainingsCompleted: 0,
-  email: "", password: "",
+  email: "", password: "", position: "",
   // Personal Information
   dateOfBirth: "", placeOfBirth: "", age: "", sex: "", civilStatus: "",
   citizenship: "Filipino", height: "", weight: "", bloodType: "",
-  homeAddress: "", emailAddress: "",
   // Military Information
-  reserveCenter: "", groupCommand: "", category: "", rankDateOfAppointment: "",
-  sourceOfCommission: [], reserveStatus: [],
+  reserveCenter: "", category: "", rankDateOfAppointment: "",
+  sourceOfCommission: "", reserveStatus: "Ready Reserve",
   // Educational Background
   highestEducation: "", courseDegree: "", school: "", yearGraduated: "",
   // Civilian Information
   employerCompany: "", officeAddress: "",
   // Military Training
   basicTraining: "", basicTrainingDateCompleted: "",
-  militaryCourses: [],
-  // Awards and Decorations
-  awardsDecorations: [],
   // Emergency Contact
-  emergencyContactName: "", emergencyContactRelationship: "",
-  emergencyContactNumber: "", emergencyContactAddress: "",
+  emergencyContactName: "", emergencyContactNumber: "", emergencyContactAddress: "",
 };
 
 /**
@@ -52,32 +46,20 @@ export default function Reservists() {
   const [modal,         setModal]         = useState({ open: false, mode: "add", row: null });
   const [form,          setForm]          = useState(EMPTY_FORM);
   const [detailRow,     setDetailRow]     = useState(null);
+  const [viewRow,       setViewRow]       = useState(null);
   const [bulkUploadModal, setBulkUploadModal] = useState(false);
 
 // Transform API data to frontend format
    const transformReservistData = (apiData) => {
       return apiData.map(r => ({
         id: r.id,
+        userId: r.user_id,
         firstName: r.first_name || '',
         lastName: r.last_name || '',
         serialNo: r.service_number || '',
         rank: r.rank || '',
         status: r.is_active ? 'active' : 'inactive',
-        reserveStatus: r.reserve_status || 'Ready Reserve',
-        squadron: r.squadron_name || '',
-        squadronId: r.squadron_id || '',
-        group: r.group_name || '',
-        groupId: r.group_id || '',
-        arcen: r.arcen || '',
-        airbase: r.airbase || '',
-        specialization: r.specialization || '',
-        civilOccupation: r.occupation || '',
-        contact: r.phone_number || '',
-        address: r.address || '',
-        dateEnlisted: r.date_enlisted || '',
-        readinessScore: r.readiness_score || 0,
-        attendanceRate: r.attendance_rate || 0,
-        trainingsCompleted: r.trainings_completed || 0,
+        position: r.position || '',
         dateOfBirth: r.date_of_birth || '',
         placeOfBirth: r.place_of_birth || '',
         age: r.age || '',
@@ -87,27 +69,35 @@ export default function Reservists() {
         height: r.height || '',
         weight: r.weight || '',
         bloodType: r.blood_type || '',
-        homeAddress: r.home_address || '',
-        emailAddress: r.email_address || '',
-        reserveCenter: r.arcen_id || r.arcen || '',
-        groupCommand: r.group_id || '',
+        contact: r.phone_number || '',
+        address: r.address || '',
+        email: r.email || '',
+        reserveCenter: r.reserve_center || '',
         category: r.category || '',
-        rankDateOfAppointment: r.rank_date_of_appointment || '',
-        sourceOfCommission: r.source_of_commission || [],
+        dateEnlisted: r.date_enlisted || '',
+        sourceOfCommission: r.source_of_commission || '',
+        rankDateOfAppointment: r.rank_date_appointment || '',
+        specialization: r.specialization || '',
+        reserveStatus: r.reserve_status || 'Ready Reserve',
         highestEducation: r.highest_education || '',
         courseDegree: r.course_degree || '',
         school: r.school || '',
         yearGraduated: r.year_graduated || '',
-        employerCompany: r.employer_company || '',
+        civilOccupation: r.occupation || '',
+        employerCompany: r.employer || '',
         officeAddress: r.office_address || '',
-        basicTraining: r.basic_training || '',
-        basicTrainingDateCompleted: r.basic_training_date_completed || '',
-        militaryCourses: r.military_courses || [],
-        awardsDecorations: r.awards_decorations || [],
+        basicTraining: r.basic_training_completed || '',
+        basicTrainingDateCompleted: r.basic_training_date || '',
         emergencyContactName: r.emergency_contact_name || '',
-        emergencyContactRelationship: r.emergency_contact_relationship || '',
-        emergencyContactNumber: r.emergency_contact_number || '',
+        emergencyContactNumber: r.emergency_contact_phone || '',
         emergencyContactAddress: r.emergency_contact_address || '',
+        assignmentId: r.assignment_id || '',
+        squadronId: r.squadron_id || '',
+        groupId: r.group_id || '',
+        squadron: r.squadron_name || '',
+        group: r.group_name || '',
+        arcen: r.arcen_name || '',
+        airbase: r.squadron_location || '',
       }));
     };
 
@@ -181,17 +171,16 @@ const openEdit = (row) => {
         dateEnlisted: row.dateEnlisted,
         rank: row.rank,
         status: row.status || 'active',
-        squadron: row.squadronId || '',
-        group: row.groupId || '',
+        position: row.position || '',
+        squadronId: row.squadronId || '',
+        groupId: row.groupId || '',
         arcen: row.arcen || '',
         airbase: row.airbase || '',
         specialization: row.specialization || '',
         civilOccupation: row.civilOccupation || '',
         contact: row.contact || '',
         address: row.address || '',
-        readinessScore: row.readinessScore || 0,
-        attendanceRate: row.attendanceRate || 0,
-        trainingsCompleted: row.trainingsCompleted || 0,
+        email: row.email || '',
         // Personal Information
         dateOfBirth: row.dateOfBirth || '',
         placeOfBirth: row.placeOfBirth || '',
@@ -202,15 +191,12 @@ const openEdit = (row) => {
         height: row.height || '',
         weight: row.weight || '',
         bloodType: row.bloodType || '',
-        homeAddress: row.homeAddress || '',
-        emailAddress: row.emailAddress || '',
         // Military Information
         reserveCenter: row.reserveCenter || '',
-        groupCommand: row.groupCommand || '',
         category: row.category || '',
         rankDateOfAppointment: row.rankDateOfAppointment || '',
-        sourceOfCommission: row.sourceOfCommission || [],
-        reserveStatus: row.reserveStatus || [],
+        sourceOfCommission: row.sourceOfCommission || '',
+        reserveStatus: row.reserveStatus || 'Ready Reserve',
         // Educational Background
         highestEducation: row.highestEducation || '',
         courseDegree: row.courseDegree || '',
@@ -222,17 +208,14 @@ const openEdit = (row) => {
         // Military Training
         basicTraining: row.basicTraining || '',
         basicTrainingDateCompleted: row.basicTrainingDateCompleted || '',
-        militaryCourses: row.militaryCourses || [],
-        // Awards and Decorations
-        awardsDecorations: row.awardsDecorations || [],
         // Emergency Contact
         emergencyContactName: row.emergencyContactName || '',
-        emergencyContactRelationship: row.emergencyContactRelationship || '',
         emergencyContactNumber: row.emergencyContactNumber || '',
         emergencyContactAddress: row.emergencyContactAddress || '',
       });
       setModal({ open: true, mode: "edit", row });
       setDetailRow(null);
+      setViewRow(null);
     };
 
   const closeModal = () => setModal((m) => ({ ...m, open: false }));
@@ -247,8 +230,7 @@ const handleSubmit = async () => {
           last_name: form.lastName,
           service_number: form.serialNo,
           rank: form.rank,
-          squadron_id: form.squadron ? parseInt(form.squadron, 10) : null,
-          date_enlisted: form.dateEnlisted,
+          position: form.position,
           phone_number: form.contact,
           address: form.address,
           specialization: form.specialization,
@@ -262,27 +244,22 @@ const handleSubmit = async () => {
           height: form.height ? parseFloat(form.height) : null,
           weight: form.weight ? parseFloat(form.weight) : null,
           blood_type: form.bloodType,
-          home_address: form.homeAddress,
-          email_address: form.emailAddress,
-          arcen_id: form.reserveCenter ? parseInt(form.reserveCenter, 10) : null,
-          group_id: form.groupCommand ? parseInt(form.groupCommand, 10) : null,
+          reserve_center: form.reserveCenter,
           category: form.category,
-          rank_date_of_appointment: form.rankDateOfAppointment,
+          date_enlisted: form.dateEnlisted,
           source_of_commission: form.sourceOfCommission,
+          rank_date_appointment: form.rankDateOfAppointment,
           reserve_status: form.reserveStatus,
           highest_education: form.highestEducation,
           course_degree: form.courseDegree,
           school: form.school,
           year_graduated: form.yearGraduated ? parseInt(form.yearGraduated, 10) : null,
-          employer_company: form.employerCompany,
+          employer: form.employerCompany,
           office_address: form.officeAddress,
-          basic_training: form.basicTraining,
-          basic_training_date_completed: form.basicTrainingDateCompleted,
-          military_courses: form.militaryCourses,
-          awards_decorations: form.awardsDecorations,
+          basic_training_completed: form.basicTraining,
+          basic_training_date: form.basicTrainingDateCompleted,
           emergency_contact_name: form.emergencyContactName,
-          emergency_contact_relationship: form.emergencyContactRelationship,
-          emergency_contact_number: form.emergencyContactNumber,
+          emergency_contact_phone: form.emergencyContactNumber,
           emergency_contact_address: form.emergencyContactAddress,
         };
 
@@ -295,8 +272,7 @@ const handleSubmit = async () => {
           first_name: form.firstName,
           last_name: form.lastName,
           rank: form.rank,
-          squadron_id: form.squadron ? parseInt(form.squadron, 10) : null,
-          date_enlisted: form.dateEnlisted,
+          position: form.position,
           phone_number: form.contact,
           address: form.address,
           specialization: form.specialization,
@@ -310,27 +286,22 @@ const handleSubmit = async () => {
           height: form.height ? parseFloat(form.height) : null,
           weight: form.weight ? parseFloat(form.weight) : null,
           blood_type: form.bloodType,
-          home_address: form.homeAddress,
-          email_address: form.emailAddress,
-          arcen_id: form.reserveCenter ? parseInt(form.reserveCenter, 10) : null,
-          group_id: form.groupCommand ? parseInt(form.groupCommand, 10) : null,
+          reserve_center: form.reserveCenter,
           category: form.category,
-          rank_date_of_appointment: form.rankDateOfAppointment,
+          date_enlisted: form.dateEnlisted,
           source_of_commission: form.sourceOfCommission,
+          rank_date_appointment: form.rankDateOfAppointment,
           reserve_status: form.reserveStatus,
           highest_education: form.highestEducation,
           course_degree: form.courseDegree,
           school: form.school,
           year_graduated: form.yearGraduated ? parseInt(form.yearGraduated, 10) : null,
-          employer_company: form.employerCompany,
+          employer: form.employerCompany,
           office_address: form.officeAddress,
-          basic_training: form.basicTraining,
-          basic_training_date_completed: form.basicTrainingDateCompleted,
-          military_courses: form.militaryCourses,
-          awards_decorations: form.awardsDecorations,
+          basic_training_completed: form.basicTraining,
+          basic_training_date: form.basicTrainingDateCompleted,
           emergency_contact_name: form.emergencyContactName,
-          emergency_contact_relationship: form.emergencyContactRelationship,
-          emergency_contact_number: form.emergencyContactNumber,
+          emergency_contact_phone: form.emergencyContactNumber,
           emergency_contact_address: form.emergencyContactAddress,
         });
         if (response.data.status === 'success') {
@@ -340,6 +311,9 @@ const handleSubmit = async () => {
           );
           if (detailRow?.id === modal.row.id) {
             setDetailRow(updatedReservist);
+          }
+          if (viewRow?.id === modal.row.id) {
+            setViewRow(updatedReservist);
           }
         }
       }
@@ -401,19 +375,21 @@ const toggleStatus = async (id) => {
       {!loading && (
         <>
           {/* ── Page header ─────────────────────────────────────── */}
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <AirbasePageHeader
               icon={UserSquare}
               title="Reservists"
               description="Manage all Philippine Air Force reservist records, assignments, and status."
               breadcrumbs={[{ label: "Reservists" }]}
             />
-            <div className="flex gap-2">
-              <PrimaryButton icon={Upload} onClick={() => setBulkUploadModal(true)} variant="secondary">
-                Bulk Upload
+            <div className="flex gap-2 shrink-0">
+              <PrimaryButton icon={Upload} onClick={() => setBulkUploadModal(true)} variant="secondary" className="flex-1 sm:flex-none">
+                <span className="hidden sm:inline">Bulk Upload</span>
+                <span className="sm:hidden">Upload</span>
               </PrimaryButton>
-              <PrimaryButton icon={Plus} onClick={openAdd}>
-                Add Reservist
+              <PrimaryButton icon={Plus} onClick={openAdd} className="flex-1 sm:flex-none">
+                <span className="hidden sm:inline">Add Reservist</span>
+                <span className="sm:hidden">Add</span>
               </PrimaryButton>
             </div>
           </div>
@@ -422,7 +398,7 @@ const toggleStatus = async (id) => {
           <ReservistStatsBar data={data} />
 
           {/* ── Search bar ──────────────────────────────────────── */}
-          <div className="relative max-w-sm">
+          <div className="relative max-w-full sm:max-w-sm">
             <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
             <input
               type="text"
@@ -455,7 +431,7 @@ const toggleStatus = async (id) => {
           {/* ── Table ───────────────────────────────────────────── */}
           <ReservistTable
             data={filteredData}
-            onView={setDetailRow}
+            onView={setViewRow}
             onEdit={openEdit}
             onDelete={handleDelete}
             onToggleStatus={toggleStatus}
@@ -486,6 +462,13 @@ const toggleStatus = async (id) => {
               onEdit={() => openEdit(detailRow)}
             />
           )}
+
+          {/* ── View Modal ─────────────────────────────────────────── */}
+          <ReservistViewModal
+            reservist={viewRow}
+            onClose={() => setViewRow(null)}
+            onEdit={(row) => { setViewRow(null); openEdit(row); }}
+          />
         </>
       )}
     </div>

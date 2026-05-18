@@ -39,22 +39,21 @@ export default function AirbasePageHeader({ icon: Icon, title, description, acti
       )}
 
       {/* Title row */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-indigo-900/40">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-indigo-900/40">
             <Icon size={16} strokeWidth={2} />
           </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 leading-none">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 leading-none truncate">
               {title}
             </h1>
-            <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-500">
+            <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-500 line-clamp-1">
               {description}
             </p>
           </div>
         </div>
 
-        {/* Action slot */}
         {actions && (
           <div className="flex shrink-0 items-center gap-2">
             {actions}
