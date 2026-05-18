@@ -424,6 +424,10 @@ CREATE TABLE supply_issuances (
 CREATE TABLE reports (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     title VARCHAR(500) NOT NULL,
+    event_type ENUM('internal', 'external') NOT NULL DEFAULT 'internal',
+    event_source_id BIGINT DEFAULT NULL COMMENT 'FK to trainings.id or external_trainings.id',
+    event_date DATE DEFAULT NULL,
+    summary TEXT DEFAULT NULL,
     type ENUM('attendance', 'readiness', 'logistics', 'custom') NOT NULL,
     format ENUM('pdf', 'excel', 'csv') NOT NULL,
     file_path VARCHAR(1000) NOT NULL,
@@ -437,8 +441,34 @@ CREATE TABLE reports (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (generated_by) REFERENCES users(id),
     INDEX idx_type (type),
+    INDEX idx_event_type (event_type),
     INDEX idx_generated_at (generated_at),
     INDEX idx_generated_by (generated_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE report_participants (
+    report_id BIGINT NOT NULL,
+    reservist_id BIGINT NOT NULL,
+    squadron_id BIGINT DEFAULT NULL,
+    attendance_status ENUM('present', 'absent', 'late', 'excused') NOT NULL DEFAULT 'present',
+    notes VARCHAR(500) DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (report_id, reservist_id),
+    KEY idx_rp_report (report_id),
+    KEY idx_rp_reservist (reservist_id),
+    KEY idx_rp_squadron (squadron_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE report_documentations (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    report_id BIGINT NOT NULL,
+    original_filename VARCHAR(500) NOT NULL,
+    file_path VARCHAR(1000) NOT NULL,
+    file_size INT DEFAULT NULL,
+    mime_type VARCHAR(100) DEFAULT NULL,
+    uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_rd_report (report_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------
