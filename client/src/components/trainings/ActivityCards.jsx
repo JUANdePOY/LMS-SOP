@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { computeTotalSlots } from '@/lib/slotUtils';
 import {
   Calendar,
   MapPin,
@@ -165,8 +166,8 @@ export function ActivityCard({ activity, onAction }) {
   const rawType = (activity.type || 'training').toLowerCase();
   const typeChipClass = activityTypeStyles[rawType] || activityTypeStyles.training;
 
-  const startTime = activity.start_datetime || activity.startTime;
-  const endTime = activity.end_datetime || activity.endTime;
+  const startTime = activity.start_datetime || activity.start_time || activity.startTime;
+  const endTime = activity.end_datetime || activity.end_time || activity.endTime;
   const location = activity.venue || activity.location;
 
   const handleAction = (action) => {
@@ -175,10 +176,11 @@ export function ActivityCard({ activity, onAction }) {
 
   const hasActions = typeof onAction === 'function';
 
-  const attendanceTotal = activity.attendance?.total;
+  
+  const totalSlots = computeTotalSlots(activity);
   const attendanceCurrent = activity.attendance?.current;
-  const pct =
-    attendanceTotal > 0 ? Math.min(100, Math.round((attendanceCurrent / attendanceTotal) * 100)) : 0;
+  const attendanceTotal = totalSlots ?? activity.attendance?.total ?? 0;
+  const pct = attendanceTotal > 0 ? Math.min(100, Math.round((attendanceCurrent / attendanceTotal) * 100)) : 0;
 
   const title = activity.title || activity.name || 'Untitled activity';
   const description = activity.description?.trim();
@@ -234,12 +236,10 @@ export function ActivityCard({ activity, onAction }) {
           <MetaRow icon={Calendar} label="Starts">
             {startLabel || <span className="text-neutral-400">To be scheduled</span>}
           </MetaRow>
-          {endLabel && (
-            <MetaRow icon={Clock} label="Ends">
-              {endLabel}
-            </MetaRow>
-          )}
-          <MetaRow icon={MapPin} label="Location" className={!endLabel ? 'sm:col-span-1' : 'sm:col-span-2'}>
+          <MetaRow icon={Clock} label="Ends">
+            {endLabel || <span className="text-neutral-400">To be scheduled</span>}
+          </MetaRow>
+          <MetaRow icon={MapPin} label="Location" className="sm:col-span-2">
             {location ? <span className="break-words">{location}</span> : 'Not set'}
           </MetaRow>
           <MetaRow icon={User} label="Instructor" className="sm:col-span-2">

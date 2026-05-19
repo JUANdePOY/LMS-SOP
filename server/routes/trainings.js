@@ -162,6 +162,9 @@ router.post(
   [
     body('title').trim().notEmpty(),
     body('start_date').notEmpty(),
+    body('squadron_limits').optional().isArray(),
+    body('squadron_limits.*.squadron_id').optional().isInt({ min: 1 }),
+    body('squadron_limits.*.slot_limit').optional().isInt({ min: 0 }),
   ],
   rejectInvalid,
   trainingsController.createExternal
@@ -172,6 +175,11 @@ router.patch(
   authenticateToken,
   authorize('admin'),
   [...idParam],
+  [
+    body('squadron_limits').optional().isArray(),
+    body('squadron_limits.*.squadron_id').optional().isInt({ min: 1 }),
+    body('squadron_limits.*.slot_limit').optional().isInt({ min: 0 }),
+  ],
   rejectInvalid,
   trainingsController.updateExternal
 );
@@ -188,7 +196,32 @@ router.delete(
 router.post(
   '/external/:id/register',
   optionalAuthenticateToken,
-  [...idParam],
+  [...idParam,
+    body('participantData').custom((val) => {
+      // participantData must be an object or JSON string containing squadron_id (integer)
+      if (val == null) {
+        throw new Error('participantData is required');
+      }
+      let obj = val;
+      if (typeof val === 'string') {
+        try {
+          obj = JSON.parse(val);
+        } catch (e) {
+          throw new Error('participantData must be valid JSON');
+        }
+      }
+      if (typeof obj !== 'object' || obj === null) {
+        throw new Error('participantData must be an object');
+      }
+      const sid = obj.squadron_id ?? obj.squadronId ?? obj.squadron;
+      if (sid == null) {
+        throw new Error('participantData.squadron_id is required');
+      }
+      if (!Number.isInteger(Number(sid)) || Number(sid) < 1) {
+        throw new Error('participantData.squadron_id must be a positive integer');
+      }
+      return true;
+    })],
   rejectInvalid,
   trainingsController.registerExternal
 );

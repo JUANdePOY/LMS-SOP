@@ -458,6 +458,7 @@ async function createExternalTraining(body) {
     venue: body.venue ?? null,
     status,
     capacity: body.capacity != null ? Number(body.capacity) : null,
+    squadron_limits: body.squadron_limits ?? null,
     registration_fields: body.registration_fields ?? null,
   });
   return getExternalTrainingById(newId);
@@ -477,6 +478,7 @@ async function updateExternalTraining(id, body) {
   if (body.start_time !== undefined) patch.start_time = body.start_time;
   if (body.venue !== undefined) patch.venue = body.venue;
   if (body.capacity !== undefined) patch.capacity = body.capacity != null ? Number(body.capacity) : null;
+  if (body.squadron_limits !== undefined) patch.squadron_limits = body.squadron_limits;
   if (body.registration_fields !== undefined) patch.registration_fields = body.registration_fields;
   if (body.status !== undefined) {
     if (!externalModel.isValidExternalStatus(body.status)) {
@@ -497,28 +499,117 @@ async function deleteExternalTraining(id) {
 }
 
 async function registerExternalParticipant(trainingId, participantData) {
-  const t = await externalModel.findExternalById(trainingId);
-  if (!t) {
-    const err = new Error('Training not found');
-    err.statusCode = 404;
+  const conn = await trainingModel.pool.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Lock the external training row to prevent race conditions while counting/inserting
+    const [trows] = await conn.query(
+      'SELECT id, status, capacity, squadron_limits FROM external_trainings WHERE id = ? FOR UPDATE',
+      [trainingId]
+    );
+    const trow = trows && trows[0];
+    if (!trow) {
+      const err = new Error('Training not found');
+      err.statusCode = 404;
+      throw err;
+    }
+    if (trow.status !== 'open') {
+      const err = new Error('Registration is not open for this training');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    let sqLimits = null;
+    if (trow.squadron_limits != null) {
+      try {
+        sqLimits = typeof trow.squadron_limits === 'string' ? JSON.parse(trow.squadron_limits) : trow.squadron_limits;
+      } catch (_) {
+        sqLimits = trow.squadron_limits;
+      }
+    }
+
+    async function countRegistrationsConn(trainingId, squadronId = null) {
+      if (squadronId == null) {
+        const [rows] = await conn.query('SELECT COUNT(*) AS c FROM training_registrations WHERE training_id = ?', [trainingId]);
+        return rows[0]?.c ?? 0;
+      }
+      const [rows] = await conn.query(
+        'SELECT COUNT(*) AS c FROM training_registrations WHERE training_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(participant_data, "$.squadron_id")) = ?',
+        [trainingId, String(squadronId)]
+      );
+      return rows[0]?.c ?? 0;
+    }
+
+    // Parse participant data
+    let pdObj = null;
+    if (participantData != null && typeof participantData !== 'string') pdObj = participantData;
+    else if (participantData != null && typeof participantData === 'string') {
+      try { pdObj = JSON.parse(participantData); } catch (_) { pdObj = null; }
+    }
+
+    if (Array.isArray(sqLimits) && sqLimits.length > 0) {
+      const hasUnlimitedSquadron = sqLimits.some((s) => s && (s.slot_limit == null || s.slotLimit == null));
+      const totalLimitedSlots = sqLimits.reduce((sum, s) => {
+        const v = s && (s.slot_limit ?? s.slotLimit ?? null);
+        return sum + (v == null ? 0 : Number(v));
+      }, 0);
+
+      if (pdObj && (pdObj.squadron_id != null || pdObj.squadronId != null)) {
+        const sid = pdObj.squadron_id ?? pdObj.squadronId;
+        const current = await countRegistrationsConn(trainingId, sid);
+        const limitEntry = sqLimits.find((s) => Number(s.squadron_id ?? s.squadronId) === Number(sid));
+        const limit = limitEntry ? (limitEntry.slot_limit ?? limitEntry.slotLimit ?? null) : null;
+        if (limit != null && current >= Number(limit)) {
+          const err = new Error('Selected squadron is full');
+          err.statusCode = 400;
+          throw err;
+        }
+        if (limit == null && !hasUnlimitedSquadron && totalLimitedSlots > 0) {
+          const totalCurrent = await countRegistrationsConn(trainingId, null);
+          if (totalCurrent >= totalLimitedSlots) {
+            const err = new Error('No slots available');
+            err.statusCode = 400;
+            throw err;
+          }
+        }
+      } else {
+        if (!hasUnlimitedSquadron && totalLimitedSlots > 0) {
+          const totalCurrent = await countRegistrationsConn(trainingId, null);
+          if (totalCurrent >= totalLimitedSlots) {
+            const err = new Error('No slots available');
+            err.statusCode = 400;
+            throw err;
+          }
+        }
+      }
+    } else if (trow.capacity != null) {
+      const totalCurrent = await countRegistrationsConn(trainingId, null);
+      if (totalCurrent >= Number(trow.capacity)) {
+        const err = new Error('Training is full');
+        err.statusCode = 400;
+        throw err;
+      }
+    }
+
+    const pd =
+      participantData == null
+        ? null
+        : typeof participantData === 'string'
+          ? participantData
+          : JSON.stringify(participantData);
+    const [result] = await conn.query(
+      'INSERT INTO training_registrations (training_id, participant_data) VALUES (?, ?)',
+      [trainingId, pd]
+    );
+    await conn.commit();
+    return { id: result.insertId };
+  } catch (err) {
+    try { await conn.rollback(); } catch (_) {}
     throw err;
+  } finally {
+    try { conn.release(); } catch (_) {}
   }
-  if (t.status !== 'open') {
-    const err = new Error('Registration is not open for this training');
-    err.statusCode = 400;
-    throw err;
-  }
-  const pd =
-    participantData == null
-      ? null
-      : typeof participantData === 'string'
-        ? participantData
-        : JSON.stringify(participantData);
-  const [result] = await trainingModel.pool.query(
-    'INSERT INTO training_registrations (training_id, participant_data) VALUES (?, ?)',
-    [trainingId, pd]
-  );
-  return { id: result.insertId };
 }
 
 async function listExternalRegistrations(trainingId) {
