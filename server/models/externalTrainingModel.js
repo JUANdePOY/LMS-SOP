@@ -22,7 +22,7 @@ async function findExternalMany({ page, limit, search, status }) {
   const offset = (page - 1) * limit;
   let sql = `
     SELECT id, title, description, start_date, start_time, venue, status, capacity,
-           registration_fields, created_at, updated_at
+           registration_fields, squadron_limits, created_at, updated_at
     FROM external_trainings
     WHERE 1 = 1
   `;
@@ -41,6 +41,10 @@ async function findExternalMany({ page, limit, search, status }) {
   const [rows] = await pool.query(sql, params);
   return rows.map((r) => ({
     ...r,
+    squadron_limits:
+      typeof r.squadron_limits === 'string'
+        ? safeJsonParse(r.squadron_limits)
+        : r.squadron_limits,
     registration_fields:
       typeof r.registration_fields === 'string'
         ? safeJsonParse(r.registration_fields)
@@ -59,7 +63,7 @@ function safeJsonParse(s) {
 async function findExternalById(id) {
   const [rows] = await pool.query(
     `SELECT id, title, description, start_date, start_time, venue, status, capacity,
-            registration_fields, created_at, updated_at
+            registration_fields, squadron_limits, created_at, updated_at
      FROM external_trainings WHERE id = ?`,
     [id]
   );
@@ -67,6 +71,10 @@ async function findExternalById(id) {
   const r = rows[0];
   return {
     ...r,
+    squadron_limits:
+      typeof r.squadron_limits === 'string'
+        ? safeJsonParse(r.squadron_limits)
+        : r.squadron_limits,
     registration_fields:
       typeof r.registration_fields === 'string'
         ? safeJsonParse(r.registration_fields)
@@ -75,6 +83,7 @@ async function findExternalById(id) {
 }
 
 async function insertExternal(row) {
+  const executor = row.executor || pool;
   const rf =
     row.registration_fields == null
       ? null
@@ -82,10 +91,10 @@ async function insertExternal(row) {
         ? row.registration_fields
         : JSON.stringify(row.registration_fields);
 
-  const [result] = await pool.query(
+  const [result] = await executor.query(
     `INSERT INTO external_trainings (
-      title, description, start_date, start_time, venue, status, capacity, registration_fields
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      title, description, start_date, start_time, venue, status, capacity, squadron_limits, registration_fields
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.title,
       row.description ?? null,
@@ -94,6 +103,7 @@ async function insertExternal(row) {
       row.venue ?? null,
       row.status,
       row.capacity ?? null,
+      row.squadron_limits == null ? null : typeof row.squadron_limits === 'string' ? row.squadron_limits : JSON.stringify(row.squadron_limits),
       rf,
     ]
   );
@@ -118,6 +128,11 @@ async function updateExternal(id, patch) {
       params.push(v ?? null);
     }
   }
+  if (Object.prototype.hasOwnProperty.call(patch, 'squadron_limits')) {
+    fields.push('squadron_limits = ?');
+    const sl = patch.squadron_limits;
+    params.push(sl == null ? null : typeof sl === 'string' ? sl : JSON.stringify(sl));
+  }
   if (Object.prototype.hasOwnProperty.call(patch, 'registration_fields')) {
     fields.push('registration_fields = ?');
     const rf = patch.registration_fields;
@@ -125,7 +140,8 @@ async function updateExternal(id, patch) {
   }
   if (!fields.length) return 0;
   params.push(id);
-  const [result] = await pool.query(
+  const executor = patch.executor || pool;
+  const [result] = await executor.query(
     `UPDATE external_trainings SET ${fields.join(', ')} WHERE id = ?`,
     params
   );

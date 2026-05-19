@@ -13,6 +13,7 @@ import {
 import { useToast } from '@/components/ui/Toast';
 import RegistrationBuilder from './RegistrationBuilder';
 import SquadronParticipantBlocks from './SquadronParticipantBlocks';
+import SquadronSlotLimits from './SquadronSlotLimits';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -402,10 +403,15 @@ function ExternalFields({ form, onChange, errors, trainingId, existingAttachment
             {EXTERNAL_STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </FormGroup>
-        <FormGroup label="Capacity" hint="Optional">
-          <input type="number" value={form.capacity} onChange={e => onChange('capacity', e.target.value)}
-            className={inputCls} placeholder="Max participants" min={1} />
-        </FormGroup>
+        <div />
+      </div>
+
+      <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">
+        <SquadronSlotLimits
+          blocks={form.squadronSlotLimits || []}
+          onChange={(blocks) => onChange('squadronSlotLimits', blocks)}
+          error={errors.squadronSlotLimits}
+        />
       </div>
 
       <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">
@@ -432,6 +438,7 @@ const defaultInternal = {
 const defaultExternal = {
   title: '', description: '', startDate: '', startTime: '',
   venue: '', status: 'draft', capacity: '',
+  squadronSlotLimits: [],
   letterOrderFile: null,
 };
 
@@ -486,6 +493,12 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
       venue:       str(training.venue || training.location),
       status:      training.status || 'draft',
       capacity:    str(training.capacity ?? training.max_participants ?? ''),
+      squadronSlotLimits: Array.isArray(training.squadron_limits) ? training.squadron_limits.map((limit) => ({
+        localId: `s-${limit.squadron_id}-${Math.random().toString(36).slice(2)}`,
+        squadronId: limit.squadron_id,
+        squadronName: limit.squadron_name || '',
+        slotLimit: limit.slot_limit ?? '',
+      })) : [],
       letterOrderFile: null,
     } : {}),
   });
@@ -550,7 +563,14 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
           // BUG FIX: str() guard so null venue doesn't crash .trim()
           venue:       str(externalForm.venue).trim() || null,
           status:      externalForm.status,
-          capacity:    externalForm.capacity ? Number(externalForm.capacity) : null,
+          squadron_limits: (externalForm.squadronSlotLimits || [])
+            .filter((block) => block.squadronId && block.slotLimit)
+            .map((block) => ({
+              squadron_id: Number(block.squadronId),
+              squadron_name: block.squadronName,
+              slot_limit: Number(block.slotLimit),
+            })),
+          capacity:    null,
           registration_fields: registrationFields,
         };
       }

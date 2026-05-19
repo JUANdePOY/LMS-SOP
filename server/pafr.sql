@@ -190,6 +190,7 @@ CREATE TABLE IF NOT EXISTS `external_trainings` (
   `venue` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `status` enum('draft','open','closed','completed') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'draft',
   `capacity` int UNSIGNED DEFAULT NULL,
+  `squadron_limits` json DEFAULT NULL COMMENT 'Per-squadron slot limits (array of {squadron_id, slot_limit})',
   `registration_fields` json DEFAULT NULL COMMENT 'Dynamic form field schema (array of field configs)',
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

@@ -1,4 +1,5 @@
 import React from 'react';
+import { computeTotalSlots } from '@/lib/slotUtils';
 
 const TrainingStats = ({ trainings = [] }) => {
   // Calculate statistics
@@ -16,7 +17,8 @@ const TrainingStats = ({ trainings = [] }) => {
   
   // Calculate average participation rate
   const totalMaxCapacity = trainings.reduce((sum, training) => {
-    return sum + (training.maxParticipants || training.capacity || 0);
+    const slots = computeTotalSlots(training);
+    return sum + (slots || 0);
   }, 0);
   
   const avgParticipationRate = totalMaxCapacity > 0 
