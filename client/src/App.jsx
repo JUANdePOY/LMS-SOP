@@ -13,6 +13,7 @@ const Attendance = lazy(() => import("@/pages/Attendance"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const Logistics = lazy(() => import("@/pages/Logistics"));
 const Reports = lazy(() => import("@/pages/Reports"));
+const Landing = lazy(() => import("@/pages/Landing"));
 
 // Simple fallback while lazy chunks load
 function PageLoader() {
@@ -24,6 +25,14 @@ function PageLoader() {
 }
 
 const router = createBrowserRouter([
+  {
+    path: "/landing",
+    element: (
+      <Suspense fallback={<PageLoader />}>
+        <Landing />
+      </Suspense>
+    ),
+  },
   {
     path: "/",
     element: <AppLayout />,
