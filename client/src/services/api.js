@@ -93,6 +93,14 @@ export const getLowStockSupplies = () => api.get('/supplies/low-stock');
 export const getSupplyCategories = () => api.get('/supplies/categories');
 export const adjustSupplyStock = (data) => api.post('/supplies/adjust-stock', data);
 
+// Issuances
+export const getIssuances = (params = {}) => api.get('/issuances', { params });
+export const getIssuance = (id) => api.get(`/issuances/${id}`);
+export const getOverdueIssuances = () => api.get('/issuances/overdue');
+export const getReservistIssuances = (id) => api.get(`/issuances/reservist/${id}`);
+export const createIssuance = (data) => api.post('/issuances', data);
+export const returnIssuance = (id, data) => api.put(`/issuances/${id}`, data);
+
 // Areas
 export const getAreas = (params = {}) => api.get('/areas', { params });
 export const getArea = (id) => api.get(`/areas/${id}`);
@@ -123,5 +131,18 @@ export const deleteSquadron = (id) => api.delete(`/squadron/${id}`);
 
 // Filter metadata
 export const getReservistFilterMetadata = () => api.get('/reservists/filters/metadata');
+
+// Settings
+export const getSettings = () => api.get('/settings');
+export const getSetting = (key) => api.get(`/settings/${key}`);
+export const updateSetting = (key, data) => api.put(`/settings/${key}`, data);
+export const createSetting = (data) => api.post('/settings', data);
+
+// Role Management (Settings)
+export const getRoles = () => api.get('/settings/roles');
+export const getSettingsUsers = () => api.get('/settings/users');
+export const updateUserRole = (id, data) => api.put(`/settings/users/${id}/role`, data);
+export const getUserRoleHistory = (id) => api.get(`/settings/users/${id}/role-history`);
+export const getRoleOptions = () => api.get('/settings/role-options');
 
 export default api;

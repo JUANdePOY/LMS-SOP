@@ -65,6 +65,8 @@ export function AuthProvider({ children }) {
 
   const isAuthenticated = !!user;
   const isAdmin = user?.role === 'admin';
+  const isAnyAdmin = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'].includes(user?.role);
+  const isUnitAdmin = ['admin_arsen', 'admin_group', 'admin_squadron'].includes(user?.role);
 
   return (
     <AuthContext.Provider value={{
@@ -75,6 +77,8 @@ export function AuthProvider({ children }) {
       logout,
       isAuthenticated,
       isAdmin,
+      isAnyAdmin,
+      isUnitAdmin,
       setError,
     }}>
       {children}

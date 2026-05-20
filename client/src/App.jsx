@@ -14,6 +14,7 @@ const Attendance        = lazy(() => import("@/pages/Attendance"));
 const Analytics         = lazy(() => import("@/pages/Analytics"));
 const Logistics         = lazy(() => import("@/pages/Logistics"));
 const Reports           = lazy(() => import("@/pages/Reports"));
+const Settings          = lazy(() => import("@/pages/Settings"));
 const Login             = lazy(() => import("@/pages/Login"));
 
 // Airbase pages
@@ -69,7 +70,8 @@ const router = createBrowserRouter([
       { path: "attendance",    element: ProtectedWrapper(Attendance)      },
       { path: "analytics",     element: ProtectedWrapper(Analytics)       },
       { path: "logistics",     element: ProtectedWrapper(Logistics)       },
-      { path: "reports",       element: ProtectedWrapper(Reports)         },
+      { path: "reports",     element: ProtectedWrapper(Reports)         },
+      { path: "settings",    element: <ProtectedRoute allowedRoles={['admin']}><Settings /></ProtectedRoute> },
       { path: "airbase",      element: ProtectedWrapper(AirbaseOverview) },
       { path: "airbase/arcens",   element: ProtectedWrapper(ManageArcens) },
       { path: "airbase/groups",   element: ProtectedWrapper(ManageGroups) },

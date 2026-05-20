@@ -37,13 +37,14 @@ router.post('/login', [
         const { id_number, password } = req.body;
 
         // Find user by ID Number (service_number in reservists table)
-        const [results] = await db.query(
-            `SELECT u.id, u.password_hash, u.role, u.is_active, r.service_number as id_number 
-             FROM users u
-             JOIN reservists r ON u.id = r.user_id
-             WHERE r.service_number = ?`,
-            [id_number]
-        );
+         const [results] = await db.query(
+             `SELECT u.id, u.password_hash, u.role, u.is_active, u.scope_arsen_id, u.scope_group_id, u.scope_squadron_id,
+                     r.service_number as id_number 
+              FROM users u
+              JOIN reservists r ON u.id = r.user_id
+              WHERE r.service_number = ?`,
+             [id_number]
+         );
 
         // Check if user exists
         if (!results || results.length === 0) {
@@ -106,7 +107,10 @@ router.post('/login', [
                     user: {
                         id: user.id,
                         id_number: user.id_number,
-                        role: user.role
+                        role: user.role,
+                        scope_arsen_id: user.scope_arsen_id || null,
+                        scope_group_id: user.scope_group_id || null,
+                        scope_squadron_id: user.scope_squadron_id || null,
                     }
                 }
             });
@@ -169,8 +173,8 @@ router.post('/register', authenticateToken, [
         .isLength({ min: 8 })
         .withMessage('Password must be at least 8 characters'),
     body('role')
-        .isIn(['admin', 'reservist'])
-        .withMessage('Role must be either admin or reservist')
+        .isIn(['admin', 'admin_arsen', 'admin_group', 'admin_squadron', 'reservist'])
+        .withMessage('Role must be admin, admin_arsen, admin_group, admin_squadron, or reservist')
 ], async (req, res) => {
     try {
         // Check for validation errors
@@ -259,13 +263,14 @@ router.post('/register', authenticateToken, [
  */
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
-        const [results] = await db.query(
-            `SELECT u.id, u.role, r.service_number as id_number 
-             FROM users u
-             JOIN reservists r ON u.id = r.user_id
-             WHERE u.id = ?`,
-            [req.user.userId]
-        );
+         const [results] = await db.query(
+             `SELECT u.id, u.role, u.scope_arsen_id, u.scope_group_id, u.scope_squadron_id,
+                     r.service_number as id_number 
+              FROM users u
+              JOIN reservists r ON u.id = r.user_id
+              WHERE u.id = ?`,
+             [req.user.userId]
+         );
 
         if (!results || results.length === 0) {
             return res.status(404).json({
@@ -275,15 +280,18 @@ router.get('/profile', authenticateToken, async (req, res) => {
             });
         }
 
-        const user = results[0];
-        res.status(200).json({
-            status: 'success',
-            data: {
-                userId: user.id,
-                id_number: user.id_number,
-                role: user.role
-            }
-        });
+         const user = results[0];
+         res.status(200).json({
+             status: 'success',
+             data: {
+                 userId: user.id,
+                 id_number: user.id_number,
+                 role: user.role,
+                 scope_arsen_id: user.scope_arsen_id || null,
+                 scope_group_id: user.scope_group_id || null,
+                 scope_squadron_id: user.scope_squadron_id || null,
+             }
+         });
     } catch (error) {
         console.error('Profile error:', error);
         res.status(500).json({

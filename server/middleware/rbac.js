@@ -1,7 +1,15 @@
 /**
  * RBAC (Role-Based Access Control) Middleware
  * Provides role-based authorization checks for routes
+ * Supports granular admin roles: admin, admin_arsen, admin_group, admin_squadron
  */
+
+const ADMIN_ROLES = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'];
+
+/**
+ * Check if a role is any admin variant
+ */
+const isAdmin = (role) => ADMIN_ROLES.includes(role);
 
 /**
  * Authorize middleware - checks if user has required role(s)
@@ -18,7 +26,6 @@ const authorize = (...roles) => {
       });
     }
 
-    // Check if user has one of the required roles
     if (!roles.includes(req.user.role)) {
       return res.status(403).json({
         status: 'error',
@@ -32,11 +39,31 @@ const authorize = (...roles) => {
 };
 
 /**
- * Authorize admin only
- * Shorthand for authorize('admin')
+ * Authorize any admin role
  */
 const requireAdmin = (req, res, next) => {
-  return authorize('admin')(req, res, next);
+  if (!isAdmin(req.user?.role)) {
+    return res.status(403).json({
+      status: 'error',
+      message: 'Admin access required',
+      code: 'ADMIN_REQUIRED'
+    });
+  }
+  next();
+};
+
+/**
+ * Authorize super admin only (full system access)
+ */
+const requireSuperAdmin = (req, res, next) => {
+  if (req.user?.role !== 'admin') {
+    return res.status(403).json({
+      status: 'error',
+      message: 'System administrator access required',
+      code: 'SUPER_ADMIN_REQUIRED'
+    });
+  }
+  next();
 };
 
 /**
@@ -55,9 +82,8 @@ const checkOwnership = (userIdField = 'user_id') => {
     }
 
     const resourceUserId = req.params[userIdField] || req.body[userIdField];
-    
-    // Admin can access all, others only their own
-    if (req.user.role !== 'admin' && resourceUserId !== String(req.user.id)) {
+
+    if (!isAdmin(req.user.role) && resourceUserId !== String(req.user.id)) {
       return res.status(403).json({
         status: 'error',
         message: 'Access denied - You can only access your own resources',
@@ -72,5 +98,8 @@ const checkOwnership = (userIdField = 'user_id') => {
 module.exports = {
   authorize,
   requireAdmin,
-  checkOwnership
+  requireSuperAdmin,
+  checkOwnership,
+  isAdmin,
+  ADMIN_ROLES,
 };

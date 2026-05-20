@@ -1,0 +1,733 @@
+import { useState, useEffect, useCallback } from "react";
+import {
+  Settings as SettingsIcon, Users, Shield, Plus, Pencil, Save, X,
+  ChevronDown, ChevronRight, History, Building2, UsersRound, Plane,
+  ToggleLeft, ToggleRight, AlertCircle, CheckCircle, Info, Search,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/components/Toast";
+import {
+  getSettings, updateSetting, createSetting,
+  getRoles, getSettingsUsers, updateUserRole, getUserRoleHistory, getRoleOptions,
+} from "@/services/api";
+
+const ROLE_META = {
+  admin:           { label: "System Admin",     icon: Shield,        color: "text-red-600 dark:text-red-400",     bg: "bg-red-50 dark:bg-red-500/10",     border: "border-red-200 dark:border-red-500/30",     desc: "Full system access" },
+  admin_arsen:     { label: "ARCEN Admin",      icon: Building2,     color: "text-orange-600 dark:text-orange-400", bg: "bg-orange-50 dark:bg-orange-500/10", border: "border-orange-200 dark:border-orange-500/30", desc: "Manages a specific ARCEN" },
+  admin_group:     { label: "Group Admin",      icon: UsersRound,    color: "text-blue-600 dark:text-blue-400",   bg: "bg-blue-50 dark:bg-blue-500/10",   border: "border-blue-200 dark:border-blue-500/30",   desc: "Manages a specific group" },
+  admin_squadron:  { label: "Squadron Admin",   icon: Plane,         color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-500/10", border: "border-emerald-200 dark:border-emerald-500/30", desc: "Manages a specific squadron" },
+  reservist:       { label: "Reservist",        icon: Users,         color: "text-neutral-600 dark:text-neutral-400", bg: "bg-neutral-50 dark:bg-neutral-800", border: "border-neutral-200 dark:border-neutral-700", desc: "Standard reservist access" },
+};
+
+const TABS = [
+  { key: "roles",    label: "Role Management", icon: Shield },
+  { key: "general",  label: "General Settings", icon: SettingsIcon },
+];
+
+export default function Settings() {
+  const toast = useToast();
+  const [activeTab, setActiveTab] = useState("roles");
+
+  return (
+    <div className="flex flex-col gap-6 pb-10">
+      {/* Header */}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-indigo-900/40">
+            <SettingsIcon size={16} strokeWidth={2} />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 leading-none">
+              System Settings
+            </h1>
+            <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-500">
+              Manage roles, permissions, and system configuration
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100/60 dark:bg-neutral-900/60 p-1">
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={cn(
+                "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150 flex-1 justify-center",
+                activeTab === tab.key
+                  ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-50 shadow-sm"
+                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300"
+              )}
+            >
+              <Icon size={14} />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab content */}
+      {activeTab === "roles" && <RoleManagement toast={toast} />}
+      {activeTab === "general" && <GeneralSettings toast={toast} />}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+// ROLE MANAGEMENT TAB
+// ════════════════════════════════════════════════════════════════════
+function RoleManagement({ toast }) {
+  const [users, setUsers] = useState([]);
+  const [roleOptions, setRoleOptions] = useState({ arsens: [], groups: [], squadrons: [] });
+  const [loading, setLoading] = useState(true);
+  const [editUser, setEditUser] = useState(null);
+  const [formRole, setFormRole] = useState("");
+  const [formScope, setFormScope] = useState({ arsen_id: null, group_id: null, squadron_id: null });
+  const [saving, setSaving] = useState(false);
+  const [historyUser, setHistoryUser] = useState(null);
+  const [historyData, setHistoryData] = useState([]);
+  const [showAddUser, setShowAddUser] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [usersRes, optionsRes] = await Promise.all([
+        getSettingsUsers(),
+        getRoleOptions(),
+      ]);
+      if (usersRes.data.status === 'success') setUsers(usersRes.data.data);
+      if (optionsRes.data.status === 'success') setRoleOptions(optionsRes.data.data);
+    } catch (err) {
+      toast.error("Failed to load role data");
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const openEdit = (user) => {
+    setEditUser(user);
+    setFormRole(user.role);
+    setFormScope({
+      arsen_id: user.scope_arsen_id || null,
+      group_id: user.scope_group_id || null,
+      squadron_id: user.scope_squadron_id || null,
+    });
+  };
+
+  const closeEdit = () => {
+    setEditUser(null);
+    setFormRole("");
+    setFormScope({ arsen_id: null, group_id: null, squadron_id: null });
+  };
+
+  const handleSaveRole = async () => {
+    if (!editUser) return;
+    setSaving(true);
+    try {
+      const payload = { role: formRole };
+      if (formRole === 'admin_arsen') payload.scope_arsen_id = formScope.arsen_id;
+      if (formRole === 'admin_group') payload.scope_group_id = formScope.group_id;
+      if (formRole === 'admin_squadron') payload.scope_squadron_id = formScope.squadron_id;
+
+      const res = await updateUserRole(editUser.id, payload);
+      if (res.data.status === 'success') {
+        toast.success(`Role updated for ${editUser.first_name} ${editUser.last_name}`);
+        closeEdit();
+        fetchData();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update role");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openHistory = async (user) => {
+    setHistoryUser(user);
+    try {
+      const res = await getUserRoleHistory(user.id);
+      if (res.data.status === 'success') setHistoryData(res.data.data);
+    } catch {
+      toast.error("Failed to load role history");
+    }
+  };
+
+  const getScopeLabel = (user) => {
+    if (user.role === 'admin_arsen' && user.arsen_name) return user.arsen_name;
+    if (user.role === 'admin_group' && user.group_name) return user.group_name;
+    if (user.role === 'admin_squadron' && user.squadron_name) return user.squadron_name;
+    return null;
+  };
+
+  const [searchQueries, setSearchQueries] = useState({});
+
+  const getSearch = (roleKey) => searchQueries[roleKey] || "";
+
+  const setSearchFor = (roleKey, value) => {
+    setSearchQueries(prev => ({ ...prev, [roleKey]: value }));
+  };
+
+  const filterBySearch = (userList, roleKey) => {
+    const query = (searchQueries[roleKey] || "").trim().toLowerCase();
+    if (!query) return userList;
+    return userList.filter((u) =>
+      (u.first_name || "").toLowerCase().includes(query) ||
+      (u.last_name || "").toLowerCase().includes(query) ||
+      (u.service_number || "").toLowerCase().includes(query) ||
+      (u.email || "").toLowerCase().includes(query)
+    );
+  };
+
+  const groupedUsers = {
+    admin: users.filter(u => u.role === 'admin'),
+    admin_arsen: users.filter(u => u.role === 'admin_arsen'),
+    admin_group: users.filter(u => u.role === 'admin_group'),
+    admin_squadron: users.filter(u => u.role === 'admin_squadron'),
+    reservist: users.filter(u => u.role === 'reservist'),
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {Object.entries(ROLE_META).map(([key, meta]) => (
+          <div key={key} className={cn("flex flex-col rounded-xl border px-4 py-3", meta.border, meta.bg)}>
+            <span className={cn("text-2xl font-bold leading-none", meta.color)}>
+              {groupedUsers[key]?.length || 0}
+            </span>
+            <span className="mt-1 text-[10px] font-medium text-neutral-500 dark:text-neutral-400">
+              {meta.label}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Role sections */}
+      {Object.entries(ROLE_META).map(([roleKey, meta]) => {
+        const allRoleUsers = groupedUsers[roleKey] || [];
+        if (allRoleUsers.length === 0) return null;
+        const roleUsers = filterBySearch(allRoleUsers, roleKey);
+        const Icon = meta.icon;
+
+        return (
+          <div key={roleKey} className="flex flex-col gap-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <div className={cn("flex h-7 w-7 items-center justify-center rounded-lg", meta.bg)}>
+                  <Icon size={14} className={meta.color} />
+                </div>
+                <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">{meta.label}s</h2>
+                <span className="text-[10px] text-neutral-400">
+                  {roleUsers.length !== allRoleUsers.length
+                    ? `${roleUsers.length} of ${allRoleUsers.length}`
+                    : `${allRoleUsers.length} user${allRoleUsers.length !== 1 ? 's' : ''}`}
+                </span>
+              </div>
+              <div className="relative w-full max-w-[220px]">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="text"
+                  value={getSearch(roleKey)}
+                  onChange={(e) => setSearchFor(roleKey, e.target.value)}
+                  placeholder="Search…"
+                  className={cn(
+                    "w-full rounded-lg border pl-8 pr-3 py-1.5 text-xs",
+                    "border-neutral-200 dark:border-neutral-700",
+                    "bg-white dark:bg-neutral-800",
+                    "text-neutral-800 dark:text-neutral-200",
+                    "placeholder:text-neutral-400 dark:placeholder:text-neutral-600",
+                    "outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400",
+                    "transition-all duration-150"
+                  )}
+                />
+              </div>
+            </div>
+
+            {roleUsers.length === 0 ? (
+              <div className="flex items-center justify-center rounded-xl border border-neutral-200 dark:border-neutral-800 py-10 text-neutral-400">
+                <span className="text-xs">No users match your search</span>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+                <table className="w-full">
+                <thead>
+                  <tr className="border-b border-neutral-100 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50">
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-400">User</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-400">ID Number</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Email</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Scope</th>
+                    <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Status</th>
+                    <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {roleUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <span className="text-[13px] font-medium text-neutral-800 dark:text-neutral-200">
+                            {user.first_name} {user.last_name}
+                          </span>
+                          {user.rank && <span className="text-[10px] text-neutral-400">{user.rank}</span>}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-neutral-500 font-mono">{user.service_number}</td>
+                      <td className="px-4 py-3 text-xs text-neutral-500">{user.email}</td>
+                      <td className="px-4 py-3 text-xs text-neutral-500">
+                        {getScopeLabel(user) || <span className="text-neutral-300 dark:text-neutral-600">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn(
+                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                          user.is_active
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                            : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                        )}>
+                          {user.is_active ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => openHistory(user)}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                            title="Role history"
+                          >
+                            <History size={13} />
+                          </button>
+                          <button
+                            onClick={() => openEdit(user)}
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                            title="Change role"
+                          >
+                            <Pencil size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
+
+      {/* ── Edit Role Modal ──────────────────────────────────── */}
+      {editUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={closeEdit} />
+          <div className={cn(
+            "relative z-10 w-full max-w-lg rounded-2xl shadow-2xl",
+            "bg-white dark:bg-neutral-900",
+            "border border-neutral-200 dark:border-neutral-800"
+          )}>
+            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
+              <div>
+                <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-50">Change Role</h2>
+                <p className="text-[11px] text-neutral-500 mt-0.5">
+                  {editUser.first_name} {editUser.last_name} ({editUser.service_number})
+                </p>
+              </div>
+              <button onClick={closeEdit} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="px-6 py-4 flex flex-col gap-4 max-h-[60vh] overflow-y-auto">
+              {/* Current role */}
+              <div className="flex items-center gap-2 rounded-lg bg-neutral-50 dark:bg-neutral-800/50 px-3 py-2">
+                <span className="text-[11px] text-neutral-500">Current:</span>
+                <span className={cn("text-[11px] font-semibold", ROLE_META[editUser.role]?.color)}>
+                  {ROLE_META[editUser.role]?.label || editUser.role}
+                </span>
+              </div>
+
+              {/* Role selection */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">New Role</label>
+                <div className="flex flex-col gap-1.5">
+                  {Object.entries(ROLE_META).map(([key, meta]) => {
+                    const RoleIcon = meta.icon;
+                    const selected = formRole === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setFormRole(key)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all duration-150",
+                          selected
+                            ? cn(meta.border, meta.bg, "ring-1 ring-indigo-500/30")
+                            : "border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600"
+                        )}
+                      >
+                        <RoleIcon size={16} className={selected ? meta.color : "text-neutral-400"} />
+                        <div className="flex flex-col flex-1">
+                          <span className={cn("text-xs font-semibold", selected ? meta.color : "text-neutral-700 dark:text-neutral-300")}>
+                            {meta.label}
+                          </span>
+                          <span className="text-[10px] text-neutral-400">{meta.desc}</span>
+                        </div>
+                        {selected && <CheckCircle size={14} className="text-indigo-500" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Scope selection */}
+              {formRole === 'admin_arsen' && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">ARCEN Scope <span className="text-red-500">*</span></label>
+                  <select
+                    value={formScope.arsen_id || ""}
+                    onChange={(e) => setFormScope(s => ({ ...s, arsen_id: e.target.value ? parseInt(e.target.value) : null }))}
+                    className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  >
+                    <option value="">Select ARCEN...</option>
+                    {roleOptions.arsens.map(a => (
+                      <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {formRole === 'admin_group' && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Group Scope <span className="text-red-500">*</span></label>
+                  <select
+                    value={formScope.group_id || ""}
+                    onChange={(e) => setFormScope(s => ({ ...s, group_id: e.target.value ? parseInt(e.target.value) : null }))}
+                    className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  >
+                    <option value="">Select Group...</option>
+                    {roleOptions.groups.map(g => (
+                      <option key={g.id} value={g.id}>{g.name} ({g.arsen_name})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {formRole === 'admin_squadron' && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Squadron Scope <span className="text-red-500">*</span></label>
+                  <select
+                    value={formScope.squadron_id || ""}
+                    onChange={(e) => setFormScope(s => ({ ...s, squadron_id: e.target.value ? parseInt(e.target.value) : null }))}
+                    className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  >
+                    <option value="">Select Squadron...</option>
+                    {roleOptions.squadrons.map(s => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.group_name})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+              <button
+                onClick={closeEdit}
+                className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveRole}
+                disabled={saving || formRole === editUser.role || (formRole === 'admin_arsen' && !formScope.arsen_id) || (formRole === 'admin_group' && !formScope.group_id) || (formRole === 'admin_squadron' && !formScope.squadron_id)}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150",
+                  "bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800",
+                  "disabled:opacity-40 disabled:cursor-not-allowed"
+                )}
+              >
+                {saving ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Save size={14} />
+                )}
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Role History Modal ───────────────────────────────── */}
+      {historyUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setHistoryUser(null)} />
+          <div className={cn(
+            "relative z-10 w-full max-w-lg rounded-2xl shadow-2xl",
+            "bg-white dark:bg-neutral-900",
+            "border border-neutral-200 dark:border-neutral-800"
+          )}>
+            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
+              <div>
+                <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-50">Role History</h2>
+                <p className="text-[11px] text-neutral-500 mt-0.5">
+                  {historyUser.first_name} {historyUser.last_name}
+                </p>
+              </div>
+              <button onClick={() => setHistoryUser(null)} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
+              {historyData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-neutral-400">
+                  <History size={24} className="mb-2" />
+                  <span className="text-xs">No role changes recorded</span>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {historyData.map((entry) => (
+                    <div key={entry.id} className="flex gap-3 rounded-lg border border-neutral-100 dark:border-neutral-800 p-3">
+                      <div className="flex flex-col flex-1 gap-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={cn("text-[11px] font-semibold", ROLE_META[entry.old_role]?.color)}>
+                            {ROLE_META[entry.old_role]?.label || entry.old_role || '(none)'}
+                          </span>
+                          <ChevronRight size={12} className="text-neutral-300 dark:text-neutral-600" />
+                          <span className={cn("text-[11px] font-semibold", ROLE_META[entry.new_role]?.color)}>
+                            {ROLE_META[entry.new_role]?.label || entry.new_role}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-neutral-400">
+                          {new Date(entry.changed_at).toLocaleString()}
+                          {entry.first_name && ` · by ${entry.first_name} ${entry.last_name}`}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+// GENERAL SETTINGS TAB
+// ════════════════════════════════════════════════════════════════════
+function GeneralSettings({ toast }) {
+  const [settings, setSettings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editingKey, setEditingKey] = useState(null);
+  const [editValue, setEditValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newKey, setNewKey] = useState("");
+  const [newValue, setNewValue] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+
+  const fetchSettings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await getSettings();
+      if (res.data.status === 'success') setSettings(res.data.data);
+    } catch {
+      toast.error("Failed to load settings");
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+
+  const startEdit = (setting) => {
+    setEditingKey(setting.key);
+    setEditValue(typeof setting.value === 'object' ? JSON.stringify(setting.value) : String(setting.value));
+  };
+
+  const cancelEdit = () => {
+    setEditingKey(null);
+    setEditValue("");
+  };
+
+  const saveEdit = async (key) => {
+    setSaving(true);
+    try {
+      let parsedValue;
+      try {
+        parsedValue = JSON.parse(editValue);
+      } catch {
+        parsedValue = editValue;
+      }
+      const res = await updateSetting(key, { value: parsedValue });
+      if (res.data.status === 'success') {
+        toast.success("Setting updated");
+        cancelEdit();
+        fetchSettings();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update setting");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAdd = async () => {
+    if (!newKey.trim()) return;
+    setSaving(true);
+    try {
+      let parsedValue;
+      try {
+        parsedValue = JSON.parse(newValue);
+      } catch {
+        parsedValue = newValue;
+      }
+      const res = await createSetting({ key: newKey.trim(), value: parsedValue, description: newDesc || null });
+      if (res.data.status === 'success') {
+        toast.success("Setting created");
+        setShowAdd(false);
+        setNewKey("");
+        setNewValue("");
+        setNewDesc("");
+        fetchSettings();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to create setting");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderValue = (value) => {
+    if (typeof value === 'object') return JSON.stringify(value);
+    if (typeof value === 'boolean') return value ? 'Enabled' : 'Disabled';
+    return String(value);
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-neutral-500">{settings.length} configuration settings</p>
+        <button
+          onClick={() => setShowAdd(true)}
+          className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+        >
+          <Plus size={13} /> Add Setting
+        </button>
+      </div>
+
+      <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-neutral-100 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50">
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Key</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Value</th>
+              <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Description</th>
+              <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+            {settings.map((s) => (
+              <tr key={s.key} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30 transition-colors">
+                <td className="px-4 py-3">
+                  <span className="text-xs font-mono font-medium text-neutral-800 dark:text-neutral-200">{s.key}</span>
+                </td>
+                <td className="px-4 py-3">
+                  {editingKey === s.key ? (
+                    <input
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-xs text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="text-xs text-neutral-600 dark:text-neutral-400">{renderValue(s.value)}</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-xs text-neutral-400 max-w-[200px] truncate">{s.description || '—'}</td>
+                <td className="px-4 py-3 text-right">
+                  {editingKey === s.key ? (
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={cancelEdit} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
+                        <X size={13} />
+                      </button>
+                      <button onClick={() => saveEdit(s.key)} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors">
+                        <Save size={13} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => startEdit(s)} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors">
+                      <Pencil size={13} />
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Add Setting Modal ────────────────────────────────── */}
+      {showAdd && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setShowAdd(false)} />
+          <div className={cn(
+            "relative z-10 w-full max-w-lg rounded-2xl shadow-2xl",
+            "bg-white dark:bg-neutral-900",
+            "border border-neutral-200 dark:border-neutral-800"
+          )}>
+            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
+              <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-50">Add New Setting</h2>
+              <button onClick={() => setShowAdd(false)} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
+                <X size={15} />
+              </button>
+            </div>
+            <div className="px-6 py-4 flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Key <span className="text-red-500">*</span></label>
+                <input type="text" value={newKey} onChange={(e) => setNewKey(e.target.value)} placeholder="e.g. app_name" className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Value <span className="text-red-500">*</span></label>
+                <input type="text" value={newValue} onChange={(e) => setNewValue(e.target.value)} placeholder="e.g. PAFR or true or 30" className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Description</label>
+                <input type="text" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Optional description" className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" />
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+              <button onClick={() => setShowAdd(false)} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">Cancel</button>
+              <button onClick={handleAdd} disabled={saving || !newKey.trim() || !newValue.trim()} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                {saving ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Plus size={14} />}
+                Add Setting
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

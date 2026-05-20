@@ -26,7 +26,7 @@ const authenticateToken = async (req, res, next) => {
     let users;
     try {
       [users] = await db.query(
-        'SELECT id, role, is_active FROM users WHERE id = ?',
+        'SELECT id, role, is_active, scope_arsen_id, scope_group_id, scope_squadron_id FROM users WHERE id = ?',
         [decoded.userId]
       );
     } catch (dbError) {
@@ -58,7 +58,10 @@ const authenticateToken = async (req, res, next) => {
     req.user = {
       id: user.id,
       role: user.role,
-      id_number: decoded.id_number
+      id_number: decoded.id_number,
+      scope_arsen_id: user.scope_arsen_id || null,
+      scope_group_id: user.scope_group_id || null,
+      scope_squadron_id: user.scope_squadron_id || null,
     };
 
     next();
@@ -112,10 +115,11 @@ const optionalAuthenticateToken = async (req, res, next) => {
 };
 
 /**
- * Middleware to check if user is admin
+ * Middleware to check if user is any type of admin
  */
 const requireAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
+  const adminRoles = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'];
+  if (!adminRoles.includes(req.user.role)) {
     return res.status(403).json({
       status: 'error',
       message: 'Admin access required',
@@ -126,10 +130,25 @@ const requireAdmin = (req, res, next) => {
 };
 
 /**
+ * Middleware to check if user is a super admin (full system access)
+ */
+const requireSuperAdmin = (req, res, next) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({
+      status: 'error',
+      message: 'System administrator access required',
+      code: 'SUPER_ADMIN_REQUIRED'
+    });
+  }
+  next();
+};
+
+/**
  * Middleware to check if user is admin or the resource owner
  */
 const requireAdminOrOwner = (req, res, next) => {
-  if (req.user.role !== 'admin' && req.user.id !== parseInt(req.params.id)) {
+  const adminRoles = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'];
+  if (!adminRoles.includes(req.user.role) && req.user.id !== parseInt(req.params.id)) {
     return res.status(403).json({
       status: 'error',
       message: 'Access denied',
@@ -139,10 +158,17 @@ const requireAdminOrOwner = (req, res, next) => {
   next();
 };
 
+/**
+ * Check if user role is any admin variant
+ */
+const isAdminRole = (role) => ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'].includes(role);
+
 module.exports = {
   authenticateToken,
   optionalAuthenticateToken,
   requireAdmin,
+  requireSuperAdmin,
   requireAdminOrOwner,
+  isAdminRole,
   JWT_SECRET
 };

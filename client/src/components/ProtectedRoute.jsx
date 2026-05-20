@@ -3,10 +3,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * ProtectedRoute
- * Requires authentication to access
+ * Requires authentication to access.
+ * Optionally accepts allowedRoles to restrict by role.
  */
-export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+export default function ProtectedRoute({ children, allowedRoles }) {
+  const { isAuthenticated, isAnyAdmin, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -18,6 +19,12 @@ export default function ProtectedRoute({ children }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles && allowedRoles.length > 0) {
+    if (!allowedRoles.includes(user?.role)) {
+      return <Navigate to="/" replace />;
+    }
   }
 
   return children;
