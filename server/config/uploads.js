@@ -12,9 +12,17 @@ function getMaxUploadBytes() {
 }
 
 /** Allowed MIME types for letter-order / training documents (local storage). */
-const ALLOWED_MIME = new Set(['application/pdf', 'image/jpeg', 'image/png']);
+const ALLOWED_MIME = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  // Word documents
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
+  'application/msword', // .doc
+]);
 
-const ALLOWED_EXT = new Set(['.pdf', '.jpg', '.jpeg', '.png']);
+const ALLOWED_EXT = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.docx', '.doc']);
+
 
 function isAllowedMime(mime) {
   return mime && ALLOWED_MIME.has(String(mime).toLowerCase());

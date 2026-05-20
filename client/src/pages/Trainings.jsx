@@ -15,6 +15,7 @@ import TrainingFilters from '@/components/trainings/TrainingFilters';
 import useTrainingFilters from '@/hooks/useTrainingFilters';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
+import TrainingCard from '@/components/trainings/TrainingCard';
 
 const INTERNAL_STATUSES = new Set(['draft', 'published', 'ongoing', 'completed', 'cancelled']);
 const EXTERNAL_STATUSES = new Set(['draft', 'open', 'closed', 'completed']);
