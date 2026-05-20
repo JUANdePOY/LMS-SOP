@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, Keyboard, ScanLine, X, AlertCircle, CheckCircle2, Loader } from 'lucide-react';
+import { Camera, Keyboard, ScanLine, X, AlertCircle, CheckCircle2, Loader, SwitchCamera } from 'lucide-react';
 
 export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 'barcode_scanner', disabled = false }) {
   const [scanMethod, setScanMethod] = useState(initialMethod);
@@ -7,9 +7,17 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
   const [scanning, setScanning] = useState(false);
   const [lastResult, setLastResult] = useState(null);
   const [error, setError] = useState(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  const [recentScans, setRecentScans] = useState([]);
   const inputRef = useRef(null);
   const bufferRef = useRef('');
   const bufferTimerRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const scanIntervalRef = useRef(null);
+  const codeReaderRef = useRef(null);
 
   const handleScan = useCallback(async (barcode) => {
     if (!barcode || scanning || disabled) return;
@@ -18,11 +26,15 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
     setLastResult(null);
     try {
       const result = await onScan(barcode.trim(), scanMethod);
-      setLastResult({ success: true, message: result?.message || 'Scan successful', data: result });
+      const scanResult = { success: true, message: result?.message || 'Scan successful', data: result, timestamp: Date.now() };
+      setLastResult(scanResult);
+      setRecentScans(prev => [scanResult, ...prev].slice(0, 10));
       setManualInput('');
     } catch (err) {
       const msg = err?.response?.data?.message || err?.message || 'Scan failed';
-      setLastResult({ success: false, message: msg });
+      const scanResult = { success: false, message: msg, timestamp: Date.now() };
+      setLastResult(scanResult);
+      setRecentScans(prev => [scanResult, ...prev].slice(0, 10));
       setError(msg);
     } finally {
       setScanning(false);
@@ -56,6 +68,81 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
       };
     }
   }, [scanMethod, handleScan, disabled]);
+
+  const stopCamera = useCallback(() => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (codeReaderRef.current) {
+      try { codeReaderRef.current.reset(); } catch {}
+      codeReaderRef.current = null;
+    }
+    setCameraActive(false);
+  }, []);
+
+  const startCamera = useCallback(async () => {
+    setCameraError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraActive(true);
+
+      try {
+        const { BrowserMultiFormatReader, NotFoundException } = await import('@zxing/library');
+        const codeReader = new BrowserMultiFormatReader();
+        codeReaderRef.current = codeReader;
+
+        scanIntervalRef.current = setInterval(async () => {
+          if (!videoRef.current || !canvasRef.current) return;
+          const canvas = canvasRef.current;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          canvas.width = videoRef.current.videoWidth;
+          canvas.height = videoRef.current.videoHeight;
+          ctx.drawImage(videoRef.current, 0, 0);
+
+          try {
+            const result = codeReader.decodeFromCanvas(canvas);
+            if (result?.text) {
+              handleScan(result.text);
+            }
+          } catch (e) {
+            if (!(e instanceof NotFoundException)) {
+              // ignore scan errors
+            }
+          }
+        }, 250);
+      } catch (libErr) {
+        setCameraError('Camera barcode scanning requires @zxing/library. Install it with: npm install @zxing/library');
+        setCameraActive(false);
+        stopCamera();
+      }
+    } catch (err) {
+      setCameraError(err.name === 'NotAllowedError'
+        ? 'Camera access denied. Please allow camera permissions.'
+        : 'Could not access camera. Ensure a camera is connected.');
+      setCameraActive(false);
+    }
+  }, [handleScan, stopCamera]);
+
+  useEffect(() => {
+    if (scanMethod === 'camera') {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    return () => stopCamera();
+  }, [scanMethod, startCamera, stopCamera]);
 
   const handleManualSubmit = (e) => {
     e.preventDefault();
@@ -129,17 +216,55 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
       )}
 
       {scanMethod === 'camera' && (
-        <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-neutral-300 dark:border-neutral-600 rounded-xl bg-neutral-50 dark:bg-neutral-900/50">
-          <Camera className="h-12 w-12 text-indigo-400 mb-3" />
-          <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
-            Camera scanning
-          </p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-            Position barcode within camera view
-          </p>
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-            Camera barcode scanning requires a compatible library (e.g., @zxing/library)
-          </p>
+        <div className="space-y-3">
+          {cameraError ? (
+            <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-amber-300 dark:border-amber-700 rounded-xl bg-amber-50 dark:bg-amber-950/20">
+              <Camera className="h-12 w-12 text-amber-400 mb-3" />
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                Camera Unavailable
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 text-center max-w-xs">
+                {cameraError}
+              </p>
+              <button
+                onClick={startCamera}
+                className="mt-3 px-4 py-2 text-xs font-medium bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+              >
+                Try Again
+              </button>
+            </div>
+          ) : (
+            <div className="relative rounded-xl overflow-hidden bg-black">
+              <video
+                ref={videoRef}
+                className="w-full aspect-video object-cover"
+                playsInline
+                muted
+              />
+              <canvas ref={canvasRef} className="hidden" />
+              {cameraActive && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-48 h-32 border-2 border-indigo-400 rounded-lg relative">
+                    <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-indigo-500 rounded-tl-lg" />
+                    <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-indigo-500 rounded-tr-lg" />
+                    <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-indigo-500 rounded-bl-lg" />
+                    <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-indigo-500 rounded-br-lg" />
+                    <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-indigo-400/60 animate-pulse" />
+                  </div>
+                </div>
+              )}
+              {!cameraActive && (
+                <div className="absolute inset-0 flex items-center justify-center bg-neutral-900/80">
+                  <Loader className="h-8 w-8 text-indigo-400 animate-spin" />
+                </div>
+              )}
+            </div>
+          )}
+          {cameraActive && (
+            <p className="text-xs text-center text-neutral-500 dark:text-neutral-400">
+              Position barcode within the frame. Scanning happens automatically.
+            </p>
+          )}
         </div>
       )}
 
@@ -193,6 +318,28 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
           <button onClick={clearResult} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300">
             <X className="h-4 w-4" />
           </button>
+        </div>
+      )}
+
+      {recentScans.length > 1 && (
+        <div className="border-t border-neutral-200 dark:border-neutral-700 pt-3">
+          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-2">Recent Scans</p>
+          <div className="space-y-1.5 max-h-40 overflow-y-auto">
+            {recentScans.slice(1).map((scan, i) => (
+              <div key={scan.timestamp + '-' + i} className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs ${
+                scan.success
+                  ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-300'
+              }`}>
+                {scan.success ? (
+                  <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="h-3 w-3 flex-shrink-0" />
+                )}
+                <span className="truncate">{scan.message}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>

@@ -317,6 +317,103 @@ async function getExternalRegistrationCount(externalTrainingId) {
   return rows[0]?.total ?? 0;
 }
 
+async function getMyEvents(userId, role) {
+  let internalRows, externalRows;
+
+  if (role === 'admin') {
+    [internalRows] = await pool.query(
+      `SELECT t.id, t.title, t.start_datetime, t.end_datetime, t.venue, t.status,
+              'internal' AS event_type, t.created_at
+       FROM trainings t
+       ORDER BY t.start_datetime DESC`
+    );
+
+    [externalRows] = await pool.query(
+      `SELECT et.id, et.title, et.start_date, et.start_time, et.venue, et.status,
+              'external' AS event_type, et.created_at
+       FROM external_trainings et
+       ORDER BY et.start_date DESC`
+    );
+  } else {
+    [internalRows] = await pool.query(
+      `SELECT t.id, t.title, t.start_datetime, t.end_datetime, t.venue, t.status,
+              'internal' AS event_type, t.created_at
+       FROM training_facilitators tf
+       INNER JOIN trainings t ON t.id = tf.training_id
+       WHERE tf.user_id = ?
+       ORDER BY t.start_datetime DESC`,
+      [userId]
+    );
+
+    [externalRows] = await pool.query(
+      `SELECT et.id, et.title, et.start_date, et.start_time, et.venue, et.status,
+              'external' AS event_type, et.created_at
+       FROM training_facilitators tf
+       INNER JOIN external_trainings et ON et.id = tf.external_training_id
+       WHERE tf.user_id = ?
+       ORDER BY et.start_date DESC`,
+      [userId]
+    );
+  }
+
+  return {
+    internal: internalRows || [],
+    external: externalRows || []
+  };
+}
+
+async function getEventStatus(eventType, id) {
+  if (eventType === 'internal') {
+    const [trainingRows] = await pool.query(
+      `SELECT id, title, status, start_datetime, end_datetime, venue
+       FROM trainings WHERE id = ?`,
+      [id]
+    );
+    if (!trainingRows[0]) return null;
+    const [statRows] = await pool.query(
+      `SELECT
+         COUNT(*) AS total_participants,
+         SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) AS present_count,
+         SUM(CASE WHEN a.status = 'absent' THEN 1 ELSE 0 END) AS absent_count,
+         SUM(CASE WHEN a.status = 'late' THEN 1 ELSE 0 END) AS late_count,
+         SUM(CASE WHEN a.status = 'excused' THEN 1 ELSE 0 END) AS excused_count,
+         SUM(CASE WHEN a.status = 'pending' THEN 1 ELSE 0 END) AS pending_count
+       FROM internal_training_participants itp
+       LEFT JOIN attendance a ON a.training_id = itp.training_id
+         AND a.reservist_id = itp.reservist_id AND a.event_type = 'internal'
+       WHERE itp.training_id = ?`,
+      [id]
+    );
+    return {
+      event: trainingRows[0],
+      stats: statRows[0] || { total_participants: 0, present_count: 0, absent_count: 0, late_count: 0, excused_count: 0, pending_count: 0 }
+    };
+  } else {
+    const [trainingRows] = await pool.query(
+      `SELECT id, title, status, start_date, venue, capacity
+       FROM external_trainings WHERE id = ?`,
+      [id]
+    );
+    if (!trainingRows[0]) return null;
+    const [statRows] = await pool.query(
+      `SELECT
+         COUNT(*) AS total_attendees,
+         SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) AS present_count,
+         SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) AS absent_count,
+         SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) AS late_count,
+         SUM(CASE WHEN status = 'excused' THEN 1 ELSE 0 END) AS excused_count,
+         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending_count
+       FROM external_training_attendance
+       WHERE external_training_id = ?`,
+      [id]
+    );
+    return {
+      event: trainingRows[0],
+      stats: statRows[0] || { total_attendees: 0, present_count: 0, absent_count: 0, late_count: 0, excused_count: 0, pending_count: 0 }
+    };
+  }
+}
+
 module.exports = {
   pool,
   findReservistByBarcode,
@@ -338,4 +435,6 @@ module.exports = {
   updateAttendanceStatus,
   getScanAuditLog,
   getExternalRegistrationCount,
+  getMyEvents,
+  getEventStatus,
 };

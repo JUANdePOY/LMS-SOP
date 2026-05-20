@@ -284,6 +284,18 @@ async function getExternalRegistrationCount(externalTrainingId) {
   return attendanceModel.getExternalRegistrationCount(externalTrainingId);
 }
 
+async function getMyEvents(userId, role) {
+  return attendanceModel.getMyEvents(userId, role);
+}
+
+async function getEventStatus(eventType, id) {
+  const result = await attendanceModel.getEventStatus(eventType, id);
+  if (!result) {
+    throw createError(eventType === 'internal' ? 'Training not found' : 'External training not found', 404);
+  }
+  return result;
+}
+
 module.exports = {
   scanBarcodeInternal,
   scanBarcodeExternal,
@@ -296,6 +308,8 @@ module.exports = {
   assignFacilitator,
   getFacilitators,
   getExternalRegistrationCount,
+  getMyEvents,
+  getEventStatus,
   VALID_SCAN_METHODS,
   VALID_STATUSES
 };

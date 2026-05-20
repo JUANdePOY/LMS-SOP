@@ -3,6 +3,7 @@ const { query, param, body, validationResult } = require('express-validator');
 const attendanceController = require('../controllers/attendanceController');
 const { authenticateToken } = require('../middleware/auth');
 const { authorize } = require('../middleware/rbac');
+const { authorizeFacilitator } = require('../middleware/facilitatorAuth');
 
 const router = express.Router();
 
@@ -18,12 +19,12 @@ const idParam = [param('id').isInt({ min: 1 })];
 const trainingIdParam = [param('trainingId').isInt({ min: 1 })];
 const externalTrainingIdParam = [param('externalTrainingId').isInt({ min: 1 })];
 
-// ── Scan endpoints (facilitator only) ────────────────────────────────────────
+// ── Scan endpoints (admin or facilitator) ────────────────────────────────────
 
 router.post(
   '/scan/internal/:trainingId',
   authenticateToken,
-  authorize('admin'),
+  authorizeFacilitator(),
   [
     ...trainingIdParam,
     body('barcode').trim().notEmpty().withMessage('Barcode is required'),
@@ -37,7 +38,7 @@ router.post(
 router.post(
   '/scan/external/:externalTrainingId',
   authenticateToken,
-  authorize('admin'),
+  authorizeFacilitator(),
   [
     ...externalTrainingIdParam,
     body('barcode').trim().notEmpty().withMessage('Barcode is required'),
@@ -48,12 +49,12 @@ router.post(
   attendanceController.scanExternal
 );
 
-// ── Manual check-in (facilitator only) ───────────────────────────────────────
+// ── Manual check-in (admin or facilitator) ────────────────────────────────────
 
 router.post(
   '/manual/internal/:trainingId',
   authenticateToken,
-  authorize('admin'),
+  authorizeFacilitator(),
   [
     ...trainingIdParam,
     body('reservist_id').isInt({ min: 1 }).withMessage('reservist_id is required'),
@@ -66,7 +67,7 @@ router.post(
 router.post(
   '/manual/external/:externalTrainingId',
   authenticateToken,
-  authorize('admin'),
+  authorizeFacilitator(),
   [
     ...externalTrainingIdParam,
     body('reservist_id').isInt({ min: 1 }).withMessage('reservist_id is required'),
@@ -76,12 +77,12 @@ router.post(
   attendanceController.manualCheckInExternal
 );
 
-// ── Attendance list & stats ──────────────────────────────────────────────────
+// ── Attendance list & stats (admin or facilitator) ────────────────────────────
 
 router.get(
   '/internal/:trainingId',
   authenticateToken,
-  authorize('admin'),
+  authorizeFacilitator(),
   [...trainingIdParam],
   rejectInvalid,
   attendanceController.getInternalAttendance
@@ -90,18 +91,18 @@ router.get(
 router.get(
   '/external/:externalTrainingId',
   authenticateToken,
-  authorize('admin'),
+  authorizeFacilitator(),
   [...externalTrainingIdParam],
   rejectInvalid,
   attendanceController.getExternalAttendance
 );
 
-// ── Update attendance status ─────────────────────────────────────────────────
+// ── Update attendance status (admin or facilitator) ───────────────────────────
 
 router.patch(
   '/:eventType/:id',
   authenticateToken,
-  authorize('admin'),
+  authorizeFacilitator(),
   [
     ...idParam,
     param('eventType').isIn(['internal', 'external']).withMessage('eventType must be internal or external'),
@@ -111,12 +112,12 @@ router.patch(
   attendanceController.updateStatus
 );
 
-// ── Scan audit log ───────────────────────────────────────────────────────────
+// ── Scan audit log (admin or facilitator) ─────────────────────────────────────
 
 router.get(
   '/scan-history',
   authenticateToken,
-  authorize('admin'),
+  authorizeFacilitator(),
   [
     query('training_id').optional().isInt({ min: 1 }),
     query('external_training_id').optional().isInt({ min: 1 }),
@@ -126,7 +127,29 @@ router.get(
   attendanceController.getScanHistory
 );
 
-// ── Facilitator management ───────────────────────────────────────────────────
+// ── My events — list events where current user is facilitator ─────────────────
+
+router.get(
+  '/my-events',
+  authenticateToken,
+  attendanceController.getMyEvents
+);
+
+// ── Event status — quick stats for a specific event ───────────────────────────
+
+router.get(
+  '/event-status/:eventType/:id',
+  authenticateToken,
+  authorizeFacilitator(),
+  [
+    ...idParam,
+    param('eventType').isIn(['internal', 'external']).withMessage('eventType must be internal or external'),
+  ],
+  rejectInvalid,
+  attendanceController.getEventStatus
+);
+
+// ── Facilitator management (admin only) ───────────────────────────────────────
 
 router.post(
   '/facilitators',

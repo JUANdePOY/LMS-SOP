@@ -145,6 +145,22 @@ function getFacilitators(req, res) {
     .catch((err) => sendError(res, err, 'Failed to load facilitators'));
 }
 
+function getMyEvents(req, res) {
+  const userId = req.user?.id;
+  const role = req.user?.role;
+  attendanceService
+    .getMyEvents(userId, role)
+    .then((data) => res.json({ success: true, message: 'OK', data }))
+    .catch((err) => sendError(res, err, 'Failed to load events'));
+}
+
+function getEventStatus(req, res) {
+  attendanceService
+    .getEventStatus(req.params.eventType, req.params.id)
+    .then((data) => res.json({ success: true, message: 'OK', data }))
+    .catch((err) => sendError(res, err, 'Failed to load event status'));
+}
+
 module.exports = {
   scanInternal,
   scanExternal,
@@ -156,4 +172,6 @@ module.exports = {
   getScanHistory,
   assignFacilitator,
   getFacilitators,
+  getMyEvents,
+  getEventStatus,
 };

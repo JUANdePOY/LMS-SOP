@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Calendar, MapPin, Users, Loader, AlertCircle, ScanLine, ClipboardList, Search } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Loader, AlertCircle, ScanLine, ClipboardList, LayoutDashboard, Wifi, WifiOff } from 'lucide-react';
+import AttendanceDashboard from '@/components/trainings/AttendanceDashboard';
 import AttendanceScanner from '@/components/trainings/AttendanceScanner';
 import AttendanceList from '@/components/trainings/AttendanceList';
 import {
@@ -11,9 +12,9 @@ import {
   getExternalAttendance,
   updateAttendanceStatus,
 } from '@/services/attendanceApiService';
-import { getTrainings, getExternalTrainings } from '@/services/trainingsService';
 
 export default function Attendance() {
+  const [view, setView] = useState('dashboard');
   const [eventType, setEventType] = useState('internal');
   const [trainingId, setTrainingId] = useState(null);
   const [training, setTraining] = useState(null);
@@ -22,6 +23,7 @@ export default function Attendance() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('scan');
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   const urlParams = new URLSearchParams(window.location.search);
   const urlEventType = urlParams.get('type') || 'internal';
@@ -31,6 +33,7 @@ export default function Attendance() {
     if (urlTrainingId) {
       setEventType(urlEventType);
       setTrainingId(urlTrainingId);
+      setView('event');
     }
   }, [urlTrainingId, urlEventType]);
 
@@ -59,10 +62,26 @@ export default function Attendance() {
   }, [trainingId, eventType]);
 
   useEffect(() => {
-    if (trainingId) {
+    if (trainingId && view === 'event') {
       loadAttendance();
     }
-  }, [trainingId, loadAttendance]);
+  }, [trainingId, view, loadAttendance]);
+
+  useEffect(() => {
+    if (view === 'event' && activeTab === 'list' && autoRefresh && trainingId) {
+      const interval = setInterval(loadAttendance, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [view, activeTab, autoRefresh, trainingId, loadAttendance]);
+
+  const handleSelectEvent = async (type, id, eventData) => {
+    setEventType(type);
+    setTrainingId(id);
+    setTraining(eventData);
+    setView('event');
+    setActiveTab('scan');
+    setError(null);
+  };
 
   const handleScan = async (barcode, scanMethod) => {
     let response;
@@ -89,21 +108,26 @@ export default function Attendance() {
     await loadAttendance();
   };
 
-  if (!trainingId) {
+  const handleBack = () => {
+    setView('dashboard');
+    setTrainingId(null);
+    setTraining(null);
+    setParticipants([]);
+    setStats(null);
+    setError(null);
+    window.history.replaceState({}, '', window.location.pathname);
+  };
+
+  if (view === 'dashboard') {
     return (
-      <div className="p-8">
-        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-4">Attendance Management</h1>
-        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-6">
-          <div className="flex items-center gap-3">
-            <AlertCircle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-            <div>
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">No training selected</p>
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                Navigate to a training event and click "Take Attendance" to begin scanning.
-              </p>
-            </div>
-          </div>
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">Attendance Tracker</h1>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+            Select an event to start tracking attendance
+          </p>
         </div>
+        <AttendanceDashboard onSelectEvent={handleSelectEvent} />
       </div>
     );
   }
@@ -111,54 +135,62 @@ export default function Attendance() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">Attendance</h1>
-          {training && (
-            <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-neutral-500 dark:text-neutral-400">
-              <span className="font-medium text-neutral-700 dark:text-neutral-300">{training.title}</span>
-              <span className="inline-flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5" />
-                {training.start_datetime
-                  ? new Date(training.start_datetime).toLocaleDateString()
-                  : training.start_date}
-              </span>
-              {training.venue && (
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleBack}
+            className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 dark:text-neutral-400 transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">Attendance</h1>
+            {training && (
+              <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-neutral-500 dark:text-neutral-400">
+                <span className="font-medium text-neutral-700 dark:text-neutral-300">{training.title}</span>
                 <span className="inline-flex items-center gap-1">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {training.venue}
+                  <Calendar className="h-3.5 w-3.5" />
+                  {training.start_datetime
+                    ? new Date(training.start_datetime).toLocaleDateString()
+                    : training.start_date}
                 </span>
-              )}
-              <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                training.status === 'ongoing' || training.status === 'open'
-                  ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
-              }`}>
-                {training.status}
-              </span>
-            </div>
-          )}
+                {training.venue && (
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {training.venue}
+                  </span>
+                )}
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                  training.status === 'ongoing' || training.status === 'open'
+                    ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                    : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+                }`}>
+                  {training.status}
+                </span>
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                  eventType === 'internal'
+                    ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+                    : 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
+                }`}>
+                  {eventType}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setEventType('internal')}
-            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-              eventType === 'internal'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
-            }`}
-          >
-            Internal
-          </button>
-          <button
-            onClick={() => setEventType('external')}
-            className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-              eventType === 'external'
-                ? 'bg-indigo-600 text-white'
-                : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
-            }`}
-          >
-            External
-          </button>
+          {activeTab === 'list' && (
+            <button
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                autoRefresh
+                  ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+              }`}
+            >
+              {autoRefresh ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+              Auto-refresh {autoRefresh ? 'ON' : 'OFF'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -166,6 +198,35 @@ export default function Attendance() {
         <div className="flex items-center gap-3 p-4 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
           <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
           <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+        </div>
+      )}
+
+      {stats && (
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 text-center">
+            <p className="text-lg font-bold text-neutral-900 dark:text-neutral-50">{stats.total_participants || stats.total_attendees || 0}</p>
+            <p className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 uppercase">Total</p>
+          </div>
+          <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 text-center">
+            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{stats.present_count || 0}</p>
+            <p className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 uppercase">Present</p>
+          </div>
+          <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 text-center">
+            <p className="text-lg font-bold text-red-600 dark:text-red-400">{stats.absent_count || 0}</p>
+            <p className="text-[10px] font-medium text-red-600 dark:text-red-400 uppercase">Absent</p>
+          </div>
+          <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 text-center">
+            <p className="text-lg font-bold text-amber-600 dark:text-amber-400">{stats.late_count || 0}</p>
+            <p className="text-[10px] font-medium text-amber-600 dark:text-amber-400 uppercase">Late</p>
+          </div>
+          <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 text-center">
+            <p className="text-lg font-bold text-blue-600 dark:text-blue-400">{stats.excused_count || 0}</p>
+            <p className="text-[10px] font-medium text-blue-600 dark:text-blue-400 uppercase">Excused</p>
+          </div>
+          <div className="bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 p-3 text-center">
+            <p className="text-lg font-bold text-neutral-500 dark:text-neutral-400">{stats.pending_count || 0}</p>
+            <p className="text-[10px] font-medium text-neutral-500 dark:text-neutral-400 uppercase">Pending</p>
+          </div>
         </div>
       )}
 
@@ -192,7 +253,7 @@ export default function Attendance() {
           }`}
         >
           <span className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
+            <ClipboardList className="h-4 w-4" />
             Attendance List
           </span>
         </button>
@@ -215,10 +276,12 @@ export default function Attendance() {
             eventType={eventType}
             training={training}
             participants={participants}
-            stats={stats}
+            stats={null}
             loading={loading}
             onStatusChange={handleStatusChange}
             onManualCheckIn={handleManualCheckIn}
+            autoRefresh={autoRefresh}
+            onRefresh={loadAttendance}
           />
         </div>
       )}

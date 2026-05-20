@@ -41,3 +41,13 @@ export const assignFacilitator = (data) =>
 
 export const getFacilitators = (params = {}) =>
   api.get('/attendance/facilitators', { params });
+
+// ── My events ─────────────────────────────────────────────────────────────────
+
+export const getMyEvents = () =>
+  api.get('/attendance/my-events');
+
+// ── Event status ──────────────────────────────────────────────────────────────
+
+export const getEventStatus = (eventType, id) =>
+  api.get(`/attendance/event-status/${eventType}/${id}`);
