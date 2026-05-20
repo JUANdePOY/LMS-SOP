@@ -29,6 +29,30 @@ export async function searchSquadrons(search, limit = 50) {
   }
 }
 
+export async function searchReservistsBySquadrons(squadronIds, search, limit = 50) {
+  try {
+    const response = await api.get('/squadrons/reservists/search', {
+      params: {
+        squadron_ids: JSON.stringify(squadronIds),
+        search,
+        limit,
+      },
+    });
+    const body = response.data;
+    return {
+      success: body?.success !== false,
+      reservists: body?.data?.reservists ?? [],
+      message: body?.message,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      reservists: [],
+      message: error.response?.data?.message || 'Failed to search reservists',
+    };
+  }
+}
+
 export async function searchSquadronReservists(squadronId, search, limit = 50) {
   try {
     const response = await api.get(`/squadrons/${squadronId}/reservists`, {

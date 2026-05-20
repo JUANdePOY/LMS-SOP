@@ -22,7 +22,7 @@ async function findExternalMany({ page, limit, search, status }) {
   const offset = (page - 1) * limit;
   let sql = `
     SELECT id, title, description, start_date, start_time, venue, status, capacity,
-           registration_fields, squadron_limits, created_at, updated_at
+           instructor, registration_fields, squadron_limits, created_at, updated_at
     FROM external_trainings
     WHERE 1 = 1
   `;
@@ -63,7 +63,7 @@ function safeJsonParse(s) {
 async function findExternalById(id) {
   const [rows] = await pool.query(
     `SELECT id, title, description, start_date, start_time, venue, status, capacity,
-            registration_fields, squadron_limits, created_at, updated_at
+            instructor, registration_fields, squadron_limits, created_at, updated_at
      FROM external_trainings WHERE id = ?`,
     [id]
   );
@@ -93,8 +93,8 @@ async function insertExternal(row) {
 
   const [result] = await executor.query(
     `INSERT INTO external_trainings (
-      title, description, start_date, start_time, venue, status, capacity, squadron_limits, registration_fields
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      title, description, start_date, start_time, venue, status, capacity, instructor, squadron_limits, registration_fields
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       row.title,
       row.description ?? null,
@@ -103,6 +103,7 @@ async function insertExternal(row) {
       row.venue ?? null,
       row.status,
       row.capacity ?? null,
+      row.instructor ?? null,
       row.squadron_limits == null ? null : typeof row.squadron_limits === 'string' ? row.squadron_limits : JSON.stringify(row.squadron_limits),
       rf,
     ]
@@ -121,6 +122,7 @@ async function updateExternal(id, patch) {
     venue: patch.venue,
     status: patch.status,
     capacity: patch.capacity,
+    instructor: patch.instructor,
   };
   for (const [k, v] of Object.entries(map)) {
     if (Object.prototype.hasOwnProperty.call(patch, k)) {
