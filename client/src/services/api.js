@@ -117,4 +117,7 @@ export const createSquadron = (data) => api.post('/squadron', data);
 export const updateSquadron = (id, data) => api.put(`/squadron/${id}`, data);
 export const deleteSquadron = (id) => api.delete(`/squadron/${id}`);
 
+// Filter metadata
+export const getReservistFilterMetadata = () => api.get('/reservists/filters/metadata');
+
 export default api;

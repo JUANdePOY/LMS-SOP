@@ -126,11 +126,11 @@ function EventCard({ event, eventType, onSelect }) {
   );
 }
 
-export default function AttendanceDashboard({ onSelectEvent }) {
+export default function AttendanceDashboard({ onSelectEvent, filter = 'all' }) {
   const [events, setEvents] = useState({ internal: [], external: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('all');
+  const [sortAsc, setSortAsc] = useState(false);
 
   const loadEvents = useCallback(async () => {
     setLoading(true);
@@ -158,14 +158,15 @@ export default function AttendanceDashboard({ onSelectEvent }) {
   const allEvents = [
     ...events.internal.map(e => ({ ...e, eventType: 'internal' })),
     ...events.external.map(e => ({ ...e, eventType: 'external' }))
-  ];
+  ].sort((a, b) => {
+    const dateA = new Date(a.start_datetime || a.start_date || 0);
+    const dateB = new Date(b.start_datetime || b.start_date || 0);
+    return sortAsc ? dateA - dateB : dateB - dateA;
+  });
 
   const filteredEvents = filter === 'all'
     ? allEvents
     : allEvents.filter(e => e.eventType === filter);
-
-  const totalInternal = events.internal.length;
-  const totalExternal = events.external.length;
 
   if (loading) {
     return (
@@ -205,36 +206,15 @@ export default function AttendanceDashboard({ onSelectEvent }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-neutral-400 dark:text-neutral-500">
+          {filteredEvents.length} event{filteredEvents.length !== 1 ? 's' : ''}
+        </p>
         <button
-          onClick={() => setFilter('all')}
-          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-            filter === 'all'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-          }`}
+          onClick={() => setSortAsc((s) => !s)}
+          className="flex items-center gap-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
         >
-          All ({allEvents.length})
-        </button>
-        <button
-          onClick={() => setFilter('internal')}
-          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-            filter === 'internal'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-          }`}
-        >
-          Internal ({totalInternal})
-        </button>
-        <button
-          onClick={() => setFilter('external')}
-          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-            filter === 'external'
-              ? 'bg-indigo-600 text-white'
-              : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-          }`}
-        >
-          External ({totalExternal})
+          {sortAsc ? 'Oldest first' : 'Newest first'}
         </button>
       </div>
 

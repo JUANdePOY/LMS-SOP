@@ -1,22 +1,12 @@
 import { cn } from "@/lib/utils";
-import { Users, UserCheck, UserX, TrendingUp, Award } from "lucide-react";
+import { Users, UserCheck, UserX, AlertCircle } from "lucide-react";
 
-/**
- * ReservistStatsBar
- * Summary KPI cards computed from current filtered/full data.
- */
 export default function ReservistStatsBar({ data }) {
   const total    = data.length;
   const active   = data.filter((r) => r.status === "active").length;
   const inactive = data.filter((r) => r.status === "inactive").length;
-  const standby  = data.filter((r) => r.status === "standby").length;
-
-  const avgReadiness  = total
-    ? Math.round(data.reduce((a, r) => a + (r.readinessScore || 0), 0)  / total)
-    : 0;
-  const avgAttendance = total
-    ? Math.round(data.reduce((a, r) => a + (r.attendanceRate || 0), 0) / total)
-    : 0;
+  const standby  = data.filter((r) => r.reserveStatus === "Standby Reserve").length;
+  const retired  = data.filter((r) => r.reserveStatus === "Retired").length;
 
   const stats = [
     {
@@ -41,29 +31,25 @@ export default function ReservistStatsBar({ data }) {
       bg:    "bg-red-50 dark:bg-red-500/10 border-red-100 dark:border-red-500/20",
     },
     {
-      label: "Standby",
+      label: "Standby Reserve",
       value: standby.toLocaleString(),
-      icon: Users,
+      icon: AlertCircle,
       color: "text-amber-600 dark:text-amber-400",
       bg:    "bg-amber-50 dark:bg-amber-500/10 border-amber-100 dark:border-amber-500/20",
     },
     {
-      label: "Avg Readiness",
-      value: `${avgReadiness}%`,
-      icon: TrendingUp,
-      color: avgReadiness >= 80 ? "text-emerald-600 dark:text-emerald-400"
-           : avgReadiness >= 60 ? "text-amber-600 dark:text-amber-400"
-           : "text-red-500 dark:text-red-400",
-      bg: "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800",
+      label: "Retired",
+      value: retired.toLocaleString(),
+      icon: Users,
+      color: "text-neutral-500 dark:text-neutral-400",
+      bg:    "bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700",
     },
     {
-      label: "Avg Attendance",
-      value: `${avgAttendance}%`,
-      icon: Award,
-      color: avgAttendance >= 80 ? "text-emerald-600 dark:text-emerald-400"
-           : avgAttendance >= 60 ? "text-amber-600 dark:text-amber-400"
-           : "text-red-500 dark:text-red-400",
-      bg: "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800",
+      label: "Ready Reserve",
+      value: (total - standby - retired).toLocaleString(),
+      icon: Users,
+      color: "text-blue-600 dark:text-blue-400",
+      bg:    "bg-blue-50 dark:bg-blue-500/10 border-blue-100 dark:border-blue-500/20",
     },
   ];
 

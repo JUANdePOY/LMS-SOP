@@ -1765,4 +1765,70 @@ router.post(
   }
 );
 
+/**
+ * GET /api/reservists/filters/metadata
+ * Return distinct filter values from the database for dynamic filter dropdowns
+ */
+router.get('/filters/metadata', authenticateToken, async (req, res) => {
+  try {
+    const [rankRows] = await db.query(
+      "SELECT DISTINCT `rank` FROM reservists WHERE `rank` IS NOT NULL AND `rank` != '' ORDER BY `rank`"
+    );
+    const [specRows] = await db.query(
+      "SELECT DISTINCT specialization FROM reservists WHERE specialization IS NOT NULL AND specialization != '' ORDER BY specialization"
+    );
+    const [statusRows] = await db.query(
+      "SELECT DISTINCT reserve_status FROM reservists WHERE reserve_status IS NOT NULL AND reserve_status != '' ORDER BY reserve_status"
+    );
+    const [arsenRows] = await db.query(
+      'SELECT id, name FROM arsens WHERE is_active = TRUE ORDER BY name'
+    );
+    const [groupRows] = await db.query(
+      'SELECT g.id, g.name, g.arsen_id, a.name as arsen_name FROM `groups` g JOIN arsens a ON g.arsen_id = a.id WHERE g.is_active = TRUE ORDER BY a.name, g.name'
+    );
+    const [squadronRows] = await db.query(
+      'SELECT s.id, s.name, s.group_id, g.name as group_name, g.arsen_id, a.name as arsen_name FROM squadron s JOIN `groups` g ON s.group_id = g.id JOIN arsens a ON g.arsen_id = a.id WHERE s.is_active = TRUE ORDER BY a.name, g.name, s.name'
+    );
+    const [categoryRows] = await db.query(
+      "SELECT DISTINCT category FROM reservists WHERE category IS NOT NULL AND category != '' ORDER BY category"
+    );
+    const [sourceRows] = await db.query(
+      "SELECT DISTINCT source_of_commission FROM reservists WHERE source_of_commission IS NOT NULL AND source_of_commission != '' ORDER BY source_of_commission"
+    );
+    const [bloodTypeRows] = await db.query(
+      "SELECT DISTINCT blood_type FROM reservists WHERE blood_type IS NOT NULL AND blood_type != 'Unknown' ORDER BY blood_type"
+    );
+    const [sexRows] = await db.query(
+      "SELECT DISTINCT sex FROM reservists WHERE sex IS NOT NULL AND sex != '' ORDER BY sex"
+    );
+    const [civilStatusRows] = await db.query(
+      "SELECT DISTINCT civil_status FROM reservists WHERE civil_status IS NOT NULL AND civil_status != '' ORDER BY civil_status"
+    );
+
+    res.json({
+      status: 'success',
+      data: {
+        ranks: rankRows.map(r => r.rank),
+        specializations: specRows.map(r => r.specialization),
+        reserveStatuses: statusRows.map(r => r.reserve_status),
+        categories: categoryRows.map(r => r.category),
+        sourcesOfCommission: sourceRows.map(r => r.source_of_commission),
+        bloodTypes: bloodTypeRows.map(r => r.blood_type),
+        sexes: sexRows.map(r => r.sex),
+        civilStatuses: civilStatusRows.map(r => r.civil_status),
+        arsens: arsenRows.map(a => ({ id: a.id, name: a.name })),
+        groups: groupRows.map(g => ({ id: g.id, name: g.name, arsen_id: g.arsen_id, arsen_name: g.arsen_name })),
+        squadrons: squadronRows.map(s => ({ id: s.id, name: s.name, group_id: s.group_id, group_name: s.group_name, arsen_id: s.arsen_id, arsen_name: s.arsen_name })),
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching filter metadata:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch filter metadata',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
 module.exports = router;
