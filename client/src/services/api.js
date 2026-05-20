@@ -77,7 +77,11 @@ export const createAttendance = (data) => api.post('/attendance', data);
 export const updateAttendance = (id, data) => api.put(`/attendance/${id}`, data);
 
 // Readiness
-export const getReadiness = (params = {}) => api.get('/readiness', { params });
+export const getReadiness = (options = {}) => {
+  const { endpoint = '', params = {} } = options;
+  const path = endpoint ? `/readiness/${endpoint}` : '/readiness';
+  return api.get(path, { params });
+};
 
 // Supplies
 export const getSupplies = (params = {}) => api.get('/supplies', { params });

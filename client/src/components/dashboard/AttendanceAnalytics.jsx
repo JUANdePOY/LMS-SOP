@@ -4,9 +4,7 @@ import {
 } from "recharts";
 import { Info, ClipboardCheck, TrendingDown, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { attendanceTimelineData, attendanceByAreaData } from "@/data/dashboardData";
 
-/** Shared card shell */
 function ChartCard({ title, icon: Icon, badge, children, className }) {
   return (
     <div className={cn(
@@ -30,7 +28,7 @@ function ChartCard({ title, icon: Icon, badge, children, className }) {
           )}>
             {badge.type === "down"
               ? <TrendingDown size={9} className="inline mr-0.5" />
-              : <TrendingUp   size={9} className="inline mr-0.5" />
+              : <TrendingUp size={9} className="inline mr-0.5" />
             }
             {badge.label}
           </span>
@@ -42,7 +40,6 @@ function ChartCard({ title, icon: Icon, badge, children, className }) {
   );
 }
 
-/** Custom tooltip */
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
@@ -57,120 +54,76 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
-/**
- * AttendanceAnalytics
- * Timeline area chart + per-area bar breakdown.
- */
-export default function AttendanceAnalytics() {
-  const latest = attendanceTimelineData.at(-1)?.rate ?? 0;
-  const prev   = attendanceTimelineData.at(-2)?.rate ?? 0;
-  const delta  = (latest - prev).toFixed(1);
+export default function AttendanceAnalytics({ data }) {
+  const timeline = data?.timeline || [];
+
+  const latest = timeline.length > 0 ? timeline[timeline.length - 1]?.rate ?? 0 : 0;
+  const prev = timeline.length > 1 ? timeline[timeline.length - 2]?.rate ?? 0 : 0;
+  const delta = (latest - prev).toFixed(1);
   const isDown = delta < 0;
 
   return (
     <ChartCard
       title="Attendance Analytics"
       icon={ClipboardCheck}
-      badge={{ type: isDown ? "down" : "up", label: `${isDown ? "" : "+"}${delta}% vs prev` }}
+      badge={timeline.length > 1 ? { type: isDown ? "down" : "up", label: `${isDown ? "" : "+"}${delta}% vs prev` } : null}
     >
       <div className="flex flex-col gap-6">
-
-        {/* ── Headline number ───────────────────────────────── */}
         <div className="flex items-end gap-3">
           <span className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 leading-none">
             {latest}%
           </span>
           <span className="text-xs text-neutral-400 dark:text-neutral-600 mb-0.5">
-            avg attendance rate · latest week
+            avg attendance rate · latest period
           </span>
         </div>
 
-        {/* ── Timeline area chart ───────────────────────────── */}
-        <ResponsiveContainer width="100%" height={100}>
-          <AreaChart
-            data={attendanceTimelineData}
-            margin={{ top: 4, right: 4, left: -28, bottom: 0 }}
-          >
-            <defs>
-              <linearGradient id="attendanceGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#10b981" stopOpacity={0.15} />
-                <stop offset="95%" stopColor="#10b981" stopOpacity={0}    />
-              </linearGradient>
-            </defs>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              stroke="currentColor"
-              className="text-neutral-100 dark:text-neutral-800"
-              vertical={false}
-            />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 10, fill: "currentColor" }}
-              className="text-neutral-400"
-              tickLine={false}
-              axisLine={false}
-            />
-            <YAxis
-              domain={[70, 100]}
-              tick={{ fontSize: 10, fill: "currentColor" }}
-              className="text-neutral-400"
-              tickLine={false}
-              axisLine={false}
-              tickFormatter={(v) => `${v}%`}
-            />
-            <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#10b981", strokeWidth: 1, strokeDasharray: "3 3" }} />
-            <Area
-              type="monotone"
-              dataKey="rate"
-              name="Attendance"
-              stroke="#10b981"
-              strokeWidth={2}
-              fill="url(#attendanceGrad)"
-              dot={{ fill: "#10b981", r: 3, strokeWidth: 0 }}
-              activeDot={{ r: 5, fill: "#10b981" }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        {timeline.length > 0 ? (
+          <ResponsiveContainer width="100%" height={100}>
+            <AreaChart data={timeline} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+              <defs>
+                <linearGradient id="attendanceGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
+                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-neutral-100 dark:text-neutral-800" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "currentColor" }} className="text-neutral-400" tickLine={false} axisLine={false} />
+              <YAxis domain={[70, 100]} tick={{ fontSize: 10, fill: "currentColor" }} className="text-neutral-400" tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
+              <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#10b981", strokeWidth: 1, strokeDasharray: "3 3" }} />
+              <Area type="monotone" dataKey="rate" name="Attendance" stroke="#10b981" strokeWidth={2} fill="url(#attendanceGrad)" dot={{ fill: "#10b981", r: 3, strokeWidth: 0 }} activeDot={{ r: 5, fill: "#10b981" }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex h-24 items-center justify-center text-xs text-neutral-400">No attendance data available</div>
+        )}
 
-        {/* ── Divider ──────────────────────────────────────── */}
         <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
-        {/* ── Per-area breakdown ────────────────────────────── */}
         <div>
           <p className="mb-3 text-[11px] font-semibold text-neutral-500 dark:text-neutral-500 uppercase tracking-wider">
-            Attendance Rate by Area
+            Score Composition Weights
           </p>
           <div className="flex flex-col gap-2">
-            {attendanceByAreaData.map((row) => {
-              const isLow = row.rate < 70;
-              const isMid = row.rate >= 70 && row.rate < 85;
-              const color = isLow ? "bg-red-400" : isMid ? "bg-amber-400" : "bg-emerald-400";
-              const textColor = isLow
-                ? "text-red-600 dark:text-red-400"
-                : isMid
-                ? "text-amber-600 dark:text-amber-400"
-                : "text-emerald-600 dark:text-emerald-400";
-
-              return (
-                <div key={row.area} className="flex items-center gap-3">
-                  <span className="w-[72px] shrink-0 text-[11px] text-neutral-600 dark:text-neutral-400 font-medium">
-                    {row.area}
-                  </span>
-                  <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
-                    <div
-                      className={cn("h-full rounded-full transition-all duration-500", color)}
-                      style={{ width: `${row.rate}%` }}
-                    />
-                  </div>
-                  <span className={cn("w-[42px] shrink-0 text-right text-[11px] font-semibold", textColor)}>
-                    {row.rate}%
-                  </span>
+            {[
+              { label: "Training Participation", value: 40, color: "bg-indigo-400" },
+              { label: "Attendance Rate", value: 30, color: "bg-emerald-400" },
+              { label: "Active Status", value: 30, color: "bg-amber-400" },
+            ].map((row) => (
+              <div key={row.label} className="flex items-center gap-3">
+                <span className="w-[100px] shrink-0 text-[11px] text-neutral-600 dark:text-neutral-400 font-medium">
+                  {row.label}
+                </span>
+                <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+                  <div className={cn("h-full rounded-full transition-all duration-500", row.color)} style={{ width: `${row.value}%` }} />
                 </div>
-              );
-            })}
+                <span className="w-[30px] shrink-0 text-right text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                  {row.value}%
+                </span>
+              </div>
+            ))}
           </div>
         </div>
-
       </div>
     </ChartCard>
   );

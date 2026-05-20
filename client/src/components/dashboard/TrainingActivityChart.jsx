@@ -2,14 +2,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
-import {
-  PieChart, Pie, Legend,
-} from "recharts";
+import { PieChart, Pie } from "recharts";
 import { Info, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { trainingActivityData, topGroupsData } from "@/data/dashboardData";
 
-/** Shared card shell */
 function ChartCard({ title, icon: Icon, children, className }) {
   return (
     <div className={cn(
@@ -29,7 +25,6 @@ function ChartCard({ title, icon: Icon, children, className }) {
   );
 }
 
-/** Custom tooltip */
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
@@ -46,26 +41,20 @@ function CustomTooltip({ active, payload, label }) {
 
 const AREA_COLORS = ["#6366f1", "#818cf8", "#a5b4fc", "#c7d2fe", "#e0e7ff", "#eef2ff"];
 
-/**
- * TrainingActivityChart
- * Two sub-charts: trainings by area (donut) + top groups (horizontal bar).
- */
-export default function TrainingActivityChart() {
-  const totalTrainings = trainingActivityData.reduce((a, d) => a + d.trainings, 0);
+export default function TrainingActivityChart({ data }) {
+  const byArea = data?.by_area || [];
+  const totalTrainings = byArea.reduce((a, d) => a + (d.trainings || 0), 0);
 
-  const pieData = trainingActivityData.map((d, i) => ({
-    name:  d.area,
-    value: d.trainings,
+  const pieData = byArea.map((d, i) => ({
+    name: d.area || "Unknown",
+    value: d.trainings || 0,
     color: AREA_COLORS[i] ?? "#6366f1",
   }));
 
   return (
     <ChartCard title="Training Activity" icon={Dumbbell}>
       <div className="flex flex-col gap-6">
-
-        {/* ── Top row: donut + legend ───────────────────────── */}
         <div className="flex items-center gap-4">
-          {/* Donut */}
           <div className="relative h-[140px] w-[140px] shrink-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -84,7 +73,6 @@ export default function TrainingActivityChart() {
                 <Tooltip content={<CustomTooltip />} />
               </PieChart>
             </ResponsiveContainer>
-            {/* Center label */}
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-[22px] font-bold leading-none text-neutral-900 dark:text-neutral-50">
                 {totalTrainings}
@@ -95,7 +83,6 @@ export default function TrainingActivityChart() {
             </div>
           </div>
 
-          {/* Legend */}
           <div className="flex flex-1 flex-col gap-1.5">
             {pieData.map((d) => (
               <div key={d.name} className="flex items-center justify-between">
@@ -108,64 +95,16 @@ export default function TrainingActivityChart() {
                     {d.value}
                   </span>
                   <span className="text-[10px] text-neutral-400 dark:text-neutral-600 w-[34px] text-right">
-                    {Math.round((d.value / totalTrainings) * 100)}%
+                    {totalTrainings > 0 ? Math.round((d.value / totalTrainings) * 100) : 0}%
                   </span>
                 </div>
               </div>
             ))}
+            {pieData.length === 0 && (
+              <p className="text-xs text-neutral-400">No training data available</p>
+            )}
           </div>
         </div>
-
-        {/* ── Divider ──────────────────────────────────────── */}
-        <div className="border-t border-neutral-100 dark:border-neutral-800" />
-
-        {/* ── Top groups bar ────────────────────────────────── */}
-        <div>
-          <p className="mb-3 text-[11px] font-semibold text-neutral-500 dark:text-neutral-500 uppercase tracking-wider">
-            Top Groups by Trainings
-          </p>
-          <ResponsiveContainer width="100%" height={140}>
-            <BarChart
-              data={topGroupsData}
-              layout="vertical"
-              margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
-              barSize={7}
-            >
-              <CartesianGrid
-                strokeDasharray="3 3"
-                stroke="currentColor"
-                className="text-neutral-100 dark:text-neutral-800"
-                horizontal={false}
-              />
-              <XAxis
-                type="number"
-                tick={{ fontSize: 10, fill: "currentColor" }}
-                className="text-neutral-400"
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                dataKey="group"
-                type="category"
-                tick={{ fontSize: 10, fill: "currentColor" }}
-                className="text-neutral-500 dark:text-neutral-400"
-                tickLine={false}
-                axisLine={false}
-                width={110}
-              />
-              <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(99,102,241,0.04)" }} />
-              <Bar dataKey="trainings" name="Trainings" radius={[0, 4, 4, 0]}>
-                {topGroupsData.map((_, i) => (
-                  <Cell
-                    key={i}
-                    fill={i === 0 ? "#6366f1" : i === 1 ? "#818cf8" : "#d4d4d4"}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
       </div>
     </ChartCard>
   );
