@@ -1433,4 +1433,336 @@ if (existingReservists.length > 0) {
   }
 );
 
+/**
+ * POST /api/reservists/bulk-upload-info
+ * Bulk upload reservists from Excel file with detailed personal & military info
+ * Expected columns: Fullname, Rank, AFPSN (Serial Number), Date of Birth, Place of Birth,
+ *   Age, Sex, Civil Status, Citizenship, Height, Weight, Blood Type, Home Address,
+ *   Contact Number, Email Address, Branch of Service, Reserve Center, Group Command,
+ *   Squadron, Category, Source of Commission/Enlistment, Rank Date of Appointment,
+ *   Specialization/MOS, Status, Highest Educational Attainment, Course/Degree, School,
+ *   Year Graduated, Occupation, Employer/Company, Office Address,
+ *   Basic Training Completed, Date Completed, Other Military Courses/Training,
+ *   AWARDS AND DECORATIONS, Emergency contact name, Relationship, Contact Number, Address
+ */
+router.post(
+  '/bulk-upload-info',
+  authenticateToken,
+  requireAdmin,
+  upload.single('file'),
+  async (req, res) => {
+    let connection;
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'No file provided',
+          code: 'NO_FILE'
+        });
+      }
+
+      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+      const sheetNames = workbook.SheetNames;
+
+      if (sheetNames.length === 0) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Excel file has no sheets',
+          code: 'INVALID_FILE'
+        });
+      }
+
+      const bodyArsenId = req.body.arsen_id ? parseInt(req.body.arsen_id) : null;
+      const bodyGroupId = req.body.group_id ? parseInt(req.body.group_id) : null;
+      const bodySquadronId = req.body.squadron_id ? parseInt(req.body.squadron_id) : null;
+
+      if (!bodyArsenId || isNaN(bodyArsenId)) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Valid ARSEN ID is required',
+          code: 'INVALID_ARSEN'
+        });
+      }
+
+      if (!bodyGroupId || isNaN(bodyGroupId)) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Valid Group ID is required',
+          code: 'INVALID_GROUP'
+        });
+      }
+
+      if (!bodySquadronId || isNaN(bodySquadronId)) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Valid Squadron ID is required',
+          code: 'INVALID_SQUADRON'
+        });
+      }
+
+      connection = await db.getConnection();
+      await connection.beginTransaction();
+
+      let successCount = 0;
+      let failureCount = 0;
+      const errors = [];
+
+      for (let sheetIndex = 0; sheetIndex < sheetNames.length; sheetIndex++) {
+        const sheetName = sheetNames[sheetIndex];
+        const worksheet = workbook.Sheets[sheetName];
+
+        const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        let headerRowIndex = 0;
+        for (let i = 0; i < rawRows.length; i++) {
+          const row = rawRows[i];
+          if (row && row.some(cell =>
+            cell && typeof cell === 'string' &&
+            (cell === 'Fullname' || cell === 'Rank' || cell === 'AFPSN (Serial Number)' ||
+             cell === 'Email Address' || cell === 'Contact Number')
+          )) {
+            headerRowIndex = i;
+            break;
+          }
+        }
+
+        const headers = rawRows[headerRowIndex] || [];
+        const dataRows = rawRows.slice(headerRowIndex + 1);
+        const rows = dataRows.map(row => {
+          const obj = {};
+          headers.forEach((key, idx) => {
+            if (key != null) obj[key] = row[idx];
+          });
+          return obj;
+        });
+
+        if (rows.length === 0) continue;
+
+        for (const row of rows) {
+          try {
+            const fullname = (row['Fullname'] || '').trim();
+            const rank = (row['Rank'] || '').trim();
+            const serviceNumber = (row['AFPSN (Serial Number)'] || '').trim();
+
+            if (!fullname || fullname.length < 2) continue;
+
+            const dateOfBirth = row['Date of Birth'] || null;
+            const placeOfBirth = row['Place of Birth'] || null;
+            const age = row['Age'] ? parseInt(row['Age'], 10) : null;
+            const sex = row['Sex'] || null;
+            const civilStatus = row['Civil Status'] || null;
+            const citizenship = row['Citizenship'] || 'Filipino';
+            const height = row['Height'] ? parseFloat(row['Height']) : null;
+            const weight = row['Weight'] ? parseFloat(row['Weight']) : null;
+            const bloodType = row['Blood Type'] || null;
+            const homeAddress = row['Home Address'] || null;
+            const contactNumber = row['Contact Number'] || null;
+            const email = row['Email Address'] || null;
+            const branchOfService = row['Branch of Service'] || null;
+            const reserveCenter = row['Reserve Center'] || null;
+            const groupCommand = row['Group Command'] || null;
+            const squadron = row['Squadron'] || null;
+            const category = row['Category (1st / 2nd / 3rd Category)'] || null;
+            const sourceOfCommission = row['Source of Commission/Enlistment (ROTC/ BCMT/ MOTC/ Direct Commission)'] || null;
+            const rankDateOfAppointment = row['Rank Date of Appointment'] || null;
+            const specialization = row['Specialization/MOS'] || null;
+            const reserveStatus = row['Status (Ready Reserve/ Standby Reserve/ Retired)'] || 'Ready Reserve';
+            const highestEducation = row['Highest Educational Attainment'] || null;
+            const courseDegree = row['Course/Degree'] || null;
+            const school = row['School'] || null;
+            const yearGraduated = row['Year Graduated'] ? parseInt(row['Year Graduated'], 10) : null;
+            const occupation = row['Occupation'] || null;
+            const employer = row['Employer/Company'] || null;
+            const officeAddress = row['Office Address'] || null;
+            const basicTraining = row['Basic Training Completed (BCMT/ROTC)'] || null;
+            const dateCompleted = row['Date Completed'] || null;
+            const otherTraining = row['Other Military Courses/Training'] || null;
+            const awards = row['AWARDS AND DECORATIONS'] || null;
+            const emergencyContactName = row['Emergency contact name'] || null;
+            const emergencyRelationship = row['Relationship'] || null;
+            const emergencyContactNumber = row['Contact Number'] || null;
+            const emergencyAddress = row['Address'] || null;
+
+            // Parse fullname into first and last name
+            const nameParts = fullname.trim().split(/\s+/);
+            const firstName = nameParts[0] || 'Unknown';
+            const lastName = nameParts.slice(1).join(' ') || nameParts[0] || 'Unknown';
+
+            // Check if reservist exists by service number
+            let reservistId;
+
+            if (serviceNumber) {
+              const [existingReservists] = await connection.query(
+                'SELECT id FROM reservists WHERE service_number = ?',
+                [serviceNumber]
+              );
+
+              if (existingReservists.length > 0) {
+                reservistId = existingReservists[0].id;
+                await connection.query(
+                  `UPDATE reservists SET
+                    first_name = ?, last_name = ?, rank = ?, date_of_birth = ?,
+                    place_of_birth = ?, age = ?, sex = ?, civil_status = ?,
+                    citizenship = ?, height = ?, weight = ?, blood_type = ?,
+                    phone_number = ?, address = ?, reserve_center = ?, category = ?,
+                    source_of_commission = ?, rank_date_appointment = ?, specialization = ?,
+                    reserve_status = ?, highest_education = ?, course_degree = ?, school = ?,
+                    year_graduated = ?, occupation = ?, employer = ?, office_address = ?,
+                    basic_training_completed = ?, basic_training_date = ?,
+                    emergency_contact_name = ?, emergency_contact_phone = ?,
+                    emergency_contact_address = ?
+                  WHERE id = ?`,
+                  [
+                    firstName, lastName, rank, dateOfBirth, placeOfBirth, age, sex,
+                    civilStatus, citizenship, height, weight, bloodType, contactNumber,
+                    homeAddress, reserveCenter, category, sourceOfCommission,
+                    rankDateOfAppointment, specialization, reserveStatus, highestEducation,
+                    courseDegree, school, yearGraduated, occupation, employer, officeAddress,
+                    basicTraining, dateCompleted, emergencyContactName, emergencyContactNumber,
+                    emergencyAddress, reservistId
+                  ]
+                );
+              } else {
+                // Create new reservist
+                const userEmail = email || `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@pafr.mil`;
+                const tempPassword = 'TempPassword123!';
+                const passwordHash = await hashPassword(tempPassword);
+
+                const [existingUsers] = await connection.query(
+                  'SELECT id FROM users WHERE email = ?',
+                  [userEmail]
+                );
+
+                let userId;
+                if (existingUsers.length > 0) {
+                  userId = existingUsers[0].id;
+                } else {
+                  const [userResult] = await connection.query(
+                    'INSERT INTO users (email, password_hash, role, is_active) VALUES (?, ?, ?, TRUE)',
+                    [userEmail, passwordHash, 'reservist']
+                  );
+                  userId = userResult.insertId;
+                }
+
+                const [reservistResult] = await connection.query(
+                  `INSERT INTO reservists (
+                    user_id, first_name, last_name, rank, service_number, date_of_birth,
+                    place_of_birth, age, sex, civil_status, citizenship, height, weight,
+                    blood_type, phone_number, address, reserve_center, category,
+                    source_of_commission, rank_date_appointment, specialization,
+                    reserve_status, highest_education, course_degree, school, year_graduated,
+                    occupation, employer, office_address, basic_training_completed,
+                    basic_training_date, emergency_contact_name, emergency_contact_phone,
+                    emergency_contact_address, is_active
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+                  [
+                    userId, firstName, lastName, rank, serviceNumber || null, dateOfBirth,
+                    placeOfBirth, age, sex, civilStatus, citizenship, height, weight,
+                    bloodType, contactNumber, homeAddress, reserveCenter, category,
+                    sourceOfCommission, rankDateOfAppointment, specialization,
+                    reserveStatus, highestEducation, courseDegree, school, yearGraduated,
+                    occupation, employer, officeAddress, basicTraining, dateCompleted,
+                    emergencyContactName, emergencyContactNumber, emergencyAddress
+                  ]
+                );
+
+                reservistId = reservistResult.insertId;
+              }
+            }
+
+            // Create or update assignment
+            if (bodyGroupId) {
+                // Validate group belongs to the selected arsen
+                const [groupCheck] = await connection.query(
+                  'SELECT id FROM `groups` WHERE id = ? AND arsen_id = ?',
+                  [bodyGroupId, bodyArsenId]
+                );
+                if (groupCheck.length === 0) {
+                  errors.push(`Row "${fullname}": Selected group does not belong to the selected ARSEN`);
+                  failureCount++;
+                  continue;
+                }
+
+                // Validate squadron belongs to the selected group
+                const [squadronCheck] = await connection.query(
+                  'SELECT id FROM squadron WHERE id = ? AND group_id = ?',
+                  [bodySquadronId, bodyGroupId]
+                );
+                if (squadronCheck.length === 0) {
+                  errors.push(`Row "${fullname}": Selected squadron does not belong to the selected group`);
+                  failureCount++;
+                  continue;
+                }
+
+                const [existingAssignments] = await connection.query(
+                  'SELECT id FROM reservist_assignments WHERE reservist_id = ? AND group_id = ? AND squadron_id = ?',
+                  [reservistId, bodyGroupId, bodySquadronId]
+                );
+
+                if (existingAssignments.length === 0) {
+                  await connection.query(
+                    'UPDATE reservist_assignments SET is_primary = FALSE WHERE reservist_id = ? AND is_primary = TRUE',
+                    [reservistId]
+                  );
+
+                  await connection.query(
+                    `INSERT INTO reservist_assignments (
+                      reservist_id, group_id, squadron_id, assigned_date, is_primary
+                    ) VALUES (?, ?, ?, CURDATE(), TRUE)`,
+                    [reservistId, bodyGroupId, bodySquadronId]
+                  );
+                }
+              }
+
+              successCount++;
+          } catch (rowError) {
+            errors.push(`Row "${row['Fullname'] || 'unknown'}" in sheet "${sheetName}": ${rowError.message}`);
+            failureCount++;
+          }
+        }
+      }
+
+      await connection.commit();
+
+      logAudit({
+        user_id: req.user.id,
+        action: 'reservist.bulk_upload_info',
+        entity_type: 'reservist',
+        new_values: { successful: successCount, failed: failureCount },
+        ip_address: getClientIp(req),
+        user_agent: req.headers['user-agent']
+      });
+
+      res.json({
+        status: 'success',
+        message: 'Bulk upload completed',
+        data: {
+          successful: successCount,
+          failed: failureCount,
+          total: successCount + failureCount,
+          errors: errors
+        }
+      });
+    } catch (error) {
+      if (connection) {
+        try {
+          await connection.rollback();
+        } catch (rollbackError) {
+          console.error('Rollback error:', rollbackError);
+        }
+      }
+
+      console.error('Error in bulk upload info:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Bulk upload failed: ' + error.message,
+        code: 'BULK_UPLOAD_ERROR'
+      });
+    } finally {
+      if (connection) {
+        connection.release();
+      }
+    }
+  }
+);
+
 module.exports = router;

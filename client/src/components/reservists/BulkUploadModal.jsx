@@ -1,8 +1,27 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Upload, AlertCircle, CheckCircle, Loader, FileText, ChevronRight, ChevronLeft } from "lucide-react";
+import { X, Upload, AlertCircle, CheckCircle, Loader, FileText, ChevronRight, ChevronLeft, Users, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
-import { bulkUploadReservists, getArcens, getGroupsList } from "@/services/api";
+import { bulkUploadReservists, bulkUploadReservistInfo, getArcens, getGroupsList, getSquadrons } from "@/services/api";
+
+const UPLOAD_TYPES = {
+  POSITION: 'position',
+  RESERVIST_INFO: 'reservist_info',
+};
+
+const RESERVIST_INFO_COLUMNS = [
+  'Fullname', 'Rank', 'AFPSN (Serial Number)', 'Date of Birth', 'Place of Birth',
+  'Age', 'Sex', 'Civil Status', 'Citizenship', 'Height', 'Weight', 'Blood Type',
+  'Home Address', 'Contact Number', 'Email Address', 'Branch of Service',
+  'Reserve Center', 'Group Command', 'Squadron', 'Category (1st / 2nd / 3rd Category)',
+  'Source of Commission/Enlistment (ROTC/ BCMT/ MOTC/ Direct Commission)',
+  'Rank Date of Appointment', 'Specialization/MOS',
+  'Status (Ready Reserve/ Standby Reserve/ Retired)', 'Highest Educational Attainment',
+  'Course/Degree', 'School', 'Year Graduated', 'Occupation', 'Employer/Company',
+  'Office Address', 'Basic Training Completed (BCMT/ROTC)', 'Date Completed',
+  'Other Military Courses/Training', 'AWARDS AND DECORATIONS',
+  'Emergency contact name', 'Relationship', 'Contact Number', 'Address',
+];
 
 export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
   const fileInputRef = useRef(null);
@@ -22,6 +41,10 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
   const [groups, setGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [loadingGroups, setLoadingGroups] = useState(false);
+  const [squadrons, setSquadrons] = useState([]);
+  const [selectedSquadron, setSelectedSquadron] = useState(null);
+  const [loadingSquadrons, setLoadingSquadrons] = useState(false);
+  const [uploadType, setUploadType] = useState(UPLOAD_TYPES.POSITION);
 
   useEffect(() => {
     loadArsensAndGroups();
@@ -50,13 +73,35 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
     }
   };
 
+  const loadSquadrons = async (groupId) => {
+    if (!groupId) {
+      setSquadrons([]);
+      setSelectedSquadron(null);
+      return;
+    }
+    try {
+      setLoadingSquadrons(true);
+      const squadronRes = await getSquadrons({ group_id: groupId, is_active: true });
+      if (squadronRes.data.status === 'success') {
+        setSquadrons(squadronRes.data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to load Squadrons:', err);
+      setSquadrons([]);
+    } finally {
+      setLoadingSquadrons(false);
+    }
+  };
+
   const filteredGroups = groups.filter(g => {
     if (!selectedArsen) return false;
     const arsenId = g.arsen_id != null ? parseInt(g.arsen_id, 10) : null;
     return arsenId === selectedArsen;
   });
 
-  const parseExcelFile = (excelFile) => {
+  const filteredSquadrons = squadrons;
+
+  const parsePositionExcel = (excelFile) => {
     try {
       setParseError(null);
       const reader = new FileReader();
@@ -70,18 +115,15 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
 
           const firstSheet = sheets[0];
           const worksheet = workbook.Sheets[firstSheet];
-          
-          // Get raw data as array of arrays to detect header row
+
           const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-          
-          // Find the header row index by looking for expected column names
-          // The header row should contain cells like "DESCRIPTION/POSITION", "GRADE", "AFSC", "REQUIRED", "NAME"
+
           let headerRowIndex = 0;
           for (let i = 0; i < rawData.length; i++) {
             const row = rawData[i];
-            if (row && row.some(cell => 
-              cell && typeof cell === 'string' && 
-              (cell === 'DESCRIPTION/POSITION' || cell === 'GRADE' || cell === 'AFSC' || 
+            if (row && row.some(cell =>
+              cell && typeof cell === 'string' &&
+              (cell === 'DESCRIPTION/POSITION' || cell === 'GRADE' || cell === 'AFSC' ||
                cell === 'REQUIRED' || cell === 'NAME' || cell === 'Position' || cell === 'Name')
             )) {
               headerRowIndex = i;
@@ -89,7 +131,6 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
             }
           }
 
-          // Extract header names from the detected header row and build data rows manually
           const headers = rawData[headerRowIndex] || [];
           const dataRows = rawData.slice(headerRowIndex + 1);
           const jsonData = dataRows.map(row => {
@@ -99,8 +140,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
             });
             return obj;
           });
-          
-          // Filter out non-data rows (section headers, totals, etc.)
+
           const filteredData = jsonData.filter(row => {
             const position = (row["DESCRIPTION/POSITION"] || row["Position"] || "").trim();
             const name = (row["NAME"] || row["Name"] || "").trim();
@@ -146,6 +186,119 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
     }
   };
 
+  const parseReservistInfoExcel = (excelFile) => {
+    try {
+      setParseError(null);
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheets = workbook.SheetNames;
+          setSheetNames(sheets);
+
+          const firstSheet = sheets[0];
+          const worksheet = workbook.Sheets[firstSheet];
+
+          const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+          let headerRowIndex = 0;
+          for (let i = 0; i < rawData.length; i++) {
+            const row = rawData[i];
+            if (row && row.some(cell =>
+              cell && typeof cell === 'string' &&
+              (cell === 'Fullname' || cell === 'Rank' || cell === 'AFPSN (Serial Number)' ||
+               cell === 'Email Address' || cell === 'Contact Number')
+            )) {
+              headerRowIndex = i;
+              break;
+            }
+          }
+
+          const headers = rawData[headerRowIndex] || [];
+          const dataRows = rawData.slice(headerRowIndex + 1);
+          const jsonData = dataRows.map(row => {
+            const obj = {};
+            headers.forEach((key, idx) => {
+              if (key != null) obj[key] = row[idx];
+            });
+            return obj;
+          });
+
+          const filteredData = jsonData.filter(row => {
+            const fullname = (row["Fullname"] || "").trim();
+            return fullname && fullname.length >= 2;
+          });
+
+          const preview = filteredData.slice(0, 3).map((row, idx) => ({
+            sheetName: firstSheet,
+            sheetIndex: 0,
+            rowIndex: idx + 1,
+            data: {
+              fullname: row["Fullname"] || "",
+              rank: row["Rank"] || "",
+              afpsn: row["AFPSN (Serial Number)"] || "",
+              dateOfBirth: row["Date of Birth"] || "",
+              placeOfBirth: row["Place of Birth"] || "",
+              age: row["Age"] || "",
+              sex: row["Sex"] || "",
+              civilStatus: row["Civil Status"] || "",
+              citizenship: row["Citizenship"] || "",
+              height: row["Height"] || "",
+              weight: row["Weight"] || "",
+              bloodType: row["Blood Type"] || "",
+              homeAddress: row["Home Address"] || "",
+              contactNumber: row["Contact Number"] || "",
+              email: row["Email Address"] || "",
+              branchOfService: row["Branch of Service"] || "",
+              reserveCenter: row["Reserve Center"] || "",
+              groupCommand: row["Group Command"] || "",
+              squadron: row["Squadron"] || "",
+              category: row["Category (1st / 2nd / 3rd Category)"] || "",
+              sourceOfCommission: row["Source of Commission/Enlistment (ROTC/ BCMT/ MOTC/ Direct Commission)"] || "",
+              rankDateOfAppointment: row["Rank Date of Appointment"] || "",
+              specialization: row["Specialization/MOS"] || "",
+              status: row["Status (Ready Reserve/ Standby Reserve/ Retired)"] || "",
+              highestEducation: row["Highest Educational Attainment"] || "",
+              courseDegree: row["Course/Degree"] || "",
+              school: row["School"] || "",
+              yearGraduated: row["Year Graduated"] || "",
+              occupation: row["Occupation"] || "",
+              employer: row["Employer/Company"] || "",
+              officeAddress: row["Office Address"] || "",
+              basicTraining: row["Basic Training Completed (BCMT/ROTC)"] || "",
+              dateCompleted: row["Date Completed"] || "",
+              otherTraining: row["Other Military Courses/Training"] || "",
+              awards: row["AWARDS AND DECORATIONS"] || "",
+              emergencyContactName: row["Emergency contact name"] || "",
+              emergencyRelationship: row["Relationship"] || "",
+              emergencyContactNumber: row["Contact Number"] || row["Contact Number"] || "",
+              emergencyAddress: row["Address"] || "",
+            },
+          }));
+
+          setPreviewData(preview);
+          setStage("preview");
+          setPreviewing(false);
+        } catch (err) {
+          setParseError(`Error parsing Excel file: ${err.message}`);
+          setPreviewing(false);
+        }
+      };
+
+      reader.onerror = () => {
+        setParseError("Error reading file");
+        setPreviewing(false);
+      };
+
+      reader.readAsArrayBuffer(excelFile);
+    } catch (err) {
+      setParseError(`Error processing file: ${err.message}`);
+      setPreviewing(false);
+    }
+  };
+
   const handleFileChange = (e) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -162,7 +315,12 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
     setFile(selectedFile);
     setError(null);
     setPreviewing(true);
-    parseExcelFile(selectedFile);
+
+    if (uploadType === UPLOAD_TYPES.RESERVIST_INFO) {
+      parseReservistInfoExcel(selectedFile);
+    } else {
+      parsePositionExcel(selectedFile);
+    }
   };
 
   const handleFileClick = () => {
@@ -170,9 +328,21 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
   };
 
   const handleUpload = async () => {
-    if (!file || !selectedArsen) {
+    if (!file) {
+      setError("Please select a file first");
+      return;
+    }
+
+    if (uploadType === UPLOAD_TYPES.POSITION && !selectedArsen) {
       setError("Please select an ARSEN first");
       return;
+    }
+
+    if (uploadType === UPLOAD_TYPES.RESERVIST_INFO) {
+      if (!selectedArsen || !selectedGroup || !selectedSquadron) {
+        setError("Please select an ARSEN, Group, and Squadron");
+        return;
+      }
     }
 
     setLoading(true);
@@ -182,16 +352,30 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("arsen_id", selectedArsen);
-      if (selectedGroup) {
+
+      if (uploadType === UPLOAD_TYPES.POSITION) {
+        formData.append("arsen_id", selectedArsen);
+        if (selectedGroup) {
+          formData.append("group_id", selectedGroup);
+        }
+        if (selectedSquadron) {
+          formData.append("squadron_id", selectedSquadron);
+        }
+      } else {
+        formData.append("arsen_id", selectedArsen);
         formData.append("group_id", selectedGroup);
+        formData.append("squadron_id", selectedSquadron);
       }
 
-      const response = await bulkUploadReservists(formData);
+      const uploadFn = uploadType === UPLOAD_TYPES.RESERVIST_INFO
+        ? bulkUploadReservistInfo
+        : bulkUploadReservists;
+
+      const response = await uploadFn(formData);
 
       if (response.status === "success") {
         setSuccessMessage(
-          `Successfully uploaded ${response.data.successful} reservist(s). ${
+          `Successfully uploaded ${response.data.successful} record(s). ${
             response.data.failed > 0 ? `${response.data.failed} failed.` : ""
           }`
         );
@@ -225,21 +409,35 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
     setUploadProgress(0);
     setSelectedArsen(null);
     setSelectedGroup(null);
+    setSelectedSquadron(null);
+    setUploadType(UPLOAD_TYPES.POSITION);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
     onClose();
   };
 
+  const handleUploadTypeChange = (e) => {
+    setUploadType(e.target.value);
+    setFile(null);
+    setPreviewData(null);
+    setSheetNames([]);
+    setParseError(null);
+    setError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div 
+      <div
         className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
         onClick={handleClose}
       />
-      
+
       <div className={cn(
         "relative z-10 w-full rounded-2xl shadow-2xl max-w-2xl",
         "bg-white dark:bg-neutral-900",
@@ -253,7 +451,9 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
               Bulk Upload Reservists
             </h2>
             <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-              Upload Excel file with position data for multiple reservists
+              {uploadType === UPLOAD_TYPES.POSITION
+                ? "Upload Excel file with position data for multiple reservists"
+                : "Upload Excel file with detailed reservist information"}
             </p>
           </div>
           <button
@@ -269,30 +469,113 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
         <div className="px-6 py-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
           {stage === "upload" && (
             <>
+              {/* Upload Type Selection */}
+              <div className="space-y-2">
+                <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                  Upload Type <span className="text-red-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setUploadType(UPLOAD_TYPES.POSITION)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all duration-150",
+                      uploadType === UPLOAD_TYPES.POSITION
+                        ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10"
+                        : "border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600"
+                    )}
+                  >
+                    <div className={cn(
+                      "flex h-10 w-10 items-center justify-center rounded-lg",
+                      uploadType === UPLOAD_TYPES.POSITION
+                        ? "bg-indigo-500 text-white"
+                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"
+                    )}>
+                      <Users size={20} />
+                    </div>
+                    <div>
+                      <p className={cn(
+                        "text-sm font-semibold",
+                        uploadType === UPLOAD_TYPES.POSITION
+                          ? "text-indigo-700 dark:text-indigo-300"
+                          : "text-neutral-700 dark:text-neutral-300"
+                      )}>
+                        Position Upload
+                      </p>
+                      <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                        Unit manning document with positions
+                      </p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setUploadType(UPLOAD_TYPES.RESERVIST_INFO)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all duration-150",
+                      uploadType === UPLOAD_TYPES.RESERVIST_INFO
+                        ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10"
+                        : "border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600"
+                    )}
+                  >
+                    <div className={cn(
+                      "flex h-10 w-10 items-center justify-center rounded-lg",
+                      uploadType === UPLOAD_TYPES.RESERVIST_INFO
+                        ? "bg-indigo-500 text-white"
+                        : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"
+                    )}>
+                      <UserCog size={20} />
+                    </div>
+                    <div>
+                      <p className={cn(
+                        "text-sm font-semibold",
+                        uploadType === UPLOAD_TYPES.RESERVIST_INFO
+                          ? "text-indigo-700 dark:text-indigo-300"
+                          : "text-neutral-700 dark:text-neutral-300"
+                      )}>
+                        Reservist Info
+                      </p>
+                      <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                        Detailed personal & military information
+                      </p>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
               {/* Instructions */}
               <div className="rounded-lg bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 p-4">
                 <h3 className="text-[11px] font-semibold text-neutral-900 dark:text-neutral-300 mb-2 uppercase tracking-wide">
-                  File Format Requirements
+                  {uploadType === UPLOAD_TYPES.POSITION ? 'Position Upload Format' : 'Reservist Info Format'}
                 </h3>
-                <ul className="text-[11px] text-neutral-600 dark:text-neutral-400 space-y-1 ml-4 list-disc">
-                  <li>
-                    <strong>First sheet:</strong> Group positions (unit manning document)
-                  </li>
-                  <li>Other sheets: Squadron positions</li>
-                  <li>
-                    <strong>Required columns:</strong> DESCRIPTION/POSITION, GRADE, AFSC, REQUIRED, NAME
-                  </li>
-                </ul>
+                {uploadType === UPLOAD_TYPES.POSITION ? (
+                  <ul className="text-[11px] text-neutral-600 dark:text-neutral-400 space-y-1 ml-4 list-disc">
+                    <li><strong>First sheet:</strong> Group positions (unit manning document)</li>
+                    <li>Other sheets: Squadron positions</li>
+                    <li><strong>Required columns:</strong> DESCRIPTION/POSITION, GRADE, AFSC, REQUIRED, NAME</li>
+                  </ul>
+                ) : (
+                  <ul className="text-[11px] text-neutral-600 dark:text-neutral-400 space-y-1 ml-4 list-disc">
+                    <li><strong>Single sheet</strong> with all reservist details</li>
+                    <li><strong>Required columns:</strong> Fullname, Rank, AFPSN (Serial Number)</li>
+                    <li><strong>Optional columns:</strong> Date of Birth, Place of Birth, Age, Sex, Civil Status, Citizenship, Height, Weight, Blood Type, Home Address, Contact Number, Email Address, Branch of Service, Reserve Center, Group Command, Squadron, Category, Source of Commission/Enlistment, Rank Date of Appointment, Specialization/MOS, Status, Highest Educational Attainment, Course/Degree, School, Year Graduated, Occupation, Employer/Company, Office Address, Basic Training Completed, Date Completed, Other Military Courses/Training, AWARDS AND DECORATIONS, Emergency contact name, Relationship, Contact Number, Address</li>
+                  </ul>
+                )}
               </div>
 
-              {/* ARSEN Selection */}
+              {/* ARSEN / Group / Squadron Selection */}
               <div className="space-y-2">
                 <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
                   Select ARSEN (Air Reserve Squadron Center) <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={selectedArsen || ""}
-                  onChange={(e) => setSelectedArsen(parseInt(e.target.value))}
+                  onChange={(e) => {
+                    const newArsen = e.target.value ? parseInt(e.target.value) : null;
+                    setSelectedArsen(newArsen);
+                    setSelectedGroup(null);
+                    setSelectedSquadron(null);
+                    setSquadrons([]);
+                  }}
                   disabled={loadingArsens}
                   className={cn(
                     "w-full rounded-lg border px-2.5 py-1.5 text-sm",
@@ -320,14 +603,18 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                 )}
               </div>
 
-              {/* Group Selection */}
               <div className="space-y-2">
                 <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
-                  Select Group (Optional)
+                  Select Group <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={selectedGroup || ""}
-                  onChange={(e) => setSelectedGroup(e.target.value ? parseInt(e.target.value) : null)}
+                  onChange={(e) => {
+                    const newGroup = e.target.value ? parseInt(e.target.value) : null;
+                    setSelectedGroup(newGroup);
+                    setSelectedSquadron(null);
+                    loadSquadrons(newGroup);
+                  }}
                   disabled={!selectedArsen || loadingGroups}
                   className={cn(
                     "w-full rounded-lg border px-2.5 py-1.5 text-sm",
@@ -351,6 +638,40 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                 {selectedArsen && filteredGroups.length === 0 && !loadingGroups && (
                   <p className="text-[11px] text-amber-600">
                     No active groups available for this ARSEN.
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
+                  Select Squadron <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={selectedSquadron || ""}
+                  onChange={(e) => setSelectedSquadron(e.target.value ? parseInt(e.target.value) : null)}
+                  disabled={!selectedGroup || loadingSquadrons}
+                  className={cn(
+                    "w-full rounded-lg border px-2.5 py-1.5 text-sm",
+                    "border-neutral-200 dark:border-neutral-700",
+                    "bg-white dark:bg-neutral-800",
+                    "text-neutral-800 dark:text-neutral-200",
+                    "outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400",
+                    "transition-all duration-150 cursor-pointer",
+                    (!selectedGroup || loadingSquadrons) && "cursor-not-allowed opacity-60"
+                  )}
+                >
+                  <option value="">
+                    {!selectedGroup ? "Select a Group first..." : loadingSquadrons ? "Loading squadrons..." : "Select a Squadron..."}
+                  </option>
+                  {filteredSquadrons.map((squadron) => (
+                    <option key={squadron.id} value={squadron.id}>
+                      {squadron.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedGroup && filteredSquadrons.length === 0 && !loadingSquadrons && (
+                  <p className="text-[11px] text-amber-600">
+                    No active squadrons available for this group.
                   </p>
                 )}
               </div>
@@ -410,35 +731,72 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
           {stage === "preview" && previewData && (
             <>
               {/* Selection Summary */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 p-3">
-                  <p className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide mb-1">
-                    Selected ARSEN
-                  </p>
-                  <p className="text-[12px] font-medium text-emerald-900 dark:text-emerald-200">
-                    {arsens.find(a => a.id === selectedArsen)?.name || "Unknown"}
-                    {arsens.find(a => a.id === selectedArsen)?.code && (
-                      <span className="text-neutral-600 dark:text-neutral-400"> ({arsens.find(a => a.id === selectedArsen)?.code})</span>
-                    )}
-                  </p>
+              {uploadType === UPLOAD_TYPES.POSITION ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 p-3">
+                    <p className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide mb-1">
+                      Selected ARSEN
+                    </p>
+                    <p className="text-[12px] font-medium text-emerald-900 dark:text-emerald-200">
+                      {arsens.find(a => a.id === selectedArsen)?.name || "Unknown"}
+                      {arsens.find(a => a.id === selectedArsen)?.code && (
+                        <span className="text-neutral-600 dark:text-neutral-400"> ({arsens.find(a => a.id === selectedArsen)?.code})</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 p-3">
+                    <p className="text-[10px] font-semibold text-violet-800 dark:text-violet-300 uppercase tracking-wide mb-1">
+                      Selected Group
+                    </p>
+                    <p className="text-[12px] font-medium text-violet-900 dark:text-violet-200">
+                      {selectedGroup
+                        ? groups.find(g => g.id === selectedGroup)?.name || "Unknown"
+                        : "None (will use ARSEN default)"}
+                    </p>
+                  </div>
                 </div>
-                <div className="rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 p-3">
-                  <p className="text-[10px] font-semibold text-violet-800 dark:text-violet-300 uppercase tracking-wide mb-1">
-                    Selected Group
-                  </p>
-                  <p className="text-[12px] font-medium text-violet-900 dark:text-violet-200">
-                    {selectedGroup
-                      ? groups.find(g => g.id === selectedGroup)?.name || "Unknown"
-                      : "None (will use ARSEN default)"}
-                  </p>
+              ) : (
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 p-3">
+                    <p className="text-[10px] font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide mb-1">
+                      Selected ARSEN
+                    </p>
+                    <p className="text-[12px] font-medium text-emerald-900 dark:text-emerald-200">
+                      {selectedArsen
+                        ? arsens.find(a => a.id === selectedArsen)?.name || "Unknown"
+                        : "None"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20 p-3">
+                    <p className="text-[10px] font-semibold text-violet-800 dark:text-violet-300 uppercase tracking-wide mb-1">
+                      Selected Group
+                    </p>
+                    <p className="text-[12px] font-medium text-violet-900 dark:text-violet-200">
+                      {selectedGroup
+                        ? groups.find(g => g.id === selectedGroup)?.name || "Unknown"
+                        : "None"}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 p-3">
+                    <p className="text-[10px] font-semibold text-sky-800 dark:text-sky-300 uppercase tracking-wide mb-1">
+                      Selected Squadron
+                    </p>
+                    <p className="text-[12px] font-medium text-sky-900 dark:text-sky-200">
+                      {selectedSquadron
+                        ? squadrons.find(s => s.id === selectedSquadron)?.name || "Unknown"
+                        : "None"}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Sheet Names */}
               {sheetNames.length > 0 && (
                 <div className="rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 p-3">
                   <p className="text-[10px] font-semibold text-blue-800 dark:text-blue-300 uppercase tracking-wide mb-2">
-                    Sheets/Squadrons Found ({sheetNames.length})
+                    {uploadType === UPLOAD_TYPES.POSITION
+                      ? `Sheets/Squadrons Found (${sheetNames.length})`
+                      : `Sheet Found (${sheetNames.length})`}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {sheetNames.map((name, idx) => (
@@ -451,7 +809,9 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                             : "bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-300"
                         )}
                       >
-                        {idx === 0 ? "🏢 " : "🛩️ "}
+                        {uploadType === UPLOAD_TYPES.POSITION
+                          ? (idx === 0 ? "🏢 " : "🛩️ ")
+                          : "📋 "}
                         {name}
                       </span>
                     ))}
@@ -464,29 +824,60 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                 <h3 className="text-[10px] font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wide mb-2">
                   Preview (First 3 Records from First Sheet)
                 </h3>
-                <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
-                  <table className="w-full text-[11px]">
-                    <thead className="bg-neutral-50 dark:bg-neutral-800">
-                      <tr>
-                        <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Position</th>
-                        <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Grade</th>
-                        <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">AFSC</th>
-                        <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Required</th>
-                        <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Name</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                      {previewData.map((item, idx) => (
-                        <tr key={idx} className="bg-white dark:bg-neutral-900">
-                          <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.position}</td>
-                          <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.grade}</td>
-                          <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.afsc}</td>
-                          <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.required}</td>
-                          <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.name}</td>
+                <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-x-auto">
+                  {uploadType === UPLOAD_TYPES.POSITION ? (
+                    <table className="w-full text-[11px]">
+                      <thead className="bg-neutral-50 dark:bg-neutral-800">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Position</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Grade</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">AFSC</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Required</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Name</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        {previewData.map((item, idx) => (
+                          <tr key={idx} className="bg-white dark:bg-neutral-900">
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.position}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.grade}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.afsc}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.required}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.name}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <table className="w-full text-[11px]">
+                      <thead className="bg-neutral-50 dark:bg-neutral-800">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Fullname</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Rank</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">AFPSN</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Date of Birth</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Sex</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Contact</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Email</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        {previewData.map((item, idx) => (
+                          <tr key={idx} className="bg-white dark:bg-neutral-900">
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.fullname}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.rank}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.afpsn}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.dateOfBirth}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.sex}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.contactNumber}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.email}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
 
@@ -575,7 +966,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
               {stage === "upload" && (
                 <button
                   onClick={() => file && setStage("preview")}
-                  disabled={!file || loading}
+                  disabled={!file || loading || (uploadType === UPLOAD_TYPES.POSITION && !selectedArsen) || (uploadType === UPLOAD_TYPES.RESERVIST_INFO && (!selectedArsen || !selectedGroup || !selectedSquadron))}
                   className={cn(
                     "flex items-center gap-1 rounded-lg px-4 py-1.5 text-[11px] font-semibold",
                     "bg-indigo-600 text-white",
