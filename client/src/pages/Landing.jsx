@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
+import { fetchActiveAnnouncements } from '@/services/announcementsService';
 import { getTrainings, getExternalTrainings } from '@/services/trainingsService';
 import { Calendar, MapPin, Users, ClipboardList, ShieldCheck, Sun, Moon } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
@@ -131,7 +132,8 @@ function Carousel({ slides = [], interval = 6000 }) {
         {slides.map((s, i) => (
           <div
             key={s.key || i}
-            className={`absolute inset-0 transition-opacity duration-700 ${i === index ? 'opacity-100 relative' : 'opacity-0 pointer-events-none'}`}>
+            className={`absolute inset-0 transition-opacity duration-700 ${i === index ? 'opacity-100 relative' : 'opacity-0 pointer-events-none'}`}
+          >
             <div className="grid h-full gap-8 lg:grid-cols-[1.4fr_0.8fr] lg:items-center">
               <div>{s.left}</div>
               <div>{s.right}</div>
@@ -141,33 +143,53 @@ function Carousel({ slides = [], interval = 6000 }) {
       </div>
 
       {/* Controls */}
-      <div className="absolute inset-x-0 bottom-4 flex justify-center gap-2">
-        {slides.map((s, i) => (
-          <button
-            key={s.key || i}
-            aria-label={`Go to slide ${i + 1}`}
-            onClick={() => goTo(i)}
-            className={`h-2 w-8 rounded-full transition-colors ${i === index ? 'bg-indigo-600' : 'bg-neutral-300/60 dark:bg-neutral-600'}`}
-          />
-        ))}
-      </div>
+      {slides.length > 1 && (
+        <div className="absolute inset-x-0 bottom-4 flex justify-center gap-2">
+          {slides.map((s, i) => (
+            <button
+              key={s.key || i}
+              aria-label={`Go to slide ${i + 1}`}
+              onClick={() => goTo(i)}
+              className={`h-2 w-8 rounded-full transition-colors ${i === index ? 'bg-indigo-600' : 'bg-neutral-300/60 dark:bg-neutral-600'}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 export default function Landing() {
+  const [announcements, setAnnouncements] = useState([]);
   const [internalTrainings, setInternalTrainings] = useState([]);
   const [externalTrainings, setExternalTrainings] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
+  const [loadingTrainings, setLoadingTrainings] = useState(true);
   const [error, setError] = useState('');
+  const [trainingsError, setTrainingsError] = useState('');
   const navigate = useNavigate();
   const { addToast } = useToast();
   const { isDark, toggleTheme } = useTheme();
 
+  // Load announcements for the carousel
   useEffect(() => {
     async function load() {
-      setLoading(true);
-      setError('');
+      setLoadingAnnouncements(true);
+      const result = await fetchActiveAnnouncements({ limit: 50 });
+      if (result && !result.success) {
+        setError(result.message || 'Failed to load announcements');
+      }
+      setAnnouncements(result?.data?.announcements || []);
+      setLoadingAnnouncements(false);
+    }
+    load();
+  }, []);
+
+  // Load trainings for the bottom grids
+  useEffect(() => {
+    async function load() {
+      setLoadingTrainings(true);
+      setTrainingsError('');
 
       const [internalResult, externalResult] = await Promise.all([
         getTrainings({ limit: 6 }),
@@ -175,20 +197,20 @@ export default function Landing() {
       ]);
 
       if (internalResult && !internalResult.success) {
-        setError(internalResult.message || 'Failed to load internal trainings');
-        setLoading(false);
+        setTrainingsError(internalResult.message || 'Failed to load internal trainings');
+        setLoadingTrainings(false);
         return;
       }
 
       if (externalResult && !externalResult.success) {
-        setError(externalResult.message || 'Failed to load external trainings');
-        setLoading(false);
+        setTrainingsError(externalResult.message || 'Failed to load external trainings');
+        setLoadingTrainings(false);
         return;
       }
 
       setInternalTrainings(internalResult?.data?.trainings || []);
       setExternalTrainings(externalResult?.data?.trainings || []);
-      setLoading(false);
+      setLoadingTrainings(false);
     }
 
     load();
@@ -200,86 +222,120 @@ export default function Landing() {
     navigate('/login');
   };
 
-  const slides = [
-    {
-      key: 'landing',
-      left: (
-        <div className="space-y-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-indigo-600 dark:text-indigo-400">Public landing page</p>
-          <h1 className="text-4xl font-semibold tracking-tight text-neutral-950 dark:text-neutral-50">Browse admin-created trainings and activities.</h1>
-          <p className="max-w-2xl text-base leading-7 text-neutral-600 dark:text-neutral-400">
-            Guests can review internal training summaries and external event details before signing in. Registration and deeper training actions require authentication.
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={handleLogin}>Sign in to register</Button>
-            <Button variant="outline" onClick={() => navigate('/')}>Go to dashboard</Button>
-          </div>
-        </div>
-      ),
-      right: (
-        <div className="rounded-[1.5rem] border border-neutral-200 bg-neutral-50 p-6 text-sm text-neutral-700 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">
-          <div className="flex items-center gap-3 rounded-3xl bg-indigo-50 px-4 py-4 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-200">
-            <MapPin size={20} className="shrink-0" />
-            <span>Free preview of trainings and activities for all visitors.</span>
-          </div>
-          <div className="mt-6 space-y-4">
+  // ── Carousel slides driven entirely by active announcements ────────────────
+
+  const buildCarouselSlides = () => {
+    if (!announcements.length) {
+      return [{
+        key: 'no-announcements',
+        left: (
+          <div className="space-y-5">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-indigo-600 dark:text-indigo-400">No Announcements</p>
+            <h2 className="text-3xl font-semibold tracking-tight text-neutral-950 dark:text-neutral-50">No announcements yet</h2>
+            <p className="max-w-2xl text-base leading-7 text-neutral-600 dark:text-neutral-400">
+              Admin-created announcements will appear here as soon as they are published.
+            </p>
             <div className="flex items-center gap-3">
-              <Users className="text-sky-600" size={18} />
-              <span>View internal training summaries and participants.</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <ShieldCheck className="text-violet-600" size={18} />
-              <span>External events show squadron details. Register only after login.</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <ClipboardList className="text-emerald-600" size={18} />
-              <span>Explore event registration previews without signing in.</span>
+              <Button onClick={handleLogin}>Sign in</Button>
             </div>
           </div>
-        </div>
-      ),
-    },
-    {
-      key: 'featured-internal',
-      left: (
-        <div className="space-y-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-indigo-600 dark:text-indigo-400">Featured internal training</p>
-          <h2 className="text-3xl font-semibold tracking-tight text-neutral-950 dark:text-neutral-50">{internalTrainings[0]?.title ?? 'No internal trainings yet'}</h2>
-          <p className="max-w-2xl text-base leading-7 text-neutral-600 dark:text-neutral-400">{internalTrainings[0]?.description ?? 'When available, internal training summaries and participant previews will appear here.'}</p>
-          <div className="flex items-center gap-3">
-            <Button onClick={handleLogin}>Sign in for details</Button>
-            <Button variant="outline" onClick={() => navigate('/')}>Go to dashboard</Button>
+        ),
+        right: (
+          <div className="rounded-[1.5rem] border border-neutral-200 bg-neutral-50 p-6 text-sm text-neutral-700 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">
+            <div className="flex items-center gap-3 rounded-3xl bg-indigo-50 px-4 py-4 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-200">
+              <ClipboardList size={20} className="shrink-0" />
+              <span>Announcements from the admin team will be shown here.</span>
+            </div>
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <Calendar className="text-sky-600" size={18} />
+                <span>Stay tuned for upcoming events and updates.</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Users className="text-emerald-600" size={18} />
+                <span>Check back regularly or sign in to receive notifications.</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <ShieldCheck className="text-amber-600" size={18} />
+                <span>Only admins can publish announcements.</span>
+              </div>
+            </div>
           </div>
-        </div>
-      ),
-      right: internalTrainings[0] ? <InternalTrainingCard training={internalTrainings[0]} onLogin={handleLogin} /> : (
-        <div className="rounded-[1.5rem] border border-neutral-200 bg-neutral-50 p-6 text-sm text-neutral-700 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">
-          <p className="font-semibold">No preview available</p>
-          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">There are currently no internal trainings to preview.</p>
-        </div>
-      ),
-    },
-    {
-      key: 'featured-external',
-      left: (
-        <div className="space-y-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.3em] text-indigo-600 dark:text-indigo-400">Featured external event</p>
-          <h2 className="text-3xl font-semibold tracking-tight text-neutral-950 dark:text-neutral-50">{externalTrainings[0]?.title ?? 'No external events yet'}</h2>
-          <p className="max-w-2xl text-base leading-7 text-neutral-600 dark:text-neutral-400">{externalTrainings[0]?.description ?? 'External events with squadron details will appear here for preview.'}</p>
-          <div className="flex items-center gap-3">
-            <Button onClick={handleLogin}>Sign in to register</Button>
-            <Button variant="outline" onClick={() => navigate('/')}>Go to dashboard</Button>
+        ),
+      }];
+    }
+
+    return announcements.map((announcement) => {
+      const badgeClass =
+        announcement.announcement_type === 'urgent' ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300' :
+        announcement.announcement_type === 'event'    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' :
+                                                        'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300';
+      const badgeIcon =
+        announcement.announcement_type === 'urgent' ? '🔴' :
+        announcement.announcement_type === 'event'    ? '📅' :
+                                                        '📢';
+
+      const startDate = announcement.start_date ? new Date(announcement.start_date).toLocaleDateString() : '';
+      const endDate   = announcement.end_date   ? new Date(announcement.end_date).toLocaleDateString()   : '';
+      const dateLabel = startDate && endDate ? `${startDate} – ${endDate}` : startDate || 'No date set';
+
+      return {
+        key: `ann-${announcement.id}`,
+        left: (
+          <div className="space-y-5">
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-indigo-600 dark:text-indigo-400">
+              {badgeIcon} Announcement
+            </p>
+            <h2 className="text-3xl font-semibold tracking-tight text-neutral-950 dark:text-neutral-50">
+              {announcement.title}
+            </h2>
+            <p className="max-w-2xl text-base leading-7 text-neutral-600 dark:text-neutral-400">
+              {announcement.body}
+            </p>
+            <div className="flex items-center gap-3">
+              <Button variant="default" size="sm" onClick={handleLogin}>Sign in</Button>
+              <Button variant="outline" onClick={() => navigate('/')}>Go to dashboard</Button>
+            </div>
           </div>
-        </div>
-      ),
-      right: externalTrainings[0] ? <ExternalTrainingCard training={externalTrainings[0]} onRegister={handleRegister} /> : (
-        <div className="rounded-[1.5rem] border border-neutral-200 bg-neutral-50 p-6 text-sm text-neutral-700 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">
-          <p className="font-semibold">No preview available</p>
-          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">There are currently no external events to preview.</p>
-        </div>
-      ),
-    },
-  ];
+        ),
+        right: (
+          <div className="rounded-[1.5rem] border border-neutral-200 bg-neutral-50 p-6 text-sm text-neutral-700 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">
+            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}>
+              {announcement.announcement_type === 'urgent' ? '🔴 Urgent' :
+               announcement.announcement_type === 'event'    ? '📅 Event' :
+                                                               '📢 General'}
+            </span>
+            <div className="mt-6 space-y-4">
+              <div className="flex items-center gap-3">
+                <Calendar className="text-indigo-500 shrink-0" size={18} />
+                <span>{dateLabel}</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <Users className="text-sky-600 shrink-0" size={18} />
+                <span>
+                  {announcement.audience === 'admin'    ? 'Admin only' :
+                   announcement.audience === 'reservist' ? 'Reservists only' :
+                                                           'All users'}
+                </span>
+              </div>
+              {announcement.is_pinned && (
+                <div className="flex items-center gap-3">
+                  <MapPin className="text-amber-500 shrink-0" size={18} />
+                  <span className="font-semibold text-amber-700 dark:text-amber-300">Pinned</span>
+                </div>
+              )}
+              <div className="flex items-center gap-3">
+                <ClipboardList className="text-indigo-500 shrink-0" size={18} />
+                <span>ID: {announcement.id}</span>
+              </div>
+            </div>
+          </div>
+        ),
+      };
+    });
+  };
+
+  const carouselSlides = buildCarouselSlides();
 
   return (
     <div className="min-h-screen bg-neutral-50 pt-0 pb-10 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 sm:px-6 lg:px-8">
@@ -300,73 +356,90 @@ export default function Landing() {
       </header>
 
       <div className="mx-auto flex max-w-6xl flex-col gap-12 px-4 sm:px-6 lg:px-8">
+        {/* ═══════════════════════════════════════════════════════════════
+            CAROUSEL — displays admin-created announcements as rotating slides
+        ═══════════════════════════════════════════════════════════════ */}
         <section className="mt-6 rounded-[2rem] border border-neutral-200 bg-white/90 p-8 shadow-xl shadow-neutral-200/40 backdrop-blur dark:border-neutral-800 dark:bg-neutral-900/90">
-          <Carousel slides={slides} />
+          {loadingAnnouncements ? (
+            <div className="flex h-[300px] items-center justify-center text-neutral-600 dark:text-neutral-300">
+              Loading announcements…
+            </div>
+          ) : error ? (
+            <div className="rounded-3xl border border-red-200 bg-red-50 p-8 text-red-700 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300">
+              {error}
+            </div>
+          ) : (
+            <Carousel slides={carouselSlides} />
+          )}
         </section>
 
-        {loading ? (
-          <div className="rounded-[2rem] border border-neutral-200 bg-white p-12 text-center text-neutral-600 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
-            Loading training previews...
+        {/* ═══════════════════════════════════════════════════════════════
+            INTERNAL TRAININGS — admin-created, full participant grid
+        ═══════════════════════════════════════════════════════════════ */}
+        <section className="space-y-6">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-neutral-500 dark:text-neutral-400">Internal trainings</p>
+            <h2 className="mt-2 text-2xl font-semibold text-neutral-950 dark:text-neutral-50">Summary and participant preview</h2>
           </div>
-        ) : error ? (
-          <div className="rounded-[2rem] border border-red-200 bg-red-50 p-8 text-red-700 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300">
-            {error}
+
+          {loadingTrainings ? (
+            <div className="rounded-[2rem] border border-neutral-200 bg-white p-12 text-center text-neutral-600 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
+              Loading training previews…
+            </div>
+          ) : trainingsError ? (
+            <div className="rounded-3xl border border-red-200 bg-red-50 p-8 text-red-700 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300">
+              {trainingsError}
+            </div>
+          ) : internalTrainings.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-neutral-200 bg-neutral-50 p-8 text-center text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
+              No internal trainings are available right now.
+            </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2">
+              {internalTrainings.map((training) => (
+                <InternalTrainingCard
+                  key={training.id ?? training.training_id ?? training.title}
+                  training={training}
+                  onLogin={handleLogin}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* ═══════════════════════════════════════════════════════════════
+            EXTERNAL EVENTS — admin-created, squadron registration grid
+        ═══════════════════════════════════════════════════════════════ */}
+        <section className="space-y-6">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-neutral-500 dark:text-neutral-400">External events</p>
+            <h2 className="mt-2 text-2xl font-semibold text-neutral-950 dark:text-neutral-50">Squadron details and registration preview</h2>
           </div>
-        ) : (
-          <div className="grid gap-8">
-            <section className="space-y-6">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.28em] text-neutral-500 dark:text-neutral-400">Internal trainings</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-neutral-950 dark:text-neutral-50">Summary and participant preview</h2>
-                </div>
-                <Button variant="outline" size="sm" onClick={handleLogin}>Sign in for details</Button>
-              </div>
 
-              {internalTrainings.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-neutral-200 bg-neutral-50 p-8 text-center text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
-                  No internal trainings are available right now.
-                </div>
-              ) : (
-                <div className="grid gap-5 md:grid-cols-2">
-                  {internalTrainings.map((training) => (
-                    <InternalTrainingCard
-                      key={training.id ?? training.training_id ?? training.title}
-                      training={training}
-                      onLogin={handleLogin}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className="space-y-6">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.28em] text-neutral-500 dark:text-neutral-400">External events</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-neutral-950 dark:text-neutral-50">Squadron details and registration preview</h2>
-                </div>
-                <Button variant="outline" size="sm" onClick={handleLogin}>Sign in to register</Button>
-              </div>
-
-              {externalTrainings.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-neutral-200 bg-neutral-50 p-8 text-center text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
-                  No external events are available right now.
-                </div>
-              ) : (
-                <div className="grid gap-5 md:grid-cols-2">
-                  {externalTrainings.map((training) => (
-                    <ExternalTrainingCard
-                      key={training.id ?? training.training_id ?? training.title}
-                      training={training}
-                      onRegister={handleRegister}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-          </div>
-        )}
+          {loadingTrainings ? (
+            <div className="rounded-[2rem] border border-neutral-200 bg-white p-12 text-center text-neutral-600 shadow-sm dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
+              Loading event previews…
+            </div>
+          ) : trainingsError ? (
+            <div className="rounded-3xl border border-red-200 bg-red-50 p-8 text-red-700 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300">
+              {trainingsError}
+            </div>
+          ) : externalTrainings.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-neutral-200 bg-neutral-50 p-8 text-center text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
+              No external events are available right now.
+            </div>
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2">
+              {externalTrainings.map((training) => (
+                <ExternalTrainingCard
+                  key={training.id ?? training.training_id ?? training.title}
+                  training={training}
+                  onRegister={handleRegister}
+                />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );
