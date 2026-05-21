@@ -525,6 +525,25 @@ CREATE TABLE system_settings (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------
+-- Table announcements
+-- -----------------------------------------------------
+CREATE TABLE announcements (
+    id VARCHAR(36) PRIMARY KEY DEFAULT (UUID()),
+    title VARCHAR(500) NOT NULL,
+    type ENUM('General', 'Training', 'Deployment', 'Administrative', 'Emergency') NOT NULL DEFAULT 'General',
+    priority ENUM('low', 'medium', 'high', 'critical') NOT NULL DEFAULT 'medium',
+    status ENUM('active', 'inactive') NOT NULL DEFAULT 'active',
+    author VARCHAR(200) NOT NULL DEFAULT 'CO Admin',
+    body TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_type (type),
+    INDEX idx_priority (priority),
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------
 -- Table audit_logs
 -- -----------------------------------------------------
 CREATE TABLE audit_logs (

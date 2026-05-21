@@ -1,5 +1,5 @@
 const db = require('../config/database');
-const pool = db.promise();
+const pool = db;
 const { parseActivityMeta, buildActivityDescription } = require('../utils/activityMeta');
 
 function mapActivityRow(row, trainingStatus) {

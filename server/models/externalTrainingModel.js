@@ -1,5 +1,5 @@
 const db = require('../config/database');
-const pool = db.promise();
+const pool = db;
 
 const EXTERNAL_STATUSES = ['draft', 'open', 'closed', 'completed'];
 
