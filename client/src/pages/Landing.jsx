@@ -1,162 +1,37 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { fetchActiveAnnouncements } from '@/services/announcementsService';
 import { getTrainings, getExternalTrainings } from '@/services/trainingsService';
-import { Calendar, MapPin, Users, ClipboardList, ShieldCheck, Sun, Moon } from 'lucide-react';
+import { Sun, Moon } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
+import { Swiper, SwiperSlide } from 'swiper/react';
+import { Autoplay, Pagination } from 'swiper/modules';
+import 'swiper/css';
+import 'swiper/css/pagination';
+import TrainingPreviewCard from '@/components/trainings/TrainingPreviewCard';
 
-function shortDate(value) {
-  if (!value) return 'TBD';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'TBD';
-  return date.toLocaleDateString();
-}
-
-function commaList(items = []) {
-  return items.filter(Boolean).join(', ');
-}
-
-function InternalTrainingCard({ training, onLogin }) {
-  const participantCount = training.participants?.length ?? training.participant_groups?.reduce((sum, group) => sum + (group.selectedReservists?.length || 0), 0) ?? 0;
-  const participantLabels = training.participants?.slice(0, 4).map((participant) => participant.name || participant.username || participant.email) || [];
-
-  return (
-    <div className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm transition-all duration-200 hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:border-neutral-700">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{training.title || 'Untitled internal training'}</p>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{training.location || training.venue || 'Location not set'}</p>
-        </div>
-        <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700 dark:bg-sky-500/10 dark:text-sky-300">Internal</span>
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-neutral-500 dark:text-neutral-400">Starts</p>
-          <p className="mt-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">{shortDate(training.start_datetime || training.start_date)}</p>
-        </div>
-        <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-neutral-500 dark:text-neutral-400">Participants</p>
-          <p className="mt-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">{participantCount}</p>
-        </div>
-        <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-neutral-500 dark:text-neutral-400">Activities</p>
-          <p className="mt-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">{training.activities?.length ?? 0}</p>
-        </div>
-      </div>
-
-      <div className="mt-5 space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
-        <div className="flex items-center gap-2">
-          <Users className="text-indigo-500" size={16} />
-          <span>{participantCount > 0 ? `${participantCount} participant${participantCount !== 1 ? 's' : ''}` : 'No participants yet'}</span>
-        </div>
-        {participantLabels.length > 0 && (
-          <p className="text-sm text-neutral-500 dark:text-neutral-400">{commaList(participantLabels)}{participantCount > participantLabels.length ? ` +${participantCount - participantLabels.length} more` : ''}</p>
-        )}
-      </div>
-
-      <div className="mt-6 flex justify-end">
-        <Button variant="secondary" size="sm" onClick={onLogin}>
-          Sign in for full details
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function ExternalTrainingCard({ training, onRegister }) {
-  const squadronCount = training.squadron_limits?.length ?? training.squadronLimits?.length ?? 0;
-  const registrationFields = training.registration_fields?.length ?? 0;
-
-  return (
-    <div className="rounded-3xl border border-neutral-200 bg-white p-5 shadow-sm transition-all duration-200 hover:border-neutral-300 dark:border-neutral-800 dark:bg-neutral-950 dark:hover:border-neutral-700">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{training.title || 'Untitled external event'}</p>
-          <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{training.location || training.venue || 'Location not set'}</p>
-        </div>
-        <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">External</span>
-      </div>
-
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
-        <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-neutral-500 dark:text-neutral-400">Starts</p>
-          <p className="mt-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">{shortDate(training.start_datetime || training.start_date)}</p>
-        </div>
-        <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-neutral-500 dark:text-neutral-400">Squadrons</p>
-          <p className="mt-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">{squadronCount}</p>
-        </div>
-        <div className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900">
-          <p className="text-[11px] uppercase tracking-[0.24em] text-neutral-500 dark:text-neutral-400">Registration</p>
-          <p className="mt-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">{registrationFields ? `${registrationFields} field${registrationFields !== 1 ? 's' : ''}` : 'Login required'}</p>
-        </div>
-      </div>
-
-      <div className="mt-5 space-y-2 text-sm text-neutral-600 dark:text-neutral-400">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="text-violet-500" size={16} />
-          <span>{training.status ? training.status.charAt(0).toUpperCase() + training.status.slice(1) : 'Status unavailable'}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <ClipboardList className="text-indigo-500" size={16} />
-          <span>{registrationFields > 0 ? 'Registration form configured' : 'Registration requires login'}</span>
-        </div>
-      </div>
-
-      <div className="mt-6 flex justify-end">
-        <Button variant="default" size="sm" onClick={onRegister}>
-          Login to register
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function Carousel({ slides = [], interval = 6000 }) {
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    if (!slides || slides.length <= 1) return undefined;
-    const id = setInterval(() => setIndex((i) => (i + 1) % slides.length), interval);
-    return () => clearInterval(id);
-  }, [slides, interval]);
-
-  const goTo = (i) => setIndex(((i % slides.length) + slides.length) % slides.length);
-
-  return (
-    <div className="relative mx-auto w-full max-w-[1080px] h-[420px]">
-      <div className="relative h-full overflow-hidden">
-        {slides.map((s, i) => (
-          <div
-            key={s.key || i}
-            className={`absolute inset-0 transition-opacity duration-700 ${i === index ? 'opacity-100 relative' : 'opacity-0 pointer-events-none'}`}
-          >
-            <div className="grid h-full gap-8 lg:grid-cols-[1.4fr_0.8fr] lg:items-center">
-              <div>{s.left}</div>
-              <div>{s.right}</div>
-            </div>
+function Carousel({ slides = [] }) {
+  return slides.length > 0 ? (
+    <Swiper
+      modules={[Autoplay, Pagination]}
+      spaceBetween={0}
+      slidesPerView={1}
+      autoplay={{ delay: 3000, disableOnInteraction: false }}
+      loop={true}
+      pagination={{ clickable: true }}
+      className="h-[420px] w-full max-w-[1080px] mx-auto"
+    >
+      {slides.map((s, i) => (
+        <SwiperSlide key={s.key || i}>
+          <div className="grid h-full gap-8 lg:grid-cols-[1.4fr] lg:items-center">
+            <div>{s.left}</div>
           </div>
-        ))}
-      </div>
-
-      {/* Controls */}
-      {slides.length > 1 && (
-        <div className="absolute inset-x-0 bottom-4 flex justify-center gap-2">
-          {slides.map((s, i) => (
-            <button
-              key={s.key || i}
-              aria-label={`Go to slide ${i + 1}`}
-              onClick={() => goTo(i)}
-              className={`h-2 w-8 rounded-full transition-colors ${i === index ? 'bg-indigo-600' : 'bg-neutral-300/60 dark:bg-neutral-600'}`}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
+        </SwiperSlide>
+      ))}
+    </Swiper>
+  ) : null;
 }
 
 export default function Landing() {
@@ -170,6 +45,11 @@ export default function Landing() {
   const navigate = useNavigate();
   const { addToast } = useToast();
   const { isDark, toggleTheme } = useTheme();
+  const trainingsRef = useRef(null);
+
+  const scrollToTrainings = () => {
+    trainingsRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   // Load announcements for the carousel
   useEffect(() => {
@@ -224,7 +104,7 @@ export default function Landing() {
 
   // ── Carousel slides driven entirely by active announcements ────────────────
 
-  const buildCarouselSlides = () => {
+const buildCarouselSlides = () => {
     if (!announcements.length) {
       return [{
         key: 'no-announcements',
@@ -236,29 +116,7 @@ export default function Landing() {
               Admin-created announcements will appear here as soon as they are published.
             </p>
             <div className="flex items-center gap-3">
-              <Button onClick={handleLogin}>Sign in</Button>
-            </div>
-          </div>
-        ),
-        right: (
-          <div className="rounded-[1.5rem] border border-neutral-200 bg-neutral-50 p-6 text-sm text-neutral-700 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">
-            <div className="flex items-center gap-3 rounded-3xl bg-indigo-50 px-4 py-4 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-200">
-              <ClipboardList size={20} className="shrink-0" />
-              <span>Announcements from the admin team will be shown here.</span>
-            </div>
-            <div className="mt-6 space-y-4">
-              <div className="flex items-center gap-3">
-                <Calendar className="text-sky-600" size={18} />
-                <span>Stay tuned for upcoming events and updates.</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Users className="text-emerald-600" size={18} />
-                <span>Check back regularly or sign in to receive notifications.</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <ShieldCheck className="text-amber-600" size={18} />
-                <span>Only admins can publish announcements.</span>
-              </div>
+              <Button onClick={scrollToTrainings}>View All Trainings</Button>
             </div>
           </div>
         ),
@@ -266,18 +124,10 @@ export default function Landing() {
     }
 
     return announcements.map((announcement) => {
-      const badgeClass =
-        announcement.announcement_type === 'urgent' ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300' :
-        announcement.announcement_type === 'event'    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' :
-                                                        'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300';
       const badgeIcon =
         announcement.announcement_type === 'urgent' ? '🔴' :
         announcement.announcement_type === 'event'    ? '📅' :
-                                                        '📢';
-
-      const startDate = announcement.start_date ? new Date(announcement.start_date).toLocaleDateString() : '';
-      const endDate   = announcement.end_date   ? new Date(announcement.end_date).toLocaleDateString()   : '';
-      const dateLabel = startDate && endDate ? `${startDate} – ${endDate}` : startDate || 'No date set';
+                                                       '📢';
 
       return {
         key: `ann-${announcement.id}`,
@@ -293,41 +143,7 @@ export default function Landing() {
               {announcement.body}
             </p>
             <div className="flex items-center gap-3">
-              <Button variant="default" size="sm" onClick={handleLogin}>Sign in</Button>
-              <Button variant="outline" onClick={() => navigate('/')}>Go to dashboard</Button>
-            </div>
-          </div>
-        ),
-        right: (
-          <div className="rounded-[1.5rem] border border-neutral-200 bg-neutral-50 p-6 text-sm text-neutral-700 shadow-sm dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200">
-            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${badgeClass}`}>
-              {announcement.announcement_type === 'urgent' ? '🔴 Urgent' :
-               announcement.announcement_type === 'event'    ? '📅 Event' :
-                                                               '📢 General'}
-            </span>
-            <div className="mt-6 space-y-4">
-              <div className="flex items-center gap-3">
-                <Calendar className="text-indigo-500 shrink-0" size={18} />
-                <span>{dateLabel}</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Users className="text-sky-600 shrink-0" size={18} />
-                <span>
-                  {announcement.audience === 'admin'    ? 'Admin only' :
-                   announcement.audience === 'reservist' ? 'Reservists only' :
-                                                           'All users'}
-                </span>
-              </div>
-              {announcement.is_pinned && (
-                <div className="flex items-center gap-3">
-                  <MapPin className="text-amber-500 shrink-0" size={18} />
-                  <span className="font-semibold text-amber-700 dark:text-amber-300">Pinned</span>
-                </div>
-              )}
-              <div className="flex items-center gap-3">
-                <ClipboardList className="text-indigo-500 shrink-0" size={18} />
-                <span>ID: {announcement.id}</span>
-              </div>
+              <Button variant="default" size="sm" onClick={scrollToTrainings}>View All Trainings</Button>
             </div>
           </div>
         ),
@@ -373,10 +189,10 @@ export default function Landing() {
           )}
         </section>
 
-        {/* ═══════════════════════════════════════════════════════════════
-            INTERNAL TRAININGS — admin-created, full participant grid
-        ═══════════════════════════════════════════════════════════════ */}
-        <section className="space-y-6">
+{/* ═══════════════════════════════════════════════════════════════
+             INTERNAL TRAININGS — admin-created, full participant grid
+         ═══════════════════════════════════════════════════════════════ */}
+        <section ref={trainingsRef} className="space-y-6">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.28em] text-neutral-500 dark:text-neutral-400">Internal trainings</p>
             <h2 className="mt-2 text-2xl font-semibold text-neutral-950 dark:text-neutral-50">Summary and participant preview</h2>
@@ -394,16 +210,17 @@ export default function Landing() {
             <div className="rounded-3xl border border-dashed border-neutral-200 bg-neutral-50 p-8 text-center text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
               No internal trainings are available right now.
             </div>
-          ) : (
-            <div className="grid gap-5 md:grid-cols-2">
-              {internalTrainings.map((training) => (
-                <InternalTrainingCard
-                  key={training.id ?? training.training_id ?? training.title}
-                  training={training}
-                  onLogin={handleLogin}
-                />
-              ))}
-            </div>
+) : (
+             <div className="grid gap-5 md:grid-cols-2">
+               {internalTrainings.map((training) => (
+                 <TrainingPreviewCard
+                   key={training.id ?? training.training_id ?? training.title}
+                   training={training}
+                   onLogin={handleLogin}
+                   variant="internal"
+                 />
+               ))}
+             </div>
           )}
         </section>
 
@@ -428,16 +245,17 @@ export default function Landing() {
             <div className="rounded-3xl border border-dashed border-neutral-200 bg-neutral-50 p-8 text-center text-neutral-600 dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-300">
               No external events are available right now.
             </div>
-          ) : (
-            <div className="grid gap-5 md:grid-cols-2">
-              {externalTrainings.map((training) => (
-                <ExternalTrainingCard
-                  key={training.id ?? training.training_id ?? training.title}
-                  training={training}
-                  onRegister={handleRegister}
-                />
-              ))}
-            </div>
+) : (
+             <div className="grid gap-5 md:grid-cols-2">
+               {externalTrainings.map((training) => (
+                 <TrainingPreviewCard
+                   key={training.id ?? training.training_id ?? training.title}
+                   training={training}
+                   onLogin={handleRegister}
+                   variant="external"
+                 />
+               ))}
+             </div>
           )}
         </section>
       </div>

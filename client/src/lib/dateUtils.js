@@ -74,11 +74,24 @@ export const isToday = (date) => {
   return d.setHours(0, 0, 0, 0) === new Date().setHours(0, 0, 0, 0);
 };
 
+/**
+ * Format date to locale string, or return TBD if invalid
+ * @param {Date|string} value - Date to format
+ * @returns {string} Formatted date or 'TBD'
+ */
+export const shortDate = (value) => {
+  if (!value) return 'TBD';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'TBD';
+  return date.toLocaleDateString();
+};
+
 export default {
   formatDateForInput,
   formatDateDisplay,
   calculateDurationDays,
   isPastDate,
   isFutureDate,
-  isToday
+  isToday,
+  shortDate
 };
