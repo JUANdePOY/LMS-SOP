@@ -96,22 +96,38 @@ async function syncAndGetSystemAlerts(user, filters = {}) {
 
   const generated = [];
 
-  // Helper to upsert a system alert (avoid duplicates within recent window)
+  // Helper to upsert a system alert (at most one row per alert_type + entity_id ever)
   async function ensureSystemAlert({ ruleType, title, message, severity, entityType, entityId, entityName, squadronId, groupId, arsenId }) {
-    // Check for existing unacknowledged in last 30 days
+    // Build null-safe conditions for entity_id (critical: = NULL never matches, must use IS NULL)
+    const entityIsNull = entityId == null;
+    const checkWhere = entityIsNull
+      ? 'alert_type = ? AND entity_id IS NULL'
+      : 'alert_type = ? AND entity_id = ?';
+    const checkParams = entityIsNull ? [ruleType] : [ruleType, entityId];
+
+    // If any row for this key exists (ack or not), reuse it forever to prevent duplicate creation / growth on refresh
     const [existing] = await db.query(
       `SELECT id FROM system_alerts 
-       WHERE alert_type = ? 
-         AND entity_id = ? 
-         AND is_acknowledged = 0 
-         AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+       WHERE ${checkWhere}
        LIMIT 1`,
-      [ruleType, entityId]
+      checkParams
     );
 
     if (existing.length > 0) {
       return existing[0].id;
     }
+
+    // First time for this key: clean any prior unacked dups (if any from before), then insert the canonical one
+    const updateWhere = entityIsNull
+      ? 'alert_type = ? AND entity_id IS NULL AND is_acknowledged = 0'
+      : 'alert_type = ? AND entity_id = ? AND is_acknowledged = 0';
+    const updateParams = entityIsNull ? [ruleType] : [ruleType, entityId];
+    await db.query(
+      `UPDATE system_alerts 
+       SET is_acknowledged = 1, acknowledged_at = NOW() 
+       WHERE ${updateWhere}`,
+      updateParams
+    );
 
     // Find rule id
     const rule = ruleMap[ruleType];
@@ -455,9 +471,6 @@ async function syncAndGetSystemAlerts(user, filters = {}) {
   if (severity) {
     systemSql += ` AND severity = ? `;
     sysParams.push(severity);
-  }
-  if (unread_only === 'true' || unread_only === '1') {
-    // all returned here are unacknowledged = "unread"
   }
 
   systemSql += ` ORDER BY 

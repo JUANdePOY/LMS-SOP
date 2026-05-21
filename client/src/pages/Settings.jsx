@@ -168,8 +168,18 @@ function RoleManagement({ toast }) {
 
   const getSearch = (roleKey) => searchQueries[roleKey] || "";
 
+  const PAGE_SIZE = 10;
+  const [pages, setPages] = useState({});
+
+  const getPage = (roleKey) => pages[roleKey] || 1;
+
+  const setPageFor = (roleKey, pageNum) => {
+    setPages(prev => ({ ...prev, [roleKey]: pageNum }));
+  };
+
   const setSearchFor = (roleKey, value) => {
     setSearchQueries(prev => ({ ...prev, [roleKey]: value }));
+    setPages(prev => ({ ...prev, [roleKey]: 1 }));
   };
 
   const filterBySearch = (userList, roleKey) => {
@@ -221,6 +231,16 @@ function RoleManagement({ toast }) {
         if (allRoleUsers.length === 0) return null;
         const roleUsers = filterBySearch(allRoleUsers, roleKey);
         const Icon = meta.icon;
+
+        const needsPagination = roleKey === 'admin' || roleKey === 'reservist';
+        let displayUsers = roleUsers;
+        let totalPages = 1;
+        if (needsPagination && roleUsers.length > 0) {
+          totalPages = Math.max(1, Math.ceil(roleUsers.length / PAGE_SIZE));
+          const currentPage = Math.min(getPage(roleKey), totalPages);
+          const startIdx = (currentPage - 1) * PAGE_SIZE;
+          displayUsers = roleUsers.slice(startIdx, startIdx + PAGE_SIZE);
+        }
 
         return (
           <div key={roleKey} className="flex flex-col gap-3">
@@ -274,7 +294,7 @@ function RoleManagement({ toast }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                  {roleUsers.map((user) => (
+                  {displayUsers.map((user) => (
                     <tr key={user.id} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex flex-col">
@@ -321,6 +341,30 @@ function RoleManagement({ toast }) {
                   ))}
                 </tbody>
               </table>
+
+              {needsPagination && totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/40 dark:bg-neutral-900/40 px-4 py-2 text-[11px]">
+                  <div className="text-neutral-500 dark:text-neutral-400">
+                    Page {getPage(roleKey)} of {totalPages} • {roleUsers.length} total
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPageFor(roleKey, Math.max(1, getPage(roleKey) - 1))}
+                      disabled={getPage(roleKey) <= 1}
+                      className="rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-0.5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Prev
+                    </button>
+                    <button
+                      onClick={() => setPageFor(roleKey, Math.min(totalPages, getPage(roleKey) + 1))}
+                      disabled={getPage(roleKey) >= totalPages}
+                      className="rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-0.5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
               </div>
             )}
           </div>
