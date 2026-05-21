@@ -176,7 +176,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
           "flex shrink-0 items-center",
           "border-t border-neutral-200 dark:border-neutral-800",
           "bg-neutral-50 dark:bg-neutral-900",
-          isCollapsed ? "justify-center p-3" : "gap-3 px-4 py-3"
+          isCollapsed ? "justify-center gap-2 p-3" : "gap-3 px-4 py-3"
         )}
       >
         <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 text-xs font-bold text-white shadow-sm">
@@ -185,7 +185,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
         </span>
 
         {!isCollapsed && (
-          <div className="flex flex-col leading-tight overflow-hidden">
+          <div className="flex flex-1 flex-col leading-tight overflow-hidden">
             <span className="truncate text-[13px] font-medium text-neutral-800 dark:text-neutral-200">
               Commanding Officer
             </span>
@@ -194,28 +194,19 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
             </span>
           </div>
         )}
-      </div>
 
-      {/* ── Logout button ──────────────────────────────────────── */}
-      <div
-        className={cn(
-          "flex shrink-0 items-center",
-          "border-t border-neutral-200 dark:border-neutral-800",
-          isCollapsed ? "justify-center p-3" : "gap-3 px-4 py-3"
-        )}
-      >
         <button
           onClick={logout}
           className={cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium",
-            "text-red-600 hover:text-red-700",
+            "flex items-center justify-center rounded-md text-red-600 hover:text-red-700",
             "hover:bg-red-50 dark:hover:bg-red-950/20",
             "transition-colors duration-150",
-            isCollapsed && "px-2"
+            isCollapsed ? "p-2" : "p-2 ml-1"
           )}
+          title="Logout"
         >
-          <LogOut size={18} />
-          {!isCollapsed && <span>Logout</span>}
+          <LogOut size={isCollapsed ? 16 : 18} />
+          {!isCollapsed && <span className="ml-1 text-sm font-medium">Logout</span>}
         </button>
       </div>
     </aside>
