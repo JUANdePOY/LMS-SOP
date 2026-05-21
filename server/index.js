@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
+const announcementsRoutes = require('./routes/announcements');
 
 dotenv.config();
 
@@ -19,6 +20,9 @@ app.use(morgan('dev'));
 app.get('/health', (req, res) => {
   res.status(200).json({ ok: true });
 });
+
+// API Routes
+app.use('/api/announcements', announcementsRoutes);
 
 const PORT = process.env.PORT || 5000;
 
