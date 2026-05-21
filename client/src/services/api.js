@@ -145,4 +145,10 @@ export const updateUserRole = (id, data) => api.put(`/settings/users/${id}/role`
 export const getUserRoleHistory = (id) => api.get(`/settings/users/${id}/role-history`);
 export const getRoleOptions = () => api.get('/settings/role-options');
 
+// Alerts & Insights
+export const getAlerts = (params = {}) => api.get('/alerts', { params });
+export const createAlert = (data) => api.post('/alerts', data);
+export const markAlertRead = (id) => api.patch(`/alerts/${id}/read`);
+export const getAlertsInsights = () => api.get('/alerts/insights');
+
 export default api;
