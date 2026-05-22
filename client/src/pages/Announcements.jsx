@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
-import { Radio } from 'lucide-react';
+import { Plus, Radio } from 'lucide-react';
 import AnnouncementCard from '@/components/announcements/AnnouncementCard';
 import AnnouncementForm from '@/components/announcements/AnnouncementForm';
 import AnnouncementFilters from '@/components/announcements/AnnouncementFilters';
 import ConfirmationDialog from '@/components/ui/ConfirmationDialog';
 import useAnnouncements from '@/hooks/useAnnouncements';
 import { useToast } from '@/components/ui/Toast';
+import { Button } from '@/components/ui/Button';
 
 /**
  * Announcements Page
@@ -121,13 +122,19 @@ export default function Announcements() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
-          Announcements
-        </h1>
-        <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-          Latest updates and announcements for reservists
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
+            Announcements
+          </h1>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+            Latest updates and announcements for reservists
+          </p>
+        </div>
+        <Button onClick={handleCreate}>
+          <Plus size={16} className="mr-2" />
+          New Announcement
+        </Button>
       </div>
 
       {/* Filters */}
