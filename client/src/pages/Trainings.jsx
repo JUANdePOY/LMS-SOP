@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Edit, Trash2, Calendar } from 'lucide-react';
+import { Plus, ClipboardCheck, GraduationCap } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -12,6 +12,7 @@ import {
 } from '@/services/trainingsService';
 import TrainingForm from '@/components/trainings/TrainingForm';
 import TrainingFilters from '@/components/trainings/TrainingFilters';
+import TrainingStats from '@/components/trainings/TrainingStats';
 import useTrainingFilters from '@/hooks/useTrainingFilters';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
@@ -45,17 +46,17 @@ export default function Trainings() {
   const { isAdmin } = useAuth();
   const { addToast } = useToast();
   const [trainings, setTrainings]     = useState([]);
+  const [allTrainings, setAllTrainings] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState('');
   const [totalCount, setTotalCount]   = useState(0);
 
   const { filters, setFilters, resetFilters, debouncedSearch } = useTrainingFilters();
 
-  // Pagination
   const [page, setPage]   = useState(1);
-  const [limit]           = useState(10);
+  const [limit]           = useState(12);
+  const [sortAsc, setSortAsc]   = useState(true);
 
-  // Modal
   const [showForm, setShowForm]             = useState(false);
   const [editingTraining, setEditingTraining] = useState(null);
   const [formLoading, setFormLoading]         = useState(false);
@@ -69,11 +70,6 @@ export default function Trainings() {
     setError('');
 
     try {
-      // ── Decide which sources to fetch ──────────────────────────────────────
-      // The backend has two completely separate tables and endpoints:
-      //   /trainings/internal  → trainings table
-      //   /trainings/external  → external_trainings table
-      // We must call both when sourceFilter is 'all', or the matching one only.
       const { source: sourceFilter, status: statusFilter, activityType: activityTypeFilter } = filters;
 
       const fetchInternal = sourceFilter === 'all' || sourceFilter === 'internal';
@@ -102,13 +98,11 @@ export default function Trainings() {
         status: externalStatus,
       };
 
-      // Fetch in parallel — only what we need
       const [internalResult, externalResult] = await Promise.all([
         fetchInternal ? getTrainings(internalParams)         : Promise.resolve(null),
         fetchExternal ? getExternalTrainings(externalParams) : Promise.resolve(null),
       ]);
 
-      // Check for errors on either fetch
       if (internalResult && !internalResult.success) {
         setError(internalResult.message || 'Failed to fetch internal trainings');
         setLoading(false);
@@ -120,7 +114,6 @@ export default function Trainings() {
         return;
       }
 
-      // Tag each record so edit/delete know which endpoint to use
       const internalRows = (internalResult?.data?.trainings || []).map(t => ({
         ...t,
         _source: 'internal',
@@ -130,11 +123,10 @@ export default function Trainings() {
         _source: 'external',
       }));
 
-      // Merge and sort by date descending (most recent first)
       const merged = [...internalRows, ...externalRows].sort((a, b) => {
         const dateA = new Date(a.start_datetime || a.start_date || 0);
         const dateB = new Date(b.start_datetime || b.start_date || 0);
-        return dateB - dateA;
+        return sortAsc ? dateA - dateB : dateB - dateA;
       });
 
       const internalTotal = internalResult?.data?.pagination?.total || 0;
@@ -145,13 +137,14 @@ export default function Trainings() {
         : merged;
 
       setTrainings(pageRows);
+      setAllTrainings(merged);
       setTotalCount(isMerged ? internalTotal + externalTotal : (internalTotal || externalTotal));
     } catch {
       setError('Network error. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, [page, limit, debouncedSearch, filters]);
+  }, [page, limit, debouncedSearch, filters, sortAsc]);
 
   useEffect(() => {
     fetchTrainings();
@@ -258,12 +251,19 @@ export default function Trainings() {
       {/* ── Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
-            Trainings & Activities
-          </h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-            Schedule and manage training sessions and activities
-          </p>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10">
+              <GraduationCap size={20} className="text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
+                Trainings & Activities
+              </h1>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400">
+                Schedule and manage training sessions and activities
+              </p>
+            </div>
+          </div>
         </div>
 
         {isAdmin && (
@@ -275,7 +275,7 @@ export default function Trainings() {
                 setNewScheduleKind('internal');
                 setShowForm(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm shadow-blue-500/20"
             >
               <Plus size={16} />
               Internal training
@@ -287,7 +287,7 @@ export default function Trainings() {
                 setNewScheduleKind('external');
                 setShowForm(true);
               }}
-              className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors text-sm font-semibold"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors text-sm font-semibold shadow-sm shadow-violet-500/20"
             >
               <Plus size={16} />
               External training
@@ -296,8 +296,16 @@ export default function Trainings() {
         )}
       </div>
 
+      {/* ── Stats ── */}
+      {!loading && !error && allTrainings.length > 0 && (
+        <TrainingStats trainings={allTrainings} />
+      )}
+
+      {/* ── Filters ── */}
       <TrainingFilters
         filters={filters}
+        sortAsc={sortAsc}
+        onSortToggle={() => setSortAsc(s => !s)}
         onChange={(next) => {
           setFilters((f) => {
             const patch = {};
@@ -316,30 +324,55 @@ export default function Trainings() {
           setPage(1);
         }}
       />
+
       {/* ── Error ── */}
       {error && (
-        <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg border border-red-200 dark:border-red-800">
+        <div className="p-4 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl border border-red-200 dark:border-red-800">
           {error}
         </div>
       )}
 
       {/* ── Content ── */}
       {loading ? (
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        <div className="flex flex-col items-center justify-center py-20">
+          <div className="relative">
+            <div className="h-12 w-12 rounded-full border-2 border-neutral-200 dark:border-neutral-700" />
+            <div className="absolute inset-0 h-12 w-12 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+          </div>
+          <p className="mt-4 text-sm text-neutral-500 dark:text-neutral-400">Loading trainings...</p>
         </div>
       ) : (
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {trainings.length === 0 ? (
-              <div className="col-span-full flex flex-col items-center justify-center py-12 text-center">
-                <div className="text-neutral-400 dark:text-neutral-500 mb-2">
-                  <svg className="h-12 w-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
+              <div className="col-span-full">
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-200 dark:border-neutral-700 bg-gradient-to-b from-neutral-50/80 to-white dark:from-neutral-900/60 dark:to-neutral-900/30 px-6 py-16 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-md ring-1 ring-neutral-100 dark:bg-neutral-800 dark:ring-neutral-700">
+                    <ClipboardCheck className="text-neutral-400" size={28} strokeWidth={1.5} />
+                  </div>
+                  <p className="mt-5 text-lg font-semibold text-neutral-900 dark:text-neutral-100">No trainings found</p>
+                  <p className="mt-2 max-w-md text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
+                    {debouncedSearch || filters.status !== 'all' || filters.activityType !== 'all' || filters.source !== 'all'
+                      ? 'No trainings match your current filters. Try adjusting your search or filter criteria.'
+                      : 'Get started by creating your first training session. Click the button above to schedule a new training.'}
+                  </p>
+                  {isAdmin && !debouncedSearch && filters.status === 'all' && filters.activityType === 'all' && filters.source === 'all' && (
+                    <div className="mt-5 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingTraining(null);
+                          setNewScheduleKind('internal');
+                          setShowForm(true);
+                        }}
+                        className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-semibold"
+                      >
+                        <Plus size={16} />
+                        Create training
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <p className="text-neutral-500 dark:text-neutral-400">No trainings found</p>
               </div>
             ) : (
               trainings.map((training) => (
@@ -349,6 +382,10 @@ export default function Trainings() {
                   isAdmin={isAdmin}
                   onEdit={() => handleEditTraining(training)}
                   onDelete={() => openDeleteDialog(training)}
+                  onAttendance={() => {
+                    const type = training._source === 'external' ? 'external' : 'internal';
+                    window.location.href = `/attendance?type=${type}&trainingId=${training.id}`;
+                  }}
                 />
               ))
             )}
@@ -356,23 +393,55 @@ export default function Trainings() {
 
           {/* ── Pagination ── */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800 pt-4">
               <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                Showing {((page - 1) * limit) + 1}–{Math.min(page * limit, totalCount)} of {totalCount} trainings
+                Showing <span className="font-semibold text-neutral-700 dark:text-neutral-200">{((page - 1) * limit) + 1}</span>
+                {' – '}
+                <span className="font-semibold text-neutral-700 dark:text-neutral-200">{Math.min(page * limit, totalCount)}</span>
+                {' of '}
+                <span className="font-semibold text-neutral-700 dark:text-neutral-200">{totalCount}</span>
+                {' '}trainings
               </p>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1.5 text-sm border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Previous
                 </button>
-                <span className="px-3 py-1.5 text-sm">Page {page} of {totalPages}</span>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (page <= 3) {
+                      pageNum = i + 1;
+                    } else if (page >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = page - 2 + i;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setPage(pageNum)}
+                        className={cn(
+                          'h-8 w-8 text-sm font-medium rounded-lg transition-colors',
+                          page === pageNum
+                            ? 'bg-indigo-600 text-white shadow-sm'
+                            : 'hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300'
+                        )}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
                 <button
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="px-3 py-1.5 text-sm border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium border border-neutral-200 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Next
                 </button>
@@ -382,19 +451,20 @@ export default function Trainings() {
         </>
       )}
 
-      {/* ── Form Modal ── */}
+      {/* ── Form Loading Overlay ── */}
       {showForm && formLoading && (
         <div
           className="fixed inset-0 flex items-center justify-center p-4"
           style={{ zIndex: 9999, backgroundColor: 'rgba(0, 0, 0, 0.55)' }}
         >
           <div className="flex flex-col items-center gap-3 rounded-2xl bg-white dark:bg-neutral-900 px-8 py-6 border border-neutral-200 dark:border-neutral-800 shadow-2xl">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
             <p className="text-sm text-neutral-600 dark:text-neutral-300">Loading training…</p>
           </div>
         </div>
       )}
 
+      {/* ── Delete Confirmation ── */}
       <ConfirmDialog
         open={!!deleteTarget}
         title="Delete training?"
@@ -413,6 +483,7 @@ export default function Trainings() {
         onCancel={cancelDelete}
       />
 
+      {/* ── Form Modal ── */}
       {showForm && !formLoading && (
         <TrainingForm
           key={

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, Bell, Settings } from "lucide-react";
+import { ChevronLeft, Bell, Settings, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
 import { menuItems } from "@/config/menuItems";
@@ -149,6 +149,12 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
           <li>
             <SidebarItem
               item={{ name: "Settings", path: "/settings", icon: Settings, description: "Preferences" }}
+              isCollapsed={isCollapsed}
+            />
+          </li>
+          <li>
+            <SidebarItem
+              item={{ name: "Audit Logs", path: "/audit-logs", icon: History, description: "System change history" }}
               isCollapsed={isCollapsed}
             />
           </li>

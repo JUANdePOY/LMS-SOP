@@ -55,4 +55,38 @@ router.get(
   }
 );
 
+router.get(
+  '/reservists/search',
+  optionalAuthenticateToken,
+  [
+    query('squadron_ids').notEmpty().withMessage('squadron_ids is required'),
+    query('search').optional().trim().isLength({ max: 100 }),
+    query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+  ],
+  rejectInvalid,
+  async (req, res) => {
+    try {
+      let { squadron_ids: rawIds } = req.query;
+      const { search, limit } = req.query;
+
+      let squadronIds;
+      try {
+        squadronIds = typeof rawIds === 'string' ? JSON.parse(rawIds) : rawIds;
+      } catch {
+        squadronIds = rawIds ? String(rawIds).split(',').map((s) => s.trim()) : [];
+      }
+
+      const reservists = await squadronLookupModel.searchReservistsForSquadrons({
+        squadronIds,
+        search,
+        limit,
+      });
+      res.json({ success: true, data: { reservists } });
+    } catch (err) {
+      console.error('Error searching reservists by squadrons:', err);
+      res.status(500).json({ success: false, message: 'Failed to search reservists' });
+    }
+  }
+);
+
 module.exports = router;

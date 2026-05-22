@@ -6,7 +6,6 @@ import {
 import { PieChart, Pie } from "recharts";
 import { Info, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { readinessRankingData, readinessCompositionData } from "@/data/dashboardData";
 
 function ChartCard({ title, icon: Icon, children, className }) {
   return (
@@ -43,7 +42,6 @@ function CustomTooltip({ active, payload, label }) {
   );
 }
 
-/** Readiness color by score */
 function readinessColor(score) {
   if (score >= 80) return { bar: "#10b981", text: "text-emerald-600 dark:text-emerald-400" };
   if (score >= 70) return { bar: "#6366f1", text: "text-indigo-600 dark:text-indigo-400" };
@@ -51,21 +49,17 @@ function readinessColor(score) {
   return { bar: "#ef4444", text: "text-red-600 dark:text-red-400" };
 }
 
-/**
- * ReadinessScoreChart
- * Ranking bars + score composition donut.
- */
-export default function ReadinessScoreChart() {
-  const avg = (
-    readinessRankingData.reduce((a, d) => a + d.score, 0) /
-    readinessRankingData.length
-  ).toFixed(1);
+export default function ReadinessScoreChart({ data }) {
+  const byArsen = data?.by_arsen || [];
+  const composition = data?.composition || [];
+
+  const avg = byArsen.length > 0
+    ? (byArsen.reduce((a, d) => a + (d.avg_readiness_score || 0), 0) / byArsen.length).toFixed(1)
+    : "0.0";
 
   return (
     <ChartCard title="Readiness Score" icon={ShieldCheck}>
       <div className="flex flex-col gap-6">
-
-        {/* ── Headline ─────────────────────────────────────── */}
         <div className="flex items-end gap-3">
           <span className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 leading-none">
             {avg}%
@@ -75,13 +69,12 @@ export default function ReadinessScoreChart() {
           </span>
         </div>
 
-        {/* ── Ranking bars ─────────────────────────────────── */}
         <div className="flex flex-col gap-2">
-          {readinessRankingData.map((row, i) => {
-            const { bar, text } = readinessColor(row.score);
+          {byArsen.map((row, i) => {
+            const score = row.avg_readiness_score || 0;
+            const { bar, text } = readinessColor(score);
             return (
-              <div key={row.area} className="flex items-center gap-3">
-                {/* Rank badge */}
+              <div key={row.arsen_id || i} className="flex items-center gap-3">
                 <span className={cn(
                   "flex h-5 w-5 shrink-0 items-center justify-center rounded text-[10px] font-bold",
                   i === 0
@@ -91,44 +84,44 @@ export default function ReadinessScoreChart() {
                   {i + 1}
                 </span>
                 <span className="w-[72px] shrink-0 text-[11px] text-neutral-600 dark:text-neutral-400 font-medium">
-                  {row.area}
+                  {row.arsen_name || "Unknown"}
                 </span>
                 <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${row.score}%`, background: bar }}
+                    style={{ width: `${Math.min(score, 100)}%`, background: bar }}
                   />
                 </div>
                 <span className={cn("w-[42px] shrink-0 text-right text-[11px] font-bold", text)}>
-                  {row.score}%
+                  {score}%
                 </span>
               </div>
             );
           })}
+          {byArsen.length === 0 && (
+            <p className="text-xs text-neutral-400 dark:text-neutral-600 text-center py-4">No readiness data available</p>
+          )}
         </div>
 
-        {/* ── Divider ──────────────────────────────────────── */}
         <div className="border-t border-neutral-100 dark:border-neutral-800" />
 
-        {/* ── Score composition ─────────────────────────────── */}
         <div>
           <p className="mb-3 text-[11px] font-semibold text-neutral-500 dark:text-neutral-500 uppercase tracking-wider">
             Score Composition
           </p>
           <div className="flex items-center gap-4">
-            {/* Donut */}
             <div className="h-[90px] w-[90px] shrink-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={readinessCompositionData}
+                    data={composition}
                     cx="50%" cy="50%"
                     innerRadius={26} outerRadius={40}
                     dataKey="value"
                     paddingAngle={2}
                     strokeWidth={0}
                   >
-                    {readinessCompositionData.map((entry) => (
+                    {composition.map((entry) => (
                       <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Pie>
@@ -136,10 +129,8 @@ export default function ReadinessScoreChart() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-
-            {/* Legend */}
             <div className="flex flex-col gap-1.5">
-              {readinessCompositionData.map((d) => (
+              {composition.map((d) => (
                 <div key={d.name} className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full shrink-0" style={{ background: d.color }} />
                   <span className="text-[11px] text-neutral-600 dark:text-neutral-400">{d.name}</span>
@@ -151,7 +142,6 @@ export default function ReadinessScoreChart() {
             </div>
           </div>
         </div>
-
       </div>
     </ChartCard>
   );

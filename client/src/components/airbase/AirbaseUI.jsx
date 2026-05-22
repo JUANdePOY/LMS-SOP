@@ -79,16 +79,25 @@ export function MonoCode({ children }) {
 /**
  * PrimaryButton — main CTA button
  */
-export function PrimaryButton({ children, onClick, icon: Icon }) {
+export function PrimaryButton({ children, onClick, icon: Icon, variant = "primary", className }) {
   return (
     <button
       onClick={onClick}
       className={cn(
-        "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold",
-        "bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-indigo-900/30",
-        "hover:bg-indigo-700 active:bg-indigo-800",
+        "flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs sm:text-sm font-semibold",
         "transition-all duration-150",
-        "outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
+        "outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60",
+        variant === "secondary" && [
+          "border border-neutral-200 dark:border-neutral-700",
+          "bg-white dark:bg-neutral-900",
+          "text-neutral-700 dark:text-neutral-300",
+          "hover:bg-neutral-50 dark:hover:bg-neutral-800",
+        ],
+        variant !== "secondary" && [
+          "bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-indigo-900/30",
+          "hover:bg-indigo-700 active:bg-indigo-800",
+        ],
+        className
       )}
     >
       {Icon && <Icon size={14} strokeWidth={2} />}

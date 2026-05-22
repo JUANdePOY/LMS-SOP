@@ -1,7 +1,179 @@
 const express = require('express');
+const { query, param, body, validationResult } = require('express-validator');
+const attendanceController = require('../controllers/attendanceController');
+const { authenticateToken } = require('../middleware/auth');
+const { authorize } = require('../middleware/rbac');
+const { authorizeFacilitator } = require('../middleware/facilitatorAuth');
+
 const router = express.Router();
 
-// TODO: Implement attendance API
-router.get('/', (req, res) => res.json({ message: 'Attendance API - TODO' }));
+const rejectInvalid = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
+  }
+  return next();
+};
+
+const idParam = [param('id').isInt({ min: 1 })];
+const trainingIdParam = [param('trainingId').isInt({ min: 1 })];
+const externalTrainingIdParam = [param('externalTrainingId').isInt({ min: 1 })];
+
+// ── Scan endpoints (admin or facilitator) ────────────────────────────────────
+
+router.post(
+  '/scan/internal/:trainingId',
+  authenticateToken,
+  authorizeFacilitator(),
+  [
+    ...trainingIdParam,
+    body('barcode').trim().notEmpty().withMessage('Barcode is required'),
+    body('scan_method').optional().isIn(['barcode_scanner', 'camera', 'manual']),
+    body('device_info').optional().isString().isLength({ max: 500 }),
+  ],
+  rejectInvalid,
+  attendanceController.scanInternal
+);
+
+router.post(
+  '/scan/external/:externalTrainingId',
+  authenticateToken,
+  authorizeFacilitator(),
+  [
+    ...externalTrainingIdParam,
+    body('barcode').trim().notEmpty().withMessage('Barcode is required'),
+    body('scan_method').optional().isIn(['barcode_scanner', 'camera', 'manual']),
+    body('device_info').optional().isString().isLength({ max: 500 }),
+  ],
+  rejectInvalid,
+  attendanceController.scanExternal
+);
+
+// ── Manual check-in (admin or facilitator) ────────────────────────────────────
+
+router.post(
+  '/manual/internal/:trainingId',
+  authenticateToken,
+  authorizeFacilitator(),
+  [
+    ...trainingIdParam,
+    body('reservist_id').isInt({ min: 1 }).withMessage('reservist_id is required'),
+    body('status').isIn(['present', 'absent', 'late', 'excused', 'pending']).withMessage('Invalid status'),
+  ],
+  rejectInvalid,
+  attendanceController.manualCheckInInternal
+);
+
+router.post(
+  '/manual/external/:externalTrainingId',
+  authenticateToken,
+  authorizeFacilitator(),
+  [
+    ...externalTrainingIdParam,
+    body('reservist_id').isInt({ min: 1 }).withMessage('reservist_id is required'),
+    body('status').isIn(['present', 'absent', 'late', 'excused', 'pending']).withMessage('Invalid status'),
+  ],
+  rejectInvalid,
+  attendanceController.manualCheckInExternal
+);
+
+// ── Attendance list & stats (admin or facilitator) ────────────────────────────
+
+router.get(
+  '/internal/:trainingId',
+  authenticateToken,
+  authorizeFacilitator(),
+  [...trainingIdParam],
+  rejectInvalid,
+  attendanceController.getInternalAttendance
+);
+
+router.get(
+  '/external/:externalTrainingId',
+  authenticateToken,
+  authorizeFacilitator(),
+  [...externalTrainingIdParam],
+  rejectInvalid,
+  attendanceController.getExternalAttendance
+);
+
+// ── Update attendance status (admin or facilitator) ───────────────────────────
+
+router.patch(
+  '/:eventType/:id',
+  authenticateToken,
+  authorizeFacilitator(),
+  [
+    ...idParam,
+    param('eventType').isIn(['internal', 'external']).withMessage('eventType must be internal or external'),
+    body('status').isIn(['present', 'absent', 'late', 'excused', 'pending']).withMessage('Invalid status'),
+  ],
+  rejectInvalid,
+  attendanceController.updateStatus
+);
+
+// ── Scan audit log (admin or facilitator) ─────────────────────────────────────
+
+router.get(
+  '/scan-history',
+  authenticateToken,
+  authorizeFacilitator(),
+  [
+    query('training_id').optional().isInt({ min: 1 }),
+    query('external_training_id').optional().isInt({ min: 1 }),
+    query('limit').optional().isInt({ min: 1, max: 200 }),
+  ],
+  rejectInvalid,
+  attendanceController.getScanHistory
+);
+
+// ── My events — list events where current user is facilitator ─────────────────
+
+router.get(
+  '/my-events',
+  authenticateToken,
+  attendanceController.getMyEvents
+);
+
+// ── Event status — quick stats for a specific event ───────────────────────────
+
+router.get(
+  '/event-status/:eventType/:id',
+  authenticateToken,
+  authorizeFacilitator(),
+  [
+    ...idParam,
+    param('eventType').isIn(['internal', 'external']).withMessage('eventType must be internal or external'),
+  ],
+  rejectInvalid,
+  attendanceController.getEventStatus
+);
+
+// ── Facilitator management (admin only) ───────────────────────────────────────
+
+router.post(
+  '/facilitators',
+  authenticateToken,
+  authorize('admin'),
+  [
+    body('user_id').isInt({ min: 1 }).withMessage('user_id is required'),
+    body('training_id').optional().isInt({ min: 1 }),
+    body('external_training_id').optional().isInt({ min: 1 }),
+  ],
+  rejectInvalid,
+  attendanceController.assignFacilitator
+);
+
+router.get(
+  '/facilitators',
+  authenticateToken,
+  authorize('admin'),
+  [
+    query('training_id').optional().isInt({ min: 1 }),
+    query('external_training_id').optional().isInt({ min: 1 }),
+  ],
+  rejectInvalid,
+  attendanceController.getFacilitators
+);
 
 module.exports = router;

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { X, Upload, FileText, Image, File, Trash2 } from 'lucide-react';
 import {
   createInternalTraining,
@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/Toast';
 import RegistrationBuilder from './RegistrationBuilder';
 import SquadronParticipantBlocks from './SquadronParticipantBlocks';
 import SquadronSlotLimits from './SquadronSlotLimits';
+import SearchableFacilitatorDropdown from './SearchableFacilitatorDropdown';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -295,6 +296,13 @@ function LetterOrderUpload({ file, onFileChange, existingAttachments = [], train
 
 // ─── Internal Training Fields ──────────────────────────────────────────────────
 function InternalFields({ form, onChange, onFileChange, errors, disabled, trainingId, existingAttachments }) {
+  const selectedSquadronIds = useMemo(
+    () => (form.participantBlocks || [])
+      .filter((b) => b.squadronId)
+      .map((b) => b.squadronId),
+    [form.participantBlocks],
+  );
+
   return (
     <div className="space-y-4">
       <FormGroup label="Training Title" required error={errors.title}>
@@ -337,8 +345,12 @@ function InternalFields({ form, onChange, onFileChange, errors, disabled, traini
             className={inputCls} placeholder="Training venue..." />
         </FormGroup>
         <FormGroup label="Facilitator">
-          <input type="text" value={form.instructor} onChange={e => onChange('instructor', e.target.value)}
-            className={inputCls} placeholder="Facilitator name..." />
+          <SearchableFacilitatorDropdown
+            value={form.instructor}
+            onChange={(val) => onChange('instructor', val)}
+            squadronIds={selectedSquadronIds}
+            disabled={disabled}
+          />
         </FormGroup>
       </div>
 
@@ -370,6 +382,13 @@ function InternalFields({ form, onChange, onFileChange, errors, disabled, traini
 
 // ─── External Training Fields ──────────────────────────────────────────────────
 function ExternalFields({ form, onChange, errors, trainingId, existingAttachments }) {
+  const selectedSquadronIds = useMemo(
+    () => (form.squadronSlotLimits || [])
+      .filter((b) => b.squadronId)
+      .map((b) => b.squadronId),
+    [form.squadronSlotLimits],
+  );
+
   return (
     <div className="space-y-4">
       <FormGroup label="Training Title" required error={errors.title}>
@@ -403,7 +422,14 @@ function ExternalFields({ form, onChange, errors, trainingId, existingAttachment
             {EXTERNAL_STATUS_OPTIONS.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </FormGroup>
-        <div />
+        <FormGroup label="Facilitator">
+          <SearchableFacilitatorDropdown
+            value={form.instructor}
+            onChange={(val) => onChange('instructor', val)}
+            squadronIds={selectedSquadronIds}
+            disabled={false}
+          />
+        </FormGroup>
       </div>
 
       <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">
@@ -438,6 +464,7 @@ const defaultInternal = {
 const defaultExternal = {
   title: '', description: '', startDate: '', startTime: '',
   venue: '', status: 'draft', capacity: '',
+  instructor: '',
   squadronSlotLimits: [],
   letterOrderFile: null,
 };
@@ -499,6 +526,7 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
         squadronName: limit.squadron_name || '',
         slotLimit: limit.slot_limit ?? '',
       })) : [],
+      instructor: str(training.instructor),
       letterOrderFile: null,
     } : {}),
   });
@@ -563,6 +591,7 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
           // BUG FIX: str() guard so null venue doesn't crash .trim()
           venue:       str(externalForm.venue).trim() || null,
           status:      externalForm.status,
+          instructor:  str(externalForm.instructor).trim() || null,
           squadron_limits: (externalForm.squadronSlotLimits || [])
             .filter((block) => block.squadronId && block.slotLimit)
             .map((block) => ({

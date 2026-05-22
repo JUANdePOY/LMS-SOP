@@ -469,6 +469,7 @@ async function createExternalTraining(body) {
     venue: body.venue ?? null,
     status,
     capacity: body.capacity != null ? Number(body.capacity) : null,
+    instructor: body.instructor ? String(body.instructor).slice(0, 200) : null,
     squadron_limits: body.squadron_limits ?? null,
     registration_fields: body.registration_fields ?? null,
   });
@@ -489,6 +490,7 @@ async function updateExternalTraining(id, body) {
   if (body.start_time !== undefined) patch.start_time = body.start_time;
   if (body.venue !== undefined) patch.venue = body.venue;
   if (body.capacity !== undefined) patch.capacity = body.capacity != null ? Number(body.capacity) : null;
+  if (body.instructor !== undefined) patch.instructor = body.instructor ? String(body.instructor).slice(0, 200) : null;
   if (body.squadron_limits !== undefined) patch.squadron_limits = body.squadron_limits;
   if (body.registration_fields !== undefined) patch.registration_fields = body.registration_fields;
   if (body.status !== undefined) {

@@ -14,6 +14,9 @@ const Attendance        = lazy(() => import("@/pages/Attendance"));
 const Analytics         = lazy(() => import("@/pages/Analytics"));
 const Logistics         = lazy(() => import("@/pages/Logistics"));
 const Reports           = lazy(() => import("@/pages/Reports"));
+const Settings          = lazy(() => import("@/pages/Settings"));
+const Alerts            = lazy(() => import("@/pages/Alerts"));
+const AuditLogs         = lazy(() => import("@/pages/AuditLogs"));
 const Login             = lazy(() => import("@/pages/Login"));
 
 // Airbase pages
@@ -69,7 +72,10 @@ const router = createBrowserRouter([
       { path: "attendance",    element: ProtectedWrapper(Attendance)      },
       { path: "analytics",     element: ProtectedWrapper(Analytics)       },
       { path: "logistics",     element: ProtectedWrapper(Logistics)       },
-      { path: "reports",       element: ProtectedWrapper(Reports)         },
+      { path: "alerts",        element: ProtectedWrapper(Alerts)          },
+      { path: "reports",     element: ProtectedWrapper(Reports)         },
+      { path: "settings",    element: <ProtectedRoute allowedRoles={['admin']}><Settings /></ProtectedRoute> },
+      { path: "audit-logs",  element: <ProtectedRoute allowedRoles={['admin']}><AuditLogs /></ProtectedRoute> },
       { path: "airbase",      element: ProtectedWrapper(AirbaseOverview) },
       { path: "airbase/arcens",   element: ProtectedWrapper(ManageArcens) },
       { path: "airbase/groups",   element: ProtectedWrapper(ManageGroups) },

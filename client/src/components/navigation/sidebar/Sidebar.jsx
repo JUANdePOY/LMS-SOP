@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeft, Bell, Settings, LogOut } from "lucide-react";
+import { ChevronLeft, Bell, Settings, LogOut, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
 import { menuItems } from "@/config/menuItems";
 import { useAuth } from "@/contexts/AuthContext";
 
-export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
+export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobileOpen, onMobileClose }) {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const { logout } = useAuth();
 
@@ -18,32 +18,41 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
     else setInternalCollapsed((v) => !v);
   };
 
+  const handleNavClick = () => {
+    if (onMobileClose) onMobileClose();
+  };
+
   return (
     <aside
       className={cn(
-        "fixed inset-y-0 left-0 z-40 flex flex-col",
+        "fixed inset-y-0 left-0 z-50 flex flex-col",
         "transition-all duration-200 ease-out",
         isCollapsed ? "w-[64px]" : "w-[260px]",
         "bg-white border-r border-neutral-200",
-        "dark:bg-neutral-950 dark:border-neutral-800"
+        "dark:bg-neutral-950 dark:border-neutral-800",
+        // Mobile: hidden by default, shown when mobileOpen
+        "max-lg:-translate-x-full",
+        "max-lg:data-[mobile-open=true]:translate-x-0",
+        mobileOpen && "translate-x-0"
       )}
+      data-mobile-open={mobileOpen}
     >
       {/* ── Brand ─────────────────────────────────────────────── */}
       <div
         className={cn(
-          "flex h-16 shrink-0 items-center",
+          "flex h-14 shrink-0 items-center",
           "border-b border-neutral-200 dark:border-neutral-800",
           isCollapsed ? "justify-center px-0" : "justify-between px-4"
         )}
       >
         <Link
           to="/"
+          onClick={handleNavClick}
           className={cn(
             "flex items-center gap-2.5 overflow-hidden",
             isCollapsed && "justify-center"
           )}
         >
-          {/* Logo mark — PAF roundel-inspired badge */}
           <span className={cn(
             "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
             "bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700",
@@ -52,24 +61,18 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
             "before:absolute before:inset-[3px] before:rounded-full",
             "before:border before:border-white/20"
           )}>
-            {/* Outer ring detail */}
             <span className="absolute inset-0 rounded-full border border-white/10" />
-            {/* PAF text */}
             <span className="relative z-10 text-[9px] font-black tracking-[0.05em] text-white leading-none select-none">
               PAF
             </span>
-            {/* Bottom star accent */}
             <span className="absolute bottom-[5px] text-[6px] text-yellow-300 leading-none select-none">★</span>
           </span>
 
-          {/* Brand text */}
           {!isCollapsed && (
             <div className="flex flex-col leading-tight overflow-hidden">
-              {/* P.A.F.R with letter-spaced styling */}
               <span className="text-[15px] font-black tracking-[0.12em] text-neutral-900 dark:text-neutral-50 leading-none">
                 P.A.F.R
               </span>
-              {/* Subtitle — subtle, small, tight */}
               <span className="mt-[3px] text-[9px] font-medium tracking-[0.06em] uppercase text-neutral-400 dark:text-neutral-500 truncate leading-none">
                 Philippine Air Force Reservists
               </span>
@@ -77,7 +80,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
           )}
         </Link>
 
-        {/* Collapse toggle */}
+        {/* Collapse toggle — desktop only */}
         {!isCollapsed && (
           <button
             onClick={handleToggle}
@@ -87,7 +90,8 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
               "text-neutral-400 hover:text-neutral-700",
               "hover:bg-neutral-100 dark:hover:bg-neutral-800",
               "dark:text-neutral-500 dark:hover:text-neutral-300",
-              "transition-colors duration-150"
+              "transition-colors duration-150",
+              "max-lg:hidden"
             )}
           >
             <ChevronLeft size={15} />
@@ -95,9 +99,9 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
         )}
       </div>
 
-      {/* ── Expand button (collapsed only) ────────────────────── */}
+      {/* ── Expand button (collapsed only) — desktop only */}
       {isCollapsed && (
-        <div className="flex justify-center mt-2">
+        <div className="flex justify-center mt-2 max-lg:hidden">
           <button
             onClick={handleToggle}
             aria-label="Expand sidebar"
@@ -128,7 +132,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
         <ul className="space-y-0.5" role="list">
           {menuItems.map((item) => (
             <li key={item.path}>
-              <SidebarItem item={item} isCollapsed={isCollapsed} />
+              <SidebarItem item={item} isCollapsed={isCollapsed} onNavClick={handleNavClick} />
             </li>
           ))}
         </ul>
@@ -146,12 +150,21 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
             <SidebarItem
               item={{ name: "Alerts", path: "/alerts", icon: Bell, description: "Notifications" }}
               isCollapsed={isCollapsed}
+              onNavClick={handleNavClick}
             />
           </li>
           <li>
             <SidebarItem
               item={{ name: "Settings", path: "/settings", icon: Settings, description: "Preferences" }}
               isCollapsed={isCollapsed}
+              onNavClick={handleNavClick}
+            />
+          </li>
+          <li>
+            <SidebarItem
+              item={{ name: "Audit Logs", path: "/audit-logs", icon: History, description: "System change history" }}
+              isCollapsed={isCollapsed}
+              onNavClick={handleNavClick}
             />
           </li>
         </ul>

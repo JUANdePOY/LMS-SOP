@@ -10,8 +10,6 @@ const COLUMNS = [
   { key: "squadron",        label: "Squadron",        sortable: true  },
   { key: "airbase",         label: "Airbase",         sortable: true  },
   { key: "specialization",  label: "Specialization",  sortable: true  },
-  { key: "readinessScore",  label: "Readiness",       sortable: true  },
-  { key: "attendanceRate",  label: "Attendance",      sortable: true  },
   { key: "status",          label: "Status",          sortable: false },
   { key: "actions",         label: "",                sortable: false, className: "w-28" },
 ];
@@ -23,26 +21,65 @@ function SortIcon({ field, sortField, sortDir }) {
     : <ChevronDown size={11} className="text-indigo-500" />;
 }
 
-function ReadinessBar({ value }) {
-  const score = value || 0;
-  const color = score >= 80 ? "bg-emerald-400" : score >= 60 ? "bg-amber-400" : "bg-red-400";
-  const text  = score >= 80 ? "text-emerald-600 dark:text-emerald-400"
-               : score >= 60 ? "text-amber-600 dark:text-amber-400"
-               : "text-red-500 dark:text-red-400";
+function MobileCard({ row, onView, onEdit, onDelete, onToggleStatus }) {
   return (
-    <div className="flex items-center gap-2 min-w-[80px]">
-      <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800">
-        <div className={cn("h-full rounded-full", color)} style={{ width: `${score}%` }} />
+    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 p-4 space-y-3">
+      {/* Header: avatar + name + status */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 text-xs font-bold text-white">
+            {row.firstName?.[0]}{row.lastName?.[0]}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[13px] font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+              {row.lastName}, {row.firstName}
+            </p>
+            <p className="text-[11px] text-neutral-500 dark:text-neutral-500 font-mono truncate">{row.serialNo}</p>
+          </div>
+        </div>
+        <StatusBadge status={row.status} />
       </div>
-      <span className={cn("text-[11px] font-semibold w-8 text-right", text)}>{score}%</span>
+
+      {/* Details grid */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+        <div>
+          <span className="text-neutral-400 dark:text-neutral-500">Rank</span>
+          <p className="font-medium text-neutral-700 dark:text-neutral-300">{row.rank || "—"}</p>
+        </div>
+        <div>
+          <span className="text-neutral-400 dark:text-neutral-500">Squadron</span>
+          <p className="font-medium text-neutral-700 dark:text-neutral-300 truncate">{row.squadron || "—"}</p>
+        </div>
+        <div>
+          <span className="text-neutral-400 dark:text-neutral-500">Airbase</span>
+          <p className="font-medium text-neutral-700 dark:text-neutral-300 truncate">{row.airbase || "—"}</p>
+        </div>
+        <div>
+          <span className="text-neutral-400 dark:text-neutral-500">Specialization</span>
+          <p className="font-medium text-neutral-700 dark:text-neutral-300 truncate">{row.specialization || "—"}</p>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-1 pt-1 border-t border-neutral-100 dark:border-neutral-800">
+        <button onClick={() => onView(row)} className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-medium text-neutral-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors">
+          <Eye size={13} /> View
+        </button>
+        <button onClick={() => onEdit(row)} className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-medium text-neutral-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors">
+          <Pencil size={13} /> Edit
+        </button>
+        <button onClick={() => onToggleStatus(row.id)} className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-medium text-neutral-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10 transition-colors">
+          {row.status === "active" ? <ToggleRight size={13} /> : <ToggleLeft size={13} />}
+          Toggle
+        </button>
+        <button onClick={() => onDelete(row.id)} className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg text-[11px] font-medium text-neutral-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors">
+          <Trash2 size={13} /> Delete
+        </button>
+      </div>
     </div>
   );
 }
 
-/**
- * ReservistTable
- * Sortable table with per-row view/edit/delete/toggle actions.
- */
 export default function ReservistTable({ data, onView, onEdit, onDelete, onToggleStatus }) {
   const [sortField, setSortField] = useState("lastName");
   const [sortDir,   setSortDir]   = useState("asc");
@@ -59,57 +96,70 @@ export default function ReservistTable({ data, onView, onEdit, onDelete, onToggl
     return sortDir === "asc" ? cmp : -cmp;
   });
 
-  return (
-    <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          {/* Head */}
-          <thead>
-            <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900">
-              {COLUMNS.map((col) => (
-                <th
-                  key={col.key}
-                  onClick={() => col.sortable && handleSort(col.key)}
-                  className={cn(
-                    "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider",
-                    "text-neutral-500 dark:text-neutral-500",
-                    col.sortable && "cursor-pointer select-none hover:text-neutral-700 dark:hover:text-neutral-300",
-                    col.className
-                  )}
-                >
-                  <span className="flex items-center gap-1">
-                    {col.label}
-                    {col.sortable && <SortIcon field={col.key} sortField={sortField} sortDir={sortDir} />}
-                  </span>
-                </th>
-              ))}
-            </tr>
-          </thead>
+  if (sorted.length === 0) {
+    return (
+      <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 py-16 text-center text-sm text-neutral-400 dark:text-neutral-600">
+        No reservists found matching your filters.
+      </div>
+    );
+  }
 
-          {/* Body */}
-          <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/60 bg-white dark:bg-neutral-900">
-            {sorted.length === 0 ? (
-              <tr>
-                <td colSpan={COLUMNS.length} className="py-16 text-center text-sm text-neutral-400 dark:text-neutral-600">
-                  No reservists found matching your filters.
-                </td>
+  return (
+    <>
+      {/* Mobile card layout */}
+      <div className="flex flex-col gap-3 lg:hidden">
+        {sorted.map((row) => (
+          <MobileCard
+            key={row.id}
+            row={row}
+            onView={onView}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onToggleStatus={onToggleStatus}
+          />
+        ))}
+      </div>
+
+      {/* Desktop table layout */}
+      <div className="hidden lg:block overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900">
+                {COLUMNS.map((col) => (
+                  <th
+                    key={col.key}
+                    onClick={() => col.sortable && handleSort(col.key)}
+                    className={cn(
+                      "px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider",
+                      "text-neutral-500 dark:text-neutral-500",
+                      col.sortable && "cursor-pointer select-none hover:text-neutral-700 dark:hover:text-neutral-300",
+                      col.className
+                    )}
+                  >
+                    <span className="flex items-center gap-1">
+                      {col.label}
+                      {col.sortable && <SortIcon field={col.key} sortField={sortField} sortDir={sortDir} />}
+                    </span>
+                  </th>
+                ))}
               </tr>
-            ) : (
-              sorted.map((row) => (
+            </thead>
+
+            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/60 bg-white dark:bg-neutral-900">
+              {sorted.map((row) => (
                 <tr
                   key={row.id}
-                  className="group hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors duration-100 cursor-pointer"
-                  onClick={() => onView(row)}
+                  className="group hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors duration-100"
                 >
                   <td className="px-4 py-3">
                     <MonoCode>{row.serialNo}</MonoCode>
                   </td>
 
-                  {/* Name + avatar */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2.5">
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 text-[10px] font-bold text-white">
-                        {row.firstName[0]}{row.lastName[0]}
+                        {row.firstName?.[0]}{row.lastName?.[0]}
                       </span>
                       <div className="flex flex-col leading-tight">
                         <span className="text-[13px] font-semibold text-neutral-800 dark:text-neutral-200">
@@ -138,19 +188,10 @@ export default function ReservistTable({ data, onView, onEdit, onDelete, onToggl
                   </td>
 
                   <td className="px-4 py-3">
-                    <ReadinessBar value={row.readinessScore} />
-                  </td>
-
-                  <td className="px-4 py-3">
-                    <ReadinessBar value={row.attendanceRate} />
-                  </td>
-
-                  <td className="px-4 py-3">
                     <StatusBadge status={row.status} />
                   </td>
 
-                  {/* Actions — stop propagation so row click doesn't fire */}
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3">
                     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                       <ActionButton icon={Eye}    label="View"   onClick={() => onView(row)} />
                       <ActionButton icon={Pencil} label="Edit"   onClick={() => onEdit(row)} />
@@ -163,20 +204,26 @@ export default function ReservistTable({ data, onView, onEdit, onDelete, onToggl
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {sorted.length > 0 && (
+          <div className="border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 px-4 py-2.5">
+            <p className="text-[11px] text-neutral-400 dark:text-neutral-600">
+              Showing <span className="font-semibold text-neutral-600 dark:text-neutral-400">{sorted.length}</span> reservist{sorted.length !== 1 ? "s" : ""}
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Footer count */}
-      {sorted.length > 0 && (
-        <div className="border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 px-4 py-2.5">
-          <p className="text-[11px] text-neutral-400 dark:text-neutral-600">
-            Showing <span className="font-semibold text-neutral-600 dark:text-neutral-400">{sorted.length}</span> reservist{sorted.length !== 1 ? "s" : ""}
-          </p>
-        </div>
-      )}
-    </div>
+      {/* Footer count for mobile */}
+      <div className="lg:hidden">
+        <p className="text-[11px] text-neutral-400 dark:text-neutral-600 px-1">
+          Showing <span className="font-semibold text-neutral-600 dark:text-neutral-400">{sorted.length}</span> reservist{sorted.length !== 1 ? "s" : ""}
+        </p>
+      </div>
+    </>
   );
 }

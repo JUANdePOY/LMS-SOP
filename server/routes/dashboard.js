@@ -1,7 +1,192 @@
 const express = require('express');
 const router = express.Router();
+const db = require('../config/database');
+const { authenticateToken } = require('../middleware/auth');
 
-// TODO: Implement dashboard API
-router.get('/', (req, res) => res.json({ message: 'Dashboard API - TODO' }));
+/**
+ * GET /api/dashboard
+ * Aggregated dashboard data: KPIs, readiness, attendance, training, alerts.
+ */
+router.get('/', authenticateToken, async (req, res) => {
+  try {
+    // ── KPI Summary ──────────────────────────────────────────────
+    const [[overallReadiness]] = await db.query('SELECT * FROM v_overall_readiness');
+
+    const [[reservistCount]] = await db.query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN is_active = TRUE THEN 1 ELSE 0 END) AS active,
+        SUM(CASE WHEN reserve_status = 'Ready Reserve' THEN 1 ELSE 0 END) AS ready,
+        SUM(CASE WHEN reserve_status = 'Standby Reserve' THEN 1 ELSE 0 END) AS standby
+      FROM reservists
+    `);
+
+    const [[trainingCount]] = await db.query(`
+      SELECT
+        COUNT(*) AS total,
+        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+        SUM(CASE WHEN status = 'ongoing' THEN 1 ELSE 0 END) AS ongoing,
+        SUM(CASE WHEN status = 'published' THEN 1 ELSE 0 END) AS upcoming
+      FROM trainings
+    `);
+
+    const [[attendanceStats]] = await db.query(`
+      SELECT
+        COUNT(*) AS total_records,
+        SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) AS present_count,
+        ROUND(100.0 * SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) AS attendance_rate
+      FROM attendance
+    `);
+
+    // ── Readiness by Arsen (for ranking chart) ───────────────────
+    const [arsenReadiness] = await db.query(`
+      SELECT arsen_id AS id, arsen_name AS name, avg_readiness_score AS score,
+        avg_training_participation, avg_attendance_rate, avg_active_status
+      FROM v_arsen_readiness
+      ORDER BY avg_readiness_score DESC
+    `);
+
+    // ── Readiness by Group (for group comparison) ────────────────
+    const [groupReadiness] = await db.query(`
+      SELECT group_id AS id, group_name AS name, arsen_name, avg_readiness_score AS score,
+        avg_training_participation, avg_attendance_rate, avg_active_status
+      FROM v_group_readiness
+      ORDER BY avg_readiness_score DESC
+    `);
+
+    // ── Readiness by Squadron ─────────────────────────────────────
+    const [squadronReadiness] = await db.query(`
+      SELECT squadron_id AS id, squadron_name AS name, group_name, avg_readiness_score AS score,
+        avg_training_participation, avg_attendance_rate, avg_active_status
+      FROM v_squadron_readiness
+      ORDER BY avg_readiness_score DESC
+    `);
+
+    // ── Low performing areas (arsen-level, score < 65) ───────────
+    const [lowPerforming] = await db.query(`
+      SELECT arsen_name AS name, avg_readiness_score AS readiness,
+        avg_attendance_rate AS attendance, below_threshold_count
+      FROM v_arsen_readiness
+      WHERE avg_readiness_score < 65 OR avg_readiness_score IS NULL
+      ORDER BY avg_readiness_score ASC
+      LIMIT 5
+    `);
+
+    // ── Training activity by area ─────────────────────────────────
+    const [trainingByArea] = await db.query(`
+      SELECT a.name AS area, COUNT(t.id) AS trainings
+      FROM trainings t
+      LEFT JOIN areas a ON t.area_id = a.id
+      GROUP BY a.name
+      ORDER BY trainings DESC
+      LIMIT 10
+    `);
+
+    // ── Attendance timeline (last 8 weeks) ────────────────────────
+    const [attendanceTimeline] = await db.query(`
+      SELECT
+        DATE_FORMAT(created_at, '%b %d') AS date,
+        ROUND(100.0 * SUM(CASE WHEN status IN ('present', 'late') THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 1) AS rate
+      FROM attendance
+      GROUP BY DATE_FORMAT(created_at, '%Y-%m-%d')
+      ORDER BY MIN(created_at) DESC
+      LIMIT 8
+    `);
+
+    // ── Force distribution ────────────────────────────────────────
+    const [forceDistribution] = await db.query(`
+      SELECT
+        a.name AS area,
+        COUNT(r.id) AS total,
+        SUM(CASE WHEN r.is_active = TRUE THEN 1 ELSE 0 END) AS active,
+        SUM(CASE WHEN r.reserve_status = 'Standby Reserve' THEN 1 ELSE 0 END) AS standby
+      FROM reservists r
+      LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+      LEFT JOIN \`groups\` g ON ra.group_id = g.id
+      LEFT JOIN arsens a ON g.arsen_id = a.id
+      GROUP BY a.name
+      ORDER BY total DESC
+    `);
+
+    // ── Rank distribution ─────────────────────────────────────────
+    const [rankDistribution] = await db.query(`
+      SELECT \`rank\`, COUNT(*) AS \`count\`
+      FROM reservists
+      GROUP BY \`rank\`
+      ORDER BY \`count\` DESC
+    `);
+
+    // ── Active alerts ─────────────────────────────────────────────
+    const [alerts] = await db.query(`
+      SELECT id, title, message, target_role, created_at
+      FROM alerts
+      WHERE is_active = TRUE AND (end_date IS NULL OR end_date >= CURDATE())
+      ORDER BY created_at DESC
+      LIMIT 10
+    `);
+
+    // ── Readiness distribution buckets ────────────────────────────
+    const [readinessDistribution] = await db.query(`
+      SELECT
+        SUM(CASE WHEN readiness_score >= 90 THEN 1 ELSE 0 END) AS excellent,
+        SUM(CASE WHEN readiness_score >= 80 AND readiness_score < 90 THEN 1 ELSE 0 END) AS good,
+        SUM(CASE WHEN readiness_score >= 70 AND readiness_score < 80 THEN 1 ELSE 0 END) AS fair,
+        SUM(CASE WHEN readiness_score >= 60 AND readiness_score < 70 THEN 1 ELSE 0 END) AS poor,
+        SUM(CASE WHEN readiness_score < 60 THEN 1 ELSE 0 END) AS critical
+      FROM v_reservist_readiness
+    `);
+
+    res.json({
+      status: 'success',
+      data: {
+        kpis: {
+          total_reservists: reservistCount.total || 0,
+          active_reservists: reservistCount.active || 0,
+          ready_reservists: reservistCount.ready || 0,
+          standby_reservists: reservistCount.standby || 0,
+          avg_readiness_score: overallReadiness?.avg_readiness_score || 0,
+          avg_training_participation: overallReadiness?.avg_training_participation || 0,
+          avg_attendance_rate: overallReadiness?.avg_attendance_rate || 0,
+          avg_active_status: overallReadiness?.avg_active_status || 0,
+          total_trainings: trainingCount.total || 0,
+          completed_trainings: trainingCount.completed || 0,
+          ongoing_trainings: trainingCount.ongoing || 0,
+          upcoming_trainings: trainingCount.upcoming || 0,
+          overall_attendance_rate: attendanceStats?.attendance_rate || 0,
+          below_threshold_count: overallReadiness?.below_threshold_count || 0,
+        },
+        readiness: {
+          by_arsen: arsenReadiness,
+          by_group: groupReadiness,
+          by_squadron: squadronReadiness,
+          distribution: readinessDistribution?.[0] || { excellent: 0, good: 0, fair: 0, poor: 0, critical: 0 },
+          composition: [
+            { name: 'Training Participation', value: 40, color: '#6366f1' },
+            { name: 'Attendance Rate', value: 30, color: '#10b981' },
+            { name: 'Active Status Weight', value: 30, color: '#f59e0b' },
+          ]
+        },
+        attendance: {
+          timeline: attendanceTimeline?.reverse() || [],
+          by_area: [],  // populated from force distribution
+        },
+        trainings: {
+          by_area: trainingByArea,
+        },
+        force_distribution: forceDistribution,
+        rank_distribution: rankDistribution,
+        low_performing: lowPerforming,
+        alerts: alerts,
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+      code: 'INTERNAL_ERROR'
+    });
+  }
+});
 
 module.exports = router;

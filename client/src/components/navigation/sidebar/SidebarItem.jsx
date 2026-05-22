@@ -4,12 +4,13 @@ import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarTooltip from "@/components/ui/Tooltip";
 
-function SidebarSubItem({ item }) {
+function SidebarSubItem({ item, onNavClick }) {
   const Icon = item.icon;
   return (
     <NavLink
       to={item.path}
       end={item.end ?? false}
+      onClick={onNavClick}
       className={({ isActive }) =>
         cn(
           "relative flex items-center gap-2.5 rounded-lg py-2 pl-9 pr-3 w-full",
@@ -45,7 +46,7 @@ function SidebarSubItem({ item }) {
   );
 }
 
-export default function SidebarItem({ item, isCollapsed }) {
+export default function SidebarItem({ item, isCollapsed, onNavClick }) {
   const Icon = item.icon;
   const location = useLocation();
   const hasChildren = item.children && item.children.length > 0;
@@ -121,7 +122,7 @@ export default function SidebarItem({ item, isCollapsed }) {
                 <ul className="space-y-0.5 py-0.5" role="list">
                   {item.children.map((child) => (
                     <li key={child.path}>
-                      <SidebarSubItem item={child} />
+                      <SidebarSubItem item={child} onNavClick={onNavClick} />
                     </li>
                   ))}
                 </ul>
@@ -138,6 +139,7 @@ export default function SidebarItem({ item, isCollapsed }) {
       <NavLink
         to={item.path}
         end={item.path === "/"}
+        onClick={onNavClick}
         className={({ isActive }) =>
           cn(
             "relative flex items-center gap-3 rounded-lg px-3 py-2.5 w-full",
