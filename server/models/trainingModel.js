@@ -61,7 +61,8 @@ async function findInternalMany({ page, limit, search, status, type }) {
       TIMESTAMPDIFF(HOUR, t.start_datetime, t.end_datetime) AS duration_hours,
       JSON_UNQUOTE(JSON_EXTRACT(a.description, '$.activityType')) AS type,
       a.instructor AS instructor,
-      JSON_UNQUOTE(JSON_EXTRACT(a.description, '$.requirements')) AS requirements
+      JSON_UNQUOTE(JSON_EXTRACT(a.description, '$.requirements')) AS requirements,
+      (SELECT COUNT(*) FROM internal_training_participants itp WHERE itp.training_id = t.id) AS participant_count
     FROM trainings t
     LEFT JOIN activities a ON a.training_id = t.id AND a.id = (
       SELECT MIN(a2.id) FROM activities a2 WHERE a2.training_id = t.id

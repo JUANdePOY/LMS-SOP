@@ -4,7 +4,7 @@ import { shortDate } from '@/lib/dateUtils';
 
 export default function TrainingPreviewCard({ training, onLogin, variant = 'internal' }) {
   if (variant === 'internal') {
-    const participantCount = training.participants?.length ?? training.participant_groups?.reduce((sum, group) => sum + (group.selectedReservists?.length || 0), 0) ?? 0;
+    const participantCount = training.participant_count ?? training.participants?.length ?? training.participant_groups?.reduce((sum, group) => sum + (group.selectedReservists?.length || 0), 0) ?? 0;
     const participantLabels = training.participants?.slice(0, 4).map((participant) => participant.name || participant.username || participant.email) || [];
 
     return (
