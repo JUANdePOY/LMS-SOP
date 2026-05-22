@@ -595,3 +595,23 @@ CREATE TABLE user_role_history (
     CONSTRAINT user_role_history_ibfk_1 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT user_role_history_ibfk_2 FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------
+-- Table announcements
+-- -----------------------------------------------------
+CREATE TABLE announcements (
+    id VARCHAR(36) NOT NULL DEFAULT (UUID()),
+    title VARCHAR(255) NOT NULL,
+    type ENUM('General','Training','Deployment','Administrative','Emergency') NOT NULL DEFAULT 'General',
+    priority ENUM('critical','high','medium','low') NOT NULL DEFAULT 'medium',
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    author VARCHAR(100) NOT NULL DEFAULT 'CO Admin',
+    body TEXT NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_type (type),
+    KEY idx_priority (priority),
+    KEY idx_status (status),
+    KEY idx_created (created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

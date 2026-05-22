@@ -32,6 +32,7 @@ const settingsRoutes = require('./routes/settings');
 const dashboardRoutes = require('./routes/dashboard');
 const assignmentsRoutes = require('./routes/assignments');
 const hierarchyRoutes = require('./routes/hierarchy');
+const announcementsRoutes = require('./routes/announcements');
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -53,6 +54,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/assignments', assignmentsRoutes);
 app.use('/api/hierarchy', hierarchyRoutes);
+app.use('/api/announcements', announcementsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -78,7 +80,7 @@ app.use('*', (req, res) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`PAFR Server running on port ${PORT}`);

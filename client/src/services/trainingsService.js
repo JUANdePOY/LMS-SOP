@@ -1,9 +1,9 @@
 // client/src/services/trainingsService.js
 import axios from 'axios';
 
-// Create axios instance with base URL
+// Create axios instance - uses relative URLs which work with Vite proxy
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
