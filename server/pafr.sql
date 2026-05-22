@@ -308,6 +308,7 @@ CREATE TABLE IF NOT EXISTS `reservists` (
   `date_enlisted` date DEFAULT NULL,
   `source_of_commission` enum('ROTC','BCMT','MOTC','Direct Commission') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `rank_date_appointment` date DEFAULT NULL,
+  `position` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `specialization` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `reserve_status` enum('Ready Reserve','Standby Reserve','Retired') COLLATE utf8mb4_unicode_ci DEFAULT 'Ready Reserve',
   `highest_education` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,

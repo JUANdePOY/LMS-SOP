@@ -58,6 +58,7 @@ CREATE TABLE reservists (
     date_enlisted DATE NULL,
     source_of_commission ENUM('ROTC', 'BCMT', 'MOTC', 'Direct Commission') NULL,
     rank_date_appointment DATE NULL,
+    position VARCHAR(200) NULL,
     specialization VARCHAR(200) NULL,
     reserve_status ENUM('Ready Reserve', 'Standby Reserve', 'Retired') DEFAULT 'Ready Reserve',
     highest_education VARCHAR(100) NULL,

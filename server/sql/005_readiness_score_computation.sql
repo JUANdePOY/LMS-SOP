@@ -2,7 +2,7 @@
 -- Training Participation 40%, Attendance Rate 30%, Active Status 30%
 --
 -- Creates views that compute readiness scores dynamically from:
---   1. Training Participation (40%): % of mandatory trainings attended vs assigned
+--   1. Training Participation (40%): % of trainings attended vs assigned
 --   2. Attendance Rate (30%): % of present+late vs total attendance records
 --   3. Active Status (30%): is_active flag (100 or 0)
 
@@ -26,7 +26,7 @@ SELECT
   ra.squadron_id,
   g.arsen_id,
 
-  -- Training Participation (40%): % of mandatory trainings where reservist was present
+  -- Training Participation (40%): % of trainings where reservist was present
   COALESCE((
     SELECT ROUND(
       100.0 * SUM(CASE WHEN a.status = 'present' THEN 1 ELSE 0 END) /
@@ -36,7 +36,6 @@ SELECT
     JOIN trainings t ON itp.training_id = t.id
     LEFT JOIN attendance a ON a.training_id = t.id AND a.reservist_id = itp.reservist_id
     WHERE itp.reservist_id = r.id
-      AND t.is_mandatory = TRUE
   ), 0) AS training_participation_pct,
 
   -- Attendance Rate (30%): % of present+late vs total attendance records
@@ -61,7 +60,6 @@ SELECT
       JOIN trainings t ON itp.training_id = t.id
       LEFT JOIN attendance a ON a.training_id = t.id AND a.reservist_id = itp.reservist_id
       WHERE itp.reservist_id = r.id
-        AND t.is_mandatory = TRUE
     ), 0)
     +
     COALESCE((
@@ -110,7 +108,7 @@ SELECT
   g.arsen_id,
   a.name AS arsen_name,
   COUNT(DISTINCT sr.squadron_id) AS total_squadrons,
-  COUNT(DISTINCT sr.total_reservists) AS total_reservists,
+  SUM(sr.total_reservists) AS total_reservists,
   SUM(sr.active_reservists) AS active_reservists,
   ROUND(AVG(sr.avg_readiness_score), 2) AS avg_readiness_score,
   ROUND(AVG(sr.avg_training_participation), 2) AS avg_training_participation,

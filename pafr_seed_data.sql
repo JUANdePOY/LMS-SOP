@@ -150,51 +150,51 @@ INSERT INTO reservist_assignments (id, reservist_id, group_id, squadron_id, assi
 -- ============================================================
 -- 8. TRAININGS (created by admin user)
 -- ============================================================
-INSERT INTO trainings (id, title, description, start_datetime, end_datetime, venue, area_id, status, capacity, is_mandatory, created_by, created_at) VALUES
-  (1, 'Basic Infantry Training 2026', 'Fundamentals of infantry combat operations for new reservists', '2026-06-01 08:00:00', '2026-06-15 17:00:00', 'Camp Aguinaldo Training Range', 6, 'published', 50, TRUE, 1, '2026-05-01 09:00:00'),
-  (2, 'Advanced Weapons Qualification', 'Weapons handling and marksmanship certification', '2026-06-20 07:00:00', '2026-06-22 18:00:00', 'Camp Aguinaldo Firing Range', 6, 'published', 30, TRUE, 1, '2026-05-02 10:00:00'),
-  (3, 'Tactical Communications Course', 'Radio communications and encrypted messaging protocols', '2026-07-01 08:00:00', '2026-07-05 17:00:00', 'Camp Tecson Training Center', 7, 'draft', 25, FALSE, 1, '2026-05-03 11:00:00'),
-  (4, 'Combat First Aid Training', 'Emergency medical response and battlefield triage', '2026-07-15 08:00:00', '2026-07-17 17:00:00', 'Camp Olongapo Medical Facility', 11, 'published', 40, TRUE, 1, '2026-05-04 12:00:00'),
-  (5, 'Physical Fitness Assessment', 'Semi-annual physical readiness test', '2026-05-15 06:00:00', '2026-05-15 12:00:00', 'Camp Aguinaldo PT Field', 6, 'ongoing', 100, TRUE, 1, '2026-05-01 08:00:00'),
-  (6, 'Leadership Development Seminar', 'Command and leadership skills for NCOs and officers', '2026-08-01 08:00:00', '2026-08-03 17:00:00', 'Camp General Macario Peralta Jr.', 11, 'draft', 35, FALSE, 1, '2026-05-05 09:00:00'),
-  (7, 'Counter-Insurgency Operations Workshop', 'COIN doctrine and community engagement strategies', '2026-08-10 08:00:00', '2026-08-14 17:00:00', 'Camp Panacan, Davao', 13, 'published', 45, TRUE, 1, '2026-05-06 10:00:00'),
-  (8, 'Disaster Response Training', 'Humanitarian assistance and disaster relief operations', '2026-09-01 08:00:00', '2026-09-05 17:00:00', 'Camp Lapu-Lapu, Cebu', 12, 'draft', 60, FALSE, 1, '2026-05-07 11:00:00'),
-  (9, 'Marksmanship Refresher Course', 'Rifle and pistol qualification renewal', '2026-06-25 07:00:00', '2026-06-27 18:00:00', 'Camp Evangelista, CDO', 13, 'published', 35, TRUE, 1, '2026-05-08 09:00:00'),
-  (10, 'Urban Operations Training', 'Close quarters battle and urban patrol techniques', '2026-10-01 08:00:00', '2026-10-10 17:00:00', 'Camp Tecson, Bulacan', 10, 'draft', 40, TRUE, 1, '2026-05-09 08:00:00');
+INSERT INTO trainings (id, title, description, start_datetime, end_datetime, venue, area_id, status, capacity, created_by, created_at) VALUES
+  (1, 'Basic Infantry Training 2026', 'Fundamentals of infantry combat operations for new reservists', '2026-06-01 08:00:00', '2026-06-15 17:00:00', 'Camp Aguinaldo Training Range', 6, 'published', 50, 1, '2026-05-01 09:00:00'),
+  (2, 'Advanced Weapons Qualification', 'Weapons handling and marksmanship certification', '2026-06-20 07:00:00', '2026-06-22 18:00:00', 'Camp Aguinaldo Firing Range', 6, 'published', 30, 1, '2026-05-02 10:00:00'),
+  (3, 'Tactical Communications Course', 'Radio communications and encrypted messaging protocols', '2026-07-01 08:00:00', '2026-07-05 17:00:00', 'Camp Tecson Training Center', 7, 'draft', 25, 1, '2026-05-03 11:00:00'),
+  (4, 'Combat First Aid Training', 'Emergency medical response and battlefield triage', '2026-07-15 08:00:00', '2026-07-17 17:00:00', 'Camp Olongapo Medical Facility', 11, 'published', 40, 1, '2026-05-04 12:00:00'),
+  (5, 'Physical Fitness Assessment', 'Semi-annual physical readiness test', '2026-05-15 06:00:00', '2026-05-15 12:00:00', 'Camp Aguinaldo PT Field', 6, 'ongoing', 100, 1, '2026-05-01 08:00:00'),
+  (6, 'Leadership Development Seminar', 'Command and leadership skills for NCOs and officers', '2026-08-01 08:00:00', '2026-08-03 17:00:00', 'Camp General Macario Peralta Jr.', 11, 'draft', 35, 1, '2026-05-05 09:00:00'),
+  (7, 'Counter-Insurgency Operations Workshop', 'COIN doctrine and community engagement strategies', '2026-08-10 08:00:00', '2026-08-14 17:00:00', 'Camp Panacan, Davao', 13, 'published', 45, 1, '2026-05-06 10:00:00'),
+  (8, 'Disaster Response Training', 'Humanitarian assistance and disaster relief operations', '2026-09-01 08:00:00', '2026-09-05 17:00:00', 'Camp Lapu-Lapu, Cebu', 12, 'draft', 60, 1, '2026-05-07 11:00:00'),
+  (9, 'Marksmanship Refresher Course', 'Rifle and pistol qualification renewal', '2026-06-25 07:00:00', '2026-06-27 18:00:00', 'Camp Evangelista, CDO', 13, 'published', 35, 1, '2026-05-08 09:00:00'),
+  (10, 'Urban Operations Training', 'Close quarters battle and urban patrol techniques', '2026-10-01 08:00:00', '2026-10-10 17:00:00', 'Camp Tecson, Bulacan', 10, 'draft', 40, 1, '2026-05-09 08:00:00');
 
 -- ============================================================
 -- 9. ACTIVITIES (within trainings)
 -- Description format: JSON with activityType and requirements fields
 -- ============================================================
-INSERT INTO activities (id, training_id, title, description, start_time, end_time, location, instructor, is_mandatory) VALUES
+INSERT INTO activities (id, training_id, title, description, start_time, end_time, location, instructor) VALUES
   -- Training 1 activities
-  (1, 1, 'Orientation & Safety Briefing', '{"activityType":"orientation","requirements":"None"}', '2026-06-01 08:00:00', '2026-06-01 10:00:00', 'Camp Aguinaldo HQ', 'Capt. Garcia', TRUE),
-  (2, 1, 'Squad Drill Fundamentals', '{"activityType":"drill","requirements":"Combat uniform, boots"}', '2026-06-01 13:00:00', '2026-06-02 17:00:00', 'Training Field Alpha', '1LT Santos', TRUE),
-  (3, 1, 'Weapons Familiarization', '{"activityType":"weapons","requirements":"Safety gear"}', '2026-06-03 08:00:00', '2026-06-04 17:00:00', 'Armory Building', 'SSG Reyes', TRUE),
-  (4, 1, 'Field Exercise FTX-1', '{"activityType":"field_exercise","requirements":"Full combat load, 72hr pack"}', '2026-06-08 06:00:00', '2026-06-10 18:00:00', 'Tactical Training Area', 'Capt. Garcia', TRUE),
-  (5, 1, 'After Action Review', '{"activityType":"review","requirements":"None"}', '2026-06-14 08:00:00', '2026-06-15 12:00:00', 'Training Room 1', 'Capt. Garcia', TRUE),
+  (1, 1, 'Orientation & Safety Briefing', '{"activityType":"orientation","requirements":"None"}', '2026-06-01 08:00:00', '2026-06-01 10:00:00', 'Camp Aguinaldo HQ', 'Capt. Garcia'),
+  (2, 1, 'Squad Drill Fundamentals', '{"activityType":"drill","requirements":"Combat uniform, boots"}', '2026-06-01 13:00:00', '2026-06-02 17:00:00', 'Training Field Alpha', '1LT Santos'),
+  (3, 1, 'Weapons Familiarization', '{"activityType":"weapons","requirements":"Safety gear"}', '2026-06-03 08:00:00', '2026-06-04 17:00:00', 'Armory Building', 'SSG Reyes'),
+  (4, 1, 'Field Exercise FTX-1', '{"activityType":"field_exercise","requirements":"Full combat load, 72hr pack"}', '2026-06-08 06:00:00', '2026-06-10 18:00:00', 'Tactical Training Area', 'Capt. Garcia'),
+  (5, 1, 'After Action Review', '{"activityType":"review","requirements":"None"}', '2026-06-14 08:00:00', '2026-06-15 12:00:00', 'Training Room 1', 'Capt. Garcia'),
   -- Training 2 activities
-  (6, 2, 'Weapons Safety & Rules', '{"activityType":"weapons","requirements":"Eye and ear protection"}', '2026-06-20 07:00:00', '2026-06-20 09:00:00', 'Firing Range Safety Area', 'SMSgt Peralto', TRUE),
-  (7, 2, 'Marksmanship - Rifle Qualification', '{"activityType":"weapons","requirements":"M16/M4 rifle, 40 rounds"}', '2026-06-20 10:00:00', '2026-06-21 17:00:00', 'Firing Range', 'SMSgt Peralto', TRUE),
-  (8, 2, 'Marksmanship - Pistol Qualification', '{"activityType":"weapons","requirements":"9mm pistol, 30 rounds"}', '2026-06-22 07:00:00', '2026-06-22 17:00:00', 'Pistol Range', 'SSG Pasion', FALSE),
+  (6, 2, 'Weapons Safety & Rules', '{"activityType":"weapons","requirements":"Eye and ear protection"}', '2026-06-20 07:00:00', '2026-06-20 09:00:00', 'Firing Range Safety Area', 'SMSgt Peralto'),
+  (7, 2, 'Marksmanship - Rifle Qualification', '{"activityType":"weapons","requirements":"M16/M4 rifle, 40 rounds"}', '2026-06-20 10:00:00', '2026-06-21 17:00:00', 'Firing Range', 'SMSgt Peralto'),
+  (8, 2, 'Marksmanship - Pistol Qualification', '{"activityType":"weapons","requirements":"9mm pistol, 30 rounds"}', '2026-06-22 07:00:00', '2026-06-22 17:00:00', 'Pistol Range', 'SSG Pasion'),
   -- Training 3 activities
-  (9, 3, 'Radio Fundamentals', '{"activityType":"communications","requirements":"PRC-152 radio"}', '2026-07-01 08:00:00', '2026-07-02 17:00:00', 'Comms Room', '1LT Oban', TRUE),
-  (10, 3, 'Encrypted Communications', '{"activityType":"communications","requirements":"Crypto key material"}', '2026-07-03 08:00:00', '2026-07-04 17:00:00', 'Comms Room', '1LT Oban', TRUE),
-  (11, 3, 'Field Exercise COMEX', '{"activityType":"field_exercise","requirements":"Full comms kit"}', '2026-07-05 06:00:00', '2026-07-05 17:00:00', 'Field Training Area', 'Capt. Garcia', TRUE),
+  (9, 3, 'Radio Fundamentals', '{"activityType":"communications","requirements":"PRC-152 radio"}', '2026-07-01 08:00:00', '2026-07-02 17:00:00', 'Comms Room', '1LT Oban'),
+  (10, 3, 'Encrypted Communications', '{"activityType":"communications","requirements":"Crypto key material"}', '2026-07-03 08:00:00', '2026-07-04 17:00:00', 'Comms Room', '1LT Oban'),
+  (11, 3, 'Field Exercise COMEX', '{"activityType":"field_exercise","requirements":"Full comms kit"}', '2026-07-05 06:00:00', '2026-07-05 17:00:00', 'Field Training Area', 'Capt. Garcia'),
   -- Training 4 activities
-  (12, 4, 'TCCC Level A', '{"activityType":"medical","requirements":"IFAK, tourniquet"}', '2026-07-15 08:00:00', '2026-07-15 17:00:00', 'Medical Training Hall', 'Nurse Santos', TRUE),
-  (13, 4, 'Casualty Evacuation Drill', '{"activityType":"medical","requirements":"Litter, stretcher"}', '2026-07-16 08:00:00', '2026-07-16 17:00:00', 'Field Training Area', 'Nurse Santos', TRUE),
-  (14, 4, 'Mass Casualty Exercise', '{"activityType":"medical","requirements":"Full medical kit, triage tags"}', '2026-07-17 08:00:00', '2026-07-17 17:00:00', 'Multi-Purpose Hall', 'Capt. Mapagu', TRUE),
+  (12, 4, 'TCCC Level A', '{"activityType":"medical","requirements":"IFAK, tourniquet"}', '2026-07-15 08:00:00', '2026-07-15 17:00:00', 'Medical Training Hall', 'Nurse Santos'),
+  (13, 4, 'Casualty Evacuation Drill', '{"activityType":"medical","requirements":"Litter, stretcher"}', '2026-07-16 08:00:00', '2026-07-16 17:00:00', 'Field Training Area', 'Nurse Santos'),
+  (14, 4, 'Mass Casualty Exercise', '{"activityType":"medical","requirements":"Full medical kit, triage tags"}', '2026-07-17 08:00:00', '2026-07-17 17:00:00', 'Multi-Purpose Hall', 'Capt. Mapagu'),
   -- Training 5 activities (Physical Fitness)
-  (15, 5, 'APFT Administration', '{"activityType":"fitness","requirements":"PT uniform, running shoes"}', '2026-05-15 06:00:00', '2026-05-15 09:00:00', 'PT Field', '1LT Tolentino', TRUE),
-  (16, 5, 'Cross-Country Run', '{"activityType":"fitness","requirements":"Running shoes, hydration"}', '2026-05-15 10:00:00', '2026-05-15 12:00:00', 'Camp Grounds', '1LT Tolentino', TRUE),
+  (15, 5, 'APFT Administration', '{"activityType":"fitness","requirements":"PT uniform, running shoes"}', '2026-05-15 06:00:00', '2026-05-15 09:00:00', 'PT Field', '1LT Tolentino'),
+  (16, 5, 'Cross-Country Run', '{"activityType":"fitness","requirements":"Running shoes, hydration"}', '2026-05-15 10:00:00', '2026-05-15 12:00:00', 'Camp Grounds', '1LT Tolentino'),
   -- Training 7 activities
-  (17, 7, 'COIN Classroom Instruction', '{"activityType":"classroom","requirements":"None"}', '2026-08-10 08:00:00', '2026-08-11 17:00:00', 'Lecture Hall', 'Col. Oban', TRUE),
-  (18, 7, 'Civil-Military Operations', '{"activityType":"classroom","requirements":"None"}', '2026-08-12 08:00:00', '2026-08-12 17:00:00', 'Community Center', 'Capt. Mapagu', TRUE),
-  (19, 7, 'Patrol Exercise', '{"activityType":"field_exercise","requirements":"Full combat load"}', '2026-08-13 06:00:00', '2026-08-14 18:00:00', 'Rural Training Area', 'Col. Oban', TRUE),
+  (17, 7, 'COIN Classroom Instruction', '{"activityType":"classroom","requirements":"None"}', '2026-08-10 08:00:00', '2026-08-11 17:00:00', 'Lecture Hall', 'Col. Oban'),
+  (18, 7, 'Civil-Military Operations', '{"activityType":"classroom","requirements":"None"}', '2026-08-12 08:00:00', '2026-08-12 17:00:00', 'Community Center', 'Capt. Mapagu'),
+  (19, 7, 'Patrol Exercise', '{"activityType":"field_exercise","requirements":"Full combat load"}', '2026-08-13 06:00:00', '2026-08-14 18:00:00', 'Rural Training Area', 'Col. Oban'),
   -- Training 9 activities
-  (20, 9, 'Qualification Zeroing', '{"activityType":"weapons","requirements":"M16/M4 rifle, 10 rounds"}', '2026-06-25 07:00:00', '2026-06-25 10:00:00', 'Firing Range', 'SSG Sendong', TRUE),
-  (21, 9, 'Marksmanship Record Fire', '{"activityType":"weapons","requirements":"M16/M4 rifle, 40 rounds"}', '2026-06-25 10:30:00', '2026-06-26 17:00:00', 'Firing Range', 'SSG Sendong', TRUE);
+  (20, 9, 'Qualification Zeroing', '{"activityType":"weapons","requirements":"M16/M4 rifle, 10 rounds"}', '2026-06-25 07:00:00', '2026-06-25 10:00:00', 'Firing Range', 'SSG Sendong'),
+  (21, 9, 'Marksmanship Record Fire', '{"activityType":"weapons","requirements":"M16/M4 rifle, 40 rounds"}', '2026-06-25 10:30:00', '2026-06-26 17:00:00', 'Firing Range', 'SSG Sendong');
 
 -- ============================================================
 -- 10. ATTENDANCE (recording reservist training participation)
