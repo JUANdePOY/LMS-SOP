@@ -1,12 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Plus, Radio } from 'lucide-react';
+import { Radio } from 'lucide-react';
 import AnnouncementCard from '@/components/announcements/AnnouncementCard';
 import AnnouncementForm from '@/components/announcements/AnnouncementForm';
 import AnnouncementFilters from '@/components/announcements/AnnouncementFilters';
 import ConfirmationDialog from '@/components/ui/ConfirmationDialog';
 import useAnnouncements from '@/hooks/useAnnouncements';
 import { useToast } from '@/components/ui/Toast';
-import { Button } from '@/components/ui/Button';
 
 /**
  * Announcements Page

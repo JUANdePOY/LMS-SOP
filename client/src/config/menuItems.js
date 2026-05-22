@@ -11,6 +11,7 @@ import {
   Users,
   Layers,
   PlaneTakeoff,
+  Megaphone,
 } from "lucide-react";
 
 export const menuItems = [
@@ -19,6 +20,12 @@ export const menuItems = [
     path: "/",
     icon: LayoutDashboard,
     description: "Overview & summary",
+  },
+  {
+    name: "Announcements",
+    path: "/announcements",
+    icon: Megaphone,
+    description: "Updates & notices",
   },
   {
     name: "Reservists",

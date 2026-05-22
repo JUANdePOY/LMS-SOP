@@ -18,6 +18,7 @@ const Reports           = lazy(() => import("@/pages/Reports"));
 const Settings          = lazy(() => import("@/pages/Settings"));
 const Alerts            = lazy(() => import("@/pages/Alerts"));
 const AuditLogs         = lazy(() => import("@/pages/AuditLogs"));
+const Announcements     = lazy(() => import("@/pages/Announcements"));
 const Login             = lazy(() => import("@/pages/Login"));
 
 // Airbase pages
@@ -76,6 +77,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true,           element: ProtectedWrapper(Dashboard)       },
+      { path: "announcements", element: ProtectedWrapper(Announcements)   },
       { path: "reservists",    element: ProtectedWrapper(Reservists)      },
       { path: "trainings",     element: ProtectedWrapper(Trainings)       },
       { path: "attendance",    element: ProtectedWrapper(Attendance)      },
