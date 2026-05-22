@@ -1,292 +1,217 @@
-# BACKEND_WORKFLOW.md
-# Backend Development Workflow Guide
+# Backend Workflow Guide
 
-This document defines the standard backend architecture and workflow rules for building scalable features inside the Airforce System.
+This document defines the standard workflow and architecture rules for building backend features inside the Airforce System.
 
-## Core Principles
+The goal is to:
 
-- Separate Routes, Controllers, Services, Models, Middleware, and Utilities
+- Maintain clean architecture
 - Avoid spaghetti code
-- Keep backend modular and scalable
-- Keep SQL queries organized
-- Keep controllers thin
-
-# Recommended Structure
-
-```txt
-server/
- ┣ config/
- ┃ ┗ db.js
- ┣ controllers/
- ┣ middleware/
- ┣ models/
- ┣ routes/
- ┣ services/
- ┣ utils/
- ┣ uploads/
- ┣ app.js
- ┗ server.js
-```
+- Keep code modular and testable
+- Keep the backend scalable
+- Provide consistent layering across routes → controller → service → model → DB
 
 ---
 
-# Backend Flow
+## Core Architecture Principles
 
-```txt
-Route
- ↓
-Controller
- ↓
-Service
- ↓
-Model
- ↓
-Database
-```
+### Separation of Concerns
+Always separate:
 
----
-
-# Routes
-
-Responsibilities:
-- Define API endpoints
-- Attach middleware
-- Call controllers
-
-Example:
-
-```txt
-routes/
- ┣ trainings.js
- ┣ attendance.js
- ┗ registrations.js
-```
+- **Routes** (HTTP endpoints + validation wiring)
+- **Controller** (request/response orchestration)
+- **Service** (business logic + transaction boundaries when needed)
+- **Model** (DB access)
+- **SQL/Migrations/Queries** (schema and query definitions)
+- **Middleware** (auth/role checks, file upload handling, etc.)
 
 DO NOT:
-- Put SQL queries in routes
+
 - Put business logic in routes
+- Put direct SQL calls in controllers
+- Mix request validation with DB logic
+- Return DB rows directly without mapping to a stable response shape
 
 ---
 
-# Controllers
+## Standard Folder Workflow (Backend)
 
-Responsibilities:
-- Handle request/response
-- Validate request flow
-- Call services
-
-Example:
+Every feature should follow this workflow:
 
 ```txt
-controllers/
- ┣ trainingsController.js
- ┣ attendanceController.js
- ┗ registrationController.js
-```
-
-DO NOT:
-- Write SQL queries
-- Create giant controller files
-
----
-
-# Services
-
-Responsibilities:
-- Business logic
-- Data processing
-- Feature workflows
-
-Example:
-
-```txt
-services/
- ┣ trainingsService.js
- ┣ attendanceService.js
- ┗ registrationService.js
+server/routes/
+server/controllers/
+server/services/
+server/models/
+server/sql/   (optional migrations/ups)
 ```
 
 ---
 
-# Models
+## Responsibilities
 
-Responsibilities:
-- Database queries
-- MySQL operations
+### server/routes/
 
-Example:
+Contains:
 
-```txt
-models/
- ┣ trainingModel.js
- ┣ attendanceModel.js
- ┗ registrationModel.js
-```
-
-DO:
-- Use parameterized queries
-- Reuse query methods
-
-DO NOT:
-- Duplicate queries
-- Concatenate unsafe SQL strings
-
----
-
-# Middleware
-
-Responsibilities:
-- Authentication
-- Validation
-- File uploads
-- Error handling
-
-Example:
-
-```txt
-middleware/
- ┣ authMiddleware.js
- ┣ uploadMiddleware.js
- ┗ errorMiddleware.js
-```
-
----
-
-# Utils
-
-Responsibilities:
-- Shared helper functions
-- Date formatting
-- Validation helpers
-
-Example:
-
-```txt
-utils/
- ┣ dateUtils.js
- ┣ validationUtils.js
- ┗ responseFormatter.js
-```
-
----
-
-# Uploads
-
-Example:
-
-```txt
-uploads/
- ┣ letter-orders/
- ┣ certificates/
- ┣ trainings/            (internal training attachments; metadata in internal_training_attachments)
- ┣ external-trainings/   (external training attachments; metadata in external_training_attachments)
- ┗ attachments/
-```
-
-Database tables: `internal_training_attachments` (FK `trainings`), `external_training_attachments` (FK `external_trainings`). Legacy `training_attachments` was renamed via `server/sql/rename_training_attachments_to_internal.up.sql`.
+- Express route definitions (e.g. `router.get/post/...`)
+- Middleware chaining
+- Request validation wiring (if applicable)
 
 Rules:
-- Validate file type
-- Use unique filenames
-- Organize uploads properly
+
+- Routes only define the endpoint contract.
+- Keep route handlers thin; delegate to controllers.
 
 ---
 
-# API Response Standard
+### server/controllers/
 
-Success:
+Contains:
 
-```json
-{
-  "success": true,
-  "message": "Training created successfully",
-  "data": {}
-}
-```
+- HTTP request/response orchestration
+- Input normalization (but not business rules)
+- Calling the service layer
+- Mapping service results to HTTP responses
 
-Error:
+Rules:
 
-```json
-{
-  "success": false,
-  "message": "Validation failed"
-}
-```
+- Controllers should be thin.
+- No direct SQL calls.
 
 ---
 
-# Feature Development Workflow
+### server/services/
 
-## Step 1 — Create Route
+Contains:
 
-```txt
-routes/trainings.js
-```
+- Business logic
+- Orchestration across models
+- Transaction handling when multiple DB writes must succeed together
+- Auditing/logging integration (when applicable)
 
-## Step 2 — Create Controller
+Rules:
 
-```txt
-controllers/trainingsController.js
-```
-
-## Step 3 — Create Service
-
-```txt
-services/trainingsService.js
-```
-
-## Step 4 — Create Model
-
-```txt
-models/trainingModel.js
-```
+- Services encapsulate the feature behavior.
+- Keep service methods focused and reusable.
 
 ---
 
-# Clean Code Rules
+### server/models/
 
-DO:
-- Keep functions small
-- Reuse services and models
-- Use descriptive names
-- Separate concerns
+Contains:
 
-DO NOT:
-- Create giant backend files
-- Mix responsibilities
-- Put everything in one file
+- Data access logic (DB reads/writes)
+- Query building / parameter binding
+- Mapping raw DB rows to domain-friendly objects (light mapping)
 
----
+Rules:
 
-# Naming Conventions
-
-Routes:
-```txt
-feature.js
-```
-
-Controllers:
-```txt
-featureController.js
-```
-
-Services:
-```txt
-featureService.js
-```
-
-Models:
-```txt
-featureModel.js
-```
+- Models should not understand HTTP.
+- Models should not implement business rules.
 
 ---
 
-# Final Goal
+### server/sql/ (optional)
+
+Contains:
+
+- Migration scripts (`*.up.sql`)
+- Schema evolution steps
+
+Rules:
+
+- Keep migrations small and atomic.
+- Prefer additive migrations; update app code accordingly.
+
+---
+
+## Request Flow (End-to-End)
+
+1. **Route** receives request
+2. **Middleware** runs (auth/rbac/upload/training upload checks)
+3. **Controller** validates/normalizes inputs, calls service
+4. **Service** performs business logic, calls models
+5. **Model** executes DB operations
+6. **Controller** returns mapped response
+7. **Client** renders UI
+
+---
+
+## Feature Development Workflow (Backend)
+
+### STEP 1 — Plan the Feature
+
+Before coding:
+
+- Define endpoint(s) (method + path + expected inputs/outputs)
+- Identify business rules
+- Identify DB tables/fields involved
+- Decide whether transactions are required
+- Decide what needs authorization (RBAC)
+
+---
+
+### STEP 2 — Add/Update Routes
+
+- Create new route file or update existing one
+- Wire middleware (auth/rbac/upload)
+- Delegate to controller functions
+
+---
+
+### STEP 3 — Implement Controller
+
+- Normalize input (dates, enums, ids)
+- Call service methods
+- Handle errors consistently (e.g., pass to error middleware)
+
+---
+
+### STEP 4 — Implement Service
+
+- Implement business logic
+- Orchestrate multiple model calls
+- If needed, wrap DB changes in transactions
+
+---
+
+### STEP 5 — Implement Model
+
+- Add read/write/query methods
+- Use parameterized queries
+- Keep query logic isolated from business rules
+
+---
+
+### STEP 6 — Update SQL/Migrations (if needed)
+
+- Add migration scripts for schema changes
+- Ensure app code matches new schema
+
+---
+
+### STEP 7 — Integration Testing (if applicable)
+
+- Validate full request flow against a dev database
+- Cover success and key failure cases (validation, RBAC, missing entities)
+
+---
+
+## Error Handling Standards
+
+- Validate inputs at the boundary (route/controller)
+- Use consistent error responses (message + code/status as per existing conventions)
+- Services throw meaningful errors; controllers map them to HTTP responses
+
+---
+
+## Final Goal
 
 Every backend feature should:
+
 - Be scalable
 - Be maintainable
+- Follow clean layering
 - Avoid spaghetti code
-- Follow clean architecture
-- Be easy to extend
+- Be easy to extend and test
+

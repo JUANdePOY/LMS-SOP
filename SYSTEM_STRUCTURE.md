@@ -670,7 +670,6 @@ CREATE TABLE trainings (
     area_id BIGINT NULL,
     status ENUM('draft', 'published', 'ongoing', 'completed', 'cancelled') NOT NULL DEFAULT 'draft',
     capacity INT NULL,  -- optional limit
-    is_mandatory BOOLEAN NOT NULL DEFAULT FALSE,
     created_by BIGINT NOT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -694,7 +693,6 @@ CREATE TABLE activities (
     end_time DATETIME NOT NULL,
     location VARCHAR(500) NULL,  -- can override training venue
     instructor VARCHAR(200) NULL,
-    is_mandatory BOOLEAN NOT NULL DEFAULT TRUE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (training_id) REFERENCES trainings(id) ON DELETE CASCADE,

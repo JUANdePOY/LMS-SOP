@@ -116,7 +116,7 @@ router.get('/reservists/:id', authenticateToken, async (req, res) => {
     }
 
     const [trainingRows] = await db.query(`
-      SELECT t.id, t.title, t.start_datetime, t.end_datetime, t.is_mandatory, a.status
+      SELECT t.id, t.title, t.start_datetime, t.end_datetime, a.status
       FROM internal_training_participants itp
       JOIN trainings t ON itp.training_id = t.id
       LEFT JOIN attendance a ON a.training_id = t.id AND a.reservist_id = itp.reservist_id

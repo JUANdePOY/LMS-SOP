@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 
 // Pages
 const Dashboard         = lazy(() => import("@/pages/Dashboard"));
+const Landing           = lazy(() => import("@/pages/Landing"));
 const Reservists        = lazy(() => import("@/pages/Reservists"));
 const Trainings         = lazy(() => import("@/pages/Trainings"));
 const Attendance        = lazy(() => import("@/pages/Attendance"));
@@ -55,6 +56,14 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: wrap(Login),
+  },
+  {
+    path: "/landing",
+    element: wrap(Landing),
+  },
+  {
+    path: "/Landing",
+    element: wrap(Landing),
   },
   {
     path: "/",
