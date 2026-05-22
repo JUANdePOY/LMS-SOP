@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Plus, Radio } from 'lucide-react';
 import AnnouncementCard from '@/components/announcements/AnnouncementCard';
 import AnnouncementForm from '@/components/announcements/AnnouncementForm';
+import AnnouncementFilters from '@/components/announcements/AnnouncementFilters';
 import ConfirmationDialog from '@/components/ui/ConfirmationDialog';
 import useAnnouncements from '@/hooks/useAnnouncements';
 import { useToast } from '@/components/ui/Toast';
@@ -14,6 +15,33 @@ export default function Announcements() {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [announcementToDelete, setAnnouncementToDelete] = useState(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState(null);
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const filteredAnnouncements = useMemo(() => {
+    return announcements.filter(announcement => {
+      const matchesSearch = searchTerm === '' ||
+        announcement.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        announcement.body.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        announcement.author.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesType = typeFilter === 'all' || announcement.type === typeFilter;
+      const matchesPriority = priorityFilter === 'all' || announcement.priority === priorityFilter;
+      const matchesStatus = statusFilter === 'all' || announcement.status === statusFilter;
+
+      return matchesSearch && matchesType && matchesPriority && matchesStatus;
+    });
+  }, [announcements, searchTerm, typeFilter, priorityFilter, statusFilter]);
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setTypeFilter('all');
+    setPriorityFilter('all');
+    setStatusFilter('all');
+  };
 
   const handleCreate = () => {
     setEditingAnnouncement(null);
@@ -106,10 +134,25 @@ export default function Announcements() {
         </Button>
       </div>
 
+      {/* Filters */}
+      <AnnouncementFilters
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        typeFilter={typeFilter}
+        setTypeFilter={setTypeFilter}
+        priorityFilter={priorityFilter}
+        setPriorityFilter={setPriorityFilter}
+        statusFilter={statusFilter}
+        setStatusFilter={setStatusFilter}
+        onClearFilters={handleClearFilters}
+        resultCount={filteredAnnouncements.length}
+        totalCount={announcements.length}
+      />
+
       {/* Announcements Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto scrollbar-custom flex-1 min-h-0">
-        {announcements.length > 0 ? (
-          announcements.map((announcement) => (
+        {filteredAnnouncements.length > 0 ? (
+          filteredAnnouncements.map((announcement) => (
             <AnnouncementCard
               key={announcement.id}
               announcement={announcement}
@@ -117,6 +160,20 @@ export default function Announcements() {
               onDelete={handleDelete}
             />
           ))
+        ) : announcements.length > 0 ? (
+          <div className="col-span-full">
+            <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-sm p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
+                <Radio size={32} className="text-neutral-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-neutral-700 dark:text-neutral-300 mb-2">
+                No Matching Announcements
+              </h3>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 max-w-sm mx-auto">
+                No announcements match your current filters. Try adjusting your search criteria.
+              </p>
+            </div>
+          </div>
         ) : (
           <div className="col-span-full">
             <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-sm p-12 text-center">
