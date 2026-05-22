@@ -1,7 +1,7 @@
 const express = require('express');
 const { query, param, validationResult } = require('express-validator');
 const db = require('../config/database');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, requireSuperAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -32,7 +32,7 @@ const idParam = [param('id').isInt({ min: 1 })];
 router.get(
   '/',
   authenticateToken,
-  requireAdmin,
+  requireSuperAdmin,
   pageLimitValidators,
   [
     query('action').optional().isString().trim().isLength({ max: 100 }),
@@ -151,7 +151,7 @@ router.get(
 router.get(
   '/:id',
   authenticateToken,
-  requireAdmin,
+  requireSuperAdmin,
   idParam,
   rejectInvalid,
   async (req, res) => {

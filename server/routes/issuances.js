@@ -2,7 +2,7 @@ const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
-const { authorize } = require('../middleware/rbac');
+const { authorize, requireAdmin } = require('../middleware/rbac');
 const { logAudit } = require('../utils/auditLogger');
 
 const router = express.Router();
@@ -196,7 +196,7 @@ router.get('/:id', authenticateToken, [
 /**
  * POST /api/issuances
  */
-router.post('/', authenticateToken, authorize('admin'), [
+router.post('/', authenticateToken, requireAdmin, [
     body('reservist_id').isInt({ min: 1 }).withMessage('Valid reservist ID is required'),
     body('supply_id').isInt({ min: 1 }).withMessage('Valid supply ID is required'),
     body('quantity_issued').isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
@@ -247,7 +247,7 @@ router.post('/', authenticateToken, authorize('admin'), [
 /**
  * PUT /api/issuances/:id (return items)
  */
-router.put('/:id', authenticateToken, authorize('admin'), [
+router.put('/:id', authenticateToken, requireAdmin, [
     param('id').isInt({ min: 1 }).withMessage('Valid issuance ID is required'),
     body('returned_quantity').optional().isInt({ min: 1 }),
     body('condition_on_return').optional().isIn(['new', 'good', 'fair', 'poor', 'damaged']),

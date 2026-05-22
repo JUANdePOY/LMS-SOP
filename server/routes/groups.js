@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, query, param, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { getUserScopeFilter } = require('../middleware/rbac');
 const { logAudit } = require('../utils/auditLogger');
 
 // Validation middleware
@@ -49,6 +50,18 @@ router.get('/', [
     if (arsen_id) {
       whereConditions.push('g.arsen_id = ?');
       queryParams.push(arsen_id);
+    }
+
+    // For unit admins, enforce scope (override user-provided arsen_id)
+    if (req.user.role !== 'admin') {
+      const { conditions, params: scopeP } = getUserScopeFilter(req.user, { group: 'g.id', arsen: 'g.arsen_id' });
+      if (conditions.length > 0) {
+        // Remove user-provided arsen_id filter
+        const idx = whereConditions.findIndex(w => w.includes('g.arsen_id'));
+        if (idx >= 0) { whereConditions.splice(idx, 1); queryParams.splice(idx, 1); }
+        whereConditions.push('(' + conditions.join(' OR ') + ')');
+        queryParams.push(...scopeP);
+      }
     }
 
     if (is_active !== undefined) {

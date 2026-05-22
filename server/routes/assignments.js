@@ -2,7 +2,7 @@ const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
-const { authorize } = require('../middleware/rbac');
+const { authorize, requireAdmin, getUserScopeFilter } = require('../middleware/rbac');
 const { logAudit } = require('../utils/auditLogger');
 
 const router = express.Router();
@@ -11,7 +11,7 @@ const router = express.Router();
  * GET /api/assignments
  * List all assignments with pagination and filtering
  */
-router.get('/', authenticateToken, authorize('admin'), [
+router.get('/', authenticateToken, requireAdmin, [
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
     query('reservist_id').optional().isInt({ min: 1 }),
@@ -200,7 +200,7 @@ router.get('/:id', authenticateToken, [
  * POST /api/assignments
  * Create new reservist assignment
  */
-router.post('/', authenticateToken, authorize('admin'), [
+router.post('/', authenticateToken, requireAdmin, [
     body('reservist_id').isInt({ min: 1 }).withMessage('Valid reservist ID is required'),
     body('group_id').isInt({ min: 1 }).withMessage('Valid group ID is required'),
     body('squadron_id').isInt({ min: 1 }).withMessage('Valid squadron ID is required'),
@@ -344,7 +344,7 @@ router.post('/', authenticateToken, authorize('admin'), [
  * PUT /api/assignments/:id
  * Update assignment
  */
-router.put('/:id', authenticateToken, authorize('admin'), [
+router.put('/:id', authenticateToken, requireAdmin, [
     param('id').isInt({ min: 1 }).withMessage('Valid assignment ID is required'),
     body('reservist_id').optional().isInt({ min: 1 }),
     body('group_id').optional().isInt({ min: 1 }),
@@ -506,7 +506,7 @@ router.put('/:id', authenticateToken, authorize('admin'), [
  * DELETE /api/assignments/:id
  * Delete assignment (hard delete)
  */
-router.delete('/:id', authenticateToken, authorize('admin'), [
+router.delete('/:id', authenticateToken, requireAdmin, [
     param('id').isInt({ min: 1 }).withMessage('Valid assignment ID is required')
 ], (req, res) => {
     try {

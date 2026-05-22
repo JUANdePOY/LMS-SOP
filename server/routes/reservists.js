@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult, query } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { getUserScopeFilter } = require('../middleware/rbac');
 const { hashPassword, generateResetToken } = require('../app/auth');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -100,6 +101,17 @@ router.get(
         });
       }
 
+      // Apply scope filter for unit admins
+      let scopeWhere = '';
+      let scopeParams = [];
+      if (req.user.role !== 'admin') {
+        const { conditions, params } = getUserScopeFilter(req.user);
+        if (conditions.length > 0) {
+          scopeWhere = ' AND (' + conditions.join(' OR ') + ')';
+          scopeParams = params;
+        }
+      }
+
       // Validate query params
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -112,19 +124,20 @@ router.get(
 
       const filter = buildFilterQuery(req.query);
 
-const countQuery = `
+      const countQuery = `
          SELECT COUNT(DISTINCT r.id) as total
          FROM reservists r
          LEFT JOIN users u ON r.user_id = u.id
          LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id
          ${filter.whereClause}
+         ${scopeWhere}
        `;
 
-       const [countResult] = await db.query(countQuery, filter.params);
+       const [countResult] = await db.query(countQuery, [...filter.params, ...scopeParams]);
        const total = countResult[0].total;
 
         // Fetch paginated records
-const query = `
+       const query_str = `
            SELECT 
              r.id, r.user_id, r.first_name, r.last_name, r.rank, 
              r.service_number, r.position, r.date_of_birth, r.place_of_birth,
@@ -148,12 +161,13 @@ const query = `
           LEFT JOIN arsens a ON g.arsen_id = a.id
           LEFT JOIN squadron s ON ra.squadron_id = s.id
           ${filter.whereClause}
+          ${scopeWhere}
           ORDER BY r.${sortBy} ${sortOrder}
           LIMIT ? OFFSET ?
         `;
 
-      const params = [...filter.params, limit, offset];
-      const [rows] = await db.query(query, params);
+       const params = [...filter.params, ...scopeParams, limit, offset];
+    const [rows] = await db.query(query_str, params);
 
       res.json({
         status: 'success',
@@ -193,7 +207,26 @@ router.get('/:id', authenticateToken, async (req, res) => {
       });
     }
 
-const query = `
+    // For unit admins, verify the reservist is within their scope
+    if (req.user.role !== 'admin' && req.user.role !== 'reservist') {
+      const [scopeCheck] = await db.query(`
+        SELECT r.id FROM reservists r
+        LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+        LEFT JOIN \`groups\` g ON ra.group_id = g.id
+        WHERE r.id = ? AND (
+          ra.squadron_id = ? OR ra.group_id = ? OR g.arsen_id = ?
+        )
+      `, [id, req.user.scope_squadron_id, req.user.scope_group_id, req.user.scope_arsen_id]);
+      if (scopeCheck.length === 0) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Access denied - reservist is outside your scope',
+          code: 'OUT_OF_SCOPE'
+        });
+      }
+    }
+
+    const query_str = `
       SELECT 
         r.*, u.email, u.role, u.is_active as user_active,
         ra.id as assignment_id, ra.group_id, ra.squadron_id, ra.assigned_date,
@@ -889,7 +922,7 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
       });
     }
 
-let query = `
+    let query_str = `
        SELECT 
          r.id, r.first_name, r.last_name, r.rank, r.service_number,
          r.position, r.date_of_birth, r.sex, r.phone_number, r.reserve_status,
@@ -906,17 +939,26 @@ let query = `
 
     const params = [];
 
+    // Apply scope filter for unit admins
+    if (req.user.role !== 'admin') {
+      const { conditions, params: scopeParams } = getUserScopeFilter(req.user);
+      if (conditions.length > 0) {
+        query_str += ' AND (' + conditions.join(' OR ') + ')';
+        params.push(...scopeParams);
+      }
+    }
+
     if (group_id) {
-      query += ' AND ra.group_id = ?';
+      query_str += ' AND ra.group_id = ?';
       params.push(group_id);
     }
 
     if (squadron_id) {
-      query += ' AND ra.squadron_id = ?';
+      query_str += ' AND ra.squadron_id = ?';
       params.push(squadron_id);
     }
 
-    query += ' ORDER BY r.last_name, r.first_name';
+    query_str += ' ORDER BY r.last_name, r.first_name';
 
     const [rows] = await db.query(query, params);
 
@@ -1826,6 +1868,154 @@ router.get('/filters/metadata', authenticateToken, async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to fetch filter metadata',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /api/reservists/my/profile
+ * Get current reservist's own profile (self-service)
+ */
+router.get('/my/profile', authenticateToken, async (req, res) => {
+  try {
+    // Find the reservist record linked to this user
+    const [reservists] = await db.query(`
+      SELECT 
+        r.*, u.email, u.role, u.is_active as user_active,
+        ra.id as assignment_id, ra.group_id, ra.squadron_id, ra.assigned_date,
+        g.name as group_name, g.code as group_code,
+        s.name as squadron_name, s.location
+      FROM reservists r
+      LEFT JOIN users u ON r.user_id = u.id
+      LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+      LEFT JOIN \`groups\` g ON ra.group_id = g.id
+      LEFT JOIN squadron s ON ra.squadron_id = s.id
+      WHERE r.user_id = ?
+    `, [req.user.id]);
+
+    if (reservists.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Reservist profile not found',
+        code: 'NOT_FOUND'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      data: reservists[0]
+    });
+  } catch (error) {
+    console.error('Error fetching own profile:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch profile',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /api/reservists/my/trainings
+ * Get current reservist's training history (self-service)
+ */
+router.get('/my/trainings', authenticateToken, async (req, res) => {
+  try {
+    const [reservist] = await db.query('SELECT id FROM reservists WHERE user_id = ?', [req.user.id]);
+    if (reservist.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Reservist not found', code: 'NOT_FOUND' });
+    }
+    const reservistId = reservist[0].id;
+
+    const [trainings] = await db.query(`
+      SELECT 
+        t.id, t.title, t.start_datetime, t.end_datetime, t.status,
+        a.status as attendance_status
+      FROM internal_training_participants itp
+      JOIN trainings t ON itp.training_id = t.id
+      LEFT JOIN attendance a ON a.training_id = t.id AND a.reservist_id = itp.reservist_id
+      WHERE itp.reservist_id = ?
+      ORDER BY t.start_datetime DESC
+    `, [reservistId]);
+
+    res.json({
+      status: 'success',
+      data: trainings
+    });
+  } catch (error) {
+    console.error('Error fetching own trainings:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch trainings',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /api/reservists/my/attendance
+ * Get current reservist's attendance records (self-service)
+ */
+router.get('/my/attendance', authenticateToken, async (req, res) => {
+  try {
+    const [reservist] = await db.query('SELECT id FROM reservists WHERE user_id = ?', [req.user.id]);
+    if (reservist.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Reservist not found', code: 'NOT_FOUND' });
+    }
+    const reservistId = reservist[0].id;
+
+    const [attendance] = await db.query(`
+      SELECT 
+        a.id, a.status, a.created_at,
+        t.title as training_title, t.start_datetime
+      FROM attendance a
+      JOIN trainings t ON a.training_id = t.id
+      WHERE a.reservist_id = ?
+      ORDER BY a.created_at DESC
+      LIMIT 100
+    `, [reservistId]);
+
+    res.json({
+      status: 'success',
+      data: attendance
+    });
+  } catch (error) {
+    console.error('Error fetching own attendance:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch attendance',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /api/reservists/my/readiness
+ * Get current reservist's readiness score (self-service)
+ */
+router.get('/my/readiness', authenticateToken, async (req, res) => {
+  try {
+    const [reservist] = await db.query('SELECT id FROM reservists WHERE user_id = ?', [req.user.id]);
+    if (reservist.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Reservist not found', code: 'NOT_FOUND' });
+    }
+    const reservistId = reservist[0].id;
+
+    const [readiness] = await db.query(
+      'SELECT * FROM v_reservist_readiness WHERE reservist_id = ?',
+      [reservistId]
+    );
+
+    res.json({
+      status: 'success',
+      data: readiness[0] || null
+    });
+  } catch (error) {
+    console.error('Error fetching own readiness:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch readiness',
       code: 'FETCH_ERROR'
     });
   }

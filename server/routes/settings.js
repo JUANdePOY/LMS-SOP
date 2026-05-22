@@ -54,14 +54,21 @@ router.get('/users', async (req, res) => {
     const [rows] = await db.query(`
       SELECT u.id, u.email, u.role, u.is_active, u.scope_arsen_id, u.scope_group_id, u.scope_squadron_id,
              r.first_name, r.last_name, r.service_number, r.\`rank\`,
-        a.name AS arsen_name,
-        g.name AS group_name,
-        s.name AS squadron_name
+         a.name AS arsen_name,
+         g.name AS group_name,
+         s.name AS squadron_name,
+         raa.id AS assignment_arsen_id, raa.name AS assignment_arsen_name,
+         ra.group_id AS assignment_group_id, rag.name AS assignment_group_name,
+         ra.squadron_id AS assignment_squadron_id, rasq.name AS assignment_squadron_name
       FROM users u
       LEFT JOIN reservists r ON u.id = r.user_id
       LEFT JOIN arsens a ON u.scope_arsen_id = a.id
       LEFT JOIN \`groups\` g ON u.scope_group_id = g.id
       LEFT JOIN squadron s ON u.scope_squadron_id = s.id
+      LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+      LEFT JOIN \`groups\` rag ON ra.group_id = rag.id
+      LEFT JOIN squadron rasq ON ra.squadron_id = rasq.id
+      LEFT JOIN arsens raa ON rag.arsen_id = raa.id
       ORDER BY u.role, r.last_name, r.first_name
     `);
     res.json({ status: 'success', data: rows });

@@ -43,7 +43,7 @@ function applyFilterUpdates(current, updates) {
 }
 
 export default function Trainings() {
-  const { isAdmin } = useAuth();
+  const { isAnyAdmin } = useAuth();
   const { addToast } = useToast();
   const [trainings, setTrainings]     = useState([]);
   const [allTrainings, setAllTrainings] = useState([]);
@@ -266,7 +266,7 @@ export default function Trainings() {
           </div>
         </div>
 
-        {isAdmin && (
+        {isAnyAdmin && (
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -356,7 +356,7 @@ export default function Trainings() {
                       ? 'No trainings match your current filters. Try adjusting your search or filter criteria.'
                       : 'Get started by creating your first training session. Click the button above to schedule a new training.'}
                   </p>
-                  {isAdmin && !debouncedSearch && filters.status === 'all' && filters.activityType === 'all' && filters.source === 'all' && (
+                  {isAnyAdmin && !debouncedSearch && filters.status === 'all' && filters.activityType === 'all' && filters.source === 'all' && (
                     <div className="mt-5 flex items-center gap-2">
                       <button
                         type="button"
@@ -379,7 +379,7 @@ export default function Trainings() {
                 <TrainingCard
                   key={`${training._source}-${training.id}`}
                   training={training}
-                  isAdmin={isAdmin}
+                  isAdmin={isAnyAdmin}
                   onEdit={() => handleEditTraining(training)}
                   onDelete={() => openDeleteDialog(training)}
                   onAttendance={() => {

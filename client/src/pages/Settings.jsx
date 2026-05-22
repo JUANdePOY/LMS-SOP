@@ -161,6 +161,8 @@ function RoleManagement({ toast }) {
     if (user.role === 'admin_arsen' && user.arsen_name) return user.arsen_name;
     if (user.role === 'admin_group' && user.group_name) return user.group_name;
     if (user.role === 'admin_squadron' && user.squadron_name) return user.squadron_name;
+    if (user.role === 'reservist' && user.assignment_squadron_name) return user.assignment_squadron_name;
+    if (user.role === 'reservist' && user.assignment_group_name) return user.assignment_group_name;
     return null;
   };
 
@@ -398,10 +400,21 @@ function RoleManagement({ toast }) {
                 <span className="text-[11px] text-neutral-500">Current:</span>
                 <span className={cn("text-[11px] font-semibold", ROLE_META[editUser.role]?.color)}>
                   {ROLE_META[editUser.role]?.label || editUser.role}
-                </span>
-              </div>
+                 </span>
+               </div>
 
-              {/* Role selection */}
+               {/* Current assignment for reservists */}
+               {editUser.role === 'reservist' && (editUser.assignment_squadron_name || editUser.assignment_group_name) && (
+                 <div className="flex items-center gap-2 rounded-lg bg-neutral-50 dark:bg-neutral-800/50 px-3 py-1.5">
+                   <span className="text-[11px] text-neutral-500">Assignment:</span>
+                   <span className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+                     {editUser.assignment_squadron_name || editUser.assignment_group_name}
+                     {editUser.assignment_squadron_name && editUser.assignment_group_name ? ` · ${editUser.assignment_group_name}` : ''}
+                   </span>
+                 </div>
+               )}
+
+               {/* Role selection */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">New Role</label>
                 <div className="flex flex-col gap-1.5">
@@ -411,7 +424,18 @@ function RoleManagement({ toast }) {
                     return (
                       <button
                         key={key}
-                        onClick={() => setFormRole(key)}
+                        onClick={() => {
+                          setFormRole(key);
+                          if (editUser?.role === 'reservist') {
+                            if (key === 'admin_arsen' && editUser.assignment_arsen_id) {
+                              setFormScope(s => ({ ...s, arsen_id: editUser.assignment_arsen_id }));
+                            } else if (key === 'admin_group' && editUser.assignment_group_id) {
+                              setFormScope(s => ({ ...s, group_id: editUser.assignment_group_id }));
+                            } else if (key === 'admin_squadron' && editUser.assignment_squadron_id) {
+                              setFormScope(s => ({ ...s, squadron_id: editUser.assignment_squadron_id }));
+                            }
+                          }
+                        }}
                         className={cn(
                           "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all duration-150",
                           selected

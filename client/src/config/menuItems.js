@@ -13,6 +13,24 @@ import {
   PlaneTakeoff,
 } from "lucide-react";
 
+// Role requirements for menu items (undefined = any authenticated user)
+export const ADMIN_ROLES = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'];
+
+export function filterMenuByRole(items, userRole) {
+  if (!userRole) return items;
+  return items
+    .filter((item) => !item.roles || item.roles.includes(userRole))
+    .map((item) => {
+      if (item.children) {
+        return {
+          ...item,
+          children: item.children.filter((c) => !c.roles || c.roles.includes(userRole)),
+        };
+      }
+      return item;
+    });
+}
+
 export const menuItems = [
   {
     name: "Dashboard",
@@ -25,12 +43,15 @@ export const menuItems = [
     path: "/reservists",
     icon: UserSquare,
     description: "Manage reservists",
+    // Only admins can access full list (reservists blocked by backend + route guard)
+    roles: ADMIN_ROLES,
   },
   {
     name: "Airbase",
     path: "/airbase",
     icon: PlaneTakeoff,
     description: "Airbase hierarchy management",
+    roles: ADMIN_ROLES,
     children: [
       {
         name: "Overview",
@@ -38,24 +59,28 @@ export const menuItems = [
         icon: MapPin,
         description: "Hierarchy drill-down",
         end: true,
+        roles: ADMIN_ROLES,
       },
       {
         name: "Manage ARCENs",
         path: "/airbase/arcens",
         icon: Shield,
         description: "ARCEN units management",
+        roles: ADMIN_ROLES,
       },
       {
         name: "Manage Groups",
         path: "/airbase/groups",
         icon: Users,
         description: "Reserve groups management",
+        roles: ADMIN_ROLES,
       },
       {
         name: "Manage Squadrons",
         path: "/airbase/squadrons",
         icon: Layers,
         description: "Squadron management",
+        roles: ADMIN_ROLES,
       },
     ],
   },
@@ -82,6 +107,7 @@ export const menuItems = [
     path: "/logistics",
     icon: Package,
     description: "Inventory & resources",
+    roles: ADMIN_ROLES,
   },
   {
     name: "Reports",

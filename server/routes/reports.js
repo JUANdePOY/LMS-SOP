@@ -2,7 +2,7 @@ const express = require('express');
 const { query, param, body, validationResult } = require('express-validator');
 const reportsController = require('../controllers/reportsController');
 const { authenticateToken } = require('../middleware/auth');
-const { authorize } = require('../middleware/rbac');
+const { requireAdmin } = require('../middleware/rbac');
 const multer = require('multer');
 const crypto = require('crypto');
 const fs = require('fs');
@@ -83,7 +83,7 @@ router.get(
 router.post(
   '/',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [
     body('title').trim().notEmpty().isLength({ max: 500 }),
     body('event_type').optional().isIn(['internal', 'external']),
@@ -101,7 +101,7 @@ router.post(
 router.patch(
   '/:id',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...idParam, body('participants').optional().isArray()],
   rejectInvalid,
   reportsController.updateReport
@@ -110,7 +110,7 @@ router.patch(
 router.delete(
   '/:id',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...idParam],
   rejectInvalid,
   reportsController.deleteReport
@@ -119,7 +119,7 @@ router.delete(
 router.post(
   '/:id/documentations',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...idParam],
   rejectInvalid,
   documentationUploadMiddleware,

@@ -3,15 +3,18 @@ import { Link } from "react-router-dom";
 import { ChevronLeft, Bell, Settings, LogOut, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
-import { menuItems } from "@/config/menuItems";
+import { menuItems, filterMenuByRole, ADMIN_ROLES } from "@/config/menuItems";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAlerts } from "@/services/api";
 
 export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobileOpen, onMobileClose }) {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
-  const { logout } = useAuth();
-
   const [alertSummary, setAlertSummary] = useState(null);
+
+  const { user, logout } = useAuth();
+  const visibleMenuItems = filterMenuByRole(menuItems, user?.role);
+  const isSuperAdmin = user?.role === 'admin';
+  const isAnyAdmin = ADMIN_ROLES.includes(user?.role);
 
   useEffect(() => {
     const load = async () => {
@@ -147,7 +150,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
         )}
 
         <ul className="space-y-0.5" role="list">
-          {menuItems.map((item) => (
+          {visibleMenuItems.map((item) => (
             <li key={item.path}>
               <SidebarItem item={item} isCollapsed={isCollapsed} onNavClick={handleNavClick} />
             </li>
@@ -196,20 +199,24 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
               )}
             </Link>
           </li>
-          <li>
-            <SidebarItem
-              item={{ name: "Settings", path: "/settings", icon: Settings, description: "Preferences" }}
-              isCollapsed={isCollapsed}
-              onNavClick={handleNavClick}
-            />
-          </li>
-          <li>
-            <SidebarItem
-              item={{ name: "Audit Logs", path: "/audit-logs", icon: History, description: "System change history" }}
-              isCollapsed={isCollapsed}
-              onNavClick={handleNavClick}
-            />
-          </li>
+          {isSuperAdmin && (
+            <li>
+              <SidebarItem
+                item={{ name: "Settings", path: "/settings", icon: Settings, description: "Preferences" }}
+                isCollapsed={isCollapsed}
+                onNavClick={handleNavClick}
+              />
+            </li>
+          )}
+          {isSuperAdmin && (
+            <li>
+              <SidebarItem
+                item={{ name: "Audit Logs", path: "/audit-logs", icon: History, description: "System change history" }}
+                isCollapsed={isCollapsed}
+                onNavClick={handleNavClick}
+              />
+            </li>
+          )}
         </ul>
       </nav>
 
@@ -230,10 +237,10 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
         {!isCollapsed && (
           <div className="flex flex-1 flex-col leading-tight overflow-hidden">
             <span className="truncate text-[13px] font-medium text-neutral-800 dark:text-neutral-200">
-              Commanding Officer
+              {user?.email || 'User'}
             </span>
             <span className="truncate text-[11px] text-neutral-400 dark:text-neutral-500">
-              CO Admin
+              {user?.role ? user.role.replace('admin_', 'Admin ').replace('_', ' ') : '—'}
             </span>
           </div>
         )}

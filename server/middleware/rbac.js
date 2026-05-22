@@ -95,6 +95,88 @@ const checkOwnership = (userIdField = 'user_id') => {
   };
 };
 
+/**
+ * Returns scope filter conditions for the current user.
+ * For unit admins, restricts to their assigned arsen/group/squadron.
+ * Super admin (role==='admin') gets no restrictions.
+ *
+ * Supports multiple column name patterns via the `columns` parameter:
+ *   Default: { squadron: 'squadron_id', group: 'group_id', arsen: 'arsen_id' }
+ *
+ * Usage example:
+ *   const { conditions, params } = getUserScopeFilter(req.user);
+ *   // Append to existing WHERE with AND:
+ *   if (conditions.length) where += ' AND (' + conditions.join(' OR ') + ')';
+ */
+function getUserScopeFilter(user, columns) {
+  const conditions = [];
+  const params = [];
+
+  if (!user || user.role === 'admin') {
+    return { conditions, params }; // full access
+  }
+
+  const col = columns || {};
+
+  if (user.scope_squadron_id) {
+    const c = col.squadron || 'squadron_id';
+    conditions.push(`${c} = ?`);
+    params.push(user.scope_squadron_id);
+  } else if (user.scope_group_id) {
+    const c = col.group || 'group_id';
+    conditions.push(`${c} = ?`);
+    params.push(user.scope_group_id);
+  } else if (user.scope_arsen_id) {
+    const c = col.arsen || 'arsen_id';
+    conditions.push(`${c} = ?`);
+    params.push(user.scope_arsen_id);
+  }
+
+  return { conditions, params };
+}
+
+/**
+ * Middleware factory that enforces data scoping on list endpoints.
+ * Non-admin users are automatically restricted to their scope.
+ * For reservist role, returns 403 (they should not access list endpoints).
+ *
+ * @param {object} options
+ * @param {string} options.entityColumn - The column to filter on (e.g. 'ra.squadron_id')
+ * @param {boolean} options.blockReservist - If true (default), block reservist role entirely
+ */
+function enforceScope(options = {}) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ status: 'error', message: 'Unauthorized', code: 'UNAUTHORIZED' });
+    }
+
+    // Reservists should not access list endpoints (they use /my-* routes)
+    if (req.user.role === 'reservist' && options.blockReservist !== false) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Access denied. Use self-service endpoints.',
+        code: 'USE_SELF_SERVICE'
+      });
+    }
+
+    // Admin sees everything - no filter needed
+    if (req.user.role === 'admin') {
+      req.scopeFilter = null;
+      return next();
+    }
+
+    // Unit admin: build scope filter
+    const { conditions, params } = getUserScopeFilter(req.user);
+    if (conditions.length === 0) {
+      req.scopeFilter = null;
+    } else {
+      req.scopeFilter = { where: conditions.join(' OR '), params };
+    }
+
+    next();
+  };
+}
+
 module.exports = {
   authorize,
   requireAdmin,
@@ -102,4 +184,6 @@ module.exports = {
   checkOwnership,
   isAdmin,
   ADMIN_ROLES,
+  getUserScopeFilter,
+  enforceScope,
 };
