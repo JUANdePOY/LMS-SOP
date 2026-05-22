@@ -4,6 +4,7 @@ const externalModel = require('../models/externalTrainingModel');
 const trainingAttachmentService = require('./trainingAttachmentService');
 const externalTrainingAttachmentService = require('./externalTrainingAttachmentService');
 const internalParticipantModel = require('../models/internalTrainingParticipantModel');
+const db = require('../config/database');
 const { buildActivityDescription, parseActivityMeta } = require('../utils/activityMeta');
 
 const DEFAULT_PAGE = 1;
@@ -668,4 +669,32 @@ module.exports = {
   deleteExternalTraining,
   registerExternalParticipant,
   listExternalRegistrations,
+
+  // Real training statistics for dashboard (used by TrainingActivityChart)
+  async getTrainingStats(filters = {}) {
+    const year = filters.year ? parseInt(filters.year, 10) : new Date().getFullYear();
+
+    const sql = `
+      SELECT 
+        a.id AS arsen_id,
+        a.name AS arsen_name,
+        g.id AS group_id,
+        g.name AS group_name,
+        s.id AS squadron_id,
+        s.name AS squadron_name,
+        COUNT(DISTINCT t.id) AS trainings
+      FROM trainings t
+      JOIN internal_training_participants itp ON itp.training_id = t.id
+      JOIN squadron s ON itp.squadron_id = s.id
+      JOIN \`groups\` g ON s.group_id = g.id
+      JOIN arsens a ON g.arsen_id = a.id
+      WHERE YEAR(t.start_datetime) = ?
+        AND t.status IN ('completed', 'ongoing', 'published')
+      GROUP BY a.id, g.id, s.id
+      ORDER BY trainings DESC
+    `;
+
+    const [rows] = await db.query(sql, [year]);
+    return rows;
+  },
 };

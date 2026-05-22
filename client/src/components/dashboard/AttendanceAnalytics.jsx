@@ -1,130 +1,167 @@
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid,
-  Tooltip, ResponsiveContainer, BarChart, Bar, Cell,
-} from "recharts";
-import { Info, ClipboardCheck, TrendingDown, TrendingUp } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ClipboardCheck, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-function ChartCard({ title, icon: Icon, badge, children, className }) {
+function ChartCard({ children, className }) {
   return (
     <div className={cn(
-      "rounded-xl border border-neutral-200 dark:border-neutral-800",
+      "rounded-2xl border border-neutral-200 dark:border-neutral-800",
       "bg-white dark:bg-neutral-900 p-5",
       className
     )}>
-      <div className="flex items-center gap-2 mb-4">
-        {Icon && (
-          <Icon size={14} className="text-emerald-500 dark:text-emerald-400" strokeWidth={1.8} />
-        )}
-        <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100 tracking-tight">
-          {title}
-        </h3>
-        {badge && (
-          <span className={cn(
-            "ml-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
-            badge.type === "down"
-              ? "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400"
-              : "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
-          )}>
-            {badge.type === "down"
-              ? <TrendingDown size={9} className="inline mr-0.5" />
-              : <TrendingUp size={9} className="inline mr-0.5" />
-            }
-            {badge.label}
-          </span>
-        )}
-        <Info size={13} className="text-neutral-400 dark:text-neutral-600 ml-auto shrink-0" />
-      </div>
       {children}
     </div>
   );
 }
 
-function CustomTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 shadow-lg text-xs">
-      <p className="font-semibold text-neutral-700 dark:text-neutral-300 mb-1">{label}</p>
-      {payload.map((p) => (
-        <p key={p.dataKey} style={{ color: p.fill ?? p.stroke }}>
-          {p.name}: <span className="font-bold">{p.value}%</span>
-        </p>
-      ))}
-    </div>
+export default function AttendanceAnalytics() {
+  const [squadrons, setSquadrons] = useState([]);
+  const [topReservists, setTopReservists] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedArsen, setSelectedArsen] = useState("All");
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const [sqRes, topRes] = await Promise.all([
+          fetch("/api/readiness/squadrons", { headers }),
+          fetch("/api/readiness/reservists?sort_by=attendance_rate_pct&sort_order=desc&limit=5", { headers })
+        ]);
+        const [sqJson, topJson] = await Promise.all([sqRes.json(), topRes.json()]);
+        if (sqJson.status === "success" && sqJson.data) setSquadrons(sqJson.data);
+        else setSquadrons([]);
+        if (topJson.status === "success" && topJson.data) setTopReservists(topJson.data);
+        else setTopReservists([]);
+      } catch (err) {
+        setSquadrons([]);
+        setTopReservists([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const arsenOptions = ["All", ...new Set(squadrons.map((s) => s.arsen_name).filter(Boolean))];
+
+  const filtered = squadrons.filter((row) =>
+    selectedArsen === "All" || row.arsen_name === selectedArsen
   );
-}
 
-export default function AttendanceAnalytics({ data }) {
-  const timeline = data?.timeline || [];
+  const overallRate = filtered.length
+    ? (filtered.reduce((sum, r) => sum + (Number(r.avg_attendance_rate) || 0), 0) / filtered.length).toFixed(1)
+    : "0";
 
-  const latest = timeline.length > 0 ? timeline[timeline.length - 1]?.rate ?? 0 : 0;
-  const prev = timeline.length > 1 ? timeline[timeline.length - 2]?.rate ?? 0 : 0;
-  const delta = (latest - prev).toFixed(1);
-  const isDown = delta < 0;
+  const sorted = [...filtered].sort((a, b) => (Number(b.avg_attendance_rate) || 0) - (Number(a.avg_attendance_rate) || 0));
+  const displayRows = sorted.slice(0, 5);
 
   return (
-    <ChartCard
-      title="Attendance Analytics"
-      icon={ClipboardCheck}
-      badge={timeline.length > 1 ? { type: isDown ? "down" : "up", label: `${isDown ? "" : "+"}${delta}% vs prev` } : null}
-    >
-      <div className="flex flex-col gap-6">
-        <div className="flex items-end gap-3">
-          <span className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 leading-none">
-            {latest}%
-          </span>
-          <span className="text-xs text-neutral-400 dark:text-neutral-600 mb-0.5">
-            avg attendance rate · latest period
-          </span>
+    <ChartCard>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <ClipboardCheck size={15} className="text-emerald-500" />
+          <h3 className="text-[15px] font-semibold text-neutral-900 dark:text-neutral-100 tracking-tight">
+            Attendance Analytics
+          </h3>
+          <Info size={14} className="text-neutral-400" />
         </div>
-
-        {timeline.length > 0 ? (
-          <ResponsiveContainer width="100%" height={100}>
-            <AreaChart data={timeline} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
-              <defs>
-                <linearGradient id="attendanceGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.15} />
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-neutral-100 dark:text-neutral-800" vertical={false} />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "currentColor" }} className="text-neutral-400" tickLine={false} axisLine={false} />
-              <YAxis domain={[70, 100]} tick={{ fontSize: 10, fill: "currentColor" }} className="text-neutral-400" tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
-              <Tooltip content={<CustomTooltip />} cursor={{ stroke: "#10b981", strokeWidth: 1, strokeDasharray: "3 3" }} />
-              <Area type="monotone" dataKey="rate" name="Attendance" stroke="#10b981" strokeWidth={2} fill="url(#attendanceGrad)" dot={{ fill: "#10b981", r: 3, strokeWidth: 0 }} activeDot={{ r: 5, fill: "#10b981" }} />
-            </AreaChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="flex h-24 items-center justify-center text-xs text-neutral-400">No attendance data available</div>
-        )}
-
-        <div className="border-t border-neutral-100 dark:border-neutral-800" />
-
-        <div>
-          <p className="mb-3 text-[11px] font-semibold text-neutral-500 dark:text-neutral-500 uppercase tracking-wider">
-            Score Composition Weights
-          </p>
-          <div className="flex flex-col gap-2">
-            {[
-              { label: "Training Participation", value: 40, color: "bg-indigo-400" },
-              { label: "Attendance Rate", value: 30, color: "bg-emerald-400" },
-              { label: "Active Status", value: 30, color: "bg-amber-400" },
-            ].map((row) => (
-              <div key={row.label} className="flex items-center gap-3">
-                <span className="w-[100px] shrink-0 text-[11px] text-neutral-600 dark:text-neutral-400 font-medium">
-                  {row.label}
-                </span>
-                <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
-                  <div className={cn("h-full rounded-full transition-all duration-500", row.color)} style={{ width: `${row.value}%` }} />
-                </div>
-                <span className="w-[30px] shrink-0 text-right text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
-                  {row.value}%
-                </span>
-              </div>
+        <div className="flex items-center gap-2 text-xs">
+          <select
+            value={selectedArsen}
+            onChange={(e) => setSelectedArsen(e.target.value)}
+            className="rounded border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500"
+          >
+            {arsenOptions.map((a) => (
+              <option key={a} value={a}>{a === "All" ? "All Arsens" : a}</option>
             ))}
+          </select>
+          <div className="text-neutral-500 dark:text-neutral-400">
+            {filtered.length} squadrons
           </div>
         </div>
       </div>
+
+      <div className="mb-3">
+        <div className="text-xs text-neutral-500 dark:text-neutral-400">Average Attendance Rate</div>
+        <div className="text-3xl font-bold text-neutral-900 dark:text-neutral-100 mt-0.5">{overallRate}%</div>
+      </div>
+
+      {loading ? (
+        <div className="h-40 flex items-center justify-center text-sm text-neutral-400">Loading...</div>
+      ) : (
+        <div className="flex flex-col lg:flex-row gap-4">
+          {/* Left: Top 5 Reservists (Overall) */}
+          <div className="lg:w-1/2">
+            {topReservists.length > 0 ? (
+              <div>
+                <div className="text-[11px] font-medium text-neutral-600 dark:text-neutral-400 mb-1">Top 5 Reservists (Overall)</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-neutral-500 dark:text-neutral-400 text-xs border-b border-neutral-100 dark:border-neutral-800">
+                        <th className="text-left pb-2 font-semibold">Reservist</th>
+                        <th className="text-right pb-2 font-semibold w-16">Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                      {topReservists.map((r, idx) => {
+                        const rate = Math.round(Number(r.attendance_rate_pct) || 0);
+                        const color = rate >= 90 ? "#10b981" : rate >= 80 ? "#6366f1" : rate >= 70 ? "#f59e0b" : "#ef4444";
+                        const name = `${r.last_name || r.first_name}${r.rank ? ` (${r.rank})` : ''}`;
+                        return (
+                          <tr key={idx} className="text-neutral-800 dark:text-neutral-200">
+                            <td className="py-1 pr-2 truncate max-w-[200px]">{name}</td>
+                            <td className="py-1 w-16 text-right font-semibold" style={{ color }}>{rate}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="text-xs text-neutral-400">No top reservists data</div>
+            )}
+          </div>
+
+          {/* Right: Squadron table (Arsen filtered) */}
+          <div className="lg:w-1/2">
+            {displayRows.length > 0 ? (
+              <div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-neutral-500 dark:text-neutral-400 text-xs border-b border-neutral-100 dark:border-neutral-800">
+                        <th className="text-left pb-2 font-semibold">Squadron</th>
+                        <th className="text-right pb-2 font-semibold w-16">Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                      {displayRows.map((row, idx) => {
+                        const rate = Math.round(Number(row.avg_attendance_rate) || 0);
+                        const color = rate >= 90 ? "#10b981" : rate >= 80 ? "#6366f1" : rate >= 70 ? "#f59e0b" : "#ef4444";
+                        return (
+                          <tr key={idx} className="text-neutral-800 dark:text-neutral-200">
+                            <td className="py-1 pr-2 text-sm truncate max-w-[200px]">{row.squadron_name || row.name}</td>
+                            <td className="py-1 w-16 text-right font-semibold" style={{ color }}>{rate}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {sorted.length > 5 && (
+                  <div className="text-[10px] text-neutral-400 mt-1">Showing top 5 of {filtered.length}</div>
+                )}
+              </div>
+            ) : (
+              <div className="text-xs text-neutral-400">No squadron data</div>
+            )}
+          </div>
+        </div>
+      )}
     </ChartCard>
   );
 }

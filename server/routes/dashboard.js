@@ -93,6 +93,30 @@ router.get('/', authenticateToken, async (req, res) => {
       LIMIT 8
     `);
 
+    // ── Top / bottom squadrons by attendance rate (real) ─────────
+    const [topSquadronsByAttendance] = await db.query(`
+      SELECT squadron_name AS name, ROUND(avg_attendance_rate, 1) AS rate
+      FROM v_squadron_readiness
+      ORDER BY avg_attendance_rate DESC
+      LIMIT 5
+    `);
+    const [bottomSquadronsByAttendance] = await db.query(`
+      SELECT squadron_name AS name, ROUND(avg_attendance_rate, 1) AS rate
+      FROM v_squadron_readiness
+      ORDER BY avg_attendance_rate ASC
+      LIMIT 3
+    `);
+
+    // ── Attendance rate distribution buckets (squadron counts) ───
+    const [attendanceDist] = await db.query(`
+      SELECT
+        SUM(CASE WHEN avg_attendance_rate >= 90 THEN 1 ELSE 0 END) AS excellent,
+        SUM(CASE WHEN avg_attendance_rate >= 80 AND avg_attendance_rate < 90 THEN 1 ELSE 0 END) AS good,
+        SUM(CASE WHEN avg_attendance_rate >= 70 AND avg_attendance_rate < 80 THEN 1 ELSE 0 END) AS fair,
+        SUM(CASE WHEN avg_attendance_rate < 70 THEN 1 ELSE 0 END) AS needs_attention
+      FROM v_squadron_readiness
+    `);
+
     // ── Force distribution ────────────────────────────────────────
     const [forceDistribution] = await db.query(`
       SELECT
@@ -116,6 +140,36 @@ router.get('/', authenticateToken, async (req, res) => {
       ORDER BY \`count\` DESC
     `);
 
+    // ── Profession / Occupation distribution ───────────────────────
+    const [rawOccupations] = await db.query(`
+      SELECT occupation FROM reservists
+    `);
+
+    function categorizeOccupation(occ) {
+      if (!occ || !occ.trim()) return 'Others';
+      const o = occ.toLowerCase();
+      if (/engineer|technician|mechanic|electric|architect/.test(o)) return 'Engineering';
+      if (/it |computer|programmer|developer|software|network|cyber|communicat|telecom/.test(o)) return 'IT / Communications';
+      if (/nurse|doctor|medical|health|paramedic|pharma|dentist|therap/.test(o)) return 'Medical / Health';
+      if (/security|police|guard|enforc|law|patrol|military|officer/.test(o)) return 'Security Personnel';
+      if (/admin|clerk|secretar|office|account|finance|hr |human|manager|logistics|operations/.test(o)) return 'Administrative';
+      return 'Others';
+    }
+
+    const profCounts = {};
+    for (const row of rawOccupations || []) {
+      const cat = categorizeOccupation(row.occupation);
+      profCounts[cat] = (profCounts[cat] || 0) + 1;
+    }
+    const professionDistribution = [
+      "Security Personnel",
+      "Engineering",
+      "IT / Communications",
+      "Medical / Health",
+      "Administrative",
+      "Others"
+    ].map(cat => ({ name: cat, count: profCounts[cat] || 0 }));
+
     // ── Active alerts ─────────────────────────────────────────────
     const [alerts] = await db.query(`
       SELECT id, title, message, target_role, created_at
@@ -135,6 +189,17 @@ router.get('/', authenticateToken, async (req, res) => {
         SUM(CASE WHEN readiness_score < 60 THEN 1 ELSE 0 END) AS critical
       FROM v_reservist_readiness
     `);
+
+    // ── Real computed composition weights from overall readiness view ─
+    const tp = Number(overallReadiness?.avg_training_participation || 0);
+    const ar = Number(overallReadiness?.avg_attendance_rate || 0);
+    const as = Number(overallReadiness?.avg_active_status || 0);
+    const totalW = tp + ar + as || 1;
+    const realComposition = [
+      { name: 'Training Participation', value: Math.round((tp / totalW) * 100), color: '#6366f1' },
+      { name: 'Attendance Rate', value: Math.round((ar / totalW) * 100), color: '#10b981' },
+      { name: 'Active Status Weight', value: Math.round((as / totalW) * 100), color: '#f59e0b' },
+    ];
 
     res.json({
       status: 'success',
@@ -160,21 +225,20 @@ router.get('/', authenticateToken, async (req, res) => {
           by_group: groupReadiness,
           by_squadron: squadronReadiness,
           distribution: readinessDistribution?.[0] || { excellent: 0, good: 0, fair: 0, poor: 0, critical: 0 },
-          composition: [
-            { name: 'Training Participation', value: 40, color: '#6366f1' },
-            { name: 'Attendance Rate', value: 30, color: '#10b981' },
-            { name: 'Active Status Weight', value: 30, color: '#f59e0b' },
-          ]
+          composition: realComposition
         },
         attendance: {
           timeline: attendanceTimeline?.reverse() || [],
-          by_area: [],  // populated from force distribution
+          top_squadrons: topSquadronsByAttendance || [],
+          bottom_squadrons: bottomSquadronsByAttendance || [],
+          distribution: attendanceDist?.[0] || { excellent: 0, good: 0, fair: 0, needs_attention: 0 },
         },
         trainings: {
           by_area: trainingByArea,
         },
         force_distribution: forceDistribution,
         rank_distribution: rankDistribution,
+        profession_distribution: professionDistribution,
         low_performing: lowPerforming,
         alerts: alerts,
       }

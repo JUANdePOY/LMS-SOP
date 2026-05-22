@@ -13,6 +13,14 @@ const rejectInvalid = (req, res, next) => {
   return next();
 };
 
+const safeParseJson = (val) => {
+  if (val == null) return null;
+  if (typeof val === 'string') {
+    try { return JSON.parse(val); } catch { return null; }
+  }
+  return val;
+};
+
 const pageLimitValidators = [
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
@@ -115,8 +123,8 @@ router.get(
 
       const logs = rows.map((r) => ({
         ...r,
-        old_values: r.old_values ? JSON.parse(r.old_values) : null,
-        new_values: r.new_values ? JSON.parse(r.new_values) : null,
+        old_values: safeParseJson(r.old_values),
+        new_values: safeParseJson(r.new_values),
       }));
 
       return res.json({
@@ -167,8 +175,8 @@ router.get(
       }
 
       const log = rows[0];
-      log.old_values = log.old_values ? JSON.parse(log.old_values) : null;
-      log.new_values = log.new_values ? JSON.parse(log.new_values) : null;
+      log.old_values = safeParseJson(log.old_values);
+      log.new_values = safeParseJson(log.new_values);
 
       return res.json({ success: true, message: 'OK', data: log });
     } catch (err) {

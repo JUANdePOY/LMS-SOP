@@ -235,4 +235,7 @@ router.get(
   trainingsController.listRegistrations
 );
 
+// ── Training Statistics for Dashboard (real data for filters & charts) ───────
+router.get('/stats', authenticateToken, trainingsController.getTrainingStats);
+
 module.exports = router;

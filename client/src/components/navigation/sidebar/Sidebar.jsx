@@ -1,14 +1,31 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, Bell, Settings, LogOut, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
 import { menuItems } from "@/config/menuItems";
 import { useAuth } from "@/contexts/AuthContext";
+import { getAlerts } from "@/services/api";
 
 export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobileOpen, onMobileClose }) {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const { logout } = useAuth();
+
+  const [alertSummary, setAlertSummary] = useState(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await getAlerts({ params: { limit: 1 } });
+        if (res.data?.status === 'success') {
+          setAlertSummary(res.data.data?.summary || null);
+        }
+      } catch (_) {
+        // silent fail — badge is non-critical
+      }
+    };
+    load();
+  }, []);
 
   const isCollapsed =
     controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
@@ -147,11 +164,37 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
 
         <ul className="space-y-0.5" role="list">
           <li>
-            <SidebarItem
-              item={{ name: "Alerts", path: "/alerts", icon: Bell, description: "Notifications" }}
-              isCollapsed={isCollapsed}
-              onNavClick={handleNavClick}
-            />
+            <Link
+              to="/alerts"
+              onClick={handleNavClick}
+              className={cn(
+                "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5",
+                "text-sm font-medium leading-none tracking-[-0.01em]",
+                "transition-all duration-200 ease-out",
+                "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100",
+                "dark:text-neutral-400 dark:hover:text-neutral-50 dark:hover:bg-neutral-800",
+                "hover:scale-[1.015]",
+                isCollapsed && "justify-center px-0"
+              )}
+            >
+              <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center text-neutral-400 dark:text-neutral-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                <Bell size={17} strokeWidth={1.8} />
+              </span>
+              {!isCollapsed && <span className="truncate">Alerts</span>}
+              {!isCollapsed && alertSummary && (alertSummary.unread > 0 || alertSummary.critical > 0) && (
+                <span className={cn(
+                  "ml-auto inline-flex min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none",
+                  alertSummary.critical > 0
+                    ? "bg-red-600 text-white"
+                    : "bg-amber-500 text-white"
+                )}>
+                  {alertSummary.critical || alertSummary.unread}
+                </span>
+              )}
+              {isCollapsed && alertSummary && (alertSummary.unread > 0 || alertSummary.critical > 0) && (
+                <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-500" />
+              )}
+            </Link>
           </li>
           <li>
             <SidebarItem
