@@ -5,8 +5,14 @@ const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { getUserScopeFilter } = require('../middleware/rbac');
 const { hashPassword, generateResetToken } = require('../app/auth');
 const { logAudit } = require('../utils/auditLogger');
+const crypto = require('crypto');
 
 const router = express.Router();
+
+// Helper: Generate unique reservist barcode (e.g. RES- followed by 12 hex chars)
+function generateUniqueBarcode() {
+  return `RES-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+}
 
 // Helper: Get client IP
 const getClientIp = (req) => {
@@ -414,9 +420,10 @@ body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Ret
            basic_training_date: basic_training_date || null,
            emergency_contact_name: emergency_contact_name || null,
            emergency_contact_phone: emergency_contact_phone || null,
-           emergency_contact_address: emergency_contact_address || null,
-           ...otherFields
-         };
+            emergency_contact_address: emergency_contact_address || null,
+            ...otherFields,
+            barcode: generateUniqueBarcode()
+          };
 
         const columns = Object.keys(reservistData).map(col => `\`${col}\``);
         const values = Object.values(reservistData);
@@ -1095,10 +1102,11 @@ router.post(
                sex: record.sex || null,
                blood_type: record.blood_type || 'Unknown',
                phone_number: record.phone_number || null,
-               position: record.position || null,
-               reserve_status: record.reserve_status || 'Ready Reserve',
-               is_active: true
-             };
+                position: record.position || null,
+                reserve_status: record.reserve_status || 'Ready Reserve',
+                is_active: true,
+                barcode: generateUniqueBarcode()
+              };
 
             const columns = Object.keys(reservistData).map(col => `\`${col}\``);
             const values = Object.values(reservistData);
@@ -1389,13 +1397,13 @@ if (existingReservists.length > 0) {
               }
 
 // Create reservist
-               const [reservistResult] = await connection.query(
-                 `INSERT INTO reservists (
-                   user_id, first_name, last_name, rank, service_number,
-                   position, reserve_status, is_active
-                 ) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)`,
-                 [userId, firstName, lastName, rank, serviceNumber, position, 'Ready Reserve']
-               );
+                const [reservistResult] = await connection.query(
+                  `INSERT INTO reservists (
+                    user_id, first_name, last_name, rank, service_number,
+                    position, reserve_status, barcode, is_active
+                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+                  [userId, firstName, lastName, rank, serviceNumber, position, 'Ready Reserve', generateUniqueBarcode()]
+                );
 
               reservistId = reservistResult.insertId;
             }
@@ -1691,20 +1699,21 @@ router.post(
                     place_of_birth, age, sex, civil_status, citizenship, height, weight,
                     blood_type, phone_number, address, reserve_center, category,
                     source_of_commission, rank_date_appointment, specialization,
-                    reserve_status, highest_education, course_degree, school, year_graduated,
-                    occupation, employer, office_address, basic_training_completed,
-                    basic_training_date, emergency_contact_name, emergency_contact_phone,
-                    emergency_contact_address, is_active
-                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+                     reserve_status, highest_education, course_degree, school, year_graduated,
+                     occupation, employer, office_address, basic_training_completed,
+                     basic_training_date, emergency_contact_name, emergency_contact_phone,
+                     emergency_contact_address, barcode, is_active
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
                   [
                     userId, firstName, lastName, rank, serviceNumber || null, dateOfBirth,
                     placeOfBirth, age, sex, civilStatus, citizenship, height, weight,
                     bloodType, contactNumber, homeAddress, reserveCenter, category,
                     sourceOfCommission, rankDateOfAppointment, specialization,
                     reserveStatus, highestEducation, courseDegree, school, yearGraduated,
-                    occupation, employer, officeAddress, basicTraining, dateCompleted,
-                    emergencyContactName, emergencyContactNumber, emergencyAddress
-                  ]
+                     occupation, employer, officeAddress, basicTraining, dateCompleted,
+                     emergencyContactName, emergencyContactNumber, emergencyAddress,
+                     generateUniqueBarcode()
+                   ]
                 );
 
                 reservistId = reservistResult.insertId;

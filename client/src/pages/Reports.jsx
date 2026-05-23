@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Edit, Trash2, FileText, Calendar } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { getReports, getReportById, deleteReport } from '@/services/reportsService';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
