@@ -9,8 +9,8 @@ const crypto = require('crypto');
 
 const router = express.Router();
 
-// Helper: Generate unique reservist barcode (e.g. RES- followed by 12 hex chars)
-function generateUniqueBarcode() {
+// Helper: Generate unique reservist QR code (e.g. RES- followed by 12 hex chars)
+function generateUniqueQRCode() {
   return `RES-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
 }
 
@@ -421,8 +421,8 @@ body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Ret
            emergency_contact_name: emergency_contact_name || null,
            emergency_contact_phone: emergency_contact_phone || null,
             emergency_contact_address: emergency_contact_address || null,
-            ...otherFields,
-            barcode: generateUniqueBarcode()
+             ...otherFields,
+             qr_code: generateUniqueQRCode()
           };
 
         const columns = Object.keys(reservistData).map(col => `\`${col}\``);
@@ -1104,8 +1104,8 @@ router.post(
                phone_number: record.phone_number || null,
                 position: record.position || null,
                 reserve_status: record.reserve_status || 'Ready Reserve',
-                is_active: true,
-                barcode: generateUniqueBarcode()
+                 is_active: true,
+                 qr_code: generateUniqueQRCode()
               };
 
             const columns = Object.keys(reservistData).map(col => `\`${col}\``);
@@ -1400,9 +1400,9 @@ if (existingReservists.length > 0) {
                 const [reservistResult] = await connection.query(
                   `INSERT INTO reservists (
                     user_id, first_name, last_name, rank, service_number,
-                    position, reserve_status, barcode, is_active
+                    position, reserve_status, qr_code, is_active
                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
-                  [userId, firstName, lastName, rank, serviceNumber, position, 'Ready Reserve', generateUniqueBarcode()]
+                  [userId, firstName, lastName, rank, serviceNumber, position, 'Ready Reserve', generateUniqueQRCode()]
                 );
 
               reservistId = reservistResult.insertId;
@@ -1702,7 +1702,7 @@ router.post(
                      reserve_status, highest_education, course_degree, school, year_graduated,
                      occupation, employer, office_address, basic_training_completed,
                      basic_training_date, emergency_contact_name, emergency_contact_phone,
-                     emergency_contact_address, barcode, is_active
+                     emergency_contact_address, qr_code, is_active
                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
                   [
                     userId, firstName, lastName, rank, serviceNumber || null, dateOfBirth,
@@ -1712,7 +1712,7 @@ router.post(
                     reserveStatus, highestEducation, courseDegree, school, yearGraduated,
                      occupation, employer, officeAddress, basicTraining, dateCompleted,
                      emergencyContactName, emergencyContactNumber, emergencyAddress,
-                     generateUniqueBarcode()
+                     generateUniqueQRCode()
                    ]
                 );
 

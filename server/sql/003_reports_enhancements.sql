@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS `report_participants` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `report_documentations` (
-  `id` bigint NOT NULL AUTO_INCREMENT,
+  `id` bigint NOT NULL AUTO_INCREMENT, 
   `report_id` bigint NOT NULL,
   `original_filename` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_path` varchar(1000) COLLATE utf8mb4_unicode_ci NOT NULL,

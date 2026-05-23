@@ -11,6 +11,7 @@ import {
   Users,
   Layers,
   PlaneTakeoff,
+  CalendarDays,
 } from "lucide-react";
 
 // Role requirements for menu items (undefined = any authenticated user)
@@ -85,16 +86,30 @@ export const menuItems = [
     ],
   },
   {
-    name: "Trainings & Activities",
+    name: "Events",
     path: "/trainings",
-    icon: Dumbbell,
-    description: "Sessions & programs",
-  },
-  {
-    name: "Attendance",
-    path: "/attendance",
-    icon: ClipboardList,
-    description: "Track presence",
+    icon: CalendarDays,
+    description: "Events, trainings & reports",
+    children: [
+      {
+        name: "Trainings & Activities",
+        path: "/trainings",
+        icon: Dumbbell,
+        description: "Sessions & programs",
+      },
+      {
+        name: "Attendance",
+        path: "/attendance",
+        icon: ClipboardList,
+        description: "Track presence",
+      },
+      {
+        name: "Reports",
+        path: "/reports",
+        icon: FileText,
+        description: "Generate reports",
+      },
+    ],
   },
   {
     name: "Readiness & Analytics",
@@ -108,11 +123,5 @@ export const menuItems = [
     icon: Package,
     description: "Inventory & resources",
     roles: ADMIN_ROLES,
-  },
-  {
-    name: "Reports",
-    path: "/reports",
-    icon: FileText,
-    description: "Generate reports",
   },
 ];

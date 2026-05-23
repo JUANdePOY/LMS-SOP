@@ -19,10 +19,10 @@ function sendError(res, err, fallback = 'Request failed') {
 function scanInternal(req, res) {
   const facilitatorId = req.user?.id;
   attendanceService
-    .scanBarcodeInternal(
+    .scanQRCodeInternal(
       req.params.trainingId,
-      req.body.barcode,
-      req.body.scan_method || 'barcode_scanner',
+      req.body.qr_code,
+      req.body.scan_method || 'qr_scanner',
       facilitatorId,
       req.body.device_info || req.headers['user-agent'] || null
     )
@@ -30,7 +30,7 @@ function scanInternal(req, res) {
       logAudit('attendance.scan', facilitatorId, {
         trainingId: req.params.trainingId,
         eventType: 'internal',
-        barcode: req.body.barcode
+        qr_code: req.body.qr_code
       });
       return res.json({ success: true, message: data.message, data: data.data });
     })
@@ -40,10 +40,10 @@ function scanInternal(req, res) {
 function scanExternal(req, res) {
   const facilitatorId = req.user?.id;
   attendanceService
-    .scanBarcodeExternal(
+    .scanQRCodeExternal(
       req.params.externalTrainingId,
-      req.body.barcode,
-      req.body.scan_method || 'barcode_scanner',
+      req.body.qr_code,
+      req.body.scan_method || 'qr_scanner',
       facilitatorId,
       req.body.device_info || req.headers['user-agent'] || null
     )
@@ -51,7 +51,7 @@ function scanExternal(req, res) {
       logAudit('attendance.scan', facilitatorId, {
         externalTrainingId: req.params.externalTrainingId,
         eventType: 'external',
-        barcode: req.body.barcode
+        qr_code: req.body.qr_code
       });
       return res.json({ success: true, message: data.message, data: data.data });
     })

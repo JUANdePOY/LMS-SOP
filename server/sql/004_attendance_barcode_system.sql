@@ -1,16 +1,16 @@
--- Migration: Attendance barcode scanning system
--- Adds barcode support, facilitator tracking, external training attendance, and scan audit log
+-- Migration: Attendance QR code scanning system
+-- Adds QR code support, facilitator tracking, external training attendance, and scan audit log
 
--- Add barcode column to reservists if not exists
+-- Add qr_code column to reservists if not exists
 ALTER TABLE `reservists`
-  ADD COLUMN `barcode` VARCHAR(255) UNIQUE NULL AFTER `service_number`,
-  ADD INDEX `idx_barcode` (`barcode`);
+  ADD COLUMN `qr_code` VARCHAR(255) UNIQUE NULL AFTER `service_number`,
+  ADD INDEX `idx_qr_code` (`qr_code`);
 
 -- Add facilitator and event_type columns to attendance
 ALTER TABLE `attendance`
   ADD COLUMN `event_type` ENUM('internal', 'external') NOT NULL DEFAULT 'internal' AFTER `training_id`,
   ADD COLUMN `external_training_id` BIGINT NULL AFTER `event_type`,
-  ADD COLUMN `scan_method` ENUM('barcode_scanner', 'camera', 'manual') NULL AFTER `qr_code_used`,
+  ADD COLUMN `scan_method` ENUM('qr_scanner', 'camera', 'manual') NULL AFTER `qr_code_used`,
   ADD COLUMN `scan_timestamp` DATETIME NULL AFTER `scan_method`,
   ADD INDEX `idx_external_training` (`external_training_id`),
   ADD INDEX `idx_event_type` (`event_type`);
@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS `external_training_attendance` (
   `status` ENUM('present', 'absent', 'late', 'excused', 'pending') NOT NULL DEFAULT 'pending',
   `check_in_time` DATETIME NULL,
   `check_out_time` DATETIME NULL,
-  `scan_method` ENUM('barcode_scanner', 'camera', 'manual') NULL,
-  `barcode_scanned` VARCHAR(255) NULL,
+  `scan_method` ENUM('qr_scanner', 'camera', 'manual') NULL,
+  `qr_code_scanned` VARCHAR(255) NULL,
   `notes` TEXT NULL,
   `recorded_by` BIGINT NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -48,10 +48,10 @@ CREATE TABLE IF NOT EXISTS `scan_audit_log` (
   `training_id` BIGINT NULL,
   `external_training_id` BIGINT NULL,
   `event_type` ENUM('internal', 'external') NOT NULL,
-  `barcode_scanned` VARCHAR(255) NOT NULL,
+  `qr_code_scanned` VARCHAR(255) NOT NULL,
   `reservist_id` BIGINT NULL,
-  `scan_result` ENUM('success', 'not_registered', 'invalid_barcode', 'event_inactive', 'duplicate', 'capacity_full') NOT NULL,
-  `scan_method` ENUM('barcode_scanner', 'camera', 'manual') NULL,
+  `scan_result` ENUM('success', 'not_registered', 'invalid_qr_code', 'event_inactive', 'duplicate', 'capacity_full') NOT NULL,
+  `scan_method` ENUM('qr_scanner', 'camera', 'manual') NULL,
   `device_info` VARCHAR(500) NULL,
   `facilitator_id` BIGINT NULL,
   `error_message` VARCHAR(500) NULL,
@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS `scan_audit_log` (
   FOREIGN KEY (`facilitator_id`) REFERENCES `users`(`id`) ON DELETE SET NULL,
   INDEX `idx_sal_training` (`training_id`),
   INDEX `idx_sal_external` (`external_training_id`),
-  INDEX `idx_sal_barcode` (`barcode_scanned`),
+  INDEX `idx_sal_qr_code` (`qr_code_scanned`),
   INDEX `idx_sal_result` (`scan_result`),
   INDEX `idx_sal_time` (`scanned_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

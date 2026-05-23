@@ -27,8 +27,8 @@ router.post(
   authorizeFacilitator(),
   [
     ...trainingIdParam,
-    body('barcode').trim().notEmpty().withMessage('Barcode is required'),
-    body('scan_method').optional().isIn(['barcode_scanner', 'camera', 'manual']),
+    body('qr_code').trim().notEmpty().withMessage('QR code is required'),
+    body('scan_method').optional().isIn(['qr_scanner', 'camera', 'manual']),
     body('device_info').optional().isString().isLength({ max: 500 }),
   ],
   rejectInvalid,
@@ -41,8 +41,8 @@ router.post(
   authorizeFacilitator(),
   [
     ...externalTrainingIdParam,
-    body('barcode').trim().notEmpty().withMessage('Barcode is required'),
-    body('scan_method').optional().isIn(['barcode_scanner', 'camera', 'manual']),
+    body('qr_code').trim().notEmpty().withMessage('QR code is required'),
+    body('scan_method').optional().isIn(['qr_scanner', 'camera', 'manual']),
     body('device_info').optional().isString().isLength({ max: 500 }),
   ],
   rejectInvalid,

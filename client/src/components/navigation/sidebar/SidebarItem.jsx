@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarTooltip from "@/components/ui/Tooltip";
@@ -49,6 +49,7 @@ function SidebarSubItem({ item, onNavClick }) {
 export default function SidebarItem({ item, isCollapsed, onNavClick }) {
   const Icon = item.icon;
   const location = useLocation();
+  const navigate = useNavigate();
   const hasChildren = item.children && item.children.length > 0;
 
   const isChildActive = hasChildren &&
@@ -60,12 +61,21 @@ export default function SidebarItem({ item, isCollapsed, onNavClick }) {
 
   if (hasChildren) {
     const isParentActive = isParentPathActive || isChildActive;
+    const firstChildPath = item.children[0]?.path;
+
+    const handleChevronClick = (e) => {
+      e.stopPropagation();
+      setOpen((v) => !v);
+    };
 
     return (
       <SidebarTooltip label={item.name} description={item.description} enabled={isCollapsed}>
         <div className="w-full">
           <button
-            onClick={() => !isCollapsed && setOpen((v) => !v)}
+            onClick={() => {
+              navigate(firstChildPath);
+              setOpen(true);
+            }}
             aria-expanded={open}
             className={cn(
               "relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5",
@@ -97,14 +107,20 @@ export default function SidebarItem({ item, isCollapsed, onNavClick }) {
             {!isCollapsed && (
               <>
                 <span className="flex-1 truncate text-left">{item.name}</span>
-                <ChevronDown
-                  size={13}
-                  className={cn(
-                    "shrink-0 text-neutral-400 dark:text-neutral-600",
-                    "transition-transform duration-200",
-                    open && "rotate-180"
-                  )}
-                />
+                <span
+                  onClick={handleChevronClick}
+                  className="shrink-0 p-0.5 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700 cursor-pointer"
+                  aria-label={open ? "Collapse" : "Expand"}
+                >
+                  <ChevronDown
+                    size={13}
+                    className={cn(
+                      "text-neutral-400 dark:text-neutral-600",
+                      "transition-transform duration-200",
+                      open && "rotate-180"
+                    )}
+                  />
+                </span>
               </>
             )}
 
