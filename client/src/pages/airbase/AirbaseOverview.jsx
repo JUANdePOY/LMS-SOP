@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { HierarchyProvider, useHierarchy } from "@/components/hierarchy/HierarchyContext";
 import AreaAccordion from "@/components/hierarchy/AreaAccordion";
 import SelectedSquadronPanel from "@/components/hierarchy/SelectedSquadronPanel";
+import MembersModal from "@/components/hierarchy/MembersModal";
 import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
 import { getGroups, getMapSquadrons, getMapSummary } from "@/services/api";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -387,7 +388,7 @@ function HierarchyView() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
-  const { resetAll, selectedSquadron } = useHierarchy();
+  const { resetAll, selectedSquadron, modalSquadron, closeMembersModal } = useHierarchy();
 
   useEffect(() => { fetchHierarchy(); }, []);
 
@@ -527,6 +528,14 @@ function HierarchyView() {
       )}
 
       {selectedSquadron && <SelectedSquadronPanel />}
+      {modalSquadron && (
+        <MembersModal
+          open={!!modalSquadron}
+          node={modalSquadron}
+          nodeType="squadron"
+          onClose={closeMembersModal}
+        />
+      )}
     </div>
   );
 }

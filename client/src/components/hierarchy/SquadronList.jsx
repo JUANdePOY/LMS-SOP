@@ -1,8 +1,6 @@
-import { useState } from "react";
 import { CheckCircle2, XCircle, Users, Tag, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useHierarchy } from "./HierarchyContext";
-import MembersModal from "./MembersModal";
 
 function StatusBadge({ status }) {
   const isActive = status === "active";
@@ -24,8 +22,7 @@ function StatusBadge({ status }) {
  * Each card is clickable → opens MembersModal for that squadron.
  */
 export default function SquadronList({ squadrons }) {
-  const { selectedSquadron, selectSquadron } = useHierarchy();
-  const [modalNode, setModalNode] = useState(null);
+  const { selectedSquadron, selectSquadron, openMembersModal } = useHierarchy();
 
   if (!squadrons?.length) {
     return <p className="py-3 text-xs text-neutral-400 italic">No squadrons found.</p>;
@@ -42,7 +39,7 @@ export default function SquadronList({ squadrons }) {
               key={sq.id}
               onClick={() => {
                 selectSquadron(sq);
-                setModalNode(sq);
+                openMembersModal(sq);
               }}
               title="Click to view members"
               className={cn(
@@ -100,14 +97,6 @@ export default function SquadronList({ squadrons }) {
           );
         })}
       </div>
-
-      {/* Members Modal */}
-      <MembersModal
-        open={!!modalNode}
-        node={modalNode}
-        nodeType="squadron"
-        onClose={() => setModalNode(null)}
-      />
     </>
   );
 }

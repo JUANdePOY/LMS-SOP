@@ -367,20 +367,28 @@ router.delete('/:id', [...validateId, authenticateToken, requireAdmin], async (r
       });
     }
 
-    // Get current squadron for audit
-    const [currentSquadron] = await db.query('SELECT * FROM squadron WHERE id = ? AND is_active = TRUE', [req.params.id]);
+    // Get current squadron (allow already-inactive for idempotent delete)
+    const [currentSquadron] = await db.query('SELECT * FROM squadron WHERE id = ?', [req.params.id]);
 
     if (currentSquadron.length === 0) {
       return res.status(404).json({
         status: 'error',
-        message: 'Squadron not found or already inactive',
+        message: 'Squadron not found',
         code: 'NOT_FOUND'
       });
     }
 
-    // Check if squadron has active assignments
+    // Idempotent: if already soft-deleted, treat as success
+    if (!currentSquadron[0].is_active) {
+      return res.json({
+        status: 'success',
+        message: 'Squadron was already deactivated'
+      });
+    }
+
+    // Check if squadron has active (current primary) assignments
     const [activeAssignments] = await db.query(
-      'SELECT COUNT(*) as count FROM reservist_assignments WHERE squadron_id = ?',
+      'SELECT COUNT(*) as count FROM reservist_assignments WHERE squadron_id = ? AND is_primary = TRUE',
       [req.params.id]
     );
 

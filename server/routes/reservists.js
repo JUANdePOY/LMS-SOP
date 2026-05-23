@@ -10,8 +10,26 @@ const crypto = require('crypto');
 const router = express.Router();
 
 // Helper: Generate unique reservist QR code (e.g. RES- followed by 12 hex chars)
+// Uses 8 bytes (16 hex chars) to minimize collision risk with UNIQUE constraint
 function generateUniqueQRCode() {
-  return `RES-${crypto.randomBytes(6).toString('hex').toUpperCase()}`;
+  return `RES-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+}
+
+// Helper: Parse Excel date (serial number) or string to MySQL date format
+function parseExcelDate(value) {
+  if (!value) return null;
+  // Excel serial date (number)
+  if (typeof value === 'number') {
+    const date = new Date((value - 25569) * 86400 * 1000);
+    if (isNaN(date.getTime())) return null;
+    return date.toISOString().split('T')[0];
+  }
+  // String date - try to parse
+  const str = String(value).trim();
+  if (!str) return null;
+  const date = new Date(str);
+  if (isNaN(date.getTime())) return null;
+  return date.toISOString().split('T')[0];
 }
 
 // Helper: Get client IP
@@ -367,8 +385,9 @@ body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Ret
         }
       }
 
-      // Hash password
-      const hashedPassword = await hashPassword(password);
+      // Hash password — use service_number as default if password is empty
+      const passwordToUse = password || service_number;
+      const hashedPassword = await hashPassword(passwordToUse);
 
       // Start transaction
       const connection = await db.getConnection();
@@ -1081,8 +1100,8 @@ router.post(
           }
 
           try {
-            // Generate temporary password
-            const tempPassword = Math.random().toString(36).slice(-8);
+            // Use service_number as password
+            const tempPassword = record.service_number;
             const hashedPassword = await hashPassword(tempPassword);
 
             // Create user
@@ -1330,7 +1349,7 @@ router.post(
             // "Sgt Angelyn J Bass MN-T21-024171 PAF(Res)"
             // Extract service number first (MN-XXXXX or O-XXXXX pattern)
             const serviceNumberMatch = name.match(/(MN-\w+|O-\w+)/);
-            const serviceNumber = serviceNumberMatch ? serviceNumberMatch[1] : `${Date.now()}-${Math.random()}`;
+            const serviceNumber = serviceNumberMatch ? serviceNumberMatch[1] : `TEMP-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
             
             // Remove service number from name for parsing
             let cleanName = name.replace(/\s*(MN-\w+|O-\w+)\s*/i, '').trim();
@@ -1368,15 +1387,15 @@ if (existingReservists.length > 0) {
                // Update existing reservist
                reservistId = existingReservists[0].id;
                await connection.query(
-                 'UPDATE reservists SET rank = ?, position = ? WHERE id = ?',
+                  'UPDATE reservists SET `rank` = ?, position = ? WHERE id = ?',
                  [rank, position, reservistId]
                );
              } else {
               // Create new reservist
               // First create a user account
               const email = `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@pafr.mil`;
-              const tempPassword = 'TempPassword123!';
-              const passwordHash = await hashPassword(tempPassword);
+               const tempPassword = finalServiceNumber;
+               const passwordHash = await hashPassword(tempPassword);
 
               // Check if user exists
               const [existingUsers] = await connection.query(
@@ -1399,10 +1418,10 @@ if (existingReservists.length > 0) {
 // Create reservist
                 const [reservistResult] = await connection.query(
                   `INSERT INTO reservists (
-                    user_id, first_name, last_name, rank, service_number,
-                    position, reserve_status, qr_code, is_active
-                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
-                  [userId, firstName, lastName, rank, serviceNumber, position, 'Ready Reserve', generateUniqueQRCode()]
+                     user_id, first_name, last_name, service_number,
+                     position, reserve_status, qr_code, \`rank\`, is_active
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+                   [userId, firstName, lastName, serviceNumber, position, 'Ready Reserve', generateUniqueQRCode(), rank]
                 );
 
               reservistId = reservistResult.insertId;
@@ -1597,12 +1616,12 @@ router.post(
 
             const dateOfBirth = row['Date of Birth'] || null;
             const placeOfBirth = row['Place of Birth'] || null;
-            const age = row['Age'] ? parseInt(row['Age'], 10) : null;
+             const age = (() => { const v = parseInt(row['Age'], 10); return isNaN(v) ? null : v; })();
             const sex = row['Sex'] || null;
             const civilStatus = row['Civil Status'] || null;
             const citizenship = row['Citizenship'] || 'Filipino';
-            const height = row['Height'] ? parseFloat(row['Height']) : null;
-            const weight = row['Weight'] ? parseFloat(row['Weight']) : null;
+             const height = (() => { const v = parseFloat(row['Height']); return isNaN(v) ? null : v; })();
+             const weight = (() => { const v = parseFloat(row['Weight']); return isNaN(v) ? null : v; })();
             const bloodType = row['Blood Type'] || null;
             const homeAddress = row['Home Address'] || null;
             const contactNumber = row['Contact Number'] || null;
@@ -1619,7 +1638,7 @@ router.post(
             const highestEducation = row['Highest Educational Attainment'] || null;
             const courseDegree = row['Course/Degree'] || null;
             const school = row['School'] || null;
-            const yearGraduated = row['Year Graduated'] ? parseInt(row['Year Graduated'], 10) : null;
+             const yearGraduated = (() => { const v = parseInt(row['Year Graduated'], 10); return isNaN(v) ? null : v; })();
             const occupation = row['Occupation'] || null;
             const employer = row['Employer/Company'] || null;
             const officeAddress = row['Office Address'] || null;
@@ -1637,20 +1656,28 @@ router.post(
             const firstName = nameParts[0] || 'Unknown';
             const lastName = nameParts.slice(1).join(' ') || nameParts[0] || 'Unknown';
 
+            // service_number is NOT NULL UNIQUE in DB, generate placeholder if empty
+            const sn = (serviceNumber || '').trim();
+            const finalServiceNumber = sn || `TEMP-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
             // Check if reservist exists by service number
             let reservistId;
+            let createdNew = false;
 
-            if (serviceNumber) {
+            if (finalServiceNumber) {
               const [existingReservists] = await connection.query(
                 'SELECT id FROM reservists WHERE service_number = ?',
-                [serviceNumber]
+                [finalServiceNumber]
               );
 
               if (existingReservists.length > 0) {
                 reservistId = existingReservists[0].id;
+                const parsedUpdateDob = parseExcelDate(dateOfBirth);
+                const parsedUpdateRankDate = parseExcelDate(rankDateOfAppointment);
+                const parsedUpdateBasicDate = parseExcelDate(dateCompleted);
                 await connection.query(
                   `UPDATE reservists SET
-                    first_name = ?, last_name = ?, rank = ?, date_of_birth = ?,
+                    first_name = ?, last_name = ?, date_of_birth = ?,
                     place_of_birth = ?, age = ?, sex = ?, civil_status = ?,
                     citizenship = ?, height = ?, weight = ?, blood_type = ?,
                     phone_number = ?, address = ?, reserve_center = ?, category = ?,
@@ -1659,23 +1686,32 @@ router.post(
                     year_graduated = ?, occupation = ?, employer = ?, office_address = ?,
                     basic_training_completed = ?, basic_training_date = ?,
                     emergency_contact_name = ?, emergency_contact_phone = ?,
-                    emergency_contact_address = ?
+                    emergency_contact_address = ?, \`rank\` = ?
                   WHERE id = ?`,
-                  [
-                    firstName, lastName, rank, dateOfBirth, placeOfBirth, age, sex,
-                    civilStatus, citizenship, height, weight, bloodType, contactNumber,
-                    homeAddress, reserveCenter, category, sourceOfCommission,
-                    rankDateOfAppointment, specialization, reserveStatus, highestEducation,
-                    courseDegree, school, yearGraduated, occupation, employer, officeAddress,
-                    basicTraining, dateCompleted, emergencyContactName, emergencyContactNumber,
-                    emergencyAddress, reservistId
-                  ]
+                    [
+                     firstName, lastName, parsedUpdateDob, placeOfBirth, age, sex,
+                     civilStatus, citizenship, height, weight, bloodType, contactNumber,
+                     homeAddress, reserveCenter, category, sourceOfCommission,
+                     parsedUpdateRankDate, specialization, reserveStatus, highestEducation,
+                     courseDegree, school, yearGraduated, occupation, employer, officeAddress,
+                     basicTraining, parsedUpdateBasicDate, emergencyContactName, emergencyContactNumber,
+                     emergencyAddress, rank, reservistId
+                   ]
                 );
-              } else {
-                // Create new reservist
-                const userEmail = email || `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@pafr.mil`;
-                const tempPassword = 'TempPassword123!';
-                const passwordHash = await hashPassword(tempPassword);
+              }
+            }
+
+            // Create new reservist if not found by service number (or no service number provided)
+            if (!reservistId) {
+              // Parse date fields from Excel format
+              const parsedDateOfBirth = parseExcelDate(dateOfBirth);
+              const parsedRankDateOfAppointment = parseExcelDate(rankDateOfAppointment);
+              const parsedBasicTrainingDate = parseExcelDate(dateCompleted);
+
+                 // Create new reservist — use service number as password
+                 const userEmail = email || `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@pafr.mil`;
+                 const tempPassword = finalServiceNumber;
+                 const passwordHash = await hashPassword(tempPassword);
 
                 const [existingUsers] = await connection.query(
                   'SELECT id FROM users WHERE email = ?',
@@ -1694,30 +1730,29 @@ router.post(
                 }
 
                 const [reservistResult] = await connection.query(
-                  `INSERT INTO reservists (
-                    user_id, first_name, last_name, rank, service_number, date_of_birth,
+                  `INSERT INTO reservists (user_id, first_name, last_name, service_number, date_of_birth,
                     place_of_birth, age, sex, civil_status, citizenship, height, weight,
                     blood_type, phone_number, address, reserve_center, category,
                     source_of_commission, rank_date_appointment, specialization,
-                     reserve_status, highest_education, course_degree, school, year_graduated,
-                     occupation, employer, office_address, basic_training_completed,
-                     basic_training_date, emergency_contact_name, emergency_contact_phone,
-                     emergency_contact_address, qr_code, is_active
-                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+                    reserve_status, highest_education, course_degree, school, year_graduated,
+                    occupation, employer, office_address, basic_training_completed,
+                    basic_training_date, emergency_contact_name, emergency_contact_phone,
+                    emergency_contact_address, qr_code, \`rank\`, is_active
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
                   [
-                    userId, firstName, lastName, rank, serviceNumber || null, dateOfBirth,
-                    placeOfBirth, age, sex, civilStatus, citizenship, height, weight,
-                    bloodType, contactNumber, homeAddress, reserveCenter, category,
-                    sourceOfCommission, rankDateOfAppointment, specialization,
-                    reserveStatus, highestEducation, courseDegree, school, yearGraduated,
-                     occupation, employer, officeAddress, basicTraining, dateCompleted,
-                     emergencyContactName, emergencyContactNumber, emergencyAddress,
-                     generateUniqueQRCode()
-                   ]
+                     userId, firstName, lastName, finalServiceNumber, parsedDateOfBirth,
+                     placeOfBirth, age, sex, civilStatus, citizenship, height, weight,
+                     bloodType, contactNumber, homeAddress, reserveCenter, category,
+                     sourceOfCommission, parsedRankDateOfAppointment, specialization,
+                     reserveStatus, highestEducation, courseDegree, school, yearGraduated,
+                     occupation, employer, officeAddress, basicTraining, parsedBasicTrainingDate,
+                      emergencyContactName, emergencyContactNumber, emergencyAddress,
+                      generateUniqueQRCode(), rank, true
+                    ]
                 );
 
                 reservistId = reservistResult.insertId;
-              }
+                createdNew = true;
             }
 
             // Create or update assignment
@@ -1773,6 +1808,10 @@ router.post(
       }
 
       await connection.commit();
+
+      if (errors.length > 0) {
+        console.error('Bulk upload info errors:', JSON.stringify(errors, null, 2));
+      }
 
       logAudit({
         user_id: req.user.id,

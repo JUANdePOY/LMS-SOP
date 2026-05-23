@@ -386,14 +386,22 @@ router.delete('/:id', validateId, authenticateToken, requireAdmin, async (req, r
       });
     }
 
-    // Get current group for audit
-    const [currentGroup] = await db.query('SELECT * FROM `groups` WHERE id = ? AND is_active = TRUE', [req.params.id]);
+    // Get current group (allow already-inactive for idempotent delete)
+    const [currentGroup] = await db.query('SELECT * FROM `groups` WHERE id = ?', [req.params.id]);
 
     if (currentGroup.length === 0) {
       return res.status(404).json({
         status: 'error',
-        message: 'Group not found or already inactive',
+        message: 'Group not found',
         code: 'NOT_FOUND'
+      });
+    }
+
+    // Idempotent: if already soft-deleted, treat as success
+    if (!currentGroup[0].is_active) {
+      return res.json({
+        status: 'success',
+        message: 'Group was already deactivated'
       });
     }
 

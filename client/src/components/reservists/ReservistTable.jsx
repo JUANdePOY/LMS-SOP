@@ -8,7 +8,6 @@ const COLUMNS = [
   { key: "lastName",        label: "Name",            sortable: true  },
   { key: "rank",            label: "Rank",            sortable: true  },
   { key: "squadron",        label: "Squadron",        sortable: true  },
-  { key: "airbase",         label: "Airbase",         sortable: true  },
   { key: "specialization",  label: "Specialization",  sortable: true  },
   { key: "status",          label: "Status",          sortable: false },
   { key: "actions",         label: "",                sortable: false, className: "w-28" },
@@ -49,10 +48,6 @@ function MobileCard({ row, onView, onEdit, onDelete, onToggleStatus }) {
         <div>
           <span className="text-neutral-400 dark:text-neutral-500">Squadron</span>
           <p className="font-medium text-neutral-700 dark:text-neutral-300 truncate">{row.squadron || "—"}</p>
-        </div>
-        <div>
-          <span className="text-neutral-400 dark:text-neutral-500">Airbase</span>
-          <p className="font-medium text-neutral-700 dark:text-neutral-300 truncate">{row.airbase || "—"}</p>
         </div>
         <div>
           <span className="text-neutral-400 dark:text-neutral-500">Specialization</span>
@@ -175,10 +170,6 @@ export default function ReservistTable({ data, onView, onEdit, onDelete, onToggl
 
                   <td className="px-4 py-3 text-xs text-neutral-600 dark:text-neutral-400 max-w-[140px] truncate">
                     {row.squadron}
-                  </td>
-
-                  <td className="px-4 py-3 text-xs text-neutral-500 dark:text-neutral-500">
-                    {row.airbase}
                   </td>
 
                   <td className="px-4 py-3">

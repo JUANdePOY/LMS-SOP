@@ -128,6 +128,8 @@ export default function ManageGroups() {
         setDetail(null);
       }
     } catch (err) {
+      const msg = err?.response?.data?.message || err.message || 'Failed to delete group';
+      alert(msg);
       console.error('Failed to delete group:', err);
     }
   };
