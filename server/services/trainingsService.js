@@ -127,7 +127,22 @@ async function getInternalTrainingById(id) {
     trainingAttachmentService.listPublicForTraining(id),
     loadParticipantGroups(id),
   ]);
-  return { ...training, activities, attachments, participant_groups };
+  const participants = [];
+  for (const group of participant_groups) {
+    for (const r of group.reservists) {
+      participants.push({
+        id: r.id,
+        name: `${r.first_name || ''} ${r.last_name || ''}`.trim(),
+        first_name: r.first_name,
+        last_name: r.last_name,
+        rank: r.rank,
+        service_number: r.service_number,
+        squadron_id: group.squadron_id,
+        squadron_name: group.squadron_name,
+      });
+    }
+  }
+  return { ...training, activities, attachments, participant_groups, participants };
 }
 
 async function createInternalTraining(body, createdByUserId) {
@@ -150,7 +165,7 @@ async function createInternalTraining(body, createdByUserId) {
     throw err;
   }
 
-  const conn = await trainingModel.pool.getConnection();
+  const conn = await trainingModel.getConnection();
   try {
     await conn.beginTransaction();
     const trainingId = await trainingModel.insertInternal(conn, {
@@ -229,7 +244,7 @@ async function updateInternalTraining(id, body) {
     trainingPatch.venue = normalizeVenue(body.venue ?? body.location ?? existing.venue);
   }
 
-  const conn = await trainingModel.pool.getConnection();
+  const conn = await trainingModel.getConnection();
   try {
     await conn.beginTransaction();
 
@@ -499,7 +514,7 @@ async function deleteExternalTraining(id) {
 }
 
 async function registerExternalParticipant(trainingId, participantData) {
-  const conn = await trainingModel.pool.getConnection();
+  const conn = await trainingModel.getConnection();
   try {
     await conn.beginTransaction();
 
@@ -612,6 +627,95 @@ async function registerExternalParticipant(trainingId, participantData) {
   }
 }
 
+async function getTrainingSlotAvailability(trainingId) {
+  // Fetch the external training row
+  const [trows] = await trainingModel.db.query(
+    'SELECT * FROM external_trainings WHERE id = ?',
+    [trainingId]
+  );
+  const trow = trows && trows[0];
+  if (!trow) {
+
+    const err = new Error('Training not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // Parse squadron_limits (handle JSON string vs object)
+  let sqLimits = null;
+  if (trow.squadron_limits != null) {
+    try {
+      sqLimits = typeof trow.squadron_limits === 'string' ? JSON.parse(trow.squadron_limits) : trow.squadron_limits;
+    } catch (_) {
+      sqLimits = trow.squadron_limits;
+    }
+  }
+
+  // If squadron_limits exists and is an array with elements
+  if (Array.isArray(sqLimits) && sqLimits.length > 0) {
+    const squads = [];
+    
+    // For each squadron in squadron_limits, count registrations
+    for (const limit of sqLimits) {
+      const squadronId = limit.squadron_id ?? limit.squadronId;
+      if (squadronId == null) continue;
+      
+      // Count existing registrations for this squadron
+      const [rows] = await trainingModel.db.query(
+        'SELECT COUNT(*) AS c FROM training_registrations WHERE training_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(participant_data, "$.squadron_id")) = ?',
+        [trainingId, String(squadronId)]
+      );
+      const registered = rows[0]?.c ?? 0;
+      
+      // Get slot_limit (handle both slot_limit and slotLimit properties)
+      const slotLimit = limit.slot_limit ?? limit.slotLimit ?? null;
+      
+      // Calculate remaining
+      let remaining = null;
+      if (slotLimit !== null) {
+        remaining = slotLimit - registered;
+        if (remaining < 0) remaining = 0; // Don't go negative
+      }
+      squads.push({
+        squadron_id: squadronId,
+        name: limit.name ?? null,
+        slot_limit: slotLimit,
+        registered,
+        remaining: remaining,
+        isUnlimited: slotLimit === null || slotLimit === 0,
+        isFull: remaining !== null && remaining <= 0,
+      });
+    }
+    
+    return { hasSquadronLimits: true, squads };
+  } else {
+    // No squadron limits, check capacity
+    const totalSlots = trow.capacity != null ? Number(trow.capacity) : null;
+    
+    // Count total registrations
+    const [rows] = await trainingModel.db.query(
+      'SELECT COUNT(*) AS c FROM training_registrations WHERE training_id = ?',
+      [trainingId]
+    );
+    const totalRegistered = rows[0]?.c ?? 0;
+
+    
+    // Calculate remaining
+    let remaining = null;
+    if (totalSlots !== null) {
+      remaining = totalSlots - totalRegistered;
+      if (remaining < 0) remaining = 0; // Don't go negative
+    }
+    
+    return {
+      hasSquadronLimits: false,
+      totalSlots,
+      totalRegistered,
+      remaining
+    };
+  }
+}
+
 async function listExternalRegistrations(trainingId) {
   const t = await externalModel.findExternalById(trainingId);
   if (!t) {
@@ -619,7 +723,7 @@ async function listExternalRegistrations(trainingId) {
     err.statusCode = 404;
     throw err;
   }
-  const [rows] = await trainingModel.pool.query(
+  const [rows] = await trainingModel.db.query(
     'SELECT id, training_id, participant_data, registered_at FROM training_registrations WHERE training_id = ? ORDER BY registered_at DESC',
     [trainingId]
   );
@@ -655,4 +759,5 @@ module.exports = {
   deleteExternalTraining,
   registerExternalParticipant,
   listExternalRegistrations,
+  getTrainingSlotAvailability,
 };

@@ -124,6 +124,14 @@ router.get(
   trainingsController.downloadTrainingAttachment
 );
 
+router.get(
+  '/internal/:trainingId/attachments',
+  optionalAuthenticateToken,
+  [...trainingIdParam],
+  rejectInvalid,
+  trainingsController.listInternalAttachments
+);
+
 // ── External trainings ───────────────────────────────────────────────────────
 
 router.get(
@@ -151,6 +159,14 @@ router.get(
   [...idParam, ...attachmentIdParam],
   rejectInvalid,
   trainingsController.downloadExternalTrainingAttachment
+);
+
+router.get(
+  '/external/:id/attachments',
+  optionalAuthenticateToken,
+  [...idParam],
+  rejectInvalid,
+  trainingsController.listExternalAttachments
 );
 
 router.get('/external/:id', optionalAuthenticateToken, [...idParam], rejectInvalid, trainingsController.getExternal);
@@ -198,7 +214,7 @@ router.post(
   optionalAuthenticateToken,
   [...idParam,
     body('participantData').custom((val) => {
-      // participantData must be an object or JSON string containing squadron_id (integer)
+      // participantData must be an object or JSON string
       if (val == null) {
         throw new Error('participantData is required');
       }
@@ -213,17 +229,24 @@ router.post(
       if (typeof obj !== 'object' || obj === null) {
         throw new Error('participantData must be an object');
       }
-      const sid = obj.squadron_id ?? obj.squadronId ?? obj.squadron;
-      if (sid == null) {
-        throw new Error('participantData.squadron_id is required');
-      }
-      if (!Number.isInteger(Number(sid)) || Number(sid) < 1) {
-        throw new Error('participantData.squadron_id must be a positive integer');
+      // If squadron_id is provided, validate it's a positive integer
+      if (obj.squadron_id != null) {
+        if (!Number.isInteger(Number(obj.squadron_id)) || Number(obj.squadron_id) < 1) {
+          throw new Error('participantData.squadron_id must be a positive integer');
+        }
       }
       return true;
     })],
   rejectInvalid,
   trainingsController.registerExternal
+);
+
+router.get(
+  '/external/:id/slots',
+  optionalAuthenticateToken,
+  [...idParam],
+  rejectInvalid,
+  trainingsController.getTrainingSlotAvailability
 );
 
 router.get(

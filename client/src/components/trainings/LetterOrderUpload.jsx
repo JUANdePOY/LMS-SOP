@@ -67,7 +67,7 @@ const LetterOrderUpload = ({ onUpload, trainingId }) => {
           <input
             type="file"
             id="letterOrderFile"
-            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xlsx,.xls"
             style={{ display: 'none' }}
             onChange={handleFileChange}
           />

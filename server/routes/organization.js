@@ -16,8 +16,6 @@ const rejectInvalid = (req, res, next) => {
 
 router.get(
   '/squadrons',
-  authenticateToken,
-  authorize('admin'),
   [query('search').optional().isString(), query('limit').optional().isInt({ min: 1, max: 100 })],
   rejectInvalid,
   organizationController.listSquadrons

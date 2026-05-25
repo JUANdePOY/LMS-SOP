@@ -99,6 +99,22 @@ export const filterTrainingsByType = (trainings, type) => {
   return trainings.filter(training => training.type === type);
 };
 
+/**
+ * Get file type category from extension or mime type
+ * @param {string} fileType - File extension (e.g., 'pdf', 'docx') or mime type
+ * @returns {string} Category: 'image', 'pdf', 'docx', 'xlsx', or 'unknown'
+ */
+export const getFileTypeCategory = (fileType) => {
+  if (!fileType) return 'unknown';
+  const normalized = fileType.toLowerCase();
+  const images = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+  if (images.includes(normalized) || normalized.startsWith('image/')) return 'image';
+  if (normalized === 'pdf' || normalized === 'application/pdf') return 'pdf';
+  if (normalized === 'docx' || normalized.includes('wordprocessingml')) return 'docx';
+  if (normalized === 'xlsx' || normalized === 'xls' || normalized.includes('spreadsheetml')) return 'xlsx';
+  return 'unknown';
+};
+
 export default {
   formatTrainingDate,
   formatTrainingDateTime,
@@ -107,5 +123,6 @@ export default {
   calculateParticipationPercentage,
   filterTrainingsBySearch,
   filterTrainingsByStatus,
-  filterTrainingsByType
+  filterTrainingsByType,
+  getFileTypeCategory
 };

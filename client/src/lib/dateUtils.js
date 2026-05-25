@@ -86,6 +86,51 @@ export const shortDate = (value) => {
   return date.toLocaleDateString();
 };
 
+export const formatFileSize = (bytes) => {
+  if (bytes === null || bytes === undefined || isNaN(bytes)) return '';
+  const num = Number(bytes);
+  if (num === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(num) / Math.log(k));
+  return `${parseFloat((num / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+};
+
+export const formatDateShort = (dateString) => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString();
+};
+
+/**
+ * Format time to locale string (h:mm AM/PM)
+ * @param {Date|string} value - Date/time to format
+ * @returns {string} Formatted time or empty string
+ */
+export const formatTime = (value) => {
+  if (!value) return '';
+  
+  console.log('formatTime input:', value, typeof value);
+  
+  // Handle time-only strings (HH:MM or HH:MM:SS)
+  if (typeof value === 'string') {
+    const timeOnlyMatch = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?/);
+    if (timeOnlyMatch) {
+      const hours = parseInt(timeOnlyMatch[1], 10);
+      const minutes = parseInt(timeOnlyMatch[2], 10);
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      return `${displayHours}:${String(minutes).padStart(2, '0')} ${period}`;
+    }
+  }
+  
+  // Handle Date objects
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+};
+
 export default {
   formatDateForInput,
   formatDateDisplay,
@@ -93,5 +138,8 @@ export default {
   isPastDate,
   isFutureDate,
   isToday,
-  shortDate
+  shortDate,
+  formatTime,
+  formatFileSize,
+  formatDateShort,
 };

@@ -7,7 +7,8 @@ import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/pagination';
-import TrainingPreviewCard from '@/components/trainings/TrainingPreviewCard';
+import InternalTrainingCard from '@/components/landing/InternalTrainingCard';
+import ExternalTrainingCard from '@/components/landing/ExternalTrainingCard';
 import CarouselSlideContent from '@/components/landing/CarouselSlideContent';
 import useLandingAnnouncements from '@/hooks/useLandingAnnouncements';
 import useLandingTrainings from '@/hooks/useLandingTrainings';
@@ -112,12 +113,11 @@ export default function Landing() {
               No internal trainings are available right now.
             </div>
           ) : (
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-5 md:grid-cols-3">
               {internalTrainings.map((training) => (
-                <TrainingPreviewCard
+                <InternalTrainingCard
                   key={training.id ?? training.training_id ?? training.title}
                   training={training}
-                  variant="internal"
                 />
               ))}
             </div>
@@ -144,12 +144,11 @@ export default function Landing() {
               No external events are available right now.
             </div>
           ) : (
-            <div className="grid gap-5 md:grid-cols-2">
+            <div className="grid gap-5 md:grid-cols-3">
               {externalTrainings.map((training) => (
-                <TrainingPreviewCard
+                <ExternalTrainingCard
                   key={training.id ?? training.training_id ?? training.title}
                   training={training}
-                  variant="external"
                 />
               ))}
             </div>

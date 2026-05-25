@@ -62,7 +62,7 @@ export default function TrainingCard({ training, isAdmin, onEdit, onDelete }) {
         </span>
       </div>
 
-      <div className={cn('gap-3', isExternal && 'grid grid-cols-2')}>
+      <div className={cn('gap-3', isExternal && 'grid grid-cols-3')}>
         <div className="flex items-start gap-2 text-sm">
           <Calendar size={14} className="text-neutral-400 mt-0.5 shrink-0" />
           <div>
@@ -74,15 +74,27 @@ export default function TrainingCard({ training, isAdmin, onEdit, onDelete }) {
         </div>
 
         {isExternal && (
-          <div className="flex items-start gap-2 text-sm">
-            <Calendar size={14} className="text-neutral-400 mt-0.5 shrink-0" />
-            <div>
-              <span className="text-neutral-500 dark:text-neutral-400 block text-xs">Capacity</span>
-              <span className="text-neutral-700 dark:text-neutral-300">
-                {totalSlots ? `${totalSlots} slots` : 'Unlimited'}
-              </span>
+          <>
+            <div className="flex items-start gap-2 text-sm">
+              <Calendar size={14} className="text-neutral-400 mt-0.5 shrink-0" />
+              <div>
+                <span className="text-neutral-500 dark:text-neutral-400 block text-xs">Capacity</span>
+                <span className="text-neutral-700 dark:text-neutral-300">
+                  {totalSlots ? `${totalSlots} slots` : 'Unlimited'}
+                </span>
+              </div>
             </div>
-          </div>
+
+            <div className="flex items-start gap-2 text-sm">
+              <Calendar size={14} className="text-neutral-400 mt-0.5 shrink-0" />
+              <div>
+                <span className="text-neutral-500 dark:text-neutral-400 block text-xs">Squadrons</span>
+                <span className="text-neutral-700 dark:text-neutral-300">
+                  {training.squadron_limits?.length ?? training.squadronLimits?.length ?? 0}
+                </span>
+              </div>
+            </div>
+          </>
         )}
       </div>
 
