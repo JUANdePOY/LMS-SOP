@@ -1,7 +1,7 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import AppLayout from "@/layout/AppLayout";
 import { lazy, Suspense } from "react";
-import { AuthProvider } from "@/contexts/AuthContext";
+
 import { ToastProvider } from "@/components/Toast";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -27,6 +27,10 @@ const ManageArcens      = lazy(() => import("@/pages/airbase/ManageArcens"));
 const ManageGroups      = lazy(() => import("@/pages/airbase/ManageGroups"));
 const ManageSquadrons   = lazy(() => import("@/pages/airbase/ManageSquadrons"));
 
+// RBAC role groups (match server)
+const ADMIN_ROLES = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'];
+const SUPER_ADMIN_ROLES = ['admin'];
+
 function PageLoader() {
   return (
     <div className="flex h-screen items-center justify-center">
@@ -47,6 +51,26 @@ function ProtectedWrapper(Component) {
   return (
     <Suspense fallback={<PageLoader />}>
       <ProtectedRoute>
+        <Component />
+      </ProtectedRoute>
+    </Suspense>
+  );
+}
+
+function AdminProtectedWrapper(Component) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ProtectedRoute allowedRoles={ADMIN_ROLES}>
+        <Component />
+      </ProtectedRoute>
+    </Suspense>
+  );
+}
+
+function SuperAdminProtectedWrapper(Component) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ProtectedRoute allowedRoles={SUPER_ADMIN_ROLES}>
         <Component />
       </ProtectedRoute>
     </Suspense>
@@ -76,29 +100,26 @@ const router = createBrowserRouter([
       </ErrorBoundary>
     ),
     children: [
-      { index: true,           element: ProtectedWrapper(Dashboard)       },
+{ index: true,           element: ProtectedWrapper(Dashboard)       },
       { path: "announcements", element: ProtectedWrapper(Announcements)   },
-      { path: "reservists",    element: ProtectedWrapper(Reservists)      },
+      { path: "reservists",    element: AdminProtectedWrapper(Reservists)      },
       { path: "trainings",     element: ProtectedWrapper(Trainings)       },
       { path: "attendance",    element: ProtectedWrapper(Attendance)      },
       { path: "analytics",     element: ProtectedWrapper(Analytics)       },
-      { path: "logistics",     element: ProtectedWrapper(Logistics)       },
+      { path: "logistics",     element: AdminProtectedWrapper(Logistics)       },
       { path: "alerts",        element: ProtectedWrapper(Alerts)          },
       { path: "reports",     element: ProtectedWrapper(Reports)         },
-      { path: "settings",    element: <ProtectedRoute allowedRoles={['admin']}><Settings /></ProtectedRoute> },
-      { path: "audit-logs",  element: <ProtectedRoute allowedRoles={['admin']}><AuditLogs /></ProtectedRoute> },
-      { path: "airbase",      element: ProtectedWrapper(AirbaseOverview) },
-      { path: "airbase/arcens",   element: ProtectedWrapper(ManageArcens) },
-      { path: "airbase/groups",   element: ProtectedWrapper(ManageGroups) },
-      { path: "airbase/squadrons",element: ProtectedWrapper(ManageSquadrons) },
+      { path: "settings",    element: SuperAdminProtectedWrapper(Settings) },
+      { path: "audit-logs",  element: SuperAdminProtectedWrapper(AuditLogs) },
+      { path: "airbase",      element: AdminProtectedWrapper(AirbaseOverview) },
+      { path: "airbase/arcens",   element: AdminProtectedWrapper(ManageArcens) },
+      { path: "airbase/groups",   element: AdminProtectedWrapper(ManageGroups) },
+      { path: "airbase/squadrons",element: AdminProtectedWrapper(ManageSquadrons) },
+
     ],
   },
 ]);
 
 export default function App() {
-  return (
-    <AuthProvider>
-      <RouterProvider router={router} />
-    </AuthProvider>
-  );
+  return <RouterProvider router={router} />;
 }

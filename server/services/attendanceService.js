@@ -2,7 +2,7 @@ const attendanceModel = require('../models/attendanceModel');
 const trainingModel = require('../models/trainingModel');
 const externalTrainingModel = require('../models/externalTrainingModel');
 
-const VALID_SCAN_METHODS = ['barcode_scanner', 'camera', 'manual'];
+const VALID_SCAN_METHODS = ['qr_scanner', 'camera', 'manual'];
 const VALID_STATUSES = ['present', 'absent', 'late', 'excused', 'pending'];
 const ACTIVE_INTERNAL_STATUSES = ['published', 'ongoing'];
 const ACTIVE_EXTERNAL_STATUSES = ['open', 'closed', 'completed'];
@@ -13,11 +13,11 @@ function createError(message, statusCode) {
   return err;
 }
 
-async function scanBarcodeInternal(trainingId, barcode, scanMethod, facilitatorId, deviceInfo) {
+async function scanQRCodeInternal(trainingId, qrCode, scanMethod, facilitatorId, deviceInfo) {
   const training = await trainingModel.findInternalById(trainingId);
   if (!training) {
     await attendanceModel.logScanAudit({
-      trainingId, eventType: 'internal', barcodeScanned: barcode,
+      trainingId, eventType: 'internal', qrCodeScanned: qrCode,
       scanResult: 'event_inactive', scanMethod, deviceInfo, facilitatorId,
       errorMessage: 'Training not found'
     });
@@ -26,27 +26,27 @@ async function scanBarcodeInternal(trainingId, barcode, scanMethod, facilitatorI
 
   if (!ACTIVE_INTERNAL_STATUSES.includes(training.status)) {
     await attendanceModel.logScanAudit({
-      trainingId, eventType: 'internal', barcodeScanned: barcode,
+      trainingId, eventType: 'internal', qrCodeScanned: qrCode,
       scanResult: 'event_inactive', scanMethod, deviceInfo, facilitatorId,
       errorMessage: `Training status is '${training.status}', scanning not allowed`
     });
     throw createError(`Cannot scan: training status is '${training.status}'`, 400);
   }
 
-  const reservist = await attendanceModel.findReservistByBarcode(barcode);
+  const reservist = await attendanceModel.findReservistByQRCode(qrCode);
   if (!reservist) {
     await attendanceModel.logScanAudit({
-      trainingId, eventType: 'internal', barcodeScanned: barcode,
-      scanResult: 'invalid_barcode', scanMethod, deviceInfo, facilitatorId,
-      errorMessage: 'No reservist found with this barcode'
+      trainingId, eventType: 'internal', qrCodeScanned: qrCode,
+      scanResult: 'invalid_qr_code', scanMethod, deviceInfo, facilitatorId,
+      errorMessage: 'No reservist found with this QR code'
     });
-    throw createError('No reservist found with this barcode', 404);
+    throw createError('No reservist found with this QR code', 404);
   }
 
   const isParticipant = await attendanceModel.isParticipantInInternalTraining(trainingId, reservist.id);
   if (!isParticipant) {
     await attendanceModel.logScanAudit({
-      trainingId, eventType: 'internal', barcodeScanned: barcode, reservistId: reservist.id,
+      trainingId, eventType: 'internal', qrCodeScanned: qrCode, reservistId: reservist.id,
       scanResult: 'not_registered', scanMethod, deviceInfo, facilitatorId,
       errorMessage: `${reservist.rank} ${reservist.first_name} ${reservist.last_name} is not a participant in this training`
     });
@@ -61,7 +61,7 @@ async function scanBarcodeInternal(trainingId, barcode, scanMethod, facilitatorI
   );
 
   await attendanceModel.logScanAudit({
-    trainingId, eventType: 'internal', barcodeScanned: barcode, reservistId: reservist.id,
+    trainingId, eventType: 'internal', qrCodeScanned: qrCode, reservistId: reservist.id,
     scanResult: 'success', scanMethod, deviceInfo, facilitatorId
   });
 
@@ -73,7 +73,7 @@ async function scanBarcodeInternal(trainingId, barcode, scanMethod, facilitatorI
         id: reservist.id,
         name: `${reservist.rank} ${reservist.first_name} ${reservist.last_name}`,
         service_number: reservist.service_number,
-        barcode: reservist.barcode
+        qr_code: reservist.qr_code
       },
       attendance: result,
       scan_method: scanMethod
@@ -81,11 +81,11 @@ async function scanBarcodeInternal(trainingId, barcode, scanMethod, facilitatorI
   };
 }
 
-async function scanBarcodeExternal(externalTrainingId, barcode, scanMethod, facilitatorId, deviceInfo) {
+async function scanQRCodeExternal(externalTrainingId, qrCode, scanMethod, facilitatorId, deviceInfo) {
   const training = await externalTrainingModel.findExternalById(externalTrainingId);
   if (!training) {
     await attendanceModel.logScanAudit({
-      externalTrainingId, eventType: 'external', barcodeScanned: barcode,
+      externalTrainingId, eventType: 'external', qrCodeScanned: qrCode,
       scanResult: 'event_inactive', scanMethod, deviceInfo, facilitatorId,
       errorMessage: 'External training not found'
     });
@@ -94,27 +94,27 @@ async function scanBarcodeExternal(externalTrainingId, barcode, scanMethod, faci
 
   if (!ACTIVE_EXTERNAL_STATUSES.includes(training.status)) {
     await attendanceModel.logScanAudit({
-      externalTrainingId, eventType: 'external', barcodeScanned: barcode,
+      externalTrainingId, eventType: 'external', qrCodeScanned: qrCode,
       scanResult: 'event_inactive', scanMethod, deviceInfo, facilitatorId,
       errorMessage: `Training status is '${training.status}', scanning not allowed`
     });
     throw createError(`Cannot scan: training status is '${training.status}'`, 400);
   }
 
-  const reservist = await attendanceModel.findReservistByBarcode(barcode);
+  const reservist = await attendanceModel.findReservistByQRCode(qrCode);
   if (!reservist) {
     await attendanceModel.logScanAudit({
-      externalTrainingId, eventType: 'external', barcodeScanned: barcode,
-      scanResult: 'invalid_barcode', scanMethod, deviceInfo, facilitatorId,
-      errorMessage: 'No reservist found with this barcode'
+      externalTrainingId, eventType: 'external', qrCodeScanned: qrCode,
+      scanResult: 'invalid_qr_code', scanMethod, deviceInfo, facilitatorId,
+      errorMessage: 'No reservist found with this QR code'
     });
-    throw createError('No reservist found with this barcode', 404);
+    throw createError('No reservist found with this QR code', 404);
   }
 
   const registration = await attendanceModel.isRegisteredForExternalTraining(externalTrainingId, reservist.id);
   if (!registration) {
     await attendanceModel.logScanAudit({
-      externalTrainingId, eventType: 'external', barcodeScanned: barcode, reservistId: reservist.id,
+      externalTrainingId, eventType: 'external', qrCodeScanned: qrCode, reservistId: reservist.id,
       scanResult: 'not_registered', scanMethod, deviceInfo, facilitatorId,
       errorMessage: `${reservist.rank} ${reservist.first_name} ${reservist.last_name} is not registered for this external training`
     });
@@ -129,7 +129,7 @@ async function scanBarcodeExternal(externalTrainingId, barcode, scanMethod, faci
   );
 
   await attendanceModel.logScanAudit({
-    externalTrainingId, eventType: 'external', barcodeScanned: barcode, reservistId: reservist.id,
+    externalTrainingId, eventType: 'external', qrCodeScanned: qrCode, reservistId: reservist.id,
     scanResult: 'success', scanMethod, deviceInfo, facilitatorId
   });
 
@@ -141,7 +141,7 @@ async function scanBarcodeExternal(externalTrainingId, barcode, scanMethod, faci
         id: reservist.id,
         name: `${reservist.rank} ${reservist.first_name} ${reservist.last_name}`,
         service_number: reservist.service_number,
-        barcode: reservist.barcode
+        qr_code: reservist.qr_code
       },
       attendance: result,
       scan_method: scanMethod
@@ -208,7 +208,7 @@ async function getInternalAttendanceList(trainingId) {
       last_name: p.last_name,
       rank: p.rank,
       service_number: p.service_number,
-      barcode: p.barcode,
+      qr_code: p.qr_code,
       squadron_name: p.squadron_name,
       squadron_id: p.squadron_id,
       status: att?.status || 'pending',
@@ -297,8 +297,8 @@ async function getEventStatus(eventType, id) {
 }
 
 module.exports = {
-  scanBarcodeInternal,
-  scanBarcodeExternal,
+  scanQRCodeInternal,
+  scanQRCodeExternal,
   manualCheckInInternal,
   manualCheckInExternal,
   getInternalAttendanceList,

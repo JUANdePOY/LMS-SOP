@@ -2,7 +2,7 @@ const express = require('express');
 const { query, param, body, validationResult } = require('express-validator');
 const attendanceController = require('../controllers/attendanceController');
 const { authenticateToken } = require('../middleware/auth');
-const { authorize } = require('../middleware/rbac');
+const { authorize, requireAdmin } = require('../middleware/rbac');
 const { authorizeFacilitator } = require('../middleware/facilitatorAuth');
 
 const router = express.Router();
@@ -27,8 +27,8 @@ router.post(
   authorizeFacilitator(),
   [
     ...trainingIdParam,
-    body('barcode').trim().notEmpty().withMessage('Barcode is required'),
-    body('scan_method').optional().isIn(['barcode_scanner', 'camera', 'manual']),
+    body('qr_code').trim().notEmpty().withMessage('QR code is required'),
+    body('scan_method').optional().isIn(['qr_scanner', 'camera', 'manual']),
     body('device_info').optional().isString().isLength({ max: 500 }),
   ],
   rejectInvalid,
@@ -41,8 +41,8 @@ router.post(
   authorizeFacilitator(),
   [
     ...externalTrainingIdParam,
-    body('barcode').trim().notEmpty().withMessage('Barcode is required'),
-    body('scan_method').optional().isIn(['barcode_scanner', 'camera', 'manual']),
+    body('qr_code').trim().notEmpty().withMessage('QR code is required'),
+    body('scan_method').optional().isIn(['qr_scanner', 'camera', 'manual']),
     body('device_info').optional().isString().isLength({ max: 500 }),
   ],
   rejectInvalid,
@@ -154,7 +154,7 @@ router.get(
 router.post(
   '/facilitators',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [
     body('user_id').isInt({ min: 1 }).withMessage('user_id is required'),
     body('training_id').optional().isInt({ min: 1 }),
@@ -167,7 +167,7 @@ router.post(
 router.get(
   '/facilitators',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [
     query('training_id').optional().isInt({ min: 1 }),
     query('external_training_id').optional().isInt({ min: 1 }),

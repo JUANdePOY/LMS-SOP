@@ -167,6 +167,8 @@ export default function ManageSquadrons() {
         setDetail(null);
       }
     } catch (err) {
+      const msg = err?.response?.data?.message || err.message || 'Failed to delete squadron';
+      alert(msg);
       console.error('Failed to delete squadron:', err);
     }
   };

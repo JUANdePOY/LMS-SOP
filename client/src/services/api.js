@@ -151,4 +151,8 @@ export const createAlert = (data) => api.post('/alerts', data);
 export const markAlertRead = (id) => api.patch(`/alerts/${id}/read`);
 export const getAlertsInsights = () => api.get('/alerts/insights');
 
+// Map
+export const getMapSquadrons = (params = {}) => api.get('/map/squadrons', { params });
+export const getMapSummary = () => api.get('/map/summary');
+
 export default api;

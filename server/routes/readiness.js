@@ -3,6 +3,7 @@ const router = express.Router();
 const { query, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const { getUserScopeFilter } = require('../middleware/rbac');
 
 /**
  * GET /api/readiness
@@ -10,7 +11,16 @@ const { authenticateToken } = require('../middleware/auth');
  */
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT * FROM v_overall_readiness');
+    let scopeWhere = '';
+    let scopeParams = [];
+    if (req.user.role !== 'admin') {
+      const { conditions, params } = getUserScopeFilter(req.user);
+      if (conditions.length > 0) {
+        scopeWhere = ' AND (' + conditions.map(c => c.replace('squadron_id', 'vr.squadron_id').replace('group_id', 'vr.group_id').replace('arsen_id', 'vr.arsen_id')).join(' OR ') + ')';
+        scopeParams = params;
+      }
+    }
+    const [rows] = await db.query(`SELECT * FROM v_overall_readiness vr WHERE 1=1 ${scopeWhere}`, scopeParams);
     const summary = rows[0] || {
       total_reservists: 0, active_reservists: 0, avg_readiness_score: 0,
       avg_training_participation: 0, avg_attendance_rate: 0, avg_active_status: 0,
@@ -58,6 +68,27 @@ router.get('/reservists', [
     if (squadron_id) { conditions.push('vr.squadron_id = ?'); params.push(squadron_id); }
     if (group_id) { conditions.push('vr.group_id = ?'); params.push(group_id); }
     if (arsen_id) { conditions.push('vr.arsen_id = ?'); params.push(arsen_id); }
+
+    // For unit admins, enforce scope - ignore user-provided scope filters
+    if (req.user.role !== 'admin') {
+      const { conditions: scopeConds, params: scopeP } = getUserScopeFilter(req.user);
+      if (scopeConds.length > 0) {
+        // Remove user-provided scope params and enforce admin's scope
+        const nonScopeConditions = conditions.filter(c => !c.includes('vr.squadron_id') && !c.includes('vr.group_id') && !c.includes('vr.arsen_id'));
+        const nonScopeParams = params.slice(0, nonScopeConditions.length);
+        conditions.length = 0;
+        params.length = 0;
+        scopeConds.forEach((c, i) => { conditions.push('vr.' + c); params.push(scopeP[i]); });
+        nonScopeConditions.forEach((c, i) => { conditions.push(c); params.push(nonScopeParams[i]); });
+        if (is_active !== undefined) { conditions.push('vr.is_active = ?'); params.push(is_active); }
+        if (search) {
+          conditions.push('(vr.first_name LIKE ? OR vr.last_name LIKE ? OR vr.service_number LIKE ? OR vr.`rank` LIKE ?)');
+          const s = `%${search}%`;
+          params.push(s, s, s, s);
+        }
+      }
+    }
+
     if (is_active !== undefined) { conditions.push('vr.is_active = ?'); params.push(is_active); }
     if (search) {
       conditions.push('(vr.first_name LIKE ? OR vr.last_name LIKE ? OR vr.service_number LIKE ? OR vr.`rank` LIKE ?)');
@@ -151,8 +182,16 @@ router.get('/squadrons', [
     const conditions = [];
     const params = [];
 
-    if (group_id) { conditions.push('sr.group_id = ?'); params.push(group_id); }
-    if (arsen_id) { conditions.push('sr.arsen_id = ?'); params.push(arsen_id); }
+    // For unit admins, enforce scope
+    if (req.user.role !== 'admin') {
+      const { conditions: scopeConds, params: scopeP } = getUserScopeFilter(req.user);
+      if (scopeConds.length > 0) {
+        scopeConds.forEach((c, i) => { conditions.push('sr.' + c); params.push(scopeP[i]); });
+      }
+    } else {
+      if (group_id) { conditions.push('sr.group_id = ?'); params.push(group_id); }
+      if (arsen_id) { conditions.push('sr.arsen_id = ?'); params.push(arsen_id); }
+    }
 
     const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
@@ -181,7 +220,15 @@ router.get('/groups', [
     const conditions = [];
     const params = [];
 
-    if (arsen_id) { conditions.push('gr.arsen_id = ?'); params.push(arsen_id); }
+    // For unit admins, enforce scope
+    if (req.user.role !== 'admin') {
+      const { conditions: scopeConds, params: scopeP } = getUserScopeFilter(req.user);
+      if (scopeConds.length > 0) {
+        scopeConds.forEach((c, i) => { conditions.push('gr.' + c); params.push(scopeP[i]); });
+      }
+    } else {
+      if (arsen_id) { conditions.push('gr.arsen_id = ?'); params.push(arsen_id); }
+    }
 
     const where = conditions.length > 0 ? 'WHERE ' + conditions.join(' AND ') : '';
 
@@ -203,9 +250,20 @@ router.get('/groups', [
  */
 router.get('/arsens', authenticateToken, async (req, res) => {
   try {
-    const [rows] = await db.query(
-      'SELECT * FROM v_arsen_readiness ORDER BY avg_readiness_score DESC'
-    );
+    let sql;
+    let params = [];
+    if (req.user.role !== 'admin') {
+      const { conditions, params: scopeP } = getUserScopeFilter(req.user);
+      if (conditions.length > 0) {
+        sql = `SELECT * FROM v_arsen_readiness WHERE ${conditions.map(c => c.replace('arsen_id', 'arsen_id')).join(' OR ')} ORDER BY avg_readiness_score DESC`;
+        params = scopeP;
+      } else {
+        sql = 'SELECT * FROM v_arsen_readiness ORDER BY avg_readiness_score DESC';
+      }
+    } else {
+      sql = 'SELECT * FROM v_arsen_readiness ORDER BY avg_readiness_score DESC';
+    }
+    const [rows] = await db.query(sql, params);
     res.json({ status: 'success', data: rows });
   } catch (error) {
     console.error('Error fetching arsen readiness:', error);
@@ -303,14 +361,20 @@ router.get('/trend', [
     const params = [];
 
     if (reservist_id) { conditions.push('a.reservist_id = ?'); params.push(reservist_id); }
-    if (squadron_id) {
-      conditions.push('ra.squadron_id = ?');
-      params.push(squadron_id);
-    }
-    if (group_id) { conditions.push('ra.group_id = ?'); params.push(group_id); }
-    if (arsen_id) {
-      conditions.push('g.arsen_id = ?');
-      params.push(arsen_id);
+
+    // For unit admins, enforce scope - ignore user-provided scope filters
+    if (req.user.role !== 'admin') {
+      const { conditions: scopeConds, params: scopeP } = getUserScopeFilter(req.user);
+      if (scopeConds.length > 0) {
+        scopeConds.forEach((c, i) => {
+          conditions.push(c.replace('squadron_id', 'ra.squadron_id').replace('group_id', 'ra.group_id').replace('arsen_id', 'g.arsen_id'));
+          params.push(scopeP[i]);
+        });
+      }
+    } else {
+      if (squadron_id) { conditions.push('ra.squadron_id = ?'); params.push(squadron_id); }
+      if (group_id) { conditions.push('ra.group_id = ?'); params.push(group_id); }
+      if (arsen_id) { conditions.push('g.arsen_id = ?'); params.push(arsen_id); }
     }
 
     const joinAssignment = reservist_id ? '' : `

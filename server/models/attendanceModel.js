@@ -1,18 +1,18 @@
 const pool = require('../config/database');
 
-async function findReservistByBarcode(barcode) {
+async function findReservistByQRCode(qrCode) {
   const [rows] = await pool.query(
-    `SELECT r.id, r.first_name, r.last_name, r.rank, r.service_number, r.barcode, r.user_id
+    `SELECT r.id, r.first_name, r.last_name, r.rank, r.service_number, r.qr_code, r.user_id
      FROM reservists r
-     WHERE r.barcode = ? AND r.is_active = TRUE`,
-    [barcode]
+     WHERE r.qr_code = ? AND r.is_active = TRUE`,
+    [qrCode]
   );
   return rows[0] || null;
 }
 
 async function findReservistByServiceNumber(serviceNumber) {
   const [rows] = await pool.query(
-    `SELECT r.id, r.first_name, r.last_name, r.rank, r.service_number, r.barcode, r.user_id
+    `SELECT r.id, r.first_name, r.last_name, r.rank, r.service_number, r.qr_code, r.user_id
      FROM reservists r
      WHERE r.service_number = ? AND r.is_active = TRUE`,
     [serviceNumber]
@@ -43,7 +43,7 @@ async function isRegisteredForExternalTraining(externalTrainingId, reservistId) 
 
 async function getInternalTrainingParticipantIds(trainingId) {
   const [rows] = await pool.query(
-    `SELECT itp.reservist_id, r.first_name, r.last_name, r.rank, r.service_number, r.barcode,
+    `SELECT itp.reservist_id, r.first_name, r.last_name, r.rank, r.service_number, r.qr_code,
             s.name AS squadron_name, s.id AS squadron_id
      FROM internal_training_participants itp
      INNER JOIN reservists r ON r.id = itp.reservist_id
@@ -58,7 +58,7 @@ async function getInternalTrainingParticipantIds(trainingId) {
 async function getExternalTrainingRegistrations(externalTrainingId) {
   const [rows] = await pool.query(
     `SELECT tr.id AS registration_id, tr.participant_data, tr.registered_at,
-            r.id AS reservist_id, r.first_name, r.last_name, r.rank, r.service_number, r.barcode
+            r.id AS reservist_id, r.first_name, r.last_name, r.rank, r.service_number, r.qr_code
      FROM training_registrations tr
      LEFT JOIN reservists r ON r.id = tr.reservist_id
      WHERE tr.training_id = ?
@@ -134,16 +134,16 @@ async function upsertExternalAttendance(externalTrainingId, registrationId, rese
 
 async function logScanAudit(data) {
   const {
-    trainingId, externalTrainingId, eventType, barcodeScanned, reservistId,
+    trainingId, externalTrainingId, eventType, qrCodeScanned, reservistId,
     scanResult, scanMethod, deviceInfo, facilitatorId, errorMessage
   } = data;
 
   await pool.query(
     `INSERT INTO scan_audit_log
-      (training_id, external_training_id, event_type, barcode_scanned, reservist_id,
+      (training_id, external_training_id, event_type, qr_code_scanned, reservist_id,
        scan_result, scan_method, device_info, facilitator_id, error_message)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [trainingId, externalTrainingId, eventType, barcodeScanned, reservistId,
+    [trainingId, externalTrainingId, eventType, qrCodeScanned, reservistId,
      scanResult, scanMethod, deviceInfo, facilitatorId, errorMessage]
   );
 }
@@ -152,7 +152,7 @@ async function getAttendanceByInternalTraining(trainingId) {
   const [rows] = await pool.query(
     `SELECT a.id, a.reservist_id, a.training_id, a.status, a.check_in_time, a.check_out_time,
             a.scan_method, a.scan_timestamp, a.notes, a.recorded_by, a.created_at, a.updated_at,
-            r.first_name, r.last_name, r.rank, r.service_number, r.barcode,
+            r.first_name, r.last_name, r.rank, r.service_number, r.qr_code,
             s.name AS squadron_name, s.id AS squadron_id
      FROM attendance a
      INNER JOIN reservists r ON r.id = a.reservist_id
@@ -169,9 +169,9 @@ async function getAttendanceByExternalTraining(externalTrainingId) {
   const [rows] = await pool.query(
     `SELECT eta.id, eta.external_training_id, eta.registration_id, eta.reservist_id,
             eta.participant_name, eta.participant_data, eta.status, eta.check_in_time,
-            eta.check_out_time, eta.scan_method, eta.barcode_scanned, eta.notes,
+            eta.check_out_time, eta.scan_method, eta.qr_code_scanned, eta.notes,
             eta.recorded_by, eta.created_at, eta.updated_at,
-            r.first_name, r.last_name, r.rank, r.service_number, r.barcode
+            r.first_name, r.last_name, r.rank, r.service_number, r.qr_code
      FROM external_training_attendance eta
      LEFT JOIN reservists r ON r.id = eta.reservist_id
      WHERE eta.external_training_id = ?
@@ -416,7 +416,7 @@ async function getEventStatus(eventType, id) {
 
 module.exports = {
   pool,
-  findReservistByBarcode,
+  findReservistByQRCode,
   findReservistByServiceNumber,
   isParticipantInInternalTraining,
   isRegisteredForExternalTraining,

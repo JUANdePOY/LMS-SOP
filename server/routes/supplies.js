@@ -2,7 +2,7 @@ const express = require('express');
 const { body, param, query, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
-const { authorize } = require('../middleware/rbac');
+const { authorize, requireAdmin } = require('../middleware/rbac');
 const { logAudit } = require('../utils/auditLogger');
 
 const router = express.Router();
@@ -141,7 +141,7 @@ router.get('/:id', authenticateToken, [
 /**
  * POST /api/supplies
  */
-router.post('/', authenticateToken, authorize('admin'), [
+router.post('/', authenticateToken, requireAdmin, [
     body('name').notEmpty().trim().withMessage('Name is required'),
     body('category').notEmpty().trim().withMessage('Category is required'),
     body('unit').notEmpty().trim().withMessage('Unit is required'),
@@ -178,7 +178,7 @@ router.post('/', authenticateToken, authorize('admin'), [
 /**
  * PUT /api/supplies/:id
  */
-router.put('/:id', authenticateToken, authorize('admin'), [
+router.put('/:id', authenticateToken, requireAdmin, [
     param('id').isInt({ min: 1 }).withMessage('Valid supply ID is required'),
     body('name').optional().notEmpty().trim(),
     body('category').optional().notEmpty().trim(),
@@ -236,7 +236,7 @@ router.put('/:id', authenticateToken, authorize('admin'), [
 /**
  * POST /api/supplies/adjust-stock
  */
-router.post('/adjust-stock', authenticateToken, authorize('admin'), [
+router.post('/adjust-stock', authenticateToken, requireAdmin, [
     body('supply_id').isInt({ min: 1 }).withMessage('Valid supply ID is required'),
     body('quantity_change').isInt().withMessage('Quantity change is required (positive or negative)'),
     body('reason').notEmpty().trim().withMessage('Reason for adjustment is required')
@@ -275,7 +275,7 @@ router.post('/adjust-stock', authenticateToken, authorize('admin'), [
 /**
  * DELETE /api/supplies/:id
  */
-router.delete('/:id', authenticateToken, authorize('admin'), [
+router.delete('/:id', authenticateToken, requireAdmin, [
     param('id').isInt({ min: 1 }).withMessage('Valid supply ID is required')
 ], async (req, res) => {
     try {

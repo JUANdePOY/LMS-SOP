@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, query, param, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { getUserScopeFilter } = require('../middleware/rbac');
 const { logAudit } = require('../utils/auditLogger');
 
 // Validation middleware
@@ -49,6 +50,18 @@ router.get('/', [
     if (arsen_id) {
       whereConditions.push('g.arsen_id = ?');
       queryParams.push(arsen_id);
+    }
+
+    // For unit admins, enforce scope (override user-provided arsen_id)
+    if (req.user.role !== 'admin') {
+      const { conditions, params: scopeP } = getUserScopeFilter(req.user, { group: 'g.id', arsen: 'g.arsen_id' });
+      if (conditions.length > 0) {
+        // Remove user-provided arsen_id filter
+        const idx = whereConditions.findIndex(w => w.includes('g.arsen_id'));
+        if (idx >= 0) { whereConditions.splice(idx, 1); queryParams.splice(idx, 1); }
+        whereConditions.push('(' + conditions.join(' OR ') + ')');
+        queryParams.push(...scopeP);
+      }
     }
 
     if (is_active !== undefined) {
@@ -373,14 +386,22 @@ router.delete('/:id', validateId, authenticateToken, requireAdmin, async (req, r
       });
     }
 
-    // Get current group for audit
-    const [currentGroup] = await db.query('SELECT * FROM `groups` WHERE id = ? AND is_active = TRUE', [req.params.id]);
+    // Get current group (allow already-inactive for idempotent delete)
+    const [currentGroup] = await db.query('SELECT * FROM `groups` WHERE id = ?', [req.params.id]);
 
     if (currentGroup.length === 0) {
       return res.status(404).json({
         status: 'error',
-        message: 'Group not found or already inactive',
+        message: 'Group not found',
         code: 'NOT_FOUND'
+      });
+    }
+
+    // Idempotent: if already soft-deleted, treat as success
+    if (!currentGroup[0].is_active) {
+      return res.json({
+        status: 'success',
+        message: 'Group was already deactivated'
       });
     }
 

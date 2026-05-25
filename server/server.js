@@ -33,6 +33,7 @@ const dashboardRoutes = require('./routes/dashboard');
 const assignmentsRoutes = require('./routes/assignments');
 const hierarchyRoutes = require('./routes/hierarchy');
 const announcementsRoutes = require('./routes/announcements');
+const mapRoutes = require('./routes/map');
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -55,6 +56,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/assignments', assignmentsRoutes);
 app.use('/api/hierarchy', hierarchyRoutes);
 app.use('/api/announcements', announcementsRoutes);
+app.use('/api/map', mapRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

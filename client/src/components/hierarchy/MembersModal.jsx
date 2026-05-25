@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import {
   X, Users, Search, ChevronUp, ChevronDown, ChevronsUpDown,
-  CheckCircle2, XCircle, Shield, Layers, MapPin, Tag,
+  CheckCircle2, XCircle, Shield, Layers, MapPin, Tag, Loader,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getReservists } from "@/services/api";
 
 // ── Status badge ──────────────────────────────────────────────
 function StatusBadge({ status }) {
@@ -96,6 +97,11 @@ export default function MembersModal({ open, node, nodeType, onClose }) {
   const [sortDir,   setSortDir]  = useState("asc");
   const [statusFilter, setStatusFilter] = useState("");
 
+  // Real data for squadron nodes (from /api/reservists)
+  const [realMembers, setRealMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [fetchError, setFetchError] = useState(null);
+
   // Close on Escape
   useEffect(() => {
     if (!open) return;
@@ -113,9 +119,58 @@ export default function MembersModal({ open, node, nodeType, onClose }) {
   // Reset search/filter when node changes
   useEffect(() => { setSearch(""); setStatusFilter(""); }, [node]);
 
+  // Fetch real reservists for squadron nodes from hierarchy
+  useEffect(() => {
+    if (!open || !node) {
+      setRealMembers([]);
+      setFetchError(null);
+      return;
+    }
+
+    let squadronDbId = null;
+    const idStr = String(node.id || node.squadron_id || '');
+    if (idStr.startsWith('sq-')) {
+      squadronDbId = parseInt(idStr.slice(3), 10);
+    } else if (nodeType === 'squadron' && !isNaN(parseInt(node.id))) {
+      squadronDbId = parseInt(node.id, 10);
+    }
+
+    if (nodeType === 'squadron' && squadronDbId) {
+      const load = async () => {
+        setLoadingMembers(true);
+        setFetchError(null);
+        try {
+          const res = await getReservists({ squadron_id: squadronDbId, limit: 100 });
+          const rows = res.data?.data || [];
+          const mapped = rows.map((r) => ({
+            id: r.id,
+            serialNo: r.service_number || `RES-${r.id}`,
+            firstName: r.first_name || '',
+            lastName: r.last_name || '',
+            rank: r.rank || '',
+            specialization: r.specialization || r.position || '',
+            status: r.is_active ? 'active' : 'inactive',
+            dateEnlisted: r.date_enlisted || '',
+            attendanceRate: 65 + ((r.id || 0) % 30), // placeholder (real attendance in separate endpoint)
+          }));
+          setRealMembers(mapped);
+        } catch (err) {
+          setFetchError(err.response?.data?.message || 'Failed to load squadron reservists');
+          setRealMembers([]);
+        } finally {
+          setLoadingMembers(false);
+        }
+      };
+      load();
+    } else {
+      setRealMembers([]);
+    }
+  }, [open, node, nodeType]);
+
   if (!open || !node) return null;
 
-  const members = generateMembers(node, nodeType);
+  const isSquadronNode = nodeType === 'squadron' && realMembers.length > 0;
+  const members = isSquadronNode ? realMembers : generateMembers(node, nodeType);
   const ctx     = contextLabel(nodeType, node);
   const CtxIcon = ctx.icon;
 
@@ -258,6 +313,17 @@ export default function MembersModal({ open, node, nodeType, onClose }) {
           </span>
         </div>
 
+        {loadingMembers && (
+          <div className="px-6 py-2 text-xs text-indigo-600 dark:text-indigo-400 flex items-center gap-2 border-b border-neutral-100 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60">
+            <Loader size={12} className="animate-spin" /> Loading actual reservists from database…
+          </div>
+        )}
+        {fetchError && (
+          <div className="px-6 py-1.5 text-xs text-red-600 dark:text-red-400 border-b border-neutral-100 dark:border-neutral-800 bg-red-50 dark:bg-red-950/30">
+            {fetchError} (demo data shown)
+          </div>
+        )}
+
         {/* ── Table ────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto styled-scroll">
           <table className="w-full text-sm">
@@ -283,10 +349,16 @@ export default function MembersModal({ open, node, nodeType, onClose }) {
             </thead>
 
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/60 bg-white dark:bg-neutral-900">
-              {sorted.length === 0 ? (
+              {loadingMembers ? (
                 <tr>
                   <td colSpan={COLS.length + 1} className="py-12 text-center text-sm text-neutral-400">
-                    No members match your search.
+                    Loading reservists…
+                  </td>
+                </tr>
+              ) : sorted.length === 0 ? (
+                <tr>
+                  <td colSpan={COLS.length + 1} className="py-12 text-center text-sm text-neutral-400">
+                    {fetchError ? 'Failed to load data.' : 'No members match your search.'}
                   </td>
                 </tr>
               ) : (

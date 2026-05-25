@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, Keyboard, ScanLine, X, AlertCircle, CheckCircle2, Loader, SwitchCamera } from 'lucide-react';
+import { Camera, Keyboard, ScanLine, QrCode, X, AlertCircle, CheckCircle2, Loader } from 'lucide-react';
 
-export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 'barcode_scanner', disabled = false }) {
+export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 'qr_scanner', disabled = false }) {
   const [scanMethod, setScanMethod] = useState(initialMethod);
   const [manualInput, setManualInput] = useState('');
   const [scanning, setScanning] = useState(false);
@@ -19,13 +19,13 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
   const scanIntervalRef = useRef(null);
   const codeReaderRef = useRef(null);
 
-  const handleScan = useCallback(async (barcode) => {
-    if (!barcode || scanning || disabled) return;
+  const handleScan = useCallback(async (qrCode) => {
+    if (!qrCode || scanning || disabled) return;
     setScanning(true);
     setError(null);
     setLastResult(null);
     try {
-      const result = await onScan(barcode.trim(), scanMethod);
+      const result = await onScan(qrCode.trim(), scanMethod);
       const scanResult = { success: true, message: result?.message || 'Scan successful', data: result, timestamp: Date.now() };
       setLastResult(scanResult);
       setRecentScans(prev => [scanResult, ...prev].slice(0, 10));
@@ -42,7 +42,7 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
   }, [onScan, scanMethod, scanning, disabled]);
 
   useEffect(() => {
-    if (scanMethod === 'barcode_scanner' && !disabled) {
+    if (scanMethod === 'qr_scanner' && !disabled) {
       const handleKeyDown = (e) => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         if (bufferTimerRef.current) clearTimeout(bufferTimerRef.current);
@@ -123,7 +123,7 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
           }
         }, 250);
       } catch (libErr) {
-        setCameraError('Camera barcode scanning requires @zxing/library. Install it with: npm install @zxing/library');
+        setCameraError('Camera QR code scanning requires @zxing/library. Install it with: npm install @zxing/library');
         setCameraActive(false);
         stopCamera();
       }
@@ -161,16 +161,16 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => setScanMethod('barcode_scanner')}
+          onClick={() => setScanMethod('qr_scanner')}
           className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all ${
-            scanMethod === 'barcode_scanner'
+            scanMethod === 'qr_scanner'
               ? 'bg-indigo-600 text-white shadow-md'
               : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
           } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
           disabled={disabled}
         >
-          <ScanLine className="h-4 w-4" />
-          Barcode Scanner
+          <QrCode className="h-4 w-4" />
+          QR Scanner
         </button>
         <button
           type="button"
@@ -200,14 +200,14 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
         </button>
       </div>
 
-      {scanMethod === 'barcode_scanner' && (
+      {scanMethod === 'qr_scanner' && (
         <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-neutral-300 dark:border-neutral-600 rounded-xl bg-neutral-50 dark:bg-neutral-900/50">
-          <ScanLine className="h-12 w-12 text-indigo-400 mb-3" />
+          <QrCode className="h-12 w-12 text-indigo-400 mb-3" />
           <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">
             Ready to scan
           </p>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-            Point barcode scanner at reservist ID badge
+            Point QR scanner at reservist ID badge
           </p>
           {scanning && (
             <Loader className="h-6 w-6 text-indigo-500 animate-spin mt-3" />
@@ -244,7 +244,7 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
               <canvas ref={canvasRef} className="hidden" />
               {cameraActive && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-48 h-32 border-2 border-indigo-400 rounded-lg relative">
+                  <div className="w-48 h-48 border-2 border-indigo-400 rounded-lg relative">
                     <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-indigo-500 rounded-tl-lg" />
                     <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-indigo-500 rounded-tr-lg" />
                     <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-indigo-500 rounded-bl-lg" />
@@ -262,7 +262,7 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
           )}
           {cameraActive && (
             <p className="text-xs text-center text-neutral-500 dark:text-neutral-400">
-              Position barcode within the frame. Scanning happens automatically.
+              Position QR code within the frame. Scanning happens automatically.
             </p>
           )}
         </div>
@@ -275,7 +275,7 @@ export default function AttendanceScanner({ onScan, scanMethod: initialMethod = 
             type="text"
             value={manualInput}
             onChange={(e) => setManualInput(e.target.value)}
-            placeholder="Enter barcode or service number..."
+            placeholder="Enter QR code or service number..."
             className="flex-1 px-4 py-2.5 text-sm bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg text-neutral-900 dark:text-neutral-100 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
             disabled={scanning || disabled}
             autoFocus

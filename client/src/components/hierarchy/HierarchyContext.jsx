@@ -12,6 +12,7 @@ export function HierarchyProvider({ children }) {
   const [expandedArcenId,  setExpandedArcenId]  = useState(null);
   const [expandedGroupId,  setExpandedGroupId]  = useState(null);
   const [selectedSquadron, setSelectedSquadron] = useState(null);
+  const [modalSquadron,    setModalSquadron]    = useState(null);
 
   /** Toggle an Area. Collapses ARCEN/Group/Squadron when switching. */
   const toggleArea = useCallback((id) => {
@@ -64,12 +65,23 @@ export function HierarchyProvider({ children }) {
     );
   }, []);
 
+  /** Open the members modal for a specific squadron. */
+  const openMembersModal = useCallback((squadron) => {
+    setModalSquadron(squadron);
+  }, []);
+
+  /** Close the members modal. */
+  const closeMembersModal = useCallback(() => {
+    setModalSquadron(null);
+  }, []);
+
   /** Reset entire hierarchy. */
   const resetAll = useCallback(() => {
     setExpandedAreaId(null);
     setExpandedArcenId(null);
     setExpandedGroupId(null);
     setSelectedSquadron(null);
+    setModalSquadron(null);
   }, []);
 
   return (
@@ -78,6 +90,9 @@ export function HierarchyProvider({ children }) {
       expandedArcenId,
       expandedGroupId,
       selectedSquadron,
+      modalSquadron,
+      openMembersModal,
+      closeMembersModal,
       toggleArea,
       toggleArcen,
       toggleGroup,

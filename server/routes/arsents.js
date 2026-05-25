@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, query, param, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { getUserScopeFilter } = require('../middleware/rbac');
 const { logAudit } = require('../utils/auditLogger');
 
 // Validation middleware
@@ -53,6 +54,15 @@ router.get('/', [
     if (search) {
       whereConditions.push('(a.code LIKE ? OR a.name LIKE ? OR a.location LIKE ?)');
       queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    }
+
+    // For unit admins, enforce scope
+    if (req.user.role !== 'admin') {
+      const { conditions, params: scopeP } = getUserScopeFilter(req.user, { arsen: 'a.id' });
+      if (conditions.length > 0) {
+        whereConditions.push('(' + conditions.join(' OR ') + ')');
+        queryParams.push(...scopeP);
+      }
     }
 
     const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';

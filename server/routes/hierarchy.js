@@ -3,6 +3,7 @@ const router = express.Router();
 const { query, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
+const { getUserScopeFilter } = require('../middleware/rbac');
 
 /**
  * GET /api/hierarchy
@@ -37,6 +38,15 @@ router.get('/', [
     let arsensParams = [];
     if (activeOnly) {
       arsensWhere = 'WHERE a.is_active = TRUE';
+    }
+
+    // For unit admins, enforce scope
+    if (req.user.role !== 'admin') {
+      const { conditions, params: scopeP } = getUserScopeFilter(req.user, { arsen: 'a.id' });
+      if (conditions.length > 0) {
+        arsensWhere = 'WHERE (' + conditions.join(' OR ') + ')';
+        arsensParams = scopeP;
+      }
     }
 
     const [arsens] = await db.query(`

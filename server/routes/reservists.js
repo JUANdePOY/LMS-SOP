@@ -2,10 +2,35 @@ const express = require('express');
 const { body, validationResult, query } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { getUserScopeFilter } = require('../middleware/rbac');
 const { hashPassword, generateResetToken } = require('../app/auth');
 const { logAudit } = require('../utils/auditLogger');
+const crypto = require('crypto');
 
 const router = express.Router();
+
+// Helper: Generate unique reservist QR code (e.g. RES- followed by 12 hex chars)
+// Uses 8 bytes (16 hex chars) to minimize collision risk with UNIQUE constraint
+function generateUniqueQRCode() {
+  return `RES-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+}
+
+// Helper: Parse Excel date (serial number) or string to MySQL date format
+function parseExcelDate(value) {
+  if (!value) return null;
+  // Excel serial date (number)
+  if (typeof value === 'number') {
+    const date = new Date((value - 25569) * 86400 * 1000);
+    if (isNaN(date.getTime())) return null;
+    return date.toISOString().split('T')[0];
+  }
+  // String date - try to parse
+  const str = String(value).trim();
+  if (!str) return null;
+  const date = new Date(str);
+  if (isNaN(date.getTime())) return null;
+  return date.toISOString().split('T')[0];
+}
 
 // Helper: Get client IP
 const getClientIp = (req) => {
@@ -100,6 +125,17 @@ router.get(
         });
       }
 
+      // Apply scope filter for unit admins
+      let scopeWhere = '';
+      let scopeParams = [];
+      if (req.user.role !== 'admin') {
+        const { conditions, params } = getUserScopeFilter(req.user);
+        if (conditions.length > 0) {
+          scopeWhere = ' AND (' + conditions.join(' OR ') + ')';
+          scopeParams = params;
+        }
+      }
+
       // Validate query params
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -112,19 +148,20 @@ router.get(
 
       const filter = buildFilterQuery(req.query);
 
-const countQuery = `
+      const countQuery = `
          SELECT COUNT(DISTINCT r.id) as total
          FROM reservists r
          LEFT JOIN users u ON r.user_id = u.id
          LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id
          ${filter.whereClause}
+         ${scopeWhere}
        `;
 
-       const [countResult] = await db.query(countQuery, filter.params);
+       const [countResult] = await db.query(countQuery, [...filter.params, ...scopeParams]);
        const total = countResult[0].total;
 
         // Fetch paginated records
-const query = `
+       const query_str = `
            SELECT 
              r.id, r.user_id, r.first_name, r.last_name, r.rank, 
              r.service_number, r.position, r.date_of_birth, r.place_of_birth,
@@ -148,12 +185,13 @@ const query = `
           LEFT JOIN arsens a ON g.arsen_id = a.id
           LEFT JOIN squadron s ON ra.squadron_id = s.id
           ${filter.whereClause}
+          ${scopeWhere}
           ORDER BY r.${sortBy} ${sortOrder}
           LIMIT ? OFFSET ?
         `;
 
-      const params = [...filter.params, limit, offset];
-      const [rows] = await db.query(query, params);
+       const params = [...filter.params, ...scopeParams, limit, offset];
+    const [rows] = await db.query(query_str, params);
 
       res.json({
         status: 'success',
@@ -193,7 +231,26 @@ router.get('/:id', authenticateToken, async (req, res) => {
       });
     }
 
-const query = `
+    // For unit admins, verify the reservist is within their scope
+    if (req.user.role !== 'admin' && req.user.role !== 'reservist') {
+      const [scopeCheck] = await db.query(`
+        SELECT r.id FROM reservists r
+        LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+        LEFT JOIN \`groups\` g ON ra.group_id = g.id
+        WHERE r.id = ? AND (
+          ra.squadron_id = ? OR ra.group_id = ? OR g.arsen_id = ?
+        )
+      `, [id, req.user.scope_squadron_id, req.user.scope_group_id, req.user.scope_arsen_id]);
+      if (scopeCheck.length === 0) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Access denied - reservist is outside your scope',
+          code: 'OUT_OF_SCOPE'
+        });
+      }
+    }
+
+    const query_str = `
       SELECT 
         r.*, u.email, u.role, u.is_active as user_active,
         ra.id as assignment_id, ra.group_id, ra.squadron_id, ra.assigned_date,
@@ -328,8 +385,9 @@ body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Ret
         }
       }
 
-      // Hash password
-      const hashedPassword = await hashPassword(password);
+      // Hash password — use service_number as default if password is empty
+      const passwordToUse = password || service_number;
+      const hashedPassword = await hashPassword(passwordToUse);
 
       // Start transaction
       const connection = await db.getConnection();
@@ -381,9 +439,10 @@ body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Ret
            basic_training_date: basic_training_date || null,
            emergency_contact_name: emergency_contact_name || null,
            emergency_contact_phone: emergency_contact_phone || null,
-           emergency_contact_address: emergency_contact_address || null,
-           ...otherFields
-         };
+            emergency_contact_address: emergency_contact_address || null,
+             ...otherFields,
+             qr_code: generateUniqueQRCode()
+          };
 
         const columns = Object.keys(reservistData).map(col => `\`${col}\``);
         const values = Object.values(reservistData);
@@ -889,7 +948,7 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
       });
     }
 
-let query = `
+    let query_str = `
        SELECT 
          r.id, r.first_name, r.last_name, r.rank, r.service_number,
          r.position, r.date_of_birth, r.sex, r.phone_number, r.reserve_status,
@@ -906,17 +965,26 @@ let query = `
 
     const params = [];
 
+    // Apply scope filter for unit admins
+    if (req.user.role !== 'admin') {
+      const { conditions, params: scopeParams } = getUserScopeFilter(req.user);
+      if (conditions.length > 0) {
+        query_str += ' AND (' + conditions.join(' OR ') + ')';
+        params.push(...scopeParams);
+      }
+    }
+
     if (group_id) {
-      query += ' AND ra.group_id = ?';
+      query_str += ' AND ra.group_id = ?';
       params.push(group_id);
     }
 
     if (squadron_id) {
-      query += ' AND ra.squadron_id = ?';
+      query_str += ' AND ra.squadron_id = ?';
       params.push(squadron_id);
     }
 
-    query += ' ORDER BY r.last_name, r.first_name';
+    query_str += ' ORDER BY r.last_name, r.first_name';
 
     const [rows] = await db.query(query, params);
 
@@ -1032,8 +1100,8 @@ router.post(
           }
 
           try {
-            // Generate temporary password
-            const tempPassword = Math.random().toString(36).slice(-8);
+            // Use service_number as password
+            const tempPassword = record.service_number;
             const hashedPassword = await hashPassword(tempPassword);
 
             // Create user
@@ -1053,10 +1121,11 @@ router.post(
                sex: record.sex || null,
                blood_type: record.blood_type || 'Unknown',
                phone_number: record.phone_number || null,
-               position: record.position || null,
-               reserve_status: record.reserve_status || 'Ready Reserve',
-               is_active: true
-             };
+                position: record.position || null,
+                reserve_status: record.reserve_status || 'Ready Reserve',
+                 is_active: true,
+                 qr_code: generateUniqueQRCode()
+              };
 
             const columns = Object.keys(reservistData).map(col => `\`${col}\``);
             const values = Object.values(reservistData);
@@ -1280,7 +1349,7 @@ router.post(
             // "Sgt Angelyn J Bass MN-T21-024171 PAF(Res)"
             // Extract service number first (MN-XXXXX or O-XXXXX pattern)
             const serviceNumberMatch = name.match(/(MN-\w+|O-\w+)/);
-            const serviceNumber = serviceNumberMatch ? serviceNumberMatch[1] : `${Date.now()}-${Math.random()}`;
+            const serviceNumber = serviceNumberMatch ? serviceNumberMatch[1] : `TEMP-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
             
             // Remove service number from name for parsing
             let cleanName = name.replace(/\s*(MN-\w+|O-\w+)\s*/i, '').trim();
@@ -1318,15 +1387,15 @@ if (existingReservists.length > 0) {
                // Update existing reservist
                reservistId = existingReservists[0].id;
                await connection.query(
-                 'UPDATE reservists SET rank = ?, position = ? WHERE id = ?',
+                  'UPDATE reservists SET `rank` = ?, position = ? WHERE id = ?',
                  [rank, position, reservistId]
                );
              } else {
               // Create new reservist
               // First create a user account
               const email = `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@pafr.mil`;
-              const tempPassword = 'TempPassword123!';
-              const passwordHash = await hashPassword(tempPassword);
+               const tempPassword = finalServiceNumber;
+               const passwordHash = await hashPassword(tempPassword);
 
               // Check if user exists
               const [existingUsers] = await connection.query(
@@ -1347,13 +1416,13 @@ if (existingReservists.length > 0) {
               }
 
 // Create reservist
-               const [reservistResult] = await connection.query(
-                 `INSERT INTO reservists (
-                   user_id, first_name, last_name, rank, service_number,
-                   position, reserve_status, is_active
-                 ) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE)`,
-                 [userId, firstName, lastName, rank, serviceNumber, position, 'Ready Reserve']
-               );
+                const [reservistResult] = await connection.query(
+                  `INSERT INTO reservists (
+                     user_id, first_name, last_name, service_number,
+                     position, reserve_status, qr_code, \`rank\`, is_active
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+                   [userId, firstName, lastName, serviceNumber, position, 'Ready Reserve', generateUniqueQRCode(), rank]
+                );
 
               reservistId = reservistResult.insertId;
             }
@@ -1547,12 +1616,12 @@ router.post(
 
             const dateOfBirth = row['Date of Birth'] || null;
             const placeOfBirth = row['Place of Birth'] || null;
-            const age = row['Age'] ? parseInt(row['Age'], 10) : null;
+             const age = (() => { const v = parseInt(row['Age'], 10); return isNaN(v) ? null : v; })();
             const sex = row['Sex'] || null;
             const civilStatus = row['Civil Status'] || null;
             const citizenship = row['Citizenship'] || 'Filipino';
-            const height = row['Height'] ? parseFloat(row['Height']) : null;
-            const weight = row['Weight'] ? parseFloat(row['Weight']) : null;
+             const height = (() => { const v = parseFloat(row['Height']); return isNaN(v) ? null : v; })();
+             const weight = (() => { const v = parseFloat(row['Weight']); return isNaN(v) ? null : v; })();
             const bloodType = row['Blood Type'] || null;
             const homeAddress = row['Home Address'] || null;
             const contactNumber = row['Contact Number'] || null;
@@ -1569,7 +1638,7 @@ router.post(
             const highestEducation = row['Highest Educational Attainment'] || null;
             const courseDegree = row['Course/Degree'] || null;
             const school = row['School'] || null;
-            const yearGraduated = row['Year Graduated'] ? parseInt(row['Year Graduated'], 10) : null;
+             const yearGraduated = (() => { const v = parseInt(row['Year Graduated'], 10); return isNaN(v) ? null : v; })();
             const occupation = row['Occupation'] || null;
             const employer = row['Employer/Company'] || null;
             const officeAddress = row['Office Address'] || null;
@@ -1587,20 +1656,28 @@ router.post(
             const firstName = nameParts[0] || 'Unknown';
             const lastName = nameParts.slice(1).join(' ') || nameParts[0] || 'Unknown';
 
+            // service_number is NOT NULL UNIQUE in DB, generate placeholder if empty
+            const sn = (serviceNumber || '').trim();
+            const finalServiceNumber = sn || `TEMP-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
             // Check if reservist exists by service number
             let reservistId;
+            let createdNew = false;
 
-            if (serviceNumber) {
+            if (finalServiceNumber) {
               const [existingReservists] = await connection.query(
                 'SELECT id FROM reservists WHERE service_number = ?',
-                [serviceNumber]
+                [finalServiceNumber]
               );
 
               if (existingReservists.length > 0) {
                 reservistId = existingReservists[0].id;
+                const parsedUpdateDob = parseExcelDate(dateOfBirth);
+                const parsedUpdateRankDate = parseExcelDate(rankDateOfAppointment);
+                const parsedUpdateBasicDate = parseExcelDate(dateCompleted);
                 await connection.query(
                   `UPDATE reservists SET
-                    first_name = ?, last_name = ?, rank = ?, date_of_birth = ?,
+                    first_name = ?, last_name = ?, date_of_birth = ?,
                     place_of_birth = ?, age = ?, sex = ?, civil_status = ?,
                     citizenship = ?, height = ?, weight = ?, blood_type = ?,
                     phone_number = ?, address = ?, reserve_center = ?, category = ?,
@@ -1609,23 +1686,32 @@ router.post(
                     year_graduated = ?, occupation = ?, employer = ?, office_address = ?,
                     basic_training_completed = ?, basic_training_date = ?,
                     emergency_contact_name = ?, emergency_contact_phone = ?,
-                    emergency_contact_address = ?
+                    emergency_contact_address = ?, \`rank\` = ?
                   WHERE id = ?`,
-                  [
-                    firstName, lastName, rank, dateOfBirth, placeOfBirth, age, sex,
-                    civilStatus, citizenship, height, weight, bloodType, contactNumber,
-                    homeAddress, reserveCenter, category, sourceOfCommission,
-                    rankDateOfAppointment, specialization, reserveStatus, highestEducation,
-                    courseDegree, school, yearGraduated, occupation, employer, officeAddress,
-                    basicTraining, dateCompleted, emergencyContactName, emergencyContactNumber,
-                    emergencyAddress, reservistId
-                  ]
+                    [
+                     firstName, lastName, parsedUpdateDob, placeOfBirth, age, sex,
+                     civilStatus, citizenship, height, weight, bloodType, contactNumber,
+                     homeAddress, reserveCenter, category, sourceOfCommission,
+                     parsedUpdateRankDate, specialization, reserveStatus, highestEducation,
+                     courseDegree, school, yearGraduated, occupation, employer, officeAddress,
+                     basicTraining, parsedUpdateBasicDate, emergencyContactName, emergencyContactNumber,
+                     emergencyAddress, rank, reservistId
+                   ]
                 );
-              } else {
-                // Create new reservist
-                const userEmail = email || `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@pafr.mil`;
-                const tempPassword = 'TempPassword123!';
-                const passwordHash = await hashPassword(tempPassword);
+              }
+            }
+
+            // Create new reservist if not found by service number (or no service number provided)
+            if (!reservistId) {
+              // Parse date fields from Excel format
+              const parsedDateOfBirth = parseExcelDate(dateOfBirth);
+              const parsedRankDateOfAppointment = parseExcelDate(rankDateOfAppointment);
+              const parsedBasicTrainingDate = parseExcelDate(dateCompleted);
+
+                 // Create new reservist — use service number as password
+                 const userEmail = email || `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@pafr.mil`;
+                 const tempPassword = finalServiceNumber;
+                 const passwordHash = await hashPassword(tempPassword);
 
                 const [existingUsers] = await connection.query(
                   'SELECT id FROM users WHERE email = ?',
@@ -1644,29 +1730,29 @@ router.post(
                 }
 
                 const [reservistResult] = await connection.query(
-                  `INSERT INTO reservists (
-                    user_id, first_name, last_name, rank, service_number, date_of_birth,
+                  `INSERT INTO reservists (user_id, first_name, last_name, service_number, date_of_birth,
                     place_of_birth, age, sex, civil_status, citizenship, height, weight,
                     blood_type, phone_number, address, reserve_center, category,
                     source_of_commission, rank_date_appointment, specialization,
                     reserve_status, highest_education, course_degree, school, year_graduated,
                     occupation, employer, office_address, basic_training_completed,
                     basic_training_date, emergency_contact_name, emergency_contact_phone,
-                    emergency_contact_address, is_active
-                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+                    emergency_contact_address, qr_code, \`rank\`, is_active
+                   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
                   [
-                    userId, firstName, lastName, rank, serviceNumber || null, dateOfBirth,
-                    placeOfBirth, age, sex, civilStatus, citizenship, height, weight,
-                    bloodType, contactNumber, homeAddress, reserveCenter, category,
-                    sourceOfCommission, rankDateOfAppointment, specialization,
-                    reserveStatus, highestEducation, courseDegree, school, yearGraduated,
-                    occupation, employer, officeAddress, basicTraining, dateCompleted,
-                    emergencyContactName, emergencyContactNumber, emergencyAddress
-                  ]
+                     userId, firstName, lastName, finalServiceNumber, parsedDateOfBirth,
+                     placeOfBirth, age, sex, civilStatus, citizenship, height, weight,
+                     bloodType, contactNumber, homeAddress, reserveCenter, category,
+                     sourceOfCommission, parsedRankDateOfAppointment, specialization,
+                     reserveStatus, highestEducation, courseDegree, school, yearGraduated,
+                     occupation, employer, officeAddress, basicTraining, parsedBasicTrainingDate,
+                      emergencyContactName, emergencyContactNumber, emergencyAddress,
+                      generateUniqueQRCode(), rank, true
+                    ]
                 );
 
                 reservistId = reservistResult.insertId;
-              }
+                createdNew = true;
             }
 
             // Create or update assignment
@@ -1722,6 +1808,10 @@ router.post(
       }
 
       await connection.commit();
+
+      if (errors.length > 0) {
+        console.error('Bulk upload info errors:', JSON.stringify(errors, null, 2));
+      }
 
       logAudit({
         user_id: req.user.id,
@@ -1826,6 +1916,154 @@ router.get('/filters/metadata', authenticateToken, async (req, res) => {
     res.status(500).json({
       status: 'error',
       message: 'Failed to fetch filter metadata',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /api/reservists/my/profile
+ * Get current reservist's own profile (self-service)
+ */
+router.get('/my/profile', authenticateToken, async (req, res) => {
+  try {
+    // Find the reservist record linked to this user
+    const [reservists] = await db.query(`
+      SELECT 
+        r.*, u.email, u.role, u.is_active as user_active,
+        ra.id as assignment_id, ra.group_id, ra.squadron_id, ra.assigned_date,
+        g.name as group_name, g.code as group_code,
+        s.name as squadron_name, s.location
+      FROM reservists r
+      LEFT JOIN users u ON r.user_id = u.id
+      LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+      LEFT JOIN \`groups\` g ON ra.group_id = g.id
+      LEFT JOIN squadron s ON ra.squadron_id = s.id
+      WHERE r.user_id = ?
+    `, [req.user.id]);
+
+    if (reservists.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Reservist profile not found',
+        code: 'NOT_FOUND'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      data: reservists[0]
+    });
+  } catch (error) {
+    console.error('Error fetching own profile:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch profile',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /api/reservists/my/trainings
+ * Get current reservist's training history (self-service)
+ */
+router.get('/my/trainings', authenticateToken, async (req, res) => {
+  try {
+    const [reservist] = await db.query('SELECT id FROM reservists WHERE user_id = ?', [req.user.id]);
+    if (reservist.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Reservist not found', code: 'NOT_FOUND' });
+    }
+    const reservistId = reservist[0].id;
+
+    const [trainings] = await db.query(`
+      SELECT 
+        t.id, t.title, t.start_datetime, t.end_datetime, t.status,
+        a.status as attendance_status
+      FROM internal_training_participants itp
+      JOIN trainings t ON itp.training_id = t.id
+      LEFT JOIN attendance a ON a.training_id = t.id AND a.reservist_id = itp.reservist_id
+      WHERE itp.reservist_id = ?
+      ORDER BY t.start_datetime DESC
+    `, [reservistId]);
+
+    res.json({
+      status: 'success',
+      data: trainings
+    });
+  } catch (error) {
+    console.error('Error fetching own trainings:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch trainings',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /api/reservists/my/attendance
+ * Get current reservist's attendance records (self-service)
+ */
+router.get('/my/attendance', authenticateToken, async (req, res) => {
+  try {
+    const [reservist] = await db.query('SELECT id FROM reservists WHERE user_id = ?', [req.user.id]);
+    if (reservist.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Reservist not found', code: 'NOT_FOUND' });
+    }
+    const reservistId = reservist[0].id;
+
+    const [attendance] = await db.query(`
+      SELECT 
+        a.id, a.status, a.created_at,
+        t.title as training_title, t.start_datetime
+      FROM attendance a
+      JOIN trainings t ON a.training_id = t.id
+      WHERE a.reservist_id = ?
+      ORDER BY a.created_at DESC
+      LIMIT 100
+    `, [reservistId]);
+
+    res.json({
+      status: 'success',
+      data: attendance
+    });
+  } catch (error) {
+    console.error('Error fetching own attendance:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch attendance',
+      code: 'FETCH_ERROR'
+    });
+  }
+});
+
+/**
+ * GET /api/reservists/my/readiness
+ * Get current reservist's readiness score (self-service)
+ */
+router.get('/my/readiness', authenticateToken, async (req, res) => {
+  try {
+    const [reservist] = await db.query('SELECT id FROM reservists WHERE user_id = ?', [req.user.id]);
+    if (reservist.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Reservist not found', code: 'NOT_FOUND' });
+    }
+    const reservistId = reservist[0].id;
+
+    const [readiness] = await db.query(
+      'SELECT * FROM v_reservist_readiness WHERE reservist_id = ?',
+      [reservistId]
+    );
+
+    res.json({
+      status: 'success',
+      data: readiness[0] || null
+    });
+  } catch (error) {
+    console.error('Error fetching own readiness:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to fetch readiness',
       code: 'FETCH_ERROR'
     });
   }

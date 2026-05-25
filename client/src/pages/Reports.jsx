@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Edit, Trash2, FileText, Calendar } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { getReports, getReportById, deleteReport } from '@/services/reportsService';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
@@ -8,7 +8,7 @@ import ReportForm from '@/components/reports/ReportForm';
 import { cn } from '@/lib/utils';
 
 export default function Reports() {
-  const { isAdmin } = useAuth();
+  const { isAnyAdmin } = useAuth();
   const { addToast } = useToast();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -130,7 +130,7 @@ export default function Reports() {
             Finalize and summarize completed trainings and events
           </p>
         </div>
-        {isAdmin && (
+        {isAnyAdmin && (
           <button
             type="button"
             onClick={() => { setEditingReport(null); setShowForm(true); }}
@@ -187,7 +187,7 @@ export default function Reports() {
                   <FileText className="h-12 w-12 mx-auto" />
                 </div>
                 <p className="text-neutral-500 dark:text-neutral-400">No reports found</p>
-                {isAdmin && (
+                {isAnyAdmin && (
                   <button
                     type="button"
                     onClick={() => { setEditingReport(null); setShowForm(true); }}
@@ -202,7 +202,7 @@ export default function Reports() {
                 <ReportCard
                   key={report.id}
                   report={report}
-                  isAdmin={isAdmin}
+                  isAdmin={isAnyAdmin}
                   onEdit={() => handleEditReport(report)}
                   onDelete={() => setDeleteTarget(report)}
                 />
@@ -260,7 +260,7 @@ export default function Reports() {
   );
 }
 
-function ReportCard({ report, isAdmin, onEdit, onDelete }) {
+function ReportCard({ report, isAnyAdmin, onEdit, onDelete }) {
   const typeStyles = {
     attendance: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-400 dark:border-blue-500/20',
     readiness: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20',
@@ -320,7 +320,7 @@ function ReportCard({ report, isAdmin, onEdit, onDelete }) {
         <p className="text-[11px] text-neutral-400 dark:text-neutral-500">
           {report.created_at ? new Date(report.created_at).toLocaleDateString() : 'N/A'}
         </p>
-        {isAdmin && (
+        {isAnyAdmin && (
           <div className="flex items-center gap-1">
             <button onClick={onEdit} className="p-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors" title="Edit">
               <Edit size={14} className="text-neutral-500" />

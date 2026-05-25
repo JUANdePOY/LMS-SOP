@@ -1,7 +1,7 @@
 const express = require('express');
 const { query, param, validationResult } = require('express-validator');
 const db = require('../config/database');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, requireSuperAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -11,6 +11,14 @@ const rejectInvalid = (req, res, next) => {
     return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
   }
   return next();
+};
+
+const safeParseJson = (val) => {
+  if (val == null) return null;
+  if (typeof val === 'string') {
+    try { return JSON.parse(val); } catch { return null; }
+  }
+  return val;
 };
 
 const pageLimitValidators = [
@@ -24,7 +32,7 @@ const idParam = [param('id').isInt({ min: 1 })];
 router.get(
   '/',
   authenticateToken,
-  requireAdmin,
+  requireSuperAdmin,
   pageLimitValidators,
   [
     query('action').optional().isString().trim().isLength({ max: 100 }),
@@ -115,8 +123,8 @@ router.get(
 
       const logs = rows.map((r) => ({
         ...r,
-        old_values: r.old_values ? JSON.parse(r.old_values) : null,
-        new_values: r.new_values ? JSON.parse(r.new_values) : null,
+        old_values: safeParseJson(r.old_values),
+        new_values: safeParseJson(r.new_values),
       }));
 
       return res.json({
@@ -143,7 +151,7 @@ router.get(
 router.get(
   '/:id',
   authenticateToken,
-  requireAdmin,
+  requireSuperAdmin,
   idParam,
   rejectInvalid,
   async (req, res) => {
@@ -167,8 +175,8 @@ router.get(
       }
 
       const log = rows[0];
-      log.old_values = log.old_values ? JSON.parse(log.old_values) : null;
-      log.new_values = log.new_values ? JSON.parse(log.new_values) : null;
+      log.old_values = safeParseJson(log.old_values);
+      log.new_values = safeParseJson(log.new_values);
 
       return res.json({ success: true, message: 'OK', data: log });
     } catch (err) {

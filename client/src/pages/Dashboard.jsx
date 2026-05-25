@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getDashboard } from "@/services/api";
+import { getDashboard, getAlerts } from "@/services/api";
 import DashboardFilters from "@/components/dashboard/DashboardFilters";
 import KPIStatsGrid from "@/components/dashboard/KPIStatsGrid";
 import ForceDistributionChart from "@/components/dashboard/ForceDistributionChart";
@@ -31,9 +31,17 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
     try {
-      const response = await getDashboard();
-      if (response.data.status === 'success') {
-        setDashboardData(response.data.data);
+      const [dashRes, alertsRes] = await Promise.all([
+        getDashboard(),
+        getAlerts({ params: { limit: 6, severity: 'critical' } })
+      ]);
+      if (dashRes.data.status === 'success') {
+        const data = dashRes.data.data;
+        if (alertsRes.data?.status === 'success') {
+          data.live_critical_alerts = alertsRes.data.data?.alerts || [];
+          data.alert_summary = alertsRes.data.data?.summary || null;
+        }
+        setDashboardData(data);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load dashboard data');
@@ -80,15 +88,25 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-        <AttendanceAnalytics data={dashboardData?.attendance} />
+        <AttendanceAnalytics 
+          data={dashboardData?.attendance} 
+          composition={dashboardData?.readiness?.composition} 
+        />
         <ReadinessScoreChart data={dashboardData?.readiness} />
       </div>
 
-      <ReservistProfileOverview data={dashboardData?.rank_distribution} />
+      <ReservistProfileOverview 
+        rankData={dashboardData?.rank_distribution} 
+        professionData={dashboardData?.profession_distribution} 
+      />
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <LowPerformingAreas data={dashboardData?.low_performing} />
-        <AlertsInsights data={dashboardData?.alerts} />
+        <AlertsInsights 
+          data={dashboardData?.alerts} 
+          liveCriticalAlerts={dashboardData?.live_critical_alerts}
+          alertSummary={dashboardData?.alert_summary}
+        />
       </div>
     </div>
   );

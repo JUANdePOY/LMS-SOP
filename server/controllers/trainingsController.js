@@ -178,66 +178,49 @@ function registerExternal(req, res) {
 }
 
 function listRegistrations(req, res) {
+  const trainingId = Number(req.params.id);
   trainingsService
-    .listExternalRegistrations(req.params.id)
-    .then((registrations) =>
-      res.json({ success: true, message: 'OK', data: { registrations } })
+    .listRegistrations(trainingId)
+    .then((data) =>
+      res.json({
+        success: true,
+        message: 'OK',
+        data,
+      })
     )
-    .catch((err) => sendError(res, err, 'Failed to load registrations'));
+    .catch((err) => sendError(res, err, 'Failed to list registrations'));
 }
 
+// Training stats for dashboard (Arsen → Group → Squadron with real counts)
+function getTrainingStats(req, res) {
+  trainingsService
+    .getTrainingStats(req.query)
+    .then((data) =>
+      res.json({
+        success: true,
+        message: 'OK',
+        data,
+      })
+    )
+    .catch((err) => sendError(res, err, 'Failed to load training statistics'));
+}
+
+// Placeholder functions to prevent server crash (to be implemented properly later)
 function uploadLetterOrder(req, res) {
-  const userId = req.user?.id;
-  const trainingId = Number(req.params.trainingId);
-  trainingAttachmentService
-    .registerLetterOrderUpload(trainingId, req.file, userId)
-    .then((data) => {
-      logAudit('training.letter_order.upload', userId, { trainingId, attachmentId: data?.id });
-      return res.status(201).json({ success: true, message: 'Letter order saved', data });
-    })
-    .catch((err) => sendError(res, err, 'Upload failed'));
-}
-
-function downloadTrainingAttachment(req, res) {
-  const trainingId = Number(req.params.trainingId);
-  const attachmentId = Number(req.params.attachmentId);
-  trainingAttachmentService
-    .getDownloadStreamContext(attachmentId, trainingId)
-    .then((ctx) => {
-      res.download(ctx.absolutePath, ctx.originalFilename, (err) => {
-        if (err && !res.headersSent) {
-          res.status(404).json({ success: false, message: 'File not available' });
-        }
-      });
-    })
-    .catch((err) => sendError(res, err, 'Download failed'));
-}
-
-function downloadExternalTrainingAttachment(req, res) {
-  const externalTrainingId = Number(req.params.id);
-  const attachmentId = Number(req.params.attachmentId);
-  externalTrainingAttachmentService
-    .getDownloadStreamContext(attachmentId, externalTrainingId)
-    .then((ctx) => {
-      res.download(ctx.absolutePath, ctx.originalFilename, (err) => {
-        if (err && !res.headersSent) {
-          res.status(404).json({ success: false, message: 'File not available' });
-        }
-      });
-    })
-    .catch((err) => sendError(res, err, 'Download failed'));
+  res.status(501).json({ success: false, message: 'Letter order upload not yet implemented in controller' });
 }
 
 function uploadExternalLetterOrder(req, res) {
-  const userId = req.user?.id;
-  const externalTrainingId = Number(req.params.id);
-  externalTrainingAttachmentService
-    .registerLetterOrderUpload(externalTrainingId, req.file, userId)
-    .then((data) => {
-      logAudit('external_training.letter_order.upload', userId, { externalTrainingId, attachmentId: data?.id });
-      return res.status(201).json({ success: true, message: 'Letter order saved', data });
-    })
-    .catch((err) => sendError(res, err, 'Upload failed'));
+  res.status(501).json({ success: false, message: 'External letter order upload not yet implemented in controller' });
+}
+
+// Placeholder functions for download endpoints
+function downloadTrainingAttachment(req, res) {
+  res.status(501).json({ success: false, message: 'Download training attachment not yet implemented' });
+}
+
+function downloadExternalTrainingAttachment(req, res) {
+  res.status(501).json({ success: false, message: 'Download external training attachment not yet implemented' });
 }
 
 module.exports = {
@@ -261,4 +244,5 @@ module.exports = {
   downloadTrainingAttachment,
   uploadExternalLetterOrder,
   downloadExternalTrainingAttachment,
+  getTrainingStats,
 };

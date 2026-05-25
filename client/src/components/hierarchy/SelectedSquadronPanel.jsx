@@ -27,7 +27,7 @@ function resolveBreadcrumb(squadron) {
 }
 
 export default function SelectedSquadronPanel() {
-  const { selectedSquadron, selectSquadron } = useHierarchy();
+  const { selectedSquadron, selectSquadron, openMembersModal } = useHierarchy();
   if (!selectedSquadron) return null;
 
   const bc = resolveBreadcrumb(selectedSquadron);
@@ -77,9 +77,13 @@ export default function SelectedSquadronPanel() {
 
         <div className="flex flex-col gap-1">
           <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400">Members</span>
-          <span className="flex items-center gap-1.5 text-[12px] font-semibold text-neutral-800 dark:text-neutral-200">
-            <Users size={12} className="text-indigo-500" /> {selectedSquadron.members ?? 0}
-          </span>
+          <button
+            onClick={() => openMembersModal(selectedSquadron)}
+            className="flex items-center gap-1.5 text-[12px] font-semibold text-neutral-800 dark:text-neutral-200 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer text-left"
+            title="View all reservists in this squadron"
+          >
+            <Users size={12} className="text-indigo-500" /> {selectedSquadron.members ?? 0} <span className="text-[10px] text-indigo-400 ml-1">view →</span>
+          </button>
         </div>
 
         <div className="flex flex-col gap-1">

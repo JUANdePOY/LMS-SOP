@@ -1,14 +1,34 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ChevronLeft, Bell, Settings, LogOut, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
-import { menuItems } from "@/config/menuItems";
+import { menuItems, filterMenuByRole, ADMIN_ROLES } from "@/config/menuItems";
 import { useAuth } from "@/contexts/AuthContext";
+import { getAlerts } from "@/services/api";
 
 export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobileOpen, onMobileClose }) {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
-  const { logout } = useAuth();
+  const [alertSummary, setAlertSummary] = useState(null);
+
+  const { user, logout } = useAuth();
+  const visibleMenuItems = filterMenuByRole(menuItems, user?.role);
+  const isSuperAdmin = user?.role === 'admin';
+  const isAnyAdmin = ADMIN_ROLES.includes(user?.role);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await getAlerts({ params: { limit: 1 } });
+        if (res.data?.status === 'success') {
+          setAlertSummary(res.data.data?.summary || null);
+        }
+      } catch (_) {
+        // silent fail — badge is non-critical
+      }
+    };
+    load();
+  }, []);
 
   const isCollapsed =
     controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
@@ -130,7 +150,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
         )}
 
         <ul className="space-y-0.5" role="list">
-          {menuItems.map((item) => (
+          {visibleMenuItems.map((item) => (
             <li key={item.path}>
               <SidebarItem item={item} isCollapsed={isCollapsed} onNavClick={handleNavClick} />
             </li>
@@ -147,26 +167,56 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
 
         <ul className="space-y-0.5" role="list">
           <li>
-            <SidebarItem
-              item={{ name: "Alerts", path: "/alerts", icon: Bell, description: "Notifications" }}
-              isCollapsed={isCollapsed}
-              onNavClick={handleNavClick}
-            />
+            <Link
+              to="/alerts"
+              onClick={handleNavClick}
+              className={cn(
+                "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5",
+                "text-sm font-medium leading-none tracking-[-0.01em]",
+                "transition-all duration-200 ease-out",
+                "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100",
+                "dark:text-neutral-400 dark:hover:text-neutral-50 dark:hover:bg-neutral-800",
+                "hover:scale-[1.015]",
+                isCollapsed && "justify-center px-0"
+              )}
+            >
+              <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center text-neutral-400 dark:text-neutral-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                <Bell size={17} strokeWidth={1.8} />
+              </span>
+              {!isCollapsed && <span className="truncate">Alerts</span>}
+              {!isCollapsed && alertSummary && (alertSummary.unread > 0 || alertSummary.critical > 0) && (
+                <span className={cn(
+                  "ml-auto inline-flex min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none",
+                  alertSummary.critical > 0
+                    ? "bg-red-600 text-white"
+                    : "bg-amber-500 text-white"
+                )}>
+                  {alertSummary.critical || alertSummary.unread}
+                </span>
+              )}
+              {isCollapsed && alertSummary && (alertSummary.unread > 0 || alertSummary.critical > 0) && (
+                <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-500" />
+              )}
+            </Link>
           </li>
-          <li>
-            <SidebarItem
-              item={{ name: "Settings", path: "/settings", icon: Settings, description: "Preferences" }}
-              isCollapsed={isCollapsed}
-              onNavClick={handleNavClick}
-            />
-          </li>
-          <li>
-            <SidebarItem
-              item={{ name: "Audit Logs", path: "/audit-logs", icon: History, description: "System change history" }}
-              isCollapsed={isCollapsed}
-              onNavClick={handleNavClick}
-            />
-          </li>
+          {isSuperAdmin && (
+            <li>
+              <SidebarItem
+                item={{ name: "Settings", path: "/settings", icon: Settings, description: "Preferences" }}
+                isCollapsed={isCollapsed}
+                onNavClick={handleNavClick}
+              />
+            </li>
+          )}
+          {isSuperAdmin && (
+            <li>
+              <SidebarItem
+                item={{ name: "Audit Logs", path: "/audit-logs", icon: History, description: "System change history" }}
+                isCollapsed={isCollapsed}
+                onNavClick={handleNavClick}
+              />
+            </li>
+          )}
         </ul>
       </nav>
 
@@ -176,7 +226,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
           "flex shrink-0 items-center",
           "border-t border-neutral-200 dark:border-neutral-800",
           "bg-neutral-50 dark:bg-neutral-900",
-          isCollapsed ? "justify-center p-3" : "gap-3 px-4 py-3"
+          isCollapsed ? "justify-center gap-2 p-3" : "gap-3 px-4 py-3"
         )}
       >
         <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 text-xs font-bold text-white shadow-sm">
@@ -185,37 +235,28 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
         </span>
 
         {!isCollapsed && (
-          <div className="flex flex-col leading-tight overflow-hidden">
+          <div className="flex flex-1 flex-col leading-tight overflow-hidden">
             <span className="truncate text-[13px] font-medium text-neutral-800 dark:text-neutral-200">
-              Commanding Officer
+              {user?.email || 'User'}
             </span>
             <span className="truncate text-[11px] text-neutral-400 dark:text-neutral-500">
-              CO Admin
+              {user?.role ? user.role.replace('admin_', 'Admin ').replace('_', ' ') : '—'}
             </span>
           </div>
         )}
-      </div>
 
-      {/* ── Logout button ──────────────────────────────────────── */}
-      <div
-        className={cn(
-          "flex shrink-0 items-center",
-          "border-t border-neutral-200 dark:border-neutral-800",
-          isCollapsed ? "justify-center p-3" : "gap-3 px-4 py-3"
-        )}
-      >
         <button
           onClick={logout}
           className={cn(
-            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium",
-            "text-red-600 hover:text-red-700",
+            "flex items-center justify-center rounded-md text-red-600 hover:text-red-700",
             "hover:bg-red-50 dark:hover:bg-red-950/20",
             "transition-colors duration-150",
-            isCollapsed && "px-2"
+            isCollapsed ? "p-2" : "p-2 ml-1"
           )}
+          title="Logout"
         >
-          <LogOut size={18} />
-          {!isCollapsed && <span>Logout</span>}
+          <LogOut size={isCollapsed ? 16 : 18} />
+          {!isCollapsed && <span className="ml-1 text-sm font-medium">Logout</span>}
         </button>
       </div>
     </aside>

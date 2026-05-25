@@ -26,31 +26,8 @@ pool.getConnection((err, connection) => {
 });
 
 // Export the promise-based pool for async/await support
+// pool.promise() provides .query(), .execute(), and .getConnection() with Promise APIs
+// .getConnection() returns a PromisePoolConnection with promise-based query/execute
 const db = pool.promise();
-
-// Add getConnection method for transactions - returns connection with promise-based execute/query
-db.getConnection = function() {
-  return new Promise((resolve, reject) => {
-    pool.getConnection((err, connection) => {
-      if (err) return reject(err);
-      // Convert connection to promise-based for both execute and query
-      // mysql2 promises return [rows, fields], so we need to match that format
-      const makePromiseMethod = (method) => {
-        const originalMethod = connection[method].bind(connection);
-        connection[method] = (...args) => {
-          return new Promise((resolve, reject) => {
-            originalMethod(...args, (err, results, fields) => {
-              if (err) reject(err);
-              else resolve([results, fields]);
-            });
-          });
-        };
-      };
-      makePromiseMethod('execute');
-      makePromiseMethod('query');
-      resolve(connection);
-    });
-  });
-};
 
 module.exports = db;

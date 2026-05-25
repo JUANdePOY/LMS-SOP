@@ -84,12 +84,12 @@ export default function Attendance() {
     setError(null);
   };
 
-  const handleScan = async (barcode, scanMethod) => {
+  const handleScan = async (qrCode, scanMethod) => {
     let response;
     if (eventType === 'internal') {
-      response = await scanInternalTraining(trainingId, barcode, scanMethod);
+      response = await scanInternalTraining(trainingId, qrCode, scanMethod);
     } else {
-      response = await scanExternalTraining(trainingId, barcode, scanMethod);
+      response = await scanExternalTraining(trainingId, qrCode, scanMethod);
     }
     await loadAttendance();
     return response?.data?.data;
@@ -296,7 +296,7 @@ export default function Attendance() {
 
       {activeTab === 'scan' && (
         <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-6">
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">Barcode Scanning</h2>
+          <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">QR Code Scanning</h2>
           <AttendanceScanner
             onScan={handleScan}
             disabled={loading}

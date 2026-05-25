@@ -2,11 +2,11 @@ import api from './api';
 
 // ── Scan endpoints ───────────────────────────────────────────────────────────
 
-export const scanInternalTraining = (trainingId, barcode, scanMethod = 'barcode_scanner', deviceInfo = null) =>
-  api.post(`/attendance/scan/internal/${trainingId}`, { barcode, scan_method: scanMethod, device_info: deviceInfo });
+export const scanInternalTraining = (trainingId, qrCode, scanMethod = 'qr_scanner', deviceInfo = null) =>
+  api.post(`/attendance/scan/internal/${trainingId}`, { qr_code: qrCode, scan_method: scanMethod, device_info: deviceInfo });
 
-export const scanExternalTraining = (externalTrainingId, barcode, scanMethod = 'barcode_scanner', deviceInfo = null) =>
-  api.post(`/attendance/scan/external/${externalTrainingId}`, { barcode, scan_method: scanMethod, device_info: deviceInfo });
+export const scanExternalTraining = (externalTrainingId, qrCode, scanMethod = 'qr_scanner', deviceInfo = null) =>
+  api.post(`/attendance/scan/external/${externalTrainingId}`, { qr_code: qrCode, scan_method: scanMethod, device_info: deviceInfo });
 
 // ── Manual check-in ──────────────────────────────────────────────────────────
 

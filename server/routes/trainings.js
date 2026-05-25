@@ -2,7 +2,7 @@ const express = require('express');
 const { query, param, body, validationResult } = require('express-validator');
 const trainingsController = require('../controllers/trainingsController');
 const { authenticateToken, optionalAuthenticateToken } = require('../middleware/auth');
-const { authorize } = require('../middleware/rbac');
+const { requireAdmin } = require('../middleware/rbac');
 const { letterOrderUploadMiddleware, externalLetterOrderUploadMiddleware } = require('../middleware/trainingUpload');
 
 const router = express.Router();
@@ -48,7 +48,7 @@ router.get('/internal/:id', optionalAuthenticateToken, [...idParam], rejectInval
 router.post(
   '/internal',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [
     body('title').trim().notEmpty().isLength({ max: 500 }),
     body('start_datetime').optional().isString(),
@@ -63,7 +63,7 @@ router.post(
 router.patch(
   '/internal/:id',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...idParam, body('participants').optional().isArray()],
   rejectInvalid,
   trainingsController.updateInternal
@@ -72,7 +72,7 @@ router.patch(
 router.delete(
   '/internal/:id',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...idParam],
   rejectInvalid,
   trainingsController.deleteInternal
@@ -81,7 +81,7 @@ router.delete(
 router.post(
   '/internal/:trainingId/activities',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...trainingIdParam, body('title').trim().notEmpty()],
   rejectInvalid,
   trainingsController.createActivity
@@ -90,7 +90,7 @@ router.post(
 router.patch(
   '/internal/:trainingId/activities/:activityId',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...trainingIdParam, ...activityIdParam],
   rejectInvalid,
   trainingsController.updateActivity
@@ -99,7 +99,7 @@ router.patch(
 router.delete(
   '/internal/:trainingId/activities/:activityId',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...trainingIdParam, ...activityIdParam],
   rejectInvalid,
   trainingsController.deleteActivity
@@ -108,7 +108,7 @@ router.delete(
 router.post(
   '/internal/:trainingId/attachments/letter-order',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...trainingIdParam],
   rejectInvalid,
   letterOrderUploadMiddleware,
@@ -118,7 +118,7 @@ router.post(
 router.get(
   '/internal/:trainingId/attachments/:attachmentId/file',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...trainingIdParam, ...attachmentIdParam],
   rejectInvalid,
   trainingsController.downloadTrainingAttachment
@@ -137,7 +137,7 @@ router.get(
 router.post(
   '/external/:id/attachments/letter-order',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...idParam],
   rejectInvalid,
   externalLetterOrderUploadMiddleware,
@@ -147,7 +147,7 @@ router.post(
 router.get(
   '/external/:id/attachments/:attachmentId/file',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...idParam, ...attachmentIdParam],
   rejectInvalid,
   trainingsController.downloadExternalTrainingAttachment
@@ -158,7 +158,7 @@ router.get('/external/:id', optionalAuthenticateToken, [...idParam], rejectInval
 router.post(
   '/external',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [
     body('title').trim().notEmpty(),
     body('start_date').notEmpty(),
@@ -173,7 +173,7 @@ router.post(
 router.patch(
   '/external/:id',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...idParam],
   [
     body('squadron_limits').optional().isArray(),
@@ -187,7 +187,7 @@ router.patch(
 router.delete(
   '/external/:id',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...idParam],
   rejectInvalid,
   trainingsController.deleteExternal
@@ -229,10 +229,13 @@ router.post(
 router.get(
   '/external/:id/registrations',
   authenticateToken,
-  authorize('admin'),
+  requireAdmin,
   [...idParam],
   rejectInvalid,
   trainingsController.listRegistrations
 );
+
+// ── Training Statistics for Dashboard (real data for filters & charts) ───────
+router.get('/stats', authenticateToken, trainingsController.getTrainingStats);
 
 module.exports = router;

@@ -373,10 +373,10 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
 
       const response = await uploadFn(formData);
 
-      if (response.status === "success") {
+      if (response.data.status === "success") {
         setSuccessMessage(
-          `Successfully uploaded ${response.data.successful} record(s). ${
-            response.data.failed > 0 ? `${response.data.failed} failed.` : ""
+          `Successfully uploaded ${response.data.data.successful} record(s). ${
+            response.data.data.failed > 0 ? `${response.data.data.failed} failed.` : ""
           }`
         );
         setStage("success");
@@ -387,11 +387,11 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
           onSuccess?.();
         }, 3000);
       } else {
-        setError(response.message || "Upload failed");
+        setError(response.data.message || "Upload failed");
         setStage("preview");
       }
     } catch (err) {
-      setError(err.message || "Upload failed. Please try again.");
+      setError(err.response?.data?.message || err.message || "Upload failed. Please try again.");
       setStage("preview");
     } finally {
       setLoading(false);
