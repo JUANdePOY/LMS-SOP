@@ -13,8 +13,8 @@ export default function useLandingTrainings() {
       setError('');
 
       const [internalResult, externalResult] = await Promise.all([
-        getTrainings({ limit: 6 }),
-        getExternalTrainings({ limit: 6 }),
+        getTrainings({ limit: 100, status: 'published' }),
+        getExternalTrainings({ limit: 100, status: 'open' }),
       ]);
 
       if (internalResult && !internalResult.success) {

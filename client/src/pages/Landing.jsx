@@ -1,7 +1,8 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Sun, Moon } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination } from 'swiper/modules';
@@ -13,6 +14,8 @@ import CarouselSlideContent from '@/components/landing/CarouselSlideContent';
 import useLandingAnnouncements from '@/hooks/useLandingAnnouncements';
 import useLandingTrainings from '@/hooks/useLandingTrainings';
 import useCarouselSlides from '@/hooks/useCarouselSlides';
+
+const ITEMS_PER_PAGE = 9;
 
 function Carousel({ slides = [], onAction }) {
   if (!slides.length) return null;
@@ -42,10 +45,59 @@ function Carousel({ slides = [], onAction }) {
   );
 }
 
+function PaginationControls({ currentPage, totalPages, onPageChange }) {
+  if (totalPages <= 1) return null;
+
+  const pages = [];
+  for (let i = 0; i < totalPages; i++) {
+    pages.push(i + 1);
+  }
+
+  return (
+    <div className="mt-8 flex items-center justify-center gap-2">
+      <button
+        onClick={() => onPageChange(currentPage - 1)}
+        disabled={currentPage === 1}
+        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-500 transition-all duration-200 hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-50"
+        aria-label="Previous page"
+      >
+        <ChevronLeft size={16} />
+      </button>
+      
+      <div className="flex gap-1">
+        {pages.map((page) => (
+          <button
+            key={page}
+            onClick={() => onPageChange(page)}
+            className={`inline-flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-semibold transition-all duration-200 ${
+              currentPage === page
+                ? 'border-blue-500 bg-blue-500 text-white'
+                : 'border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700'
+            }`}
+          >
+            {page}
+          </button>
+        ))}
+      </div>
+
+      <button
+        onClick={() => onPageChange(currentPage + 1)}
+        disabled={currentPage === totalPages}
+        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-neutral-200 bg-white text-neutral-500 transition-all duration-200 hover:bg-neutral-100 hover:text-neutral-900 disabled:opacity-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700 dark:hover:text-neutral-50"
+        aria-label="Next page"
+      >
+        <ChevronRight size={16} />
+      </button>
+    </div>
+  );
+}
+
 export default function Landing() {
   const navigate = useNavigate();
   const { isDark, toggleTheme } = useTheme();
   const trainingsRef = useRef(null);
+  const [internalPage, setInternalPage] = useState(1);
+  const [externalPage, setExternalPage] = useState(1);
 
   const scrollToTrainings = () => {
     trainingsRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -56,6 +108,18 @@ export default function Landing() {
   const carouselSlides = useCarouselSlides(announcements);
 
   const handleLogin = () => navigate('/login');
+
+  const internalTrainingsPaginated = internalTrainings.slice(
+    (internalPage - 1) * ITEMS_PER_PAGE,
+    internalPage * ITEMS_PER_PAGE
+  );
+  const externalTrainingsPaginated = externalTrainings.slice(
+    (externalPage - 1) * ITEMS_PER_PAGE,
+    externalPage * ITEMS_PER_PAGE
+  );
+
+  const internalTotalPages = Math.ceil(internalTrainings.length / ITEMS_PER_PAGE) || 1;
+  const externalTotalPages = Math.ceil(externalTrainings.length / ITEMS_PER_PAGE) || 1;
 
   return (
     <div className="min-h-screen bg-neutral-50 pt-0 pb-10 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-100 sm:px-6 lg:px-8">
@@ -113,14 +177,21 @@ export default function Landing() {
               No internal trainings are available right now.
             </div>
           ) : (
-            <div className="grid gap-5 md:grid-cols-3">
-              {internalTrainings.map((training) => (
-                <InternalTrainingCard
-                  key={training.id ?? training.training_id ?? training.title}
-                  training={training}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid gap-5 md:grid-cols-3">
+                {internalTrainingsPaginated.map((training) => (
+                  <InternalTrainingCard
+                    key={training.id ?? training.training_id ?? training.title}
+                    training={training}
+                  />
+                ))}
+              </div>
+              <PaginationControls
+                currentPage={internalPage}
+                totalPages={internalTotalPages}
+                onPageChange={setInternalPage}
+              />
+            </>
           )}
         </section>
 
@@ -144,14 +215,21 @@ export default function Landing() {
               No external events are available right now.
             </div>
           ) : (
-            <div className="grid gap-5 md:grid-cols-3">
-              {externalTrainings.map((training) => (
-                <ExternalTrainingCard
-                  key={training.id ?? training.training_id ?? training.title}
-                  training={training}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid gap-5 md:grid-cols-3">
+                {externalTrainingsPaginated.map((training) => (
+                  <ExternalTrainingCard
+                    key={training.id ?? training.training_id ?? training.title}
+                    training={training}
+                  />
+                ))}
+              </div>
+              <PaginationControls
+                currentPage={externalPage}
+                totalPages={externalTotalPages}
+                onPageChange={setExternalPage}
+              />
+            </>
           )}
         </section>
       </div>

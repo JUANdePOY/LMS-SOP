@@ -212,9 +212,30 @@ function getTrainingStats(req, res) {
     .catch((err) => sendError(res, err, 'Failed to load training statistics'));
 }
 
-// Placeholder functions to prevent server crash (to be implemented properly later)
 function uploadLetterOrder(req, res) {
-  res.status(501).json({ success: false, message: 'Letter order upload not yet implemented in controller' });
+  const trainingId = Number(req.params.trainingId);
+  const userId = req.user?.id;
+  trainingAttachmentService
+    .registerLetterOrderUpload(trainingId, req.file, userId)
+    .then((attachment) => res.status(201).json({ success: true, message: 'Letter order uploaded', data: attachment }))
+    .catch((err) => sendError(res, err, 'Failed to upload letter order'));
+}
+
+function uploadExternalLetterOrder(req, res) {
+  const externalTrainingId = Number(req.params.id);
+  const userId = req.user?.id;
+  externalTrainingAttachmentService
+    .registerLetterOrderUpload(externalTrainingId, req.file, userId)
+    .then((attachment) => res.status(201).json({ success: true, message: 'Letter order uploaded', data: attachment }))
+    .catch((err) => sendError(res, err, 'Failed to upload letter order'));
+}
+
+function downloadTrainingAttachment(req, res) {
+  res.status(501).json({ success: false, message: 'Download training attachment not yet implemented' });
+}
+
+function downloadExternalTrainingAttachment(req, res) {
+  res.status(501).json({ success: false, message: 'Download external training attachment not yet implemented' });
 }
 
 function uploadExternalLetterOrder(req, res) {
@@ -270,4 +291,5 @@ module.exports = {
   listInternalAttachments,
   listExternalAttachments,
   getTrainingStats,
+  getTrainingSlotAvailability,
 };

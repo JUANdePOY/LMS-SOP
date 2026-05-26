@@ -15,7 +15,6 @@ const dbConfig = {
 // Create connection pool
 const pool = mysql.createPool(dbConfig);
 
-<<<<<<< HEAD
 // Health-check probe (callback API, fires once at startup)
 pool.getConnection((err, connection) => {
   if (err) {
@@ -26,14 +25,6 @@ pool.getConnection((err, connection) => {
   connection.release();
 });
 
-<<<<<<< HEAD
-// Export the promise-based pool for async/await support
-// pool.promise() provides .query(), .execute(), and .getConnection() with Promise APIs
-// .getConnection() returns a PromisePoolConnection with promise-based query/execute
-const db = pool.promise();
-
-module.exports = db;
-=======
 // Promise-based wrapper — every method on connections obtained from
 // getConnection() (query, execute, beginTransaction, commit, rollback,
 // release) is fully Promise-returning.
