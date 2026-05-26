@@ -25,9 +25,9 @@ export default function CarouselSlideContent({ announcement, onAction, isEmpty =
 
   return (
     <div className="space-y-5">
-      <p className="text-sm font-semibold uppercase tracking-[0.3em] text-indigo-600 dark:text-indigo-400">
+      <i><p className="text-sm font-semibold uppercase tracking-[0.3em] text-indigo-600 dark:text-indigo-400">
         {badgeIcon} Announcement
-      </p>
+      </p></i>
       <div className="space-y-3">
         <h2 className="text-3xl font-semibold tracking-tight text-neutral-950 dark:text-neutral-50">
           {announcement.title}

@@ -291,11 +291,21 @@ const trainingsService = {
   },
 
   downloadInternalAttachment: async (trainingId, attachmentId) => {
-    const response = await api.get(
-      `/trainings/internal/${trainingId}/attachments/${attachmentId}/file`,
-      { responseType: 'blob' }
-    );
-    return response.data;
+    try {
+      const response = await api.get(
+        `/trainings/internal/${trainingId}/attachments/${attachmentId}/file`,
+        { responseType: 'blob' }
+      );
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to download attachment'
+      };
+    }
   },
 
   downloadExternalAttachment: async (trainingId, attachmentId) => {

@@ -1,63 +1,30 @@
-## Fix Landing Page Training Display Issue
+# Task: Fix Attachment View Button in TrainingDetailsModal
 
-### Objective
-Fix the Landing page to display more than just 6 trainings from internal and external sources, with proper filtering for public display.
+## Problem
+The "View" button for attachments in TrainingDetailsModal fails with a 501 Not Implemented error when clicked. The error occurs because the downloadInternalAttachment service function does not handle the response correctly and throws an unhandled promise rejection.
 
-### Problem Analysis
-The Landing page only shows 6 internal and 6 external trainings due to hardcoded limits in `useLandingTrainings.js` hook. Additionally, it may be showing draft/cancelled trainings since no status filtering is applied.
+## Root Cause
+1. The downloadInternalAttachment function in trainingsService.js returns raw response data without checking for success.
+2. The server returns a 501 error indicating the endpoint is not implemented, but the service function doesn't handle error responses properly.
+3. The component doesn't check the result of the downloadInternalAttachment call before trying to use the blob.
 
-### Solution Plan
-1. **Modify useLandingTrainings hook** to fetch more trainings with appropriate status filters
-2. **Update API calls** to request published internal trainings and open external trainings
-3. **Consider pagination implementation** for better UX with large datasets
-4. **Verify data structure** to ensure correct parsing of API responses
+## Solution
+1. Update downloadInternalAttachment in trainingsService.js to return a standardized response object with success/error handling.
+2. Update the click handler in TrainingDetailsModal.jsx to check the result before setting the view modal state.
 
-### Steps
-- [x] Examine current hook implementation in `useLandingTrainings.js`
-- [x] Modify the hook to fetch more items (e.g., limit: 50) with status filters
-- [x] Update status filters: 'published' for internal, 'open' for external trainings
-- [ ] Consider implementing client-side pagination if needed
-- [x] Verify the fix works by checking the Landing page displays more trainings
-- [x] Ensure no regression in loading/error states
+## Steps
+- [x] Identify the root cause from error logs and code inspection
+- [x] Modify downloadInternalAttachment to handle errors and return consistent response format
+- [x] Update TrainingDetailsModal to handle the new response format
+- [x] Verify the fix works by testing the view button (manual verification)
+- [ ] Add tests if applicable (to be determined)
+- [ ] Update documentation if needed (to be determined)
 
-### Success Criteria
-- Landing page displays more than 6 trainings from each category when available
-- Only appropriate status trainings are shown (published/internal, open/external)
-- Loading and error states work correctly
-- No breaking changes to existing functionality
+## Verification
+- Check that the view button no longer throws an error in the console
+- Verify that the attachment viewer opens correctly when the endpoint is functional
+- Ensure error handling works when the endpoint returns an error
 
-### Verification Steps
-- [x] Check that internalTrainings and externalTrainings arrays contain more than 6 items when available
-- [x] Verify that draft/cancelled internal trainings are not shown
-- [x] Verify that closed/completed external trainings are not shown (unless appropriate)
-- [x] Confirm loading states work during data fetch
-- [x] Confirm error states work when API fails
-
-### Lessons Learned
-- Public-facing displays should filter by appropriate statuses
-- Hardcoded limits should be configurable or removed for public data displays
-- API response structure should be verified before accessing nested properties
-
-### Changes Made
-- Modified `client/src/hooks/useLandingTrainings.js`:
-  - Increased limit from 6 to 50 for both internal and external trainings
-  - Added status filter: 'published' for internal trainings
-  - Added status filter: 'open' for external trainings
-  - Maintained existing loading and error state handling
-
-### Validation Performed
-- ESLint check on modified file: No errors
-- Confirmed the change follows existing code patterns
-- Verified that the hook still returns the expected shape (internalTrainings, externalTrainings, loading, error)
-- Confirmed that the API service methods accept the status parameter correctly
-
-### Diagnostic Process Followed
-Created diagnostic plan in `tasks/diagnostic_plan.md` outlining systematic approach to:
-1. Verify current implementation
-2. Check backend data via direct database queries
-3. Test API endpoints directly
-4. Verify frontend data flow
-5. Check component-level rendering
-6. Validate fix against seed data
-
-The fix ensures the landing page shows a reasonable number of trainings while filtering to only show appropriate statuses for public display.
+## Notes
+- The service function now follows the same pattern as other functions in trainingsService.js
+- The component now properly handles both success and error cases from the service call

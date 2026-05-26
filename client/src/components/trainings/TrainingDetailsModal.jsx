@@ -5,6 +5,39 @@ import { getInternalTrainingById, getInternalTrainingAttachments, downloadIntern
 import AttachmentIcon from '@/components/ui/AttachmentIcon';
 import ViewAttachmentModal from '@/components/ui/ViewAttachmentModal';
 
+const ParticipantsTable = ({ participants, loading }) => {
+  if (loading) {
+    return <p className="mt-1 text-neutral-600 dark:text-neutral-400">Loading participants...</p>;
+  }
+
+  if (!participants || participants.length === 0) {
+    return <p className="mt-1 text-neutral-600 dark:text-neutral-400">No participants registered yet.</p>;
+  }
+
+  return (
+    <div className="mt-2 border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-neutral-50 dark:bg-neutral-800">
+          <tr>
+            <th className="px-3 py-2 text-left font-semibold text-neutral-700 dark:text-neutral-300">Name</th>
+            <th className="px-3 py-2 text-left font-semibold text-neutral-700 dark:text-neutral-300">Rank</th>
+            <th className="px-3 py-2 text-left font-semibold text-neutral-700 dark:text-neutral-300">Squadron</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
+          {participants.map((p) => (
+            <tr key={p.id || p.email} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors">
+              <td className="px-3 py-2 text-neutral-900 dark:text-neutral-100">{p.name}</td>
+              <td className="px-3 py-2 text-neutral-600 dark:text-neutral-400">{p.rank || '-'}</td>
+              <td className="px-3 py-2 text-neutral-600 dark:text-neutral-400">{p.squadron_name || '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 export default function TrainingDetailsModal({ training, isOpen, onClose }) {
   const [fullTraining, setFullTraining] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -106,28 +139,7 @@ export default function TrainingDetailsModal({ training, isOpen, onClose }) {
           <div className="space-y-4">
             <div>
               <p className="text-sm font-semibold text-neutral-500 dark:text-neutral-400">Participants</p>
-              {loading ? (
-                <p className="mt-1 text-neutral-600 dark:text-neutral-400">Loading participants...</p>
-              ) : !trainingData.participants || trainingData.participants.length === 0 ? (
-                <p className="mt-1 text-neutral-600 dark:text-neutral-400">No participants registered yet.</p>
-              ) : (
-                <ul className="mt-2 space-y-1">
-                  {trainingData.participants.slice(0, 10).map((p) => (
-                    <li key={p.id || p.email} className="text-sm text-neutral-700 dark:text-neutral-300">
-                      {p.name}
-                      {p.rank && (
-                        <span className="ml-2 text-xs text-neutral-500 dark:text-neutral-400">({p.rank})</span>
-                      )}
-                      {p.squadron_name && (
-                        <div className="text-xs text-neutral-500 dark:text-neutral-400">{p.squadron_name}</div>
-                      )}
-                    </li>
-                  ))}
-                  {trainingData.participants.length > 10 && (
-                    <li className="text-sm text-neutral-500 dark:text-neutral-400">+{trainingData.participants.length - 10} more</li>
-                  )}
-                </ul>
-              )}
+              <ParticipantsTable participants={trainingData.participants} loading={loading} />
             </div>
           </div>
         </div>
@@ -166,17 +178,21 @@ export default function TrainingDetailsModal({ training, isOpen, onClose }) {
                              {attachment.created_at && ` • ${formatDateShort(attachment.created_at)}`}
                            </p>
                          </div>
-                         <button
-                           type="button"
-                           onClick={async () => {
-                             const trainingId = fullTraining?.id ?? fullTraining?.training_id;
-                             const blob = await downloadInternalAttachment(trainingId, attachment.id);
-                             setViewModal({ isOpen: true, file: blob, fileName: attachment.original_filename || attachment.name, fileType: fileExt });
-                           }}
-                           className="px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/30 rounded-lg transition-colors"
-                         >
-                           View
-                         </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const trainingId = fullTraining?.id ?? fullTraining?.training_id;
+                              const result = await downloadInternalAttachment(trainingId, attachment.id);
+                              if (result.success && result.data) {
+                                setViewModal({ isOpen: true, file: result.data, fileName: attachment.original_filename || attachment.name, fileType: fileExt });
+                              } else {
+                                setAttachmentError(result.message || 'Failed to download attachment');
+                              }
+                            }}
+                            className="px-3 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/30 rounded-lg transition-colors"
+                          >
+                            View
+                          </button>
                        </div>
                      );
                    })}
