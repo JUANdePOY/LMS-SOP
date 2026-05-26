@@ -177,6 +177,13 @@ function registerExternal(req, res) {
     .catch((err) => sendError(res, err, 'Registration failed'));
 }
 
+function getTrainingSlotAvailability(req, res) {
+  trainingsService
+    .getTrainingSlotAvailability(req.params.id)
+    .then((data) => res.json({ success: true, message: 'OK', data }))
+    .catch((err) => sendError(res, err, 'Failed to get slot availability'));
+}
+
 function listRegistrations(req, res) {
   const trainingId = Number(req.params.id);
   trainingsService
@@ -223,6 +230,22 @@ function downloadExternalTrainingAttachment(req, res) {
   res.status(501).json({ success: false, message: 'Download external training attachment not yet implemented' });
 }
 
+function listInternalAttachments(req, res) {
+  const trainingId = Number(req.params.trainingId);
+  trainingAttachmentService
+    .listPublicForTraining(trainingId)
+    .then((attachments) => res.json({ success: true, message: 'OK', data: attachments }))
+    .catch((err) => sendError(res, err, 'Failed to list attachments'));
+}
+
+function listExternalAttachments(req, res) {
+  const externalTrainingId = Number(req.params.id);
+  externalTrainingAttachmentService
+    .listPublicForExternalTraining(externalTrainingId)
+    .then((attachments) => res.json({ success: true, message: 'OK', data: attachments }))
+    .catch((err) => sendError(res, err, 'Failed to list attachments'));
+}
+
 module.exports = {
   listInternal,
   getInternal,
@@ -244,5 +267,7 @@ module.exports = {
   downloadTrainingAttachment,
   uploadExternalLetterOrder,
   downloadExternalTrainingAttachment,
+  listInternalAttachments,
+  listExternalAttachments,
   getTrainingStats,
 };

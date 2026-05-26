@@ -96,7 +96,7 @@ async function registerLetterOrderUpload(trainingId, file, userId) {
     throw err;
   }
 
-  const conn = await trainingModel.pool.getConnection();
+  const conn = await trainingModel.getConnection();
   let oldPaths = [];
   let insertId;
   try {

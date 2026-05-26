@@ -231,6 +231,37 @@ const trainingsService = {
     }
   },
 
+  // Get slot availability for external training.
+  //
+  // BUG FIX: The server wraps its payload in a standard envelope:
+  //   { success: true, message: 'OK', data: { hasSquadronLimits, squads, ... } }
+  //
+  // The original implementation returned `response.data` (the full envelope) as
+  // `result.data`, so `result.data.hasSquadronLimits` was always `undefined` and
+  // `result.data.squads` was always `undefined` — causing every squadron to show
+  // "0 registered" regardless of actual registrations.
+  //
+  // The fix unwraps `body.data` (the inner payload) before returning it.
+  getTrainingSlotAvailability: async (trainingId) => {
+    try {
+      const response = await api.get(`/trainings/external/${trainingId}/slots`);
+      const body = response.data;
+      if (body?.success === false) {
+        return { success: false, message: body.message || 'Failed to fetch slot availability' };
+      }
+      // body.data is { hasSquadronLimits, squads } or { hasSquadronLimits: false, totalSlots, totalRegistered, remaining }
+      return {
+        success: true,
+        data: body?.data ?? body,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch slot availability'
+      };
+    }
+  },
+
   // Upload letter order (internal training)
   uploadLetterOrder: async (file, trainingId) => {
     try {
@@ -301,6 +332,40 @@ const trainingsService = {
       };
     }
   },
+
+  getInternalTrainingAttachments: async (trainingId) => {
+    try {
+      const response = await api.get(`/trainings/internal/${trainingId}/attachments`);
+      const body = response.data;
+      return {
+        success: body.success !== false,
+        message: body.message,
+        data: body.data || [],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch attachments',
+      };
+    }
+  },
+
+  getExternalTrainingAttachments: async (trainingId) => {
+    try {
+      const response = await api.get(`/trainings/external/${trainingId}/attachments`);
+      const body = response.data;
+      return {
+        success: body.success !== false,
+        message: body.message,
+        data: body.data || [],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch attachments',
+      };
+    }
+  },
 };
 
 export const getTrainings = trainingsService.getTrainings;
@@ -320,7 +385,11 @@ export const updateExternalTraining = trainingsService.updateExternalTraining;
 export const deleteExternalTraining = trainingsService.deleteExternalTraining;
 export const getExternalTrainingById = trainingsService.getExternalTrainingById;
 export const getInternalTrainingById = trainingsService.getInternalTrainingById;
+export const getTrainingSlotAvailability = trainingsService.getTrainingSlotAvailability;
+
 export const downloadInternalAttachment = trainingsService.downloadInternalAttachment;
 export const downloadExternalAttachment = trainingsService.downloadExternalAttachment;
+export const getInternalTrainingAttachments = trainingsService.getInternalTrainingAttachments;
+export const getExternalTrainingAttachments = trainingsService.getExternalTrainingAttachments;
 
 export default trainingsService;

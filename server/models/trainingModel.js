@@ -1,4 +1,6 @@
-const pool = require('../config/database');
+const db = require('../config/database');
+// rawPool kept for direct pool access; prefer db / db.getConnection() for Promises
+const pool = db.rawPool;
 
 const INTERNAL_STATUSES = ['draft', 'published', 'ongoing', 'completed', 'cancelled'];
 
@@ -36,7 +38,7 @@ async function countInternal({ search, status, type }) {
     params.push(type);
   }
 
-  const [rows] = await pool.query(sql, params);
+  const [rows] = await db.query(sql, params);
   return rows[0]?.total ?? 0;
 }
 
@@ -86,12 +88,12 @@ async function findInternalMany({ page, limit, search, status, type }) {
   sql += ' ORDER BY t.start_datetime DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
-  const [rows] = await pool.query(sql, params);
+  const [rows] = await db.query(sql, params);
   return rows;
 }
 
 async function findInternalById(id) {
-  const [rows] = await pool.query(
+  const [rows] = await db.query(
     `SELECT
        t.id,
        t.title,
@@ -132,7 +134,7 @@ async function insertInternal(conn, row) {
     row.capacity ?? null,
     row.created_by,
   ];
-  const executor = conn || pool;
+  const executor = conn || db;
   const [result] = await executor.query(sql, params);
   return result.insertId;
 }
@@ -158,13 +160,13 @@ async function updateInternal(id, patch, conn = null) {
   }
   if (!sets.length) return 0;
   params.push(id);
-  const executor = conn || pool;
+  const executor = conn || db;
   const [result] = await executor.query(`UPDATE trainings SET ${sets.join(', ')} WHERE id = ?`, params);
   return result.affectedRows;
 }
 
 async function deleteInternal(id) {
-  const [result] = await pool.query('DELETE FROM trainings WHERE id = ?', [id]);
+  const [result] = await db.query('DELETE FROM trainings WHERE id = ?', [id]);
   return result.affectedRows;
 }
 
@@ -173,7 +175,9 @@ function isValidInternalStatus(s) {
 }
 
 module.exports = {
+  db,
   pool,
+  getConnection: db.getConnection.bind(db),
   toDatetime,
   countInternal,
   findInternalMany,

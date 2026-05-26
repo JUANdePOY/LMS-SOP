@@ -19,9 +19,12 @@ const ALLOWED_MIME = new Set([
   // Word documents
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
   'application/msword', // .doc
+  // Excel spreadsheets
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+  'application/vnd.ms-excel', // .xls
 ]);
 
-const ALLOWED_EXT = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.docx', '.doc']);
+const ALLOWED_EXT = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.docx', '.doc', '.xlsx', '.xls']);
 
 
 function isAllowedMime(mime) {
