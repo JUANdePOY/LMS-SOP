@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
  * Optionally accepts allowedRoles to restrict by role.
  */
 export default function ProtectedRoute({ children, allowedRoles }) {
-  const { isAuthenticated, isAnyAdmin, loading, user } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return (

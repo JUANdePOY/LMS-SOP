@@ -11,9 +11,9 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [alertSummary, setAlertSummary] = useState(null);
 
-   const { user, logout } = useAuth();
-   const visibleMenuItems = filterMenuByRole(menuItems, user?.role);
-   const isSuperAdmin = user?.role === 'admin';
+  const { user, logout } = useAuth();
+  const visibleMenuItems = filterMenuByRole(menuItems, user?.role);
+  const isSuperAdmin = user?.role === 'admin';
 
   useEffect(() => {
     const load = async () => {
@@ -22,7 +22,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
         if (res.data?.status === 'success') {
           setAlertSummary(res.data.data?.summary || null);
         }
-      } catch (_) {
+      } catch {
         // silent fail — badge is non-critical
       }
     };

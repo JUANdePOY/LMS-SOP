@@ -13,7 +13,6 @@ import {
   PlaneTakeoff,
   Megaphone,
   CalendarDays,
-  Settings as SettingsIcon,
 } from "lucide-react";
 
 // Role requirements for menu items (undefined = any authenticated user)

@@ -20,7 +20,7 @@ export function AuthProvider({ children }) {
     if (token && storedUser) {
       try {
         setUser(JSON.parse(storedUser));
-      } catch (err) {
+      } catch {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }

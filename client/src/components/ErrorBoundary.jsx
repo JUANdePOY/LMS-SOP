@@ -20,9 +20,9 @@ export class ErrorBoundary extends Component {
     console.error("ErrorBoundary caught an error:", error, errorInfo);
   }
 
-  handleReset = () => {
+  handleReset() {
     this.setState({ hasError: false, error: null, errorInfo: null });
-  };
+  }
 
   render() {
     if (this.state.hasError) {
