@@ -30,6 +30,7 @@ const ManageSquadrons   = lazy(() => import("@/pages/airbase/ManageSquadrons"));
 // RBAC role groups (match server)
 const ADMIN_ROLES = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'];
 const SUPER_ADMIN_ROLES = ['admin'];
+const RESERVISTS_ROLE = ['reservist'];
 
 function PageLoader() {
   return (
@@ -77,18 +78,20 @@ function SuperAdminProtectedWrapper(Component) {
   );
 }
 
+function ReservistWrapper(Component) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ProtectedRoute allowedRoles={RESERVISTS_ROLE}>
+        <Component />
+      </ProtectedRoute>
+    </Suspense>
+  );
+}
+
 const router = createBrowserRouter([
   {
     path: "/login",
     element: wrap(Login),
-  },
-  {
-    path: "/landing",
-    element: wrap(Landing),
-  },
-  {
-    path: "/Landing",
-    element: wrap(Landing),
   },
   {
     path: "/",
@@ -100,8 +103,9 @@ const router = createBrowserRouter([
       </ErrorBoundary>
     ),
     children: [
-{ index: true,           element: ProtectedWrapper(Dashboard)       },
-      { path: "announcements", element: ProtectedWrapper(Announcements)   },
+      { index: true,           element: AdminProtectedWrapper(Dashboard)       },
+      { path: "landing",       element: ReservistWrapper(Landing)       },
+      { path: "announcements", element: AdminProtectedWrapper(Announcements)   },
       { path: "reservists",    element: AdminProtectedWrapper(Reservists)      },
       { path: "trainings",     element: ProtectedWrapper(Trainings)       },
       { path: "attendance",    element: ProtectedWrapper(Attendance)      },

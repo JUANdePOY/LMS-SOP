@@ -260,7 +260,7 @@ export default function Trainings() {
                 Trainings & Activities
               </h1>
               <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                Schedule and manage training sessions and activities
+                Schedule and manage training sessions and activities            
               </p>
             </div>
           </div>

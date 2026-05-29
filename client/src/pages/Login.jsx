@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertCircle, Loader } from 'lucide-react';
 
+const ADMIN_ROLES = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'];
+
 export default function Login() {
   const navigate = useNavigate();
-  const { login, isAuthenticated, loading: authLoading } = useAuth();
+  const { login, isAuthenticated, loading: authLoading, user } = useAuth();
 
   const [id_number, setIdNumber] = useState('');
   const [password, setPassword] = useState('');
@@ -14,10 +16,11 @@ export default function Login() {
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated && !authLoading) {
-      navigate('/', { replace: true });
+    if (isAuthenticated && !authLoading && user?.role) {
+      const redirectPath = ADMIN_ROLES.includes(user.role) ? '/' : '/landing';
+      navigate(redirectPath, { replace: true });
     }
-  }, [isAuthenticated, authLoading, navigate]);
+  }, [isAuthenticated, authLoading, navigate, user?.role]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,7 +36,8 @@ export default function Login() {
     const result = await login(id_number, password);
 
     if (result.success) {
-      navigate('/', { replace: true });
+      const redirectPath = ADMIN_ROLES.includes(result.user?.role) ? '/' : '/landing';
+      navigate(redirectPath, { replace: true });
     } else {
       setError(result.error || 'Login failed');
       setLoading(false);

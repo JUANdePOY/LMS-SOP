@@ -3,9 +3,11 @@ import { Link } from "react-router-dom";
 import { ChevronLeft, Bell, Settings, History } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
-import { menuItems } from "@/config/menuItems";
+import { menuItems, filterMenuByRole } from "@/config/menuItems";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
+  const { user } = useAuth();
   const [internalCollapsed, setInternalCollapsed] = useState(false);
 
   const isCollapsed =
@@ -15,6 +17,9 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
     if (onToggle) onToggle();
     else setInternalCollapsed((v) => !v);
   };
+
+  // Filter menu items based on user role
+  const filteredMenuItems = user ? filterMenuByRole(menuItems, user.role) : [];
 
   return (
     <aside
@@ -124,7 +129,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
         )}
 
         <ul className="space-y-0.5" role="list">
-          {menuItems.map((item) => (
+          {filteredMenuItems.map((item) => (
             <li key={item.path}>
               <SidebarItem item={item} isCollapsed={isCollapsed} />
             </li>

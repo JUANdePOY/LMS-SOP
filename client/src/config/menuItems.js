@@ -13,6 +13,7 @@ import {
   PlaneTakeoff,
   Megaphone,
   CalendarDays,
+  Home,
 } from "lucide-react";
 
 // Role requirements for menu items (undefined = any authenticated user)
@@ -35,16 +36,25 @@ export function filterMenuByRole(items, userRole) {
 
 export const menuItems = [
   {
+    name: "My Profile",
+    path: "/landing",
+    icon: Home,
+    description: "View my records",
+    roles: ["reservist"],
+  },
+  {
     name: "Dashboard",
     path: "/",
     icon: LayoutDashboard,
     description: "Overview & summary",
+    roles: ADMIN_ROLES,
   },
   {
     name: "Announcements",
     path: "/announcements",
     icon: Megaphone,
     description: "Updates & notices",
+    roles: ADMIN_ROLES,
   },
    {
      name: "Reservists",
