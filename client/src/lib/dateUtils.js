@@ -111,8 +111,6 @@ export const formatDateShort = (dateString) => {
 export const formatTime = (value) => {
   if (!value) return '';
   
-  console.log('formatTime input:', value, typeof value);
-  
   // Handle time-only strings (HH:MM or HH:MM:SS)
   if (typeof value === 'string') {
     const timeOnlyMatch = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?/);

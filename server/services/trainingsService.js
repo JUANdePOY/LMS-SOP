@@ -586,6 +586,15 @@ async function registerExternalParticipant(trainingId, participantData) {
 
       if (pdObj && (pdObj.squadron_id != null || pdObj.squadronId != null)) {
         const sid = pdObj.squadron_id ?? pdObj.squadronId;
+        const [existing] = await conn.query(
+          'SELECT id FROM training_registrations WHERE training_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(participant_data, "$.squadron_id")) = ?',
+          [trainingId, String(sid)]
+        );
+        if (existing.length > 0) {
+          const err = new Error('You are already registered for this training');
+          err.statusCode = 400;
+          throw err;
+        }
         const current = await countRegistrationsConn(trainingId, sid);
         const limitEntry = sqLimits.find((s) => Number(s.squadron_id ?? s.squadronId) === Number(sid));
         const limit = limitEntry ? (limitEntry.slot_limit ?? limitEntry.slotLimit ?? null) : null;

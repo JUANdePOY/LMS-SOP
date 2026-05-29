@@ -410,8 +410,8 @@ export default function RegistrationModal({ training, isOpen, onClose }) {
             {/* Meta row directly under title */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5">
               <span className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
-                <Calendar size={12} className="text-indigo-400" />
-                {shortDate(training.start_datetime || training.start_date)}{console.log('start_time:', training.start_time, 'start_datetime:', training.start_datetime) && null}{formatTime(training.start_time || training.start_datetime) && ` · ${formatTime(training.start_time || training.start_datetime)}`}
+<Calendar size={12} className="text-indigo-400" />
+                 {shortDate(training.start_datetime || training.start_date)}{formatTime(training.start_time || training.start_datetime) && ` · ${formatTime(training.start_time || training.start_datetime)}`}
               </span>
               <span className="flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
                 <MapPin size={12} className="text-indigo-400" />

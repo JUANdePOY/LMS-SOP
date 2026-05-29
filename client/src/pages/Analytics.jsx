@@ -296,23 +296,25 @@ function ComponentRadar({ data, label }) {
 
   return (
     <Card title={`Component Breakdown — ${label}`} icon={ShieldCheck}>
-      <ResponsiveContainer width="100%" height={220}>
-        <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="70%">
-          <PolarGrid stroke="currentColor" className="text-neutral-200 dark:text-neutral-700" />
-          <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: "currentColor" }} className="text-neutral-500" />
-          <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 9 }} />
-          <Radar name="Score" dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.2} strokeWidth={2} />
-        </RadarChart>
-      </ResponsiveContainer>
-      <div className="mt-2 grid grid-cols-3 gap-2">
-        {chartData.map((d) => (
-          <div key={d.subject} className="text-center">
-            <p className="text-lg font-bold text-neutral-900 dark:text-neutral-50">{d.value}%</p>
-            <p className="text-[10px] text-neutral-500">{d.subject}</p>
+      <div className="w-full min-w-0">
+        <ResponsiveContainer width="100%" height={220}>
+              <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="70%">
+                <PolarGrid stroke="currentColor" className="text-neutral-200 dark:text-neutral-700" />
+                <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: "currentColor" }} className="text-neutral-500" />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 9 }} />
+                <Radar name="Score" dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.2} strokeWidth={2} />
+              </RadarChart>
+            </ResponsiveContainer>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {chartData.map((d) => (
+              <div key={d.subject} className="text-center">
+                <p className="text-lg font-bold text-neutral-900 dark:text-neutral-50">{d.value}%</p>
+                <p className="text-[10px] text-neutral-500">{d.subject}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-    </Card>
+        </div>
+      </Card>
   );
 }
 
@@ -762,7 +764,7 @@ export default function Analytics() {
                 </div>
               </Card>
             </div>
-            <div className="xl:col-span-2">
+            <div className="xl:col-span-2 min-w-0">
               <ComponentRadar
                 data={selectedArsen}
                 label={selectedArsen.arsen_name}
@@ -809,7 +811,7 @@ export default function Analytics() {
                 </div>
               </Card>
             </div>
-            <div className="xl:col-span-2">
+            <div className="xl:col-span-2 min-w-0">
               <ComponentRadar
                 data={selectedGroup}
                 label={selectedGroup.group_name}
@@ -858,7 +860,7 @@ export default function Analytics() {
                 </div>
               </Card>
             </div>
-            <div className="xl:col-span-2">
+            <div className="xl:col-span-2 min-w-0">
               <ComponentRadar
                 data={selectedSquadron}
                 label={selectedSquadron.squadron_name}

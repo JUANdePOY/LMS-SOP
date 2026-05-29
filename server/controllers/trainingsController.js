@@ -2,6 +2,7 @@ const trainingsService = require('../services/trainingsService');
 const trainingAttachmentService = require('../services/trainingAttachmentService');
 const externalTrainingAttachmentService = require('../services/externalTrainingAttachmentService');
 const { logAudit } = require('../utils/auditLogger');
+const fs = require('fs');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -231,24 +232,37 @@ function uploadExternalLetterOrder(req, res) {
 }
 
 function downloadTrainingAttachment(req, res) {
-  res.status(501).json({ success: false, message: 'Download training attachment not yet implemented' });
+  const { trainingId, attachmentId } = req.params;
+  trainingAttachmentService.getDownloadStreamContext(attachmentId, trainingId)
+    .then(context => {
+      res.setHeader('Content-Type', context.mimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${context.originalFilename}"`);
+      const fileStream = fs.createReadStream(context.absolutePath);
+      fileStream.on('error', () => {
+        if (!res.headersSent) {
+          res.status(500).json({ success: false, message: 'Failed to read file' });
+        }
+      });
+      fileStream.pipe(res);
+    })
+    .catch(err => sendError(res, err, 'Failed to download attachment'));
 }
 
 function downloadExternalTrainingAttachment(req, res) {
-  res.status(501).json({ success: false, message: 'Download external training attachment not yet implemented' });
-}
-
-function uploadExternalLetterOrder(req, res) {
-  res.status(501).json({ success: false, message: 'External letter order upload not yet implemented in controller' });
-}
-
-// Placeholder functions for download endpoints
-function downloadTrainingAttachment(req, res) {
-  res.status(501).json({ success: false, message: 'Download training attachment not yet implemented' });
-}
-
-function downloadExternalTrainingAttachment(req, res) {
-  res.status(501).json({ success: false, message: 'Download external training attachment not yet implemented' });
+  const { id: externalTrainingId, attachmentId } = req.params;
+  externalTrainingAttachmentService.getDownloadStreamContext(attachmentId, externalTrainingId)
+    .then(context => {
+      res.setHeader('Content-Type', context.mimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${context.originalFilename}"`);
+      const fileStream = fs.createReadStream(context.absolutePath);
+      fileStream.on('error', () => {
+        if (!res.headersSent) {
+          res.status(500).json({ success: false, message: 'Failed to read file' });
+        }
+      });
+      fileStream.pipe(res);
+    })
+    .catch(err => sendError(res, err, 'Failed to download attachment'));
 }
 
 function listInternalAttachments(req, res) {

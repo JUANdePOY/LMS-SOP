@@ -148,7 +148,7 @@ function ProfessionDistribution({ data }) {
 
       <div className="flex items-start gap-5">
         {/* Pie chart with total in center */}
-        <div className="relative w-[130px] h-[130px] shrink-0">
+        <div className="relative w-[130px] h-[130px] shrink-0 min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie

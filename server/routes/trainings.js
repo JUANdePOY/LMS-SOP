@@ -117,8 +117,7 @@ router.post(
 
 router.get(
   '/internal/:trainingId/attachments/:attachmentId/file',
-  authenticateToken,
-  requireAdmin,
+  optionalAuthenticateToken,
   [...trainingIdParam, ...attachmentIdParam],
   rejectInvalid,
   trainingsController.downloadTrainingAttachment
@@ -154,8 +153,7 @@ router.post(
 
 router.get(
   '/external/:id/attachments/:attachmentId/file',
-  authenticateToken,
-  requireAdmin,
+  optionalAuthenticateToken,
   [...idParam, ...attachmentIdParam],
   rejectInvalid,
   trainingsController.downloadExternalTrainingAttachment

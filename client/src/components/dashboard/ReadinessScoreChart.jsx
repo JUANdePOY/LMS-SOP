@@ -138,7 +138,7 @@ export default function ReadinessScoreChart() {
             Score Composition
           </p>
           <div className="flex items-center gap-6">
-            <div className="h-[100px] w-[100px] shrink-0">
+            <div className="h-[100px] w-[100px] shrink-0 min-w-0">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
