@@ -264,10 +264,10 @@ router.post('/register', authenticateToken, [
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
          const [results] = await db.query(
-             `SELECT u.id, u.role, u.scope_arsen_id, u.scope_group_id, u.scope_squadron_id,
+             `SELECT u.id, u.email, u.role, u.scope_arsen_id, u.scope_group_id, u.scope_squadron_id,
                      r.service_number as id_number 
               FROM users u
-              JOIN reservists r ON u.id = r.user_id
+              LEFT JOIN reservists r ON u.id = r.user_id
               WHERE u.id = ?`,
              [req.user.userId]
          );
@@ -286,6 +286,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
              data: {
                  userId: user.id,
                  id_number: user.id_number,
+                 email: user.email,
                  role: user.role,
                  scope_arsen_id: user.scope_arsen_id || null,
                  scope_group_id: user.scope_group_id || null,
@@ -297,6 +298,114 @@ router.get('/profile', authenticateToken, async (req, res) => {
         res.status(500).json({
             status: 'error',
             message: 'Database error',
+            code: 'DB_ERROR'
+        });
+    }
+});
+
+/**
+ * PUT /auth/profile
+ * Update current user's email and/or password
+ */
+router.put('/profile', authenticateToken, [
+    body('email').optional().isEmail().normalizeEmail().withMessage('Valid email required'),
+    body('current_password').optional().notEmpty().withMessage('Current password is required when changing password'),
+    body('new_password').optional().isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+], async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Validation failed',
+                code: 'VALIDATION_ERROR',
+                errors: errors.array()
+            });
+        }
+
+        const { email, current_password, new_password } = req.body;
+        const updates = [];
+        const params = [];
+
+        // Get current user
+        const [userResults] = await db.query(
+            'SELECT id, email, password_hash FROM users WHERE id = ?',
+            [req.user.userId]
+        );
+
+        if (!userResults || userResults.length === 0) {
+            return res.status(404).json({
+                status: 'error',
+                message: 'User not found',
+                code: 'NOT_FOUND'
+            });
+        }
+
+        const user = userResults[0];
+
+        // Handle email update
+        if (email && email !== user.email) {
+            const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
+            if (existing.length > 0) {
+                return res.status(409).json({
+                    status: 'error',
+                    message: 'Email already in use',
+                    code: 'EMAIL_EXISTS'
+                });
+            }
+            updates.push('email = ?');
+            params.push(email);
+        }
+
+        // Handle password update
+        if (new_password) {
+            if (!current_password) {
+                return res.status(400).json({
+                    status: 'error',
+                    message: 'Current password is required to set new password',
+                    code: 'VALIDATION_ERROR'
+                });
+            }
+
+            const isCurrentValid = await comparePassword(current_password, user.password_hash);
+            if (!isCurrentValid) {
+                return res.status(401).json({
+                    status: 'error',
+                    message: 'Current password is incorrect',
+                    code: 'INVALID_PASSWORD'
+                });
+            }
+
+            const newPasswordHash = await hashPassword(new_password);
+            updates.push('password_hash = ?');
+            params.push(newPasswordHash);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'No changes provided',
+                code: 'VALIDATION_ERROR'
+            });
+        }
+
+        params.push(req.user.userId);
+        await db.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
+
+        logAudit({
+            user_id: req.user.userId,
+            action: 'user.profile_updated',
+            entity_type: 'user',
+            entity_id: req.user.userId,
+            new_values: email ? { email } : { password_changed: true }
+        });
+
+        res.json({ status: 'success', message: 'Profile updated' });
+    } catch (error) {
+        console.error('Profile update error:', error);
+        res.status(500).json({
+            status: 'error',
+            message: 'Failed to update profile',
             code: 'DB_ERROR'
         });
     }

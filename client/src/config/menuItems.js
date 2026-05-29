@@ -13,6 +13,7 @@ import {
   PlaneTakeoff,
   Megaphone,
   CalendarDays,
+  Settings as SettingsIcon,
 } from "lucide-react";
 
 // Role requirements for menu items (undefined = any authenticated user)
@@ -46,21 +47,21 @@ export const menuItems = [
     icon: Megaphone,
     description: "Updates & notices",
   },
-  {
-    name: "Reservists",
-    path: "/reservists",
-    icon: UserSquare,
-    description: "Manage reservists",
-    // Only admins can access full list (reservists blocked by backend + route guard)
-    roles: ADMIN_ROLES,
-  },
-  {
-    name: "Airbase",
-    path: "/airbase",
-    icon: PlaneTakeoff,
-    description: "Airbase hierarchy management",
-    roles: ADMIN_ROLES,
-    children: [
+   {
+     name: "Reservists",
+     path: "/reservists",
+     icon: UserSquare,
+     description: "Manage reservists",
+     // Only admins can access full list (reservists blocked by backend + route guard)
+     roles: ADMIN_ROLES,
+   },
+   {
+     name: "Airbase",
+     path: "/airbase",
+     icon: PlaneTakeoff,
+     description: "Airbase hierarchy management",
+     roles: ADMIN_ROLES,
+     children: [
       {
         name: "Overview",
         path: "/airbase",
@@ -74,14 +75,14 @@ export const menuItems = [
         path: "/airbase/arcens",
         icon: Shield,
         description: "ARCEN units management",
-        roles: ADMIN_ROLES,
+        roles: ['admin'],
       },
       {
         name: "Manage Groups",
         path: "/airbase/groups",
         icon: Users,
         description: "Reserve groups management",
-        roles: ADMIN_ROLES,
+        roles: ['admin', 'admin_arsen'],
       },
       {
         name: "Manage Squadrons",

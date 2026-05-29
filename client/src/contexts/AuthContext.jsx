@@ -63,29 +63,31 @@ export function AuthProvider({ children }) {
     setError(null);
   }, []);
 
-  const isAuthenticated = !!user;
-  const isAdmin = user?.role === 'admin';
-  const isAnyAdmin = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'].includes(user?.role);
-  const isUnitAdmin = ['admin_arsen', 'admin_group', 'admin_squadron'].includes(user?.role);
-  const isReservist = user?.role === 'reservist';
+   const isAuthenticated = !!user;
+   const isAdmin = user?.role === 'admin';
+   const isAnyAdmin = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'].includes(user?.role);
+   const isUnitAdmin = ['admin_arsen', 'admin_group', 'admin_squadron'].includes(user?.role);
+   const isReservist = user?.role === 'reservist';
+   const isSuperAdmin = user?.role === 'admin';
 
-  return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      error,
-      login,
-      logout,
-      isAuthenticated,
-      isAdmin,
-      isAnyAdmin,
-      isUnitAdmin,
-      isReservist,
-      setError,
-    }}>
-      {children}
-    </AuthContext.Provider>
-  );
+   return (
+     <AuthContext.Provider value={{
+       user,
+       loading,
+       error,
+       login,
+       logout,
+       isAuthenticated,
+       isAdmin,
+       isAnyAdmin,
+       isUnitAdmin,
+       isReservist,
+       isSuperAdmin,
+       setError,
+     }}>
+       {children}
+     </AuthContext.Provider>
+   );
 }
 
 /**

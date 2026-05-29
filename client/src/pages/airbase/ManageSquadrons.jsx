@@ -7,6 +7,7 @@ import { StatusBadge, MonoCode, PrimaryButton, FilterSelect } from "@/components
 import AddEditModal, { FormField, FormInput, FormSelect } from "@/components/airbase/AddEditModal";
 import DetailModal, { DetailSection, DetailRow, DetailStatCard } from "@/components/airbase/DetailModal";
 import { getSquadrons, getArcens, getGroupsList, createSquadron, updateSquadron, deleteSquadron } from "@/services/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 const SPECIALIZATIONS = [
   "Security", "Engineering", "Communications", "Medical", "Supply",
@@ -15,17 +16,19 @@ const SPECIALIZATIONS = [
 ];
 
 export default function ManageSquadrons() {
-  const [data,         setData]         = useState([]);
+  const { user } = useAuth();
+  const isSquadronAdmin = user?.role === 'admin_squadron';
+  const [data, setData] = useState([]);
   const [groupOptions, setGroupOptions] = useState([]);
   const [arcenOptions, setArcenOptions] = useState([]);
-  const [loading,      setLoading]      = useState(false);
-  const [detail,       setDetail]       = useState(null);
-  const [editModal,    setEditModal]    = useState(false);
-  const [editMode,     setEditMode]     = useState("add");
-  const [form,         setForm]         = useState({ name: "", code: "", groupId: "", specialization: "", location: "", members: "", status: "active" });
-  const [arcenFilter,  setArcenFilter]  = useState("");
-  const [groupFilter,  setGroupFilter]  = useState("");
-  const [specFilter,   setSpecFilter]   = useState("");
+  const [loading, setLoading] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [editModal, setEditModal] = useState(false);
+  const [editMode, setEditMode] = useState("add");
+  const [form, setForm] = useState({ name: "", code: "", groupId: "", specialization: "", location: "", members: "", status: "active" });
+  const [arcenFilter, setArcenFilter] = useState("");
+  const [groupFilter, setGroupFilter] = useState("");
+  const [specFilter, setSpecFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
 
   useEffect(() => {
@@ -128,7 +131,6 @@ export default function ManageSquadrons() {
 
   const handleSubmit = async () => {
     try {
-      const grp = groupOptions.find((g) => g.value === form.groupId);
       if (editMode === "add") {
         const response = await createSquadron({
           group_id: parseInt(form.groupId),
@@ -199,7 +201,7 @@ export default function ManageSquadrons() {
         title="Manage Squadrons"
         description="Click any row to view details. Add, edit, or manage location-based squadrons."
         breadcrumbs={[{ label: "Airbase", path: "/airbase" }, { label: "Manage Squadrons" }]}
-        actions={<PrimaryButton icon={Plus} onClick={openAdd}>Add Squadron</PrimaryButton>}
+        actions={!isSquadronAdmin && <PrimaryButton icon={Plus} onClick={openAdd}>Add Squadron</PrimaryButton>}
       />
 
       {/* Stats */}
@@ -284,7 +286,7 @@ export default function ManageSquadrons() {
           subtitle={`${detail.groupName} · ${detail.arcenName}`}
           badge={detail.code}
           size="lg"
-          footer={
+          footer={!isSquadronAdmin && (
             <div className="flex items-center justify-between w-full">
               <button onClick={() => handleDelete(detail)} className="flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all duration-150">
                 <Trash2 size={14} /> Delete
@@ -298,7 +300,7 @@ export default function ManageSquadrons() {
                 </button>
               </div>
             </div>
-          }
+          )}
         >
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
             <DetailStatCard label="Members"        value={detail.members}  color="text-indigo-600 dark:text-indigo-400" />

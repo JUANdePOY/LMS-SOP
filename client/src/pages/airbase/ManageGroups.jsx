@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Users, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Shield } from "lucide-react";
+import { Users, Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
 import ManagementTable from "@/components/airbase/ManagementTable";
@@ -7,19 +7,22 @@ import { StatusBadge, TypeBadge, MonoCode, PrimaryButton, FilterSelect } from "@
 import AddEditModal, { FormField, FormInput, FormSelect } from "@/components/airbase/AddEditModal";
 import DetailModal, { DetailSection, DetailRow, DetailStatCard } from "@/components/airbase/DetailModal";
 import { getGroupsList, getArcens, createGroup, updateGroup, deleteGroup } from "@/services/api";
+import { useAuth } from "@/contexts/AuthContext";
 
 const GROUP_TYPES = ["Combat Support", "Logistics", "Air Defense", "Intelligence", "Medical"];
 
 export default function ManageGroups() {
-  const [data,        setData]        = useState([]);
+  const { user } = useAuth();
+  const isSquadronAdmin = user?.role === 'admin_squadron';
+  const [data, setData] = useState([]);
   const [arcenOptions, setArcenOptions] = useState([]);
-  const [loading,     setLoading]     = useState(false);
-  const [detail,      setDetail]      = useState(null);
-  const [editModal,   setEditModal]   = useState(false);
-  const [editMode,    setEditMode]    = useState("add");
-  const [form,        setForm]        = useState({ name: "", code: "", type: "", commander: "", arcenId: "", status: "active" });
+  const [loading, setLoading] = useState(false);
+  const [detail, setDetail] = useState(null);
+  const [editModal, setEditModal] = useState(false);
+  const [editMode, setEditMode] = useState("add");
+  const [form, setForm] = useState({ name: "", code: "", type: "", commander: "", arsenId: "", status: "active" });
   const [arcenFilter, setArcenFilter] = useState("");
-  const [typeFilter,  setTypeFilter]  = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
 
   useEffect(() => {
     fetchArcenOptions();
@@ -91,7 +94,6 @@ export default function ManageGroups() {
 
   const handleSubmit = async () => {
     try {
-      const arcen = arcenOptions.find((a) => a.value === form.arcenId);
       if (editMode === "add") {
         const response = await createGroup({
           arsen_id: parseInt(form.arcenId),
@@ -159,7 +161,7 @@ export default function ManageGroups() {
         title="Manage Groups"
         description="Click any row to view details. Add, edit, or manage reserve groups."
         breadcrumbs={[{ label: "Airbase", path: "/airbase" }, { label: "Manage Groups" }]}
-        actions={<PrimaryButton icon={Plus} onClick={openAdd}>Add Group</PrimaryButton>}
+        actions={!isSquadronAdmin && <PrimaryButton icon={Plus} onClick={openAdd}>Add Group</PrimaryButton>}
       />
 
       {/* Stats */}
@@ -242,7 +244,7 @@ export default function ManageGroups() {
           subtitle={`${detail.arcenName} · ${detail.arcenFull}`}
           badge={detail.code}
           size="lg"
-          footer={
+          footer={(user?.role === 'admin' || user?.role === 'admin_arsen') && (
             <div className="flex items-center justify-between w-full">
               <button onClick={() => handleDelete(detail)} className={cn("flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 transition-all duration-150")}>
                 <Trash2 size={14} /> Delete
@@ -256,7 +258,7 @@ export default function ManageGroups() {
                 </button>
               </div>
             </div>
-          }
+          )}
         >
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-5">
             <DetailStatCard label="Reservists"       value={detail.reservists.toLocaleString()} color="text-indigo-600 dark:text-indigo-400" />

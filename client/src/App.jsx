@@ -109,7 +109,7 @@ const router = createBrowserRouter([
       { path: "logistics",     element: AdminProtectedWrapper(Logistics)       },
       { path: "alerts",        element: ProtectedWrapper(Alerts)          },
       { path: "reports",     element: ProtectedWrapper(Reports)         },
-      { path: "settings",    element: SuperAdminProtectedWrapper(Settings) },
+      { path: "settings",    element: AdminProtectedWrapper(Settings) },
       { path: "audit-logs",  element: SuperAdminProtectedWrapper(AuditLogs) },
       { path: "airbase",      element: AdminProtectedWrapper(AirbaseOverview) },
       { path: "airbase/arcens",   element: AdminProtectedWrapper(ManageArcens) },

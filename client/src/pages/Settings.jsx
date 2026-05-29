@@ -1,14 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import {
-  Settings as SettingsIcon, Users, Shield, Plus, Pencil, Save, X,
-  ChevronDown, ChevronRight, History, Building2, UsersRound, Plane,
-  ToggleLeft, ToggleRight, AlertCircle, CheckCircle, Info, Search,
+  Settings as SettingsIcon, Users, Shield, Plus, Pencil, Save, X, Trash2,
+  ChevronRight, History, Building2, UsersRound, Plane,
+  CheckCircle, Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/Toast";
 import {
   getSettings, updateSetting, createSetting,
-  getRoles, getSettingsUsers, updateUserRole, getUserRoleHistory, getRoleOptions,
+  getSettingsUsers, updateUserRole, getUserRoleHistory, getScopedRoleOptions, createUser, deleteUser,
+  getProfile, updateProfile,
 } from "@/services/api";
 
 const ROLE_META = {
@@ -82,6 +83,7 @@ export default function Settings() {
 function RoleManagement({ toast }) {
   const [users, setUsers] = useState([]);
   const [roleOptions, setRoleOptions] = useState({ arsens: [], groups: [], squadrons: [] });
+  const [assignableRoles, setAssignableRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editUser, setEditUser] = useState(null);
   const [formRole, setFormRole] = useState("");
@@ -90,16 +92,21 @@ function RoleManagement({ toast }) {
   const [historyUser, setHistoryUser] = useState(null);
   const [historyData, setHistoryData] = useState([]);
   const [showAddUser, setShowAddUser] = useState(false);
+  const [addUserForm, setAddUserForm] = useState({ email: "", role: "", arsen_id: null, group_id: null, squadron_id: null });
+  const [deletingUserId, setDeletingUserId] = useState(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [usersRes, optionsRes] = await Promise.all([
         getSettingsUsers(),
-        getRoleOptions(),
+        getScopedRoleOptions(),
       ]);
       if (usersRes.data.status === 'success') setUsers(usersRes.data.data);
-      if (optionsRes.data.status === 'success') setRoleOptions(optionsRes.data.data);
+      if (optionsRes.data.status === 'success') {
+        setRoleOptions({ arsens: optionsRes.data.data.arsens, groups: optionsRes.data.data.groups, squadrons: optionsRes.data.data.squadrons });
+        setAssignableRoles(optionsRes.data.data.roles || []);
+      }
     } catch (err) {
       toast.error("Failed to load role data");
     } finally {
@@ -142,6 +149,44 @@ function RoleManagement({ toast }) {
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to update role");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteUser = async (user) => {
+    if (!confirm(`Are you sure you want to deactivate ${user.first_name} ${user.last_name}? This action cannot be undone.`)) return;
+    setDeletingUserId(user.id);
+    try {
+      const res = await deleteUser(user.id);
+      if (res.data.status === 'success') {
+        toast.success(`User deactivated`);
+        fetchData();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to deactivate user");
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
+
+  const handleAddUser = async () => {
+    setSaving(true);
+    try {
+      const payload = { email: addUserForm.email, role: addUserForm.role };
+      if (addUserForm.role === 'admin_arsen') payload.scope_arsen_id = addUserForm.arsen_id;
+      if (addUserForm.role === 'admin_group') payload.scope_group_id = addUserForm.group_id;
+      if (addUserForm.role === 'admin_squadron') payload.scope_squadron_id = addUserForm.squadron_id;
+
+      const res = await createUser(payload);
+      if (res.data.status === 'success') {
+        toast.success(`User created successfully`);
+        setShowAddUser(false);
+        setAddUserForm({ email: "", role: "", arsen_id: null, group_id: null, squadron_id: null });
+        fetchData();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to create user");
     } finally {
       setSaving(false);
     }
@@ -195,13 +240,12 @@ function RoleManagement({ toast }) {
     );
   };
 
-  const groupedUsers = {
-    admin: users.filter(u => u.role === 'admin'),
-    admin_arsen: users.filter(u => u.role === 'admin_arsen'),
-    admin_group: users.filter(u => u.role === 'admin_group'),
-    admin_squadron: users.filter(u => u.role === 'admin_squadron'),
-    reservist: users.filter(u => u.role === 'reservist'),
-  };
+  const groupedUsers = {};
+  ['admin', 'admin_arsen', 'admin_group', 'admin_squadron', 'reservist'].forEach(roleKey => {
+    if (roleKey === 'admin' || assignableRoles.includes(roleKey)) {
+      groupedUsers[roleKey] = users.filter(u => u.role === roleKey);
+    }
+  });
 
   if (loading) {
     return (
@@ -241,41 +285,53 @@ function RoleManagement({ toast }) {
           totalPages = Math.max(1, Math.ceil(roleUsers.length / PAGE_SIZE));
           const currentPage = Math.min(getPage(roleKey), totalPages);
           const startIdx = (currentPage - 1) * PAGE_SIZE;
-          displayUsers = roleUsers.slice(startIdx, startIdx + PAGE_SIZE);
+displayUsers = roleUsers.slice(startIdx, startIdx + PAGE_SIZE);
         }
 
         return (
-          <div key={roleKey} className="flex flex-col gap-3">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className={cn("flex h-7 w-7 items-center justify-center rounded-lg", meta.bg)}>
-                  <Icon size={14} className={meta.color} />
-                </div>
-                <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">{meta.label}s</h2>
-                <span className="text-[10px] text-neutral-400">
-                  {roleUsers.length !== allRoleUsers.length
-                    ? `${roleUsers.length} of ${allRoleUsers.length}`
-                    : `${allRoleUsers.length} user${allRoleUsers.length !== 1 ? 's' : ''}`}
-                </span>
-              </div>
-              <div className="relative w-full max-w-[220px]">
-                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
-                <input
-                  type="text"
-                  value={getSearch(roleKey)}
-                  onChange={(e) => setSearchFor(roleKey, e.target.value)}
-                  placeholder="Search…"
-                  className={cn(
-                    "w-full rounded-lg border pl-8 pr-3 py-1.5 text-xs",
-                    "border-neutral-200 dark:border-neutral-700",
-                    "bg-white dark:bg-neutral-800",
-                    "text-neutral-800 dark:text-neutral-200",
-                    "placeholder:text-neutral-400 dark:placeholder:text-neutral-600",
-                    "outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400",
-                    "transition-all duration-150"
-                  )}
-                />
-              </div>
+            <div key={roleKey} className="flex flex-col gap-3">
+             <div className="flex items-center justify-between gap-3">
+               <div className="flex items-center gap-2">
+                 <div className={cn("flex h-7 w-7 items-center justify-center rounded-lg", meta.bg)}>
+                   <Icon size={14} className={meta.color} />
+                 </div>
+                 <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">{meta.label}s</h2>
+                 <span className="text-[10px] text-neutral-400">
+                   {roleUsers.length !== allRoleUsers.length
+                     ? `${roleUsers.length} of ${allRoleUsers.length}`
+                     : `${allRoleUsers.length} user${allRoleUsers.length !== 1 ? 's' : ''}`}
+                 </span>
+               </div>
+               <div className="flex items-center gap-2">
+                 <button
+                   onClick={() => {
+                     setAddUserForm({ email: "", role: "", arsen_id: null, group_id: null, squadron_id: null });
+                     setShowAddUser(true);
+                   }}
+                   className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                   title="Add user"
+                 >
+                   <Plus size={14} />
+                 </button>
+                 <div className="relative w-full max-w-[220px]">
+                   <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+                   <input
+                     type="text"
+                     value={getSearch(roleKey)}
+                     onChange={(e) => setSearchFor(roleKey, e.target.value)}
+                     placeholder="Search…"
+                     className={cn(
+                       "w-full rounded-lg border pl-8 pr-3 py-1.5 text-xs",
+                       "border-neutral-200 dark:border-neutral-700",
+                       "bg-white dark:bg-neutral-800",
+                       "text-neutral-800 dark:text-neutral-200",
+                       "placeholder:text-neutral-400 dark:placeholder:text-neutral-600",
+                       "outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400",
+                       "transition-all duration-150"
+                     )}
+                   />
+                 </div>
+               </div>
             </div>
 
             {roleUsers.length === 0 ? (
@@ -337,11 +393,25 @@ function RoleManagement({ toast }) {
                           >
                             <Pencil size={13} />
                           </button>
+                          {user.role !== 'admin' && (
+                            <button
+                              onClick={() => handleDeleteUser(user)}
+                              disabled={deletingUserId === user.id}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors disabled:opacity-40"
+                              title="Deactivate user"
+                            >
+                              {deletingUserId === user.id ? (
+                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+                              ) : (
+                                <Trash2 size={13} />
+                              )}
+                            </button>
+                          )}
                         </div>
                       </td>
-                    </tr>
-                  ))}
-                </tbody>
+                      </tr>
+                    ))}
+                  </tbody>
               </table>
 
               {needsPagination && totalPages > 1 && (
@@ -414,48 +484,50 @@ function RoleManagement({ toast }) {
                  </div>
                )}
 
-               {/* Role selection */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">New Role</label>
+{/* Role selection */}
                 <div className="flex flex-col gap-1.5">
-                  {Object.entries(ROLE_META).map(([key, meta]) => {
-                    const RoleIcon = meta.icon;
-                    const selected = formRole === key;
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => {
-                          setFormRole(key);
-                          if (editUser?.role === 'reservist') {
-                            if (key === 'admin_arsen' && editUser.assignment_arsen_id) {
-                              setFormScope(s => ({ ...s, arsen_id: editUser.assignment_arsen_id }));
-                            } else if (key === 'admin_group' && editUser.assignment_group_id) {
-                              setFormScope(s => ({ ...s, group_id: editUser.assignment_group_id }));
-                            } else if (key === 'admin_squadron' && editUser.assignment_squadron_id) {
-                              setFormScope(s => ({ ...s, squadron_id: editUser.assignment_squadron_id }));
-                            }
-                          }
-                        }}
-                        className={cn(
-                          "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all duration-150",
-                          selected
-                            ? cn(meta.border, meta.bg, "ring-1 ring-indigo-500/30")
-                            : "border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600"
-                        )}
-                      >
-                        <RoleIcon size={16} className={selected ? meta.color : "text-neutral-400"} />
-                        <div className="flex flex-col flex-1">
-                          <span className={cn("text-xs font-semibold", selected ? meta.color : "text-neutral-700 dark:text-neutral-300")}>
-                            {meta.label}
-                          </span>
-                          <span className="text-[10px] text-neutral-400">{meta.desc}</span>
-                        </div>
-                        {selected && <CheckCircle size={14} className="text-indigo-500" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                 <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">New Role</label>
+                 <div className="flex flex-col gap-1.5">
+                   {Object.entries(ROLE_META).map(([key, meta]) => {
+                     const RoleIcon = meta.icon;
+                     const selected = formRole === key;
+                     const canAssign = assignableRoles.includes(key);
+                     if (!canAssign) return null;
+                     return (
+                       <button
+                         key={key}
+                         onClick={() => {
+                           setFormRole(key);
+                           if (editUser?.role === 'reservist') {
+                             if (key === 'admin_arsen' && editUser.assignment_arsen_id) {
+                               setFormScope(s => ({ ...s, arsen_id: editUser.assignment_arsen_id }));
+                             } else if (key === 'admin_group' && editUser.assignment_group_id) {
+                               setFormScope(s => ({ ...s, group_id: editUser.assignment_group_id }));
+                             } else if (key === 'admin_squadron' && editUser.assignment_squadron_id) {
+                               setFormScope(s => ({ ...s, squadron_id: editUser.assignment_squadron_id }));
+                             }
+                           }
+                         }}
+                         className={cn(
+                           "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all duration-150",
+                           selected
+                             ? cn(meta.border, meta.bg, "ring-1 ring-indigo-500/30")
+                             : "border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600"
+                         )}
+                       >
+                         <RoleIcon size={16} className={selected ? meta.color : "text-neutral-400"} />
+                         <div className="flex flex-col flex-1">
+                           <span className={cn("text-xs font-semibold", selected ? meta.color : "text-neutral-700 dark:text-neutral-300")}>
+                             {meta.label}
+                           </span>
+                           <span className="text-[10px] text-neutral-400">{meta.desc}</span>
+                         </div>
+                         {selected && <CheckCircle size={14} className="text-indigo-500" />}
+                       </button>
+                     );
+                   })}
+                 </div>
+               </div>
 
               {/* Scope selection */}
               {formRole === 'admin_arsen' && (
@@ -557,34 +629,174 @@ function RoleManagement({ toast }) {
             </div>
 
             <div className="px-6 py-4 max-h-[60vh] overflow-y-auto">
-              {historyData.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-neutral-400">
-                  <History size={24} className="mb-2" />
-                  <span className="text-xs">No role changes recorded</span>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {historyData.map((entry) => (
-                    <div key={entry.id} className="flex gap-3 rounded-lg border border-neutral-100 dark:border-neutral-800 p-3">
-                      <div className="flex flex-col flex-1 gap-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={cn("text-[11px] font-semibold", ROLE_META[entry.old_role]?.color)}>
-                            {ROLE_META[entry.old_role]?.label || entry.old_role || '(none)'}
-                          </span>
-                          <ChevronRight size={12} className="text-neutral-300 dark:text-neutral-600" />
-                          <span className={cn("text-[11px] font-semibold", ROLE_META[entry.new_role]?.color)}>
-                            {ROLE_META[entry.new_role]?.label || entry.new_role}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-neutral-400">
-                          {new Date(entry.changed_at).toLocaleString()}
-                          {entry.first_name && ` · by ${entry.first_name} ${entry.last_name}`}
+{historyData.length === 0 ? (
+                 <div className="flex flex-col items-center justify-center py-10 text-neutral-400">
+                   <History size={24} className="mb-2" />
+                   <span className="text-xs">No role changes recorded</span>
+                 </div>
+               ) : (
+                 <div className="flex flex-col gap-3">
+                   {historyData.map((entry) => (
+                     <div key={entry.id} className="flex gap-3 rounded-lg border border-neutral-100 dark:border-neutral-800 p-3">
+                       <div className="flex flex-col flex-1 gap-1">
+                         <div className="flex items-center gap-2 flex-wrap">
+                           <span className={cn("text-[11px] font-semibold", ROLE_META[entry.old_role]?.color)}>
+                             {ROLE_META[entry.old_role]?.label || entry.old_role || '(none)'}
+                           </span>
+                           <ChevronRight size={12} className="text-neutral-300 dark:text-neutral-600" />
+                           <span className={cn("text-[11px] font-semibold", ROLE_META[entry.new_role]?.color)}>
+                             {ROLE_META[entry.new_role]?.label || entry.new_role}
+                           </span>
+                         </div>
+                         <span className="text-[10px] text-neutral-400">
+                           {new Date(entry.changed_at).toLocaleString()}
+                           {entry.first_name && ` · by ${entry.first_name} ${entry.last_name}`}
+                         </span>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add User Modal ───────────────────────────────────── */}
+      {showAddUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+          <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setShowAddUser(false)} />
+          <div className={cn(
+            "relative z-10 w-full max-w-lg rounded-2xl shadow-2xl",
+            "bg-white dark:bg-neutral-900",
+            "border border-neutral-200 dark:border-neutral-800"
+          )}>
+            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
+              <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-50">Add New User</h2>
+              <button onClick={() => setShowAddUser(false)} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="px-6 py-4 flex flex-col gap-4">
+              {/* Email */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Email <span className="text-red-500">*</span></label>
+                <input
+                  type="email"
+                  value={addUserForm.email}
+                  onChange={(e) => setAddUserForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="user@example.com"
+                  className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                />
+              </div>
+
+              {/* Role selection */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Role <span className="text-red-500">*</span></label>
+                <div className="flex flex-col gap-1.5 max-h-48 overflow-y-auto">
+                  {assignableRoles.map((key) => {
+                    const meta = ROLE_META[key];
+                    const RoleIcon = meta?.icon || Users;
+                    const selected = addUserForm.role === key;
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setAddUserForm(f => ({ ...f, role: key }))}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all duration-150",
+                          selected
+                            ? cn(meta.border, meta.bg, "ring-1 ring-indigo-500/30")
+                            : "border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600"
+                        )}
+                      >
+                        <RoleIcon size={16} className={selected ? meta.color : "text-neutral-400"} />
+                        <span className={cn("text-xs font-semibold", selected ? meta.color : "text-neutral-700 dark:text-neutral-300")}>
+                          {meta?.label || key}
                         </span>
-                      </div>
-                    </div>
-                  ))}
+                        {selected && <CheckCircle size={14} className="ml-auto text-indigo-500" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Scope selection for scoped roles */}
+              {addUserForm.role === 'admin_arsen' && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">ARCEN Scope <span className="text-red-500">*</span></label>
+                  <select
+                    value={addUserForm.arsen_id || ""}
+                    onChange={(e) => setAddUserForm(f => ({ ...f, arsen_id: e.target.value ? parseInt(e.target.value) : null }))}
+                    className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  >
+                    <option value="">Select ARCEN...</option>
+                    {roleOptions.arsens.map(a => (
+                      <option key={a.id} value={a.id}>{a.name} ({a.code})</option>
+                    ))}
+                  </select>
                 </div>
               )}
+
+              {addUserForm.role === 'admin_group' && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Group Scope <span className="text-red-500">*</span></label>
+                  <select
+                    value={addUserForm.group_id || ""}
+                    onChange={(e) => setAddUserForm(f => ({ ...f, group_id: e.target.value ? parseInt(e.target.value) : null }))}
+                    className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  >
+                    <option value="">Select Group...</option>
+                    {roleOptions.groups.map(g => (
+                      <option key={g.id} value={g.id}>{g.name} ({g.arsen_name})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {addUserForm.role === 'admin_squadron' && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Squadron Scope <span className="text-red-500">*</span></label>
+                  <select
+                    value={addUserForm.squadron_id || ""}
+                    onChange={(e) => setAddUserForm(f => ({ ...f, squadron_id: e.target.value ? parseInt(e.target.value) : null }))}
+                    className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                  >
+                    <option value="">Select Squadron...</option>
+                    {roleOptions.squadrons.map(s => (
+                      <option key={s.id} value={s.id}>{s.name} ({s.group_name})</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+              <button
+                onClick={() => setShowAddUser(false)}
+                className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddUser}
+                disabled={saving || !addUserForm.email || !addUserForm.role || 
+                  (addUserForm.role === 'admin_arsen' && !addUserForm.arsen_id) || 
+                  (addUserForm.role === 'admin_group' && !addUserForm.group_id) || 
+                  (addUserForm.role === 'admin_squadron' && !addUserForm.squadron_id)}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150",
+                  "bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800",
+                  "disabled:opacity-40 disabled:cursor-not-allowed"
+                )}
+              >
+                {saving ? (
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                ) : (
+                  <Plus size={14} />
+                )}
+                Create User
+              </button>
             </div>
           </div>
         </div>
@@ -606,6 +818,11 @@ function GeneralSettings({ toast }) {
   const [newKey, setNewKey] = useState("");
   const [newValue, setNewValue] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [profile, setProfile] = useState(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [email, setEmail] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -619,7 +836,22 @@ function GeneralSettings({ toast }) {
     }
   }, [toast]);
 
-  useEffect(() => { fetchSettings(); }, [fetchSettings]);
+  const fetchProfile = useCallback(async () => {
+    try {
+      const res = await getProfile();
+      if (res.data.status === 'success') {
+        setProfile(res.data.data);
+        setEmail(res.data.data.email || "");
+      }
+    } catch {
+      // User might not have email (admin user)
+    }
+  }, [toast]);
+
+  useEffect(() => { 
+    fetchSettings(); 
+    fetchProfile();
+  }, [fetchSettings, fetchProfile]);
 
   const startEdit = (setting) => {
     setEditingKey(setting.key);
@@ -695,6 +927,82 @@ function GeneralSettings({ toast }) {
 
   return (
     <div className="flex flex-col gap-4">
+      <div>
+        <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200 mb-3">My Profile</h3>
+        {profile && (
+          <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4 mb-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Email</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your.email@example.com"
+                  className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Current Password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter to change password"
+                  className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="New password (min 6 characters)"
+                  disabled={!currentPassword}
+                  className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-40"
+                />
+              </div>
+              <div className="flex justify-end">
+                <button
+                  onClick={async () => {
+                    setProfileSaving(true);
+                    try {
+                      const payload = {};
+                      if (email !== profile.email) payload.email = email;
+                      if (currentPassword && newPassword) {
+                        payload.current_password = currentPassword;
+                        payload.new_password = newPassword;
+                      }
+                      if (Object.keys(payload).length === 0) {
+                        toast.error("No changes to save");
+                        return;
+                      }
+                      const res = await updateProfile(payload);
+                      if (res.data.status === 'success') {
+                        toast.success("Profile updated");
+                        fetchProfile();
+                        setCurrentPassword("");
+                        setNewPassword("");
+                      }
+                    } catch (err) {
+                      toast.error(err.response?.data?.message || "Failed to update profile");
+                    } finally {
+                      setProfileSaving(false);
+                    }
+                  }}
+                  disabled={profileSaving}
+                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors"
+                >
+                  {profileSaving ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Save size={14} />}
+                  Save Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center justify-between">
         <p className="text-xs text-neutral-500">{settings.length} configuration settings</p>
         <button
@@ -799,3 +1107,6 @@ function GeneralSettings({ toast }) {
     </div>
   );
 }
+
+
+

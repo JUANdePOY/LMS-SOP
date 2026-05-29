@@ -1,181 +1,24 @@
 const express = require('express');
-const { body, validationResult } = require('express-validator');
+const { body, param, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { requireSuperAdmin } = require('../middleware/rbac');
 const { logAudit } = require('../utils/auditLogger');
+const {
+  canManageUser,
+  canAssignRole,
+  validateScopeAssignment,
+  fetchUsersWithHierarchyForAdmin,
+  requireScopedUserManagement,
+  fetchUserWithHierarchy,
+  VALID_ROLES,
+  ROLES_BY_HIERARCHY
+} = require('../middleware/scopedUserManagement');
 
 const router = express.Router();
 
-const VALID_ROLES = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron', 'reservist'];
-
-// ─── All settings routes require super admin ───────────────────────
-router.use(authenticateToken, requireSuperAdmin);
-
-// ────────────────────────────────────────────────────────────────────
-// GET /api/settings/role-options
-// Get available arsens, groups, squadrons for scope selection
-// ────────────────────────────────────────────────────────────────────
-router.get('/role-options', async (req, res) => {
-  try {
-    const [arsens] = await db.query('SELECT id, name, code FROM arsens WHERE is_active = TRUE ORDER BY name');
-    const [groups] = await db.query('SELECT g.id, g.name, g.arsen_id, a.name AS arsen_name FROM `groups` g JOIN arsens a ON g.arsen_id = a.id WHERE g.is_active = TRUE ORDER BY a.name, g.name');
-    const [squadrons] = await db.query('SELECT s.id, s.name, s.group_id, g.name AS group_name FROM squadron s JOIN `groups` g ON s.group_id = g.id WHERE s.is_active = TRUE ORDER BY g.name, s.name');
-
-    res.json({ status: 'success', data: { arsens, groups, squadrons } });
-  } catch (err) {
-    console.error('Role options fetch error:', err);
-    res.status(500).json({ status: 'error', message: 'Failed to fetch role options', code: 'DB_ERROR' });
-  }
-});
-
-// ────────────────────────────────────────────────────────────────────
-// GET /api/settings/roles
-// List all available roles
-// ────────────────────────────────────────────────────────────────────
-router.get('/roles', async (req, res) => {
-  try {
-    const [rows] = await db.query(
-      'SELECT id, name, display_name, description, is_active FROM roles ORDER BY id'
-    );
-    res.json({ status: 'success', data: rows });
-  } catch (err) {
-    console.error('Roles fetch error:', err);
-    res.status(500).json({ status: 'error', message: 'Failed to fetch roles', code: 'DB_ERROR' });
-  }
-});
-
-// ────────────────────────────────────────────────────────────────────
-// GET /api/settings/users
-// List all users with their roles and scope info
-// ────────────────────────────────────────────────────────────────────
-router.get('/users', async (req, res) => {
-  try {
-    const [rows] = await db.query(`
-      SELECT u.id, u.email, u.role, u.is_active, u.scope_arsen_id, u.scope_group_id, u.scope_squadron_id,
-             r.first_name, r.last_name, r.service_number, r.\`rank\`,
-         a.name AS arsen_name,
-         g.name AS group_name,
-         s.name AS squadron_name,
-         raa.id AS assignment_arsen_id, raa.name AS assignment_arsen_name,
-         ra.group_id AS assignment_group_id, rag.name AS assignment_group_name,
-         ra.squadron_id AS assignment_squadron_id, rasq.name AS assignment_squadron_name
-      FROM users u
-      LEFT JOIN reservists r ON u.id = r.user_id
-      LEFT JOIN arsens a ON u.scope_arsen_id = a.id
-      LEFT JOIN \`groups\` g ON u.scope_group_id = g.id
-      LEFT JOIN squadron s ON u.scope_squadron_id = s.id
-      LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
-      LEFT JOIN \`groups\` rag ON ra.group_id = rag.id
-      LEFT JOIN squadron rasq ON ra.squadron_id = rasq.id
-      LEFT JOIN arsens raa ON rag.arsen_id = raa.id
-      ORDER BY u.role, r.last_name, r.first_name
-    `);
-    res.json({ status: 'success', data: rows });
-  } catch (err) {
-    console.error('Users fetch error:', err);
-    res.status(500).json({ status: 'error', message: 'Failed to fetch users', code: 'DB_ERROR' });
-  }
-});
-
-// ────────────────────────────────────────────────────────────────────
-// PUT /api/settings/users/:id/role
-// Change a user's role and scope
-// ────────────────────────────────────────────────────────────────────
-router.put('/users/:id/role', [
-  body('role').isIn(VALID_ROLES).withMessage(`Role must be one of: ${VALID_ROLES.join(', ')}`),
-], async (req, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
-  }
-
-  try {
-    const userId = parseInt(req.params.id);
-    const { role, scope_arsen_id, scope_group_id, scope_squadron_id } = req.body;
-
-    const [users] = await db.query(
-      'SELECT id, role, scope_arsen_id, scope_group_id, scope_squadron_id FROM users WHERE id = ?',
-      [userId]
-    );
-    if (users.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
-    }
-
-    const old = users[0];
-
-    if (role === 'admin_arsen' && !scope_arsen_id) {
-      return res.status(400).json({ status: 'error', message: 'admin_arsen requires scope_arsen_id', code: 'VALIDATION_ERROR' });
-    }
-    if (role === 'admin_group' && !scope_group_id) {
-      return res.status(400).json({ status: 'error', message: 'admin_group requires scope_group_id', code: 'VALIDATION_ERROR' });
-    }
-    if (role === 'admin_squadron' && !scope_squadron_id) {
-      return res.status(400).json({ status: 'error', message: 'admin_squadron requires scope_squadron_id', code: 'VALIDATION_ERROR' });
-    }
-
-    const newScopeArsen = (role === 'admin_arsen') ? scope_arsen_id : null;
-    const newScopeGroup = (role === 'admin_group') ? scope_group_id : null;
-    const newScopeSquadron = (role === 'admin_squadron') ? scope_squadron_id : null;
-
-    await db.query(
-      'UPDATE users SET role = ?, scope_arsen_id = ?, scope_group_id = ?, scope_squadron_id = ? WHERE id = ?',
-      [role, newScopeArsen, newScopeGroup, newScopeSquadron, userId]
-    );
-
-    await db.query(
-      `INSERT INTO user_role_history
-       (user_id, old_role, new_role, old_scope_arsen_id, new_scope_arsen_id,
-        old_scope_group_id, new_scope_group_id, old_scope_squadron_id, new_scope_squadron_id, changed_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [userId, old.role, role, old.scope_arsen_id, newScopeArsen,
-       old.scope_group_id, newScopeGroup, old.scope_squadron_id, newScopeSquadron, req.user.id]
-    );
-
-    logAudit({
-      user_id: req.user.id,
-      action: 'user.role_changed',
-      entity_type: 'user',
-      entity_id: userId,
-      old_values: { role: old.role, scope_arsen_id: old.scope_arsen_id, scope_group_id: old.scope_group_id, scope_squadron_id: old.scope_squadron_id },
-      new_values: { role, scope_arsen_id: newScopeArsen, scope_group_id: newScopeGroup, scope_squadron_id: newScopeSquadron },
-    });
-
-    res.json({ status: 'success', message: 'User role updated', data: { userId, role, scope_arsen_id: newScopeArsen, scope_group_id: newScopeGroup, scope_squadron_id: newScopeSquadron } });
-  } catch (err) {
-    console.error('Role change error:', err);
-    res.status(500).json({ status: 'error', message: 'Failed to update user role', code: 'DB_ERROR' });
-  }
-});
-
-// ────────────────────────────────────────────────────────────────────
-// GET /api/settings/users/:id/role-history
-// Get role change history for a user
-// ────────────────────────────────────────────────────────────────────
-router.get('/users/:id/role-history', async (req, res) => {
-  try {
-    const userId = parseInt(req.params.id);
-    const [rows] = await db.query(
-      `SELECT h.*, r.first_name, r.last_name
-       FROM user_role_history h
-       LEFT JOIN users u ON h.changed_by = u.id
-       LEFT JOIN reservists r ON u.id = r.user_id
-       WHERE h.user_id = ?
-       ORDER BY h.changed_at DESC`,
-      [userId]
-    );
-    res.json({ status: 'success', data: rows });
-  } catch (err) {
-    console.error('Role history fetch error:', err);
-    res.status(500).json({ status: 'error', message: 'Failed to fetch role history', code: 'DB_ERROR' });
-  }
-});
-
-// ────────────────────────────────────────────────────────────────────
-// GET /api/settings
-// List all system settings
-// ────────────────────────────────────────────────────────────────────
-router.get('/', async (req, res) => {
+// ─── Settings system endpoints - require super admin ─────────────────────
+router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const [rows] = await db.query(
       'SELECT `key`, `value`, description, updated_by, updated_at FROM system_settings ORDER BY `key`'
@@ -200,11 +43,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ────────────────────────────────────────────────────────────────────
-// PUT /api/settings/:key
-// Update a single setting
-// ────────────────────────────────────────────────────────────────────
-router.put('/:key', [
+router.put('/:key', authenticateToken, requireSuperAdmin, [
   body('value').exists().withMessage('Value is required'),
 ], async (req, res) => {
   const errors = validationResult(req);
@@ -244,11 +83,7 @@ router.put('/:key', [
   }
 });
 
-// ────────────────────────────────────────────────────────────────────
-// POST /api/settings
-// Create a new setting
-// ────────────────────────────────────────────────────────────────────
-router.post('/', [
+router.post('/', authenticateToken, requireSuperAdmin, [
   body('key').isString().trim().notEmpty().withMessage('Key is required'),
   body('value').exists().withMessage('Value is required'),
 ], async (req, res) => {
@@ -282,6 +117,422 @@ router.post('/', [
   } catch (err) {
     console.error('Settings create error:', err);
     res.status(500).json({ status: 'error', message: 'Failed to create setting', code: 'DB_ERROR' });
+  }
+});
+
+// ─── Role options and roles endpoints - require super admin ─────────────────
+router.get('/role-options', authenticateToken, requireSuperAdmin, async (req, res) => {
+  try {
+    const [arsens] = await db.query('SELECT id, name, code FROM arsens WHERE is_active = TRUE ORDER BY name');
+    const [groups] = await db.query('SELECT g.id, g.name, g.arsen_id, a.name AS arsen_name FROM `groups` g JOIN arsens a ON g.arsen_id = a.id WHERE g.is_active = TRUE ORDER BY a.name, g.name');
+    const [squadrons] = await db.query('SELECT s.id, s.name, s.group_id, g.name AS group_name FROM squadron s JOIN `groups` g ON s.group_id = g.id WHERE s.is_active = TRUE ORDER BY g.name, s.name');
+
+    res.json({ status: 'success', data: { arsens, groups, squadrons } });
+  } catch (err) {
+    console.error('Role options fetch error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch role options', code: 'DB_ERROR' });
+  }
+});
+
+router.get('/roles', authenticateToken, requireSuperAdmin, async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT id, name, display_name, description, is_active FROM roles ORDER BY id'
+    );
+    res.json({ status: 'success', data: rows });
+  } catch (err) {
+    console.error('Roles fetch error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch roles', code: 'DB_ERROR' });
+  }
+});
+
+// ─── User management routes - require scoped admin ───────────────────
+router.use('/users', authenticateToken, requireScopedUserManagement);
+
+// GET /api/settings/role-options (scoped version for admin user management)
+router.get('/users/role-options', async (req, res) => {
+  try {
+    let arsenQuery, groupQuery, squadronQuery;
+    
+    if (req.user.role === 'admin') {
+      arsenQuery = 'SELECT id, name, code FROM arsens WHERE is_active = TRUE ORDER BY name';
+      groupQuery = 'SELECT g.id, g.name, g.arsen_id, a.name AS arsen_name FROM `groups` g JOIN arsens a ON g.arsen_id = a.id WHERE g.is_active = TRUE ORDER BY a.name, g.name';
+      squadronQuery = 'SELECT s.id, s.name, s.group_id, g.name AS group_name FROM squadron s JOIN `groups` g ON s.group_id = g.id WHERE s.is_active = TRUE ORDER BY g.name, s.name';
+    } else if (req.user.role === 'admin_arsen') {
+      arsenQuery = 'SELECT id, name, code FROM arsens WHERE id = ? AND is_active = TRUE';
+      groupQuery = 'SELECT g.id, g.name, g.arsen_id, a.name AS arsen_name FROM `groups` g JOIN arsens a ON g.arsen_id = a.id WHERE g.arsen_id = ? AND g.is_active = TRUE ORDER BY g.name';
+      squadronQuery = `SELECT s.id, s.name, s.group_id, g.name AS group_name FROM squadron s JOIN \`groups\` g ON s.group_id = g.id WHERE g.arsen_id = ? AND s.is_active = TRUE ORDER BY s.name`;
+    } else if (req.user.role === 'admin_group') {
+      arsenQuery = 'SELECT a.id, a.name, a.code FROM arsens a JOIN `groups` g ON g.arsen_id = a.id WHERE g.id = ? AND a.is_active = TRUE';
+      groupQuery = 'SELECT g.id, g.name, g.arsen_id, a.name AS arsen_name FROM `groups` g JOIN arsens a ON g.arsen_id = a.id WHERE g.id = ? AND g.is_active = TRUE';
+      squadronQuery = 'SELECT s.id, s.name, s.group_id, g.name AS group_name FROM squadron s JOIN `groups` g ON s.group_id = g.id WHERE s.group_id = ? AND s.is_active = TRUE ORDER BY s.name';
+    } else if (req.user.role === 'admin_squadron') {
+      arsenQuery = `SELECT a.id, a.name, a.code FROM arsens a JOIN \`groups\` g ON g.arsen_id = a.id JOIN squadron s ON s.group_id = g.id WHERE s.id = ? AND a.is_active = TRUE`;
+      groupQuery = `SELECT g.id, g.name, g.arsen_id, a.name AS arsen_name FROM \`groups\` g JOIN arsens a ON g.arsen_id = a.id JOIN squadron s ON s.group_id = g.id WHERE s.id = ? AND g.is_active = TRUE`;
+      squadronQuery = 'SELECT s.id, s.name, s.group_id, g.name AS group_name FROM squadron s JOIN `groups` g ON s.group_id = g.id WHERE s.id = ? AND s.is_active = TRUE';
+    } else {
+      return res.json({ status: 'success', data: { arsens: [], groups: [], squadrons: [] } });
+    }
+
+    const arsenParams = req.user.role !== 'admin' ? [req.user.scope_arsen_id || req.user.scope_group_id || req.user.scope_squadron_id] : [];
+    const groupParams = req.user.role !== 'admin' ? [req.user.scope_arsen_id || req.user.scope_group_id || req.user.scope_squadron_id] : [];
+    const squadronParams = req.user.role !== 'admin' ? [req.user.scope_arsen_id || req.user.scope_group_id || req.user.scope_squadron_id] : [];
+
+    const arsenPromise = db.query(arsenQuery, arsenParams);
+    const groupPromise = db.query(groupQuery, groupParams);
+    const squadronPromise = db.query(squadronQuery, squadronParams);
+    
+    const [[arsenRows], [groupRows], [squadronRows]] = await Promise.all([arsenPromise, groupPromise, squadronPromise]);
+    
+    const roles = ROLES_BY_HIERARCHY[req.user.role] || [];
+    
+    res.json({ status: 'success', data: { arsens: arsenRows || [], groups: groupRows || [], squadrons: squadronRows || [], roles } });
+  } catch (err) {
+    console.error('Scoped role options fetch error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch role options', code: 'DB_ERROR' });
+  }
+});
+
+// GET /api/settings/users
+router.get('/users', async (req, res) => {
+  try {
+    const { where, params } = await fetchUsersWithHierarchyForAdmin(req.user);
+    
+    const baseQuery = 'SELECT u.id, u.email, u.role, u.is_active, u.scope_arsen_id, u.scope_group_id, u.scope_squadron_id, r.first_name, r.last_name, r.service_number, r.`rank` as `rank`, a.name AS arsen_name, g.name AS group_name, s.name AS squadron_name, raa.id AS assignment_arsen_id, raa.name AS assignment_arsen_name, ra.group_id AS assignment_group_id, rag.name AS assignment_group_name, ra.squadron_id AS assignment_squadron_id, rasq.name AS assignment_squadron_name FROM users u LEFT JOIN reservists r ON u.id = r.user_id LEFT JOIN arsens a ON u.scope_arsen_id = a.id LEFT JOIN `groups` g ON u.scope_group_id = g.id LEFT JOIN squadron s ON u.scope_squadron_id = s.id LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE LEFT JOIN `groups` rag ON ra.group_id = rag.id LEFT JOIN squadron rasq ON ra.squadron_id = rasq.id LEFT JOIN arsens raa ON rag.arsen_id = raa.id';
+    
+    let query = baseQuery;
+    if (where) {
+      query += ` WHERE ${where}`;
+    }
+    query += ` ORDER BY u.role, r.last_name, r.first_name`;
+    
+    const [rows] = await db.query(query, params);
+    res.json({ status: 'success', data: rows });
+  } catch (err) {
+    console.error('Users fetch error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch users', code: 'DB_ERROR' });
+  }
+});
+
+// PUT /api/settings/users/:id/role
+router.put('/users/:id/role', [
+  body('role').isIn(VALID_ROLES).withMessage(`Role must be one of: ${VALID_ROLES.join(', ')}`),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
+  }
+
+  try {
+    const userId = parseInt(req.params.id);
+    const { role, scope_arsen_id, scope_group_id, scope_squadron_id } = req.body;
+
+    const targetUser = await fetchUserWithHierarchy(userId);
+    if (!targetUser) {
+      return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
+    }
+
+    const canManage = await canManageUser(req.user, targetUser);
+    if (!canManage) {
+      return res.status(403).json({ 
+        status: 'error', 
+        message: 'Cannot manage this user - outside your scope', 
+        code: 'OUT_OF_SCOPE' 
+      });
+    }
+
+    const roleCheck = canAssignRole(req.user, role);
+    if (!roleCheck.valid) {
+      return res.status(403).json({ 
+        status: 'error', 
+        message: roleCheck.error, 
+        code: 'ROLE_NOT_ASSIGNABLE' 
+      });
+    }
+
+    const arsenId = role === 'admin_arsen' ? scope_arsen_id : null;
+    const groupId = role === 'admin_group' ? scope_group_id : null;
+    const squadronId = role === 'admin_squadron' ? scope_squadron_id : null;
+
+    const scopeCheck = await validateScopeAssignment(req.user, arsenId, groupId, squadronId);
+    if (!scopeCheck.valid) {
+      return res.status(400).json({ 
+        status: 'error', 
+        message: scopeCheck.error, 
+        code: 'SCOPE_INVALID' 
+      });
+    }
+
+    const old = targetUser;
+
+    if (role === 'admin_arsen' && !arsenId) {
+      return res.status(400).json({ status: 'error', message: 'admin_arsen requires scope_arsen_id', code: 'VALIDATION_ERROR' });
+    }
+    if (role === 'admin_group' && !groupId) {
+      return res.status(400).json({ status: 'error', message: 'admin_group requires scope_group_id', code: 'VALIDATION_ERROR' });
+    }
+    if (role === 'admin_squadron' && !squadronId) {
+      return res.status(400).json({ status: 'error', message: 'admin_squadron requires scope_squadron_id', code: 'VALIDATION_ERROR' });
+    }
+
+    const newScopeArsen = role === 'admin_arsen' ? arsenId : null;
+    const newScopeGroup = role === 'admin_group' ? groupId : null;
+    const newScopeSquadron = role === 'admin_squadron' ? squadronId : null;
+
+    await db.query(
+      'UPDATE users SET role = ?, scope_arsen_id = ?, scope_group_id = ?, scope_squadron_id = ? WHERE id = ?',
+      [role, newScopeArsen, newScopeGroup, newScopeSquadron, userId]
+    );
+
+    await db.query(
+      `INSERT INTO user_role_history
+       (user_id, old_role, new_role, old_scope_arsen_id, new_scope_arsen_id,
+        old_scope_group_id, new_scope_group_id, old_scope_squadron_id, new_scope_squadron_id, changed_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [userId, old.role, role, old.scope_arsen_id, newScopeArsen,
+       old.scope_group_id, newScopeGroup, old.scope_squadron_id, newScopeSquadron, req.user.id]
+    );
+
+    logAudit({
+      user_id: req.user.id,
+      action: 'user.role_changed',
+      entity_type: 'user',
+      entity_id: userId,
+      old_values: { role: old.role, scope_arsen_id: old.scope_arsen_id, scope_group_id: old.scope_group_id, scope_squadron_id: old.scope_squadron_id },
+      new_values: { role, scope_arsen_id: newScopeArsen, scope_group_id: newScopeGroup, scope_squadron_id: newScopeSquadron },
+    });
+
+    res.json({ status: 'success', message: 'User role updated', data: { userId, role, scope_arsen_id: newScopeArsen, scope_group_id: newScopeGroup, scope_squadron_id: newScopeSquadron } });
+  } catch (err) {
+    console.error('Role change error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to update user role', code: 'DB_ERROR' });
+  }
+});
+
+// GET /api/settings/users/:id/role-history
+router.get('/users/:id/role-history', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    
+    const targetUser = await fetchUserWithHierarchy(userId);
+    if (!targetUser) {
+      return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
+    }
+
+    const canManage = await canManageUser(req.user, targetUser);
+    if (!canManage) {
+      return res.status(403).json({ 
+        status: 'error', 
+        message: 'Cannot access role history for this user - outside your scope', 
+        code: 'OUT_OF_SCOPE' 
+      });
+    }
+
+    const [rows] = await db.query(
+      `SELECT h.*, r.first_name, r.last_name
+       FROM user_role_history h
+       LEFT JOIN users u ON h.changed_by = u.id
+       LEFT JOIN reservists r ON u.id = r.user_id
+       WHERE h.user_id = ?
+       ORDER BY h.changed_at DESC`,
+      [userId]
+    );
+    res.json({ status: 'success', data: rows });
+  } catch (err) {
+    console.error('Role history fetch error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch role history', code: 'DB_ERROR' });
+  }
+});
+
+// POST /api/settings/users
+router.post('/users', [
+  body('email').isEmail().withMessage('Valid email required'),
+  body('role').isIn(VALID_ROLES).withMessage(`Role must be one of: ${VALID_ROLES.join(', ')}`),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
+  }
+
+  try {
+    const { email, role, scope_arsen_id, scope_group_id, scope_squadron_id } = req.body;
+
+    const roleCheck = canAssignRole(req.user, role);
+    if (!roleCheck.valid) {
+      return res.status(403).json({ 
+        status: 'error', 
+        message: roleCheck.error, 
+        code: 'ROLE_NOT_ASSIGNABLE' 
+      });
+    }
+
+    const arsenId = role === 'admin_arsen' ? scope_arsen_id : null;
+    const groupId = role === 'admin_group' ? scope_group_id : null;
+    const squadronId = role === 'admin_squadron' ? scope_squadron_id : null;
+
+    const scopeCheck = await validateScopeAssignment(req.user, arsenId, groupId, squadronId);
+    if (!scopeCheck.valid) {
+      return res.status(400).json({ 
+        status: 'error', 
+        message: scopeCheck.error, 
+        code: 'SCOPE_INVALID' 
+      });
+    }
+
+    if (role === 'admin_arsen' && !arsenId) {
+      return res.status(400).json({ status: 'error', message: 'admin_arsen requires scope_arsen_id', code: 'VALIDATION_ERROR' });
+    }
+    if (role === 'admin_group' && !groupId) {
+      return res.status(400).json({ status: 'error', message: 'admin_group requires scope_group_id', code: 'VALIDATION_ERROR' });
+    }
+    if (role === 'admin_squadron' && !squadronId) {
+      return res.status(400).json({ status: 'error', message: 'admin_squadron requires scope_squadron_id', code: 'VALIDATION_ERROR' });
+    }
+
+    const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
+    if (existing.length > 0) {
+      return res.status(409).json({ status: 'error', message: 'Email already exists', code: 'EMAIL_EXISTS' });
+    }
+
+    const [result] = await db.query(
+      'INSERT INTO users (email, role, scope_arsen_id, scope_group_id, scope_squadron_id, is_active) VALUES (?, ?, ?, ?, ?, TRUE)',
+      [email, role, arsenId, groupId, squadronId]
+    );
+
+    logAudit({
+      user_id: req.user.id,
+      action: 'user.created',
+      entity_type: 'user',
+      entity_id: result.insertId,
+      new_values: { email, role, scope_arsen_id: arsenId, scope_group_id: groupId, scope_squadron_id: squadronId },
+    });
+
+    res.status(201).json({ status: 'success', message: 'User created', data: { id: result.insertId, email, role } });
+  } catch (err) {
+    console.error('User create error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to create user', code: 'DB_ERROR' });
+  }
+});
+
+// DELETE /api/settings/users/:id
+router.delete('/users/:id', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+
+    const targetUser = await fetchUserWithHierarchy(userId);
+    if (!targetUser) {
+      return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
+    }
+
+    const canManage = await canManageUser(req.user, targetUser);
+    if (!canManage) {
+      return res.status(403).json({ 
+        status: 'error', 
+        message: 'Cannot delete this user - outside your scope', 
+        code: 'OUT_OF_SCOPE' 
+      });
+    }
+
+    if (targetUser.role === 'admin') {
+      return res.status(403).json({ 
+        status: 'error', 
+        message: 'Cannot delete super admin users', 
+        code: 'CANNOT_DELETE_ADMIN' 
+      });
+    }
+
+    const [result] = await db.query(
+      'UPDATE users SET is_active = FALSE WHERE id = ? AND is_active = TRUE',
+      [userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.json({ status: 'success', message: 'User was already deactivated' });
+    }
+
+    logAudit({
+      user_id: req.user.id,
+      action: 'user.deactivated',
+      entity_type: 'user',
+      entity_id: userId,
+      old_values: { is_active: true, role: targetUser.role },
+    });
+
+    res.json({ status: 'success', message: 'User deactivated successfully' });
+  } catch (err) {
+    console.error('User delete error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to deactivate user', code: 'DB_ERROR' });
+  }
+});
+
+// GET /api/settings/users/:id/edit-options
+// Get available roles and scope options for editing a specific user
+router.get('/users/:id/edit-options', async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+
+    const targetUser = await fetchUserWithHierarchy(userId);
+    if (!targetUser) {
+      return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
+    }
+
+    const canManage = await canManageUser(req.user, targetUser);
+    if (!canManage) {
+      return res.status(403).json({ 
+        status: 'error', 
+        message: 'Cannot access edit options for this user - outside your scope', 
+        code: 'OUT_OF_SCOPE' 
+      });
+    }
+
+    let arsens = [];
+    let groups = [];
+    let squadrons = [];
+    
+    if (req.user.role === 'admin') {
+      const [[arsenRows], [groupRows], [squadronRows]] = await Promise.all([
+        db.query('SELECT id, name, code FROM arsens WHERE is_active = TRUE ORDER BY name'),
+        db.query('SELECT g.id, g.name, g.arsen_id, a.name AS arsen_name FROM `groups` g JOIN arsens a ON g.arsen_id = a.id WHERE g.is_active = TRUE ORDER BY a.name, g.name'),
+        db.query('SELECT s.id, s.name, s.group_id, g.name AS group_name FROM squadron s JOIN `groups` g ON s.group_id = g.id WHERE s.is_active = TRUE ORDER BY g.name, s.name')
+      ]);
+      arsens = arsenRows || [];
+      groups = groupRows || [];
+      squadrons = squadronRows || [];
+    } else if (req.user.role === 'admin_arsen') {
+      const [[arsenRows], [groupRows], [squadronRows]] = await Promise.all([
+        db.query('SELECT id, name, code FROM arsens WHERE id = ? AND is_active = TRUE', [req.user.scope_arsen_id]),
+        db.query('SELECT g.id, g.name, g.arsen_id, a.name AS arsen_name FROM `groups` g JOIN arsens a ON g.arsen_id = a.id WHERE g.arsen_id = ? AND g.is_active = TRUE ORDER BY g.name', [req.user.scope_arsen_id]),
+        db.query(`SELECT s.id, s.name, s.group_id, g.name AS group_name FROM squadron s JOIN \`groups\` g ON s.group_id = g.id WHERE g.arsen_id = ? AND s.is_active = TRUE ORDER BY s.name`, [req.user.scope_arsen_id])
+      ]);
+      arsens = arsenRows || [];
+      groups = groupRows || [];
+      squadrons = squadronRows || [];
+    } else if (req.user.role === 'admin_group') {
+      const [[arsenRows], [groupRows], [squadronRows]] = await Promise.all([
+        db.query('SELECT a.id, a.name, a.code FROM arsens a JOIN `groups` g ON g.arsen_id = a.id WHERE g.id = ? AND a.is_active = TRUE', [req.user.scope_group_id]),
+        db.query('SELECT g.id, g.name, g.arsen_id, a.name AS arsen_name FROM `groups` g JOIN arsens a ON g.arsen_id = a.id WHERE g.id = ? AND g.is_active = TRUE', [req.user.scope_group_id]),
+        db.query('SELECT s.id, s.name, s.group_id, g.name AS group_name FROM squadron s JOIN `groups` g ON s.group_id = g.id WHERE s.group_id = ? AND s.is_active = TRUE ORDER BY s.name', [req.user.scope_group_id])
+      ]);
+      arsens = arsenRows || [];
+      groups = groupRows || [];
+      squadrons = squadronRows || [];
+    } else if (req.user.role === 'admin_squadron') {
+      const [[arsenRows], [groupRows], [squadronRows]] = await Promise.all([
+        db.query(`SELECT a.id, a.name, a.code FROM arsens a JOIN \`groups\` g ON g.arsen_id = a.id JOIN squadron s ON s.group_id = g.id WHERE s.id = ? AND a.is_active = TRUE`, [req.user.scope_squadron_id]),
+        db.query(`SELECT g.id, g.name, g.arsen_id, a.name AS arsen_name FROM \`groups\` g JOIN arsens a ON g.arsen_id = a.id JOIN squadron s ON s.group_id = g.id WHERE s.id = ? AND g.is_active = TRUE`, [req.user.scope_squadron_id]),
+        db.query('SELECT s.id, s.name, s.group_id, g.name AS group_name FROM squadron s JOIN `groups` g ON s.group_id = g.id WHERE s.id = ? AND s.is_active = TRUE', [req.user.scope_squadron_id])
+      ]);
+      arsens = arsenRows || [];
+      groups = groupRows || [];
+      squadrons = squadronRows || [];
+    }
+
+    const roles = ROLES_BY_HIERARCHY[req.user.role] || [];
+
+    res.json({ status: 'success', data: { arsens, groups, squadrons, roles } });
+  } catch (err) {
+    console.error('User edit options fetch error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch edit options', code: 'DB_ERROR' });
   }
 });
 

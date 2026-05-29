@@ -38,6 +38,7 @@ api.interceptors.response.use(
 export const login = (credentials) => api.post('/auth/login', credentials);
 export const logout = () => api.post('/auth/logout');
 export const getProfile = () => api.get('/auth/profile');
+export const updateProfile = (data) => api.put('/auth/profile', data);
 
 // Dashboard
 export const getDashboard = () => api.get('/dashboard');
@@ -143,7 +144,15 @@ export const getRoles = () => api.get('/settings/roles');
 export const getSettingsUsers = () => api.get('/settings/users');
 export const updateUserRole = (id, data) => api.put(`/settings/users/${id}/role`, data);
 export const getUserRoleHistory = (id) => api.get(`/settings/users/${id}/role-history`);
+// Super admin only - gets all arsens/groups/squadrons
 export const getRoleOptions = () => api.get('/settings/role-options');
+// Scoped admin - gets only entities within user's scope
+export const getScopedRoleOptions = () => api.get('/settings/users/role-options');
+// Get scoped options for editing a specific user
+export const getUserEditOptions = (id) => api.get(`/settings/users/${id}/edit-options`);
+// Create/deactivate users (scoped)
+export const createUser = (data) => api.post('/settings/users', data);
+export const deleteUser = (id) => api.delete(`/settings/users/${id}`);
 
 // Alerts & Insights
 export const getAlerts = (params = {}) => api.get('/alerts', { params });

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, query, param, validationResult } = require('express-validator');
 const db = require('../config/database');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireAdminOrHigher } = require('../middleware/auth');
 const { getUserScopeFilter } = require('../middleware/rbac');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -187,8 +187,8 @@ router.get('/:id', validateId, authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/squadron - Create new squadron
-router.post('/', [...validateSquadron, authenticateToken, requireAdmin], async (req, res) => {
+// POST /api/squadron - Create new squadron (admin_arsen or higher can create)
+router.post('/', [...validateSquadron, authenticateToken, requireAdminOrHigher], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -260,8 +260,8 @@ router.post('/', [...validateSquadron, authenticateToken, requireAdmin], async (
   }
 });
 
-// PUT /api/squadron/:id - Update squadron
-router.put('/:id', [...validateId, ...validateSquadron, authenticateToken, requireAdmin], async (req, res) => {
+// PUT /api/squadron/:id - Update squadron (admin_arsen or higher can update)
+router.put('/:id', [...validateId, ...validateSquadron, authenticateToken, requireAdminOrHigher], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -354,8 +354,8 @@ router.put('/:id', [...validateId, ...validateSquadron, authenticateToken, requi
   }
 });
 
-// DELETE /api/squadron/:id - Soft delete squadron
-router.delete('/:id', [...validateId, authenticateToken, requireAdmin], async (req, res) => {
+// DELETE /api/squadron/:id - Soft delete squadron (admin_arsen or higher can delete)
+router.delete('/:id', [...validateId, authenticateToken, requireAdminOrHigher], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

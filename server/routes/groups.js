@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { body, query, param, validationResult } = require('express-validator');
 const db = require('../config/database');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireAdminOrHigher, requireAdminArsenOrHigher } = require('../middleware/auth');
 const { getUserScopeFilter } = require('../middleware/rbac');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -195,8 +195,8 @@ router.get('/:id', validateId, authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/groups - Create new group (admin only)
-router.post('/', validateGroup, authenticateToken, requireAdmin, async (req, res) => {
+// POST /api/groups - Create new group (admin_arsen or higher can create)
+router.post('/', validateGroup, authenticateToken, requireAdminArsenOrHigher, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -274,8 +274,8 @@ router.post('/', validateGroup, authenticateToken, requireAdmin, async (req, res
   }
 });
 
-// PUT /api/groups/:id - Update group (admin only)
-router.put('/:id', [...validateId, ...validateGroup], authenticateToken, requireAdmin, async (req, res) => {
+// PUT /api/groups/:id - Update group (admin_arsen or higher can update)
+router.put('/:id', [...validateId, ...validateGroup], authenticateToken, requireAdminArsenOrHigher, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -373,8 +373,8 @@ router.put('/:id', [...validateId, ...validateGroup], authenticateToken, require
   }
 });
 
-// DELETE /api/groups/:id - Soft delete group (admin only)
-router.delete('/:id', validateId, authenticateToken, requireAdmin, async (req, res) => {
+// DELETE /api/groups/:id - Soft delete group (admin_arsen or higher can delete)
+router.delete('/:id', validateId, authenticateToken, requireAdminArsenOrHigher, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

@@ -58,10 +58,16 @@ router.get('/', [
 
     // For unit admins, enforce scope
     if (req.user.role !== 'admin') {
-      const { conditions, params: scopeP } = getUserScopeFilter(req.user, { arsen: 'a.id' });
-      if (conditions.length > 0) {
-        whereConditions.push('(' + conditions.join(' OR ') + ')');
-        queryParams.push(...scopeP);
+      // For admin_group, filter via their group's ARSEN relationship
+      if (req.user.scope_group_id) {
+        const [groupRows] = await db.query('SELECT arsen_id FROM `groups` WHERE id = ?', [req.user.scope_group_id]);
+        if (groupRows.length > 0) {
+          whereConditions.push('a.id = ?');
+          queryParams.push(groupRows[0].arsen_id);
+        }
+      } else if (req.user.scope_arsen_id) {
+        whereConditions.push('a.id = ?');
+        queryParams.push(req.user.scope_arsen_id);
       }
     }
 

@@ -144,6 +144,37 @@ const requireSuperAdmin = (req, res, next) => {
 };
 
 /**
+  * Middleware to check if user is a unit admin that can mutate squadron data
+  * (admin_arsen, admin_group) - admin_squadron can only view
+  */
+const requireAdminOrHigher = (req, res, next) => {
+  const adminRoles = ['admin', 'admin_arsen', 'admin_group'];
+  if (!adminRoles.includes(req.user.role)) {
+    return res.status(403).json({
+      status: 'error',
+      message: 'Admin access required',
+      code: 'ADMIN_REQUIRED'
+    });
+  }
+  next();
+};
+
+/**
+ * Middleware to check if user is admin_arsen or higher (can manage groups)
+ */
+const requireAdminArsenOrHigher = (req, res, next) => {
+  const adminRoles = ['admin', 'admin_arsen'];
+  if (!adminRoles.includes(req.user.role)) {
+    return res.status(403).json({
+      status: 'error',
+      message: 'Admin ARSEN access required',
+      code: 'ADMIN_ARSEN_REQUIRED'
+    });
+  }
+  next();
+};
+
+/**
  * Middleware to check if user is admin or the resource owner
  */
 const requireAdminOrOwner = (req, res, next) => {
@@ -155,7 +186,6 @@ const requireAdminOrOwner = (req, res, next) => {
       code: 'ACCESS_DENIED'
     });
   }
-  next();
 };
 
 /**
@@ -164,11 +194,13 @@ const requireAdminOrOwner = (req, res, next) => {
 const isAdminRole = (role) => ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'].includes(role);
 
 module.exports = {
-  authenticateToken,
-  optionalAuthenticateToken,
-  requireAdmin,
-  requireSuperAdmin,
-  requireAdminOrOwner,
-  isAdminRole,
-  JWT_SECRET
+   authenticateToken,
+   optionalAuthenticateToken,
+   requireAdmin,
+   requireSuperAdmin,
+   requireAdminOrOwner,
+   requireAdminOrHigher,
+   requireAdminArsenOrHigher,
+   isAdminRole,
+   JWT_SECRET
 };

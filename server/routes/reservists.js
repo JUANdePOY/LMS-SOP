@@ -125,16 +125,16 @@ router.get(
         });
       }
 
-      // Apply scope filter for unit admins
-      let scopeWhere = '';
-      let scopeParams = [];
-      if (req.user.role !== 'admin') {
-        const { conditions, params } = getUserScopeFilter(req.user);
-        if (conditions.length > 0) {
-          scopeWhere = ' AND (' + conditions.join(' OR ') + ')';
-          scopeParams = params;
-        }
-      }
+// Apply scope filter for unit admins
+       let scopeWhere = '';
+       let scopeParams = [];
+       if (req.user.role !== 'admin') {
+         const { conditions, params } = getUserScopeFilter(req.user, { group: 'ra.group_id', squadron: 'ra.squadron_id', arsen: 'g.arsen_id' });
+         if (conditions.length > 0) {
+           scopeWhere = ' AND (' + conditions.join(' OR ') + ')';
+           scopeParams = params;
+         }
+       }
 
       // Validate query params
       const errors = validationResult(req);
