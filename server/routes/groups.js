@@ -26,7 +26,7 @@ router.get('/', [
   query('is_active').optional().isBoolean().toBoolean(),
   query('search').optional().trim().isLength({ max: 100 }),
   query('sort_by').optional().isIn(['name', 'code', 'created_at', 'updated_at']).trim()
-], authenticateToken, async (req, res) => {
+], authenticateToken, requireAdminOrHigher, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {

@@ -91,7 +91,7 @@ export const menuItems = [
         path: "/airbase/groups",
         icon: Users,
         description: "Reserve groups management",
-        roles: ['admin', 'admin_arsen'],
+        roles: ['admin', 'admin_arsen', 'admin_group'],
       },
       {
         name: "Manage Squadrons",

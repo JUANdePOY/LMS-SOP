@@ -148,14 +148,15 @@ router.get(
 
       const filter = buildFilterQuery(req.query);
 
-      const countQuery = `
-         SELECT COUNT(DISTINCT r.id) as total
-         FROM reservists r
-         LEFT JOIN users u ON r.user_id = u.id
-         LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id
-         ${filter.whereClause}
-         ${scopeWhere}
-       `;
+const countQuery = `
+          SELECT COUNT(DISTINCT r.id) as total
+          FROM reservists r
+          LEFT JOIN users u ON r.user_id = u.id
+          LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id
+          LEFT JOIN \`groups\` g ON ra.group_id = g.id
+          ${filter.whereClause}
+          ${scopeWhere}
+        `;
 
        const [countResult] = await db.query(countQuery, [...filter.params, ...scopeParams]);
        const total = countResult[0].total;
@@ -264,7 +265,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
       WHERE r.id = ?
     `;
 
-    const [rows] = await db.query(query, [id]);
+    const [rows] = await db.query(query_str, [id]);
 
     if (rows.length === 0) {
       return res.status(404).json({
@@ -967,7 +968,7 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
 
     // Apply scope filter for unit admins
     if (req.user.role !== 'admin') {
-      const { conditions, params: scopeParams } = getUserScopeFilter(req.user);
+      const { conditions, params: scopeParams } = getUserScopeFilter(req.user, { group: 'ra.group_id', squadron: 'ra.squadron_id', arsen: 'g.arsen_id' });
       if (conditions.length > 0) {
         query_str += ' AND (' + conditions.join(' OR ') + ')';
         params.push(...scopeParams);
@@ -986,7 +987,7 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
 
     query_str += ' ORDER BY r.last_name, r.first_name';
 
-    const [rows] = await db.query(query, params);
+    const [rows] = await db.query(query_str, params);
 
     if (format === 'json') {
       res.json({

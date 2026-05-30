@@ -55,7 +55,7 @@ router.get('/', [
 
     // For unit admins, enforce scope (override user-provided group_id)
     if (req.user.role !== 'admin') {
-      const { conditions, params: scopeP } = getUserScopeFilter(req.user, { squadron: 's.id', group: 's.group_id' });
+      const { conditions, params: scopeP } = getUserScopeFilter(req.user, { squadron: 's.id', group: 's.group_id', arsen: 'g.arsen_id' });
       if (conditions.length > 0) {
         // Remove user-provided group_id filter
         const idx = whereConditions.findIndex(w => w.includes('s.group_id'));
@@ -77,8 +77,8 @@ router.get('/', [
 
     const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
-    // Get total count
-    const countQuery = `SELECT COUNT(*) as total FROM squadron s ${whereClause}`;
+    // Get total count (need groups join for arsen scope filter)
+    const countQuery = `SELECT COUNT(*) as total FROM squadron s LEFT JOIN \`groups\` g ON s.group_id = g.id ${whereClause}`;
     const [countResult] = await db.query(countQuery, queryParams);
     const total = countResult[0].total;
 

@@ -63,7 +63,7 @@ router.get('/', [
       ${arsensWhere}
       GROUP BY a.id
       ORDER BY a.name ASC
-    `);
+    `, arsensParams);
 
     // ── Fetch Groups per ARSEN ────────────────────────────────────
     const arsenIds = arsens.map(a => a.id);
