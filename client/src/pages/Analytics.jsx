@@ -195,43 +195,46 @@ function DistributionChart({ data, onDrillDown }) {
 
   return (
     <Card title="Readiness Distribution" icon={ShieldCheck} badge={`${total} total`}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
-        <div className="h-[180px] w-[180px] shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%" cy="50%"
-                innerRadius={45} outerRadius={75}
-                dataKey="value"
-                paddingAngle={2}
-                strokeWidth={0}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+          <div className="h-[180px] w-[180px] shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={chartData}
+                  cx="50%" cy="50%"
+                  innerRadius={45} outerRadius={75}
+                  dataKey="value"
+                  paddingAngle={2}
+                  strokeWidth={0}
+                >
+                  {chartData.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="flex flex-col gap-2 flex-1">
+            <p className="mb-2 text-xs font-medium text-neutral-600 dark:text-neutral-400">
+              Readiness Levels
+            </p>
+            {chartData.map((d) => (
+              <button
+                key={d.name}
+                onClick={() => onDrillDown?.(d)}
+                className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors text-left"
               >
-                {chartData.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
+                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: d.color }} />
+                <span className="flex-1 text-xs text-neutral-600 dark:text-neutral-400">{d.name}</span>
+                <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">{d.value}</span>
+                <span className="text-[10px] text-neutral-400 w-10 text-right">
+                  {total > 0 ? Math.round((d.value / total) * 100) : 0}%
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="flex flex-col gap-2 flex-1">
-          {chartData.map((d) => (
-            <button
-              key={d.name}
-              onClick={() => onDrillDown?.(d)}
-              className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors text-left"
-            >
-              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: d.color }} />
-              <span className="flex-1 text-xs text-neutral-600 dark:text-neutral-400">{d.name}</span>
-              <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">{d.value}</span>
-              <span className="text-[10px] text-neutral-400 w-10 text-right">
-                {total > 0 ? Math.round((d.value / total) * 100) : 0}%
-              </span>
-            </button>
-          ))}
-        </div>
-      </div>
     </Card>
   );
 }
