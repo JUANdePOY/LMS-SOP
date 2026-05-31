@@ -139,10 +139,10 @@ router.post('/login', [
 router.post('/logout', authenticateToken, (req, res) => {
     try {
         logAudit({
-            user_id: req.user.userId,
+            user_id: req.user.id,
             action: 'user.logout',
             entity_type: 'user',
-            entity_id: req.user.userId
+            entity_id: req.user.id
         });
 
         res.status(200).json({
@@ -224,7 +224,7 @@ router.post('/register', authenticateToken, [
             );
 
             logAudit({
-                user_id: req.user.userId,
+                user_id: req.user.id,
                 action: 'user.created',
                 entity_type: 'user',
                 entity_id: insertResults.insertId,
@@ -264,12 +264,12 @@ router.post('/register', authenticateToken, [
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
          const [results] = await db.query(
-             `SELECT u.id, u.email, u.role, u.scope_arsen_id, u.scope_group_id, u.scope_squadron_id,
-                     r.service_number as id_number 
-              FROM users u
-              LEFT JOIN reservists r ON u.id = r.user_id
-              WHERE u.id = ?`,
-             [req.user.userId]
+              `SELECT u.id, u.email, u.role, u.scope_arsen_id, u.scope_group_id, u.scope_squadron_id,
+                      r.service_number as id_number 
+               FROM users u
+               LEFT JOIN reservists r ON u.id = r.user_id
+               WHERE u.id = ?`,
+              [req.user.id]
          );
 
         if (!results || results.length === 0) {
@@ -330,7 +330,7 @@ router.put('/profile', authenticateToken, [
         // Get current user
         const [userResults] = await db.query(
             'SELECT id, email, password_hash FROM users WHERE id = ?',
-            [req.user.userId]
+            [req.user.id]
         );
 
         if (!userResults || userResults.length === 0) {
@@ -389,14 +389,14 @@ router.put('/profile', authenticateToken, [
             });
         }
 
-        params.push(req.user.userId);
+        params.push(req.user.id);
         await db.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
 
         logAudit({
-            user_id: req.user.userId,
+            user_id: req.user.id,
             action: 'user.profile_updated',
             entity_type: 'user',
-            entity_id: req.user.userId,
+            entity_id: req.user.id,
             new_values: email ? { email } : { password_changed: true }
         });
 

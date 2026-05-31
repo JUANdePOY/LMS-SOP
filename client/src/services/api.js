@@ -38,7 +38,7 @@ api.interceptors.response.use(
 export const login = (credentials) => api.post('/auth/login', credentials);
 export const logout = () => api.post('/auth/logout');
 export const getProfile = () => api.get('/auth/profile');
-export const updateProfile = (data) => api.put('/auth/profile', data);
+export const updateProfile = (data) => api.put('/auth/profile', data, { skipAuthRedirect: true });
 
 // Dashboard
 export const getDashboard = () => api.get('/dashboard');
@@ -163,5 +163,12 @@ export const getAlertsInsights = () => api.get('/alerts/insights');
 // Map
 export const getMapSquadrons = (params = {}) => api.get('/map/squadrons', { params });
 export const getMapSummary = () => api.get('/map/summary');
+
+// Self-service profile (reservist)
+export const getMyProfile = () => api.get('/reservists/my/profile');
+export const updateMyProfile = (data) => api.put('/reservists/my/profile', data);
+export const getMyTrainings = () => api.get('/reservists/my/trainings');
+export const getMyAttendance = () => api.get('/reservists/my/attendance');
+export const getMyReadiness = () => api.get('/reservists/my/readiness');
 
 export default api;

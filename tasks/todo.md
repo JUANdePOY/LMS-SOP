@@ -1,3 +1,36 @@
+# Task: Fix Reservist Logout on Readiness & Analytics Page
+
+## Problem
+When logged in as a "Reservist" role, navigating to the "Readiness & Analytics" page (`/analytics`) caused the user to be logged out automatically.
+
+## Root Cause
+The Analytics page was accessible to Reservist users because:
+1. The menu item in `menuItems.js` had no `roles` restriction, allowing all authenticated users to see it
+2. The route in `App.jsx` used `ProtectedWrapper` without `allowedRoles`, allowing any authenticated user to access it
+3. The Analytics page loads readiness data via `/api/readiness/*` endpoints
+4. These endpoints are designed for admin users and either return empty data or 403 Forbidden for Reservists
+5. Any 401/403 response from the API triggers auto-logout in `api.js` response interceptor
+
+## Solution
+Restricted the "Readiness & Analytics" page to admin roles only since Reservists should not view aggregate readiness data of other reservists.
+
+## Steps
+- [x] Added `roles: ADMIN_ROLES` to the "Readiness & Analytics" menu item in `client/src/config/menuItems.js`
+- [x] Changed the route from `ProtectedWrapper(Analytics)` to `AdminProtectedWrapper(Analytics)` in `client/src/App.jsx`
+- [x] Updated Sidebar to use `isSuperAdmin` for System section (Alerts, Settings, Audit Logs)
+- [x] Changed Alerts and Settings routes to use `SuperAdminProtectedWrapper` in `client/src/App.jsx`
+
+## Verification
+- Reservist users will no longer see "Readiness & Analytics" in the navigation menu
+- Reservist users trying to access `/analytics` directly will be redirected to `/`
+- Admin users (admin, admin_arsen, admin_group, admin_squadron) can still access the page
+- System items (Alerts, Settings, Audit Logs) only visible to super admin role
+
+## Notes
+This follows the existing pattern in the codebase where admin-only features are restricted via both menu filtering and route guards.
+
+---
+
 # Task: Fix SQL syntax error in readiness.js for reservist readiness endpoint
 
 ## Problem

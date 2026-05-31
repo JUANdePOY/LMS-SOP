@@ -7,7 +7,7 @@ import { menuItems, filterMenuByRole } from "@/config/menuItems";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
-  const { user } = useAuth();
+  const { user, isSuperAdmin } = useAuth();
   const [internalCollapsed, setInternalCollapsed] = useState(false);
 
   const isCollapsed =
@@ -136,34 +136,39 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
           ))}
         </ul>
 
-        <div className="my-3 border-t border-neutral-200 dark:border-neutral-800" />
+        {/* ── System section (Super Admin only) ────────────────── */}
+        {isSuperAdmin && (
+          <>
+            <div className="my-3 border-t border-neutral-200 dark:border-neutral-800" />
 
-        {!isCollapsed && (
-          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-600">
-            System
-          </p>
+            {!isCollapsed && (
+              <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-600">
+                System
+              </p>
+            )}
+
+            <ul className="space-y-0.5" role="list">
+              <li>
+                <SidebarItem
+                  item={{ name: "Alerts", path: "/alerts", icon: Bell, description: "Notifications" }}
+                  isCollapsed={isCollapsed}
+                />
+              </li>
+              <li>
+                <SidebarItem
+                  item={{ name: "Settings", path: "/settings", icon: Settings, description: "Preferences" }}
+                  isCollapsed={isCollapsed}
+                />
+              </li>
+              <li>
+                <SidebarItem
+                  item={{ name: "Audit Logs", path: "/audit-logs", icon: History, description: "System change history" }}
+                  isCollapsed={isCollapsed}
+                />
+              </li>
+            </ul>
+          </>
         )}
-
-        <ul className="space-y-0.5" role="list">
-          <li>
-            <SidebarItem
-              item={{ name: "Alerts", path: "/alerts", icon: Bell, description: "Notifications" }}
-              isCollapsed={isCollapsed}
-            />
-          </li>
-          <li>
-            <SidebarItem
-              item={{ name: "Settings", path: "/settings", icon: Settings, description: "Preferences" }}
-              isCollapsed={isCollapsed}
-            />
-          </li>
-          <li>
-            <SidebarItem
-              item={{ name: "Audit Logs", path: "/audit-logs", icon: History, description: "System change history" }}
-              isCollapsed={isCollapsed}
-            />
-          </li>
-        </ul>
       </nav>
 
       {/* ── User footer ───────────────────────────────────────── */}

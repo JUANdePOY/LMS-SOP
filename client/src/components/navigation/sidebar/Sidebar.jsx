@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import { ChevronLeft, Bell, Settings, LogOut, History } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ChevronLeft, Bell, Settings, LogOut, History, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
 import { menuItems, filterMenuByRole } from "@/config/menuItems";
@@ -10,8 +10,11 @@ import { getAlerts } from "@/services/api";
 export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobileOpen, onMobileClose }) {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const [alertSummary, setAlertSummary] = useState(null);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const dropdownRef = useRef(null);
 
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const visibleMenuItems = filterMenuByRole(menuItems, user?.role);
   const isSuperAdmin = user?.role === 'admin';
 
@@ -27,6 +30,16 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
       }
     };
     load();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowProfileDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const isCollapsed =
@@ -221,19 +234,65 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
         </ul>
       </nav>
 
-      {/* ── User footer ───────────────────────────────────────── */}
+{/* ── User footer ───────────────────────────────────────── */}
       <div
+        ref={dropdownRef}
         className={cn(
           "flex shrink-0 items-center",
           "border-t border-neutral-200 dark:border-neutral-800",
           "bg-neutral-50 dark:bg-neutral-900",
-          isCollapsed ? "justify-center gap-2 p-3" : "gap-3 px-4 py-3"
+          isCollapsed ? "justify-center gap-2 p-3" : "gap-3 px-4 py-3",
+          "cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
         )}
+        onClick={() => setShowProfileDropdown(prev => !prev)}
       >
-        <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 text-xs font-bold text-white shadow-sm">
-          CO
-          <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-white dark:border-neutral-900 bg-emerald-400" />
-        </span>
+        <div className="relative">
+          <span
+            className={cn(
+              "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+              "bg-gradient-to-br from-indigo-500 to-indigo-700 text-xs font-bold text-white shadow-sm"
+            )}
+          >
+            {user?.email ? user.email.substring(0, 2).toUpperCase() : 'CO'}
+            <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-white dark:border-neutral-900 bg-emerald-400" />
+          </span>
+
+{showProfileDropdown && (
+             <div
+               className={cn(
+                 "absolute bottom-0 top-auto",
+                 isCollapsed ? "left-14 ml-2" : "left-full ml-2",
+                 "min-w-[200px] rounded-lg",
+                 "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700",
+                 "shadow-lg z-50 py-2 overflow-hidden"
+               )}
+             >
+               <div className="px-3 py-2 border-b border-neutral-200 dark:border-neutral-800">
+                 <p className="text-[13px] font-medium text-neutral-800 dark:text-neutral-200 truncate">
+                   {user?.email || 'User'}
+                 </p>
+                 <p className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate">
+                   {user?.role ? user.role.replace('admin_', 'Admin ').replace('_', ' ') : '—'}
+                 </p>
+               </div>
+               <button
+                 onClick={(e) => { e.stopPropagation(); setShowProfileDropdown(false); navigate('/profile'); }}
+                 className="w-full flex items-center gap-3 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+               >
+                 <User size={16} />
+                 My Profile
+               </button>
+               <div className="border-t border-neutral-200 dark:border-neutral-800 my-1" />
+               <button
+                 onClick={(e) => { e.stopPropagation(); setShowProfileDropdown(false); logout(); }}
+                 className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+               >
+                 <LogOut size={16} />
+                 Logout
+               </button>
+             </div>
+           )}
+        </div>
 
         {!isCollapsed && (
           <div className="flex flex-1 flex-col leading-tight overflow-hidden">
@@ -245,21 +304,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
             </span>
           </div>
         )}
-
-        <button
-          onClick={logout}
-          className={cn(
-            "flex items-center justify-center rounded-md text-red-600 hover:text-red-700",
-            "hover:bg-red-50 dark:hover:bg-red-950/20",
-            "transition-colors duration-150",
-            isCollapsed ? "p-2" : "p-2 ml-1"
-          )}
-          title="Logout"
-        >
-          <LogOut size={isCollapsed ? 16 : 18} />
-          {!isCollapsed && <span className="ml-1 text-sm font-medium">Logout</span>}
-        </button>
       </div>
     </aside>
-  );
-}
+   );
+ }

@@ -133,6 +133,7 @@ export const menuItems = [
     path: "/analytics",
     icon: BarChart3,
     description: "Performance data",
+    roles: ADMIN_ROLES,
   },
   {
     name: "Logistics & Supplies",

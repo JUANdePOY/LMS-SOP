@@ -308,7 +308,7 @@ router.post('/', authenticateToken, requireAdmin, [
                                 }
 
                                 logAudit({
-                                    user_id: req.user.userId,
+                                    user_id: req.user.id,
                                     action: 'assignment.created',
                                     entity_type: 'assignment',
                                     entity_id: insertResults.insertId,
@@ -479,7 +479,7 @@ router.put('/:id', authenticateToken, requireAdmin, [
                 }
 
                 logAudit({
-                    user_id: req.user.userId,
+                    user_id: req.user.id,
                     action: 'assignment.updated',
                     entity_type: 'assignment',
                     entity_id: assignmentId,
@@ -550,7 +550,7 @@ router.delete('/:id', authenticateToken, requireAdmin, [
                 }
 
                 logAudit({
-                    user_id: req.user.userId,
+                    user_id: req.user.id,
                     action: 'assignment.deleted',
                     entity_type: 'assignment',
                     entity_id: assignmentId,

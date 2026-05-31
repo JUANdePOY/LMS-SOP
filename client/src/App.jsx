@@ -9,6 +9,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 // Pages
 const Dashboard         = lazy(() => import("@/pages/Dashboard"));
 const Landing           = lazy(() => import("@/pages/Landing"));
+const Profile           = lazy(() => import("@/pages/Profile"));
 const Reservists        = lazy(() => import("@/pages/Reservists"));
 const Trainings         = lazy(() => import("@/pages/Trainings"));
 const Attendance        = lazy(() => import("@/pages/Attendance"));
@@ -105,15 +106,16 @@ const router = createBrowserRouter([
     children: [
       { index: true,           element: AdminProtectedWrapper(Dashboard)       },
       { path: "landing",       element: ReservistWrapper(Landing)       },
+      { path: "profile",       element: ProtectedWrapper(Profile)       },
       { path: "announcements", element: AdminProtectedWrapper(Announcements)   },
       { path: "reservists",    element: AdminProtectedWrapper(Reservists)      },
       { path: "trainings",     element: ProtectedWrapper(Trainings)       },
       { path: "attendance",    element: ProtectedWrapper(Attendance)      },
-      { path: "analytics",     element: ProtectedWrapper(Analytics)       },
+      { path: "analytics",     element: AdminProtectedWrapper(Analytics)       },
       { path: "logistics",     element: AdminProtectedWrapper(Logistics)       },
-      { path: "alerts",        element: ProtectedWrapper(Alerts)          },
+      { path: "alerts",        element: SuperAdminProtectedWrapper(Alerts)          },
       { path: "reports",     element: ProtectedWrapper(Reports)         },
-      { path: "settings",    element: AdminProtectedWrapper(Settings) },
+      { path: "settings",    element: SuperAdminProtectedWrapper(Settings) },
       { path: "audit-logs",  element: SuperAdminProtectedWrapper(AuditLogs) },
       { path: "airbase",      element: AdminProtectedWrapper(AirbaseOverview) },
       { path: "airbase/arcens",   element: AdminProtectedWrapper(ManageArcens) },

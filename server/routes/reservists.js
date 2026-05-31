@@ -7,6 +7,11 @@ const { hashPassword, generateResetToken } = require('../app/auth');
 const { logAudit } = require('../utils/auditLogger');
 const crypto = require('crypto');
 
+const TRAINING_FORBIDDEN_FIELDS = [
+  'training_id', 'trainings', 'internal_training_participants',
+  'external_training_attachments', 'training_registrations'
+];
+
 const router = express.Router();
 
 // Helper: Generate unique reservist QR code (e.g. RES- followed by 12 hex chars)
@@ -2069,5 +2074,128 @@ router.get('/my/readiness', authenticateToken, async (req, res) => {
     });
   }
 });
+
+/**
+ * PUT /api/reservists/my/profile
+ * Update current reservist's own profile (self-service)
+ * Training fields are strictly forbidden for non-admin users
+ */
+router.put(
+  '/my/profile',
+  authenticateToken,
+  [
+    body('first_name').optional().trim().isLength({ min: 2, max: 100 }),
+    body('last_name').optional().trim().isLength({ min: 2, max: 100 }),
+    body('rank').optional().trim(),
+    body('phone_number').optional().trim(),
+    body('address').optional(),
+    body('date_of_birth').optional().isISO8601(),
+    body('sex').optional().isIn(['Male', 'Female', 'Other']),
+    body('blood_type').optional().isIn(['A+','A-','B+','B-','AB+','AB-','O+','O-','Unknown']),
+    body('emergency_contact_name').optional().trim(),
+    body('emergency_contact_phone').optional().trim(),
+    body('emergency_contact_address').optional(),
+    body('civil_status').optional().isIn(['Single','Married','Widowed','Separated','Divorced']),
+    body('citizenship').optional().trim(),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ status: 'error', errors: errors.array() });
+      }
+
+      // Reject training-related fields explicitly
+      const bodyKeys = Object.keys(req.body);
+      const forbidden = bodyKeys.filter(k => TRAINING_FORBIDDEN_FIELDS.includes(k));
+      if (forbidden.length > 0) {
+        logAudit({
+          user_id: req.user.id,
+          action: 'profile_update.attempted_training_field',
+          entity_type: 'reservist',
+          entity_id: req.user.id,
+          new_values: { forbidden_fields: forbidden },
+          ip_address: getClientIp(req),
+          user_agent: req.headers['user-agent']
+        });
+        return res.status(409).json({
+          status: 'error',
+          message: 'Training data cannot be modified through profile endpoint',
+          code: 'FORBIDDEN_TRAINING_UPDATE'
+        });
+      }
+
+      const [reservist] = await db.query(
+        'SELECT id, user_id FROM reservists WHERE user_id = ?',
+        [req.user.id]
+      );
+
+      if (reservist.length === 0) {
+        return res.status(404).json({
+          status: 'error',
+          message: 'Reservist profile not found',
+          code: 'NOT_FOUND'
+        });
+      }
+
+      const reservistId = reservist[0].id;
+      const allowedFields = [
+        'first_name', 'last_name', 'rank', 'phone_number', 'address',
+        'date_of_birth', 'sex', 'blood_type',
+        'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_address',
+        'civil_status', 'citizenship'
+      ];
+
+      const updateFields = {};
+      allowedFields.forEach(field => {
+        if (req.body[field] !== undefined) {
+          updateFields[field] = req.body[field];
+        }
+      });
+
+      if (Object.keys(updateFields).length === 0) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'No valid fields to update',
+          code: 'NO_UPDATES'
+        });
+      }
+
+      const updateColumns = Object.keys(updateFields).map(col => `\`${col}\` = ?`).join(',');
+      const values = [...Object.values(updateFields), reservistId];
+
+      await db.query(`UPDATE reservists SET ${updateColumns} WHERE id = ?`, values);
+
+      logAudit({
+        user_id: req.user.id,
+        action: 'reservist.profile_updated',
+        entity_type: 'reservist',
+        entity_id: reservistId,
+        old_values: null,
+        new_values: updateFields,
+        ip_address: getClientIp(req),
+        user_agent: req.headers['user-agent']
+      });
+
+      const [updated] = await db.query(
+        'SELECT * FROM reservists WHERE id = ?',
+        [reservistId]
+      );
+
+      res.json({
+        status: 'success',
+        message: 'Profile updated successfully',
+        data: updated[0]
+      });
+    } catch (error) {
+      console.error('Error updating own profile:', error);
+      res.status(500).json({
+        status: 'error',
+        message: 'Failed to update profile',
+        code: 'UPDATE_ERROR'
+      });
+    }
+  }
+);
 
 module.exports = router;

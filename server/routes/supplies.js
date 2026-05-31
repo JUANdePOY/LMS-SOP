@@ -167,7 +167,7 @@ router.post('/', authenticateToken, requireAdmin, [
             [name, category, description || null, unit, quantity_available, reorder_level, max_stock || null, location || null, supplier || null]
         );
 
-        logAudit({ user_id: req.user.userId, action: 'supply.created', entity_type: 'supply', entity_id: result.insertId, new_values: req.body });
+        logAudit({ user_id: req.user.id, action: 'supply.created', entity_type: 'supply', entity_id: result.insertId, new_values: req.body });
 
         res.status(201).json({ status: 'success', message: 'Supply created successfully', data: { supplyId: result.insertId } });
     } catch (error) {
@@ -225,7 +225,7 @@ router.put('/:id', authenticateToken, requireAdmin, [
 
         await db.query(`UPDATE supplies SET ${updates.join(', ')} WHERE id = ?`, params);
 
-        logAudit({ user_id: req.user.userId, action: 'supply.updated', entity_type: 'supply', entity_id: supplyId, old_values: oldValues, new_values: req.body });
+        logAudit({ user_id: req.user.id, action: 'supply.updated', entity_type: 'supply', entity_id: supplyId, old_values: oldValues, new_values: req.body });
 
         res.status(200).json({ status: 'success', message: 'Supply updated successfully' });
     } catch (error) {
@@ -264,7 +264,7 @@ router.post('/adjust-stock', authenticateToken, requireAdmin, [
 
         await db.query('UPDATE supplies SET quantity_available = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [newQuantity, supply_id]);
 
-        logAudit({ user_id: req.user.userId, action: 'supply.stock_adjusted', entity_type: 'supply', entity_id: supply_id, old_values: { quantity_available: supply.quantity_available, reason }, new_values: { quantity_available: newQuantity, quantity_change, reason } });
+        logAudit({ user_id: req.user.id, action: 'supply.stock_adjusted', entity_type: 'supply', entity_id: supply_id, old_values: { quantity_available: supply.quantity_available, reason }, new_values: { quantity_available: newQuantity, quantity_change, reason } });
 
         res.status(200).json({ status: 'success', message: 'Stock adjusted successfully', data: { supply_id, previous_quantity: supply.quantity_available, new_quantity: newQuantity, change: quantity_change } });
     } catch (error) {
@@ -297,7 +297,7 @@ router.delete('/:id', authenticateToken, requireAdmin, [
 
         await db.query('DELETE FROM supplies WHERE id = ?', [supplyId]);
 
-        logAudit({ user_id: req.user.userId, action: 'supply.deleted', entity_type: 'supply', entity_id: supplyId, old_values: oldValues });
+        logAudit({ user_id: req.user.id, action: 'supply.deleted', entity_type: 'supply', entity_id: supplyId, old_values: oldValues });
 
         res.status(200).json({ status: 'success', message: 'Supply deleted successfully' });
     } catch (error) {

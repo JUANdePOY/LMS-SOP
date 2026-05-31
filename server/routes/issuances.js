@@ -137,7 +137,7 @@ router.get('/reservist/:id', authenticateToken, [
         const reservistId = req.params.id;
 
         if (req.user.role === 'reservist') {
-            const [checkResults] = await db.query('SELECT id FROM reservists WHERE user_id = ?', [req.user.userId]);
+            const [checkResults] = await db.query('SELECT id FROM reservists WHERE user_id = ?', [req.user.id]);
             if (!checkResults || checkResults.length === 0 || checkResults[0].id != reservistId) {
                 return res.status(403).json({ status: 'error', message: 'Access denied. You can only view your own issuances.', code: 'ACCESS_DENIED' });
             }
@@ -231,12 +231,12 @@ router.post('/', authenticateToken, requireAdmin, [
 
         const [issuanceResult] = await db.query(
             `INSERT INTO supply_issuances (reservist_id, supply_id, quantity_issued, issued_date, due_return_date, condition_on_issue, issued_by, notes) VALUES (?, ?, ?, CURRENT_DATE, ?, ?, ?, ?)`,
-            [reservist_id, supply_id, quantity_issued, due_return_date, condition_on_issue, req.user.userId, notes || null]
+            [reservist_id, supply_id, quantity_issued, due_return_date, condition_on_issue, req.user.id, notes || null]
         );
 
         await db.query('UPDATE supplies SET quantity_available = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [newQuantity, supply_id]);
 
-        logAudit({ user_id: req.user.userId, action: 'issuance.created', entity_type: 'issuance', entity_id: issuanceResult.insertId, new_values: req.body });
+        logAudit({ user_id: req.user.id, action: 'issuance.created', entity_type: 'issuance', entity_id: issuanceResult.insertId, new_values: req.body });
 
         res.status(201).json({ status: 'success', message: 'Supplies issued successfully', data: { issuanceId: issuanceResult.insertId, quantity_issued, remaining_stock: newQuantity } });
     } catch (error) {
@@ -283,7 +283,7 @@ router.put('/:id', authenticateToken, requireAdmin, [
 
         await db.query('UPDATE supplies SET quantity_available = quantity_available + ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [returnQty, issuance.supply_id]);
 
-        logAudit({ user_id: req.user.userId, action: 'issuance.returned', entity_type: 'issuance', entity_id: issuanceId, old_values: { returned_date: null, returned_quantity: null }, new_values: { returned_date: new Date().toISOString().split('T')[0], returned_quantity: returnQty } });
+        logAudit({ user_id: req.user.id, action: 'issuance.returned', entity_type: 'issuance', entity_id: issuanceId, old_values: { returned_date: null, returned_quantity: null }, new_values: { returned_date: new Date().toISOString().split('T')[0], returned_quantity: returnQty } });
 
         res.status(200).json({ status: 'success', message: 'Items returned successfully', data: { issuanceId, returned_quantity: returnQty, condition_on_return } });
     } catch (error) {
