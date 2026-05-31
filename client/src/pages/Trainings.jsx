@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, ClipboardCheck, GraduationCap } from 'lucide-react';
+import { Plus, ClipboardCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import {
@@ -16,7 +16,7 @@ import TrainingStats from '@/components/trainings/TrainingStats';
 import useTrainingFilters from '@/hooks/useTrainingFilters';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
-import TrainingCard from '@/components/trainings/TrainingCard';
+import TrainingCard from '@/components/trainings/TrainingTable';
 
 const INTERNAL_STATUSES = new Set(['draft', 'published', 'ongoing', 'completed', 'cancelled']);
 const EXTERNAL_STATUSES = new Set(['draft', 'open', 'closed', 'completed']);
@@ -247,54 +247,34 @@ export default function Trainings() {
 
   return (
     <div className="space-y-6">
-
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10">
-              <GraduationCap size={20} className="text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
-                Trainings & Activities
-              </h1>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400">
-                Schedule and manage training sessions and activities            
-              </p>
-            </div>
-          </div>
+      {isAnyAdmin && (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setEditingTraining(null);
+              setNewScheduleKind('internal');
+              setShowForm(true);
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm shadow-blue-500/20"
+          >
+            <Plus size={16} />
+            Internal training
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setEditingTraining(null);
+              setNewScheduleKind('external');
+              setShowForm(true);
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors text-sm font-semibold shadow-sm shadow-violet-500/20"
+          >
+            <Plus size={16} />
+            External training
+          </button>
         </div>
-
-        {isAnyAdmin && (
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setEditingTraining(null);
-                setNewScheduleKind('internal');
-                setShowForm(true);
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-semibold shadow-sm shadow-blue-500/20"
-            >
-              <Plus size={16} />
-              Internal training
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEditingTraining(null);
-                setNewScheduleKind('external');
-                setShowForm(true);
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors text-sm font-semibold shadow-sm shadow-violet-500/20"
-            >
-              <Plus size={16} />
-              External training
-            </button>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* ── Stats ── */}
       {!loading && !error && allTrainings.length > 0 && (
@@ -343,52 +323,68 @@ export default function Trainings() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {trainings.length === 0 ? (
-              <div className="col-span-full">
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-neutral-200 dark:border-neutral-700 bg-gradient-to-b from-neutral-50/80 to-white dark:from-neutral-900/60 dark:to-neutral-900/30 px-6 py-16 text-center">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-md ring-1 ring-neutral-100 dark:bg-neutral-800 dark:ring-neutral-700">
-                    <ClipboardCheck className="text-neutral-400" size={28} strokeWidth={1.5} />
-                  </div>
-                  <p className="mt-5 text-lg font-semibold text-neutral-900 dark:text-neutral-100">No trainings found</p>
-                  <p className="mt-2 max-w-md text-sm leading-relaxed text-neutral-500 dark:text-neutral-400">
-                    {debouncedSearch || filters.status !== 'all' || filters.activityType !== 'all' || filters.source !== 'all'
-                      ? 'No trainings match your current filters. Try adjusting your search or filter criteria.'
-                      : 'Get started by creating your first training session. Click the button above to schedule a new training.'}
-                  </p>
-                  {isAnyAdmin && !debouncedSearch && filters.status === 'all' && filters.activityType === 'all' && filters.source === 'all' && (
-                    <div className="mt-5 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingTraining(null);
-                          setNewScheduleKind('internal');
-                          setShowForm(true);
+          <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50">
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Source</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Title</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Location</th>
+                    <th className="px-4 py-3 text-left text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Type</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {trainings.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-12">
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
+                            <ClipboardCheck className="text-neutral-400" size={24} strokeWidth={1.5} />
+                          </div>
+                          <p className="mt-4 text-sm font-semibold text-neutral-900 dark:text-neutral-100">No trainings found</p>
+                          <p className="mt-1 max-w-sm text-xs leading-relaxed text-neutral-500 dark:text-neutral-400">
+                            {debouncedSearch || filters.status !== 'all' || filters.activityType !== 'all' || filters.source !== 'all'
+                              ? 'No trainings match your current filters. Try adjusting your search or filter criteria.'
+                              : 'Get started by creating your first training session. Click the button above to schedule a new training.'}
+                          </p>
+                          {isAnyAdmin && !debouncedSearch && filters.status === 'all' && filters.activityType === 'all' && filters.source === 'all' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingTraining(null);
+                                setNewScheduleKind('internal');
+                                setShowForm(true);
+                              }}
+                              className="mt-4 inline-flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-xs font-semibold"
+                            >
+                              <Plus size={14} />
+                              Create training
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    trainings.map((training) => (
+                      <TrainingCard
+                        key={`${training._source}-${training.id}`}
+                        training={training}
+                        isAdmin={isAnyAdmin}
+                        onEdit={() => handleEditTraining(training)}
+                        onDelete={() => openDeleteDialog(training)}
+                        onAttendance={() => {
+                          const type = training._source === 'external' ? 'external' : 'internal';
+                          window.location.href = `/attendance?type=${type}&trainingId=${training.id}`;
                         }}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm font-semibold"
-                      >
-                        <Plus size={16} />
-                        Create training
-                      </button>
-                    </div>
+                      />
+                    ))
                   )}
-                </div>
-              </div>
-            ) : (
-              trainings.map((training) => (
-                <TrainingCard
-                  key={`${training._source}-${training.id}`}
-                  training={training}
-                  isAdmin={isAnyAdmin}
-                  onEdit={() => handleEditTraining(training)}
-                  onDelete={() => openDeleteDialog(training)}
-                  onAttendance={() => {
-                    const type = training._source === 'external' ? 'external' : 'internal';
-                    window.location.href = `/attendance?type=${type}&trainingId=${training.id}`;
-                  }}
-                />
-              ))
-            )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* ── Pagination ── */}

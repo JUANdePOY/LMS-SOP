@@ -31,23 +31,6 @@ export default function Settings() {
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      {/* Header */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm shadow-indigo-200 dark:shadow-indigo-900/40">
-            <SettingsIcon size={16} strokeWidth={2} />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50 leading-none">
-              System Settings
-            </h1>
-            <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-500">
-              Manage roles, permissions, and system configuration
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Tabs */}
       <div className="flex gap-1 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-100/60 dark:bg-neutral-900/60 p-1">
         {TABS.map((tab) => {

@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, Bell, Settings, LogOut, History, User } from "lucide-react";
+import { Bell, Settings, LogOut, History, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
 import { menuItems, filterMenuByRole } from "@/config/menuItems";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAlerts } from "@/services/api";
 
-export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobileOpen, onMobileClose }) {
-  const [internalCollapsed, setInternalCollapsed] = useState(false);
+export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   const [alertSummary, setAlertSummary] = useState(null);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const dropdownRef = useRef(null);
@@ -42,14 +41,6 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const isCollapsed =
-    controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
-
-  const handleToggle = () => {
-    if (onToggle) onToggle();
-    else setInternalCollapsed((v) => !v);
-  };
-
   const handleNavClick = () => {
     if (onMobileClose) onMobileClose();
   };
@@ -58,9 +49,9 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
     <aside
       className={cn(
         "fixed inset-y-0 left-0 z-50 flex flex-col",
-        "transition-all duration-200 ease-out",
-        isCollapsed ? "w-[64px]" : "w-[260px]",
-        "bg-white border-r border-neutral-200",
+"transition-all duration-200 ease-out",
+         collapsed ? "w-[64px]" : "w-[260px]",
+         "bg-white border-r border-neutral-200",
         "dark:bg-neutral-950 dark:border-neutral-800",
         // Mobile: hidden by default, shown when mobileOpen
         "max-lg:-translate-x-full",
@@ -69,113 +60,69 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
       )}
       data-mobile-open={mobileOpen}
     >
-      {/* ── Brand ─────────────────────────────────────────────── */}
-      <div
-        className={cn(
-          "flex h-14 shrink-0 items-center",
-          "border-b border-neutral-200 dark:border-neutral-800",
-          isCollapsed ? "justify-center px-0" : "justify-between px-4"
-        )}
-      >
-        <Link
-          to="/"
-          onClick={handleNavClick}
-          className={cn(
-            "flex items-center gap-2.5 overflow-hidden",
-            isCollapsed && "justify-center"
-          )}
-        >
-          <span className={cn(
-            "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
-            "bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700",
-            "shadow-md shadow-blue-900/30 dark:shadow-blue-900/50",
-            "ring-2 ring-blue-500/30 dark:ring-blue-400/20",
-            "before:absolute before:inset-[3px] before:rounded-full",
-            "before:border before:border-white/20"
-          )}>
-            <span className="absolute inset-0 rounded-full border border-white/10" />
-            <span className="relative z-10 text-[9px] font-black tracking-[0.05em] text-white leading-none select-none">
-              PAF
-            </span>
-            <span className="absolute bottom-[5px] text-[6px] text-yellow-300 leading-none select-none">★</span>
-          </span>
-
-          {!isCollapsed && (
-            <div className="flex flex-col leading-tight overflow-hidden">
-              <span className="text-[15px] font-black tracking-[0.12em] text-neutral-900 dark:text-neutral-50 leading-none">
-                P.A.F.R
-              </span>
-              <span className="mt-[3px] text-[9px] font-medium tracking-[0.06em] uppercase text-neutral-400 dark:text-neutral-500 truncate leading-none">
-                Philippine Air Force Reservists
-              </span>
-            </div>
-          )}
-        </Link>
-
-        {/* Collapse toggle — desktop only */}
-        {!isCollapsed && (
-          <button
-            onClick={handleToggle}
-            aria-label="Collapse sidebar"
-            className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-md",
-              "text-neutral-400 hover:text-neutral-700",
-              "hover:bg-neutral-100 dark:hover:bg-neutral-800",
-              "dark:text-neutral-500 dark:hover:text-neutral-300",
-              "transition-colors duration-150",
-              "max-lg:hidden"
+       {/* ── Brand ─────────────────────────────────────────────── */}
+       <div
+         className={cn(
+           "flex h-14 shrink-0 items-center",
+           "border-b border-neutral-200 dark:border-neutral-800",
+           collapsed ? "justify-center px-0" : "justify-between px-4"
+         )}
+       >
+         <Link
+           to="/"
+           onClick={handleNavClick}
+           className={cn(
+             "flex items-center gap-2.5 overflow-hidden",
+             collapsed && "justify-center"
+           )}
+         >
+           <img
+             src="/AirForce-logo.png"
+             alt="Air Force Logo"
+             className={cn(
+               "h-9 w-9 shrink-0",
+               collapsed && "mx-auto"
+             )}
+           />
+{!collapsed && (
+              <div className="flex flex-col leading-tight overflow-hidden">
+                <span className="text-[15px] font-black tracking-[0.12em] text-neutral-900 dark:text-neutral-50 leading-none">
+                  P.A.F.R
+                </span>
+                <span className="mt-[3px] text-[9px] font-medium tracking-[0.06em] uppercase text-neutral-400 dark:text-neutral-500 truncate leading-none">
+                  Philippine Air Force Reservists
+                </span>
+              </div>
             )}
-          >
-            <ChevronLeft size={15} />
-          </button>
-        )}
-      </div>
-
-      {/* ── Expand button (collapsed only) — desktop only */}
-      {isCollapsed && (
-        <div className="flex justify-center mt-2 max-lg:hidden">
-          <button
-            onClick={handleToggle}
-            aria-label="Expand sidebar"
-            className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-md",
-              "text-neutral-400 hover:text-neutral-700",
-              "hover:bg-neutral-100 dark:hover:bg-neutral-800",
-              "dark:text-neutral-500 dark:hover:text-neutral-300",
-              "transition-colors duration-150"
-            )}
-          >
-            <ChevronLeft size={15} className="rotate-180" />
-          </button>
+</Link>
         </div>
-      )}
 
-      {/* ── Navigation ────────────────────────────────────────── */}
+        {/* ── Navigation ────────────────────────────────────────── */}
       <nav
         className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 scrollbar-none"
         aria-label="Main navigation"
       >
-        {!isCollapsed && (
-          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-600">
-            Navigation
-          </p>
-        )}
+{!collapsed && (
+           <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-600">
+             Navigation
+           </p>
+         )}
 
         <ul className="space-y-0.5" role="list">
           {visibleMenuItems.map((item) => (
             <li key={item.path}>
-              <SidebarItem item={item} isCollapsed={isCollapsed} onNavClick={handleNavClick} />
+              <SidebarItem item={item} isCollapsed={collapsed} onNavClick={handleNavClick} />
             </li>
           ))}
         </ul>
 
         <div className="my-3 border-t border-neutral-200 dark:border-neutral-800" />
 
-        {!isCollapsed && (
-          <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-600">
-            System
-          </p>
-        )}
+{!collapsed && (
+           <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-600">
+             System
+           </p>
+         )}
 
         <ul className="space-y-0.5" role="list">
       {isSuperAdmin && (
@@ -189,27 +136,27 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
               "transition-all duration-200 ease-out",
               "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100",
               "dark:text-neutral-400 dark:hover:text-neutral-50 dark:hover:bg-neutral-800",
-              "hover:scale-[1.015]",
-              isCollapsed && "justify-center px-0"
-            )}
-          >
-            <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center text-neutral-400 dark:text-neutral-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-              <Bell size={17} strokeWidth={1.8} />
-            </span>
-            {!isCollapsed && <span className="truncate">Alerts</span>}
-            {!isCollapsed && alertSummary && (alertSummary.unread > 0 || alertSummary.critical > 0) && (
-              <span className={cn(
-                "ml-auto inline-flex min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none",
-                alertSummary.critical > 0
-                  ? "bg-red-600 text-white"
-                  : "bg-amber-500 text-white"
-              )}>
-                {alertSummary.critical || alertSummary.unread}
-              </span>
-            )}
-            {isCollapsed && alertSummary && (alertSummary.unread > 0 || alertSummary.critical > 0) && (
-              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-500" />
-            )}
+"hover:scale-[1.015]",
+               collapsed && "justify-center px-0"
+             )}
+           >
+             <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center text-neutral-400 dark:text-neutral-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+               <Bell size={17} strokeWidth={1.8} />
+             </span>
+             {!collapsed && <span className="truncate">Alerts</span>}
+             {!collapsed && alertSummary && (alertSummary.unread > 0 || alertSummary.critical > 0) && (
+               <span className={cn(
+                 "ml-auto inline-flex min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none",
+                 alertSummary.critical > 0
+                   ? "bg-red-600 text-white"
+                   : "bg-amber-500 text-white"
+               )}>
+                 {alertSummary.critical || alertSummary.unread}
+               </span>
+             )}
+             {collapsed && alertSummary && (alertSummary.unread > 0 || alertSummary.critical > 0) && (
+               <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-500" />
+             )}
           </Link>
         </li>
       )}
@@ -217,7 +164,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
         <li>
           <SidebarItem
             item={{ name: "Audit Logs", path: "/audit-logs", icon: History, description: "System change history" }}
-            isCollapsed={isCollapsed}
+            isCollapsed={collapsed}
             onNavClick={handleNavClick}
           />
         </li>
@@ -226,7 +173,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
         <li>
           <SidebarItem
             item={{ name: "Settings", path: "/settings", icon: Settings, description: "User & system management" }}
-            isCollapsed={isCollapsed}
+            isCollapsed={collapsed}
             onNavClick={handleNavClick}
           />
         </li>
@@ -241,7 +188,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
           "flex shrink-0 items-center",
           "border-t border-neutral-200 dark:border-neutral-800",
           "bg-neutral-50 dark:bg-neutral-900",
-          isCollapsed ? "justify-center gap-2 p-3" : "gap-3 px-4 py-3",
+          collapsed ? "justify-center gap-2 p-3" : "gap-3 px-4 py-3",
           "cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
         )}
         onClick={() => setShowProfileDropdown(prev => !prev)}
@@ -261,7 +208,7 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
              <div
                className={cn(
                  "absolute bottom-0 top-auto",
-                 isCollapsed ? "left-14 ml-2" : "left-full ml-2",
+                 collapsed ? "left-14 ml-2" : "left-full ml-2",
                  "min-w-[200px] rounded-lg",
                  "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700",
                  "shadow-lg z-50 py-2 overflow-hidden"
@@ -294,8 +241,8 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle, mobi
            )}
         </div>
 
-        {!isCollapsed && (
-          <div className="flex flex-1 flex-col leading-tight overflow-hidden">
+{!collapsed && (
+           <div className="flex flex-1 flex-col leading-tight overflow-hidden">
             <span className="truncate text-[13px] font-medium text-neutral-800 dark:text-neutral-200">
               {user?.email || 'User'}
             </span>

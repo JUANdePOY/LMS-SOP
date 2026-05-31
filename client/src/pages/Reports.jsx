@@ -123,14 +123,9 @@ export default function Reports() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">Reports</h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-            Finalize and summarize completed trainings and events
-          </p>
-        </div>
-        {isAnyAdmin && (
+      {/* ── Actions ── */}
+      {isAnyAdmin && (
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={() => { setEditingReport(null); setShowForm(true); }}
@@ -139,8 +134,8 @@ export default function Reports() {
             <Plus size={16} />
             Create Report
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">

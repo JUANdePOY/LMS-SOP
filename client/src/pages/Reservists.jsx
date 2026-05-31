@@ -351,15 +351,8 @@ export default function Reservists() {
       )}
 
       {!loading && (
-        <>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <AirbasePageHeader
-              icon={UserSquare}
-              title="Reservists"
-              description="Manage all Philippine Air Force reservist records, assignments, and status."
-              breadcrumbs={[{ label: "Reservists" }]}
-            />
-            <div className="flex gap-2 shrink-0">
+          <>
+            <div className="flex items-center gap-2">
               <PrimaryButton icon={Upload} onClick={() => setBulkUploadModal(true)} variant="secondary" className="flex-1 sm:flex-none">
                 <span className="hidden sm:inline">Bulk Upload</span>
                 <span className="sm:hidden">Upload</span>
@@ -369,9 +362,8 @@ export default function Reservists() {
                 <span className="sm:hidden">Add</span>
               </PrimaryButton>
             </div>
-          </div>
 
-          <ReservistStatsBar data={data} />
+            <ReservistStatsBar data={data} />
 
           <SearchAndFilters
             search={search}

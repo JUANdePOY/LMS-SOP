@@ -5,7 +5,6 @@ import { HierarchyProvider, useHierarchy } from "@/components/hierarchy/Hierarch
 import AreaAccordion from "@/components/hierarchy/AreaAccordion";
 import SelectedSquadronPanel from "@/components/hierarchy/SelectedSquadronPanel";
 import MembersModal from "@/components/hierarchy/MembersModal";
-import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
 import { getGroups, getMapSquadrons, getMapSummary } from "@/services/api";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Search, X, RotateCcw, Loader, Users, MapPin, Shield, Layers, ChevronLeft, ZoomIn } from "lucide-react";
@@ -546,46 +545,35 @@ function OverviewContent() {
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      <AirbasePageHeader
-        icon={PlaneTakeoff}
-        title="Airbase Overview"
-        description="Hierarchical drill-down and geographical map of reservist units."
-        breadcrumbs={[
-          { label: "Airbase", path: "/airbase" },
-          { label: "Overview" },
-        ]}
-        actions={
-          <div className="flex items-center gap-2">
-            <Link to="/airbase/arcens" className={cn(
-              "rounded-lg border px-3 py-1.5 text-xs font-medium",
-              "border-neutral-200 dark:border-neutral-700",
-              "text-neutral-600 dark:text-neutral-400",
-              "hover:bg-neutral-50 dark:hover:bg-neutral-800",
-              "transition-colors duration-150"
-            )}>
-              Manage ARCENs
-            </Link>
-            <Link to="/airbase/groups" className={cn(
-              "rounded-lg border px-3 py-1.5 text-xs font-medium",
-              "border-neutral-200 dark:border-neutral-700",
-              "text-neutral-600 dark:text-neutral-400",
-              "hover:bg-neutral-50 dark:hover:bg-neutral-800",
-              "transition-colors duration-150"
-            )}>
-              Manage Groups
-            </Link>
-            <Link to="/airbase/squadrons" className={cn(
-              "rounded-lg border px-3 py-1.5 text-xs font-medium",
-              "border-neutral-200 dark:border-neutral-700",
-              "text-neutral-600 dark:text-neutral-400",
-              "hover:bg-neutral-50 dark:hover:bg-neutral-800",
-              "transition-colors duration-150"
-            )}>
-              Manage Squadrons
-            </Link>
-          </div>
-        }
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <Link to="/airbase/arcens" className={cn(
+          "rounded-lg border px-3 py-1.5 text-xs font-medium",
+          "border-neutral-200 dark:border-neutral-700",
+          "text-neutral-600 dark:text-neutral-400",
+          "hover:bg-neutral-50 dark:hover:bg-neutral-800",
+          "transition-colors duration-150"
+        )}>
+          Manage ARCENs
+        </Link>
+        <Link to="/airbase/groups" className={cn(
+          "rounded-lg border px-3 py-1.5 text-xs font-medium",
+          "border-neutral-200 dark:border-neutral-700",
+          "text-neutral-600 dark:text-neutral-400",
+          "hover:bg-neutral-50 dark:hover:bg-neutral-800",
+          "transition-colors duration-150"
+        )}>
+          Manage Groups
+        </Link>
+        <Link to="/airbase/squadrons" className={cn(
+          "rounded-lg border px-3 py-1.5 text-xs font-medium",
+          "border-neutral-200 dark:border-neutral-700",
+          "text-neutral-600 dark:text-neutral-400",
+          "hover:bg-neutral-50 dark:hover:bg-neutral-800",
+          "transition-colors duration-150"
+        )}>
+          Manage Squadrons
+        </Link>
+      </div>
 
       {/* Tab switcher */}
        <div className="flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-100/60 dark:bg-neutral-800/60 p-1 w-fit">

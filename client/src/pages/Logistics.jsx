@@ -254,34 +254,6 @@ export default function Logistics() {
 
   return (
     <div className="flex flex-col gap-5 p-4 sm:p-6 pb-10">
-      {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">Logistics & Supplies</h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
-            Manage inventory, track issuances, and monitor supply distribution
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {activeTab === "inventory" && (
-            <button
-              onClick={openAdd}
-              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 shadow-sm shadow-indigo-200 dark:shadow-indigo-900/30 transition-all"
-            >
-              <Plus size={15} /> Add Item
-            </button>
-          )}
-          {activeTab === "issuances" && (
-            <button
-              onClick={() => setIssueFormOpen(true)}
-              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 shadow-sm shadow-indigo-200 dark:shadow-indigo-900/30 transition-all"
-            >
-              <Plus size={15} /> Issue Supplies
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* ── KPI Cards ── */}
       <div className="flex flex-wrap gap-3">
         <KPICard

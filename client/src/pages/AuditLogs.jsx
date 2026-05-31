@@ -115,26 +115,14 @@ export default function AuditLogs() {
   const totalPages = Math.ceil(totalCount / limit) || 1;
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-3">
-<div className="p-2 bg-neutral-100 dark:bg-neutral-800 rounded-lg">
-               <History className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-             </div>
-            <div>
-<h1 className="text-2xl font-semibold tracking-tight text-neutral-900 dark:text-neutral-50">Audit Logs</h1>
-               <p className="text-sm text-neutral-500 dark:text-neutral-400">Read-only system change history • All actions are immutable</p>
-            </div>
-          </div>
+    <div className="p-6 max-w-[1400px] mx-auto space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="text-xs px-3 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
+          {totalCount.toLocaleString()} total events
         </div>
-<div className="text-xs px-3 py-1 rounded-full bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-neutral-700">
-           {totalCount.toLocaleString()} total events
-         </div>
       </div>
 
-{/* Filters */}
+      {/* Filters */}
        <div className="mb-4 p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-900/60">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3">
           <div className="lg:col-span-2">

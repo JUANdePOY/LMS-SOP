@@ -122,46 +122,6 @@ export default function Attendance() {
   if (view === 'dashboard') {
     return (
       <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">Attendance Tracker</h1>
-            <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-              Select an event to start tracking attendance
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              onClick={() => setEventFilter('all')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                eventFilter === 'all'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setEventFilter('internal')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                eventFilter === 'internal'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-              }`}
-            >
-              Internal
-            </button>
-            <button
-              onClick={() => setEventFilter('external')}
-              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                eventFilter === 'external'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700'
-              }`}
-            >
-              External
-            </button>
-          </div>
-        </div>
         <AttendanceDashboard onSelectEvent={handleSelectEvent} filter={eventFilter} />
       </div>
     );

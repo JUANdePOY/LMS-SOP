@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Layers, Plus, Pencil, Trash2, ToggleLeft, ToggleRight, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
-import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
 import ManagementTable from "@/components/airbase/ManagementTable";
 import { StatusBadge, MonoCode, PrimaryButton, FilterSelect } from "@/components/airbase/AirbaseUI";
 import AddEditModal, { FormField, FormInput, FormSelect } from "@/components/airbase/AddEditModal";
@@ -196,13 +195,11 @@ export default function ManageSquadrons() {
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      <AirbasePageHeader
-        icon={Layers}
-        title="Manage Squadrons"
-        description="Click any row to view details. Add, edit, or manage location-based squadrons."
-        breadcrumbs={[{ label: "Airbase", path: "/airbase" }, { label: "Manage Squadrons" }]}
-        actions={!isSquadronAdmin && <PrimaryButton icon={Plus} onClick={openAdd}>Add Squadron</PrimaryButton>}
-      />
+      {!isSquadronAdmin && (
+        <div className="flex justify-end">
+          <PrimaryButton icon={Plus} onClick={openAdd}>Add Squadron</PrimaryButton>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="flex flex-wrap gap-3">

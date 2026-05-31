@@ -679,28 +679,14 @@ export default function Analytics() {
 
   return (
     <div className="flex flex-col gap-5 pb-10">
-      {/* ── Header ──────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-              Readiness Analytics
-            </h1>
-            <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-500">
-              Training Participation 40% · Attendance Rate 30% · Active Status 30%
-            </p>
-          </div>
-          {level !== LEVELS.overview && (
-            <button
-              onClick={navigateBack}
-              className="flex items-center gap-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-xs font-medium text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-all"
-            >
-              <ArrowLeft size={12} /> Back
-            </button>
-          )}
-        </div>
-        <Breadcrumb items={breadcrumbItems} />
-      </div>
+      {level !== LEVELS.overview && (
+        <button
+          onClick={navigateBack}
+          className="flex items-center gap-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-xs font-medium text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-all"
+        >
+          <ArrowLeft size={12} /> Back
+        </button>
+      )}
 
       {/* ── Overview Level ──────────────────────────────────── */}
       {level === LEVELS.overview && (

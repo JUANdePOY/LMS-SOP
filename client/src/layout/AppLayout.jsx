@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
-import { Sun, Moon, Menu, X } from "lucide-react";
+import { Outlet, useMatches } from "react-router-dom";
+import { Sun, Moon, Menu, X, PanelRightClose, PanelLeftClose, GraduationCap } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Sidebar from "@/components/navigation/sidebar/Sidebar";
 import { useTheme } from "@/hooks/useTheme";
@@ -9,6 +9,9 @@ export default function AppLayout() {
   const { isDark, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const matches = useMatches();
+  const routeMatch = matches[matches.length - 1];
+  const pageTitle = routeMatch?.handle?.title || null;
 
   return (
     <div
@@ -27,13 +30,12 @@ export default function AppLayout() {
         />
       )}
 
-      {/* Sidebar */}
-      <Sidebar
-        collapsed={collapsed}
-        onToggle={() => setCollapsed((v) => !v)}
-        mobileOpen={mobileOpen}
-        onMobileClose={() => setMobileOpen(false)}
-      />
+{/* Sidebar */}
+       <Sidebar
+         collapsed={collapsed}
+         mobileOpen={mobileOpen}
+         onMobileClose={() => setMobileOpen(false)}
+       />
 
       {/* Main */}
       <main
@@ -48,12 +50,25 @@ export default function AppLayout() {
         {/* Top bar */}
         <header
           className={cn(
-            "sticky top-0 z-30 flex h-14 items-center justify-between gap-3 px-4 lg:px-6",
+            "sticky top-0 z-30 flex h-14 items-center gap-3 px-4 lg:px-2",
             "border-b border-neutral-200 dark:border-neutral-800",
             "bg-neutral-50/80 dark:bg-neutral-950/80 backdrop-blur-md",
             "transition-colors duration-300"
           )}
         >
+          {/* Sidebar toggle - desktop only */}
+          <button
+            onClick={() => setCollapsed((v) => !v)}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="hidden lg:flex h-9 w-9 items-center justify-center text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300 transition-colors duration-150"
+          >
+            {collapsed ? (
+              <PanelLeftClose size={22} />
+            ) : (
+              <PanelRightClose size={22} />
+            )}
+          </button>
+
           {/* Mobile: hamburger + title */}
           <div className="flex items-center gap-3 lg:hidden">
             <button
@@ -75,8 +90,18 @@ export default function AppLayout() {
             </span>
           </div>
 
-          {/* Spacer for desktop */}
-          <div className="hidden lg:block" />
+          {/* Page Title - Desktop */}
+          {pageTitle && (
+            <div className="hidden lg:flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-500/10">
+                <GraduationCap size={18} className="text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <h1 className="text-lg font-bold text-neutral-900 dark:text-neutral-50">{pageTitle}</h1>
+            </div>
+          )}
+
+          {/* Spacer */}
+          <div className="flex-1" />
 
           {/* Theme toggle */}
           <button

@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Users, Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
 import ManagementTable from "@/components/airbase/ManagementTable";
 import { StatusBadge, TypeBadge, MonoCode, PrimaryButton, FilterSelect } from "@/components/airbase/AirbaseUI";
 import AddEditModal, { FormField, FormInput, FormSelect } from "@/components/airbase/AddEditModal";
@@ -156,13 +155,11 @@ export default function ManageGroups() {
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      <AirbasePageHeader
-        icon={Users}
-        title="Manage Groups"
-        description="Click any row to view details. Add, edit, or manage reserve groups."
-        breadcrumbs={[{ label: "Airbase", path: "/airbase" }, { label: "Manage Groups" }]}
-        actions={!isSquadronAdmin && <PrimaryButton icon={Plus} onClick={openAdd}>Add Group</PrimaryButton>}
-      />
+      {!isSquadronAdmin && (
+        <div className="flex justify-end">
+          <PrimaryButton icon={Plus} onClick={openAdd}>Add Group</PrimaryButton>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="flex flex-wrap gap-3">

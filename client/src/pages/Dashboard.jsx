@@ -68,17 +68,7 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      <div className="flex flex-col gap-3">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
-            Air Force Reservists Analytics Dashboard
-          </h1>
-          <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-500">
-            Real-time overview of reservist strength, training, attendance, and readiness.
-          </p>
-        </div>
-        <DashboardFilters filters={filters} onChange={setFilters} />
-      </div>
+      <DashboardFilters filters={filters} onChange={setFilters} />
 
       <KPIStatsGrid data={dashboardData?.kpis} />
 

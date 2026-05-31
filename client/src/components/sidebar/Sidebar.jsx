@@ -31,72 +31,60 @@ export default function Sidebar({ collapsed: controlledCollapsed, onToggle }) {
         "dark:bg-neutral-950 dark:border-neutral-800"
       )}
     >
-      {/* ── Brand ─────────────────────────────────────────────── */}
-      <div
-        className={cn(
-          "flex h-16 shrink-0 items-center",
-          "border-b border-neutral-200 dark:border-neutral-800",
-          isCollapsed ? "justify-center px-0" : "justify-between px-4"
-        )}
-      >
-        <Link
-          to="/"
-          className={cn(
-            "flex items-center gap-2.5 overflow-hidden",
-            isCollapsed && "justify-center"
-          )}
-        >
-          {/* Logo mark — PAF roundel-inspired badge */}
-          <span className={cn(
-            "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full",
-            "bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700",
-            "shadow-md shadow-blue-900/30 dark:shadow-blue-900/50",
-            "ring-2 ring-blue-500/30 dark:ring-blue-400/20",
-            "before:absolute before:inset-[3px] before:rounded-full",
-            "before:border before:border-white/20"
-          )}>
-            {/* Outer ring detail */}
-            <span className="absolute inset-0 rounded-full border border-white/10" />
-            {/* PAF text */}
-            <span className="relative z-10 text-[9px] font-black tracking-[0.05em] text-white leading-none select-none">
-              PAF
-            </span>
-            {/* Bottom star accent */}
-            <span className="absolute bottom-[5px] text-[6px] text-yellow-300 leading-none select-none">★</span>
-          </span>
+       {/* ── Brand ─────────────────────────────────────────────── */}
+       <div
+         className={cn(
+           "flex h-16 shrink-0 items-center",
+           "border-b border-neutral-200 dark:border-neutral-800",
+           isCollapsed ? "justify-center px-0" : "justify-between px-4"
+         )}
+       >
+         <Link
+           to="/"
+           className={cn(
+             "flex items-center gap-2.5 overflow-hidden",
+             isCollapsed && "justify-center"
+           )}
+         >
+           <img
+             src="/AirForce-logo.png"
+             alt="Air Force Logo"
+             className={cn(
+               "h-9 w-9 shrink-0",
+               isCollapsed && "mx-auto"
+             )}
+           />
+           {!isCollapsed && (
+             <div className="flex flex-col leading-tight overflow-hidden">
+               {/* P.A.F.R with letter-spaced styling */}
+               <span className="text-[15px] font-black tracking-[0.12em] text-neutral-900 dark:text-neutral-50 leading-none">
+                 P.A.F.R
+               </span>
+               {/* Subtitle — subtle, small, tight */}
+               <span className="mt-[3px] text-[9px] font-medium tracking-[0.06em] uppercase text-neutral-400 dark:text-neutral-500 truncate leading-none">
+                 Philippine Air Force Reservists
+               </span>
+             </div>
+           )}
+         </Link>
 
-          {/* Brand text */}
-          {!isCollapsed && (
-            <div className="flex flex-col leading-tight overflow-hidden">
-              {/* P.A.F.R with letter-spaced styling */}
-              <span className="text-[15px] font-black tracking-[0.12em] text-neutral-900 dark:text-neutral-50 leading-none">
-                P.A.F.R
-              </span>
-              {/* Subtitle — subtle, small, tight */}
-              <span className="mt-[3px] text-[9px] font-medium tracking-[0.06em] uppercase text-neutral-400 dark:text-neutral-500 truncate leading-none">
-                Philippine Air Force Reservists
-              </span>
-            </div>
-          )}
-        </Link>
-
-        {/* Collapse toggle */}
-        {!isCollapsed && (
-          <button
-            onClick={handleToggle}
-            aria-label="Collapse sidebar"
-            className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-md",
-              "text-neutral-400 hover:text-neutral-700",
-              "hover:bg-neutral-100 dark:hover:bg-neutral-800",
-              "dark:text-neutral-500 dark:hover:text-neutral-300",
-              "transition-colors duration-150"
-            )}
-          >
-            <ChevronLeft size={15} />
-          </button>
-        )}
-      </div>
+         {/* Collapse toggle */}
+         {!isCollapsed && (
+           <button
+             onClick={handleToggle}
+             aria-label="Collapse sidebar"
+             className={cn(
+               "flex h-7 w-7 items-center justify-center rounded-md",
+               "text-neutral-400 hover:text-neutral-700",
+               "hover:bg-neutral-100 dark:hover:bg-neutral-800",
+               "dark:text-neutral-500 dark:hover:text-neutral-300",
+               "transition-colors duration-150"
+             )}
+           >
+             <ChevronLeft size={15} />
+           </button>
+         )}
+       </div>
 
       {/* ── Expand button (collapsed only) ────────────────────── */}
       {isCollapsed && (

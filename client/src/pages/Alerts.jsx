@@ -443,53 +443,38 @@ export default function Alerts() {
   }, [alerts]);
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl bg-indigo-100 dark:bg-indigo-500/10 p-2">
-              <Bell className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-semibold tracking-tight">Alerts &amp; Insights</h1>
-              <p className="text-sm text-neutral-500">System-generated alerts, broadcast notices, and positive trends</p>
-            </div>
-          </div>
-        </div>
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={fetchAlerts}
+          className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800"
+        >
+          <RefreshCw className="h-4 w-4" /> Refresh
+        </button>
 
-        <div className="flex items-center gap-2">
+        <button
+          onClick={handleClearFilters}
+          className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800"
+        >
+          <X className="h-4 w-4" /> Clear
+        </button>
+
+        <button
+          onClick={handleMarkAllRead}
+          disabled={!alerts.some(a => !a.is_read)}
+          className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50"
+        >
+          <Check className="h-4 w-4" /> Mark page read
+        </button>
+
+        {isAnyAdmin && (
           <button
-            onClick={fetchAlerts}
-            className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800"
+            onClick={() => setShowCreate(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
           >
-            <RefreshCw className="h-4 w-4" /> Refresh
+            <Plus className="h-4 w-4" /> Create Broadcast
           </button>
-
-          <button
-            onClick={handleClearFilters}
-            className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800"
-          >
-            <X className="h-4 w-4" /> Clear
-          </button>
-
-          <button
-            onClick={handleMarkAllRead}
-            disabled={!alerts.some(a => !a.is_read)}
-            className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-2 text-sm hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50"
-          >
-            <Check className="h-4 w-4" /> Mark page read
-          </button>
-
-          {isAnyAdmin && (
-            <button
-              onClick={() => setShowCreate(true)}
-              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-            >
-              <Plus className="h-4 w-4" /> Create Broadcast
-            </button>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Summary Cards */}
