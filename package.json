@@ -7,7 +7,16 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "docker:up": "docker-compose up -d --build",
+    "docker:down": "docker-compose down",
+    "docker:stop": "docker-compose stop",
+    "docker:restart": "docker-compose restart",
+    "docker:logs": "docker-compose logs -f",
+    "docker:logs:server": "docker logs -f pafr-server",
+    "docker:logs:client": "docker logs -f pafr-client",
+    "docker:logs:mysql": "docker logs -f pafr-mysql",
+    "docker:clean": "docker-compose down -v"
   },
   "repository": {
     "type": "git",

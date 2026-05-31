@@ -3,7 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
-const trainingsRouter = require('./routes/trainings');
+const authRoutes = require('./routes/auth');
+const trainingsRoutes = require('./routes/trainings');
 const organizationRouter = require('./routes/organization');
 const announcementsRoutes = require('./routes/announcements');
 
@@ -25,8 +26,9 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api', organizationRouter);
-app.use('/api/trainings', trainingsRouter);
+app.use('/api/trainings', trainingsRoutes);
 app.use('/api/announcements', announcementsRoutes);
 
 // Do not pass a listen() callback: Express also registers it on server 'error',

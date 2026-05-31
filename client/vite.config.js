@@ -2,6 +2,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+const isDocker = process.env.VITE_DOCKER === 'true';
+const apiTarget = process.env.VITE_API_TARGET || (isDocker ? "http://pafr-server:5000" : "http://localhost:5000");
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -12,7 +15,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://localhost:5000",
+        target: apiTarget,
         changeOrigin: true,
         secure: false,
       },

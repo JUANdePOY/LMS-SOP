@@ -22,6 +22,11 @@ server/uploads
 # Environment
 .env
 server/.env
+.env.docker
+
+# Docker
+*.log
+docker-compose.override.yml
 
 # Project
 tasks/
