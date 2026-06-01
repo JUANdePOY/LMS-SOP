@@ -53,15 +53,18 @@ export const assignReservist = (id, data) => api.post(`/reservists/${id}/assign`
 export const resetReservistPassword = (id, data) => api.post(`/reservists/${id}/reset-password`, data);
 export const bulkUploadReservists = (formData) =>
   api.post('/reservists/bulk-upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000
   });
 export const bulkUploadReservistInfo = (formData) =>
   api.post('/reservists/bulk-upload-info', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000
   });
 export const bulkPreviewReservists = (formData) =>
   api.post('/reservists/bulk-preview', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 60000
   });
 
 // Trainings

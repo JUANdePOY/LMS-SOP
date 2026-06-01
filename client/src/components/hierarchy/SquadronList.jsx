@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, Users, Tag, MapPin } from "lucide-react";
+import { CheckCircle2, XCircle, Users, Tag, MapPin, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useHierarchy } from "./HierarchyContext";
 
@@ -21,7 +21,7 @@ function StatusBadge({ status }) {
  * SquadronList — Level 4 (leaf)
  * Each card is clickable → opens MembersModal for that squadron.
  */
-export default function SquadronList({ squadrons }) {
+export default function SquadronList({ squadrons, onImportAll }) {
   const { selectedSquadron, selectSquadron, openMembersModal } = useHierarchy();
 
   if (!squadrons?.length) {
@@ -30,6 +30,22 @@ export default function SquadronList({ squadrons }) {
 
   return (
     <>
+      {onImportAll && (
+        <button
+          onClick={onImportAll}
+          className={cn(
+            "mb-3 flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium",
+            "border-indigo-200 dark:border-indigo-500/30",
+            "bg-indigo-50 dark:bg-indigo-500/10",
+            "text-indigo-600 dark:text-indigo-400",
+            "hover:bg-indigo-100 dark:hover:bg-indigo-500/20",
+            "transition-all duration-150"
+          )}
+        >
+          <Upload size={14} />
+          Import All Reservists
+        </button>
+      )}
       <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
         {squadrons.map((sq) => {
           const isSelected = selectedSquadron?.id === sq.id;

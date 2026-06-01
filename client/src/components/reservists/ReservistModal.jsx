@@ -62,6 +62,10 @@ export default function ReservistModal({ open, mode, form, onChange, onClose, on
         })
         .catch(err => console.error('Failed to load options:', err))
         .finally(() => setLoading(false));
+    } else {
+      setSquadronOptions([]);
+      setGroupOptions([]);
+      setArcenOptions([]);
     }
   }, [open]);
 
