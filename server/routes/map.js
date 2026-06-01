@@ -11,7 +11,7 @@ const { authenticateToken } = require('../middleware/auth');
  */
 router.get('/squadrons', [
   query('area').optional().isString(),
-  query('active_only').optional().isBoolean().toBoolean()
+  query('active_only').optional().isBoolean()
 ], authenticateToken, async (req, res) => {
   try {
     const errors = validationResult(req);

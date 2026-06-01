@@ -15,8 +15,8 @@ const { getUserScopeFilter } = require('../middleware/rbac');
  *   ?active_only=true   — filter to active entities only
  */
 router.get('/', [
-  query('hierarchical').optional().isBoolean().toBoolean(),
-  query('active_only').optional().isBoolean().toBoolean()
+  query('hierarchical').optional().isBoolean(),
+  query('active_only').optional().isBoolean()
 ], authenticateToken, async (req, res) => {
   try {
     const errors = validationResult(req);

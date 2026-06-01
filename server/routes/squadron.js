@@ -24,7 +24,7 @@ router.get('/', [
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
   query('group_id').optional().isInt({ min: 1 }).toInt(),
-  query('is_active').optional().isBoolean().toBoolean(),
+  query('is_active').optional().isBoolean(),
   query('search').optional().trim().isLength({ max: 100 }),
   query('sort_by').optional().isIn(['name', 'code', 'created_at', 'updated_at']).trim()
 ], authenticateToken, async (req, res) => {
@@ -42,7 +42,8 @@ router.get('/', [
     const page = req.query.page || 1;
     const limit = req.query.limit || 25;
     const offset = (page - 1) * limit;
-    const { group_id, is_active, search, sort_by } = req.query;
+    const { group_id, is_active: is_active_raw, search, sort_by } = req.query;
+    const is_active = is_active_raw !== undefined ? is_active_raw === 'true' : undefined;
     const sortBy = sort_by || 'name';
 
     let whereConditions = [];

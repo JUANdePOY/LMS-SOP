@@ -22,7 +22,7 @@ const validateId = [
 router.get('/', [
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
-  query('is_active').optional().isBoolean().toBoolean(),
+  query('is_active').optional().isBoolean(),
   query('search').optional().trim().isLength({ max: 100 }),
   query('sort_by').optional().isIn(['name', 'code', 'created_at', 'updated_at']).trim()
 ], authenticateToken, async (req, res) => {
@@ -40,7 +40,8 @@ router.get('/', [
     const page = req.query.page || 1;
     const limit = req.query.limit || 25;
     const offset = (page - 1) * limit;
-    const { is_active, search, sort_by } = req.query;
+    const { is_active: is_active_raw, search, sort_by } = req.query;
+    const is_active = is_active_raw !== undefined ? is_active_raw === 'true' : undefined;
     const sortBy = sort_by || 'name';
 
     let whereConditions = [];
@@ -414,7 +415,7 @@ router.get('/:id/groups', [
   param('id').isInt({ min: 1 }).withMessage('ID must be a positive integer'),
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
-  query('is_active').optional().isBoolean().toBoolean(),
+  query('is_active').optional().isBoolean(),
   query('search').optional().trim().isLength({ max: 100 })
 ], authenticateToken, async (req, res) => {
   try {
@@ -442,7 +443,8 @@ router.get('/:id/groups', [
     const page = req.query.page || 1;
     const limit = req.query.limit || 25;
     const offset = (page - 1) * limit;
-    const { is_active, search } = req.query;
+    const { is_active: is_active_raw, search } = req.query;
+    const is_active = is_active_raw !== undefined ? is_active_raw === 'true' : undefined;
 
     let whereConditions = ['g.arsen_id = ?'];
     let queryParams = [req.params.id];
