@@ -169,6 +169,7 @@ export const getMapSummary = () => api.get('/map/summary');
 
 // Self-service profile (reservist)
 export const getMyProfile = () => api.get('/reservists/my/profile');
+export const generateMyQR = () => api.post('/reservists/my/profile/generate-qr');
 export const updateMyProfile = (data) => api.put('/reservists/my/profile', data);
 export const getMyTrainings = () => api.get('/reservists/my/trainings');
 export const getMyAttendance = () => api.get('/reservists/my/attendance');

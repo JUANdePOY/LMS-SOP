@@ -2232,4 +2232,53 @@ router.put(
   }
 );
 
+/**
+ * POST /api/reservists/my/profile/generate-qr
+ * Generate a QR code value for the current reservist if not already set
+ */
+router.post('/my/profile/generate-qr', authenticateToken, async (req, res) => {
+  try {
+    const [reservists] = await db.query(
+      'SELECT id, qr_code, service_number FROM reservists WHERE user_id = ?',
+      [req.user.id]
+    );
+
+    if (reservists.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Reservist profile not found',
+        code: 'NOT_FOUND'
+      });
+    }
+
+    const reservist = reservists[0];
+
+    if (reservist.qr_code) {
+      return res.json({
+        status: 'success',
+        data: { qr_code: reservist.qr_code }
+      });
+    }
+
+    const qrValue = reservist.service_number || `RES-${reservist.id}-${Date.now()}`;
+
+    await db.query(
+      'UPDATE reservists SET qr_code = ? WHERE id = ?',
+      [qrValue, reservist.id]
+    );
+
+    res.json({
+      status: 'success',
+      data: { qr_code: qrValue }
+    });
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to generate QR code',
+      code: 'GENERATE_ERROR'
+    });
+  }
+});
+
 module.exports = router;

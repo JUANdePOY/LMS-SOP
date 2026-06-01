@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { User, Calendar, Phone, MapPin, Droplet, Shield, Loader2, Save, Lock } from 'lucide-react';
-import { getMyProfile, updateMyProfile, updateProfile } from '@/services/api';
+import QRCode from 'qrcode';
+import { User, Calendar, Phone, MapPin, Droplet, Shield, Loader2, Save, Lock, QrCode } from 'lucide-react';
+import { getMyProfile, updateMyProfile, updateProfile, generateMyQR } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
 
@@ -44,10 +45,33 @@ export default function Profile() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '' });
   const [error, setError] = useState(null);
+  const [qrDataUrl, setQrDataUrl] = useState('');
 
   useEffect(() => {
     loadProfile();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!profile) return;
+    const qrValue = profile.qr_code;
+    if (!qrValue) return;
+    QRCode.toDataURL(qrValue, { width: 256, margin: 2, color: { dark: '#1e293b', light: '#ffffff' } })
+      .then(setQrDataUrl)
+      .catch(() => {});
+  }, [profile]);
+
+  const handleGenerateQR = async () => {
+    try {
+      const res = await generateMyQR();
+      if (res.data?.status === 'success') {
+        setProfile(prev => ({ ...prev, qr_code: res.data.data.qr_code }));
+        addToast('QR code generated successfully', 'success');
+      }
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to generate QR code';
+      addToast(message, 'error');
+    }
+  };
 
   const loadProfile = async () => {
     setLoading(true);
@@ -266,7 +290,52 @@ export default function Profile() {
         </SectionCard>
       </div>
 
-{/* Password Change Section */}
+      {/* QR Code Section */}
+      <SectionCard title="My QR Code" icon={QrCode}>
+        <div className="flex flex-col sm:flex-row items-center gap-6">
+          <div className="shrink-0 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white p-3">
+            {qrDataUrl ? (
+              <img src={qrDataUrl} alt="Profile QR Code" className="w-48 h-48" />
+            ) : profile?.qr_code ? (
+              <div className="w-48 h-48 flex items-center justify-center bg-neutral-50 dark:bg-neutral-800">
+                <Loader2 className="h-8 w-8 animate-spin text-neutral-400" />
+              </div>
+            ) : (
+              <div className="w-48 h-48 flex items-center justify-center bg-neutral-50 dark:bg-neutral-800">
+                <QrCode className="h-16 w-16 text-neutral-300" />
+              </div>
+            )}
+          </div>
+          <div className="text-sm text-neutral-600 dark:text-neutral-400 space-y-2">
+            <p className="font-medium text-neutral-900 dark:text-neutral-100">Reservist Identification QR</p>
+            {profile?.qr_code ? (
+              <>
+                <p>This QR code can be scanned at events and trainings to mark your attendance.</p>
+                <p className="font-mono text-xs bg-neutral-100 dark:bg-neutral-800 rounded px-2 py-1 inline-block">
+                  {profile.qr_code}
+                </p>
+              </>
+            ) : (
+              <>
+                <p>You don't have a QR code yet. Generate one to check in at events and trainings.</p>
+                <button
+                  onClick={handleGenerateQR}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm",
+                    "bg-blue-600 hover:bg-blue-700 text-white",
+                    "transition-colors duration-200 mt-2"
+                  )}
+                >
+                  <QrCode size={16} />
+                  Generate QR Code
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </SectionCard>
+
+      {/* Password Change Section */}
        <SectionCard title="Change Password" icon={Lock}>
          <div className="space-y-4 max-w-md">
            <div>
