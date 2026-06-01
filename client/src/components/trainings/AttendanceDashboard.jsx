@@ -1,25 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, MapPin, Users, CheckCircle2, XCircle, Clock, AlertTriangle, UserMinus, Loader, ChevronRight, Radio } from 'lucide-react';
+import { Loader, ChevronRight, Radio, AlertTriangle } from 'lucide-react';
 import { getMyEvents, getEventStatus } from '@/services/attendanceApiService';
 
-const STATUS_STYLES = {
-  present: { label: 'Present', color: 'text-emerald-700 dark:text-emerald-300', bg: 'bg-emerald-100 dark:bg-emerald-900/40', icon: CheckCircle2 },
-  absent: { label: 'Absent', color: 'text-red-700 dark:text-red-300', bg: 'bg-red-100 dark:bg-red-900/40', icon: XCircle },
-  late: { label: 'Late', color: 'text-amber-700 dark:text-amber-300', bg: 'bg-amber-100 dark:bg-amber-900/40', icon: Clock },
-  excused: { label: 'Excused', color: 'text-blue-700 dark:text-blue-300', bg: 'bg-blue-100 dark:bg-emerald-900/40', icon: UserMinus },
-  pending: { label: 'Pending', color: 'text-neutral-500 dark:text-neutral-400', bg: 'bg-neutral-100 dark:bg-neutral-800', icon: AlertTriangle },
-};
-
-function MiniStat({ label, value, color }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-lg font-bold text-neutral-900 dark:text-neutral-50">{value}</span>
-      <span className={`text-xs font-medium ${color}`}>{label}</span>
-    </div>
-  );
-}
-
-function EventCard({ event, eventType, onSelect }) {
+function EventRow({ event, eventType, onSelect }) {
   const [statusData, setStatusData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -44,85 +27,49 @@ function EventCard({ event, eventType, onSelect }) {
   const stats = statusData?.stats;
   const total = stats ? (stats.total_participants || stats.total_attendees || 0) : 0;
   const present = stats ? (stats.present_count || 0) : 0;
-  const pct = total > 0 ? Math.round((present / total) * 100) : 0;
 
   const dateLabel = eventType === 'internal'
     ? (event.start_datetime ? new Date(event.start_datetime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—')
     : (event.start_date ? new Date(event.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
 
   return (
-    <button
-      onClick={() => onSelect(eventType, event.id, event)}
-      className="w-full text-left bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 p-4 hover:border-indigo-300 dark:hover:border-indigo-600 hover:shadow-md transition-all group"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded ${
-              eventType === 'internal'
-                ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
-                : 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
-            }`}>
-              {eventType}
-            </span>
-            <span className={`px-2 py-0.5 text-[10px] font-medium rounded ${
-              event.status === 'ongoing' || event.status === 'open'
-                ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
-                : event.status === 'completed' || event.status === 'closed'
-                  ? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'
-                  : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
-            }`}>
-              {event.status}
-            </span>
-          </div>
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-            {event.title}
-          </h3>
-          <div className="flex items-center gap-3 mt-1.5 text-xs text-neutral-500 dark:text-neutral-400">
-            <span className="inline-flex items-center gap-1">
-              <Calendar className="h-3 w-3" />
-              {dateLabel}
-            </span>
-            {event.venue && (
-              <span className="inline-flex items-center gap-1 truncate">
-                <MapPin className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">{event.venue}</span>
-              </span>
-            )}
-          </div>
-        </div>
-        <ChevronRight className="h-5 w-5 text-neutral-300 dark:text-neutral-600 group-hover:text-indigo-500 transition-colors flex-shrink-0 mt-1" />
-      </div>
-
-      {loading && !statusData ? (
-        <div className="flex items-center gap-2 mt-3 text-xs text-neutral-400">
-          <Loader className="h-3 w-3 animate-spin" />
-          Loading stats...
-        </div>
-      ) : stats ? (
-        <div className="mt-3 pt-3 border-t border-neutral-100 dark:border-neutral-700">
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-1 text-xs text-neutral-500 dark:text-neutral-400">
-              <Users className="h-3 w-3" />
-              <span>{present}/{total} scanned</span>
-            </div>
-            <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">{pct}%</span>
-          </div>
-          <div className="w-full h-1.5 bg-neutral-100 dark:bg-neutral-700 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          <div className="flex items-center gap-3 mt-2">
-            <MiniStat label="Present" value={stats.present_count || 0} color="text-emerald-600 dark:text-emerald-400" />
-            <MiniStat label="Late" value={stats.late_count || 0} color="text-amber-600 dark:text-amber-400" />
-            <MiniStat label="Absent" value={stats.absent_count || 0} color="text-red-600 dark:text-red-400" />
-            <MiniStat label="Pending" value={stats.pending_count || 0} color="text-neutral-500 dark:text-neutral-400" />
-          </div>
-        </div>
-      ) : null}
-    </button>
+    <tr className="border-b border-neutral-100 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors">
+      <td className="px-4 py-3">
+        <span className={`px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded ${
+          eventType === 'internal'
+            ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300'
+            : 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
+        }`}>
+          {eventType}
+        </span>
+      </td>
+      <td className="px-4 py-3 font-medium text-neutral-900 dark:text-neutral-100">{event.title}</td>
+      <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{dateLabel}</td>
+      <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">{event.venue || '—'}</td>
+      <td className="px-4 py-3 text-neutral-600 dark:text-neutral-400">
+        {loading && !statusData ? <Loader className="h-3 w-3 animate-spin" /> : present}/{total}
+      </td>
+      <td className="px-4 py-3">
+        <span className={`px-2 py-0.5 text-[10px] font-medium rounded ${
+          event.status === 'ongoing' || event.status === 'open'
+            ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+            : event.status === 'completed' || event.status === 'closed'
+              ? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400'
+              : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
+        }`}>
+          {event.status}
+        </span>
+      </td>
+      <td className="px-4 py-3">
+        <button
+          onClick={() => onSelect(eventType, event.id, event)}
+          className="p-1.5 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-500 dark:text-neutral-400 transition-colors"
+          title="View Details"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </td>
+    </tr>
   );
 }
 
@@ -218,15 +165,36 @@ export default function AttendanceDashboard({ onSelectEvent, filter = 'all' }) {
         </button>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredEvents.map((event) => (
-          <EventCard
-            key={`${event.eventType}-${event.id}`}
-            event={event}
-            eventType={event.eventType}
-            onSelect={onSelectEvent}
-          />
-        ))}
+      <div className="overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-700">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-neutral-50 dark:bg-neutral-800/50 border-b border-neutral-200 dark:border-neutral-700">
+              <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">Type</th>
+              <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">Event</th>
+              <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">Date</th>
+              <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">Location</th>
+              <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">Scanned</th>
+              <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">Status</th>
+              <th className="px-4 py-3 text-left font-medium text-neutral-600 dark:text-neutral-400">View</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredEvents.length > 0 ? filteredEvents.map((event) => (
+              <EventRow
+                key={`${event.eventType}-${event.id}`}
+                event={event}
+                eventType={event.eventType}
+                onSelect={onSelectEvent}
+              />
+            )) : (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-neutral-500">
+                  No events assigned
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

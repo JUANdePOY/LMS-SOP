@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { ArrowLeft, Calendar, MapPin, Users, Loader, AlertCircle, ScanLine, ClipboardList, LayoutDashboard, Wifi, WifiOff } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, AlertCircle, ScanLine, ClipboardList, Wifi, WifiOff } from 'lucide-react';
 import AttendanceDashboard from '@/components/trainings/AttendanceDashboard';
 import AttendanceScanner from '@/components/trainings/AttendanceScanner';
 import AttendanceList from '@/components/trainings/AttendanceList';
@@ -18,7 +18,6 @@ export default function Attendance() {
   const [eventType, setEventType] = useState('internal');
   const [trainingId, setTrainingId] = useState(null);
   const [training, setTraining] = useState(null);
-  const [eventFilter, setEventFilter] = useState('all');
   const [participants, setParticipants] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -122,7 +121,7 @@ export default function Attendance() {
   if (view === 'dashboard') {
     return (
       <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-        <AttendanceDashboard onSelectEvent={handleSelectEvent} filter={eventFilter} />
+        <AttendanceDashboard onSelectEvent={handleSelectEvent} />
       </div>
     );
   }

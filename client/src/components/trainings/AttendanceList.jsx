@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { CheckCircle2, XCircle, Clock, AlertTriangle, UserMinus, Loader, RefreshCw, Download, Filter } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -42,7 +42,6 @@ export default function AttendanceList({
   loading,
   onStatusChange,
   onManualCheckIn,
-  autoRefresh = true,
   onRefresh
 }) {
   const [updatingId, setUpdatingId] = useState(null);

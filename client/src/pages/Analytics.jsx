@@ -114,6 +114,23 @@ function ScoreBadge({ score, size = "md" }) {
   const sizeClass = size === "lg" ? "text-2xl" : size === "sm" ? "text-xs" : "text-sm";
   return <span className={cn("font-bold", sizeClass, text)}>{score}%</span>;
 }
+ 
+function Modal({ isOpen, onClose, title, children }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 w-full max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-800">
+          <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">{title}</h3>
+          <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200">
+            <ChevronDown size={16} />
+          </button>
+        </div>
+        <div className="p-4 overflow-y-auto">{children}</div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Breadcrumb Navigation ────────────────────────────────────────
 
@@ -241,15 +258,17 @@ function DistributionChart({ data, onDrillDown }) {
 
 // ─── Ranking Bar Chart ────────────────────────────────────────────
 
-function RankingChart({ data, labelKey = "name", onItemClick, title, emptyMessage }) {
+function RankingChart({ data, labelKey = "name", onItemClick, title, emptyMessage, limit = 10, showViewAll = false, onViewAll }) {
   if (!data || data.length === 0) return <EmptyState message={emptyMessage} />;
 
-  const sorted = [...data].sort((a, b) => (b.score || b.avg_readiness_score || 0) - (a.score || a.avg_readiness_score || 0));
+  const sorted = [...data].sort((a, b) => (b.score || b.avg_readiness_score || 0) - (a.score || b.avg_readiness_score || 0));
+  const displayData = showViewAll ? sorted : sorted.slice(0, limit);
+  const hasMore = !showViewAll && sorted.length > limit;
 
   return (
     <Card title={title} icon={ShieldCheck}>
       <div className="flex flex-col gap-2">
-        {sorted.map((row, i) => {
+        {displayData.map((row, i) => {
           const score = row.score || row.avg_readiness_score || 0;
           const name = row[labelKey] || row.arsen_name || row.group_name || row.squadron_name || "Unknown";
           const { text } = scoreColor(score);
@@ -281,6 +300,14 @@ function RankingChart({ data, labelKey = "name", onItemClick, title, emptyMessag
             </button>
           );
         })}
+        {hasMore && (
+          <button
+            onClick={onViewAll}
+            className="flex items-center justify-center gap-1 rounded-lg py-2 text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+          >
+            View All ({sorted.length} squadrons)
+          </button>
+        )}
       </div>
     </Card>
   );
@@ -519,6 +546,8 @@ export default function Analytics() {
 
   // Filters
   const [searchTerm, setSearchTerm] = useState("");
+  const [showAllSquadrons, setShowAllSquadrons] = useState(false);
+  const [showAllGroups, setShowAllGroups] = useState(false);
 
   // ── Data Loading ──────────────────────────────────────────────
 
@@ -709,6 +738,9 @@ export default function Analytics() {
               title="Readiness by Group"
               onItemClick={navigateToGroup}
               emptyMessage="No group data available"
+              limit={10}
+              showViewAll={false}
+              onViewAll={() => setShowAllGroups(true)}
             />
             <RankingChart
               data={squadronReadiness}
@@ -716,6 +748,9 @@ export default function Analytics() {
               title="Readiness by Squadron"
               onItemClick={navigateToSquadron}
               emptyMessage="No squadron data available"
+              limit={10}
+              showViewAll={false}
+              onViewAll={() => setShowAllSquadrons(true)}
             />
           </div>
         </>
@@ -885,13 +920,51 @@ export default function Analytics() {
         </>
       )}
 
-      {/* ── Individual Detail Level ──────────────────────────── */}
-      {level === LEVELS.individual && selectedReservist && (
-        <IndividualDetail
-          data={selectedReservist}
-          onBack={navigateBack}
-        />
-      )}
-    </div>
-  );
-}
+       {/* ── Individual Detail Level ──────────────────────────── */}
+       {level === LEVELS.individual && selectedReservist && (
+         <IndividualDetail
+           data={selectedReservist}
+           onBack={navigateBack}
+         />
+       )}
+
+{/* ── All Groups Modal ─────────────────────────────────── */}
+        <Modal
+          isOpen={showAllGroups}
+          onClose={() => setShowAllGroups(false)}
+          title="All Groups"
+        >
+          <RankingChart
+            data={groupReadiness}
+            labelKey="group_name"
+            title=""
+            onItemClick={(group) => {
+              setShowAllGroups(false);
+              navigateToGroup(group);
+            }}
+            emptyMessage="No group data available"
+            showViewAll={true}
+          />
+        </Modal>
+
+        {/* ── All Squadrons Modal ───────────────────────────────── */}
+        <Modal
+          isOpen={showAllSquadrons}
+          onClose={() => setShowAllSquadrons(false)}
+          title="All Squadrons"
+        >
+         <RankingChart
+           data={squadronReadiness}
+           labelKey="squadron_name"
+           title=""
+           onItemClick={(squadron) => {
+             setShowAllSquadrons(false);
+             navigateToSquadron(squadron);
+           }}
+           emptyMessage="No squadron data available"
+           showViewAll={true}
+         />
+       </Modal>
+     </div>
+   );
+ }
