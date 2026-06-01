@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { UserSquare, Plus, Loader, Upload } from "lucide-react";
+import { UserSquare, Plus, Loader, Upload, ChevronLeft, ChevronRight, Download } from "lucide-react";
 import { getReservists, createReservist, updateReservist, deleteReservist } from "@/services/api";
+import * as XLSX from "xlsx";
 import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
 import { PrimaryButton } from "@/components/airbase/AirbaseUI";
 import ReservistStatsBar    from "@/components/reservists/ReservistStatsBar";
@@ -12,31 +13,48 @@ import ReservistDetailPanel from "@/components/reservists/ReservistDetailPanel";
 import SearchAndFilters, { DEFAULT_FILTERS } from "@/components/reservists/SearchAndFilters";
 
 const EMPTY_FORM = {
-  firstName: "", lastName: "", serialNo: "", dateEnlisted: "",
-  rank: "", status: "active", squadronId: "", groupId: "", arcen: "", airbase: "",
-  specialization: "", civilOccupation: "", contact: "", address: "",
-  email: "", password: "", position: "",
-  dateOfBirth: "", placeOfBirth: "", age: "", sex: "", civilStatus: "",
-  citizenship: "Filipino", height: "", weight: "", bloodType: "",
-  reserveCenter: "", category: "", rankDateOfAppointment: "",
-  sourceOfCommission: "", reserveStatus: "Ready Reserve",
-  highestEducation: "", courseDegree: "", school: "", yearGraduated: "",
-  employerCompany: "", officeAddress: "",
-  basicTraining: "", basicTrainingDateCompleted: "",
-  emergencyContactName: "", emergencyContactNumber: "", emergencyContactAddress: "",
+  id: '', userId: '', assignmentId: '',
+  firstName: '', lastName: '', serialNo: '', dateEnlisted: '',
+  rank: '', status: 'active', squadronId: '', groupId: '', arcen: '', airbase: '',
+  specialization: '', civilOccupation: '', contact: '', address: '',
+  email: '', password: '', position: '',
+  dateOfBirth: '', placeOfBirth: '', age: '', sex: '', civilStatus: '',
+  citizenship: 'Filipino', height: '', weight: '', bloodType: '',
+  reserveCenter: '', category: '', rankDateOfAppointment: '',
+  sourceOfCommission: '', reserveStatus: 'Ready Reserve',
+  highestEducation: '', courseDegree: '', school: '', yearGraduated: '',
+  employerCompany: '', officeAddress: '',
+  basicTraining: '', basicTrainingDateCompleted: '',
+  emergencyContactName: '', emergencyContactNumber: '', emergencyContactAddress: '',
 };
 
 export default function Reservists() {
-  const [data,          setData]          = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [error,         setError]         = useState(null);
-  const [search,        setSearch]        = useState("");
-  const [filters,       setFilters]       = useState(DEFAULT_FILTERS);
-  const [modal,         setModal]         = useState({ open: false, mode: "add", row: null });
-  const [form,          setForm]          = useState(EMPTY_FORM);
-  const [detailRow,     setDetailRow]     = useState(null);
-  const [viewRow,       setViewRow]       = useState(null);
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [modal, setModal] = useState({ open: false, mode: "add", row: null });
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [detailRow, setDetailRow] = useState(null);
+  const [viewRow, setViewRow] = useState(null);
   const [bulkUploadModal, setBulkUploadModal] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+
+  const formatDate = (val) => {
+    if (!val) return '';
+    if (typeof val === 'string') {
+      return val.slice(0, 10);
+    }
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return '';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   const transformReservistData = (apiData) => {
     return apiData.map(r => ({
@@ -48,40 +66,40 @@ export default function Reservists() {
       rank: r.rank || '',
       status: r.is_active ? 'active' : 'inactive',
       position: r.position || '',
-      dateOfBirth: r.date_of_birth || '',
+      dateOfBirth: formatDate(r.date_of_birth),
       placeOfBirth: r.place_of_birth || '',
-      age: r.age || '',
+      age: r.age != null ? String(r.age) : '',
       sex: r.sex || '',
       civilStatus: r.civil_status || '',
       citizenship: r.citizenship || 'Filipino',
-      height: r.height || '',
-      weight: r.weight || '',
+      height: r.height != null ? String(r.height) : '',
+      weight: r.weight != null ? String(r.weight) : '',
       bloodType: r.blood_type || '',
       contact: r.phone_number || '',
       address: r.address || '',
       email: r.email || '',
-      reserveCenter: r.reserve_center || '',
+      reserveCenter: r.reserve_center != null ? String(r.reserve_center) : '',
       category: r.category || '',
-      dateEnlisted: r.date_enlisted || '',
+      dateEnlisted: formatDate(r.date_enlisted),
       sourceOfCommission: r.source_of_commission || '',
-      rankDateOfAppointment: r.rank_date_appointment || '',
+      rankDateOfAppointment: formatDate(r.rank_date_appointment),
       specialization: r.specialization || '',
       reserveStatus: r.reserve_status || 'Ready Reserve',
       highestEducation: r.highest_education || '',
       courseDegree: r.course_degree || '',
       school: r.school || '',
-      yearGraduated: r.year_graduated || '',
+      yearGraduated: r.year_graduated != null ? String(r.year_graduated) : '',
       civilOccupation: r.occupation || '',
       employerCompany: r.employer || '',
       officeAddress: r.office_address || '',
       basicTraining: r.basic_training_completed || '',
-      basicTrainingDateCompleted: r.basic_training_date || '',
+      basicTrainingDateCompleted: formatDate(r.basic_training_date),
       emergencyContactName: r.emergency_contact_name || '',
       emergencyContactNumber: r.emergency_contact_phone || '',
       emergencyContactAddress: r.emergency_contact_address || '',
       assignmentId: r.assignment_id || '',
-      squadronId: r.squadron_id || '',
-      groupId: r.group_id || '',
+      squadronId: r.squadron_id != null ? String(r.squadron_id) : '',
+      groupId: r.group_id != null ? String(r.group_id) : '',
       squadron: r.squadron_name || '',
       group: r.group_name || '',
       arcen: r.arcen_name || '',
@@ -90,23 +108,36 @@ export default function Reservists() {
   };
 
   useEffect(() => {
-    loadReservists();
-  }, []);
+    loadReservists(1);
+  }, [search, filters]);
 
-  const loadReservists = async () => {
+  const loadReservists = async (page = 1) => {
     setLoading(true);
     setError(null);
+    setCurrentPage(page);
     try {
-      const params = {};
+      const params = { page, limit: 100 };
       if (search) params.search = search;
       if (filters.status && filters.status !== '' && filters.status !== 'all') params.status = filters.status;
       if (filters.squadronId && filters.squadronId !== '') params.squadron_id = parseInt(filters.squadronId, 10);
       if (filters.groupId && filters.groupId !== '') params.group_id = parseInt(filters.groupId, 10);
       if (filters.rank && filters.rank !== '') params.rank = filters.rank;
       if (filters.reserveStatus && filters.reserveStatus !== '') params.reserve_status = filters.reserveStatus;
+      if (filters.airbase && filters.airbase !== '') params.airbase = filters.airbase;
+      if (filters.arcen && filters.arcen !== '') params.arcen = filters.arcen;
+      if (filters.group && filters.group !== '') params.group = filters.group;
+      if (filters.squadron && filters.squadron !== '') params.squadron = filters.squadron;
+      if (filters.specialization && filters.specialization !== '') params.specialization = filters.specialization;
+      if (filters.category && filters.category !== '') params.category = filters.category;
+      if (filters.sourceOfCommission && filters.sourceOfCommission !== '') params.sourceOfCommission = filters.sourceOfCommission;
+      if (filters.bloodType && filters.bloodType !== '') params.bloodType = filters.bloodType;
+      if (filters.sex && filters.sex !== '') params.sex = filters.sex;
+      if (filters.civilStatus && filters.civilStatus !== '') params.civilStatus = filters.civilStatus;
       const response = await getReservists(params);
       if (response.data.status === 'success') {
         setData(transformReservistData(response.data.data));
+        setTotalPages(response.data.pagination?.pages || 1);
+        setTotalCount(response.data.pagination?.total || 0);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load reservists');
@@ -151,15 +182,19 @@ export default function Reservists() {
 
   const openEdit = (row) => {
     setForm({
-      firstName: row.firstName,
-      lastName: row.lastName,
-      serialNo: row.serialNo,
-      dateEnlisted: row.dateEnlisted,
-      rank: row.rank,
+      ...EMPTY_FORM,
+      id: row.id || '',
+      userId: row.userId || '',
+      assignmentId: row.assignmentId || '',
+      firstName: row.firstName || '',
+      lastName: row.lastName || '',
+      serialNo: row.serialNo || '',
+      dateEnlisted: row.dateEnlisted || '',
+      rank: row.rank || '',
       status: row.status || 'active',
       position: row.position || '',
-      squadronId: row.squadronId || '',
-      groupId: row.groupId || '',
+      squadronId: row.squadronId != null ? String(row.squadronId) : '',
+      groupId: row.groupId != null ? String(row.groupId) : '',
       arcen: row.arcen || '',
       airbase: row.airbase || '',
       specialization: row.specialization || '',
@@ -169,14 +204,14 @@ export default function Reservists() {
       email: row.email || '',
       dateOfBirth: row.dateOfBirth || '',
       placeOfBirth: row.placeOfBirth || '',
-      age: row.age || '',
+      age: row.age != null ? String(row.age) : '',
       sex: row.sex || '',
       civilStatus: row.civilStatus || '',
       citizenship: row.citizenship || 'Filipino',
-      height: row.height || '',
-      weight: row.weight || '',
+      height: row.height != null ? String(row.height) : '',
+      weight: row.weight != null ? String(row.weight) : '',
       bloodType: row.bloodType || '',
-      reserveCenter: row.reserveCenter || '',
+      reserveCenter: row.reserveCenter != null ? String(row.reserveCenter) : '',
       category: row.category || '',
       rankDateOfAppointment: row.rankDateOfAppointment || '',
       sourceOfCommission: row.sourceOfCommission || '',
@@ -184,7 +219,7 @@ export default function Reservists() {
       highestEducation: row.highestEducation || '',
       courseDegree: row.courseDegree || '',
       school: row.school || '',
-      yearGraduated: row.yearGraduated || '',
+      yearGraduated: row.yearGraduated != null ? String(row.yearGraduated) : '',
       employerCompany: row.employerCompany || '',
       officeAddress: row.officeAddress || '',
       basicTraining: row.basicTraining || '',
@@ -336,6 +371,28 @@ export default function Reservists() {
     }
   };
 
+  const handleExport = () => {
+    const exportData = filteredData.map((r, idx) => ({
+      'No.': idx + 1,
+      'Serial No.': r.serialNo,
+      'Last Name': r.lastName,
+      'First Name': r.firstName,
+      'Rank': r.rank,
+      'Status': r.status,
+      'Squadron': r.squadron,
+      'Group': r.group,
+      'ARCEN': r.arcen,
+      'Contact': r.contact,
+      'Email': r.email,
+      'Date Enlisted': r.dateEnlisted,
+      'Specialization': r.specialization,
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Reservists');
+    XLSX.writeFile(wb, `reservists_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   return (
     <div className="flex flex-col gap-6 pb-10">
       {loading && (
@@ -352,10 +409,14 @@ export default function Reservists() {
 
       {!loading && (
           <>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <PrimaryButton icon={Upload} onClick={() => setBulkUploadModal(true)} variant="secondary" className="flex-1 sm:flex-none">
                 <span className="hidden sm:inline">Bulk Upload</span>
                 <span className="sm:hidden">Upload</span>
+              </PrimaryButton>
+              <PrimaryButton icon={Download} onClick={handleExport} variant="secondary" className="flex-1 sm:flex-none">
+                <span className="hidden sm:inline">Export All</span>
+                <span className="sm:hidden">Export</span>
               </PrimaryButton>
               <PrimaryButton icon={Plus} onClick={openAdd} className="flex-1 sm:flex-none">
                 <span className="hidden sm:inline">Add Reservist</span>
@@ -365,23 +426,49 @@ export default function Reservists() {
 
             <ReservistStatsBar data={data} />
 
-          <SearchAndFilters
-            search={search}
-            onSearchChange={setSearch}
-            filters={filters}
-            onFiltersChange={setFilters}
-            resultCount={filteredData.length}
-          />
+<SearchAndFilters
+              search={search}
+              onSearchChange={setSearch}
+              filters={filters}
+              onFiltersChange={setFilters}
+              resultCount={filteredData.length}
+            />
 
-          <ReservistTable
-            data={filteredData}
-            onView={setViewRow}
-            onEdit={openEdit}
-            onDelete={handleDelete}
-            onToggleStatus={toggleStatus}
-          />
+            <ReservistTable
+              data={filteredData}
+              onView={setViewRow}
+              onEdit={openEdit}
+              onDelete={handleDelete}
+              onToggleStatus={toggleStatus}
+            />
 
-          <ReservistModal
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-neutral-500">
+                <div>
+                  Showing {(currentPage - 1) * 100 + 1}–{Math.min(currentPage * 100, totalCount)} of {totalCount}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => loadReservists(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-1 disabled:opacity-40 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                  >
+                    ← Prev
+                  </button>
+                  <span className="px-2 tabular-nums">Page {currentPage} / {totalPages}</span>
+                  <button
+                    onClick={() => loadReservists(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg border border-neutral-300 dark:border-neutral-700 px-3 py-1 disabled:opacity-40 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                  >
+                    Next →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <ReservistModal
             open={modal.open}
             mode={modal.mode}
             form={form}

@@ -68,7 +68,7 @@ router.get('/reservists', [
   query('squadron_id').optional().isInt(),
   query('group_id').optional().isInt(),
   query('arsen_id').optional().isInt(),
-  query('is_active').optional().isBoolean().toBoolean(),
+  query('is_active').optional().isBoolean(),
   query('search').optional().trim(),
   query('sort_by').optional().isIn(['readiness_score', 'training_participation_pct', 'attendance_rate_pct', 'last_name', 'rank']),
   query('sort_order').optional().isIn(['asc', 'desc']),
@@ -82,10 +82,11 @@ router.get('/reservists', [
     }
 
     const {
-      squadron_id, group_id, arsen_id, is_active,
+      squadron_id, group_id, arsen_id, is_active: is_active_raw,
       search, sort_by = 'readiness_score', sort_order = 'desc',
       page = 1, limit = 25
     } = req.query;
+    const is_active = is_active_raw !== undefined ? is_active_raw === 'true' : undefined;
 
     const conditions = [];
     const params = [];

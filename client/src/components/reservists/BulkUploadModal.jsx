@@ -15,7 +15,7 @@ const RESERVIST_INFO_COLUMNS = [
   'Home Address', 'Contact Number', 'Email Address', 'Branch of Service',
   'Reserve Center', 'Group Command', 'Squadron', 'Category (1st / 2nd / 3rd Category)',
   'Source of Commission/Enlistment (ROTC/ BCMT/ MOTC/ Direct Commission)',
-  'Rank Date of Appointment', 'Specialization/MOS',
+  'Date Enlisted', 'Rank Date of Appointment', 'Specialization/MOS',
   'Status (Ready Reserve/ Standby Reserve/ Retired)', 'Highest Educational Attainment',
   'Course/Degree', 'School', 'Year Graduated', 'Occupation', 'Employer/Company',
   'Office Address', 'Basic Training Completed (BCMT/ROTC)', 'Date Completed',
@@ -152,18 +152,24 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
             return true;
           });
 
-          const preview = filteredData.slice(0, 3).map((row, idx) => ({
-            sheetName: firstSheet,
-            sheetIndex: 0,
-            rowIndex: idx + 1,
-            data: {
-              position: row["DESCRIPTION/POSITION"] || row["Position"] || "",
-              grade: row["GRADE"] || "",
-              afsc: row["AFSC"] || "",
-              required: row["REQUIRED"] || row["Required"] || "",
-              name: row["NAME"] || row["Name"] || "",
-            },
-          }));
+          const preview = filteredData.slice(0, 3).map((row, idx) => {
+            const name = row["NAME"] || row["Name"] || "";
+            const parsed = parseFullname(name);
+            return ({
+              sheetName: firstSheet,
+              sheetIndex: 0,
+              rowIndex: idx + 1,
+              data: {
+                position: row["DESCRIPTION/POSITION"] || row["Position"] || "",
+                grade: row["GRADE"] || "",
+                afsc: row["AFSC"] || "",
+                required: row["REQUIRED"] || row["Required"] || "",
+                name: name,
+                parsedRank: parsed.rank,
+                parsedServiceNumber: parsed.serviceNumber,
+              },
+            });
+          });
 
           setPreviewData(preview);
           setStage("preview");
@@ -186,7 +192,50 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
     }
   };
 
-  const parseReservistInfoExcel = (excelFile) => {
+  const parseFullname = (fullname) => {
+  if (!fullname || typeof fullname !== 'string') {
+    return { rank: '', firstName: '', lastName: '', serviceNumber: '' };
+  }
+
+  let cleanName = fullname.trim();
+
+  // Extract service number (pattern: MN-XXXXX or O-XXXXX, with possible hyphens in number)
+  const serviceNumberMatch = cleanName.match(/(MN-[\w-]+|O-[\w-]+)/i);
+  const result = {
+    serviceNumber: serviceNumberMatch ? serviceNumberMatch[1].toUpperCase() : '',
+    rank: '',
+    firstName: '',
+    lastName: ''
+  };
+
+  // Remove service number and PAF(RES) suffix from name
+  cleanName = cleanName
+    .replace(/\s*(MN-[\w-]+|O-[\w-]+)\s*/i, ' ')
+    .replace(/\s*PAF\s*\(.*?\)[\s.]*$/i, '') // Handle PAF(Res), PAF(RES), PAF(RES).
+    .trim();
+
+  // Extract rank - first word if it matches known rank patterns
+  const rankPattern = /^(LTC|LTCOL|COL|CAPT|CPT|1LT|2LT|MSGT|MSG|SSGT|SG|TSGT|TSG|SGT|Sgt|CPL|Cpl|PVT|PV2|Spc|SPC)$/i;
+  const rankMatch = cleanName.match(rankPattern);
+  result.rank = rankMatch ? rankMatch[1].toUpperCase() : '';
+
+  // Remove rank from name
+  const remainingName = cleanName.replace(rankPattern, '').trim();
+
+  // Split remaining into first and last name
+  const nameParts = remainingName.trim().split(/\s+/);
+  if (nameParts.length >= 2) {
+    result.firstName = nameParts[0];
+    result.lastName = nameParts.slice(1).join(' ');
+  } else if (nameParts.length === 1) {
+    result.firstName = nameParts[0];
+    result.lastName = '';
+  }
+
+  return result;
+};
+
+const parseReservistInfoExcel = (excelFile) => {
     try {
       setParseError(null);
       const reader = new FileReader();
@@ -208,21 +257,50 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
             const row = rawData[i];
             if (row && row.some(cell =>
               cell && typeof cell === 'string' &&
-              (cell === 'Fullname' || cell === 'Rank' || cell === 'AFPSN (Serial Number)' ||
-               cell === 'Email Address' || cell === 'Contact Number')
+              (cell.trim() === 'Fullname' || cell.trim() === 'Rank' || cell.trim() === 'AFPSN (Serial Number)' ||
+               cell.trim() === 'Email Address' || cell.trim() === 'Contact Number')
             )) {
               headerRowIndex = i;
               break;
             }
           }
 
-          const headers = rawData[headerRowIndex] || [];
+          const headers = (rawData[headerRowIndex] || []).map(h => h != null ? String(h).trim() : h);
           const dataRows = rawData.slice(headerRowIndex + 1);
+
+          const headerLookup = {};
+          headers.forEach((h, idx) => {
+            if (h != null) {
+              headerLookup[h] = idx;
+              headerLookup[h.toLowerCase()] = idx;
+              headerLookup[h.replace(/[\s/()]+/g, '').toLowerCase()] = idx;
+            }
+          });
+
+          const getVal = (rowArr, ...possibleNames) => {
+            for (const name of possibleNames) {
+              if (headerLookup[name] != null) return rowArr[headerLookup[name]] || "";
+              const lower = name.toLowerCase();
+              if (headerLookup[lower] != null) return rowArr[headerLookup[lower]] || "";
+              const stripped = name.replace(/[\s/()]+/g, '').toLowerCase();
+              if (headerLookup[stripped] != null) return rowArr[headerLookup[stripped]] || "";
+            }
+            return "";
+          };
           const jsonData = dataRows.map(row => {
             const obj = {};
             headers.forEach((key, idx) => {
               if (key != null) obj[key] = row[idx];
             });
+            obj.__raw = row;
+            const headerIndexMap = {};
+            headers.forEach((h, idx) => {
+              if (h != null) {
+                if (!headerIndexMap[h]) headerIndexMap[h] = [];
+                headerIndexMap[h].push(idx);
+              }
+            });
+            obj.__headerIndexMap = headerIndexMap;
             return obj;
           });
 
@@ -231,52 +309,57 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
             return fullname && fullname.length >= 2;
           });
 
-          const preview = filteredData.slice(0, 3).map((row, idx) => ({
-            sheetName: firstSheet,
-            sheetIndex: 0,
-            rowIndex: idx + 1,
-            data: {
-              fullname: row["Fullname"] || "",
-              rank: row["Rank"] || "",
-              afpsn: row["AFPSN (Serial Number)"] || "",
-              dateOfBirth: row["Date of Birth"] || "",
-              placeOfBirth: row["Place of Birth"] || "",
-              age: row["Age"] || "",
-              sex: row["Sex"] || "",
-              civilStatus: row["Civil Status"] || "",
-              citizenship: row["Citizenship"] || "",
-              height: row["Height"] || "",
-              weight: row["Weight"] || "",
-              bloodType: row["Blood Type"] || "",
-              homeAddress: row["Home Address"] || "",
-              contactNumber: row["Contact Number"] || "",
-              email: row["Email Address"] || "",
-              branchOfService: row["Branch of Service"] || "",
-              reserveCenter: row["Reserve Center"] || "",
-              groupCommand: row["Group Command"] || "",
-              squadron: row["Squadron"] || "",
-              category: row["Category (1st / 2nd / 3rd Category)"] || "",
-              sourceOfCommission: row["Source of Commission/Enlistment (ROTC/ BCMT/ MOTC/ Direct Commission)"] || "",
-              rankDateOfAppointment: row["Rank Date of Appointment"] || "",
-              specialization: row["Specialization/MOS"] || "",
-              status: row["Status (Ready Reserve/ Standby Reserve/ Retired)"] || "",
-              highestEducation: row["Highest Educational Attainment"] || "",
-              courseDegree: row["Course/Degree"] || "",
-              school: row["School"] || "",
-              yearGraduated: row["Year Graduated"] || "",
-              occupation: row["Occupation"] || "",
-              employer: row["Employer/Company"] || "",
-              officeAddress: row["Office Address"] || "",
-              basicTraining: row["Basic Training Completed (BCMT/ROTC)"] || "",
-              dateCompleted: row["Date Completed"] || "",
-              otherTraining: row["Other Military Courses/Training"] || "",
-              awards: row["AWARDS AND DECORATIONS"] || "",
-              emergencyContactName: row["Emergency contact name"] || "",
-              emergencyRelationship: row["Relationship"] || "",
-              emergencyContactNumber: row["Contact Number"] || row["Contact Number"] || "",
-              emergencyAddress: row["Address"] || "",
-            },
-          }));
+const preview = filteredData.slice(0, 3).map((row, idx) => {
+            const raw = row.__raw || [];
+            const parsed = parseFullname(getVal(raw, 'Fullname') || "");
+            return ({
+              sheetName: firstSheet,
+              sheetIndex: 0,
+              rowIndex: idx + 1,
+              data: {
+                fullname: getVal(raw, 'Fullname'),
+                rank: getVal(raw, 'Rank') || parsed.rank,
+                afpsn: getVal(raw, 'AFPSN (Serial Number)', 'AFPSN', 'Serial Number') || parsed.serviceNumber,
+                dateOfBirth: getVal(raw, 'Date of Birth', 'DOB', 'Birth Date'),
+                placeOfBirth: getVal(raw, 'Place of Birth', 'Birth Place'),
+                age: getVal(raw, 'Age'),
+                sex: getVal(raw, 'Sex', 'Gender'),
+                civilStatus: getVal(raw, 'Civil Status', 'Marital Status'),
+                citizenship: getVal(raw, 'Citizenship', 'Nationality'),
+                height: getVal(raw, 'Height'),
+                weight: getVal(raw, 'Weight'),
+                bloodType: getVal(raw, 'Blood Type', 'BloodType'),
+                homeAddress: getVal(raw, 'Home Address', 'Address'),
+                contactNumber: getVal(raw, 'Contact Number', 'Contact', 'Phone'),
+                email: getVal(raw, 'Email Address', 'Email'),
+                branchOfService: getVal(raw, 'Branch of Service', 'Branch'),
+                reserveCenter: getVal(raw, 'Reserve Center', 'ARCEN'),
+                groupCommand: getVal(raw, 'Group Command', 'Group'),
+                squadron: getVal(raw, 'Squadron'),
+                category: getVal(raw, 'Category (1st / 2nd / 3rd Category)', 'Category'),
+                sourceOfCommission: getVal(raw, 'Source of Commission/Enlistment (ROTC/ BCMT/ MOTC/ Direct Commission)', 'Source of Commission', 'Source of Enlistment'),
+                dateEnlisted: getVal(raw, 'Date Enlisted', 'Enlisted Date', 'Date of Enlistment'),
+                rankDateOfAppointment: getVal(raw, 'Rank Date of Appointment', 'Rank Date', 'Date of Appointment'),
+                specialization: getVal(raw, 'Specialization/MOS', 'Specialization', 'MOS'),
+                status: getVal(raw, 'Status (Ready Reserve/ Standby Reserve/ Retired)', 'Status', 'Reserve Status'),
+                highestEducation: getVal(raw, 'Highest Educational Attainment', 'Highest Education', 'Education'),
+                courseDegree: getVal(raw, 'Course/Degree', 'Course', 'Degree'),
+                school: getVal(raw, 'School'),
+                yearGraduated: getVal(raw, 'Year Graduated', 'Graduation Year'),
+                occupation: getVal(raw, 'Occupation', 'Job', 'Profession'),
+                employer: getVal(raw, 'Employer/Company', 'Employer', 'Company'),
+                officeAddress: getVal(raw, 'Office Address'),
+                basicTraining: getVal(raw, 'Basic Training Completed (BCMT/ROTC)', 'Basic Training Completed', 'Basic Training', 'BCMT'),
+                dateCompleted: getVal(raw, 'Date Completed', 'Completed Date'),
+                otherTraining: getVal(raw, 'Other Military Courses/Training', 'Other Training'),
+                awards: getVal(raw, 'AWARDS AND DECORATIONS', 'Awards', 'Awards and Decorations'),
+                emergencyContactName: getVal(raw, 'Emergency contact name', 'Emergency Contact Name', 'Emergency Contact'),
+                emergencyRelationship: getVal(raw, 'Relationship', 'Relation'),
+                emergencyContactNumber: getVal(raw, 'Contact Number', 'EC Contact', 'Emergency Phone'),
+                emergencyAddress: getVal(raw, 'Address', 'EC Address', 'Emergency Address'),
+              },
+            });
+          });
 
           setPreviewData(preview);
           setStage("preview");
@@ -327,45 +410,34 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
     fileInputRef.current?.click();
   };
 
-  const handleUpload = async () => {
-    if (!file) {
-      setError("Please select a file first");
-      return;
-    }
+const handleUpload = async () => {
+     if (!file) {
+       setError("Please select a file first");
+       return;
+     }
 
-    if (uploadType === UPLOAD_TYPES.POSITION && !selectedArsen) {
-      setError("Please select an ARSEN first");
-      return;
-    }
+     if (uploadType === UPLOAD_TYPES.POSITION && !selectedArsen) {
+       setError("Please select an ARSEN first");
+       return;
+     }
 
-    if (uploadType === UPLOAD_TYPES.RESERVIST_INFO) {
-      if (!selectedArsen || !selectedGroup || !selectedSquadron) {
-        setError("Please select an ARSEN, Group, and Squadron");
-        return;
-      }
-    }
+     if (uploadType === UPLOAD_TYPES.RESERVIST_INFO) {
+       if (!selectedArsen || !selectedGroup || !selectedSquadron) {
+         setError("Please select an ARSEN, Group, and Squadron");
+         return;
+       }
+     }
 
-    setLoading(true);
-    setError(null);
-    setStage("uploading");
+     setLoading(true);
+     setError(null);
+     setStage("uploading");
 
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      if (uploadType === UPLOAD_TYPES.POSITION) {
-        formData.append("arsen_id", selectedArsen);
-        if (selectedGroup) {
-          formData.append("group_id", selectedGroup);
-        }
-        if (selectedSquadron) {
-          formData.append("squadron_id", selectedSquadron);
-        }
-      } else {
-        formData.append("arsen_id", selectedArsen);
-        formData.append("group_id", selectedGroup);
-        formData.append("squadron_id", selectedSquadron);
-      }
+     try {
+       const formData = new FormData();
+       formData.append("file", file);
+       formData.append("arsen_id", selectedArsen);
+       formData.append("group_id", selectedGroup);
+       formData.append("squadron_id", selectedSquadron);
 
       const uploadFn = uploadType === UPLOAD_TYPES.RESERVIST_INFO
         ? bulkUploadReservistInfo
@@ -549,15 +621,17 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                 </h3>
                 {uploadType === UPLOAD_TYPES.POSITION ? (
                   <ul className="text-[11px] text-neutral-600 dark:text-neutral-400 space-y-1 ml-4 list-disc">
-                    <li><strong>First sheet:</strong> Group positions (unit manning document)</li>
-                    <li>Other sheets: Squadron positions</li>
-                    <li><strong>Required columns:</strong> DESCRIPTION/POSITION, GRADE, AFSC, REQUIRED, NAME</li>
+                    <li><strong>Single sheet</strong> for position upload</li>
+                    <li><strong>Required columns:</strong> NAME, DESCRIPTION/POSITION</li>
+                    <li><strong>Name format:</strong> "LTC JENNY LYN T NALUPA O-160092 PAF(RES)" will be auto-parsed</li>
+                    <li><strong>Other columns (GRADE, AFSC, REQUIRED) will be ignored</strong></li>
                   </ul>
                 ) : (
                   <ul className="text-[11px] text-neutral-600 dark:text-neutral-400 space-y-1 ml-4 list-disc">
                     <li><strong>Single sheet</strong> with all reservist details</li>
                     <li><strong>Required columns:</strong> Fullname, Rank, AFPSN (Serial Number)</li>
-                    <li><strong>Optional columns:</strong> Date of Birth, Place of Birth, Age, Sex, Civil Status, Citizenship, Height, Weight, Blood Type, Home Address, Contact Number, Email Address, Branch of Service, Reserve Center, Group Command, Squadron, Category, Source of Commission/Enlistment, Rank Date of Appointment, Specialization/MOS, Status, Highest Educational Attainment, Course/Degree, School, Year Graduated, Occupation, Employer/Company, Office Address, Basic Training Completed, Date Completed, Other Military Courses/Training, AWARDS AND DECORATIONS, Emergency contact name, Relationship, Contact Number, Address</li>
+                    <li><strong>Name format:</strong> "LTC JENNY LYN T NALUPA O-160092 PAF(RES)" will be auto-parsed</li>
+                    <li><strong>Optional columns:</strong> Date of Birth, Place of Birth, Age, Sex, Civil Status, Citizenship, Height, Weight, Blood Type, Home Address, Contact Number, Email Address, Branch of Service, Reserve Center, Group Command, Squadron, Category, Source of Commission/Enlistment, Date Enlisted, Rank Date of Appointment, Specialization/MOS, Status, Highest Educational Attainment, Course/Degree, School, Year Graduated, Occupation, Employer/Company, Office Address, Basic Training Completed, Date Completed, Other Military Courses/Training, AWARDS AND DECORATIONS, Emergency contact name, Relationship, Contact Number, Address</li>
                   </ul>
                 )}
               </div>
@@ -830,20 +904,18 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                       <thead className="bg-neutral-50 dark:bg-neutral-800">
                         <tr>
                           <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Position</th>
-                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Grade</th>
-                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">AFSC</th>
-                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Required</th>
                           <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Name</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Parsed Rank</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Service #</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
                         {previewData.map((item, idx) => (
                           <tr key={idx} className="bg-white dark:bg-neutral-900">
                             <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.position}</td>
-                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.grade}</td>
-                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.afsc}</td>
-                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.required}</td>
                             <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.name}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.parsedRank}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200">{item.data.parsedServiceNumber}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -856,6 +928,11 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                           <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Rank</th>
                           <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">AFPSN</th>
                           <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Date of Birth</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Date Enlisted</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Source of Commission</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Highest Education</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Basic Training</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Occupation</th>
                           <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Sex</th>
                           <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Contact</th>
                           <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Email</th>
@@ -869,6 +946,11 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                             <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.rank}</td>
                             <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.afpsn}</td>
                             <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.dateOfBirth}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.dateEnlisted}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.sourceOfCommission}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.highestEducation}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.basicTraining}</td>
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.occupation}</td>
                             <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.sex}</td>
                             <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.contactNumber}</td>
                             <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.data.email}</td>

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import {
   X, Users, Search, ChevronUp, ChevronDown, ChevronsUpDown,
-  CheckCircle2, XCircle, Shield, Layers, MapPin, Tag, Loader,
+  CheckCircle2, XCircle, Shield, Layers, MapPin, Tag, Loader, Download,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getReservists } from "@/services/api";
+import * as XLSX from "xlsx";
 
 // ── Status badge ──────────────────────────────────────────────
 function StatusBadge({ status }) {
@@ -195,6 +196,27 @@ export default function MembersModal({ open, node, nodeType, onClose }) {
     else { setSortField(key); setSortDir("asc"); }
   };
 
+  const handleExport = () => {
+    const exportData = sorted.map((m, idx) => ({
+      'No.': idx + 1,
+      'Serial No.': m.serialNo,
+      'Last Name': m.lastName,
+      'First Name': m.firstName,
+      'Rank': m.rank,
+      'Specialization': m.specialization,
+      'Status': m.status,
+      'Date Enlisted': m.dateEnlisted,
+      'Attendance Rate': `${m.attendanceRate}%`,
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Squadron Members');
+    const fileName = nodeType === 'squadron' 
+      ? `${node.name.replace(/\s+/g, '_')}_members_${new Date().toISOString().slice(0, 10)}.xlsx`
+      : `${nodeType}_${node.name.replace(/\s+/g, '_')}_members_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+  };
+
   const activeCount   = members.filter((m) => m.status === "active").length;
   const inactiveCount = members.filter((m) => m.status === "inactive").length;
 
@@ -306,6 +328,22 @@ export default function MembersModal({ open, node, nodeType, onClose }) {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
+
+          {/* Export button */}
+          <button
+            onClick={handleExport}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium",
+              "border-emerald-200 dark:border-emerald-500/30",
+              "bg-emerald-50 dark:bg-emerald-500/10",
+              "text-emerald-600 dark:text-emerald-400",
+              "hover:bg-emerald-100 dark:hover:bg-emerald-500/20",
+              "transition-all duration-150"
+            )}
+          >
+            <Download size={13} />
+            Export
+          </button>
 
           {/* Result count */}
           <span className="ml-auto text-xs text-neutral-400 dark:text-neutral-600 shrink-0">

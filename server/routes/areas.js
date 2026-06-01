@@ -34,10 +34,10 @@ router.get('/', [
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
   query('parent_id').optional().isInt({ min: 1 }).toInt(),
-  query('is_active').optional().isBoolean().toBoolean(),
+  query('is_active').optional().isBoolean(),
   query('search').optional().trim().isLength({ max: 100 }),
   query('sort_by').optional().isIn(['name', 'code', 'created_at', 'updated_at']).trim(),
-  query('hierarchical').optional().isBoolean().toBoolean()
+  query('hierarchical').optional().isBoolean()
 ], authenticateToken, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -53,7 +53,8 @@ router.get('/', [
     const page = req.query.page || 1;
     const limit = req.query.limit || 25;
     const offset = (page - 1) * limit;
-    const { parent_id, is_active, search, sort_by, hierarchical } = req.query;
+    const { parent_id, is_active: is_active_raw, search, sort_by, hierarchical } = req.query;
+    const is_active = is_active_raw !== undefined ? is_active_raw === 'true' : undefined;
     const sortBy = sort_by || 'name';
     const isHierarchical = hierarchical === true || hierarchical === 'true';
 
@@ -549,7 +550,7 @@ router.delete('/:id', validateId, authenticateToken, requireAdmin, async (req, r
 router.get('/:id/descendants', [
   param('id').isInt({ min: 1 }).withMessage('ID must be a positive integer'),
   query('depth').optional().isInt({ min: 1 }).toInt(),
-  query('include_inactive').optional().isBoolean().toBoolean()
+  query('include_inactive').optional().isBoolean()
 ], authenticateToken, async (req, res) => {
   try {
     const errors = validationResult(req);
