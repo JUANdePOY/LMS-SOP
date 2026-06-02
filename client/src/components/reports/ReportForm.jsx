@@ -1,9 +1,8 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { X, Upload, Trash2, FileText, Image, File, ChevronDown, Users, ClipboardList } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Upload, Trash2, FileText, Image, File, ClipboardList, Users } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 import { createReport, updateReport, uploadDocumentation } from '@/services/reportsService';
-import { getTrainings, getExternalTrainings } from '@/services/trainingsService';
-import { searchSquadrons, searchSquadronReservists } from '@/services/organizationService';
+import { getTrainings, getExternalTrainings, getInternalTrainingParticipants, getExternalTrainingParticipants } from '@/services/trainingsService';
 import { cn } from '@/lib/utils';
 
 const inputCls =
@@ -14,41 +13,6 @@ const ACCEPTED_MIME = ['application/pdf', 'image/jpeg', 'image/png'];
 const MAX_FILE_MB = 10;
 
 const str = (v) => (v == null ? '' : String(v));
-
-function formatReservistRow(r) {
-  const rank = r.rank ? `${r.rank} ` : '';
-  return `${rank}${r.last_name}, ${r.first_name}`;
-}
-
-function formatChipLabel(r) {
-  const parts = [];
-  if (r.rank) parts.push(r.rank);
-  parts.push(`${r.last_name}, ${r.first_name}`);
-  if (r.service_number) parts.push(r.service_number);
-  return parts.join(' · ');
-}
-
-function useDebouncedCallback(fn, delayMs) {
-  const ref = useRef(null);
-  return useCallback(
-    (...args) => {
-      if (ref.current) clearTimeout(ref.current);
-      ref.current = setTimeout(() => {
-        ref.current = null;
-        fn(...args);
-      }, delayMs);
-    },
-    [fn, delayMs]
-  );
-}
-
-function countUniqueReservists(blocks) {
-  const ids = new Set();
-  for (const b of blocks) {
-    for (const r of b.selectedReservists || []) ids.add(r.id);
-  }
-  return ids.size;
-}
 
 function FormGroup({ label, required, hint, children, error }) {
   return (
@@ -188,343 +152,6 @@ function DocumentationUpload({ files, onFilesChange }) {
   );
 }
 
-function SquadronParticipantBlocks({ blocks, onChange, disabled }) {
-  const [expandedIds, setExpandedIds] = useState(() => new Set());
-  const [squadEditing, setSquadEditing] = useState({});
-  const [squadDropdown, setSquadDropdown] = useState({});
-  const [squadSearchQuery, setSquadSearchQuery] = useState({});
-  const [memberLists, setMemberLists] = useState({});
-  const [memberLoading, setMemberLoading] = useState({});
-  const [memberFilter, setMemberFilter] = useState({});
-  const [activeSquadOption, setActiveSquadOption] = useState({});
-
-  const reservistCount = countUniqueReservists(blocks);
-
-  const summaryLine = useMemo(() => {
-    const sq = blocks.filter((b) => b.squadronId).length;
-    const parts = [];
-    if (sq) parts.push(`${sq} squadron${sq === 1 ? '' : 's'}`);
-    if (reservistCount) parts.push(`${reservistCount} participant${reservistCount === 1 ? '' : 's'}`);
-    return parts.length ? `${parts.join(' · ')} selected` : null;
-  }, [blocks, reservistCount]);
-
-  const addBlock = () => {
-    const localId = `b-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    onChange([...blocks, { localId, squadronId: null, squadronName: '', selectedReservists: [] }]);
-    setExpandedIds((prev) => new Set([...prev, localId]));
-  };
-
-  const updateBlock = (localId, patch) => {
-    onChange(blocks.map((b) => (b.localId === localId ? { ...b, ...patch } : b)));
-  };
-
-  const removeBlock = (localId) => {
-    onChange(blocks.filter((b) => b.localId !== localId));
-    setExpandedIds((prev) => { const n = new Set(prev); n.delete(localId); return n; });
-    const scrub = (setter) => setter((d) => { const n = { ...d }; delete n[localId]; return n; });
-    scrub(setSquadEditing);
-    scrub(setSquadDropdown);
-    scrub(setSquadSearchQuery);
-    scrub(setMemberLists);
-    scrub(setMemberFilter);
-    scrub(setActiveSquadOption);
-  };
-
-  const toggleExpanded = (localId) => {
-    setExpandedIds((prev) => {
-      const n = new Set(prev);
-      if (n.has(localId)) n.delete(localId); else n.add(localId);
-      return n;
-    });
-  };
-
-  const loadMembers = useCallback(async (localId, squadronId) => {
-    if (!squadronId) return;
-    setMemberLoading((d) => ({ ...d, [localId]: true }));
-    const r = await searchSquadronReservists(squadronId, '', 50);
-    setMemberLoading((d) => ({ ...d, [localId]: false }));
-    if (r.success) setMemberLists((d) => ({ ...d, [localId]: r.reservists || [] }));
-  }, []);
-
-  const debouncedSquadronSearch = useDebouncedCallback(async (localId, q) => {
-    const r = await searchSquadrons(q || '', 40);
-    if (r.success) {
-      setSquadDropdown((d) => ({ ...d, [localId]: r.squadrons || [] }));
-      setActiveSquadOption((d) => ({ ...d, [localId]: 0 }));
-    }
-  }, 300);
-
-  const debouncedMemberSearch = useDebouncedCallback(async (localId, squadronId, q) => {
-    if (!squadronId) return;
-    setMemberLoading((d) => ({ ...d, [localId]: true }));
-    const r = await searchSquadronReservists(squadronId, q || '', 50);
-    setMemberLoading((d) => ({ ...d, [localId]: false }));
-    if (r.success) setMemberLists((d) => ({ ...d, [localId]: r.reservists || [] }));
-  }, 300);
-
-  useEffect(() => {
-    if (!blocks.length) return;
-    setExpandedIds(new Set(blocks.map((b) => b.localId)));
-  }, [blocks.map((b) => b.localId).join('|')]);
-
-  useEffect(() => {
-    for (const block of blocks) {
-      if (block.squadronId && memberLists[block.localId] === undefined && !memberLoading[block.localId]) {
-        loadMembers(block.localId, block.squadronId);
-      }
-    }
-  }, [blocks, memberLists, memberLoading, loadMembers]);
-
-  const selectSquadron = (localId, s) => {
-    updateBlock(localId, { squadronId: s.id, squadronName: s.name + (s.code ? ` (${s.code})` : ''), selectedReservists: [] });
-    setSquadEditing((d) => ({ ...d, [localId]: false }));
-    setSquadDropdown((d) => ({ ...d, [localId]: [] }));
-    setSquadSearchQuery((d) => ({ ...d, [localId]: '' }));
-    setMemberLists((d) => { const n = { ...d }; delete n[localId]; return n; });
-    setMemberFilter((d) => ({ ...d, [localId]: '' }));
-    setExpandedIds((prev) => new Set([...prev, localId]));
-    loadMembers(localId, s.id);
-  };
-
-  const startChangeSquadron = (block) => {
-    if (block.selectedReservists.length > 0) {
-      const ok = window.confirm('Changing the squadron will clear selected participants for this block. Continue?');
-      if (!ok) return;
-    }
-    updateBlock(block.localId, { squadronId: null, squadronName: '', selectedReservists: [] });
-    setSquadEditing((d) => ({ ...d, [block.localId]: true }));
-    setMemberLists((d) => { const n = { ...d }; delete n[block.localId]; return n; });
-  };
-
-  const toggleReservist = (block, r, checked) => {
-    if (checked) {
-      if (block.selectedReservists.some((x) => x.id === r.id)) return;
-      updateBlock(block.localId, {
-        selectedReservists: [...block.selectedReservists, {
-          id: r.id, first_name: r.first_name, last_name: r.last_name, rank: r.rank, service_number: r.service_number,
-        }],
-      });
-    } else {
-      updateBlock(block.localId, { selectedReservists: block.selectedReservists.filter((x) => x.id !== r.id) });
-    }
-  };
-
-  const selectAllInBlock = (block, list) => {
-    const existing = new Map(block.selectedReservists.map((r) => [r.id, r]));
-    for (const r of list) {
-      if (!existing.has(r.id)) {
-        existing.set(r.id, { id: r.id, first_name: r.first_name, last_name: r.last_name, rank: r.rank, service_number: r.service_number });
-      }
-    }
-    updateBlock(block.localId, { selectedReservists: [...existing.values()] });
-  };
-
-  const clearBlockSelection = (block) => {
-    updateBlock(block.localId, { selectedReservists: [] });
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-        <div>
-          <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Participants</p>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-            Add squadrons and select participants who attended the event.
-          </p>
-          {summaryLine && (
-            <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400 mt-1">{summaryLine}</p>
-          )}
-        </div>
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={addBlock}
-          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1.5 text-xs font-semibold text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50 shrink-0"
-        >
-          <Users size={14} /> Add squadron
-        </button>
-      </div>
-
-      {blocks.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-neutral-200 dark:border-neutral-700 bg-neutral-50/80 dark:bg-neutral-900/30 px-4 py-5 text-center space-y-3">
-          <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 mx-auto">
-            <Users size={20} />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-neutral-800 dark:text-neutral-100">No participants added</p>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto">
-              Add squadrons and select the reservists who attended this event.
-            </p>
-          </div>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={addBlock}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
-          >
-            <Users size={14} /> Add first squadron
-          </button>
-        </div>
-      ) : (
-        blocks.map((block, blockIndex) => (
-          <SquadronBlock
-            key={block.localId}
-            block={block}
-            blockIndex={blockIndex}
-            disabled={disabled}
-            expanded={expandedIds.has(block.localId)}
-            onToggle={() => toggleExpanded(block.localId)}
-            onRemove={() => removeBlock(block.localId)}
-            squadEditing={!!squadEditing[block.localId]}
-            squadDropdown={squadDropdown[block.localId] || []}
-            squadSearchQuery={squadSearchQuery[block.localId] || ''}
-            activeSquadOption={activeSquadOption[block.localId] ?? 0}
-            memberList={memberLists[block.localId]}
-            memberLoading={!!memberLoading[block.localId]}
-            memberFilter={memberFilter[block.localId] || ''}
-            onSquadSearchChange={(q) => {
-              setSquadSearchQuery((d) => ({ ...d, [block.localId]: q }));
-              debouncedSquadronSearch(block.localId, q);
-            }}
-            onSelectSquadron={(s) => selectSquadron(block.localId, s)}
-            onStartChangeSquadron={() => startChangeSquadron(block)}
-            onMemberFilterChange={(q) => {
-              setMemberFilter((d) => ({ ...d, [block.localId]: q }));
-              if (!String(q || '').trim()) {
-                loadMembers(block.localId, block.squadronId);
-              } else {
-                debouncedMemberSearch(block.localId, block.squadronId, q);
-              }
-            }}
-            onToggleReservist={(r, checked) => toggleReservist(block, r, checked)}
-            onSelectAll={(list) => selectAllInBlock(block, list)}
-            onClear={() => clearBlockSelection(block)}
-          />
-        ))
-      )}
-    </div>
-  );
-}
-
-function SquadronBlock({
-  block, blockIndex, disabled, expanded, onToggle, onRemove,
-  squadEditing, squadDropdown, squadSearchQuery, activeSquadOption,
-  memberList, memberLoading, memberFilter,
-  onSquadSearchChange, onSelectSquadron, onStartChangeSquadron,
-  onMemberFilterChange, onToggleReservist, onSelectAll, onClear,
-}) {
-  const showSquadronPicker = !block.squadronId || squadEditing;
-  const headerTitle = block.squadronName || `Squadron ${blockIndex + 1}`;
-  const selectedCount = block.selectedReservists.length;
-  const list = memberList || [];
-
-  return (
-    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 border-l-4 border-l-indigo-500 bg-neutral-50/50 dark:bg-neutral-900/40 overflow-visible">
-      <div className="flex items-center gap-2 px-3 py-2 bg-white/60 dark:bg-neutral-900/60">
-        <button type="button" onClick={onToggle} className="flex flex-1 min-w-0 items-center gap-2 text-left" aria-expanded={expanded}>
-          <ChevronDown size={16} className={cn('shrink-0 text-neutral-500 transition-transform', expanded ? 'rotate-0' : '-rotate-90')} />
-          <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-100 truncate">{headerTitle}</span>
-          {block.squadronId && <span className="text-xs text-neutral-500 dark:text-neutral-400 shrink-0">· {selectedCount} selected</span>}
-        </button>
-        <button type="button" disabled={disabled} onClick={onRemove} className="shrink-0 p-1.5 rounded-lg text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
-          <Trash2 size={16} />
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="p-3 space-y-3 border-t border-neutral-200/80 dark:border-neutral-800">
-          {showSquadronPicker ? (
-            <div className="space-y-1.5 relative z-50">
-              <label className="text-[10px] font-bold text-neutral-500 dark:text-neutral-400 uppercase">Squadron</label>
-              <input
-                type="text" role="combobox" disabled={disabled}
-                placeholder="Search by name or code…"
-                value={squadSearchQuery}
-                onChange={(e) => onSquadSearchChange(e.target.value)}
-                className={inputCls}
-              />
-              {squadDropdown.length > 0 && !disabled && (
-                <ul className="absolute z-50 mt-1 max-h-40 w-full overflow-auto rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-lg text-sm">
-                  {squadDropdown.map((s, i) => (
-                    <li key={s.id}>
-                      <button type="button" className={cn('w-full text-left px-3 py-2', i === activeSquadOption ? 'bg-indigo-50 dark:bg-indigo-950/50' : 'hover:bg-neutral-100 dark:hover:bg-neutral-800')} onClick={() => onSelectSquadron(s)}>
-                        <span className="font-medium text-neutral-900 dark:text-neutral-100">{s.name}</span>
-                        {s.code && <span className="text-neutral-500 text-xs ml-1">{s.code}</span>}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center rounded-lg bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 px-2.5 py-1.5 text-xs font-medium text-indigo-900 dark:text-indigo-100">
-                {block.squadronName}
-              </span>
-              <button type="button" disabled={disabled} onClick={onStartChangeSquadron} className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50">
-                Change
-              </button>
-            </div>
-          )}
-
-          {block.squadronId && (
-            <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900/80 p-3 space-y-2">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <p className="text-xs font-semibold text-neutral-700 dark:text-neutral-200">
-                  Members {list.length > 0 && <span className="font-normal text-neutral-500 dark:text-neutral-400">({list.length})</span>}
-                </p>
-                <div className="flex gap-1.5 shrink-0">
-                  <button type="button" disabled={disabled || !list.length} onClick={() => onSelectAll(list)} className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50">Select all</button>
-                  <span className="text-neutral-300 dark:text-neutral-600">|</span>
-                  <button type="button" disabled={disabled || !block.selectedReservists.length} onClick={onClear} className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 hover:underline disabled:opacity-50">Clear</button>
-                </div>
-              </div>
-              <input type="search" disabled={disabled} placeholder="Filter name, service number, or rank…" value={memberFilter} onChange={(e) => onMemberFilterChange(e.target.value)} className={inputCls} />
-              {memberLoading ? (
-                <p className="text-xs text-neutral-500 py-3 text-center">Loading members…</p>
-              ) : list.length === 0 ? (
-                <p className="text-xs text-neutral-500 py-3 text-center">No reservists found for this squadron.</p>
-              ) : (
-                <ul className="max-h-48 overflow-auto rounded-lg border border-neutral-100 dark:border-neutral-800 divide-y divide-neutral-100 dark:divide-neutral-800">
-                  {list.map((r) => {
-                    const checked = block.selectedReservists.some((x) => x.id === r.id);
-                    return (
-                      <li key={r.id}>
-                        <label className="flex items-start gap-2.5 px-3 py-2 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                          <input type="checkbox" disabled={disabled} checked={checked} onChange={(e) => onToggleReservist(r, e.target.checked)} className="mt-0.5 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500" />
-                          <span className="flex-1 min-w-0 text-xs">
-                            <span className="font-medium text-neutral-900 dark:text-neutral-100 block truncate">{formatReservistRow(r)}</span>
-                            {r.service_number && <span className="text-neutral-500 dark:text-neutral-400">{r.service_number}</span>}
-                          </span>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                Selected: {block.selectedReservists.length}{list.length > 0 ? ` of ${list.length}` : ''}
-              </p>
-              {block.selectedReservists.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-neutral-100 dark:border-neutral-800">
-                  {block.selectedReservists.map((r) => (
-                    <span key={r.id} className="inline-flex items-center gap-1 max-w-full rounded-full bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800 px-2 py-0.5 text-[11px] text-indigo-900 dark:text-indigo-100">
-                      <span className="truncate">{formatChipLabel(r)}</span>
-                      <button type="button" disabled={disabled} className="p-0.5 rounded hover:bg-indigo-200/50 dark:hover:bg-indigo-800/50 shrink-0" onClick={() => onToggleReservist(r, false)}>
-                        <X size={12} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function ReportForm({ report, onClose, onSubmit }) {
   const { addToast } = useToast();
   const [submitting, setSubmitting] = useState(false);
@@ -533,6 +160,8 @@ export default function ReportForm({ report, onClose, onSubmit }) {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventSearch, setEventSearch] = useState('');
   const [showEventDropdown, setShowEventDropdown] = useState(false);
+  const [attendanceData, setAttendanceData] = useState(null);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
   const eventDropdownRef = useRef(null);
 
   const [form, setForm] = useState({
@@ -543,34 +172,8 @@ export default function ReportForm({ report, onClose, onSubmit }) {
     summary: str(report?.summary || ''),
     type: report?.type || 'custom',
     format: report?.format || 'pdf',
-    participantBlocks: [],
     documentationFiles: [],
   });
-
-  useEffect(() => {
-    if (report?.participants && report.participants.length > 0) {
-      const blockMap = new Map();
-      for (const p of report.participants) {
-        const sid = p.squadron_id;
-        if (!blockMap.has(sid)) {
-          blockMap.set(sid, {
-            localId: `h-${sid}-${Math.random().toString(36).slice(2)}`,
-            squadronId: sid,
-            squadronName: p.squadron_name || '',
-            selectedReservists: [],
-          });
-        }
-        blockMap.get(sid).selectedReservists.push({
-          id: p.reservist_id,
-          first_name: p.first_name,
-          last_name: p.last_name,
-          rank: p.rank,
-          service_number: p.service_number,
-        });
-      }
-      setForm((prev) => ({ ...prev, participantBlocks: Array.from(blockMap.values()) }));
-    }
-  }, [report]);
 
   useEffect(() => {
     setEventsLoading(true);
@@ -617,7 +220,24 @@ export default function ReportForm({ report, onClose, onSubmit }) {
     if (errors[key]) setErrors((prev) => ({ ...prev, [key]: undefined }));
   };
 
-  const handleEventSelect = (evt) => {
+  const handleEventSelect = async (evt) => {
+    setAttendanceData(null);
+    setAttendanceLoading(true);
+    let attendance = [];
+    try {
+      if (evt._source === 'internal') {
+        const participantsRes = await getInternalTrainingParticipants(evt.id);
+        attendance = participantsRes?.data || [];
+      } else {
+        const participantsRes = await getExternalTrainingParticipants(evt.id);
+        attendance = participantsRes?.data || [];
+      }
+    } catch (e) {
+      addToast('Could not load attendance data for this event', 'warning');
+    } finally {
+      setAttendanceLoading(false);
+      setAttendanceData({ attendance });
+    }
     setForm((prev) => ({
       ...prev,
       event_type: evt._source,
@@ -643,16 +263,6 @@ export default function ReportForm({ report, onClose, onSubmit }) {
     setSubmitting(true);
 
     try {
-      const participants = form.participantBlocks
-        .filter((b) => b.squadronId && (b.selectedReservists?.length ?? 0) > 0)
-        .flatMap((b) =>
-          b.selectedReservists.map((r) => ({
-            reservist_id: r.id,
-            squadron_id: Number(b.squadronId),
-            attendance_status: 'present',
-          }))
-        );
-
       const payload = {
         title: form.title.trim(),
         event_type: form.event_type,
@@ -661,7 +271,7 @@ export default function ReportForm({ report, onClose, onSubmit }) {
         summary: form.summary.trim() || null,
         type: form.type,
         format: form.format,
-        participants,
+        participants: attendanceData?.attendance || [],
       };
 
       let result;
@@ -672,7 +282,17 @@ export default function ReportForm({ report, onClose, onSubmit }) {
       }
 
       if (!result?.success) {
-        setErrors({ submit: result?.message || 'Failed to save report.' });
+        const serverErrors = result?.errors || [];
+        if (serverErrors.length > 0) {
+          const fieldErrors = {};
+          serverErrors.forEach((err) => {
+            const field = err.path || err.param;
+            if (field) fieldErrors[field] = err.msg || err.message;
+          });
+          setErrors(fieldErrors);
+        } else {
+          setErrors({ submit: result?.message || 'Failed to save report.' });
+        }
         return;
       }
 
@@ -815,6 +435,38 @@ export default function ReportForm({ report, onClose, onSubmit }) {
                     </button>
                   </div>
                 )}
+
+                {attendanceLoading && (
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">Loading attendance data...</p>
+                )}
+
+                {attendanceData && (
+                  <div className="mt-2 p-3 bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users size={14} className="text-neutral-500" />
+                      <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 uppercase">
+                        Attendance ({attendanceData.attendance.length})
+                      </span>
+                    </div>
+                    <div className="max-h-40 overflow-y-auto text-xs">
+                      {attendanceData.attendance.length === 0 ? (
+                        <p className="text-neutral-400">No participants recorded</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {attendanceData.attendance.map((p, idx) => (
+                            <li key={idx} className="flex items-center gap-2 text-neutral-700 dark:text-neutral-300">
+                              <span className="truncate">
+                                {p.rank} {p.first_name} {p.last_name}
+                                {p.service_number && ` (${p.service_number})`}
+                                {p.squadron_name && ` - ${p.squadron_name}`}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </FormGroup>
 
@@ -853,14 +505,6 @@ export default function ReportForm({ report, onClose, onSubmit }) {
                   <option value="csv">CSV</option>
                 </select>
               </FormGroup>
-            </div>
-
-            <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">
-              <SquadronParticipantBlocks
-                blocks={form.participantBlocks}
-                onChange={(blocks) => handleChange('participantBlocks', blocks)}
-                disabled={submitting}
-              />
             </div>
 
             <div className="pt-1 border-t border-neutral-100 dark:border-neutral-800">

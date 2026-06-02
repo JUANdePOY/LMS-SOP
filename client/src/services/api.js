@@ -104,6 +104,9 @@ export const getOverdueIssuances = () => api.get('/issuances/overdue');
 export const getReservistIssuances = (id) => api.get(`/issuances/reservist/${id}`);
 export const createIssuance = (data) => api.post('/issuances', data);
 export const returnIssuance = (id, data) => api.put(`/issuances/${id}`, data);
+export const getIssuancesBySquadron = (squadronId) => api.get(`/issuances/squadron/${squadronId}`);
+export const getUniformTracker = (params = {}) => api.get('/issuances/uniform-tracker', { params });
+export const bulkIssueUniforms = (data) => api.post('/issuances/bulk', data);
 
 // Areas
 export const getAreas = (params = {}) => api.get('/areas', { params });
@@ -111,6 +114,9 @@ export const getArea = (id) => api.get(`/areas/${id}`);
 
 // Groups
 export const getGroups = (params = {}, config = {}) => api.get('/hierarchy', { params, ...config });
+export const getSquadrons = (params = {}) => api.get('/squadron', { params });
+export const getGroupsList = (params = {}) => api.get('/groups', { params });
+export const getGroupsByArsen = (arsenId) => api.get(`/groups?arsen_id=${arsenId}`);
 
 // ARSENs
 export const getArcens = (params = {}) => api.get('/arsens', { params });
@@ -119,15 +125,13 @@ export const createArsen = (data) => api.post('/arsens', data);
 export const updateArsen = (id, data) => api.put(`/arsens/${id}`, data);
 export const deleteArsen = (id) => api.delete(`/arsens/${id}`);
 
-// Groups (management)
-export const getGroupsList = (params = {}) => api.get('/groups', { params });
+// GROUPs
 export const getGroup = (id) => api.get(`/groups/${id}`);
 export const createGroup = (data) => api.post('/groups', data);
 export const updateGroup = (id, data) => api.put(`/groups/${id}`, data);
 export const deleteGroup = (id) => api.delete(`/groups/${id}`);
 
-// Squadrons (management)
-export const getSquadrons = (params = {}) => api.get('/squadron', { params });
+// SQUADRONs
 export const getSquadron = (id) => api.get(`/squadron/${id}`);
 export const createSquadron = (data) => api.post('/squadron', data);
 export const updateSquadron = (id, data) => api.put(`/squadron/${id}`, data);

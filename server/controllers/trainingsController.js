@@ -137,6 +137,24 @@ function getExternal(req, res) {
     .catch((err) => sendError(res, err, 'Failed to load training'));
 }
 
+function getInternalTrainingParticipants(req, res) {
+  trainingsService
+    .getInternalTrainingParticipants(req.params.trainingId)
+    .then((participants) => {
+      res.json({ success: true, message: 'OK', data: participants });
+    })
+    .catch((err) => sendError(res, err, 'Failed to load participants'));
+}
+
+function getExternalTrainingParticipants(req, res) {
+  trainingsService
+    .getExternalTrainingParticipants(req.params.id)
+    .then((participants) => {
+      res.json({ success: true, message: 'OK', data: participants });
+    })
+    .catch((err) => sendError(res, err, 'Failed to load participants'));
+}
+
 function createExternal(req, res) {
   const userId = req.user?.id;
   trainingsService
@@ -306,4 +324,6 @@ module.exports = {
   listExternalAttachments,
   getTrainingStats,
   getTrainingSlotAvailability,
+  getInternalTrainingParticipants,
+  getExternalTrainingParticipants,
 };

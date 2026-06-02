@@ -376,6 +376,40 @@ const trainingsService = {
       };
     }
   },
+
+  getInternalTrainingParticipants: async (trainingId) => {
+    try {
+      const response = await api.get(`/trainings/internal/${trainingId}/participants`);
+      const body = response.data;
+      return {
+        success: body.success !== false,
+        message: body.message,
+        data: body.data || [],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch participants',
+      };
+    }
+  },
+
+  getExternalTrainingParticipants: async (trainingId) => {
+    try {
+      const response = await api.get(`/trainings/external/${trainingId}/participants`);
+      const body = response.data;
+      return {
+        success: body.success !== false,
+        message: body.message,
+        data: body.data || [],
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to fetch participants',
+      };
+    }
+  },
 };
 
 export const getTrainings = trainingsService.getTrainings;
@@ -401,5 +435,7 @@ export const downloadInternalAttachment = trainingsService.downloadInternalAttac
 export const downloadExternalAttachment = trainingsService.downloadExternalAttachment;
 export const getInternalTrainingAttachments = trainingsService.getInternalTrainingAttachments;
 export const getExternalTrainingAttachments = trainingsService.getExternalTrainingAttachments;
+export const getInternalTrainingParticipants = trainingsService.getInternalTrainingParticipants;
+export const getExternalTrainingParticipants = trainingsService.getExternalTrainingParticipants;
 
 export default trainingsService;

@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
-  Package, Plus, Pencil, Trash2, AlertTriangle, ArrowUpDown,
-  Search, X, Loader, ClipboardList, Clock, RotateCcw, Boxes,
+  Package, Plus, Pencil, Trash2, AlertTriangle, Search, X, Loader, Boxes,
+  UserCheck, ArrowUpDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/Toast";
@@ -9,18 +9,15 @@ import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import {
   getSupplies, getSupplyCategories, createSupply, updateSupply, deleteSupply,
   adjustSupplyStock, getLowStockSupplies,
-  getIssuances, getOverdueIssuances, createIssuance, returnIssuance,
+  getUniformTracker, createIssuance,
 } from "@/services/api";
 import SupplyForm from "@/components/logistics/SupplyForm";
 import StockAdjustForm from "@/components/logistics/StockAdjustForm";
-import IssueForm from "@/components/logistics/IssueForm";
-import ReturnForm from "@/components/logistics/ReturnForm";
 import { KPICard, CategoryBadge, StockLevelBar } from "@/components/logistics/LogisticsUI";
 
 const TABS = [
   { key: "inventory", label: "Inventory", icon: Package },
-  { key: "issuances", label: "Issuances", icon: ClipboardList },
-  { key: "overdue", label: "Overdue", icon: Clock },
+  { key: "uniform-tracker", label: "Uniform Tracker", icon: Boxes },
 ];
 
 export default function Logistics() {
@@ -30,41 +27,41 @@ export default function Logistics() {
   const [supplies, setSupplies] = useState([]);
   const [categories, setCategories] = useState([]);
   const [lowStock, setLowStock] = useState([]);
-  const [issuances, setIssuances] = useState([]);
-  const [overdueIssuances, setOverdueIssuances] = useState([]);
+  const [uniformTracker, setUniformTracker] = useState([]);
+  const [uniformTrackerLoading, setUniformTrackerLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("inventory");
 
-  // ── Filter state ──
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [issuanceFilter, setIssuanceFilter] = useState("all"); // all | active | returned
 
   // ── Modal state ──
   const [supplyFormOpen, setSupplyFormOpen] = useState(false);
   const [editingSupply, setEditingSupply] = useState(null);
   const [stockAdjustOpen, setStockAdjustOpen] = useState(false);
   const [adjustingSupply, setAdjustingSupply] = useState(null);
-  const [issueFormOpen, setIssueFormOpen] = useState(false);
-  const [returnFormOpen, setReturnFormOpen] = useState(false);
-  const [returningIssuance, setReturningIssuance] = useState(null);
   const [detailSupply, setDetailSupply] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [assignModal, setAssignModal] = useState(null);
 
   // ── Load data ──
   useEffect(() => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === "uniform-tracker" && uniformTracker.length === 0) {
+      loadUniformTracker();
+    }
+  }, [activeTab]);
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [suppliesRes, categoriesRes, lowStockRes, issuancesRes, overdueRes] = await Promise.all([
+      const [suppliesRes, categoriesRes, lowStockRes] = await Promise.all([
         getSupplies({ limit: 100 }),
         getSupplyCategories(),
         getLowStockSupplies(),
-        getIssuances({ limit: 100 }),
-        getOverdueIssuances(),
       ]);
 
       if (suppliesRes.data.status === "success") {
@@ -76,16 +73,24 @@ export default function Logistics() {
       if (lowStockRes.data.status === "success") {
         setLowStock(lowStockRes.data.data.supplies || []);
       }
-      if (issuancesRes.data.status === "success") {
-        setIssuances(issuancesRes.data.data.issuances || []);
-      }
-      if (overdueRes.data.status === "success") {
-        setOverdueIssuances(overdueRes.data.data.issuances || []);
-      }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load logistics data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUniformTracker = async () => {
+    setUniformTrackerLoading(true);
+    try {
+      const res = await getUniformTracker();
+      if (res.data.status === "success") {
+        setUniformTracker(res.data.data.tracker || []);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to load uniform tracker");
+    } finally {
+      setUniformTrackerLoading(false);
     }
   };
 
@@ -94,10 +99,8 @@ export default function Logistics() {
     const totalItems = supplies.length;
     const totalStock = supplies.reduce((a, s) => a + (s.quantity_available || 0), 0);
     const lowStockCount = lowStock.length;
-    const activeIssuances = issuances.filter((i) => !i.returned_date).length;
-    const overdueCount = overdueIssuances.length;
-    return { totalItems, totalStock, lowStockCount, activeIssuances, overdueCount };
-  }, [supplies, lowStock, issuances, overdueIssuances]);
+    return { totalItems, totalStock, lowStockCount };
+  }, [supplies, lowStock]);
 
   // ── Filtered data ──
   const filteredSupplies = useMemo(() => {
@@ -115,24 +118,6 @@ export default function Logistics() {
     }
     return d;
   }, [supplies, categoryFilter, search]);
-
-  const filteredIssuances = useMemo(() => {
-    let d = issuances;
-    if (issuanceFilter === "active") d = d.filter((i) => !i.returned_date);
-    if (issuanceFilter === "returned") d = d.filter((i) => !!i.returned_date);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      d = d.filter(
-        (i) =>
-          (i.supply_name || "").toLowerCase().includes(q) ||
-          (i.last_name || "").toLowerCase().includes(q) ||
-          (i.first_name || "").toLowerCase().includes(q) ||
-          (i.service_number || "").toLowerCase().includes(q) ||
-          (i.rank || "").toLowerCase().includes(q)
-      );
-    }
-    return d;
-  }, [issuances, issuanceFilter, search]);
 
   // ── Supply CRUD handlers ──
   const handleCreateSupply = async (data) => {
@@ -191,34 +176,6 @@ export default function Logistics() {
     }
   };
 
-  // ── Issuance handlers ──
-  const handleIssue = async (data) => {
-    try {
-      const res = await createIssuance(data);
-      if (res.data.status === "success") {
-        toast.success(`Issued ${data.quantity_issued} item(s) successfully`);
-        setIssueFormOpen(false);
-        loadData();
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to issue supplies");
-    }
-  };
-
-  const handleReturn = async (data) => {
-    try {
-      const res = await returnIssuance(returningIssuance.id, data);
-      if (res.data.status === "success") {
-        toast.success("Items returned successfully");
-        setReturnFormOpen(false);
-        setReturningIssuance(null);
-        loadData();
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to process return");
-    }
-  };
-
   const openEdit = (supply) => {
     setEditingSupply(supply);
     setSupplyFormOpen(true);
@@ -234,13 +191,22 @@ export default function Logistics() {
     setStockAdjustOpen(true);
   };
 
-  const openReturn = (issuance) => {
-    setReturningIssuance(issuance);
-    setReturnFormOpen(true);
-  };
-
   const openDetail = (supply) => {
     setDetailSupply(supply);
+  };
+
+  const handleAssignItem = async (data) => {
+    try {
+      const res = await createIssuance(data);
+      if (res.data.status === "success") {
+        toast.success(`Assigned ${data.quantity_issued} item(s) to ${assignModal.last_name}, ${assignModal.first_name}`);
+        setAssignModal(null);
+        loadData();
+        loadUniformTracker();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to assign item");
+    }
   };
 
   // ── Loading state ──
@@ -255,7 +221,7 @@ export default function Logistics() {
   return (
     <div className="flex flex-col gap-5 p-4 sm:p-6 pb-10">
       {/* ── KPI Cards ── */}
-      <div className="flex flex-wrap gap-3">
+<div className="flex flex-wrap gap-3">
         <KPICard
           icon={Boxes}
           label="Total Supply Items"
@@ -271,22 +237,6 @@ export default function Logistics() {
           subtext={kpis.lowStockCount > 0 ? "Items below reorder level" : "All items stocked"}
           color={kpis.lowStockCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}
           bgColor={kpis.lowStockCount > 0 ? "bg-amber-50 dark:bg-amber-500/10" : "bg-emerald-50 dark:bg-emerald-500/10"}
-        />
-        <KPICard
-          icon={ClipboardList}
-          label="Active Issuances"
-          value={kpis.activeIssuances}
-          subtext="Items currently issued"
-          color="text-blue-600 dark:text-blue-400"
-          bgColor="bg-blue-50 dark:bg-blue-500/10"
-        />
-        <KPICard
-          icon={Clock}
-          label="Overdue Returns"
-          value={kpis.overdueCount}
-          subtext={kpis.overdueCount > 0 ? "Items past due date" : "No overdue items"}
-          color={kpis.overdueCount > 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}
-          bgColor={kpis.overdueCount > 0 ? "bg-red-50 dark:bg-red-500/10" : "bg-emerald-50 dark:bg-emerald-500/10"}
         />
       </div>
 
@@ -322,14 +272,27 @@ export default function Logistics() {
             >
               <Icon size={15} />
               {tab.label}
-              {tab.key === "overdue" && kpis.overdueCount > 0 && (
-                <span className="ml-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
-                  {kpis.overdueCount}
-                </span>
-              )}
             </button>
           );
         })}
+      </div>
+
+      {/* ── Header with Action Buttons ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-sm text-neutral-500 dark:text-neutral-400">
+          {activeTab === "inventory" && `${filteredSupplies.length} item${filteredSupplies.length !== 1 ? "s" : ""}`}
+          {activeTab === "uniform-tracker" && `${uniformTracker.reduce((acc, sg) => acc + sg.reservists.length, 0)} reservist${uniformTracker.reduce((acc, sg) => acc + sg.reservists.length, 0) !== 1 ? "s" : ""}`}
+        </div>
+        <div className="flex items-center gap-2">
+          {activeTab === "inventory" && (
+            <button
+              onClick={openAdd}
+              className="flex items-center gap-2 rounded-lg bg-indigo-600 text-white px-3 py-1.5 text-sm font-medium hover:bg-indigo-700 transition-colors"
+            >
+              <Plus size={14} /> Add Item
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Tab Content ── */}
@@ -348,21 +311,14 @@ export default function Logistics() {
         />
       )}
 
-      {activeTab === "issuances" && (
-        <IssuancesTab
-          issuances={filteredIssuances}
-          filter={issuanceFilter}
-          setFilter={setIssuanceFilter}
+      {activeTab === "uniform-tracker" && (
+        <UniformTrackerTab
           search={search}
           setSearch={setSearch}
-          onReturn={openReturn}
-        />
-      )}
-
-      {activeTab === "overdue" && (
-        <OverdueTab
-          issuances={overdueIssuances}
-          onReturn={openReturn}
+          uniformTracker={uniformTracker}
+          loading={uniformTrackerLoading}
+          supplies={supplies}
+          onAssign={(reservist) => setAssignModal(reservist)}
         />
       )}
 
@@ -381,20 +337,6 @@ export default function Logistics() {
         supply={adjustingSupply}
       />
 
-      <IssueForm
-        open={issueFormOpen}
-        onClose={() => setIssueFormOpen(false)}
-        onSubmit={handleIssue}
-        supplies={supplies}
-      />
-
-      <ReturnForm
-        open={returnFormOpen}
-        onClose={() => { setReturnFormOpen(false); setReturningIssuance(null); }}
-        onSubmit={handleReturn}
-        issuance={returningIssuance}
-      />
-
       <ConfirmDialog
         open={!!deleteConfirm}
         title="Delete Supply Item"
@@ -409,6 +351,15 @@ export default function Logistics() {
       {detailSupply && (
         <SupplyDetailModal supply={detailSupply} onClose={() => setDetailSupply(null)} />
       )}
+
+      {/* ── Assign Item Modal ── */}
+      <AssignItemModal
+        reservist={assignModal}
+        supplies={supplies}
+        open={!!assignModal}
+        onClose={() => setAssignModal(null)}
+        onSubmit={handleAssignItem}
+      />
     </div>
   );
 }
@@ -584,142 +535,120 @@ function InventoryTab({
 }
 
 // ═══════════════════════════════════════════════════════════════
-// ISSUANCES TAB
+// ASSIGN ITEM MODAL
 // ═══════════════════════════════════════════════════════════════
-function IssuancesTab({ issuances, filter, setFilter, search, setSearch, onReturn }) {
-  return (
-    <div className="flex flex-col gap-4">
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1 max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, rank, item…"
-            className={cn(
-              "w-full rounded-lg border py-2 pl-9 pr-8 text-sm",
-              "border-neutral-200 dark:border-neutral-700",
-              "bg-white dark:bg-neutral-900",
-              "text-neutral-800 dark:text-neutral-200",
-              "placeholder:text-neutral-400 dark:placeholder:text-neutral-600",
-              "outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400",
-              "transition-all"
-            )}
-          />
-          {search && (
-            <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600">
-              <X size={13} />
-            </button>
-          )}
-        </div>
-        <div className="flex gap-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-0.5">
-          {[
-            { key: "all", label: "All" },
-            { key: "active", label: "Active" },
-            { key: "returned", label: "Returned" },
-          ].map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-medium transition-all",
-                filter === f.key
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300"
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <span className="ml-auto text-xs text-neutral-400 dark:text-neutral-600 shrink-0">
-          {issuances.length} record{issuances.length !== 1 ? "s" : ""}
-        </span>
-      </div>
+function AssignItemModal({ reservist, supplies, open, onClose, onSubmit }) {
+  const [selectedSupply, setSelectedSupply] = useState(null);
+  const [quantity, setQuantity] = useState(1);
+  const [issuanceType, setIssuanceType] = useState("issued");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900">
-                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Item</th>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Issued To</th>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Qty</th>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Issued Date</th>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Due Date</th>
-                <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Status</th>
-                <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/60 bg-white dark:bg-neutral-900">
-              {issuances.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-12 text-center text-sm text-neutral-400 dark:text-neutral-600">
-                    No issuance records found
-                  </td>
-                </tr>
-              ) : (
-                issuances.map((iss) => {
-                  const isOverdue = !iss.returned_date && iss.due_return_date && new Date(iss.due_return_date) < new Date();
-                  return (
-                    <tr key={iss.id} className="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors">
-                      <td className="px-4 py-3">
-                        <p className="text-[13px] font-semibold text-neutral-800 dark:text-neutral-200">{iss.supply_name}</p>
-                        <p className="text-[10px] text-neutral-400">{iss.category}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-[13px] font-medium text-neutral-700 dark:text-neutral-300">
-                          {iss.last_name}, {iss.first_name}
-                        </p>
-                        <p className="text-[10px] text-neutral-400">{iss.rank} · {iss.service_number}</p>
-                      </td>
-                      <td className="px-4 py-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                        {iss.quantity_issued} {iss.unit}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-neutral-500 dark:text-neutral-400">
-                        {iss.issued_date}
-                      </td>
-                      <td className="px-4 py-3 text-xs">
-                        <span className={cn(isOverdue ? "text-red-600 dark:text-red-400 font-semibold" : "text-neutral-500 dark:text-neutral-400")}>
-                          {iss.due_return_date}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {iss.returned_date ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400">
-                            Returned
-                          </span>
-                        ) : isOverdue ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-400">
-                            <Clock size={9} /> Overdue
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-400">
-                            Active
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          {!iss.returned_date && (
-                            <button
-                              onClick={() => onReturn(iss)}
-                              className="flex h-7 items-center gap-1 rounded-lg border border-emerald-200 dark:border-emerald-800 px-2 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all"
-                            >
-                              <RotateCcw size={11} /> Return
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+  const handleSubmit = useCallback(async () => {
+    if (!selectedSupply) return;
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        reservist_id: reservist.id,
+        supply_id: selectedSupply.id,
+        quantity_issued: quantity,
+        issuance_type: issuanceType,
+        notes: notes,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }, [selectedSupply, quantity, issuanceType, notes, onSubmit, reservist]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative z-10 w-full max-w-md rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
+              <UserCheck size={18} />
+            </span>
+            <div>
+              <h2 className="text-[15px] font-bold text-neutral-900 dark:text-neutral-50">Assign Item</h2>
+              <p className="text-[11px] text-neutral-400">{reservist.last_name}, {reservist.first_name}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
+            <X size={15} />
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div>
+            <label className="text-[10px] font-medium text-neutral-400 mb-1.5">Item</label>
+            <select
+              value={selectedSupply?.id || ""}
+              onChange={(e) => setSelectedSupply(supplies.find(s => s.id === parseInt(e.target.value)))}
+              className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400"
+            >
+              <option value="">Select an item</option>
+              {supplies.filter(s => s.quantity_available > 0).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.quantity_available} available)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-medium text-neutral-400 mb-1.5">Quantity</label>
+              <input
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-medium text-neutral-400 mb-1.5">Type</label>
+              <select
+                value={issuanceType}
+                onChange={(e) => setIssuanceType(e.target.value)}
+                className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400"
+              >
+                <option value="issued">Issued</option>
+                <option value="personal">Personal</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-medium text-neutral-400 mb-1.5">Notes (Optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Additional notes..."
+              className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 resize-none"
+              rows="2"
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-neutral-200 dark:border-neutral-800 px-6 py-4">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!selectedSupply || submitting}
+            className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? "Assigning..." : "Assign Item"}
+          </button>
         </div>
       </div>
     </div>
@@ -727,87 +656,130 @@ function IssuancesTab({ issuances, filter, setFilter, search, setSearch, onRetur
 }
 
 // ═══════════════════════════════════════════════════════════════
-// OVERDUE TAB
 // ═══════════════════════════════════════════════════════════════
-function OverdueTab({ issuances, onReturn }) {
+// UNIFORM TRACKER TAB
+// ═══════════════════════════════════════════════════════════════
+function UniformTrackerTab({ search, setSearch, uniformTracker, loading, onAssign }) {
+  const filteredTracker = useMemo(() => {
+    if (!search.trim()) return uniformTracker;
+    const q = search.toLowerCase();
+    return uniformTracker.map(squadronGroup => ({
+      ...squadronGroup,
+      reservists: squadronGroup.reservists.filter(r => 
+        `${r.last_name}, ${r.first_name}`.toLowerCase().includes(q) ||
+        r.service_number?.toLowerCase().includes(q) ||
+        r.rank?.toLowerCase().includes(q)
+      )
+    })).filter(sg => sg.reservists.length > 0);
+  }, [uniformTracker, search]);
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <Loader className="h-8 w-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4">
-      {issuances.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/10 mb-4">
-            <Clock size={28} className="text-emerald-500" />
-          </div>
-          <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200">No Overdue Items</h3>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">All issued supplies are within their return period.</p>
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-[220px] flex-1 max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, rank, service number…"
+            className="w-full rounded-lg border py-2 pl-9 pr-8 text-sm border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400 transition-all"
+          />
         </div>
-      ) : (
-        <>
-          <div className="flex items-center gap-2 rounded-xl border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-950/20 p-3">
-            <AlertTriangle size={16} className="text-red-500 shrink-0" />
-            <p className="text-sm text-red-700 dark:text-red-300">
-              <span className="font-semibold">{issuances.length} overdue item(s)</span> — These supplies are past their due return date.
-            </p>
-          </div>
-          <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900">
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Item</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Issued To</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Qty</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Due Date</th>
-                    <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Days Overdue</th>
-                    <th className="px-4 py-3 text-right text-[11px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-500">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800/60 bg-white dark:bg-neutral-900">
-                  {issuances.map((iss) => {
-                    const dueDate = new Date(iss.due_return_date);
-                    const today = new Date();
-                    const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
-                    return (
-                      <tr key={iss.id} className="group hover:bg-red-50/50 dark:hover:bg-red-500/5 transition-colors">
-                        <td className="px-4 py-3">
-                          <p className="text-[13px] font-semibold text-neutral-800 dark:text-neutral-200">{iss.supply_name}</p>
-                          <p className="text-[10px] text-neutral-400">{iss.category}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-[13px] font-medium text-neutral-700 dark:text-neutral-300">
-                            {iss.last_name}, {iss.first_name}
-                          </p>
-                          <p className="text-[10px] text-neutral-400">{iss.rank} · {iss.service_number}</p>
-                        </td>
-                        <td className="px-4 py-3 text-sm font-medium text-neutral-700 dark:text-neutral-300">
-                          {iss.quantity_issued} {iss.unit}
-                        </td>
-                        <td className="px-4 py-3 text-xs text-red-600 dark:text-red-400 font-medium">
-                          {iss.due_return_date}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="inline-flex items-center rounded-full bg-red-100 dark:bg-red-500/15 px-2 py-0.5 text-[11px] font-bold text-red-700 dark:text-red-400">
-                            {daysOverdue} day{daysOverdue !== 1 ? "s" : ""}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => onReturn(iss)}
-                              className="flex h-7 items-center gap-1 rounded-lg border border-emerald-200 dark:border-emerald-800 px-2 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-all"
-                            >
-                              <RotateCcw size={11} /> Return
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+        <span className="ml-auto text-xs text-neutral-400 dark:text-neutral-600 shrink-0">
+          {filteredTracker.reduce((acc, sg) => acc + sg.reservists.length, 0)} reservist{filteredTracker.reduce((acc, sg) => acc + sg.reservists.length, 0) !== 1 ? "s" : ""}
+        </span>
+      </div>
+
+      <div className="space-y-6">
+        {filteredTracker.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/10 mb-4">
+              <Package size={28} className="text-emerald-500" />
             </div>
+            <h3 className="text-lg font-semibold text-neutral-800 dark:text-neutral-200">No Reservists Found</h3>
+            <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Try adjusting your search criteria.</p>
           </div>
-        </>
-      )}
+        ) : (
+          filteredTracker.map((squadronGroup) => (
+            <div key={`${squadronGroup.squadron_id}-${squadronGroup.group_id}`} className="space-y-3">
+              <div className="flex items-center gap-2 border-b border-neutral-200 dark:border-neutral-800 pb-2">
+                <h3 className="font-bold text-neutral-800 dark:text-neutral-200">
+                  {squadronGroup.squadron_name || "Unassigned"} - {squadronGroup.group_name || "No Group"}
+                </h3>
+                <span className="text-xs text-neutral-400 dark:text-neutral-600">({squadronGroup.reservists.length} reservists)</span>
+              </div>
+              <div className="space-y-3">
+                {squadronGroup.reservists.map((reservist) => (
+                  <div key={reservist.id} className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+                          {reservist.last_name}, {reservist.first_name}
+                        </p>
+                        <p className="text-xs text-neutral-400">{reservist.rank} · {reservist.service_number}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold",
+                          reservist.uniforms.length === 0
+                            ? "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400"
+                            : "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                        )}>
+                          {reservist.uniforms.length === 0 ? "No Uniform" : `${reservist.uniforms.length} Uniform${reservist.uniforms.length > 1 ? "s" : ""}`}
+                        </span>
+                        <button
+                          onClick={() => onAssign(reservist)}
+                          className="flex items-center gap-1 rounded-lg bg-indigo-600 text-white px-2 py-1 text-[10px] font-medium hover:bg-indigo-700 transition-colors"
+                          title="Assign Item"
+                        >
+                          <UserCheck size={12} />
+                          Assign
+                        </button>
+                      </div>
+                    </div>
+
+                    {reservist.uniforms.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        {reservist.uniforms.map((uniform) => (
+                          <div key={uniform.issuance_id} className="flex items-center justify-between text-xs pl-2 border-l-2 border-neutral-200 dark:border-neutral-700">
+                            <div>
+                              <span className="font-medium text-neutral-700 dark:text-neutral-300">{uniform.supply_name}</span>
+                              <span className="text-neutral-400 dark:text-neutral-500"> ({uniform.issuance_type === "issued" ? "Issued" : "Personal"})</span>
+                              <span className="text-neutral-400"> - Qty: {uniform.quantity_issued}</span>
+                              {uniform.returned_date && (
+                                <span className="text-emerald-600 dark:text-emerald-400"> (Returned: {uniform.returned_date})</span>
+                              )}
+                            </div>
+                            <span className={cn(
+                              uniform.returned_date ? "text-emerald-600" : "text-blue-600"
+                            )}>
+                              {uniform.returned_date ? "Returned" : "Active"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-xs text-neutral-400 dark:text-neutral-600">
+                        <span className="mr-3">Issued: {reservist.uniforms.filter(u => u.issuance_type === "issued").length}</span>
+                        <span>Personal: {reservist.uniforms.filter(u => u.issuance_type === "personal").length}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

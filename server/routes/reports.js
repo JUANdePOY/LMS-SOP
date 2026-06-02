@@ -86,13 +86,13 @@ router.post(
   requireAdmin,
   [
     body('title').trim().notEmpty().isLength({ max: 500 }),
-    body('event_type').optional().isIn(['internal', 'external']),
-    body('event_source_id').optional().isInt({ min: 1 }),
-    body('event_date').optional().isDate(),
-    body('summary').optional().isString(),
-    body('type').optional().isIn(['attendance', 'readiness', 'logistics', 'custom']),
-    body('format').optional().isIn(['pdf', 'excel', 'csv']),
-    body('participants').optional().isArray(),
+    body('event_type').optional({ checkFalsy: true }).isIn(['internal', 'external']),
+    body('event_source_id').optional({ checkFalsy: true }).isInt({ min: 1 }),
+    body('event_date').optional({ checkFalsy: true }).isDate(),
+    body('summary').optional({ checkFalsy: true }).isString(),
+    body('type').optional({ checkFalsy: true }).isIn(['attendance', 'readiness', 'logistics', 'custom']),
+    body('format').optional({ checkFalsy: true }).isIn(['pdf', 'excel', 'csv']),
+    body('participants').optional({ checkFalsy: true }).isArray(),
   ],
   rejectInvalid,
   reportsController.createReport
@@ -102,7 +102,7 @@ router.patch(
   '/:id',
   authenticateToken,
   requireAdmin,
-  [...idParam, body('participants').optional().isArray()],
+  [...idParam, body('participants').optional({ checkFalsy: true }).isArray()],
   rejectInvalid,
   reportsController.updateReport
 );

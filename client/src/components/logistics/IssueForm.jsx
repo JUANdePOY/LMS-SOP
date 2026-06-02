@@ -9,6 +9,7 @@ export default function IssueForm({ open, onClose, onSubmit, supplies = [], load
     supply_id: "",
     quantity_issued: "",
     due_return_date: "",
+    issuance_type: "issued",
     condition_on_issue: "good",
     notes: "",
   });
@@ -21,6 +22,7 @@ export default function IssueForm({ open, onClose, onSubmit, supplies = [], load
         supply_id: "",
         quantity_issued: "",
         due_return_date: "",
+        issuance_type: "issued",
         condition_on_issue: "good",
         notes: "",
       });
@@ -120,6 +122,15 @@ export default function IssueForm({ open, onClose, onSubmit, supplies = [], load
           <option value="good">Good</option>
           <option value="fair">Fair</option>
           <option value="poor">Poor</option>
+        </FormSelect>
+      </FormField>
+      <FormField label="Issuance Type">
+        <FormSelect
+          value={form.issuance_type}
+          onChange={(v) => setForm((f) => ({ ...f, issuance_type: v }))}
+        >
+          <option value="issued">Issued (Organization-supplied)</option>
+          <option value="personal">Personal (Reservist-bought)</option>
         </FormSelect>
       </FormField>
       <FormField label="Notes">

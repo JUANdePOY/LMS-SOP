@@ -586,6 +586,7 @@ CREATE TABLE `supply_issuances` (
   `issued_by` bigint NOT NULL,
   `received_by` bigint DEFAULT NULL,
   `notes` text COLLATE utf8mb4_unicode_ci,
+  `issuance_type` enum('issued','personal') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'issued',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
