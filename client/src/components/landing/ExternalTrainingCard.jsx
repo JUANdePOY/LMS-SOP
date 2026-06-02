@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 import { shortDate } from '@/lib/dateUtils';
 import { useAuth } from '@/contexts/AuthContext';
 import RegistrationModal from './RegistrationModal';

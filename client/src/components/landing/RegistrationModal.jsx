@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Calendar, MapPin, X, ChevronDown, Paperclip, Users, ClipboardList } from "lucide-react";
 import { shortDate, formatFileSize, formatDateShort, formatTime } from "@/lib/dateUtils";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/button";
 import {
   getTrainingSlotAvailability,
   createRegistration,

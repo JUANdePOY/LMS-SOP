@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 
 export default function CarouselSlideContent({ announcement, onAction, isEmpty = false }) {
   if (isEmpty) {

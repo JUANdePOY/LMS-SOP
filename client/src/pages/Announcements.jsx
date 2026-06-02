@@ -7,7 +7,7 @@ import ConfirmationDialog from '@/components/ui/ConfirmationDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import useAnnouncements from '@/hooks/useAnnouncements';
 import { useToast } from '@/components/ui/Toast';
-import { Button } from '@/components/ui/Button';
+import { Button } from '@/components/ui/button';
 
 /**
  * Announcements Page
