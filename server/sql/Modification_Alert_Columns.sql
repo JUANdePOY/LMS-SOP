@@ -1,4 +1,5 @@
 -- Allow system-generated alerts
+use pafr;
 ALTER TABLE alerts MODIFY COLUMN created_by BIGINT NULL;
 
 -- Columns for alert type + idempotency key
