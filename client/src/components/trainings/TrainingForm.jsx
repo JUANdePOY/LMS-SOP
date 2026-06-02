@@ -486,6 +486,12 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
   const [registrationFields, setRegistrationFields] = useState(
     Array.isArray(training?.registration_fields) ? training.registration_fields : []
   );
+  const handleRegistrationChange = (fields) => {
+    setRegistrationFields(fields);
+    if (errors.registration) {
+      setErrors(prev => ({ ...prev, registration: undefined }));
+    }
+  };
 
   // BUG FIX: use str() helper so null values from DB never crash .trim() or
   // controlled-input warnings. ?? '' keeps 0 and false but converts null/undefined.
@@ -549,6 +555,9 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
     } else {
       if (!externalForm.title?.trim()) errs.title     = 'Title is required.';
       if (!externalForm.startDate)     errs.startDate = 'Start date is required.';
+      if (!registrationFields || registrationFields.length === 0) {
+        errs.registration = 'Registration form must have at least one field.';
+      }
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -702,13 +711,20 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
                 className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 -mb-px transition-all ${
                   activeTab === tab.id
                     ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                    : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
+                    : errors.registration && tab.id === 'registration'
+                      ? 'border-transparent text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300'
+                      : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
                 }`}
               >
                 {tab.label}
                 {tab.count > 0 && (
                   <span className="bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold rounded-full px-1.5 py-0.5">
                     {tab.count}
+                  </span>
+                )}
+                {tab.id === 'registration' && errors.registration && (
+                  <span className="bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-bold rounded-full px-1.5 py-0.5">
+                    !
                   </span>
                 )}
               </button>
@@ -746,8 +762,14 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
                 <RegistrationBuilder
                   initialFields={registrationFields}
                   trainingTitle={externalForm.title || 'Training Registration'}
-                  onChange={setRegistrationFields}
+                  onChange={handleRegistrationChange}
                 />
+              </div>
+            )}
+
+            {errors.registration && isExternal && activeTab === 'registration' && (
+              <div className="mt-4 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg text-xs text-red-600 dark:text-red-400">
+                {errors.registration}
               </div>
             )}
 

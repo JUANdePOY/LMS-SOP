@@ -1,22 +1,40 @@
-# Alert Notification Fix for Admin Roles
+# Task: Require Registration Form for External Training Creation
 
-## objective
-Fix the issue where Admin, Admin_arsen, Admin_group, and Admin_Squadron users cannot receive training assignment and registration notifications.
+## Objective
+Prevent external training submission when the registration form has no fields configured.
 
-## root cause
-In /server/routes/alerts.js line 583, personal training alerts are only fetched for reservist users due to conditional logic.
+## Analysis
+- **Current state**: `TrainingForm.jsx` validates only `title` and `startDate` for external trainings
+- **RegistrationBuilder.jsx**: Used for building registration fields, but fields are optional
+- **Location**: `client/src/components/trainings/TrainingForm.jsx`
 
-## implementation steps
-- [x] Make code change to fetch personal training alerts for all users
-- [x] Verify the fix by reviewing the logic flow
+## Implementation Plan
 
-## validation
-- [x] Code review for correctness
-- [ ] No lint/type errors (no test command configured)
+### Step 1: Add validation for empty registration fields ✅
+- [x] In `validate()` function (line ~550), added check for `registrationFields.length === 0` when `trainingType === TRAINING_TYPES.EXTERNAL`
+- [x] Set error message: "Registration form must have at least one field."
 
-## review
-**What was done**: Changed line 583 in `/server/routes/alerts.js` from conditionally fetching personal training alerts only for reservists to always fetching them for all users.
+### Step 2: Display registration error visibly ✅
+- [x] Added registration error display in the form body (lines 770-774)
+- [x] Added warning indicator "!" badge on Registration tab when error exists (lines 725-729)
+- [x] Tab shows red text when registration validation fails (lines 714-716)
 
-**Validation performed**: Code review - the logic now correctly fetches personal training alerts for all user roles, since the `getPersonalTrainingAlerts` function already filters by user ID via the `user_alerts` table.
+### Step 3: Auto-clear error on field changes ✅
+- [x] Created `handleRegistrationChange` wrapper function (lines 489-494)
+- [x] Error clears when user adds registration fields
 
-**Caveats**: No automated tests available to run. Manual testing required to verify the fix works as expected.
+## Success Criteria
+- [x] External training cannot be submitted with empty registration fields
+- [x] Clear error message displayed when validation fails
+- [x] Registration tab has visual indicator (red "!") when validation fails
+- [x] Existing functionality (internal trainings, editing) unaffected
+- [x] No new lint errors introduced
+
+## Review
+Changes made to `TrainingForm.jsx`:
+1. Line 489-494: Added `handleRegistrationChange` wrapper to clear registration error
+2. Line 558-560: Added validation check for empty registration fields
+3. Line 714-716: Added red styling for registration tab when error exists
+4. Line 725-729: Added "!" warning badge on registration tab
+5. Line 765: Changed `onChange` prop to use `handleRegistrationChange`
+6. Line 770-774: Added registration error display in form body
