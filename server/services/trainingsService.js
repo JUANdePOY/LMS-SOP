@@ -720,20 +720,17 @@ async function registerExternalParticipant(trainingId, participantData, registra
 }
 
 async function getTrainingSlotAvailability(trainingId) {
-  // Fetch the external training row
   const [trows] = await trainingModel.db.query(
     'SELECT * FROM external_trainings WHERE id = ?',
     [trainingId]
   );
   const trow = trows && trows[0];
   if (!trow) {
-
     const err = new Error('Training not found');
     err.statusCode = 404;
     throw err;
   }
 
-  // Parse squadron_limits (handle JSON string vs object)
   let sqLimits = null;
   if (trow.squadron_limits != null) {
     try {
@@ -743,30 +740,25 @@ async function getTrainingSlotAvailability(trainingId) {
     }
   }
 
-  // If squadron_limits exists and is an array with elements
   if (Array.isArray(sqLimits) && sqLimits.length > 0) {
     const squads = [];
     
-    // For each squadron in squadron_limits, count registrations
     for (const limit of sqLimits) {
       const squadronId = limit.squadron_id ?? limit.squadronId;
       if (squadronId == null) continue;
       
-      // Count existing registrations for this squadron
       const [rows] = await trainingModel.db.query(
         'SELECT COUNT(*) AS c FROM training_registrations WHERE training_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(participant_data, "$.squadron_id")) = ?',
         [trainingId, String(squadronId)]
       );
       const registered = rows[0]?.c ?? 0;
       
-      // Get slot_limit (handle both slot_limit and slotLimit properties)
       const slotLimit = limit.slot_limit ?? limit.slotLimit ?? null;
       
-      // Calculate remaining
       let remaining = null;
       if (slotLimit !== null) {
         remaining = slotLimit - registered;
-        if (remaining < 0) remaining = 0; // Don't go negative
+        if (remaining < 0) remaining = 0;
       }
       squads.push({
         squadron_id: squadronId,
@@ -779,33 +771,54 @@ async function getTrainingSlotAvailability(trainingId) {
       });
     }
     
-    return { hasSquadronLimits: true, squads };
+    return {
+      hasSquadronLimits: true, squads,
+    };
   } else {
-    // No squadron limits, check capacity
     const totalSlots = trow.capacity != null ? Number(trow.capacity) : null;
     
-    // Count total registrations
     const [rows] = await trainingModel.db.query(
       'SELECT COUNT(*) AS c FROM training_registrations WHERE training_id = ?',
       [trainingId]
     );
     const totalRegistered = rows[0]?.c ?? 0;
 
-    
-    // Calculate remaining
     let remaining = null;
     if (totalSlots !== null) {
       remaining = totalSlots - totalRegistered;
-      if (remaining < 0) remaining = 0; // Don't go negative
+      if (remaining < 0) remaining = 0;
     }
     
-    return {
+return {
       hasSquadronLimits: false,
       totalSlots,
       totalRegistered,
       remaining
     };
   }
+}
+
+async function getInternalTrainingParticipants(trainingId) {
+  const participants = await internalParticipantModel.getParticipantsForTraining(trainingId);
+  return participants;
+}
+
+async function getExternalTrainingParticipants(trainingId) {
+  const registrations = await externalModel.getParticipantsForTraining(trainingId);
+  const participants = [];
+  for (const reg of registrations) {
+    const pd = reg.participant_data || {};
+    participants.push({
+      reservist_id: pd.reservist_id,
+      first_name: pd.first_name || '',
+      last_name: pd.last_name || '',
+      rank: pd.rank || '',
+      service_number: pd.service_number || '',
+      squadron_id: pd.squadron_id || null,
+      squadron_name: pd.squadron_name || '',
+    });
+  }
+  return participants;
 }
 
 async function listExternalRegistrations(trainingId) {
@@ -852,6 +865,8 @@ module.exports = {
   registerExternalParticipant,
   listExternalRegistrations,
   getTrainingSlotAvailability,
+  getInternalTrainingParticipants,
+  getExternalTrainingParticipants,
 
   // Real training statistics for dashboard (used by TrainingActivityChart)
   async getTrainingStats(filters = {}) {

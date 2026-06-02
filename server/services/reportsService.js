@@ -49,7 +49,7 @@ async function getReportById(id) {
   return { ...report, participants, documentations };
 }
 
-function normalizeParticipants(input) {
+function normalizeAttendance(input) {
   if (!Array.isArray(input)) return [];
   const out = [];
   for (const p of input) {
@@ -79,7 +79,7 @@ async function createReport(body, userId) {
   const summary = body.summary ? String(body.summary).trim() : null;
   const type = reportModel.isValidReportType(body.type) ? body.type : 'custom';
   const format = reportModel.isValidReportFormat(body.format) ? body.format : 'pdf';
-  const participants = normalizeParticipants(body.participants);
+  const attendance = normalizeAttendance(body.participants);
 
   const conn = await reportModel.pool.getConnection();
   try {
@@ -96,8 +96,8 @@ async function createReport(body, userId) {
       generated_by: userId,
     });
 
-    if (participants.length) {
-      await reportModel.insertParticipants(conn, reportId, participants);
+    if (attendance.length) {
+      await reportModel.insertParticipants(conn, reportId, attendance);
     }
 
     await conn.commit();
@@ -127,7 +127,7 @@ async function updateReport(id, body) {
   if (body.type !== undefined && reportModel.isValidReportType(body.type)) patch.type = body.type;
   if (body.format !== undefined && reportModel.isValidReportFormat(body.format)) patch.format = body.format;
 
-  const participants = body.participants !== undefined ? normalizeParticipants(body.participants) : undefined;
+  const attendance = body.participants !== undefined ? normalizeAttendance(body.participants) : undefined;
 
   const conn = await reportModel.pool.getConnection();
   try {
@@ -137,10 +137,10 @@ async function updateReport(id, body) {
       await reportModel.updateReport(conn, id, patch);
     }
 
-    if (participants !== undefined) {
+    if (attendance !== undefined) {
       await reportModel.deleteParticipantsByReportId(conn, id);
-      if (participants.length) {
-        await reportModel.insertParticipants(conn, id, participants);
+      if (attendance.length) {
+        await reportModel.insertParticipants(conn, id, attendance);
       }
     }
 

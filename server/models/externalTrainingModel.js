@@ -155,6 +155,27 @@ async function deleteExternal(id) {
   return result.affectedRows;
 }
 
+async function getParticipantsForTraining(trainingId) {
+  const [rows] = await pool.query(
+    `SELECT 
+       tr.id,
+       tr.training_id,
+       tr.participant_data,
+       tr.registered_at
+     FROM training_registrations tr
+     WHERE tr.training_id = ?
+     ORDER BY tr.registered_at DESC`,
+    [trainingId]
+  );
+  return rows.map((r) => ({
+    ...r,
+    participant_data:
+      typeof r.participant_data === 'string'
+        ? safeJsonParse(r.participant_data)
+        : r.participant_data,
+  }));
+}
+
 function isValidExternalStatus(s) {
   return EXTERNAL_STATUSES.includes(s);
 }
@@ -214,4 +235,5 @@ module.exports = {
   isValidExternalStatus,
   notifyExternalRegistration,
   EXTERNAL_STATUSES,
+  getParticipantsForTraining,
 };

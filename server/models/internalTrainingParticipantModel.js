@@ -71,6 +71,26 @@ function groupBySquadron(flatRows) {
   return Array.from(map.values());
 }
 
+async function getParticipantsForTraining(trainingId) {
+  const [rows] = await pool.query(
+    `SELECT
+       itp.squadron_id,
+       s.name AS squadron_name,
+       itp.reservist_id,
+       r.first_name,
+       r.last_name,
+       r.rank,
+       r.service_number
+      FROM internal_training_participants itp
+      INNER JOIN squadron s ON s.id = itp.squadron_id
+      INNER JOIN reservists r ON r.id = itp.reservist_id
+      WHERE itp.training_id = ?
+      ORDER BY s.name ASC, r.last_name ASC, r.first_name ASC`,
+    [trainingId]
+  );
+  return rows;
+}
+
 module.exports = {
   pool,
   deleteByTrainingId,
@@ -78,4 +98,5 @@ module.exports = {
   insertMany,
   listFlatWithLabels,
   groupBySquadron,
+  getParticipantsForTraining,
 };

@@ -43,6 +43,14 @@ router.get(
   trainingsController.listActivities
 );
 
+router.get(
+  '/internal/:trainingId/participants',
+  optionalAuthenticateToken,
+  [...trainingIdParam],
+  rejectInvalid,
+  trainingsController.getInternalTrainingParticipants
+);
+
 router.get('/internal/:id', optionalAuthenticateToken, [...idParam], rejectInvalid, trainingsController.getInternal);
 
 router.post(
@@ -165,6 +173,14 @@ router.get(
   [...idParam],
   rejectInvalid,
   trainingsController.listExternalAttachments
+);
+
+router.get(
+  '/external/:id/participants',
+  optionalAuthenticateToken,
+  [...idParam],
+  rejectInvalid,
+  trainingsController.getExternalTrainingParticipants
 );
 
 router.get('/external/:id', optionalAuthenticateToken, [...idParam], rejectInvalid, trainingsController.getExternal);
