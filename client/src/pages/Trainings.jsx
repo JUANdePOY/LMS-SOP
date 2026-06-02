@@ -16,7 +16,7 @@ import TrainingStats from '@/components/trainings/TrainingStats';
 import useTrainingFilters from '@/hooks/useTrainingFilters';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { cn } from '@/lib/utils';
-import TrainingCard from '@/components/trainings/TrainingTable';
+import TrainingCard, { TrainingDetailModal } from '@/components/trainings/TrainingTable';
 
 const INTERNAL_STATUSES = new Set(['draft', 'published', 'ongoing', 'completed', 'cancelled']);
 const EXTERNAL_STATUSES = new Set(['draft', 'open', 'closed', 'completed']);
@@ -64,6 +64,7 @@ export default function Trainings() {
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [detailTraining, setDetailTraining] = useState(null);
 
   const fetchTrainings = useCallback(async () => {
     setLoading(true);
@@ -372,13 +373,7 @@ export default function Trainings() {
                       <TrainingCard
                         key={`${training._source}-${training.id}`}
                         training={training}
-                        isAdmin={isAnyAdmin}
-                        onEdit={() => handleEditTraining(training)}
-                        onDelete={() => openDeleteDialog(training)}
-                        onAttendance={() => {
-                          const type = training._source === 'external' ? 'external' : 'internal';
-                          window.location.href = `/attendance?type=${type}&trainingId=${training.id}`;
-                        }}
+                        onDetailClick={() => setDetailTraining(training)}
                       />
                     ))
                   )}
@@ -464,13 +459,11 @@ export default function Trainings() {
       <ConfirmDialog
         open={!!deleteTarget}
         title="Delete training?"
-        description={
-          deleteTarget
-            ? `“${deleteTarget.title}” (${
-                deleteTarget._source === 'external' ? 'external' : 'internal'
-              }) will be permanently removed. This action cannot be undone.`
-            : ''
-        }
+description={
+           deleteTarget
+             ? `“${deleteTarget.title}” (${deleteTarget._source === 'external' ? 'external' : 'internal'}) will be permanently removed. This action cannot be undone.`
+             : ''
+         }
         confirmLabel="Delete training"
         cancelLabel="Keep training"
         destructive
@@ -491,6 +484,28 @@ export default function Trainings() {
           initialKind={editingTraining ? undefined : newScheduleKind}
           onClose={handleCloseForm}
           onSubmit={handleFormSubmit}
+        />
+      )}
+
+      {/* ── Training Detail Modal ── */}
+      {detailTraining && (
+        <TrainingDetailModal
+          training={detailTraining}
+          onClose={() => setDetailTraining(null)}
+          isAdmin={isAnyAdmin}
+          onEdit={() => {
+            setDetailTraining(null);
+            handleEditTraining(detailTraining);
+          }}
+          onDelete={() => {
+            setDetailTraining(null);
+            openDeleteDialog(detailTraining);
+          }}
+          onAttendance={() => {
+            setDetailTraining(null);
+            const type = detailTraining._source === 'external' ? 'external' : 'internal';
+            window.location.href = `/attendance?type=${type}&trainingId=${detailTraining.id}`;
+          }}
         />
       )}
     </div>

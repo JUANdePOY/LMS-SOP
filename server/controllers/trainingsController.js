@@ -2,6 +2,7 @@ const trainingsService = require('../services/trainingsService');
 const trainingAttachmentService = require('../services/trainingAttachmentService');
 const externalTrainingAttachmentService = require('../services/externalTrainingAttachmentService');
 const { logAudit } = require('../utils/auditLogger');
+const { sendTrainingAlertSafe } = require('../services/Alertservice');
 const fs = require('fs');
 
 function sendError(res, err, fallback = 'Request failed') {
@@ -172,8 +173,9 @@ function deleteExternal(req, res) {
 }
 
 function registerExternal(req, res) {
+  const registrantUserId = req.user?.id ?? null;
   trainingsService
-    .registerExternalParticipant(req.params.id, req.body.participantData)
+    .registerExternalParticipant(req.params.id, req.body.participantData, registrantUserId)
     .then((data) => res.status(201).json({ success: true, message: 'Registered', data }))
     .catch((err) => sendError(res, err, 'Registration failed'));
 }

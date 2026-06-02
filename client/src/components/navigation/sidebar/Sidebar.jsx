@@ -124,43 +124,41 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
            </p>
          )}
 
-        <ul className="space-y-0.5" role="list">
-      {isSuperAdmin && (
-        <li>
-          <Link
-            to="/alerts"
-            onClick={handleNavClick}
-            className={cn(
-              "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5",
-              "text-sm font-medium leading-none tracking-[-0.01em]",
-              "transition-all duration-200 ease-out",
-              "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100",
-              "dark:text-neutral-400 dark:hover:text-neutral-50 dark:hover:bg-neutral-800",
-"hover:scale-[1.015]",
-               collapsed && "justify-center px-0"
-             )}
-           >
-             <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center text-neutral-400 dark:text-neutral-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
-               <Bell size={17} strokeWidth={1.8} />
-             </span>
-             {!collapsed && <span className="truncate">Alerts</span>}
-             {!collapsed && alertSummary && (alertSummary.unread > 0 || alertSummary.critical > 0) && (
-               <span className={cn(
-                 "ml-auto inline-flex min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none",
-                 alertSummary.critical > 0
-                   ? "bg-red-600 text-white"
-                   : "bg-amber-500 text-white"
-               )}>
-                 {alertSummary.critical || alertSummary.unread}
-               </span>
-             )}
-             {collapsed && alertSummary && (alertSummary.unread > 0 || alertSummary.critical > 0) && (
-               <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-500" />
-             )}
-          </Link>
-        </li>
-      )}
-      {isSuperAdmin && (
+<ul className="space-y-0.5" role="list">
+          <li>
+            <Link
+              to="/alerts"
+              onClick={handleNavClick}
+              className={cn(
+                "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5",
+                "text-sm font-medium leading-none tracking-[-0.01em]",
+                "transition-all duration-200 ease-out",
+                "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100",
+                "dark:text-neutral-400 dark:hover:text-neutral-50 dark:hover:bg-neutral-800",
+                "hover:scale-[1.015]",
+                collapsed && "justify-center px-0"
+              )}
+            >
+              <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center text-neutral-400 dark:text-neutral-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                <Bell size={17} strokeWidth={1.8} />
+              </span>
+              {!collapsed && <span className="truncate">Alerts</span>}
+              {!collapsed && alertSummary && (alertSummary.unread > 0 || alertSummary.critical > 0) && (
+                <span className={cn(
+                  "ml-auto inline-flex min-w-[17px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none",
+                  alertSummary.critical > 0
+                    ? "bg-red-600 text-white"
+                    : "bg-amber-500 text-white"
+                )}>
+                  {alertSummary.critical || alertSummary.unread}
+                </span>
+              )}
+              {collapsed && alertSummary && (alertSummary.unread > 0 || alertSummary.critical > 0) && (
+                <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-500" />
+              )}
+            </Link>
+          </li>
+          {isSuperAdmin && (
         <li>
           <SidebarItem
             item={{ name: "Audit Logs", path: "/audit-logs", icon: History, description: "System change history" }}

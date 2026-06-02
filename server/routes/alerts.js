@@ -34,6 +34,10 @@ async function getRelevantBroadcastAlerts(user, filters = {}) {
   const { severity, unread_only } = filters;
   const { where: scopeWhere, params: scopeParams } = getScopeWhere(user);
 
+  // Exclude personal training alerts — fetched separately via getPersonalTrainingAlerts
+  const PERSONAL_ALERT_TYPES = ['training_assigned_internal', 'training_registered_external'];
+  const personalTypePlaceholders = PERSONAL_ALERT_TYPES.map(() => '?').join(', ');
+
   let sql = `
     SELECT 
       a.id,
@@ -52,9 +56,10 @@ async function getRelevantBroadcastAlerts(user, filters = {}) {
     LEFT JOIN user_alerts ua ON ua.alert_id = a.id AND ua.user_id = ?
     WHERE a.is_active = 1
       AND (a.end_date IS NULL OR a.end_date >= CURDATE())
+      AND (a.alert_type IS NULL OR a.alert_type NOT IN (${personalTypePlaceholders}))
       AND (${scopeWhere})
   `;
-  const queryParams = [user.id, ...scopeParams];
+  const queryParams = [user.id, ...PERSONAL_ALERT_TYPES, ...scopeParams];
 
   if (unread_only === 'true' || unread_only === '1') {
     sql += ` AND (ua.is_read IS NULL OR ua.is_read = 0) `;
@@ -84,6 +89,55 @@ async function getRelevantBroadcastAlerts(user, filters = {}) {
     target_group_id: r.target_group_id,
     target_squadron_id: r.target_squadron_id,
     target_area_id: r.target_area_id,
+  }));
+}
+
+
+/**
+ * Fetches training alerts that belong ONLY to the current user.
+ * These are stored in alerts with a personal alert_type and linked
+ * via user_alerts so only this user can see them.
+ */
+async function getPersonalTrainingAlerts(user, filters = {}) {
+  const { unread_only } = filters;
+
+  const PERSONAL_ALERT_TYPES = ['training_assigned_internal', 'training_registered_external'];
+  const placeholders = PERSONAL_ALERT_TYPES.map(() => '?').join(', ');
+
+  let sql = `
+    SELECT
+      a.id,
+      a.title,
+      a.message,
+      a.alert_type,
+      a.created_at,
+      ua.is_read
+    FROM user_alerts ua
+    INNER JOIN alerts a ON a.id = ua.alert_id
+    WHERE ua.user_id = ?
+      AND a.is_active = 1
+      AND a.alert_type IN (${placeholders})
+  `;
+  const params = [user.id, ...PERSONAL_ALERT_TYPES];
+
+  if (unread_only === 'true' || unread_only === '1') {
+    sql += ' AND ua.is_read = 0 ';
+  }
+
+  sql += ' ORDER BY a.created_at DESC LIMIT 200 ';
+
+  const [rows] = await db.query(sql, params);
+
+  return rows.map((r) => ({
+    id: `broadcast-${r.id}`,   // re-use broadcast prefix so existing mark-as-read route works
+    source: 'personal',
+    alert_type: r.alert_type,
+    severity: 'info',
+    title: r.title,
+    message: r.message,
+    created_at: r.created_at,
+    is_read: !!r.is_read,
+    entity_type: 'training',
   }));
 }
 
@@ -521,12 +575,15 @@ router.get('/', authenticateToken, async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(5, parseInt(req.query.limit) || 25));
 
-    const [broadcast, system] = await Promise.all([
+    const isReservist = req.user.role === 'reservist';
+
+    const [broadcast, system, personal] = await Promise.all([
       getRelevantBroadcastAlerts(req.user, filters),
-      syncAndGetSystemAlerts(req.user, filters),
+      isReservist ? Promise.resolve([]) : syncAndGetSystemAlerts(req.user, filters),
+      getPersonalTrainingAlerts(req.user, filters), // Always fetch personal training alerts for all users
     ]);
 
-    let all = [...broadcast, ...system];
+    let all = [...broadcast, ...system, ...personal];
 
     // Date filter
     if (filters.start_date) {
@@ -671,7 +728,10 @@ router.post(
  */
 router.patch('/:id/read', authenticateToken, async (req, res) => {
   try {
-    const { id } = req.params; // e.g. "broadcast-45" or "system-12"
+    const { id } = req.params; // e.g. "broadcast-45", "system-12"
+    // NOTE: personal training alerts (training_assigned_internal,
+    // training_registered_external) intentionally share the "broadcast-" prefix
+    // so they are marked read via the same user_alerts upsert path below.
     const [source, numericId] = id.split('-');
 
     if (source === 'broadcast') {

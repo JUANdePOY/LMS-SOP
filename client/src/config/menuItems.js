@@ -36,11 +36,10 @@ export function filterMenuByRole(items, userRole) {
 
 export const menuItems = [
   {
-    name: "My Profile",
+    name: "Home",
     path: "/landing",
     icon: Home,
-    description: "View my records",
-    roles: ["reservist"],
+    description: "Announcements & training previews",
   },
   {
     name: "Dashboard",

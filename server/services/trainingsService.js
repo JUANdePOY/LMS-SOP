@@ -5,7 +5,9 @@ const trainingAttachmentService = require('./trainingAttachmentService');
 const externalTrainingAttachmentService = require('./externalTrainingAttachmentService');
 const internalParticipantModel = require('../models/internalTrainingParticipantModel');
 const db = require('../config/database');
+const pool = db; // alias for direct queries in alert fallback
 const { buildActivityDescription, parseActivityMeta } = require('../utils/activityMeta');
+const { sendTrainingAlertSafe } = require('./Alertservice');
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_LIMIT = 10;
@@ -36,7 +38,7 @@ function normalizeParticipantBlocks(input) {
   return out;
 }
 
-async function replaceInternalParticipants(conn, trainingId, participantsInput) {
+async function replaceInternalParticipants(conn, trainingId, participantsInput, trainingTitle) {
   if (participantsInput === undefined) return;
   try {
     await internalParticipantModel.deleteByTrainingId(conn, trainingId);
@@ -66,6 +68,19 @@ async function replaceInternalParticipants(conn, trainingId, participantsInput) 
   }
 
   await internalParticipantModel.insertMany(conn, trainingId, rowTuples);
+
+  // Send assignment alert to each newly assigned reservist (non-fatal if it fails)
+  if (trainingTitle) {
+    for (const row of rowTuples) {
+      await sendTrainingAlertSafe(conn, {
+        alertType: 'training_assigned_internal',
+        reservistId: row.reservist_id,
+        trainingId,
+        trainingType: 'internal',
+        trainingTitle,
+      });
+    }
+  }
 }
 
 async function loadParticipantGroups(trainingId) {
@@ -203,7 +218,7 @@ async function createInternalTraining(body, createdByUserId) {
     });
 
     if (body.participants !== undefined) {
-      await replaceInternalParticipants(conn, trainingId, body.participants);
+      await replaceInternalParticipants(conn, trainingId, body.participants, title);
     }
 
     await conn.commit();
@@ -304,7 +319,8 @@ async function updateInternalTraining(id, body) {
     }
 
     if (body.participants !== undefined) {
-      await replaceInternalParticipants(conn, id, body.participants);
+      const titleForAlert = trainingPatch.title ?? existing.title ?? '';
+      await replaceInternalParticipants(conn, id, body.participants, titleForAlert);
     }
 
     await conn.commit();
@@ -527,14 +543,14 @@ async function deleteExternalTraining(id) {
   return n > 0;
 }
 
-async function registerExternalParticipant(trainingId, participantData) {
+async function registerExternalParticipant(trainingId, participantData, registrantUserId = null) {
   const conn = await trainingModel.getConnection();
   try {
     await conn.beginTransaction();
 
     // Lock the external training row to prevent race conditions while counting/inserting
     const [trows] = await conn.query(
-      'SELECT id, status, capacity, squadron_limits FROM external_trainings WHERE id = ? FOR UPDATE',
+      'SELECT id, title, status, capacity, squadron_limits FROM external_trainings WHERE id = ? FOR UPDATE',
       [trainingId]
     );
     const trow = trows && trows[0];
@@ -586,14 +602,17 @@ async function registerExternalParticipant(trainingId, participantData) {
 
       if (pdObj && (pdObj.squadron_id != null || pdObj.squadronId != null)) {
         const sid = pdObj.squadron_id ?? pdObj.squadronId;
-        const [existing] = await conn.query(
-          'SELECT id FROM training_registrations WHERE training_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(participant_data, "$.squadron_id")) = ?',
-          [trainingId, String(sid)]
-        );
-        if (existing.length > 0) {
-          const err = new Error('You are already registered for this training');
-          err.statusCode = 400;
-          throw err;
+        // Check if THIS specific reservist is already registered (not just anyone from the squadron)
+        if (pdObj.reservist_id != null) {
+          const [existing] = await conn.query(
+            'SELECT id FROM training_registrations WHERE training_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(participant_data, "$.reservist_id")) = ?',
+            [trainingId, String(pdObj.reservist_id)]
+          );
+          if (existing.length > 0) {
+            const err = new Error('You are already registered for this training');
+            err.statusCode = 400;
+            throw err;
+          }
         }
         const current = await countRegistrationsConn(trainingId, sid);
         const limitEntry = sqLimits.find((s) => Number(s.squadron_id ?? s.squadronId) === Number(sid));
@@ -612,6 +631,18 @@ async function registerExternalParticipant(trainingId, participantData) {
           }
         }
       } else {
+        // Check for duplicate registration by reservist_id (if provided) even without squadron limits
+        if (pdObj && pdObj.reservist_id != null) {
+          const [existing] = await conn.query(
+            'SELECT id FROM training_registrations WHERE training_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(participant_data, "$.reservist_id")) = ?',
+            [trainingId, String(pdObj.reservist_id)]
+          );
+          if (existing.length > 0) {
+            const err = new Error('You are already registered for this training');
+            err.statusCode = 400;
+            throw err;
+          }
+        }
         if (!hasUnlimitedSquadron && totalLimitedSlots > 0) {
           const totalCurrent = await countRegistrationsConn(trainingId, null);
           if (totalCurrent >= totalLimitedSlots) {
@@ -622,6 +653,18 @@ async function registerExternalParticipant(trainingId, participantData) {
         }
       }
     } else if (trow.capacity != null) {
+      // Check if THIS specific reservist is already registered (not just anyone from the capacity)
+      if (pdObj && pdObj.reservist_id != null) {
+        const [existing] = await conn.query(
+          'SELECT id FROM training_registrations WHERE training_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(participant_data, "$.reservist_id")) = ?',
+          [trainingId, String(pdObj.reservist_id)]
+        );
+        if (existing.length > 0) {
+          const err = new Error('You are already registered for this training');
+          err.statusCode = 400;
+          throw err;
+        }
+      }
       const totalCurrent = await countRegistrationsConn(trainingId, null);
       if (totalCurrent >= Number(trow.capacity)) {
         const err = new Error('Training is full');
@@ -641,6 +684,32 @@ async function registerExternalParticipant(trainingId, participantData) {
       [trainingId, pd]
     );
     await conn.commit();
+
+    // ── Send alert to the specific reservist ────────────────────────────────
+    // Priority: participant_data.reservist_id (injected by ExternalRegistration.jsx)
+    // Fallback: look up reservists.id from registrantUserId (user who made the request)
+    let alertReservistId = (pdObj && pdObj.reservist_id) ? Number(pdObj.reservist_id) : null;
+
+    if (!alertReservistId && registrantUserId) {
+      try {
+        const [rRows] = await pool.query(
+          'SELECT id FROM reservists WHERE user_id = ? LIMIT 1',
+          [registrantUserId]
+        );
+        if (rRows && rRows.length > 0) alertReservistId = rRows[0].id;
+      } catch (_) { /* non-fatal — don't break the registration */ }
+    }
+
+    if (alertReservistId) {
+      await sendTrainingAlertSafe(null, {
+        alertType: 'training_registered_external',
+        reservistId: alertReservistId,
+        trainingId,
+        trainingType: 'external',
+        trainingTitle: trow.title || 'External Training',
+      });
+    }
+
     return { id: result.insertId };
   } catch (err) {
     try { await conn.rollback(); } catch (_) {}

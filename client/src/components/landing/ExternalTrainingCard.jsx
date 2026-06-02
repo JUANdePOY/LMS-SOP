@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { shortDate } from '@/lib/dateUtils';
+import { useAuth } from '@/contexts/AuthContext';
 import RegistrationModal from './RegistrationModal';
 import { getExternalTrainingById } from '@/services/trainingsService';
 
 export default function ExternalTrainingCard({ training }) {
+  const { user } = useAuth();
   const [fullTraining, setFullTraining] = useState(null);
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export default function ExternalTrainingCard({ training }) {
         </div>
       </div>
 
-      <RegistrationModal training={trainingData} isOpen={showDetails} onClose={handleClose} />
+      <RegistrationModal training={trainingData} isOpen={showDetails} onClose={handleClose} currentUser={user} />
     </>
   );
 }

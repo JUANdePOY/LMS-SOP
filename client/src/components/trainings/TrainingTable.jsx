@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { Calendar, MapPin, User, Users, Edit, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { computeTotalSlots } from '@/lib/slotUtils';
@@ -41,7 +40,7 @@ const statusConfig = {
   },
 };
 
-function TrainingDetailModal({ training, onClose, isAdmin, onEdit, onDelete, onAttendance }) {
+export function TrainingDetailModal({ training, onClose, isAdmin, onEdit, onDelete, onAttendance }) {
   const isExternal = training._source === 'external';
   const displayDate = training.start_datetime || training.start_date;
   const endDate = training.end_datetime || training.end_date;
@@ -203,24 +202,20 @@ function TrainingDetailModal({ training, onClose, isAdmin, onEdit, onDelete, onA
   );
 }
 
-export default function TrainingCard({ training, isAdmin, onEdit, onDelete, onAttendance }) {
+export default function TrainingCard({ training, onDetailClick }) {
   const isExternal = training._source === 'external';
   const displayDate = training.start_datetime || training.start_date;
   const status = statusConfig[training.status] || statusConfig.draft;
   const location = training.location || training.venue;
-  const [showDetail, setShowDetail] = useState(false);
-
-  const handleRowClick = () => setShowDetail(true);
 
   return (
-    <>
-      <tr
-        className={cn(
-          'group',
-          'hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer'
-        )}
-        onClick={handleRowClick}
-      >
+    <tr
+      className={cn(
+        'group',
+        'hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer'
+      )}
+      onClick={onDetailClick}
+    >
         <td className="px-4 py-3.5 align-middle">
           <span className={cn(
             'inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap',
@@ -271,17 +266,5 @@ export default function TrainingCard({ training, isAdmin, onEdit, onDelete, onAt
           </span>
         </td>
       </tr>
-
-      {showDetail && (
-        <TrainingDetailModal
-          training={training}
-          onClose={() => setShowDetail(false)}
-          isAdmin={isAdmin}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onAttendance={onAttendance}
-        />
-      )}
-    </>
   );
 }

@@ -159,6 +159,51 @@ function isValidExternalStatus(s) {
   return EXTERNAL_STATUSES.includes(s);
 }
 
+/**
+ * Creates a personal alert for a reservist upon successful registration
+ * in an external training.  Mirrors the pattern used for internal training
+ * assignment notifications (`training_assigned_internal`).
+ *
+ * @param {object} opts
+ * @param {number} opts.reservistUserId  - The `users.id` of the reservist
+ * @param {string} opts.trainingTitle    - Title of the external training
+ * @param {string|Date} opts.startDate   - Training start date (for the message)
+ * @param {object} [opts.executor]       - Optional transaction executor (e.g. pool connection)
+ */
+async function notifyExternalRegistration({ reservistUserId, trainingTitle, startDate, executor }) {
+  const db = executor || pool;
+
+  const formattedDate = startDate
+    ? new Date(startDate).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : null;
+
+  const title = `Successfully registered for "${trainingTitle}"`;
+  const message = formattedDate
+    ? `You have been successfully registered for the external training "${trainingTitle}" scheduled on ${formattedDate}.`
+    : `You have been successfully registered for the external training "${trainingTitle}".`;
+
+  // 1. Insert the alert row
+  const [alertResult] = await db.query(
+    `INSERT INTO alerts (title, message, alert_type, target_role, is_active, start_date)
+     VALUES (?, ?, 'training_registered_external', 'reservist', 1, NOW())`,
+    [title, message]
+  );
+  const alertId = alertResult.insertId;
+
+  // 2. Link it to this reservist only via user_alerts (same as internal assignment flow)
+  await db.query(
+    `INSERT INTO user_alerts (user_id, alert_id, is_read)
+     VALUES (?, ?, 0)`,
+    [reservistUserId, alertId]
+  );
+
+  return alertId;
+}
+
 module.exports = {
   countExternal,
   findExternalMany,
@@ -167,5 +212,6 @@ module.exports = {
   updateExternal,
   deleteExternal,
   isValidExternalStatus,
+  notifyExternalRegistration,
   EXTERNAL_STATUSES,
 };

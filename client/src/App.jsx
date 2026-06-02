@@ -31,7 +31,6 @@ const ManageSquadrons   = lazy(() => import("@/pages/airbase/ManageSquadrons"));
 // RBAC role groups (match server)
 const ADMIN_ROLES = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'];
 const SUPER_ADMIN_ROLES = ['admin'];
-const RESERVISTS_ROLE = ['reservist'];
 
 function PageLoader() {
   return (
@@ -79,16 +78,6 @@ function SuperAdminProtectedWrapper(Component) {
   );
 }
 
-function ReservistWrapper(Component) {
-  return (
-    <Suspense fallback={<PageLoader />}>
-      <ProtectedRoute allowedRoles={RESERVISTS_ROLE}>
-        <Component />
-      </ProtectedRoute>
-    </Suspense>
-  );
-}
-
 const router = createBrowserRouter([
   {
     path: "/login",
@@ -105,7 +94,7 @@ const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: AdminProtectedWrapper(Dashboard), handle: { title: "Dashboard" } },
-      { path: "landing", element: ReservistWrapper(Landing), handle: { title: "Landing" } },
+      { path: "landing", element: ProtectedWrapper(Landing), handle: { title: "Landing" } },
       { path: "profile", element: ProtectedWrapper(Profile), handle: { title: "Profile" } },
       { path: "announcements", element: AdminProtectedWrapper(Announcements), handle: { title: "Announcements" } },
       { path: "reservists", element: AdminProtectedWrapper(Reservists), handle: { title: "Reservists" } },
@@ -113,7 +102,7 @@ const router = createBrowserRouter([
       { path: "attendance", element: ProtectedWrapper(Attendance), handle: { title: "Attendance" } },
       { path: "analytics", element: AdminProtectedWrapper(Analytics), handle: { title: "Analytics" } },
       { path: "logistics", element: AdminProtectedWrapper(Logistics), handle: { title: "Logistics" } },
-      { path: "alerts", element: SuperAdminProtectedWrapper(Alerts), handle: { title: "Alerts" } },
+      { path: "alerts", element: ProtectedWrapper(Alerts), handle: { title: "Alerts" } },
       { path: "reports", element: ProtectedWrapper(Reports), handle: { title: "Reports" } },
       { path: "settings", element: SuperAdminProtectedWrapper(Settings), handle: { title: "Settings" } },
       { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },

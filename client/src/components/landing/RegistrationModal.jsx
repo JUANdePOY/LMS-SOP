@@ -229,7 +229,7 @@ function SectionHeader({ icon: Icon, label }) {
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 
-export default function RegistrationModal({ training, isOpen, onClose }) {
+export default function RegistrationModal({ training, isOpen, onClose, currentUser }) {
   const [selectedSquadronId, setSelectedSquadronId] = useState(null);
   const [squadrons, setSquadrons] = useState([]);
   const [squadronError, setSquadronError] = useState("");
@@ -370,6 +370,9 @@ export default function RegistrationModal({ training, isOpen, onClose }) {
     try {
       const formData = new FormData(e.currentTarget);
       const participantData = { squadron_id: Number(selectedSquadronId) };
+      if (currentUser?.reservist_id) {
+        participantData.reservist_id = currentUser.reservist_id;
+      }
       registrationFields.forEach((field) => {
         const value = formData.get(field.id);
         if (value != null && value !== '') participantData[field.id] = value;

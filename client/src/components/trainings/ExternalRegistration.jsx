@@ -6,8 +6,8 @@ export default function ExternalRegistration({
   capacity,
   currentRegistrations = 0,
   onRegister,
-  onApprove,
-  loading = false
+  loading = false,
+  currentUser = null,   // pass the logged-in user object so we can inject reservist_id
 }) {
   const [formData, setFormData] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -42,7 +42,13 @@ export default function ExternalRegistration({
     setError(null);
     setSuccess(null);
     try {
-      await onRegister(formData);
+      // Always inject reservist_id so the backend can send a personal alert.
+      // currentUser.reservist_id is the reservists.id linked to this user account.
+      const payload = {
+        ...formData,
+        ...(currentUser?.reservist_id ? { reservist_id: currentUser.reservist_id } : {}),
+      };
+      await onRegister(payload);
       setSuccess('Registration submitted successfully!');
       setFormData({});
     } catch (err) {
