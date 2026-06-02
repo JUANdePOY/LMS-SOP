@@ -100,10 +100,37 @@ export default function Logistics() {
     const totalStock = supplies.reduce((a, s) => a + (s.quantity_available || 0), 0);
     const lowStockCount = lowStock.length;
     return { totalItems, totalStock, lowStockCount };
-  }, [supplies, lowStock]);
+   }, [supplies, lowStock]);
+   const lowestSquadronData = useMemo(() => {
+     if (!uniformTracker || uniformTracker.length === 0) return null;
 
-  // ── Filtered data ──
-  const filteredSupplies = useMemo(() => {
+     let minAvg = Infinity;
+     let lowestSquadron = null;
+
+     uniformTracker.forEach(sqGroup => {
+       const totalReservists = sqGroup.reservists.length;
+       if (totalReservists === 0) return;
+
+       const totalUniforms = sqGroup.reservists.reduce((sum, r) => sum + (r.uniforms?.length || 0), 0);
+       const avg = totalUniforms / totalReservists;
+
+       if (avg < minAvg) {
+         minAvg = avg;
+         lowestSquadron = {
+           squadronName: sqGroup.squadron_name || "Unassigned",
+           groupName: sqGroup.group_name || "No Group",
+           totalReservists,
+           totalUniforms,
+           avg
+         };
+       }
+     });
+
+     return lowestSquadron;
+   }, [uniformTracker])
+
+   // ── Filtered data ――
+   const filteredSupplies = useMemo(() => {
     let d = supplies;
     if (categoryFilter) d = d.filter((s) => s.category === categoryFilter);
     if (search.trim()) {
@@ -238,6 +265,16 @@ export default function Logistics() {
           color={kpis.lowStockCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600 dark:text-emerald-400"}
           bgColor={kpis.lowStockCount > 0 ? "bg-amber-50 dark:bg-amber-500/10" : "bg-emerald-50 dark:bg-emerald-500/10"}
         />
+         {lowestSquadronData && (
+           <KPICard
+             icon={UserCheck}
+             label="Lowest Uniform Coverage"
+             value={`${lowestSquadronData.squadronName} - ${lowestSquadronData.groupName}`}
+             subtext={`${lowestSquadronData.avg.toFixed(2)} avg uniforms per reservist (${lowestSquadronData.totalReservists} reservists)`}
+             color="text-indigo-600 dark:text-indigo-400"
+             bgColor="bg-indigo-50 dark:bg-indigo-500/10"
+           />
+         )}
       </div>
 
       {/* ── Low Stock Alert Banner ── */}
@@ -541,24 +578,26 @@ function AssignItemModal({ reservist, supplies, open, onClose, onSubmit }) {
   const [selectedSupply, setSelectedSupply] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [issuanceType, setIssuanceType] = useState("issued");
+  const [dueReturnDate, setDueReturnDate] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = useCallback(async () => {
-    if (!selectedSupply) return;
+    if (!selectedSupply || !dueReturnDate) return;
     setSubmitting(true);
     try {
       await onSubmit({
         reservist_id: reservist.id,
         supply_id: selectedSupply.id,
         quantity_issued: quantity,
+        due_return_date: dueReturnDate,
         issuance_type: issuanceType,
         notes: notes,
       });
     } finally {
       setSubmitting(false);
     }
-  }, [selectedSupply, quantity, issuanceType, notes, onSubmit, reservist]);
+  }, [selectedSupply, quantity, dueReturnDate, issuanceType, notes, onSubmit, reservist]);
 
   if (!open) return null;
 
@@ -625,6 +664,17 @@ function AssignItemModal({ reservist, supplies, open, onClose, onSubmit }) {
           </div>
 
           <div>
+            <label className="text-[10px] font-medium text-neutral-400 mb-1.5">Due Return Date *</label>
+            <input
+              type="date"
+              value={dueReturnDate}
+              onChange={(e) => setDueReturnDate(e.target.value)}
+              className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400"
+              required
+            />
+          </div>
+
+          <div>
             <label className="text-[10px] font-medium text-neutral-400 mb-1.5">Notes (Optional)</label>
             <textarea
               value={notes}
@@ -644,7 +694,7 @@ function AssignItemModal({ reservist, supplies, open, onClose, onSubmit }) {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!selectedSupply || submitting}
+            disabled={!selectedSupply || !dueReturnDate || submitting}
             className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? "Assigning..." : "Assign Item"}
@@ -768,21 +818,18 @@ function UniformTrackerTab({ search, setSearch, uniformTracker, loading, onAssig
                         ))}
                       </div>
                     ) : (
-                      <div className="mt-2 text-xs text-neutral-400 dark:text-neutral-600">
-                        <span className="mr-3">Issued: {reservist.uniforms.filter(u => u.issuance_type === "issued").length}</span>
-                        <span>Personal: {reservist.uniforms.filter(u => u.issuance_type === "personal").length}</span>
-                      </div>
+                      <div className="mt-2 text-xs text-neutral-400 dark:text-neutral-600">No items assigned</div>
                     )}
                   </div>
                 ))}
               </div>
             </div>
           ))
-        )}
+          )}
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
 // ═══════════════════════════════════════════════════════════════
 // SUPPLY DETAIL MODAL
