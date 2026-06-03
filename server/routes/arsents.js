@@ -11,7 +11,8 @@ const validateArsen = [
   body('code').trim().notEmpty().withMessage('ARSEN code is required').isLength({ max: 50 }),
   body('name').trim().notEmpty().withMessage('ARSEN name is required').isLength({ max: 200 }),
   body('location').optional().trim().isLength({ max: 500 }),
-  body('commander_name').optional().trim().isLength({ max: 200 })
+  body('commander_name').optional().trim().isLength({ max: 200 }),
+  body('is_active').optional().isBoolean().withMessage('Status must be true or false').toBoolean()
 ];
 
 const validateId = [
@@ -266,7 +267,7 @@ router.put('/:id', [...validateId, ...validateArsen], authenticateToken, require
       });
     }
 
-    const { code, name, location, commander_name } = req.body;
+    const { code, name, location, commander_name, is_active } = req.body;
 
     // Get current ARSEN for audit
     const [currentArsen] = await db.query('SELECT * FROM arsens WHERE id = ?', [req.params.id]);
@@ -293,9 +294,18 @@ router.put('/:id', [...validateId, ...validateArsen], authenticateToken, require
       });
     }
 
+    // Build dynamic update query
+    const setClauses = ['code = ?', 'name = ?', 'location = ?', 'commander_name = ?'];
+    const params = [code, name, location || null, commander_name || null];
+    if (is_active !== undefined) {
+      setClauses.push('is_active = ?');
+      params.push(is_active ? 1 : 0);
+    }
+    params.push(req.params.id);
+
     const [result] = await db.query(
-      'UPDATE arsens SET code = ?, name = ?, location = ?, commander_name = ? WHERE id = ?',
-      [code, name, location || null, commander_name || null, req.params.id]
+      `UPDATE arsens SET ${setClauses.join(', ')} WHERE id = ?`,
+      params
     );
 
     if (result.affectedRows === 0) {

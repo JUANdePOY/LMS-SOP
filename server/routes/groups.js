@@ -288,7 +288,7 @@ router.put('/:id', [...validateId, ...validateGroup], authenticateToken, require
       });
     }
 
-    const { arsen_id, code, name, commander_name } = req.body;
+    const { arsen_id, code, name, commander_name, is_active } = req.body;
 
     // Get current group for audit
     const [currentGroup] = await db.query('SELECT * FROM `groups` WHERE id = ?', [req.params.id]);
@@ -325,9 +325,19 @@ router.put('/:id', [...validateId, ...validateGroup], authenticateToken, require
       });
     }
 
+    // Build dynamic SET clause so is_active is only updated when explicitly provided,
+    // matching the same pattern used in arsens.js
+    const setClauses = ['arsen_id = ?', 'code = ?', 'name = ?', 'commander_name = ?'];
+    const params     = [arsen_id, code, name, commander_name || null];
+    if (is_active !== undefined) {
+      setClauses.push('is_active = ?');
+      params.push(is_active ? 1 : 0);
+    }
+    params.push(req.params.id);
+
     const [result] = await db.query(
-      'UPDATE `groups` SET arsen_id = ?, code = ?, name = ?, commander_name = ? WHERE id = ?',
-      [arsen_id, code, name, commander_name || null, req.params.id]
+      `UPDATE \`groups\` SET ${setClauses.join(', ')} WHERE id = ?`,
+      params
     );
 
     if (result.affectedRows === 0) {

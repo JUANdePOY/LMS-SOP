@@ -10,8 +10,10 @@ import { StatusBadge, MonoCode, PrimaryButton } from "@/components/airbase/Airba
 import AddEditModal, { FormField, FormInput, FormSelect } from "@/components/airbase/AddEditModal";
 import DetailModal, { DetailSection, DetailRow, DetailStatCard } from "@/components/airbase/DetailModal";
 import { getGroups, createArsen, updateArsen, deleteArsen } from "@/services/api";
+import { useToast } from "@/components/ui/Toast";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
-const EMPTY_FORM = { name: "", fullName: "", code: "", commander: "", location: "", status: "active" };
+const EMPTY_FORM = { name: "", code: "", commander: "", location: "", status: "active" };
 
 const COLUMNS = [
   { key: "name",       label: "ARCEN",      sortable: true },
@@ -25,19 +27,25 @@ const COLUMNS = [
 ];
 
 export default function ManageArcens() {
-  const [data,    setData]    = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [detail,  setDetail]  = useState(null);
+  const [data, setData] = useState([]);
+  const [detail, setDetail] = useState(null);
   const [editModal, setEditModal] = useState(false);
-  const [editMode,  setEditMode]  = useState("add");
-  const [form,    setForm]    = useState(EMPTY_FORM);
+  const [editMode, setEditMode] = useState("add");
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [editRow, setEditRow] = useState(null);
+  const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [apiError, setApiError] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const { addToast: toast } = useToast();
 
   useEffect(() => {
     fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchData = async () => {
-    setLoading(true);
     try {
       const response = await getGroups({ hierarchical: true });
       if (response.data.status === 'success') {
@@ -46,8 +54,6 @@ export default function ManageArcens() {
       }
     } catch (err) {
       console.error('Failed to fetch hierarchy:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -57,7 +63,6 @@ export default function ManageArcens() {
       id: `arcen-${arcen.id}`,
       dbId: arcen.id,
       name: arcen.name,
-      fullName: arcen.name,
       code: arcen.code,
       commander: arcen.commander || '',
       location: arcen.location || '',
@@ -73,58 +78,111 @@ export default function ManageArcens() {
 
   const openAdd = () => {
     setForm(EMPTY_FORM);
+    setErrors({});
+    setApiError(null);
     setEditMode("add");
     setEditModal(true);
   };
 
   const openEdit = (row) => {
-    setForm({ name: row.name, fullName: row.fullName, code: row.code, commander: row.commander, location: row.location, status: row.status });
+    setForm({ name: row.name, code: row.code, commander: row.commander, location: row.location, status: row.status });
+    setErrors({});
+    setApiError(null);
     setEditMode("edit");
+    setEditRow(row);
     setEditModal(true);
     setDetail(null);
   };
 
-  const closeEdit = () => setEditModal(false);
+  const closeEdit = () => {
+    setEditModal(false);
+    setErrors({});
+    setApiError(null);
+    setEditRow(null);
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    if (!form.name?.trim()) newErrors.name = "ARCEN Name is required";
+    if (!form.code?.trim()) newErrors.code = "Code is required";
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const getErrorMessage = (err) => {
+    const data = err?.response?.data;
+    if (data?.code === 'DUPLICATE_CODE') return "This code is already in use. Please use a unique code.";
+    if (data?.errors?.length > 0) {
+      return data.errors.map(e => e.msg).join(' ');
+    }
+    return data?.message || err.message || 'An unexpected error occurred';
+  };
 
   const handleSubmit = async () => {
+    if (!validateForm()) return;
+
+    setSubmitting(true);
+    setApiError(null);
+
     try {
+      const payload = {
+        code: form.code.trim(),
+        name: form.name.trim(),
+        location: form.location.trim() || null,
+        commander_name: form.commander.trim() || null,
+      };
+
       if (editMode === "add") {
-        const response = await createArsen({
-          code: form.code,
-          name: form.name,
-          location: form.location,
-          commander_name: form.commander,
-        });
+        const response = await createArsen(payload);
         if (response.data.status === 'success') {
           await fetchData();
+          closeEdit();
+          toast("ARCEN created successfully", "success");
         }
-      } else if (detail) {
-        const response = await updateArsen(detail.dbId, {
-          code: form.code,
-          name: form.name,
-          location: form.location,
-          commander_name: form.commander,
+      } else if (editRow) {
+        const response = await updateArsen(editRow.dbId, {
+          ...payload,
+          is_active: form.status === "active"
         });
         if (response.data.status === 'success') {
           await fetchData();
+          closeEdit();
+          toast("ARCEN updated successfully", "success");
         }
       }
-      closeEdit();
     } catch (err) {
+      const msg = getErrorMessage(err);
+      setApiError(msg);
+      toast(msg, "error");
       console.error('Failed to save ARCEN:', err);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDelete = async (row) => {
-    if (!confirm(`Delete ${row.name}? This cannot be undone.`)) return;
+  const openDeleteDialog = (row) => setDeleteTarget(row);
+
+  const cancelDelete = () => {
+    if (!deleteLoading) setDeleteTarget(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
     try {
-      const response = await deleteArsen(row.dbId);
+      const response = await deleteArsen(deleteTarget.dbId);
       if (response.data.status === 'success') {
-        setData((prev) => prev.filter((r) => r.id !== row.id));
+        setData((prev) => prev.map((r) => r.id === deleteTarget.id ? { ...r, status: "inactive" } : r));
         closeDetail();
+        setDeleteTarget(null);
+        toast(`${deleteTarget.name} deleted successfully`, "success");
       }
     } catch (err) {
+      const msg = err?.response?.data?.message || err.message || 'Failed to delete ARCEN';
+      toast(msg, "error");
       console.error('Failed to delete ARCEN:', err);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -135,13 +193,17 @@ export default function ManageArcens() {
         name: row.name,
         location: row.location,
         commander_name: row.commander,
+        is_active: row.status !== "active"
       });
       if (response.data.status === 'success') {
         const updated = { ...row, status: row.status === "active" ? "inactive" : "active" };
         setData((prev) => prev.map((r) => r.id === row.id ? updated : r));
         setDetail(updated);
+        toast(`${row.name} ${updated.status === "active" ? "activated" : "deactivated"} successfully`, "success");
       }
     } catch (err) {
+      const msg = err?.response?.data?.message || "Failed to toggle status";
+      toast(msg, "error");
       console.error('Failed to toggle status:', err);
     }
   };
@@ -170,12 +232,12 @@ export default function ManageArcens() {
         ))}
       </div>
 
-      {/* Table — no action column, rows are clickable */}
+      {/* Table */}
       <ManagementTable
         columns={COLUMNS}
         data={data}
-        searchKeys={["name", "fullName", "code", "commander", "location"]}
-        searchPlaceholder="Search ARCEN name, commander, location…"
+        searchKeys={["name", "code", "commander", "location"]}
+        searchPlaceholder="Search ARCEN name, commander, location..."
         emptyMessage="No ARCENs found."
         renderRow={(row) => (
           <tr
@@ -188,7 +250,6 @@ export default function ManageArcens() {
                 <span className="text-[13px] font-bold text-neutral-800 dark:text-neutral-200 group-hover:text-indigo-700 dark:group-hover:text-indigo-300 transition-colors">
                   {row.name}
                 </span>
-                <span className="text-[10px] text-neutral-400">{row.fullName}</span>
               </div>
             </td>
             <td className="px-4 py-3"><MonoCode>{row.code}</MonoCode></td>
@@ -206,7 +267,7 @@ export default function ManageArcens() {
         )}
       />
 
-      {/* ── Detail Modal ────────────────────────────────────── */}
+      {/* Detail Modal */}
       {detail && (
         <DetailModal
           open={!!detail}
@@ -214,14 +275,13 @@ export default function ManageArcens() {
           icon={Shield}
           iconColor="bg-indigo-600"
           title={detail.name}
-          subtitle={detail.fullName}
           badge={detail.code}
           size="lg"
           footer={
             <div className="flex items-center justify-between w-full">
-              {/* Left — destructive */}
+              {/* Left - destructive */}
               <button
-                onClick={() => handleDelete(detail)}
+                onClick={() => openDeleteDialog(detail)}
                 className={cn(
                   "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium",
                   "border-red-200 dark:border-red-500/30",
@@ -233,7 +293,7 @@ export default function ManageArcens() {
                 <Trash2 size={14} /> Delete
               </button>
 
-              {/* Right — secondary + primary */}
+              {/* Right - secondary + primary */}
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => toggleStatus(detail)}
@@ -277,35 +337,38 @@ export default function ManageArcens() {
 
           {/* Details */}
           <DetailSection title="ARCEN Information">
-            <DetailRow label="Full Name"  value={detail.fullName}  />
-            <DetailRow label="Code"       value={detail.code}      />
+            <DetailRow label="Name"  value={detail.name}  />
+            <DetailRow label="Code"  value={detail.code}  />
             <DetailRow label="Commander"  value={detail.commander} />
             <DetailRow label="Location"   value={detail.location}  />
           </DetailSection>
         </DetailModal>
       )}
 
-      {/* ── Add / Edit Modal ────────────────────────────────── */}
+      {/* Add / Edit Modal */}
       <AddEditModal
         open={editModal}
-        title={editMode === "add" ? "Add New ARCEN" : `Edit ${detail?.name ?? "ARCEN"}`}
+        title={editMode === "add" ? "Add New ARCEN" : `Edit ${editRow?.name ?? "ARCEN"}`}
         onClose={closeEdit}
         onSubmit={handleSubmit}
         submitLabel={editMode === "add" ? "Add ARCEN" : "Save Changes"}
+        loading={submitting}
       >
-        <FormField label="ARCEN Name" required>
+        {apiError && (
+          <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+            {apiError}
+          </div>
+        )}
+        <FormField label="ARCEN Name" required error={errors.name}>
           <FormInput value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} placeholder="e.g. 1st ARCEN" />
         </FormField>
-        <FormField label="Full Name">
-          <FormInput value={form.fullName} onChange={(v) => setForm((f) => ({ ...f, fullName: v }))} placeholder="e.g. 1st Air Reserve Center" />
-        </FormField>
-        <FormField label="Code" required>
+        <FormField label="Code" required error={errors.code}>
           <FormInput value={form.code} onChange={(v) => setForm((f) => ({ ...f, code: v }))} placeholder="e.g. 1ARCEN" />
         </FormField>
-        <FormField label="Commander">
+        <FormField label="Commander (Optional)">
           <FormInput value={form.commander} onChange={(v) => setForm((f) => ({ ...f, commander: v }))} placeholder="e.g. Brig. Gen. Antonio Reyes" />
         </FormField>
-        <FormField label="Location">
+        <FormField label="Location (Optional)">
           <FormInput value={form.location} onChange={(v) => setForm((f) => ({ ...f, location: v }))} placeholder="e.g. Villamor Air Base, Pasay City" />
         </FormField>
         <FormField label="Status">
@@ -315,6 +378,23 @@ export default function ManageArcens() {
           </FormSelect>
         </FormField>
       </AddEditModal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete ARCEN?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.name}" (${deleteTarget.code}) will be deactivated. This action cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete ARCEN"
+        cancelLabel="Keep ARCEN"
+        destructive
+        loading={deleteLoading}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </div>
   );
 }
