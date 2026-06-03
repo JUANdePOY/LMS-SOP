@@ -12,10 +12,11 @@ import { cn } from "@/lib/utils";
  *   onClose: () => void,
  *   onSubmit: () => void,
  *   submitLabel?: string,
+ *   loading?: boolean,
  *   children: React.ReactNode,
  * }} props
  */
-export default function AddEditModal({ open, title, onClose, onSubmit, submitLabel = "Save", children, maxWidth }) {
+export default function AddEditModal({ open, title, onClose, onSubmit, submitLabel = "Save", children, maxWidth, loading = false }) {
   const overlayRef = useRef(null);
 
   useEffect(() => {
@@ -74,27 +75,33 @@ export default function AddEditModal({ open, title, onClose, onSubmit, submitLab
         <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-4 sm:px-6 py-4">
           <button
             onClick={onClose}
+            disabled={loading}
             className={cn(
               "rounded-lg border px-4 py-2 text-sm font-medium",
               "border-neutral-200 dark:border-neutral-700",
               "bg-white dark:bg-neutral-900",
               "text-neutral-600 dark:text-neutral-400",
               "hover:bg-neutral-50 dark:hover:bg-neutral-800",
-              "transition-colors duration-150"
+              "transition-colors duration-150",
+              loading && "opacity-50 cursor-not-allowed"
             )}
           >
             Cancel
           </button>
           <button
             onClick={onSubmit}
+            disabled={loading}
             className={cn(
               "rounded-lg px-4 py-2 text-sm font-semibold",
               "bg-indigo-600 text-white",
               "hover:bg-indigo-700 active:bg-indigo-800",
               "shadow-sm shadow-indigo-200 dark:shadow-indigo-900/30",
-              "transition-all duration-150"
+              "transition-all duration-150",
+              "flex items-center justify-center gap-2",
+              loading && "opacity-70 cursor-not-allowed"
             )}
           >
+            {loading && <div className="h-3 w-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
             {submitLabel}
           </button>
         </div>
@@ -104,15 +111,16 @@ export default function AddEditModal({ open, title, onClose, onSubmit, submitLab
 }
 
 /**
- * FormField — labeled input wrapper
+ * FormField — labeled input wrapper with optional error display
  */
-export function FormField({ label, required, children }) {
+export function FormField({ label, required, error, children }) {
   return (
     <div className="flex flex-col gap-0.5">
       <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
         {label} {required && <span className="text-red-500">*</span>}
       </label>
       {children}
+      {error && <span className="text-[10px] text-red-600 dark:text-red-400">{error}</span>}
     </div>
   );
 }
