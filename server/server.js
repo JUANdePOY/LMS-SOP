@@ -7,6 +7,10 @@ console.log('SERVER STARTING - Loading updated code...');
 
 const app = express();
 
+// Serve the static files from the React Vite build folder
+const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+app.use(express.static(clientDistPath));
+
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -73,7 +77,12 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
+// Serve React app for any non-API route
+app.get(/^\/(?!api).*/, (req, res) => {
+  res.sendFile(path.join(clientDistPath, 'index.html'));
+});
+
+// 404 handler for API routes and unmatched requests
 app.use((req, res) => {
   res.status(404).json({
     status: 'error',
