@@ -1,5 +1,4 @@
-import { PlaneTakeoff, Map, List } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Map, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HierarchyProvider, useHierarchy } from "@/components/hierarchy/HierarchyContext";
 import AreaAccordion from "@/components/hierarchy/AreaAccordion";
@@ -545,36 +544,6 @@ function OverviewContent() {
 
   return (
     <div className="flex flex-col gap-6 pb-10">
-      <div className="flex flex-wrap items-center gap-2">
-        <Link to="/airbase/arcens" className={cn(
-          "rounded-lg border px-3 py-1.5 text-xs font-medium",
-          "border-neutral-200 dark:border-neutral-700",
-          "text-neutral-600 dark:text-neutral-400",
-          "hover:bg-neutral-50 dark:hover:bg-neutral-800",
-          "transition-colors duration-150"
-        )}>
-          Manage ARCENs
-        </Link>
-        <Link to="/airbase/groups" className={cn(
-          "rounded-lg border px-3 py-1.5 text-xs font-medium",
-          "border-neutral-200 dark:border-neutral-700",
-          "text-neutral-600 dark:text-neutral-400",
-          "hover:bg-neutral-50 dark:hover:bg-neutral-800",
-          "transition-colors duration-150"
-        )}>
-          Manage Groups
-        </Link>
-        <Link to="/airbase/squadrons" className={cn(
-          "rounded-lg border px-3 py-1.5 text-xs font-medium",
-          "border-neutral-200 dark:border-neutral-700",
-          "text-neutral-600 dark:text-neutral-400",
-          "hover:bg-neutral-50 dark:hover:bg-neutral-800",
-          "transition-colors duration-150"
-        )}>
-          Manage Squadrons
-        </Link>
-      </div>
-
       {/* Tab switcher */}
        <div className="flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-100/60 dark:bg-neutral-800/60 p-1 w-fit">
          <button

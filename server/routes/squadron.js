@@ -189,7 +189,7 @@ router.get('/:id', validateId, authenticateToken, async (req, res) => {
 });
 
 // POST /api/squadron - Create new squadron (admin_arsen or higher can create)
-router.post('/', [...validateSquadron, authenticateToken, requireAdminOrHigher], async (req, res) => {
+router.post('/', validateSquadron, authenticateToken, requireAdminOrHigher, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -262,7 +262,7 @@ router.post('/', [...validateSquadron, authenticateToken, requireAdminOrHigher],
 });
 
 // PUT /api/squadron/:id - Update squadron (admin_arsen or higher can update)
-router.put('/:id', [...validateId, ...validateSquadron, authenticateToken, requireAdminOrHigher], async (req, res) => {
+router.put('/:id', [...validateId, ...validateSquadron], authenticateToken, requireAdminOrHigher, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -274,7 +274,7 @@ router.put('/:id', [...validateId, ...validateSquadron, authenticateToken, requi
       });
     }
 
-    const { group_id, name, code, location, specialization } = req.body;
+    const { group_id, name, code, location, specialization, is_active } = req.body;
 
     // Get current squadron for audit
     const [currentSquadron] = await db.query('SELECT * FROM squadron WHERE id = ?', [req.params.id]);
@@ -297,9 +297,18 @@ router.put('/:id', [...validateId, ...validateSquadron, authenticateToken, requi
       });
     }
 
+    // Build dynamic SET clause so is_active is only updated when explicitly provided
+    const setClauses = ['group_id = ?', 'name = ?', 'code = ?', 'location = ?', 'specialization = ?'];
+    const params     = [group_id, name, code || null, location || null, specialization || null];
+    if (is_active !== undefined) {
+      setClauses.push('is_active = ?');
+      params.push(is_active ? 1 : 0);
+    }
+    params.push(req.params.id);
+
     const [result] = await db.query(
-      'UPDATE squadron SET group_id = ?, name = ?, code = ?, location = ?, specialization = ? WHERE id = ?',
-      [group_id, name, code || null, location || null, specialization || null, req.params.id]
+      `UPDATE squadron SET ${setClauses.join(', ')} WHERE id = ?`,
+      params
     );
 
     if (result.affectedRows === 0) {
@@ -356,7 +365,7 @@ router.put('/:id', [...validateId, ...validateSquadron, authenticateToken, requi
 });
 
 // DELETE /api/squadron/:id - Soft delete squadron (admin_arsen or higher can delete)
-router.delete('/:id', [...validateId, authenticateToken, requireAdminOrHigher], async (req, res) => {
+router.delete('/:id', validateId, authenticateToken, requireAdminOrHigher, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
