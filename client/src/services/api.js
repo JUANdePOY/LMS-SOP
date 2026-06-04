@@ -22,11 +22,17 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if ((error.response?.status === 401 || error.response?.status === 403) && !error.config?.skipAuthRedirect) {
+    const status = error.response?.status;
+
+    // 401 = token is missing, expired, or invalid → clear session and redirect to login
+    // 403 = authenticated but forbidden (wrong role/scope) → do NOT logout; let the
+    //       calling component handle it gracefully (show an error, hide the UI, etc.)
+    if (status === 401 && !error.config?.skipAuthRedirect) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
+
     if (error.code === 'ECONNABORTED') {
       error.message = 'Request timed out. Please check your connection.';
     }

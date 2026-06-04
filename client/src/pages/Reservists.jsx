@@ -11,6 +11,7 @@ import ReservistViewModal from "@/components/reservists/ReservistViewModal";
 import BulkUploadModal from "@/components/reservists/BulkUploadModal";
 import ReservistDetailPanel from "@/components/reservists/ReservistDetailPanel";
 import SearchAndFilters, { DEFAULT_FILTERS } from "@/components/reservists/SearchAndFilters";
+import { useAuth } from "@/contexts/AuthContext";
 
 const EMPTY_FORM = {
   id: '', userId: '', assignmentId: '',
@@ -29,6 +30,11 @@ const EMPTY_FORM = {
 };
 
 export default function Reservists() {
+  const { user } = useAuth();
+  // Per RBAC_WORKFLOW.md: POST/PUT/DELETE reservists is admin-only.
+  // admin_arsen and admin_group can VIEW the list but cannot create, edit, or delete.
+  const canMutate = user?.role === "admin";
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -410,18 +416,22 @@ export default function Reservists() {
       {!loading && (
           <>
             <div className="flex items-center gap-2 flex-wrap">
-              <PrimaryButton icon={Upload} onClick={() => setBulkUploadModal(true)} variant="secondary" className="flex-1 sm:flex-none">
-                <span className="hidden sm:inline">Bulk Upload</span>
-                <span className="sm:hidden">Upload</span>
-              </PrimaryButton>
+              {canMutate && (
+                <PrimaryButton icon={Upload} onClick={() => setBulkUploadModal(true)} variant="secondary" className="flex-1 sm:flex-none">
+                  <span className="hidden sm:inline">Bulk Upload</span>
+                  <span className="sm:hidden">Upload</span>
+                </PrimaryButton>
+              )}
               <PrimaryButton icon={Download} onClick={handleExport} variant="secondary" className="flex-1 sm:flex-none">
                 <span className="hidden sm:inline">Export All</span>
                 <span className="sm:hidden">Export</span>
               </PrimaryButton>
-              <PrimaryButton icon={Plus} onClick={openAdd} className="flex-1 sm:flex-none">
-                <span className="hidden sm:inline">Add Reservist</span>
-                <span className="sm:hidden">Add</span>
-              </PrimaryButton>
+              {canMutate && (
+                <PrimaryButton icon={Plus} onClick={openAdd} className="flex-1 sm:flex-none">
+                  <span className="hidden sm:inline">Add Reservist</span>
+                  <span className="sm:hidden">Add</span>
+                </PrimaryButton>
+              )}
             </div>
 
             <ReservistStatsBar data={data} />
@@ -437,9 +447,9 @@ export default function Reservists() {
             <ReservistTable
               data={filteredData}
               onView={setViewRow}
-              onEdit={openEdit}
-              onDelete={handleDelete}
-              onToggleStatus={toggleStatus}
+              onEdit={canMutate ? openEdit : null}
+              onDelete={canMutate ? handleDelete : null}
+              onToggleStatus={canMutate ? toggleStatus : null}
             />
 
             {/* Pagination */}
@@ -468,26 +478,30 @@ export default function Reservists() {
               </div>
             )}
 
+            {canMutate && (
             <ReservistModal
-            open={modal.open}
-            mode={modal.mode}
-            form={form}
-            onChange={setForm}
-            onClose={closeModal}
-            onSubmit={handleSubmit}
-          />
+              open={modal.open}
+              mode={modal.mode}
+              form={form}
+              onChange={setForm}
+              onClose={closeModal}
+              onSubmit={handleSubmit}
+            />
+          )}
 
-          <BulkUploadModal
-            isOpen={bulkUploadModal}
-            onClose={() => setBulkUploadModal(false)}
-            onSuccess={loadReservists}
-          />
+          {canMutate && (
+            <BulkUploadModal
+              isOpen={bulkUploadModal}
+              onClose={() => setBulkUploadModal(false)}
+              onSuccess={loadReservists}
+            />
+          )}
 
           {detailRow && (
             <ReservistDetailPanel
               reservist={detailRow}
               onClose={() => setDetailRow(null)}
-              onEdit={() => openEdit(detailRow)}
+              onEdit={canMutate ? () => openEdit(detailRow) : null}
             />
           )}
 

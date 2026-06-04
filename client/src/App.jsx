@@ -31,6 +31,11 @@ const ManageSquadrons   = lazy(() => import("@/pages/airbase/ManageSquadrons"));
 // RBAC role groups (match server)
 const ADMIN_ROLES = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'];
 const SUPER_ADMIN_ROLES = ['admin'];
+// Reservists list: all admin roles can access the page.
+// The backend scope filter restricts what data each role actually sees.
+// admin_squadron sees only reservists in their squadron (server-enforced).
+// canMutate in Reservists.jsx ensures read-only UI for non-super-admins.
+const RESERVIST_ADMIN_ROLES = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'];
 
 function PageLoader() {
   return (
@@ -68,6 +73,16 @@ function AdminProtectedWrapper(Component) {
   );
 }
 
+function ReservistAdminProtectedWrapper(Component) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ProtectedRoute allowedRoles={RESERVIST_ADMIN_ROLES}>
+        <Component />
+      </ProtectedRoute>
+    </Suspense>
+  );
+}
+
 function SuperAdminProtectedWrapper(Component) {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -97,7 +112,7 @@ const router = createBrowserRouter([
       { path: "landing", element: ProtectedWrapper(Landing), handle: { title: "Landing" } },
       { path: "profile", element: ProtectedWrapper(Profile), handle: { title: "Profile" } },
       { path: "announcements", element: AdminProtectedWrapper(Announcements), handle: { title: "Announcements" } },
-      { path: "reservists", element: AdminProtectedWrapper(Reservists), handle: { title: "Reservists" } },
+      { path: "reservists", element: ReservistAdminProtectedWrapper(Reservists), handle: { title: "Reservists" } },
       { path: "trainings", element: ProtectedWrapper(Trainings), handle: { title: "Trainings & Activities" } },
       { path: "attendance", element: ProtectedWrapper(Attendance), handle: { title: "Attendance" } },
       { path: "analytics", element: AdminProtectedWrapper(Analytics), handle: { title: "Analytics" } },
@@ -107,7 +122,7 @@ const router = createBrowserRouter([
       { path: "settings", element: SuperAdminProtectedWrapper(Settings), handle: { title: "Settings" } },
       { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
       { path: "airbase", element: AdminProtectedWrapper(AirbaseOverview), handle: { title: "Airbase Overview" } },
-      { path: "airbase/arcens", element: AdminProtectedWrapper(ManageArcens), handle: { title: "Manage Arcens" } },
+      { path: "airbase/arcens", element: SuperAdminProtectedWrapper(ManageArcens), handle: { title: "Manage Arcens" } },
       { path: "airbase/groups", element: AdminProtectedWrapper(ManageGroups), handle: { title: "Manage Groups" } },
       { path: "airbase/squadrons", element: AdminProtectedWrapper(ManageSquadrons), handle: { title: "Manage Squadrons" } },
     ],

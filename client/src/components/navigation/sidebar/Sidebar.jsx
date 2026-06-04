@@ -77,7 +77,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
            )}
          >
            <img
-             src="/AirForce-logo.png"
+             src="/8th_ARCEN.png"
              alt="Air Force Logo"
              className={cn(
                "h-9 w-9 shrink-0",

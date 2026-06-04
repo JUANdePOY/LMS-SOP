@@ -37,8 +37,14 @@ export default function ManageSquadrons() {
   const { user } = useAuth();
   const { addToast: toast } = useToast();
 
-  // admin and admin_arsen can mutate; admin_squadron is read-only
-  const canMutate = user?.role === "admin" || user?.role === "admin_arsen";
+  // admin, admin_arsen, and admin_group can all mutate squadrons per RBAC_WORKFLOW.md.
+  // admin_squadron is read-only (they can view but not create/edit/delete).
+  const canMutate = user?.role === "admin" || user?.role === "admin_arsen" || user?.role === "admin_group";
+
+  // Scope helpers — used to restrict dropdowns so unit admins cannot assign
+  // squadrons outside their authorised scope.
+  const isArsenAdmin  = user?.role === "admin_arsen";
+  const isGroupAdmin  = user?.role === "admin_group";
 
   const [data,          setData]          = useState([]);
   const [groupOptions,  setGroupOptions]  = useState([]);
@@ -95,17 +101,29 @@ export default function ManageSquadrons() {
     try {
       const response = await getGroupsList();
       if (response.data.status === "success") {
-        setGroupOptions(
-          response.data.data.map((g) => ({
-            value:     String(g.id),
-            label:     `${g.name} — ${g.arsen_name || ""}`,
-            groupName: g.name,
-            groupCode: g.code,
-            arcenId:   String(g.arsen_id),   // FIX: was missing; needed for ARCEN-scoped group filter
-            arcenName: g.arsen_name || "",
-            arcenCode: g.arsen_code || "",
-          }))
-        );
+        let options = response.data.data.map((g) => ({
+          value:     String(g.id),
+          label:     `${g.name} — ${g.arsen_name || ""}`,
+          groupName: g.name,
+          groupCode: g.code,
+          arcenId:   String(g.arsen_id),   // FIX: was missing; needed for ARCEN-scoped group filter
+          arcenName: g.arsen_name || "",
+          arcenCode: g.arsen_code || "",
+        }));
+
+        // admin_group can only assign squadrons within their own group
+        if (isGroupAdmin && user?.scope_group_id) {
+          options = options.filter((o) => o.value === String(user.scope_group_id));
+        }
+        // admin_arsen can only assign squadrons within their ARSEN's groups
+        else if (isArsenAdmin && user?.scope_arsen_id) {
+          options = options.filter((o) => {
+            const group = response.data.data.find((g) => String(g.id) === o.value);
+            return group && String(group.arsen_id) === String(user.scope_arsen_id);
+          });
+        }
+
+        setGroupOptions(options);
       }
     } catch (err) {
       console.error("Failed to fetch groups:", err);
@@ -170,7 +188,11 @@ export default function ManageSquadrons() {
 
   // ─── Modal helpers ──────────────────────────────────────────────────────────
   const openAdd = () => {
-    setForm(EMPTY_FORM);
+    // Pre-fill groupId for admin_group — they can only create squadrons in their own group
+    const defaultGroupId = isGroupAdmin && user?.scope_group_id
+      ? String(user.scope_group_id)
+      : "";
+    setForm({ ...EMPTY_FORM, groupId: defaultGroupId });
     setErrors({});
     setApiError(null);
     setEditMode("add");

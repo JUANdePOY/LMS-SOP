@@ -10,6 +10,7 @@ import { StatusBadge, MonoCode, PrimaryButton } from "@/components/airbase/Airba
 import AddEditModal, { FormField, FormInput, FormSelect } from "@/components/airbase/AddEditModal";
 import DetailModal, { DetailSection, DetailRow, DetailStatCard } from "@/components/airbase/DetailModal";
 import { getGroups, createArsen, updateArsen, deleteArsen } from "@/services/api";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/Toast";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
@@ -27,6 +28,11 @@ const COLUMNS = [
 ];
 
 export default function ManageArcens() {
+  const { user } = useAuth();
+  // ARSENs can only be created/edited/deleted by the super admin (role === 'admin')
+  // per RBAC_WORKFLOW.md — all other roles (including admin_arsen) are read-only here
+  const canMutate = user?.role === "admin";
+
   const [data, setData] = useState([]);
   const [detail, setDetail] = useState(null);
   const [editModal, setEditModal] = useState(false);
@@ -211,7 +217,9 @@ export default function ManageArcens() {
   return (
     <div className="flex flex-col gap-6 pb-10">
       <div className="flex justify-end">
-        <PrimaryButton icon={Plus} onClick={openAdd}>Add ARCEN</PrimaryButton>
+        {canMutate && (
+          <PrimaryButton icon={Plus} onClick={openAdd}>Add ARCEN</PrimaryButton>
+        )}
       </div>
 
       {/* Stats */}
@@ -278,52 +286,54 @@ export default function ManageArcens() {
           badge={detail.code}
           size="lg"
           footer={
-            <div className="flex items-center justify-between w-full">
-              {/* Left - destructive */}
-              <button
-                onClick={() => openDeleteDialog(detail)}
-                className={cn(
-                  "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium",
-                  "border-red-200 dark:border-red-500/30",
-                  "text-red-600 dark:text-red-400",
-                  "hover:bg-red-50 dark:hover:bg-red-500/10",
-                  "transition-all duration-150"
-                )}
-              >
-                <Trash2 size={14} /> Delete
-              </button>
-
-              {/* Right - secondary + primary */}
-              <div className="flex items-center gap-2">
+            canMutate && (
+              <div className="flex items-center justify-between w-full">
+                {/* Left - destructive */}
                 <button
-                  onClick={() => toggleStatus(detail)}
+                  onClick={() => openDeleteDialog(detail)}
                   className={cn(
                     "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium",
-                    "border-neutral-200 dark:border-neutral-700",
-                    "text-neutral-600 dark:text-neutral-400",
-                    "hover:bg-neutral-50 dark:hover:bg-neutral-800",
+                    "border-red-200 dark:border-red-500/30",
+                    "text-red-600 dark:text-red-400",
+                    "hover:bg-red-50 dark:hover:bg-red-500/10",
                     "transition-all duration-150"
                   )}
                 >
-                  {detail.status === "active"
-                    ? <><ToggleRight size={14} className="text-emerald-500" /> Deactivate</>
-                    : <><ToggleLeft  size={14} className="text-neutral-400" /> Activate</>
-                  }
+                  <Trash2 size={14} /> Delete
                 </button>
-                <button
-                  onClick={() => openEdit(detail)}
-                  className={cn(
-                    "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold",
-                    "bg-indigo-600 text-white",
-                    "hover:bg-indigo-700 active:bg-indigo-800",
-                    "shadow-sm shadow-indigo-200 dark:shadow-indigo-900/30",
-                    "transition-all duration-150"
-                  )}
-                >
-                  <Pencil size={14} /> Edit ARCEN
-                </button>
+
+                {/* Right - secondary + primary */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => toggleStatus(detail)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium",
+                      "border-neutral-200 dark:border-neutral-700",
+                      "text-neutral-600 dark:text-neutral-400",
+                      "hover:bg-neutral-50 dark:hover:bg-neutral-800",
+                      "transition-all duration-150"
+                    )}
+                  >
+                    {detail.status === "active"
+                      ? <><ToggleRight size={14} className="text-emerald-500" /> Deactivate</>
+                      : <><ToggleLeft  size={14} className="text-neutral-400" /> Activate</>
+                    }
+                  </button>
+                  <button
+                    onClick={() => openEdit(detail)}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold",
+                      "bg-indigo-600 text-white",
+                      "hover:bg-indigo-700 active:bg-indigo-800",
+                      "shadow-sm shadow-indigo-200 dark:shadow-indigo-900/30",
+                      "transition-all duration-150"
+                    )}
+                  >
+                    <Pencil size={14} /> Edit ARCEN
+                  </button>
+                </div>
               </div>
-            </div>
+            )
           }
         >
           {/* Stats */}
@@ -397,4 +407,4 @@ export default function ManageArcens() {
       />
     </div>
   );
-}
+} 
