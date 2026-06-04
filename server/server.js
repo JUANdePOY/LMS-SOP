@@ -58,6 +58,16 @@ app.use('/api/hierarchy', hierarchyRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/map', mapRoutes);
 
+// Serve React frontend build from client/dist
+const clientBuildPath = path.join(__dirname, '../client/dist');
+app.use(express.static(clientBuildPath));
+app.get('/*', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
