@@ -61,7 +61,7 @@ app.use('/api/map', mapRoutes);
 // Serve React frontend build from client/dist
 const clientBuildPath = path.join(__dirname, '../client/dist');
 app.use(express.static(clientBuildPath));
-app.get('/*', (req, res, next) => {
+app.use((req, res, next) => {
   if (req.path.startsWith('/api')) {
     return next();
   }
