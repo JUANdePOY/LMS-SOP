@@ -1,8 +1,7 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
-import { UserSquare, Plus, Loader, Upload, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Plus, Loader, Upload, Download } from "lucide-react";
 import { getReservists, createReservist, updateReservist, deleteReservist } from "@/services/api";
 import * as XLSX from "xlsx";
-import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
 import { PrimaryButton } from "@/components/airbase/AirbaseUI";
 import ReservistStatsBar    from "@/components/reservists/ReservistStatsBar";
 import ReservistTable       from "@/components/reservists/ReservistTable";
@@ -12,6 +11,8 @@ import BulkUploadModal from "@/components/reservists/BulkUploadModal";
 import ReservistDetailPanel from "@/components/reservists/ReservistDetailPanel";
 import SearchAndFilters, { DEFAULT_FILTERS } from "@/components/reservists/SearchAndFilters";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/Toast";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const EMPTY_FORM = {
   id: '', userId: '', assignmentId: '',
@@ -26,18 +27,20 @@ const EMPTY_FORM = {
   highestEducation: '', courseDegree: '', school: '', yearGraduated: '',
   employerCompany: '', officeAddress: '',
   basicTraining: '', basicTrainingDateCompleted: '',
+  statusBcmt: false, statusAdt: false, statusVadt: false, statusRotc: false, statusOthers: '',
   emergencyContactName: '', emergencyContactNumber: '', emergencyContactAddress: '',
 };
 
 export default function Reservists() {
   const { user } = useAuth();
-  // Per RBAC_WORKFLOW.md: POST/PUT/DELETE reservists is admin-only.
-  // admin_arsen and admin_group can VIEW the list but cannot create, edit, or delete.
-  const canMutate = user?.role === "admin";
+  const { addToast } = useToast();
+  // Per RBAC_WORKFLOW.md: POST/PUT/DELETE/bulk-upload reservists is allowed for
+  // admin (super admin) and admin_arsen (manages reservists within their ARSEN scope).
+  // admin_group and admin_squadron can VIEW the list but cannot create, edit, or delete.
+  const canMutate = user?.role === "admin" || user?.role === "admin_arsen";
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [modal, setModal] = useState({ open: false, mode: "add", row: null });
@@ -48,6 +51,7 @@ export default function Reservists() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, id: null });
 
   const formatDate = (val) => {
     if (!val) return '';
@@ -100,6 +104,11 @@ export default function Reservists() {
       officeAddress: r.office_address || '',
       basicTraining: r.basic_training_completed || '',
       basicTrainingDateCompleted: formatDate(r.basic_training_date),
+      statusBcmt: !!r.status_bcmt,
+      statusAdt: !!r.status_adt,
+      statusVadt: !!r.status_vadt,
+      statusRotc: !!r.status_rotc,
+      statusOthers: r.status_others || '',
       emergencyContactName: r.emergency_contact_name || '',
       emergencyContactNumber: r.emergency_contact_phone || '',
       emergencyContactAddress: r.emergency_contact_address || '',
@@ -119,7 +128,6 @@ export default function Reservists() {
 
   const loadReservists = async (page = 1) => {
     setLoading(true);
-    setError(null);
     setCurrentPage(page);
     try {
       const params = { page, limit: 100 };
@@ -146,7 +154,7 @@ export default function Reservists() {
         setTotalCount(response.data.pagination?.total || 0);
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load reservists');
+      addToast(err.response?.data?.message || 'Failed to load reservists', 'error');
     } finally {
       setLoading(false);
     }
@@ -241,7 +249,7 @@ export default function Reservists() {
 
   const closeModal = () => setModal((m) => ({ ...m, open: false }));
 
-  const handleSubmit = async () => {
+const handleSubmit = async () => {
     try {
       if (modal.mode === "add") {
         const requestData = {
@@ -256,75 +264,87 @@ export default function Reservists() {
           address: form.address,
           specialization: form.specialization,
           occupation: form.civilOccupation,
-          date_of_birth: form.dateOfBirth,
-          place_of_birth: form.placeOfBirth,
+          date_of_birth: form.dateOfBirth || null,
+          place_of_birth: form.placeOfBirth || null,
           age: form.age ? parseInt(form.age, 10) : null,
-          sex: form.sex,
-          civil_status: form.civilStatus,
-          citizenship: form.citizenship,
+          sex: form.sex || null,
+          civil_status: form.civilStatus || null,
+          citizenship: form.citizenship || 'Filipino',
           height: form.height ? parseFloat(form.height) : null,
           weight: form.weight ? parseFloat(form.weight) : null,
-          blood_type: form.bloodType,
-          reserve_center: form.reserveCenter,
-          category: form.category,
-          date_enlisted: form.dateEnlisted,
-          source_of_commission: form.sourceOfCommission,
-          rank_date_appointment: form.rankDateOfAppointment,
-          reserve_status: form.reserveStatus,
-          highest_education: form.highestEducation,
-          course_degree: form.courseDegree,
-          school: form.school,
+          blood_type: form.bloodType || null,
+          reserve_center: form.reserveCenter || null,
+          category: form.category || null,
+          date_enlisted: form.dateEnlisted || null,
+          source_of_commission: form.sourceOfCommission || null,
+          rank_date_appointment: form.rankDateOfAppointment || null,
+          reserve_status: form.reserveStatus || 'Ready Reserve',
+          highest_education: form.highestEducation || null,
+          course_degree: form.courseDegree || null,
+          school: form.school || null,
           year_graduated: form.yearGraduated ? parseInt(form.yearGraduated, 10) : null,
-          employer: form.employerCompany,
-          office_address: form.officeAddress,
-          basic_training_completed: form.basicTraining,
-          basic_training_date: form.basicTrainingDateCompleted,
-          emergency_contact_name: form.emergencyContactName,
-          emergency_contact_phone: form.emergencyContactNumber,
-          emergency_contact_address: form.emergencyContactAddress,
+          employer: form.employerCompany || null,
+          office_address: form.officeAddress || null,
+          basic_training_completed: form.basicTraining || null,
+          basic_training_date: form.basicTrainingDateCompleted || null,
+          status_bcmt: form.statusBcmt ? 1 : 0,
+          status_adt: form.statusAdt ? 1 : 0,
+          status_vadt: form.statusVadt ? 1 : 0,
+          status_rotc: form.statusRotc ? 1 : 0,
+          status_others: form.statusOthers || null,
+          emergency_contact_name: form.emergencyContactName || null,
+          emergency_contact_phone: form.emergencyContactPhone || null,
+          emergency_contact_address: form.emergencyContactAddress || null,
         };
 
         const response = await createReservist(requestData);
         if (response.data.status === 'success') {
           setData((prev) => [...prev, transformReservistData([response.data.data])[0]]);
+          addToast('Reservist created successfully', 'success');
         }
       } else {
-        const response = await updateReservist(modal.row.id, {
-          first_name: form.firstName,
-          last_name: form.lastName,
-          rank: form.rank,
-          position: form.position,
-          phone_number: form.contact,
-          address: form.address,
-          specialization: form.specialization,
-          occupation: form.civilOccupation,
-          date_of_birth: form.dateOfBirth,
-          place_of_birth: form.placeOfBirth,
+        const requestData = {
+          first_name: form.firstName || null,
+          last_name: form.lastName || null,
+          rank: form.rank || null,
+          position: form.position || null,
+          phone_number: form.contact || null,
+          address: form.address || null,
+          specialization: form.specialization || null,
+          occupation: form.civilOccupation || null,
+          date_of_birth: form.dateOfBirth || null,
+          place_of_birth: form.placeOfBirth || null,
           age: form.age ? parseInt(form.age, 10) : null,
-          sex: form.sex,
-          civil_status: form.civilStatus,
-          citizenship: form.citizenship,
+          sex: form.sex || null,
+          civil_status: form.civilStatus || null,
+          citizenship: form.citizenship || 'Filipino',
           height: form.height ? parseFloat(form.height) : null,
           weight: form.weight ? parseFloat(form.weight) : null,
-          blood_type: form.bloodType,
-          reserve_center: form.reserveCenter,
-          category: form.category,
-          date_enlisted: form.dateEnlisted,
-          source_of_commission: form.sourceOfCommission,
-          rank_date_appointment: form.rankDateOfAppointment,
-          reserve_status: form.reserveStatus,
-          highest_education: form.highestEducation,
-          course_degree: form.courseDegree,
-          school: form.school,
+          blood_type: form.bloodType || null,
+          reserve_center: form.reserveCenter || null,
+          category: form.category || null,
+          date_enlisted: form.dateEnlisted || null,
+          source_of_commission: form.sourceOfCommission || null,
+          rank_date_appointment: form.rankDateOfAppointment || null,
+          reserve_status: form.reserveStatus || 'Ready Reserve',
+          highest_education: form.highestEducation || null,
+          course_degree: form.courseDegree || null,
+          school: form.school || null,
           year_graduated: form.yearGraduated ? parseInt(form.yearGraduated, 10) : null,
-          employer: form.employerCompany,
-          office_address: form.officeAddress,
-          basic_training_completed: form.basicTraining,
-          basic_training_date: form.basicTrainingDateCompleted,
-          emergency_contact_name: form.emergencyContactName,
-          emergency_contact_phone: form.emergencyContactNumber,
-          emergency_contact_address: form.emergencyContactAddress,
-        });
+          employer: form.employerCompany || null,
+          office_address: form.officeAddress || null,
+          basic_training_completed: form.basicTraining || null,
+          basic_training_date: form.basicTrainingDateCompleted || null,
+          status_bcmt: form.statusBcmt ? 1 : 0,
+          status_adt: form.statusAdt ? 1 : 0,
+          status_vadt: form.statusVadt ? 1 : 0,
+          status_rotc: form.statusRotc ? 1 : 0,
+          status_others: form.statusOthers || null,
+          emergency_contact_name: form.emergencyContactName || null,
+          emergency_contact_phone: form.emergencyContactPhone || null,
+          emergency_contact_address: form.emergencyContactAddress || null,
+        };
+        const response = await updateReservist(modal.row.id, requestData);
         if (response.data.status === 'success') {
           const updatedReservist = transformReservistData([response.data.data])[0];
           setData((prev) =>
@@ -336,22 +356,34 @@ export default function Reservists() {
           if (viewRow?.id === modal.row.id) {
             setViewRow(updatedReservist);
           }
+          addToast('Reservist updated successfully', 'success');
         }
       }
       closeModal();
     } catch (err) {
-      setError(err.response?.data?.message || 'Operation failed');
+      const errorData = err.response?.data;
+      if (errorData?.errors && Array.isArray(errorData.errors)) {
+        addToast(errorData.errors.map(e => e.msg || e.path).join(', '), 'error');
+      } else {
+        addToast(errorData?.message || 'Operation failed', 'error');
+      }
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Delete this reservist? This action cannot be undone.")) return;
+    setDeleteConfirm({ open: true, id });
+  };
+
+  const confirmDelete = async () => {
+    const { id } = deleteConfirm;
+    setDeleteConfirm({ open: false, id: null });
     try {
       await deleteReservist(id);
       setData((prev) => prev.filter((r) => r.id !== id));
       if (detailRow?.id === id) setDetailRow(null);
+      addToast('Reservist deleted successfully', 'success');
     } catch (err) {
-      setError(err.response?.data?.message || 'Delete failed');
+      addToast(err.response?.data?.message || 'Delete failed', 'error');
     }
   };
 
@@ -371,9 +403,10 @@ export default function Reservists() {
         if (detailRow?.id === id) {
           setDetailRow(updatedReservist);
         }
+        addToast('Reservist status updated successfully', 'success');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Status update failed');
+      addToast(err.response?.data?.message || 'Status update failed', 'error');
     }
   };
 
@@ -404,12 +437,6 @@ export default function Reservists() {
       {loading && (
         <div className="flex h-40 items-center justify-center">
           <Loader className="h-6 w-6 animate-spin text-indigo-500" />
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded-md bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-800 dark:text-red-200">
-          {error}
         </div>
       )}
 
@@ -508,7 +535,17 @@ export default function Reservists() {
           <ReservistViewModal
             reservist={viewRow}
             onClose={() => setViewRow(null)}
-            onEdit={(row) => { setViewRow(null); openEdit(row); }}
+            onEdit={canMutate ? (row) => { setViewRow(null); openEdit(row); } : null}
+          />
+
+          <ConfirmDialog
+            open={deleteConfirm.open}
+            title="Delete Reservist"
+            description="This action cannot be undone. Are you sure you want to delete this reservist?"
+            confirmLabel="Delete"
+            destructive
+            onConfirm={confirmDelete}
+            onCancel={() => setDeleteConfirm({ open: false, id: null })}
           />
         </>
       )}

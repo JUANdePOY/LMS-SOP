@@ -36,7 +36,7 @@ This document describes the Role-Based Access Control (RBAC) system implemented 
 - `requireAdmin` - Any admin role can pass
 - `requireSuperAdmin` - Only `admin` role passes
 - `requireAdminOrHigher` - `admin`, `admin_arsen`, `admin_group` pass (for squadron data mutation)
-- `requireAdminArsenOrHigher` - `admin`, `admin_arsen` pass (for group management)
+- `requireAdminArsenOrHigher` - `admin`, `admin_arsen` pass (for reservist data mutation)
 
 ### 2. RBAC Middleware (`server/middleware/rbac.js`)
 
@@ -44,6 +44,7 @@ This document describes the Role-Based Access Control (RBAC) system implemented 
 - `authorize(...roles)` - Generic role check middleware
 - `requireAdmin` - Shorthand middleware for any admin role
 - `requireSuperAdmin` - Only super admin passes
+- `requireAdminArsenOrHigher` - `admin`, `admin_arsen` pass (for reservist mutations)
 - `checkOwnership(userIdField)` - Ownership verification (admins bypass)
 - `getUserScopeFilter(user, columns)` - Returns SQL WHERE conditions for scope filtering
 - `enforceScope(options)` - Middleware that sets `req.scopeFilter` for queries
@@ -129,10 +130,11 @@ if (req.user.role !== 'admin') {
 |-----------|---------------|---------------|
 | GET list | `admin`, `admin_arsen`, `admin_group` | Yes (non-admin) |
 | GET single | `admin` or self (`reservist`) | Yes (unit admin) |
-| POST | `admin` only | N/A |
-| PUT | `admin` only | N/A |
-| DELETE | `admin` only | N/A |
-| assign | `admin` only | N/A |
+| POST | `admin`, `admin_arsen` | Yes (admin_arsen scoped to their ARSEN) |
+| PUT | `admin`, `admin_arsen` | Yes (admin_arsen scoped to their ARSEN) |
+| DELETE | `admin`, `admin_arsen` | Yes (admin_arsen scoped to their ARSEN) |
+| assign | `admin`, `admin_arsen` | Yes (admin_arsen scoped to their ARSEN) |
+| bulk upload | `admin`, `admin_arsen` | Yes (admin_arsen scoped to their ARSEN) |
 
 ## Modification Guidelines
 
@@ -181,7 +183,11 @@ router.get('/', authenticateToken, async (req, res) => {
 
 ```jsx
 // Example: Conditional UI based on role
+// For reservists: admin and admin_arsen can mutate
 const canMutate = user?.role === 'admin' || user?.role === 'admin_arsen';
+
+// For groups: admin and admin_arsen can mutate
+const canManageGroups = user?.role === 'admin' || user?.role === 'admin_arsen';
 
 return (
   <>
