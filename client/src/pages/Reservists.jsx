@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import { Plus, Loader, Upload, Download } from "lucide-react";
 import { getReservists, createReservist, updateReservist, deleteReservist } from "@/services/api";
 import * as XLSX from "xlsx";
@@ -43,6 +44,11 @@ export default function Reservists() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  // Pending (un-committed) filter/search values — updated immediately for UI responsiveness
+  const [pendingSearch, setPendingSearch] = useState("");
+  const [pendingFilters, setPendingFilters] = useState(DEFAULT_FILTERS);
+  const debouncedSearch  = useDebounce(pendingSearch,  400);
+  const debouncedFilters = useDebounce(pendingFilters, 400);
   const [modal, setModal] = useState({ open: false, mode: "add", row: null });
   const [form, setForm] = useState(EMPTY_FORM);
   const [detailRow, setDetailRow] = useState(null);
@@ -51,6 +57,7 @@ export default function Reservists() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState({ total:0, active:0, inactive:0, standby:0, retired:0, ready:0, bcmt:0, adt:0, vadt:0, rotc:0 });
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, id: null });
 
   const formatDate = (val) => {
@@ -122,36 +129,44 @@ export default function Reservists() {
     }));
   };
 
+  // Debounce filter/search changes — wait 400 ms after the last change before fetching.
+  // This prevents an API call on every keystroke or every select interaction.
+  // useDebounce already delays these values by 400 ms — this effect fires
+  // only once the user has stopped typing/selecting for 400 ms.
   useEffect(() => {
-    loadReservists(1);
-  }, [search, filters]);
+    setSearch(debouncedSearch);
+    setFilters(debouncedFilters);
+    loadReservists(1, debouncedSearch, debouncedFilters);
+  }, [debouncedSearch, debouncedFilters]);
 
-  const loadReservists = async (page = 1) => {
+  const loadReservists = async (page = 1, searchOverride, filtersOverride) => {
     setLoading(true);
     setCurrentPage(page);
     try {
+      // Use override values when called from debounce (avoids stale closure),
+      // fall back to committed state for direct calls (pagination, post-save reload).
+      const f = filtersOverride ?? filters;
+      const q = searchOverride  ?? search;
       const params = { page, limit: 100 };
-      if (search) params.search = search;
-      if (filters.status && filters.status !== '' && filters.status !== 'all') params.status = filters.status;
-      if (filters.squadronId && filters.squadronId !== '') params.squadron_id = parseInt(filters.squadronId, 10);
-      if (filters.groupId && filters.groupId !== '') params.group_id = parseInt(filters.groupId, 10);
-      if (filters.rank && filters.rank !== '') params.rank = filters.rank;
-      if (filters.reserveStatus && filters.reserveStatus !== '') params.reserve_status = filters.reserveStatus;
-      if (filters.airbase && filters.airbase !== '') params.airbase = filters.airbase;
-      if (filters.arcen && filters.arcen !== '') params.arcen = filters.arcen;
-      if (filters.group && filters.group !== '') params.group = filters.group;
-      if (filters.squadron && filters.squadron !== '') params.squadron = filters.squadron;
-      if (filters.specialization && filters.specialization !== '') params.specialization = filters.specialization;
-      if (filters.category && filters.category !== '') params.category = filters.category;
-      if (filters.sourceOfCommission && filters.sourceOfCommission !== '') params.sourceOfCommission = filters.sourceOfCommission;
-      if (filters.bloodType && filters.bloodType !== '') params.bloodType = filters.bloodType;
-      if (filters.sex && filters.sex !== '') params.sex = filters.sex;
-      if (filters.civilStatus && filters.civilStatus !== '') params.civilStatus = filters.civilStatus;
+      if (q)                                        params.search             = q;
+      if (f.status          && f.status !== 'all') params.status             = f.status;
+      if (f.arsenId)                               params.arsen_id           = parseInt(f.arsenId, 10);
+      if (f.groupId)                               params.group_id           = parseInt(f.groupId, 10);
+      if (f.squadronId)                            params.squadron_id        = parseInt(f.squadronId, 10);
+      if (f.rank)                                  params.rank               = f.rank;
+      if (f.reserveStatus)                         params.reserve_status     = f.reserveStatus;
+      if (f.specialization)                        params.specialization     = f.specialization;
+      if (f.category)                              params.category           = f.category;
+      if (f.sourceOfCommission)                    params.sourceOfCommission = f.sourceOfCommission;
+      if (f.bloodType)                             params.bloodType          = f.bloodType;
+      if (f.sex)                                   params.sex                = f.sex;
+      if (f.civilStatus)                           params.civilStatus        = f.civilStatus;
       const response = await getReservists(params);
       if (response.data.status === 'success') {
         setData(transformReservistData(response.data.data));
         setTotalPages(response.data.pagination?.pages || 1);
         setTotalCount(response.data.pagination?.total || 0);
+        if (response.data.stats) setStats(response.data.stats);
       }
     } catch (err) {
       addToast(err.response?.data?.message || 'Failed to load reservists', 'error');
@@ -160,34 +175,9 @@ export default function Reservists() {
     }
   };
 
-  const filteredData = useMemo(() => {
-    return data.filter((r) => {
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        const match =
-          r.firstName?.toLowerCase().includes(q) ||
-          r.lastName?.toLowerCase().includes(q)  ||
-          r.serialNo?.toLowerCase().includes(q)  ||
-          r.rank?.toLowerCase().includes(q)      ||
-          r.squadron?.toLowerCase().includes(q);
-        if (!match) return false;
-      }
-      if (filters.airbase        && r.airbase        !== filters.airbase)        return false;
-      if (filters.arcen          && r.arcen          !== filters.arcen)          return false;
-      if (filters.group          && r.group          !== filters.group)          return false;
-      if (filters.squadron       && r.squadron       !== filters.squadron)       return false;
-      if (filters.rank           && r.rank           !== filters.rank)           return false;
-      if (filters.specialization && r.specialization !== filters.specialization) return false;
-      if (filters.status         && r.status         !== filters.status)         return false;
-      if (filters.category       && r.category       !== filters.category)       return false;
-      if (filters.sourceOfCommission && r.sourceOfCommission !== filters.sourceOfCommission) return false;
-      if (filters.bloodType      && r.bloodType      !== filters.bloodType)      return false;
-      if (filters.sex            && r.sex            !== filters.sex)            return false;
-      if (filters.civilStatus    && r.civilStatus    !== filters.civilStatus)    return false;
-      if (filters.reserveStatus  && r.reserveStatus  !== filters.reserveStatus)  return false;
-      return true;
-    });
-  }, [data, search, filters]);
+  // Server handles all filtering — data already contains only matching records.
+  // Keep filteredData as an alias so downstream JSX needs no changes.
+  const filteredData = data;
 
   const openAdd = () => {
     setForm(EMPTY_FORM);
@@ -238,6 +228,11 @@ export default function Reservists() {
       officeAddress: row.officeAddress || '',
       basicTraining: row.basicTraining || '',
       basicTrainingDateCompleted: row.basicTrainingDateCompleted || '',
+      statusBcmt: !!row.statusBcmt,
+      statusAdt: !!row.statusAdt,
+      statusVadt: !!row.statusVadt,
+      statusRotc: !!row.statusRotc,
+      statusOthers: row.statusOthers || '',
       emergencyContactName: row.emergencyContactName || '',
       emergencyContactNumber: row.emergencyContactNumber || '',
       emergencyContactAddress: row.emergencyContactAddress || '',
@@ -293,7 +288,7 @@ const handleSubmit = async () => {
           status_rotc: form.statusRotc ? 1 : 0,
           status_others: form.statusOthers || null,
           emergency_contact_name: form.emergencyContactName || null,
-          emergency_contact_phone: form.emergencyContactPhone || null,
+          emergency_contact_phone: form.emergencyContactNumber || null,
           emergency_contact_address: form.emergencyContactAddress || null,
         };
 
@@ -341,21 +336,19 @@ const handleSubmit = async () => {
           status_rotc: form.statusRotc ? 1 : 0,
           status_others: form.statusOthers || null,
           emergency_contact_name: form.emergencyContactName || null,
-          emergency_contact_phone: form.emergencyContactPhone || null,
+          emergency_contact_phone: form.emergencyContactNumber || null,
           emergency_contact_address: form.emergencyContactAddress || null,
         };
         const response = await updateReservist(modal.row.id, requestData);
         if (response.data.status === 'success') {
+          // Re-fetch the full list so state is always sourced from the server.
+          // Avoids stale-closure / partial-response bugs where optimistic updates
+          // show missing assignment fields (squadron, group, arcen, airbase) until refresh.
           const updatedReservist = transformReservistData([response.data.data])[0];
-          setData((prev) =>
-            prev.map((r) => r.id === modal.row.id ? updatedReservist : r)
-          );
-          if (detailRow?.id === modal.row.id) {
-            setDetailRow(updatedReservist);
-          }
-          if (viewRow?.id === modal.row.id) {
-            setViewRow(updatedReservist);
-          }
+          await loadReservists(currentPage);
+          // Sync open panels to the freshly-loaded record.
+          if (detailRow?.id === modal.row.id) setDetailRow(updatedReservist);
+          if (viewRow?.id === modal.row.id) setViewRow(updatedReservist);
           addToast('Reservist updated successfully', 'success');
         }
       }
@@ -395,14 +388,8 @@ const handleSubmit = async () => {
       });
       if (response.data.status === 'success') {
         const updatedReservist = transformReservistData([response.data.data])[0];
-        setData((prev) =>
-          prev.map((r) =>
-            r.id === id ? updatedReservist : r
-          )
-        );
-        if (detailRow?.id === id) {
-          setDetailRow(updatedReservist);
-        }
+        await loadReservists(currentPage);
+        if (detailRow?.id === id) setDetailRow(updatedReservist);
         addToast('Reservist status updated successfully', 'success');
       }
     } catch (err) {
@@ -461,13 +448,13 @@ const handleSubmit = async () => {
               )}
             </div>
 
-            <ReservistStatsBar data={data} />
+            <ReservistStatsBar stats={stats} />
 
 <SearchAndFilters
-              search={search}
-              onSearchChange={setSearch}
-              filters={filters}
-              onFiltersChange={setFilters}
+              search={pendingSearch}
+              onSearchChange={setPendingSearch}
+              filters={pendingFilters}
+              onFiltersChange={setPendingFilters}
               resultCount={filteredData.length}
             />
 
