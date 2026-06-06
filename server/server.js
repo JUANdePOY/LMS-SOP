@@ -17,12 +17,10 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, origin);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, allowedOrigins[0]);
     }
   },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['X-CSRF-Token', 'X-Requested-With', 'Accept', 'Accept-Version', 'Content-Length', 'Content-MD5', 'Content-Type', 'Date', 'X-Api-Version', 'Authorization']
+  credentials: true
 }));
 
 app.use(express.json({ limit: '50mb' }));
@@ -103,6 +101,7 @@ app.use((err, req, res, next) => {
 
 // 404 handler
 app.use((req, res) => {
+  console.log(`404: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
     status: 'error',
     message: 'Endpoint not found',
