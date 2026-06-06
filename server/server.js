@@ -10,7 +10,7 @@ const app = express();
 // Middleware
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',')
-  : ['*'];
+  : ['https://pafr-1prk.vercel.app', 'https://pafr.vercel.app'];
 
 app.use(cors({
   origin: allowedOrigins,
