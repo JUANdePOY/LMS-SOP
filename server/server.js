@@ -58,15 +58,17 @@ app.use('/api/hierarchy', hierarchyRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/map', mapRoutes);
 
-// Serve React frontend build from client/dist
-const clientBuildPath = path.join(__dirname, '../client/dist');
-app.use(express.static(clientBuildPath));
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api')) {
-    return next();
-  }
-  res.sendFile(path.join(clientBuildPath, 'index.html'));
-});
+// Only serve static assets in combined deployment (non-serverless)
+if (!process.env.VERCEL) {
+  const clientBuildPath = path.join(__dirname, '../client/dist');
+  app.use(express.static(clientBuildPath));
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -94,8 +96,10 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`PAFR Server running on port ${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`PAFR Server running on port ${PORT}`);
+  });
+}
 
 module.exports = app;

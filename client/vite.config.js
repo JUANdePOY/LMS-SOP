@@ -15,12 +15,13 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: apiTarget,
+        target: "http://localhost:5000",
         changeOrigin: true,
         secure: false,
       },
     },
   },
+  base: "./",
   build: {
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
