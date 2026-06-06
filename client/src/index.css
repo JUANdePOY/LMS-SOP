@@ -359,7 +359,7 @@
 
   .login-eye-btn:hover { color: var(--bg-sidebar); }
 
-  /* Submit button — full-width solid navy (matches screenshot's "Sign In") */
+  /* Submit button — full-width solid navy */
   .login-btn {
     display: flex;
     align-items: center;
@@ -415,29 +415,6 @@
   .login-footer-text strong {
     color: var(--bg-sidebar);
     font-weight: 600;
-  }
-
-  /* "Back home" pill button — mirrors screenshot */
-  .login-back-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.375rem;
-    padding: 0.45rem 1.125rem;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background-color: var(--bg-surface);
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: var(--text-primary);
-    text-decoration: none;
-    cursor: pointer;
-    transition: box-shadow 0.15s ease, transform 0.15s ease, background-color 0.15s ease;
-  }
-
-  .login-back-btn:hover {
-    background-color: var(--bg-surface);
-    box-shadow: var(--shadow-sm);
-    transform: translateY(-1px);
   }
 
   /* ── Page footer (below card) ── */

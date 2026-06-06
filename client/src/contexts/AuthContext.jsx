@@ -33,7 +33,7 @@ export function AuthProvider({ children }) {
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/login', { id_number, password });
+      const response = await api.post('/auth/login', { id_number, password }, { skipAuthRedirect: true });
 
       if (response.data.status === 'success') {
         const { token, user: userData } = response.data.data;
@@ -50,7 +50,17 @@ export function AuthProvider({ children }) {
     } catch (err) {
       const message = err.response?.data?.message || err.message || 'Login failed';
       setError(message);
-      return { success: false, error: message };
+      const rateLimitData = {};
+      if (err.response?.status === 429) {
+        rateLimitData.attemptsRemaining = 0;
+        rateLimitData.cooldownSeconds = parseInt(err.response.headers['retry-after'] || '900', 10);
+      } else if (err.response?.headers) {
+        const remaining = err.response.headers['x-ratelimit-remaining'];
+        if (remaining !== undefined) {
+          rateLimitData.attemptsRemaining = parseInt(remaining, 10);
+        }
+      }
+      return { success: false, error: message, rateLimit: Object.keys(rateLimitData).length ? rateLimitData : undefined };
     } finally {
       setLoading(false);
     }

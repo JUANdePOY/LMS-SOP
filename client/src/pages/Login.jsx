@@ -17,6 +17,9 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [attemptsRemaining, setAttemptsRemaining] = useState(5);
+  const [cooldownEndsAt, setCooldownEndsAt] = useState(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
   useEffect(() => {
     if (isAuthenticated && !authLoading && user?.role) {
@@ -24,6 +27,48 @@ export default function Login() {
       navigate(redirectPath, { replace: true });
     }
   }, [isAuthenticated, authLoading, navigate, user?.role]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('loginRateLimit');
+      if (!stored) return;
+      const data = JSON.parse(stored);
+      if (data.cooldownEndsAt && Date.now() < data.cooldownEndsAt) {
+        setCooldownEndsAt(data.cooldownEndsAt);
+        setCooldownSeconds(Math.max(0, Math.ceil((data.cooldownEndsAt - Date.now()) / 1000)));
+        setAttemptsRemaining(0);
+      } else if (data.attemptsRemaining !== undefined && data.attemptsRemaining > 0) {
+        setAttemptsRemaining(data.attemptsRemaining);
+      } else {
+        localStorage.removeItem('loginRateLimit');
+      }
+    } catch (e) {
+      localStorage.removeItem('loginRateLimit');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!cooldownEndsAt) return;
+    const timer = setInterval(() => {
+      const totalSeconds = Math.max(0, Math.ceil((cooldownEndsAt - Date.now()) / 1000));
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      setCooldownSeconds(totalSeconds);
+      if (totalSeconds <= 0) {
+        clearInterval(timer);
+        setCooldownEndsAt(null);
+        setAttemptsRemaining(5);
+        localStorage.removeItem('loginRateLimit');
+      }
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownEndsAt]);
+
+  useEffect(() => {
+    if (cooldownEndsAt || attemptsRemaining < 5) {
+      localStorage.setItem('loginRateLimit', JSON.stringify({ cooldownEndsAt, attemptsRemaining }));
+    }
+  }, [cooldownEndsAt, attemptsRemaining]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,15 +81,32 @@ export default function Login() {
       return;
     }
 
-    const result = await login(id_number, password);
+  const result = await login(id_number, password);
 
-    if (result.success) {
-      const redirectPath = ADMIN_ROLES.includes(result.user?.role) ? '/' : '/landing';
-      navigate(redirectPath, { replace: true });
-    } else {
-      setError(result.error || 'Login failed. Please try again.');
-      setLoading(false);
+  if (result.success) {
+    const redirectPath = ADMIN_ROLES.includes(result.user?.role) ? '/' : '/landing';
+    navigate(redirectPath, { replace: true });
+  } else {
+    setError(result.error || 'Login failed. Please try again.');
+    if (result.rateLimit) {
+      const rateLimitData = {};
+      if (result.rateLimit.attemptsRemaining !== undefined) {
+        rateLimitData.attemptsRemaining = result.rateLimit.attemptsRemaining;
+      }
+      if (result.rateLimit.cooldownSeconds) {
+        const endsAt = Date.now() + result.rateLimit.cooldownSeconds * 1000;
+        rateLimitData.cooldownEndsAt = endsAt;
+        setCooldownEndsAt(endsAt);
+        setCooldownSeconds(result.rateLimit.cooldownSeconds);
+      } else {
+        setAttemptsRemaining(result.rateLimit.attemptsRemaining);
+      }
+      if (Object.keys(rateLimitData).length) {
+        localStorage.setItem('loginRateLimit', JSON.stringify(rateLimitData));
+      }
     }
+    setLoading(false);
+  }
   };
 
   return (
@@ -128,16 +190,28 @@ export default function Login() {
               </div>
 
               {/* Submit */}
-              <button type="submit" disabled={loading} className="login-btn">
+              <button
+                type="submit"
+                disabled={loading || attemptsRemaining === 0 || Boolean(cooldownEndsAt)}
+                className="login-btn"
+              >
                 {loading ? (
                   <>
                     <Loader className="h-4 w-4 animate-spin" />
                     <span>Signing in…</span>
                   </>
-                ) : (
+                ) : cooldownEndsAt ? (() => {
+                  const mins = Math.floor(cooldownSeconds / 60);
+                  const secs = cooldownSeconds % 60;
+                  return <span>Try again in {mins}:{String(secs).padStart(2, '0')}</span>;
+                })() : (
                   'Sign In'
                 )}
               </button>
+
+              {attemptsRemaining <= 2 && attemptsRemaining > 0 && !cooldownEndsAt && (
+                <p className="login-warning">{attemptsRemaining} attempt{attemptsRemaining === 1 ? '' : 's'} remaining before temporary lockout</p>
+              )}
 
             </form>
           </div>

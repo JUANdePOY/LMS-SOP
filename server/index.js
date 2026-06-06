@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const loginLimiter = require('./middleware/rateLimiter');
 const dotenv = require('dotenv');
 const authRoutes = require('./routes/auth');
 const trainingsRoutes = require('./routes/trainings');
@@ -26,7 +27,7 @@ app.get('/health', (req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', loginLimiter, authRoutes);
 app.use('/api', organizationRouter);
 app.use('/api/trainings', trainingsRoutes);
 app.use('/api/announcements', announcementsRoutes);

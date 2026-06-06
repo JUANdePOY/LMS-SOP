@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const loginLimiter = require('./middleware/rateLimiter');
 require('dotenv').config();
 
 console.log('SERVER STARTING - Loading updated code...');
@@ -36,7 +37,7 @@ const announcementsRoutes = require('./routes/announcements');
 const mapRoutes = require('./routes/map');
 
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', loginLimiter, authRoutes);
 app.use('/api/reservists', reservistsRoutes);
 app.use('/api/arsens', arsentsRoutes);
 app.use('/api/groups', groupsRoutes);
