@@ -2,12 +2,17 @@
   "name": "airforce",
   "private": true,
   "version": "0.0.0",
+  "type": "module",
   "engines": {
     "node": ">=18.x"
   },
   "scripts": {
     "postinstall": "cd client && npm install",
-    "build": "cd client && npx vite build",
+    "build": "cd client && node ../node_modules/vite/bin/vite.js build",
     "start": "cd server && npm start"
+  },
+  "dependencies": {
+    "vite": "^5.4.1",
+    "@vitejs/plugin-react": "^4.3.1"
   }
 }
