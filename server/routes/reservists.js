@@ -1468,7 +1468,7 @@ router.post(
  * admin_arsen: can only upload into their own ARSEN
  */
 const multer = require('multer');
-const XLSX = require('xlsx');
+const Excel = require('exceljs');
 
 // Configure multer for file uploads
 const upload = multer({
@@ -1555,11 +1555,19 @@ router.post(
         }
       }
 
-      // Parse Excel file
-      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-      const sheetNames = workbook.SheetNames;
+      // Parse Excel/CSV file
+      const workbook = new Excel.Workbook();
+      if (req.file.mimetype === 'text/csv') {
+        const worksheet = workbook.addWorksheet('CSV');
+        const csvRows = req.file.buffer.toString('utf8').trim().split('\n');
+        csvRows.forEach(row => {
+          worksheet.addRow(row.split(','));
+        });
+      } else {
+        await workbook.xlsx.load(req.file.buffer);
+      }
 
-      if (sheetNames.length === 0) {
+      if (workbook.worksheets.length === 0) {
         return res.status(400).json({
           status: 'error',
           message: 'Excel file has no sheets',
@@ -1576,11 +1584,13 @@ router.post(
       const errors = [];
 
       // Process first sheet only
-      const sheetName = sheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
+      const worksheet = workbook.worksheets[0];
 
       // Find the correct header row by looking for expected column names
-      const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      const rawRows = [];
+      worksheet.eachRow({ includeEmpty: true }, (row) => {
+        rawRows.push(row.values.slice(1));
+      });
       let headerRowIndex = 0;
       for (let i = 0; i < rawRows.length; i++) {
         const row = rawRows[i];
@@ -1796,10 +1806,18 @@ router.post(
         });
       }
 
-      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-      const sheetNames = workbook.SheetNames;
+      const workbook = new Excel.Workbook();
+      if (req.file.mimetype === 'text/csv') {
+        const worksheet = workbook.addWorksheet('CSV');
+        const csvRows = req.file.buffer.toString('utf8').trim().split('\n');
+        csvRows.forEach(row => {
+          worksheet.addRow(row.split(','));
+        });
+      } else {
+        await workbook.xlsx.load(req.file.buffer);
+      }
 
-      if (sheetNames.length === 0) {
+      if (workbook.worksheets.length === 0) {
         return res.status(400).json({
           status: 'error',
           message: 'Excel file has no sheets',
@@ -1851,11 +1869,12 @@ router.post(
       let failureCount = 0;
       const errors = [];
 
-      for (let sheetIndex = 0; sheetIndex < sheetNames.length; sheetIndex++) {
-        const sheetName = sheetNames[sheetIndex];
-        const worksheet = workbook.Sheets[sheetName];
+      for (const worksheet of workbook.worksheets) {
+        const rawRows = [];
+        worksheet.eachRow({ includeEmpty: true }, (row) => {
+          rawRows.push(row.values.slice(1));
+        });
 
-        const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         let headerRowIndex = 0;
         for (let i = 0; i < rawRows.length; i++) {
           const row = rawRows[i];

@@ -55,13 +55,14 @@ export default function AttendanceList({
     }
   }, [participants]);
 
-  const handleStatusChange = async (attendanceId, reservistId, newStatus) => {
-    setUpdatingId(attendanceId || reservistId);
+  const handleStatusChange = async (attendanceId, reservistId, registrationId, newStatus) => {
+    setUpdatingId(attendanceId || reservistId || registrationId);
     try {
       if (attendanceId) {
         await onStatusChange(attendanceId, newStatus);
       } else {
-        await onManualCheckIn(reservistId, newStatus);
+        // For manual check-in, pass both reservistId and registrationId
+        await onManualCheckIn(reservistId, registrationId, newStatus);
       }
     } finally {
       setUpdatingId(null);
@@ -190,9 +191,10 @@ export default function AttendanceList({
           </thead>
           <tbody>
             {filteredParticipants.length > 0 ? filteredParticipants.map((p) => {
-              const isUpdating = updatingId === (p.attendance_id || p.reservist_id);
+              const isUpdating = updatingId === (p.attendance_id || p.reservist_id || p.registration_id);
+              const uniqueKey = p.reservist_id || p.registration_id || p.attendance_id;
               return (
-                <tr key={p.reservist_id} className={`border-b border-neutral-100 dark:border-neutral-800 transition-colors ${
+                <tr key={uniqueKey} className={`border-b border-neutral-100 dark:border-neutral-800 transition-colors ${
                   p.status === 'present' ? 'bg-emerald-50/30 dark:bg-emerald-950/10' :
                   p.status === 'absent' ? 'bg-red-50/30 dark:bg-red-950/10' :
                   p.status === 'late' ? 'bg-amber-50/30 dark:bg-amber-950/10' :
@@ -222,7 +224,7 @@ export default function AttendanceList({
                       ) : (
                         <>
                           <button
-                            onClick={() => handleStatusChange(p.attendance_id, p.reservist_id, 'present')}
+                            onClick={() => handleStatusChange(p.attendance_id, p.reservist_id, p.registration_id, 'present')}
                             className="p-1.5 rounded hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 disabled:opacity-30"
                             title="Mark Present"
                             disabled={p.status === 'present'}
@@ -230,7 +232,7 @@ export default function AttendanceList({
                             <CheckCircle2 className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleStatusChange(p.attendance_id, p.reservist_id, 'absent')}
+                            onClick={() => handleStatusChange(p.attendance_id, p.reservist_id, p.registration_id, 'absent')}
                             className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 disabled:opacity-30"
                             title="Mark Absent"
                             disabled={p.status === 'absent'}
@@ -238,7 +240,7 @@ export default function AttendanceList({
                             <XCircle className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleStatusChange(p.attendance_id, p.reservist_id, 'late')}
+                            onClick={() => handleStatusChange(p.attendance_id, p.reservist_id, p.registration_id, 'late')}
                             className="p-1.5 rounded hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400 disabled:opacity-30"
                             title="Mark Late"
                             disabled={p.status === 'late'}
@@ -246,7 +248,7 @@ export default function AttendanceList({
                             <Clock className="h-4 w-4" />
                           </button>
                           <button
-                            onClick={() => handleStatusChange(p.attendance_id, p.reservist_id, 'excused')}
+                            onClick={() => handleStatusChange(p.attendance_id, p.reservist_id, p.registration_id, 'excused')}
                             className="p-1.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 disabled:opacity-30"
                             title="Mark Excused"
                             disabled={p.status === 'excused'}
