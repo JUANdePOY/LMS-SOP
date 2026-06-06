@@ -13,9 +13,21 @@ const allowedOrigins = process.env.CORS_ORIGINS
   : ['https://pafr-1prk.vercel.app', 'https://pafr.vercel.app'];
 
 app.use(cors({
-  origin: allowedOrigins,
-  credentials: true
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, origin);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['X-CSRF-Token', 'X-Requested-With', 'Accept', 'Accept-Version', 'Content-Length', 'Content-MD5', 'Content-Type', 'Date', 'X-Api-Version', 'Authorization']
 }));
+
+// Handle OPTIONS preflight explicitly
+app.options('*', cors());
+
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
