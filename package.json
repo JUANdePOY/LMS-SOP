@@ -6,8 +6,8 @@
     "node": ">=18.x"
   },
   "scripts": {
-    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
-    "build": "cd client && npm run build",
+    "postinstall": "cd client && npm install",
+    "build": "cd client && npx vite build",
     "start": "cd server && npm start"
   }
 }
