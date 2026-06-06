@@ -103,43 +103,70 @@ const buildFilterQuery = (filters) => {
   const conditions = [];
   const params = [];
 
-  if (filters.status !== undefined) {
-    if (filters.status === 'active') {
-      conditions.push('r.is_active = ?');
-      params.push(1);
-    } else if (filters.status === 'inactive') {
-      conditions.push('r.is_active = ?');
-      params.push(0);
-    } else if (filters.status === 'standby') {
-      conditions.push('r.reserve_status = ?');
-      params.push('Standby Reserve');
-    }
+  // Active/inactive status
+  if (filters.status === 'active') {
+    conditions.push('r.is_active = ?');
+    params.push(1);
+  } else if (filters.status === 'inactive') {
+    conditions.push('r.is_active = ?');
+    params.push(0);
   }
 
+  // Assignment filters
+  if (filters.arsen_id) {
+    conditions.push('g.arsen_id = ?');
+    params.push(Number(filters.arsen_id));
+  }
   if (filters.group_id) {
     conditions.push('ra.group_id = ?');
-    params.push(filters.group_id);
+    params.push(Number(filters.group_id));
   }
-
   if (filters.squadron_id) {
     conditions.push('ra.squadron_id = ?');
-    params.push(filters.squadron_id);
+    params.push(Number(filters.squadron_id));
   }
 
+  // Military filters
   if (filters.rank) {
     conditions.push('r.`rank` = ?');
     params.push(filters.rank);
   }
-
   if (filters.reserve_status) {
     conditions.push('r.reserve_status = ?');
     params.push(filters.reserve_status);
   }
+  if (filters.specialization) {
+    conditions.push('r.specialization = ?');
+    params.push(filters.specialization);
+  }
+  if (filters.category) {
+    conditions.push('r.category = ?');
+    params.push(filters.category);
+  }
+  if (filters.sourceOfCommission) {
+    conditions.push('r.source_of_commission = ?');
+    params.push(filters.sourceOfCommission);
+  }
 
+  // Personal filters
+  if (filters.bloodType) {
+    conditions.push('r.blood_type = ?');
+    params.push(filters.bloodType);
+  }
+  if (filters.sex) {
+    conditions.push('r.sex = ?');
+    params.push(filters.sex);
+  }
+  if (filters.civilStatus) {
+    conditions.push('r.civil_status = ?');
+    params.push(filters.civilStatus);
+  }
+
+  // Full-text search across name, service number, rank, email
   if (filters.search) {
-    conditions.push('(r.first_name LIKE ? OR r.last_name LIKE ? OR r.service_number LIKE ? OR u.email LIKE ?)');
-    const searchTerm = `%${filters.search}%`;
-    params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    conditions.push('(r.first_name LIKE ? OR r.last_name LIKE ? OR CONCAT(r.first_name, " ", r.last_name) LIKE ? OR r.service_number LIKE ? OR r.`rank` LIKE ? OR u.email LIKE ?)');
+    const s = '%' + filters.search + '%';
+    params.push(s, s, s, s, s, s);
   }
 
   return {
@@ -249,11 +276,36 @@ router.get(
         LEFT JOIN users u ON r.user_id = u.id
         LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
         LEFT JOIN \`groups\` g ON ra.group_id = g.id
+        LEFT JOIN arsens a ON g.arsen_id = a.id
         ${whereClause}
       `;
 
       const [countResult] = await db.query(countQuery, allParams);
       const total = countResult[0].total;
+
+      // Fetch per-status stats (always over the full scoped+filtered set, not just one page)
+      // Stats query — identical JOINs to the count query so the WHERE clause
+      // (which may reference g.arsen_id via scope filters) resolves correctly.
+      const statsQuery = `
+        SELECT
+          SUM(r.is_active = 1)                              AS active,
+          SUM(r.is_active = 0)                              AS inactive,
+          SUM(r.reserve_status = 'Standby Reserve')         AS standby,
+          SUM(r.reserve_status = 'Retired')                 AS retired,
+          SUM(r.reserve_status = 'Ready Reserve')           AS ready,
+          SUM(IFNULL(r.status_bcmt, 0) = 1)                 AS bcmt,
+          SUM(IFNULL(r.status_adt,  0) = 1)                 AS adt,
+          SUM(IFNULL(r.status_vadt, 0) = 1)                 AS vadt,
+          SUM(IFNULL(r.status_rotc, 0) = 1)                 AS rotc
+        FROM reservists r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+        LEFT JOIN \`groups\` g ON ra.group_id = g.id
+        LEFT JOIN arsens a ON g.arsen_id = a.id
+        ${whereClause}
+      `;
+      const [statsResult] = await db.query(statsQuery, allParams);
+      const stats = statsResult[0] || {};
 
       // Fetch paginated records
       const query_str = `
@@ -296,6 +348,18 @@ router.get(
           limit,
           total,
           pages: Math.ceil(total / limit)
+        },
+        stats: {
+          total:   Number(total),
+          active:  Number(stats.active   || 0),
+          inactive:Number(stats.inactive || 0),
+          standby: Number(stats.standby  || 0),
+          retired: Number(stats.retired  || 0),
+          ready:   Number(stats.ready    || 0),
+          bcmt:    Number(stats.bcmt     || 0),
+          adt:     Number(stats.adt      || 0),
+          vadt:    Number(stats.vadt     || 0),
+          rotc:    Number(stats.rotc     || 0),
         }
       });
     } catch (error) {
@@ -723,9 +787,34 @@ router.put(
         user_agent: req.headers['user-agent']
       });
 
-      // Fetch updated reservist
+      // Fetch updated reservist — use the same projection as the list endpoint
+      // so the response includes assignment, group, arcen, and squadron fields.
+      // Without these JOINs the frontend loses assignment details until page refresh.
       const [updated] = await db.query(
-        'SELECT r.*, u.email FROM reservists r JOIN users u ON r.user_id = u.id WHERE r.id = ?',
+        `SELECT
+          r.id, r.user_id, r.first_name, r.last_name, r.rank,
+          r.service_number, r.position, r.date_of_birth, r.place_of_birth,
+          r.age, r.sex, r.civil_status, r.citizenship, r.height, r.weight,
+          r.blood_type, r.phone_number, r.address,
+          r.reserve_center, r.category, r.date_enlisted, r.source_of_commission,
+          r.rank_date_appointment, r.specialization, r.reserve_status,
+          r.highest_education, r.course_degree, r.school, r.year_graduated,
+          r.occupation, r.employer, r.office_address,
+          r.basic_training_completed, r.basic_training_date,
+          r.status_bcmt, r.status_adt, r.status_vadt, r.status_rotc, r.status_others,
+          r.emergency_contact_name, r.emergency_contact_phone, r.emergency_contact_address,
+          r.is_active, r.created_at, r.updated_at,
+          u.email,
+          ra.id as assignment_id, ra.group_id, ra.squadron_id,
+          g.name as group_name, a.name as arcen_name,
+          s.name as squadron_name, s.location as squadron_location
+        FROM reservists r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+        LEFT JOIN \`groups\` g ON ra.group_id = g.id
+        LEFT JOIN arsens a ON g.arsen_id = a.id
+        LEFT JOIN squadron s ON ra.squadron_id = s.id
+        WHERE r.id = ?`,
         [id]
       );
 
@@ -1780,7 +1869,7 @@ router.post(
           }
         }
 
-        const headers = (rawRows[headerRowIndex] || []).map(h => h != null ? String(h).trim() : h);
+        const headers = (rawRows[headerRowIndex] || []).map(h => h != null ? String(h).replace(/\s+/g, ' ').trim() : h);
         const dataRows = rawRows.slice(headerRowIndex + 1);
 
         // Build header index map: for duplicate headers, store all indices
@@ -1803,17 +1892,6 @@ router.post(
         });
 
         if (rows.length === 0) continue;
-
-        if (sheetIndex === 0) {
-          console.log('=== BULK UPLOAD DEBUG ===');
-          console.log('Headers:', JSON.stringify(headers));
-          console.log('First row raw:', JSON.stringify(rows[0].__raw));
-          console.log('First row sourceOfCommission:', JSON.stringify(rows[0]['Source of Commission/Enlistment (ROTC/ BCMT/ MOTC/ Direct Commission)']));
-          console.log('First row highestEducation:', JSON.stringify(rows[0]['Highest Educational Attainment']));
-          console.log('First row basicTraining:', JSON.stringify(rows[0]['Basic Training Completed (BCMT/ROTC)']));
-          console.log('First row occupation:', JSON.stringify(rows[0]['Occupation']));
-          console.log('========================');
-        }
 
         for (const row of rows) {
           try {

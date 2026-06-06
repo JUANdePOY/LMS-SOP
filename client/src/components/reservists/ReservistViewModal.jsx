@@ -36,7 +36,7 @@ function DetailField({ label, value }) {
   if (!value && value !== 0) return null;
   return (
     <div className="flex items-start gap-3 py-2.5 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
-      <span className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 w-40 shrink-0 pt-0.5">
+      <span className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 w-30 shrink-0 pt-0.5">
         {label}
       </span>
       <span className="text-[13px] font-medium text-neutral-800 dark:text-neutral-200 leading-snug">
@@ -160,6 +160,24 @@ export default function ReservistViewModal({ reservist, onClose, onEdit }) {
             <DetailSection icon={BookOpen} title="Military Training">
               <DetailField label="Basic Training" value={reservist.basicTraining} />
               <DetailField label="Date Completed" value={reservist.basicTrainingDateCompleted} />
+              {(reservist.statusBcmt || reservist.statusAdt || reservist.statusVadt || reservist.statusRotc || reservist.statusOthers) && (
+                <div className="flex items-start gap-3 py-2.5 border-b border-neutral-100 dark:border-neutral-800 last:border-0">
+                  <span className="text-[11px] font-medium text-neutral-400 dark:text-neutral-500 w-40 shrink-0 pt-0.5">
+                    Training Status
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {reservist.statusBcmt  && <span title="Basic Citizen Military Training"  className="rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">BCMT</span>}
+                    {reservist.statusAdt   && <span title="Active Duty Training"             className="rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">ADT</span>}
+                    {reservist.statusVadt  && <span title="Voluntary Active Duty Training"   className="rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">VADT</span>}
+                    {reservist.statusRotc  && <span title="Reserve Officers' Training Corps" className="rounded-full bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 px-2.5 py-0.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">ROTC</span>}
+                    {reservist.statusOthers && (
+                      <span className="rounded-full bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-2.5 py-0.5 text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                        Others: {reservist.statusOthers}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </DetailSection>
 
             <DetailSection icon={Phone} title="Contact">
