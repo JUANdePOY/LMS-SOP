@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npx vite build",
+    "build": "VITE_API_BASE_URL=https://pafr.vercel.app/api npx vite build",
     "start": "vite preview",
     "build:start": "vite build && vite preview",
     "lint": "eslint .",
