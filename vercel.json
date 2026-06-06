@@ -19,14 +19,6 @@
     {
       "src": "/api/(.*)",
       "dest": "server/api.js"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "public/assets/:1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "public/index.html"
     }
   ]
 }
