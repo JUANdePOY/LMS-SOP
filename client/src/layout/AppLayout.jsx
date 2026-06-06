@@ -17,15 +17,14 @@ export default function AppLayout() {
     <div
       className={cn(
         "flex min-h-screen",
-        "bg-neutral-50 text-neutral-900",
-        "dark:bg-neutral-950 dark:text-neutral-100",
+        "bg-[var(--bg-page)] text-[var(--text-primary)]",
         "transition-colors duration-300"
       )}
     >
       {/* Mobile backdrop */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 dark:bg-black/60 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-[var(--bg-cover-overlay)] backdrop-blur-sm lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -51,16 +50,16 @@ export default function AppLayout() {
         <header
           className={cn(
             "sticky top-0 z-30 flex h-14 items-center gap-3 px-4 lg:px-2",
-            "border-b border-neutral-200 dark:border-neutral-800",
-            "bg-neutral-50/80 dark:bg-neutral-950/80 backdrop-blur-md",
+            "border-b border-[var(--border)]",
+            "bg-[var(--glass-bg)] backdrop-blur-md",
             "transition-colors duration-300"
           )}
         >
-          {/* Sidebar toggle - desktop only */}
+{/* Sidebar toggle - desktop only */}
           <button
             onClick={() => setCollapsed((v) => !v)}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="hidden lg:flex h-9 w-9 items-center justify-center text-neutral-400 hover:text-neutral-700 dark:text-neutral-500 dark:hover:text-neutral-300 transition-colors duration-150"
+            className="hidden lg:flex h-9 w-9 items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors duration-150"
           >
             {collapsed ? (
               <PanelLeftClose size={22} />
@@ -69,34 +68,34 @@ export default function AppLayout() {
             )}
           </button>
 
-          {/* Mobile: hamburger + title */}
+{/* Mobile: hamburger + title */}
           <div className="flex items-center gap-3 lg:hidden">
             <button
               onClick={() => setMobileOpen((v) => !v)}
               aria-label={mobileOpen ? "Close menu" : "Open menu"}
               className={cn(
                 "flex h-9 w-9 items-center justify-center rounded-lg",
-                "border border-neutral-200 dark:border-neutral-700",
-                "bg-white dark:bg-neutral-800",
-                "text-neutral-600 dark:text-neutral-400",
-                "hover:bg-neutral-100 dark:hover:bg-neutral-700",
+                "border border-[var(--border)]",
+                "bg-[var(--bg-surface)]",
+                "text-[var(--text-secondary)]",
+                "hover:bg-[var(--bg-hover)]",
                 "transition-colors duration-150"
               )}
             >
               {mobileOpen ? <X size={16} /> : <Menu size={16} />}
             </button>
-            <span className="text-sm font-bold tracking-tight text-neutral-900 dark:text-neutral-50">
+            <span className="text-sm font-bold tracking-tight text-[var(--text-primary)]">
               PAFR
             </span>
           </div>
 
-          {/* Page Title - Desktop */}
+{/* Page Title - Desktop */}
           {pageTitle && (
             <div className="hidden lg:flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 dark:bg-indigo-500/10">
-                <GraduationCap size={18} className="text-indigo-600 dark:text-indigo-400" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[color-mix(in_srgb,var(--accent-amber)_10%,transparent)]">
+                <GraduationCap size={18} className="text-[var(--accent-amber)]" />
               </div>
-              <h1 className="text-lg font-bold text-neutral-900 dark:text-neutral-50">{pageTitle}</h1>
+              <h1 className="text-lg font-bold text-[var(--text-primary)]">{pageTitle}</h1>
             </div>
           )}
 
@@ -109,13 +108,13 @@ export default function AppLayout() {
             aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
             className={cn(
               "flex h-9 w-9 items-center justify-center rounded-lg",
-              "border border-neutral-200 dark:border-neutral-700",
-              "bg-white dark:bg-neutral-800",
-              "text-neutral-500 dark:text-neutral-400",
-              "hover:text-neutral-900 dark:hover:text-neutral-50",
-              "hover:bg-neutral-100 dark:hover:bg-neutral-700",
+              "border border-[var(--border)]",
+              "bg-[var(--bg-surface)]",
+              "text-[var(--text-secondary)]",
+              "hover:text-[var(--text-primary)]",
+              "hover:bg-[var(--bg-hover)]",
               "transition-all duration-200 group",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-amber)]"
             )}
           >
             {isDark ? (

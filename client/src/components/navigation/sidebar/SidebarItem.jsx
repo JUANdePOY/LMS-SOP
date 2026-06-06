@@ -16,27 +16,25 @@ function SidebarSubItem({ item, onNavClick }) {
           "relative flex items-center gap-2.5 rounded-lg py-2 pl-9 pr-3 w-full",
           "text-[13px] font-medium leading-none tracking-[-0.01em]",
           "transition-all duration-150 ease-out",
-          "outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60",
-          !isActive && [
-            "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100",
-            "dark:text-neutral-400 dark:hover:text-neutral-50 dark:hover:bg-neutral-800",
-          ],
-          isActive && [
-            "text-neutral-900 bg-neutral-100",
-            "dark:text-neutral-50 dark:bg-neutral-800",
-            "before:absolute before:left-[18px] before:top-1/2 before:-translate-y-1/2",
-            "before:h-[14px] before:w-0.5 before:rounded-full",
-            "before:bg-indigo-500 dark:before:bg-indigo-400",
-          ]
+          "outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-amber)_60%,transparent)]",
+!isActive && [
+             "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:text-[var(--text-on-sidebar)] hover:bg-[var(--bg-hover)]",
+           ],
+           isActive && [
+             "text-[var(--text-on-sidebar)] bg-[var(--bg-active)]",
+             "before:absolute before:left-[18px] before:top-1/2 before:-translate-y-1/2",
+             "before:h-[14px] before:w-0.5 before:rounded-full",
+             "before:bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]",
+           ]
         )
       }
     >
       {({ isActive }) => (
         <>
-          <span className={cn(
-            "flex h-4 w-4 shrink-0 items-center justify-center transition-colors duration-150",
-            isActive ? "text-indigo-600 dark:text-indigo-400" : "text-neutral-400 dark:text-neutral-500"
-          )}>
+<span className={cn(
+             "flex h-4 w-4 shrink-0 items-center justify-center transition-colors duration-150",
+             isActive ? "text-[var(--text-on-sidebar)]" : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)]"
+           )}>
             <Icon size={14} strokeWidth={isActive ? 2.2 : 1.8} />
           </span>
           <span className="truncate">{item.name}</span>
@@ -77,30 +75,29 @@ export default function SidebarItem({ item, isCollapsed, onNavClick }) {
               setOpen(true);
             }}
             aria-expanded={open}
-            className={cn(
-              "relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5",
-              "text-sm font-medium leading-none tracking-[-0.01em]",
-              "transition-all duration-200 ease-out",
-              "outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60",
-              isParentActive
+className={cn(
+               "relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5",
+               "text-sm font-medium leading-none tracking-[-0.01em]",
+               "transition-all duration-200 ease-out",
+               "outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-amber)_60%,transparent)]",
+isParentActive
                 ? [
-                    "text-neutral-900 bg-neutral-100 dark:text-neutral-50 dark:bg-neutral-800",
+                    "text-[var(--text-on-sidebar)] bg-[var(--bg-active)]",
                     "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
                     "before:h-[18px] before:w-0.5 before:rounded-full",
-                    "before:bg-indigo-500 dark:before:bg-indigo-400",
+                    "before:bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]",
                   ]
-                : [
-                    "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100",
-                    "dark:text-neutral-400 dark:hover:text-neutral-50 dark:hover:bg-neutral-800",
-                    "hover:scale-[1.015]",
-                  ],
-              isCollapsed && "justify-center px-0"
-            )}
-          >
-            <span className={cn(
-              "flex h-[18px] w-[18px] shrink-0 items-center justify-center transition-colors duration-200",
-              isParentActive ? "text-indigo-600 dark:text-indigo-400" : "text-neutral-400 dark:text-neutral-500"
-            )}>
+                 : [
+                     "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:text-[var(--text-on-sidebar)] hover:bg-[var(--bg-hover)]",
+                     "hover:scale-[1.015]",
+                   ],
+               isCollapsed && "justify-center px-0"
+             )}
+           >
+<span className={cn(
+                "flex h-[18px] w-[18px] shrink-0 items-center justify-center transition-colors duration-200",
+                isParentActive ? "text-[var(--text-on-sidebar)]" : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)]"
+              )}>
               <Icon size={17} strokeWidth={isParentActive ? 2.2 : 1.8} />
             </span>
 
@@ -109,13 +106,13 @@ export default function SidebarItem({ item, isCollapsed, onNavClick }) {
                 <span className="flex-1 truncate text-left">{item.name}</span>
                 <span
                   onClick={handleChevronClick}
-                  className="shrink-0 p-0.5 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700 cursor-pointer"
+                  className="shrink-0 p-0.5 rounded hover:bg-[var(--bg-hover)] cursor-pointer"
                   aria-label={open ? "Collapse" : "Expand"}
                 >
                   <ChevronDown
                     size={13}
                     className={cn(
-                      "text-neutral-400 dark:text-neutral-600",
+                      "text-[var(--text-on-sidebar)]",
                       "transition-transform duration-200",
                       open && "rotate-180"
                     )}
@@ -125,7 +122,7 @@ export default function SidebarItem({ item, isCollapsed, onNavClick }) {
             )}
 
             {isCollapsed && isParentActive && (
-              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />
+              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]" />
             )}
           </button>
 
@@ -134,7 +131,7 @@ export default function SidebarItem({ item, isCollapsed, onNavClick }) {
               "overflow-hidden transition-all duration-200 ease-out",
               open ? "max-h-60 opacity-100" : "max-h-0 opacity-0"
             )}>
-              <div className="relative ml-[22px] mt-0.5 border-l border-neutral-200 dark:border-neutral-800 pb-0.5">
+              <div className="relative ml-[22px] mt-0.5 border-l border-[var(--border-sidebar)] pb-0.5">
                 <ul className="space-y-0.5 py-0.5" role="list">
                   {item.children.map((child) => (
                     <li key={child.path}>
@@ -161,17 +158,16 @@ export default function SidebarItem({ item, isCollapsed, onNavClick }) {
             "relative flex items-center gap-3 rounded-lg px-3 py-2.5 w-full",
             "text-sm font-medium leading-none tracking-[-0.01em]",
             "transition-all duration-200 ease-out",
-            "outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60",
+            "outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-amber)_60%,transparent)]",
             !isActive && [
-              "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100",
-              "dark:text-neutral-400 dark:hover:text-neutral-50 dark:hover:bg-neutral-800",
+              "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:text-[var(--text-on-sidebar)] hover:bg-[var(--bg-hover)]",
               "hover:scale-[1.015]",
             ],
             isActive && [
-              "text-neutral-900 bg-neutral-100 dark:text-neutral-50 dark:bg-neutral-800",
+              "text-[var(--text-on-sidebar)] bg-[var(--bg-active)]",
               "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
               "before:h-[18px] before:w-0.5 before:rounded-full",
-              "before:bg-indigo-500 dark:before:bg-indigo-400",
+              "before:bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]",
             ],
             isCollapsed && "justify-center px-0"
           )
@@ -179,15 +175,15 @@ export default function SidebarItem({ item, isCollapsed, onNavClick }) {
       >
         {({ isActive }) => (
           <>
-            <span className={cn(
-              "flex h-[18px] w-[18px] shrink-0 items-center justify-center transition-colors duration-200",
-              isActive ? "text-indigo-600 dark:text-indigo-400" : "text-neutral-400 dark:text-neutral-500"
-            )}>
+<span className={cn(
+               "flex h-[18px] w-[18px] shrink-0 items-center justify-center transition-colors duration-200",
+               isActive ? "text-[var(--text-on-sidebar)]" : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)]"
+             )}>
               <Icon size={17} strokeWidth={isActive ? 2.2 : 1.8} />
             </span>
             {!isCollapsed && <span className="truncate">{item.name}</span>}
             {isCollapsed && isActive && (
-              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />
+              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]" />
             )}
           </>
         )}
