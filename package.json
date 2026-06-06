@@ -2,6 +2,9 @@
   "name": "airforce",
   "private": true,
   "version": "0.0.0",
+  "engines": {
+    "node": ">=18.x"
+  },
   "scripts": {
     "postinstall": "cd server && npm install",
     "install:all": "npm install && cd server && npm install && cd ../client && npm install",
