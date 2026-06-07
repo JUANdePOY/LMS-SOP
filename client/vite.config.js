@@ -23,7 +23,7 @@ export default defineConfig({
   },
   base: "/",
   build: {
-    outDir: "../server/public",
+    outDir: "dist",
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {

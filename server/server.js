@@ -1,7 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
-const fs = require('fs');
 const db = require('./config/database');
 const loginLimiter = require('./middleware/rateLimiter');
 
@@ -59,12 +57,6 @@ const hierarchyRoutes = require('./routes/hierarchy');
 const announcementsRoutes = require('./routes/announcements');
 const mapRoutes = require('./routes/map');
 
-// Serve client static files
-const publicDir = path.join(__dirname, 'public');
-if (fs.existsSync(publicDir)) {
-  app.use(express.static(publicDir));
-}
-
 // API Routes
 app.use('/api/auth', loginLimiter, authRoutes);
 app.use('/api/reservists', reservistsRoutes);
@@ -99,15 +91,6 @@ app.get('/api/health', async (req, res) => {
     result.dbError = err.message;
   }
   res.json(result);
-});
-
-// SPA fallback — serve index.html for non-API routes
-app.use((req, res, next) => {
-  if (!req.path.startsWith('/api') && fs.existsSync(publicDir)) {
-    res.sendFile(path.join(publicDir, 'index.html'));
-  } else {
-    next();
-  }
 });
 
 // Error handling middleware
