@@ -3,7 +3,11 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const loginLimiter = require('./middleware/rateLimiter');
-require('dotenv').config();
+
+// Only load .env in local development
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 
 console.log('SERVER STARTING - Loading updated code...');
 
@@ -56,7 +60,7 @@ const mapRoutes = require('./routes/map');
 
 // Serve client static files in production
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
-if (require('fs').existsSync(clientDist)) {
+if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
 }
 
