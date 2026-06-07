@@ -2,6 +2,7 @@
   "name": "pafr-monorepo",
   "private": true,
   "version": "1.0.0",
+  "main": "api.js",
   "engines": {
     "node": ">=18.x"
   },
@@ -9,7 +10,7 @@
     "install:all": "cd client && npm install && cd ../server && npm install",
     "dev:client": "cd client && npm run dev",
     "dev:server": "cd server && npm run dev",
-    "build": "cd client && npm install && npm run build && cd ../server && npm install",
+    "vercel-build": "cd client && npm install && npm run build && cd ../server && npm install",
     "build:client": "cd client && npm run build",
     "build:server": "cd server && npm install",
     "start": "cd server && npm start"
