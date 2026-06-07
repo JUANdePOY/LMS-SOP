@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const db = require('./config/database');
 const loginLimiter = require('./middleware/rateLimiter');
 
 // Only load .env in local development
