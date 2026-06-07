@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const loginLimiter = require('./middleware/rateLimiter');
 require('dotenv').config();
 
@@ -10,14 +11,13 @@ const app = express();
 
 // CORS configuration
 const allowedOrigins = [
-  'https://pafr-1prk-i7wulo9dy-wawikun21-clouds-projects.vercel.app',
   'http://localhost:5173',
   'http://localhost:3000'
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -54,6 +54,12 @@ const hierarchyRoutes = require('./routes/hierarchy');
 const announcementsRoutes = require('./routes/announcements');
 const mapRoutes = require('./routes/map');
 
+// Serve client static files in production
+const clientDist = path.join(__dirname, '..', 'client', 'dist');
+if (require('fs').existsSync(clientDist)) {
+  app.use(express.static(clientDist));
+}
+
 // API Routes
 app.use('/api/auth', loginLimiter, authRoutes);
 app.use('/api/reservists', reservistsRoutes);
@@ -80,6 +86,15 @@ app.use('/api/map', mapRoutes);
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Serve client for all non-API routes (SPA fallback)
+app.use((req, res, next) => {
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  } else {
+    next();
+  }
 });
 
 // Error handling middleware

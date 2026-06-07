@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-// Use environment variable for API base URL, fallback to relative path
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE = '/api';
 
 // Create axios instance with auth header support
 const api = axios.create({
