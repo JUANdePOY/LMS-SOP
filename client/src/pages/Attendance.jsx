@@ -99,11 +99,12 @@ export default function Attendance() {
     await loadAttendance();
   };
 
-  const handleManualCheckIn = async (reservistId, status) => {
+  const handleManualCheckIn = async (reservistId, registrationId, status) => {
     if (eventType === 'internal') {
       await manualCheckInInternal(trainingId, reservistId, status);
     } else {
-      await manualCheckInExternal(trainingId, reservistId, status);
+      // For external trainings, pass both reservist_id and registration_id
+      await manualCheckInExternal(trainingId, reservistId, registrationId, status);
     }
     await loadAttendance();
   };

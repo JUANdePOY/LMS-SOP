@@ -301,6 +301,48 @@ export default function ReservistModal({ open, mode, form, onChange, onClose, on
         </FormField>
       </div>
 
+      <div className="mt-1 mb-1">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 mb-2">
+          Reservist Training Status
+        </p>
+        <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-3 flex flex-wrap gap-x-6 gap-y-3">
+          {[
+            { key: "statusBcmt",  label: "BCMT",  title: "Basic Citizen Military Training" },
+            { key: "statusAdt",   label: "ADT",   title: "Active Duty Training" },
+            { key: "statusVadt",  label: "VADT",  title: "Voluntary Active Duty Training" },
+            { key: "statusRotc",  label: "ROTC",  title: "Reserve Officers' Training Corps" },
+          ].map(({ key, label, title }) => (
+            <label key={key} className="flex items-center gap-2 cursor-pointer select-none" title={title}>
+              <input
+                type="checkbox"
+                checked={!!form[key]}
+                onChange={e => onChange({ ...form, [key]: e.target.checked })}
+                className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-600 text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+              />
+              <span className="text-[13px] font-semibold text-neutral-700 dark:text-neutral-300">{label}</span>
+              <span className="text-[11px] text-neutral-400 dark:text-neutral-500 hidden sm:inline">({title})</span>
+            </label>
+          ))}
+          <div className="w-full flex items-center gap-2 mt-1">
+            <label className="flex items-center gap-2 cursor-pointer select-none shrink-0">
+              <input
+                type="checkbox"
+                checked={!!(form.statusOthers !== '' && form.statusOthers !== null && form.statusOthers !== undefined)}
+                onChange={e => onChange({ ...form, statusOthers: e.target.checked ? (form.statusOthers || ' ') : '' })}
+                className="h-4 w-4 rounded border-neutral-300 dark:border-neutral-600 text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+              />
+              <span className="text-[13px] font-semibold text-neutral-700 dark:text-neutral-300">Others</span>
+            </label>
+            <FormInput
+              value={form.statusOthers || ''}
+              onChange={val => onChange({ ...form, statusOthers: val })}
+              placeholder="Specify other training status…"
+              className="flex-1"
+            />
+          </div>
+        </div>
+      </div>
+
       <div className={SECTION_TITLE_CLASS}>EMERGENCY CONTACT</div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
         <FormField label="Name">

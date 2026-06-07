@@ -273,6 +273,16 @@ async function getFacilitators(trainingId, externalTrainingId) {
   return [];
 }
 
+async function getRegistrationById(registrationId) {
+  const [rows] = await pool.query(
+    `SELECT id, training_id, reservist_id, participant_data
+     FROM training_registrations
+     WHERE id = ?`,
+    [registrationId]
+  );
+  return rows[0] || null;
+}
+
 async function updateAttendanceStatus(id, eventType, status, facilitatorId) {
   const table = eventType === 'internal' ? 'attendance' : 'external_training_attendance';
   const checkInTime = ['present', 'late'].includes(status) ? new Date() : null;
@@ -437,4 +447,5 @@ module.exports = {
   getExternalRegistrationCount,
   getMyEvents,
   getEventStatus,
+  getRegistrationById,
 };

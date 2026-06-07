@@ -30,28 +30,22 @@ export default function SidebarItem({ item, isCollapsed }) {
             // ── Transition ───────────────────────────────────────
             "transition-all duration-200 ease-out",
             // ── Focus ring ───────────────────────────────────────
-            "outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60",
+            "outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-amber)_60%,transparent)]",
 
             // ── INACTIVE ─────────────────────────────────────────
             !isActive && [
-              // Light
-              "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100",
-              // Dark
-              "dark:text-neutral-400 dark:hover:text-neutral-50 dark:hover:bg-neutral-800",
+              "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:text-[var(--text-on-sidebar)] hover:bg-[var(--bg-hover)]",
               // Scale nudge on hover
               "hover:scale-[1.015]",
             ],
 
             // ── ACTIVE ───────────────────────────────────────────
             isActive && [
-              // Light
-              "text-neutral-900 bg-neutral-100",
-              // Dark
-              "dark:text-neutral-50 dark:bg-neutral-800",
+              "text-[var(--text-on-sidebar)] bg-[var(--bg-active)]",
               // Left indicator bar via before pseudo-element
               "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
               "before:h-[18px] before:w-0.5 before:rounded-full",
-              "before:bg-indigo-500 dark:before:bg-indigo-400",
+              "before:bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]",
             ],
 
             // Collapsed: center icon
@@ -67,8 +61,8 @@ export default function SidebarItem({ item, isCollapsed }) {
                 "flex h-[18px] w-[18px] shrink-0 items-center justify-center",
                 "transition-colors duration-200",
                 isActive
-                  ? "text-indigo-600 dark:text-indigo-400"
-                  : "text-neutral-400 dark:text-neutral-500"
+                  ? "text-[var(--text-on-sidebar)]"
+                  : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)]"
               )}
             >
               <Icon size={17} strokeWidth={isActive ? 2.2 : 1.8} />
@@ -81,7 +75,7 @@ export default function SidebarItem({ item, isCollapsed }) {
 
             {/* ── Active dot for collapsed mode ─────────────────── */}
             {isCollapsed && isActive && (
-              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-indigo-500 dark:bg-indigo-400" />
+              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]" />
             )}
           </>
         )}

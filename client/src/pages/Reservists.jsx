@@ -1,8 +1,8 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { UserSquare, Plus, Loader, Upload, ChevronLeft, ChevronRight, Download } from "lucide-react";
+import { useDebounce } from "@/hooks/useDebounce";
+import { Plus, Loader, Upload, Download } from "lucide-react";
 import { getReservists, createReservist, updateReservist, deleteReservist } from "@/services/api";
 import * as XLSX from "xlsx";
-import AirbasePageHeader from "@/components/airbase/AirbasePageHeader";
 import { PrimaryButton } from "@/components/airbase/AirbaseUI";
 import ReservistStatsBar    from "@/components/reservists/ReservistStatsBar";
 import ReservistTable       from "@/components/reservists/ReservistTable";
@@ -11,6 +11,9 @@ import ReservistViewModal from "@/components/reservists/ReservistViewModal";
 import BulkUploadModal from "@/components/reservists/BulkUploadModal";
 import ReservistDetailPanel from "@/components/reservists/ReservistDetailPanel";
 import SearchAndFilters, { DEFAULT_FILTERS } from "@/components/reservists/SearchAndFilters";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/components/ui/Toast";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 const EMPTY_FORM = {
   id: '', userId: '', assignmentId: '',
@@ -25,15 +28,27 @@ const EMPTY_FORM = {
   highestEducation: '', courseDegree: '', school: '', yearGraduated: '',
   employerCompany: '', officeAddress: '',
   basicTraining: '', basicTrainingDateCompleted: '',
+  statusBcmt: false, statusAdt: false, statusVadt: false, statusRotc: false, statusOthers: '',
   emergencyContactName: '', emergencyContactNumber: '', emergencyContactAddress: '',
 };
 
 export default function Reservists() {
+  const { user } = useAuth();
+  const { addToast } = useToast();
+  // Per RBAC_WORKFLOW.md: POST/PUT/DELETE/bulk-upload reservists is allowed for
+  // admin (super admin) and admin_arsen (manages reservists within their ARSEN scope).
+  // admin_group and admin_squadron can VIEW the list but cannot create, edit, or delete.
+  const canMutate = user?.role === "admin" || user?.role === "admin_arsen";
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  // Pending (un-committed) filter/search values — updated immediately for UI responsiveness
+  const [pendingSearch, setPendingSearch] = useState("");
+  const [pendingFilters, setPendingFilters] = useState(DEFAULT_FILTERS);
+  const debouncedSearch  = useDebounce(pendingSearch,  400);
+  const debouncedFilters = useDebounce(pendingFilters, 400);
   const [modal, setModal] = useState({ open: false, mode: "add", row: null });
   const [form, setForm] = useState(EMPTY_FORM);
   const [detailRow, setDetailRow] = useState(null);
@@ -42,6 +57,8 @@ export default function Reservists() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [stats, setStats] = useState({ total:0, active:0, inactive:0, standby:0, retired:0, ready:0, bcmt:0, adt:0, vadt:0, rotc:0 });
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, id: null });
 
   const formatDate = (val) => {
     if (!val) return '';
@@ -94,6 +111,11 @@ export default function Reservists() {
       officeAddress: r.office_address || '',
       basicTraining: r.basic_training_completed || '',
       basicTrainingDateCompleted: formatDate(r.basic_training_date),
+      statusBcmt: !!r.status_bcmt,
+      statusAdt: !!r.status_adt,
+      statusVadt: !!r.status_vadt,
+      statusRotc: !!r.status_rotc,
+      statusOthers: r.status_others || '',
       emergencyContactName: r.emergency_contact_name || '',
       emergencyContactNumber: r.emergency_contact_phone || '',
       emergencyContactAddress: r.emergency_contact_address || '',
@@ -107,73 +129,55 @@ export default function Reservists() {
     }));
   };
 
+  // Debounce filter/search changes — wait 400 ms after the last change before fetching.
+  // This prevents an API call on every keystroke or every select interaction.
+  // useDebounce already delays these values by 400 ms — this effect fires
+  // only once the user has stopped typing/selecting for 400 ms.
   useEffect(() => {
-    loadReservists(1);
-  }, [search, filters]);
+    setSearch(debouncedSearch);
+    setFilters(debouncedFilters);
+    loadReservists(1, debouncedSearch, debouncedFilters);
+  }, [debouncedSearch, debouncedFilters]);
 
-  const loadReservists = async (page = 1) => {
+  const loadReservists = async (page = 1, searchOverride, filtersOverride) => {
     setLoading(true);
-    setError(null);
     setCurrentPage(page);
     try {
+      // Use override values when called from debounce (avoids stale closure),
+      // fall back to committed state for direct calls (pagination, post-save reload).
+      const f = filtersOverride ?? filters;
+      const q = searchOverride  ?? search;
       const params = { page, limit: 100 };
-      if (search) params.search = search;
-      if (filters.status && filters.status !== '' && filters.status !== 'all') params.status = filters.status;
-      if (filters.squadronId && filters.squadronId !== '') params.squadron_id = parseInt(filters.squadronId, 10);
-      if (filters.groupId && filters.groupId !== '') params.group_id = parseInt(filters.groupId, 10);
-      if (filters.rank && filters.rank !== '') params.rank = filters.rank;
-      if (filters.reserveStatus && filters.reserveStatus !== '') params.reserve_status = filters.reserveStatus;
-      if (filters.airbase && filters.airbase !== '') params.airbase = filters.airbase;
-      if (filters.arcen && filters.arcen !== '') params.arcen = filters.arcen;
-      if (filters.group && filters.group !== '') params.group = filters.group;
-      if (filters.squadron && filters.squadron !== '') params.squadron = filters.squadron;
-      if (filters.specialization && filters.specialization !== '') params.specialization = filters.specialization;
-      if (filters.category && filters.category !== '') params.category = filters.category;
-      if (filters.sourceOfCommission && filters.sourceOfCommission !== '') params.sourceOfCommission = filters.sourceOfCommission;
-      if (filters.bloodType && filters.bloodType !== '') params.bloodType = filters.bloodType;
-      if (filters.sex && filters.sex !== '') params.sex = filters.sex;
-      if (filters.civilStatus && filters.civilStatus !== '') params.civilStatus = filters.civilStatus;
+      if (q)                                        params.search             = q;
+      if (f.status          && f.status !== 'all') params.status             = f.status;
+      if (f.arsenId)                               params.arsen_id           = parseInt(f.arsenId, 10);
+      if (f.groupId)                               params.group_id           = parseInt(f.groupId, 10);
+      if (f.squadronId)                            params.squadron_id        = parseInt(f.squadronId, 10);
+      if (f.rank)                                  params.rank               = f.rank;
+      if (f.reserveStatus)                         params.reserve_status     = f.reserveStatus;
+      if (f.specialization)                        params.specialization     = f.specialization;
+      if (f.category)                              params.category           = f.category;
+      if (f.sourceOfCommission)                    params.sourceOfCommission = f.sourceOfCommission;
+      if (f.bloodType)                             params.bloodType          = f.bloodType;
+      if (f.sex)                                   params.sex                = f.sex;
+      if (f.civilStatus)                           params.civilStatus        = f.civilStatus;
       const response = await getReservists(params);
       if (response.data.status === 'success') {
         setData(transformReservistData(response.data.data));
         setTotalPages(response.data.pagination?.pages || 1);
         setTotalCount(response.data.pagination?.total || 0);
+        if (response.data.stats) setStats(response.data.stats);
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load reservists');
+      addToast(err.response?.data?.message || 'Failed to load reservists', 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredData = useMemo(() => {
-    return data.filter((r) => {
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        const match =
-          r.firstName?.toLowerCase().includes(q) ||
-          r.lastName?.toLowerCase().includes(q)  ||
-          r.serialNo?.toLowerCase().includes(q)  ||
-          r.rank?.toLowerCase().includes(q)      ||
-          r.squadron?.toLowerCase().includes(q);
-        if (!match) return false;
-      }
-      if (filters.airbase        && r.airbase        !== filters.airbase)        return false;
-      if (filters.arcen          && r.arcen          !== filters.arcen)          return false;
-      if (filters.group          && r.group          !== filters.group)          return false;
-      if (filters.squadron       && r.squadron       !== filters.squadron)       return false;
-      if (filters.rank           && r.rank           !== filters.rank)           return false;
-      if (filters.specialization && r.specialization !== filters.specialization) return false;
-      if (filters.status         && r.status         !== filters.status)         return false;
-      if (filters.category       && r.category       !== filters.category)       return false;
-      if (filters.sourceOfCommission && r.sourceOfCommission !== filters.sourceOfCommission) return false;
-      if (filters.bloodType      && r.bloodType      !== filters.bloodType)      return false;
-      if (filters.sex            && r.sex            !== filters.sex)            return false;
-      if (filters.civilStatus    && r.civilStatus    !== filters.civilStatus)    return false;
-      if (filters.reserveStatus  && r.reserveStatus  !== filters.reserveStatus)  return false;
-      return true;
-    });
-  }, [data, search, filters]);
+  // Server handles all filtering — data already contains only matching records.
+  // Keep filteredData as an alias so downstream JSX needs no changes.
+  const filteredData = data;
 
   const openAdd = () => {
     setForm(EMPTY_FORM);
@@ -224,6 +228,11 @@ export default function Reservists() {
       officeAddress: row.officeAddress || '',
       basicTraining: row.basicTraining || '',
       basicTrainingDateCompleted: row.basicTrainingDateCompleted || '',
+      statusBcmt: !!row.statusBcmt,
+      statusAdt: !!row.statusAdt,
+      statusVadt: !!row.statusVadt,
+      statusRotc: !!row.statusRotc,
+      statusOthers: row.statusOthers || '',
       emergencyContactName: row.emergencyContactName || '',
       emergencyContactNumber: row.emergencyContactNumber || '',
       emergencyContactAddress: row.emergencyContactAddress || '',
@@ -235,7 +244,7 @@ export default function Reservists() {
 
   const closeModal = () => setModal((m) => ({ ...m, open: false }));
 
-  const handleSubmit = async () => {
+const handleSubmit = async () => {
     try {
       if (modal.mode === "add") {
         const requestData = {
@@ -250,102 +259,124 @@ export default function Reservists() {
           address: form.address,
           specialization: form.specialization,
           occupation: form.civilOccupation,
-          date_of_birth: form.dateOfBirth,
-          place_of_birth: form.placeOfBirth,
+          date_of_birth: form.dateOfBirth || null,
+          place_of_birth: form.placeOfBirth || null,
           age: form.age ? parseInt(form.age, 10) : null,
-          sex: form.sex,
-          civil_status: form.civilStatus,
-          citizenship: form.citizenship,
+          sex: form.sex || null,
+          civil_status: form.civilStatus || null,
+          citizenship: form.citizenship || 'Filipino',
           height: form.height ? parseFloat(form.height) : null,
           weight: form.weight ? parseFloat(form.weight) : null,
-          blood_type: form.bloodType,
-          reserve_center: form.reserveCenter,
-          category: form.category,
-          date_enlisted: form.dateEnlisted,
-          source_of_commission: form.sourceOfCommission,
-          rank_date_appointment: form.rankDateOfAppointment,
-          reserve_status: form.reserveStatus,
-          highest_education: form.highestEducation,
-          course_degree: form.courseDegree,
-          school: form.school,
+          blood_type: form.bloodType || null,
+          reserve_center: form.reserveCenter || null,
+          category: form.category || null,
+          date_enlisted: form.dateEnlisted || null,
+          source_of_commission: form.sourceOfCommission || null,
+          rank_date_appointment: form.rankDateOfAppointment || null,
+          reserve_status: form.reserveStatus || 'Ready Reserve',
+          highest_education: form.highestEducation || null,
+          course_degree: form.courseDegree || null,
+          school: form.school || null,
           year_graduated: form.yearGraduated ? parseInt(form.yearGraduated, 10) : null,
-          employer: form.employerCompany,
-          office_address: form.officeAddress,
-          basic_training_completed: form.basicTraining,
-          basic_training_date: form.basicTrainingDateCompleted,
-          emergency_contact_name: form.emergencyContactName,
-          emergency_contact_phone: form.emergencyContactNumber,
-          emergency_contact_address: form.emergencyContactAddress,
+          employer: form.employerCompany || null,
+          office_address: form.officeAddress || null,
+          basic_training_completed: form.basicTraining || null,
+          basic_training_date: form.basicTrainingDateCompleted || null,
+          status_bcmt: form.statusBcmt ? 1 : 0,
+          status_adt: form.statusAdt ? 1 : 0,
+          status_vadt: form.statusVadt ? 1 : 0,
+          status_rotc: form.statusRotc ? 1 : 0,
+          status_others: form.statusOthers || null,
+          emergency_contact_name: form.emergencyContactName || null,
+          emergency_contact_phone: form.emergencyContactNumber || null,
+          emergency_contact_address: form.emergencyContactAddress || null,
         };
 
         const response = await createReservist(requestData);
         if (response.data.status === 'success') {
           setData((prev) => [...prev, transformReservistData([response.data.data])[0]]);
+          addToast('Reservist created successfully', 'success');
         }
       } else {
-        const response = await updateReservist(modal.row.id, {
-          first_name: form.firstName,
-          last_name: form.lastName,
-          rank: form.rank,
-          position: form.position,
-          phone_number: form.contact,
-          address: form.address,
-          specialization: form.specialization,
-          occupation: form.civilOccupation,
-          date_of_birth: form.dateOfBirth,
-          place_of_birth: form.placeOfBirth,
+        const requestData = {
+          first_name: form.firstName || null,
+          last_name: form.lastName || null,
+          rank: form.rank || null,
+          position: form.position || null,
+          phone_number: form.contact || null,
+          address: form.address || null,
+          specialization: form.specialization || null,
+          occupation: form.civilOccupation || null,
+          date_of_birth: form.dateOfBirth || null,
+          place_of_birth: form.placeOfBirth || null,
           age: form.age ? parseInt(form.age, 10) : null,
-          sex: form.sex,
-          civil_status: form.civilStatus,
-          citizenship: form.citizenship,
+          sex: form.sex || null,
+          civil_status: form.civilStatus || null,
+          citizenship: form.citizenship || 'Filipino',
           height: form.height ? parseFloat(form.height) : null,
           weight: form.weight ? parseFloat(form.weight) : null,
-          blood_type: form.bloodType,
-          reserve_center: form.reserveCenter,
-          category: form.category,
-          date_enlisted: form.dateEnlisted,
-          source_of_commission: form.sourceOfCommission,
-          rank_date_appointment: form.rankDateOfAppointment,
-          reserve_status: form.reserveStatus,
-          highest_education: form.highestEducation,
-          course_degree: form.courseDegree,
-          school: form.school,
+          blood_type: form.bloodType || null,
+          reserve_center: form.reserveCenter || null,
+          category: form.category || null,
+          date_enlisted: form.dateEnlisted || null,
+          source_of_commission: form.sourceOfCommission || null,
+          rank_date_appointment: form.rankDateOfAppointment || null,
+          reserve_status: form.reserveStatus || 'Ready Reserve',
+          highest_education: form.highestEducation || null,
+          course_degree: form.courseDegree || null,
+          school: form.school || null,
           year_graduated: form.yearGraduated ? parseInt(form.yearGraduated, 10) : null,
-          employer: form.employerCompany,
-          office_address: form.officeAddress,
-          basic_training_completed: form.basicTraining,
-          basic_training_date: form.basicTrainingDateCompleted,
-          emergency_contact_name: form.emergencyContactName,
-          emergency_contact_phone: form.emergencyContactNumber,
-          emergency_contact_address: form.emergencyContactAddress,
-        });
+          employer: form.employerCompany || null,
+          office_address: form.officeAddress || null,
+          basic_training_completed: form.basicTraining || null,
+          basic_training_date: form.basicTrainingDateCompleted || null,
+          status_bcmt: form.statusBcmt ? 1 : 0,
+          status_adt: form.statusAdt ? 1 : 0,
+          status_vadt: form.statusVadt ? 1 : 0,
+          status_rotc: form.statusRotc ? 1 : 0,
+          status_others: form.statusOthers || null,
+          emergency_contact_name: form.emergencyContactName || null,
+          emergency_contact_phone: form.emergencyContactNumber || null,
+          emergency_contact_address: form.emergencyContactAddress || null,
+        };
+        const response = await updateReservist(modal.row.id, requestData);
         if (response.data.status === 'success') {
+          // Re-fetch the full list so state is always sourced from the server.
+          // Avoids stale-closure / partial-response bugs where optimistic updates
+          // show missing assignment fields (squadron, group, arcen, airbase) until refresh.
           const updatedReservist = transformReservistData([response.data.data])[0];
-          setData((prev) =>
-            prev.map((r) => r.id === modal.row.id ? updatedReservist : r)
-          );
-          if (detailRow?.id === modal.row.id) {
-            setDetailRow(updatedReservist);
-          }
-          if (viewRow?.id === modal.row.id) {
-            setViewRow(updatedReservist);
-          }
+          await loadReservists(currentPage);
+          // Sync open panels to the freshly-loaded record.
+          if (detailRow?.id === modal.row.id) setDetailRow(updatedReservist);
+          if (viewRow?.id === modal.row.id) setViewRow(updatedReservist);
+          addToast('Reservist updated successfully', 'success');
         }
       }
       closeModal();
     } catch (err) {
-      setError(err.response?.data?.message || 'Operation failed');
+      const errorData = err.response?.data;
+      if (errorData?.errors && Array.isArray(errorData.errors)) {
+        addToast(errorData.errors.map(e => e.msg || e.path).join(', '), 'error');
+      } else {
+        addToast(errorData?.message || 'Operation failed', 'error');
+      }
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Delete this reservist? This action cannot be undone.")) return;
+    setDeleteConfirm({ open: true, id });
+  };
+
+  const confirmDelete = async () => {
+    const { id } = deleteConfirm;
+    setDeleteConfirm({ open: false, id: null });
     try {
       await deleteReservist(id);
       setData((prev) => prev.filter((r) => r.id !== id));
       if (detailRow?.id === id) setDetailRow(null);
+      addToast('Reservist deleted successfully', 'success');
     } catch (err) {
-      setError(err.response?.data?.message || 'Delete failed');
+      addToast(err.response?.data?.message || 'Delete failed', 'error');
     }
   };
 
@@ -357,17 +388,12 @@ export default function Reservists() {
       });
       if (response.data.status === 'success') {
         const updatedReservist = transformReservistData([response.data.data])[0];
-        setData((prev) =>
-          prev.map((r) =>
-            r.id === id ? updatedReservist : r
-          )
-        );
-        if (detailRow?.id === id) {
-          setDetailRow(updatedReservist);
-        }
+        await loadReservists(currentPage);
+        if (detailRow?.id === id) setDetailRow(updatedReservist);
+        addToast('Reservist status updated successfully', 'success');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Status update failed');
+      addToast(err.response?.data?.message || 'Status update failed', 'error');
     }
   };
 
@@ -401,45 +427,43 @@ export default function Reservists() {
         </div>
       )}
 
-      {error && (
-        <div className="rounded-md bg-red-50 dark:bg-red-950/30 p-4 text-sm text-red-800 dark:text-red-200">
-          {error}
-        </div>
-      )}
-
       {!loading && (
           <>
             <div className="flex items-center gap-2 flex-wrap">
-              <PrimaryButton icon={Upload} onClick={() => setBulkUploadModal(true)} variant="secondary" className="flex-1 sm:flex-none">
-                <span className="hidden sm:inline">Bulk Upload</span>
-                <span className="sm:hidden">Upload</span>
-              </PrimaryButton>
+              {canMutate && (
+                <PrimaryButton icon={Upload} onClick={() => setBulkUploadModal(true)} variant="secondary" className="flex-1 sm:flex-none">
+                  <span className="hidden sm:inline">Bulk Upload</span>
+                  <span className="sm:hidden">Upload</span>
+                </PrimaryButton>
+              )}
               <PrimaryButton icon={Download} onClick={handleExport} variant="secondary" className="flex-1 sm:flex-none">
                 <span className="hidden sm:inline">Export All</span>
                 <span className="sm:hidden">Export</span>
               </PrimaryButton>
-              <PrimaryButton icon={Plus} onClick={openAdd} className="flex-1 sm:flex-none">
-                <span className="hidden sm:inline">Add Reservist</span>
-                <span className="sm:hidden">Add</span>
-              </PrimaryButton>
+              {canMutate && (
+                <PrimaryButton icon={Plus} onClick={openAdd} className="flex-1 sm:flex-none">
+                  <span className="hidden sm:inline">Add Reservist</span>
+                  <span className="sm:hidden">Add</span>
+                </PrimaryButton>
+              )}
             </div>
 
-            <ReservistStatsBar data={data} />
+            <ReservistStatsBar stats={stats} />
 
 <SearchAndFilters
-              search={search}
-              onSearchChange={setSearch}
-              filters={filters}
-              onFiltersChange={setFilters}
+              search={pendingSearch}
+              onSearchChange={setPendingSearch}
+              filters={pendingFilters}
+              onFiltersChange={setPendingFilters}
               resultCount={filteredData.length}
             />
 
             <ReservistTable
               data={filteredData}
               onView={setViewRow}
-              onEdit={openEdit}
-              onDelete={handleDelete}
-              onToggleStatus={toggleStatus}
+              onEdit={canMutate ? openEdit : null}
+              onDelete={canMutate ? handleDelete : null}
+              onToggleStatus={canMutate ? toggleStatus : null}
             />
 
             {/* Pagination */}
@@ -468,33 +492,47 @@ export default function Reservists() {
               </div>
             )}
 
+            {canMutate && (
             <ReservistModal
-            open={modal.open}
-            mode={modal.mode}
-            form={form}
-            onChange={setForm}
-            onClose={closeModal}
-            onSubmit={handleSubmit}
-          />
+              open={modal.open}
+              mode={modal.mode}
+              form={form}
+              onChange={setForm}
+              onClose={closeModal}
+              onSubmit={handleSubmit}
+            />
+          )}
 
-          <BulkUploadModal
-            isOpen={bulkUploadModal}
-            onClose={() => setBulkUploadModal(false)}
-            onSuccess={loadReservists}
-          />
+          {canMutate && (
+            <BulkUploadModal
+              isOpen={bulkUploadModal}
+              onClose={() => setBulkUploadModal(false)}
+              onSuccess={loadReservists}
+            />
+          )}
 
           {detailRow && (
             <ReservistDetailPanel
               reservist={detailRow}
               onClose={() => setDetailRow(null)}
-              onEdit={() => openEdit(detailRow)}
+              onEdit={canMutate ? () => openEdit(detailRow) : null}
             />
           )}
 
           <ReservistViewModal
             reservist={viewRow}
             onClose={() => setViewRow(null)}
-            onEdit={(row) => { setViewRow(null); openEdit(row); }}
+            onEdit={canMutate ? (row) => { setViewRow(null); openEdit(row); } : null}
+          />
+
+          <ConfirmDialog
+            open={deleteConfirm.open}
+            title="Delete Reservist"
+            description="This action cannot be undone. Are you sure you want to delete this reservist?"
+            confirmLabel="Delete"
+            destructive
+            onConfirm={confirmDelete}
+            onCancel={() => setDeleteConfirm({ open: false, id: null })}
           />
         </>
       )}

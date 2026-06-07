@@ -9,17 +9,21 @@
     "test": "jest"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.3",
+    "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "debug": "^4.4.3",
     "dotenv": "^16.3.1",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "express-rate-limit": "^7.5.1",
     "express-validator": "^7.3.2",
     "jsonwebtoken": "^9.0.3",
-    "multer": "^2.0.2",
+    "multer": "^1.4.5-lts.1",
     "mysql2": "^3.22.3",
-    "pdfkit": "^0.13.0",
-    "xlsx": "^0.18.5"
+    "pdfkit": "^0.13.0"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

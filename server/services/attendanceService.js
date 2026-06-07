@@ -167,15 +167,30 @@ async function manualCheckInInternal(trainingId, reservistId, status, facilitato
   };
 }
 
-async function manualCheckInExternal(externalTrainingId, reservistId, status, facilitatorId) {
+async function manualCheckInExternal(externalTrainingId, id, status, facilitatorId) {
   const training = await externalTrainingModel.findExternalById(externalTrainingId);
   if (!training) throw createError('External training not found', 404);
 
-  const registration = await attendanceModel.isRegisteredForExternalTraining(externalTrainingId, reservistId);
+  // id can be either reservist_id or registration_id
+  let registration = null;
+
+  // First try to find registration by the provided ID (could be reservist_id)
+  if (id) {
+    registration = await attendanceModel.isRegisteredForExternalTraining(externalTrainingId, id);
+  }
+
+  // If not found, try looking up by registration ID directly
+  if (!registration && id) {
+    const reg = await attendanceModel.getRegistrationById(id);
+    if (reg && reg.training_id == externalTrainingId) {
+      registration = reg;
+    }
+  }
+
   if (!registration) throw createError('Reservist is not registered for this external training', 403);
 
   const result = await attendanceModel.upsertExternalAttendance(
-    externalTrainingId, registration.id, reservistId, null, status, 'manual', facilitatorId
+    externalTrainingId, registration.id, registration.reservist_id, null, status, 'manual', facilitatorId
   );
 
   return {
@@ -237,10 +252,41 @@ async function getExternalAttendanceList(externalTrainingId) {
   const training = await externalTrainingModel.findExternalById(externalTrainingId);
   if (!training) throw createError('External training not found', 404);
 
-  const [attendanceRecords, stats] = await Promise.all([
+  // Fetch both registrations and existing attendance records
+  const [registrations, attendanceRecords, stats] = await Promise.all([
+    attendanceModel.getExternalTrainingRegistrations(externalTrainingId),
     attendanceModel.getAttendanceByExternalTraining(externalTrainingId),
     attendanceModel.getExternalTrainingStats(externalTrainingId)
   ]);
+
+  // Build attendance map keyed by registration_id first, then reservist_id
+  const attendanceMap = new Map();
+  for (const rec of attendanceRecords) {
+    if (rec.registration_id) {
+      attendanceMap.set(`reg_${rec.registration_id}`, rec);
+    }
+    if (rec.reservist_id) {
+      attendanceMap.set(`res_${rec.reservist_id}`, rec);
+    }
+  }
+
+  // Merge registrations with attendance data
+  const merged = registrations.map(r => {
+    const att = attendanceMap.get(`reg_${r.registration_id}`) || attendanceMap.get(`res_${r.reservist_id}`);
+    return {
+      registration_id: r.registration_id,
+      reservist_id: r.reservist_id || null,
+      first_name: r.first_name || r.participant_data?.first_name,
+      last_name: r.last_name || r.participant_data?.last_name,
+      rank: r.rank || r.participant_data?.rank,
+      service_number: r.service_number || r.participant_data?.service_number,
+      qr_code: r.qr_code || r.participant_data?.qr_code,
+      status: att?.status || 'pending',
+      check_in_time: att?.check_in_time || null,
+      scan_method: att?.scan_method || null,
+      attendance_id: att?.id || null
+    };
+  });
 
   return {
     training: {
@@ -251,7 +297,7 @@ async function getExternalAttendanceList(externalTrainingId) {
       venue: training.venue,
       capacity: training.capacity
     },
-    attendees: attendanceRecords,
+    participants: merged,  // Use 'participants' for consistency with internal
     stats
   };
 }

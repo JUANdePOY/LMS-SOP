@@ -67,6 +67,22 @@ const requireSuperAdmin = (req, res, next) => {
 };
 
 /**
+ * Authorize admin or admin_arsen (e.g. reservist mutations scoped to ARSEN)
+ * Allows: admin, admin_arsen
+ */
+const requireAdminArsenOrHigher = (req, res, next) => {
+  const allowed = ['admin', 'admin_arsen'];
+  if (!allowed.includes(req.user?.role)) {
+    return res.status(403).json({
+      status: 'error',
+      message: 'Admin or ARSEN admin access required',
+      code: 'ADMIN_ARSEN_REQUIRED'
+    });
+  }
+  next();
+};
+
+/**
  * Check ownership - user can only access their own resources
  * @param {string} userIdField - Field name in request (params or body) containing user ID
  * @returns {Function} Express middleware
@@ -181,6 +197,7 @@ module.exports = {
   authorize,
   requireAdmin,
   requireSuperAdmin,
+  requireAdminArsenOrHigher,
   checkOwnership,
   isAdmin,
   ADMIN_ROLES,

@@ -34,6 +34,10 @@ export default function ManageGroups() {
   // Only super-admin and admin_arsen can mutate groups
   const canMutate = user?.role === "admin" || user?.role === "admin_arsen";
 
+  // admin_arsen is scoped to their own ARSEN — lock the ARSEN dropdown to their scope
+  // so they cannot accidentally (or intentionally) assign a group to a different ARSEN.
+  const isArsenAdmin = user?.role === "admin_arsen";
+
   const [data,         setData]         = useState([]);
   const [arcenOptions, setArcenOptions] = useState([]);
   const [loading,      setLoading]      = useState(false);
@@ -69,12 +73,18 @@ export default function ManageGroups() {
       const response = await getArcens();
       if (response.data.status === "success") {
         // FIX: was using `arcen.name` for BOTH value fields — now uses arcen.code for label suffix
-        const options = response.data.data.map((arcen) => ({
+        let options = response.data.data.map((arcen) => ({
           value: String(arcen.id),
           label: `${arcen.name} — ${arcen.code}`,
           arcenName: arcen.name,
           arcenCode: arcen.code,
         }));
+
+        // admin_arsen can only assign groups within their own ARSEN — filter to their scope
+        if (isArsenAdmin && user?.scope_arsen_id) {
+          options = options.filter((o) => o.value === String(user.scope_arsen_id));
+        }
+
         setArcenOptions(options);
       }
     } catch (err) {
@@ -122,7 +132,11 @@ export default function ManageGroups() {
 
   // ─── Modal helpers ──────────────────────────────────────────────────────────
   const openAdd = () => {
-    setForm(EMPTY_FORM);
+    // Pre-fill arcenId for admin_arsen — they can only create groups in their own ARSEN
+    const defaultArcenId = isArsenAdmin && user?.scope_arsen_id
+      ? String(user.scope_arsen_id)
+      : "";
+    setForm({ ...EMPTY_FORM, arcenId: defaultArcenId });
     setErrors({});
     setApiError(null);
     setEditMode("add");

@@ -1,8 +1,8 @@
 const express = require('express');
 const { body, validationResult, query } = require('express-validator');
 const db = require('../config/database');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
-const { getUserScopeFilter } = require('../middleware/rbac');
+const { authenticateToken } = require('../middleware/auth');
+const { getUserScopeFilter, requireAdminArsenOrHigher } = require('../middleware/rbac');
 const { hashPassword, generateResetToken } = require('../app/auth');
 const { logAudit } = require('../utils/auditLogger');
 const crypto = require('crypto');
@@ -103,43 +103,70 @@ const buildFilterQuery = (filters) => {
   const conditions = [];
   const params = [];
 
-  if (filters.status !== undefined) {
-    if (filters.status === 'active') {
-      conditions.push('r.is_active = ?');
-      params.push(1);
-    } else if (filters.status === 'inactive') {
-      conditions.push('r.is_active = ?');
-      params.push(0);
-    } else if (filters.status === 'standby') {
-      conditions.push('r.reserve_status = ?');
-      params.push('Standby Reserve');
-    }
+  // Active/inactive status
+  if (filters.status === 'active') {
+    conditions.push('r.is_active = ?');
+    params.push(1);
+  } else if (filters.status === 'inactive') {
+    conditions.push('r.is_active = ?');
+    params.push(0);
   }
 
+  // Assignment filters
+  if (filters.arsen_id) {
+    conditions.push('g.arsen_id = ?');
+    params.push(Number(filters.arsen_id));
+  }
   if (filters.group_id) {
     conditions.push('ra.group_id = ?');
-    params.push(filters.group_id);
+    params.push(Number(filters.group_id));
   }
-
   if (filters.squadron_id) {
     conditions.push('ra.squadron_id = ?');
-    params.push(filters.squadron_id);
+    params.push(Number(filters.squadron_id));
   }
 
+  // Military filters
   if (filters.rank) {
     conditions.push('r.`rank` = ?');
     params.push(filters.rank);
   }
-
   if (filters.reserve_status) {
     conditions.push('r.reserve_status = ?');
     params.push(filters.reserve_status);
   }
+  if (filters.specialization) {
+    conditions.push('r.specialization = ?');
+    params.push(filters.specialization);
+  }
+  if (filters.category) {
+    conditions.push('r.category = ?');
+    params.push(filters.category);
+  }
+  if (filters.sourceOfCommission) {
+    conditions.push('r.source_of_commission = ?');
+    params.push(filters.sourceOfCommission);
+  }
 
+  // Personal filters
+  if (filters.bloodType) {
+    conditions.push('r.blood_type = ?');
+    params.push(filters.bloodType);
+  }
+  if (filters.sex) {
+    conditions.push('r.sex = ?');
+    params.push(filters.sex);
+  }
+  if (filters.civilStatus) {
+    conditions.push('r.civil_status = ?');
+    params.push(filters.civilStatus);
+  }
+
+  // Full-text search across name, service number, rank, email
   if (filters.search) {
-    conditions.push('(r.first_name LIKE ? OR r.last_name LIKE ? OR r.service_number LIKE ? OR u.email LIKE ?)');
-    const searchTerm = `%${filters.search}%`;
-    params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    conditions.push('(r.first_name LIKE ? OR r.last_name LIKE ? OR CONCAT(r.first_name, " ", r.last_name) LIKE ? OR r.service_number LIKE ? OR r.`rank` LIKE ? OR u.email LIKE ?)');
+    const s = '%' + filters.search + '%';
+    params.push(s, s, s, s, s, s);
   }
 
   return {
@@ -147,6 +174,37 @@ const buildFilterQuery = (filters) => {
     params
   };
 };
+
+// ─────────────────────────────────────────────────────────────
+// Scope guard helpers — reused across PUT, DELETE, assign
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Verify that a reservist (by reservist.id) belongs to the admin_arsen's ARSEN.
+ * Returns true if in-scope, false otherwise.
+ */
+async function isReservistInArsenScope(reservistId, arsenId) {
+  const [rows] = await db.query(
+    `SELECT r.id FROM reservists r
+     LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+     LEFT JOIN \`groups\` g ON ra.group_id = g.id
+     WHERE r.id = ? AND g.arsen_id = ?`,
+    [reservistId, arsenId]
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Verify that a group belongs to the admin_arsen's ARSEN.
+ * Returns true if in-scope, false otherwise.
+ */
+async function isGroupInArsenScope(groupId, arsenId) {
+  const [rows] = await db.query(
+    'SELECT id FROM `groups` WHERE id = ? AND arsen_id = ?',
+    [groupId, arsenId]
+  );
+  return rows.length > 0;
+}
 
 /**
  * GET /api/reservists
@@ -178,16 +236,16 @@ router.get(
         });
       }
 
-// Apply scope filter for unit admins
-       let scopeWhere = '';
-       let scopeParams = [];
-       if (req.user.role !== 'admin') {
-         const { conditions, params } = getUserScopeFilter(req.user, { group: 'ra.group_id', squadron: 'ra.squadron_id', arsen: 'g.arsen_id' });
-         if (conditions.length > 0) {
-           scopeWhere = ' AND (' + conditions.join(' OR ') + ')';
-           scopeParams = params;
-         }
-       }
+      // Apply scope filter for unit admins
+      let scopeWhere = '';
+      let scopeParams = [];
+      if (req.user.role !== 'admin') {
+        const { conditions, params } = getUserScopeFilter(req.user, { group: 'ra.group_id', squadron: 'ra.squadron_id', arsen: 'g.arsen_id' });
+        if (conditions.length > 0) {
+          scopeWhere = conditions.join(' AND ');
+          scopeParams = params;
+        }
+      }
 
       // Validate query params
       const errors = validationResult(req);
@@ -200,52 +258,87 @@ router.get(
       const sortOrder = (req.query.sort_order || 'desc').toUpperCase();
 
       const filter = buildFilterQuery(req.query);
+      
+      // Combine scope and filter conditions
+      const allParams = [...filter.params, ...scopeParams];
+      let whereClause = '';
+      if (filter.whereClause && scopeWhere) {
+        whereClause = filter.whereClause + ' AND ' + scopeWhere;
+      } else if (filter.whereClause) {
+        whereClause = filter.whereClause;
+      } else if (scopeWhere) {
+        whereClause = 'WHERE ' + scopeWhere;
+      }
 
-const countQuery = `
-          SELECT COUNT(DISTINCT r.id) as total
-          FROM reservists r
-          LEFT JOIN users u ON r.user_id = u.id
-          LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id
-          LEFT JOIN \`groups\` g ON ra.group_id = g.id
-          ${filter.whereClause}
-          ${scopeWhere}
-        `;
+      const countQuery = `
+        SELECT COUNT(DISTINCT r.id) as total
+        FROM reservists r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+        LEFT JOIN \`groups\` g ON ra.group_id = g.id
+        LEFT JOIN arsens a ON g.arsen_id = a.id
+        ${whereClause}
+      `;
 
-       const [countResult] = await db.query(countQuery, [...filter.params, ...scopeParams]);
-       const total = countResult[0].total;
+      const [countResult] = await db.query(countQuery, allParams);
+      const total = countResult[0].total;
 
-        // Fetch paginated records
-       const query_str = `
-           SELECT 
-             r.id, r.user_id, r.first_name, r.last_name, r.rank, 
-             r.service_number, r.position, r.date_of_birth, r.place_of_birth,
-             r.age, r.sex, r.civil_status, r.citizenship, r.height, r.weight,
-             r.blood_type, r.phone_number, r.address,
-             r.reserve_center, r.category, r.date_enlisted, r.source_of_commission,
-             r.rank_date_appointment, r.specialization, r.reserve_status,
-             r.highest_education, r.course_degree, r.school, r.year_graduated,
-             r.occupation, r.employer, r.office_address,
-             r.basic_training_completed, r.basic_training_date,
-             r.emergency_contact_name, r.emergency_contact_phone, r.emergency_contact_address,
-             r.is_active, r.created_at, r.updated_at,
-             u.email,
-             ra.id as assignment_id, ra.group_id, ra.squadron_id, 
-             g.name as group_name, a.name as arcen_name,
-             s.name as squadron_name, s.location as squadron_location
-           FROM reservists r
-          LEFT JOIN users u ON r.user_id = u.id
-          LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
-          LEFT JOIN \`groups\` g ON ra.group_id = g.id
-          LEFT JOIN arsens a ON g.arsen_id = a.id
-          LEFT JOIN squadron s ON ra.squadron_id = s.id
-          ${filter.whereClause}
-          ${scopeWhere}
-          ORDER BY r.${sortBy} ${sortOrder}
-          LIMIT ? OFFSET ?
-        `;
+      // Fetch per-status stats (always over the full scoped+filtered set, not just one page)
+      // Stats query — identical JOINs to the count query so the WHERE clause
+      // (which may reference g.arsen_id via scope filters) resolves correctly.
+      const statsQuery = `
+        SELECT
+          SUM(r.is_active = 1)                              AS active,
+          SUM(r.is_active = 0)                              AS inactive,
+          SUM(r.reserve_status = 'Standby Reserve')         AS standby,
+          SUM(r.reserve_status = 'Retired')                 AS retired,
+          SUM(r.reserve_status = 'Ready Reserve')           AS ready,
+          SUM(IFNULL(r.status_bcmt, 0) = 1)                 AS bcmt,
+          SUM(IFNULL(r.status_adt,  0) = 1)                 AS adt,
+          SUM(IFNULL(r.status_vadt, 0) = 1)                 AS vadt,
+          SUM(IFNULL(r.status_rotc, 0) = 1)                 AS rotc
+        FROM reservists r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+        LEFT JOIN \`groups\` g ON ra.group_id = g.id
+        LEFT JOIN arsens a ON g.arsen_id = a.id
+        ${whereClause}
+      `;
+      const [statsResult] = await db.query(statsQuery, allParams);
+      const stats = statsResult[0] || {};
 
-       const params = [...filter.params, ...scopeParams, limit, offset];
-    const [rows] = await db.query(query_str, params);
+      // Fetch paginated records
+      const query_str = `
+        SELECT 
+          r.id, r.user_id, r.first_name, r.last_name, r.rank, 
+          r.service_number, r.position, r.date_of_birth, r.place_of_birth,
+          r.age, r.sex, r.civil_status, r.citizenship, r.height, r.weight,
+          r.blood_type, r.phone_number, r.address,
+          r.reserve_center, r.category, r.date_enlisted, r.source_of_commission,
+          r.rank_date_appointment, r.specialization, r.reserve_status,
+          r.highest_education, r.course_degree, r.school, r.year_graduated,
+          r.occupation, r.employer, r.office_address,
+          r.basic_training_completed, r.basic_training_date,
+          r.status_bcmt, r.status_adt, r.status_vadt, r.status_rotc, r.status_others,
+          r.emergency_contact_name, r.emergency_contact_phone, r.emergency_contact_address,
+          r.is_active, r.created_at, r.updated_at,
+          u.email,
+          ra.id as assignment_id, ra.group_id, ra.squadron_id, 
+          g.name as group_name, a.name as arcen_name,
+          s.name as squadron_name, s.location as squadron_location
+        FROM reservists r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+        LEFT JOIN \`groups\` g ON ra.group_id = g.id
+        LEFT JOIN arsens a ON g.arsen_id = a.id
+        LEFT JOIN squadron s ON ra.squadron_id = s.id
+        ${whereClause}
+        ORDER BY r.${sortBy} ${sortOrder}
+        LIMIT ? OFFSET ?
+      `;
+
+      const params = [...allParams, limit, offset];
+      const [rows] = await db.query(query_str, params);
 
       res.json({
         status: 'success',
@@ -255,6 +348,18 @@ const countQuery = `
           limit,
           total,
           pages: Math.ceil(total / limit)
+        },
+        stats: {
+          total:   Number(total),
+          active:  Number(stats.active   || 0),
+          inactive:Number(stats.inactive || 0),
+          standby: Number(stats.standby  || 0),
+          retired: Number(stats.retired  || 0),
+          ready:   Number(stats.ready    || 0),
+          bcmt:    Number(stats.bcmt     || 0),
+          adt:     Number(stats.adt      || 0),
+          vadt:    Number(stats.vadt     || 0),
+          rotc:    Number(stats.rotc     || 0),
         }
       });
     } catch (error) {
@@ -345,11 +450,13 @@ router.get('/:id', authenticateToken, async (req, res) => {
 /**
  * POST /api/reservists
  * Create a new reservist
+ * Allowed: admin, admin_arsen
+ * admin_arsen: can only assign reservists to groups within their own ARSEN
  */
 router.post(
   '/',
   authenticateToken,
-  requireAdmin,
+  requireAdminArsenOrHigher,
   [
     body('email').isEmail().trim().normalizeEmail(),
     body('first_name').notEmpty().trim().isLength({ min: 2, max: 100 }),
@@ -357,15 +464,15 @@ router.post(
     body('rank').notEmpty().trim(),
     body('service_number').notEmpty().trim().isLength({ min: 3, max: 100 }),
     body('password').isLength({ min: 6 }),
-    body('date_of_birth').optional().isISO8601(),
-    body('sex').optional().isIn(['Male', 'Female', 'Other']),
-    body('blood_type').optional().isIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown']),
-    body('phone_number').optional().trim(),
-body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Retired']),
-     body('group_id').optional().isInt(),
-     body('squadron_id').optional().isInt(),
-     body('position').optional().trim(),
-     body('specialization').optional().trim()
+    body('date_of_birth').optional({ checkFalsy: true, nullable: true }).isISO8601(),
+    body('sex').optional({ checkFalsy: true, nullable: true }).isIn(['Male', 'Female', 'Other']),
+    body('blood_type').optional({ checkFalsy: true, nullable: true }).isIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown']),
+    body('phone_number').optional({ checkFalsy: true, nullable: true }).trim(),
+    body('reserve_status').optional({ checkFalsy: true, nullable: true }).isIn(['Ready Reserve', 'Standby Reserve', 'Retired']),
+    body('group_id').optional({ checkFalsy: true, nullable: true }).isInt(),
+    body('squadron_id').optional({ checkFalsy: true, nullable: true }).isInt(),
+    body('position').optional().trim(),
+    body('specialization').optional().trim()
   ],
   async (req, res) => {
     try {
@@ -384,11 +491,24 @@ body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Ret
         highest_education, course_degree, school, year_graduated,
         occupation, employer, office_address,
         basic_training_completed, basic_training_date,
+        status_bcmt, status_adt, status_vadt, status_rotc, status_others,
         emergency_contact_name, emergency_contact_phone, emergency_contact_address,
         ...otherFields
       } = req.body;
 
-// Check if email or service number already exists
+      // ── Scope guard: admin_arsen may only create reservists inside their ARSEN ──
+      if (req.user.role === 'admin_arsen' && group_id) {
+        const inScope = await isGroupInArsenScope(parseInt(group_id), req.user.scope_arsen_id);
+        if (!inScope) {
+          return res.status(403).json({
+            status: 'error',
+            message: 'You can only assign reservists to groups within your ARSEN',
+            code: 'OUT_OF_SCOPE'
+          });
+        }
+      }
+
+      // Check if email or service number already exists
       const [existing] = await db.query(
         'SELECT id FROM users WHERE email = ? UNION SELECT r.user_id FROM reservists r WHERE r.service_number = ?',
         [email, service_number]
@@ -405,11 +525,11 @@ body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Ret
       // Validate group and squadron if provided
       let group_id_int = null;
       let squadron_id_int = null;
-      
+
       if (group_id && squadron_id) {
         const hasGroupId = !isNaN(parseInt(group_id));
         const hasSquadronId = !isNaN(parseInt(squadron_id));
-        
+
         if (!hasGroupId || !hasSquadronId) {
           return res.status(400).json({
             status: 'error',
@@ -417,7 +537,7 @@ body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Ret
             code: 'INVALID_ASSIGNMENT'
           });
         }
-        
+
         group_id_int = parseInt(group_id);
         squadron_id_int = parseInt(squadron_id);
 
@@ -456,47 +576,52 @@ body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Ret
 
         const userId = userResult.insertId;
 
-// Create reservist with all fields
-         const reservistData = {
-           user_id: userId,
-           first_name,
-           last_name,
-           rank,
-           service_number,
-           date_of_birth: date_of_birth || null,
-           sex: sex || null,
-           blood_type: blood_type || 'Unknown',
-           phone_number: phone_number || null,
-           reserve_status: reserve_status || 'Ready Reserve',
-           is_active: true,
-           place_of_birth: place_of_birth || null,
-           civil_status: civil_status || null,
-           citizenship: citizenship || 'Filipino',
-           height: height || null,
-           weight: weight || null,
-           address: address || null,
-           reserve_center: reserve_center || null,
-           category: category || null,
-           date_enlisted: date_enlisted || null,
-           source_of_commission: source_of_commission || null,
-           rank_date_appointment: rank_date_appointment || null,
-           position: position || null,
-           specialization: specialization || null,
-           highest_education: highest_education || null,
-           course_degree: course_degree || null,
-           school: school || null,
-           year_graduated: year_graduated || null,
-           occupation: occupation || null,
-           employer: employer || null,
-           office_address: office_address || null,
-           basic_training_completed: basic_training_completed || null,
-           basic_training_date: basic_training_date || null,
-           emergency_contact_name: emergency_contact_name || null,
-           emergency_contact_phone: emergency_contact_phone || null,
-            emergency_contact_address: emergency_contact_address || null,
-             ...otherFields,
-             qr_code: generateUniqueQRCode()
-          };
+        // Create reservist with all fields
+        const reservistData = {
+          user_id: userId,
+          first_name,
+          last_name,
+          rank,
+          service_number,
+          date_of_birth: date_of_birth || null,
+          sex: sex || null,
+          blood_type: blood_type || 'Unknown',
+          phone_number: phone_number || null,
+          reserve_status: reserve_status || 'Ready Reserve',
+          is_active: true,
+          place_of_birth: place_of_birth || null,
+          civil_status: civil_status || null,
+          citizenship: citizenship || 'Filipino',
+          height: height || null,
+          weight: weight || null,
+          address: address || null,
+          reserve_center: reserve_center || null,
+          category: category || null,
+          date_enlisted: date_enlisted || null,
+          source_of_commission: source_of_commission || null,
+          rank_date_appointment: rank_date_appointment || null,
+          position: position || null,
+          specialization: specialization || null,
+          highest_education: highest_education || null,
+          course_degree: course_degree || null,
+          school: school || null,
+          year_graduated: year_graduated || null,
+          occupation: occupation || null,
+          employer: employer || null,
+          office_address: office_address || null,
+          basic_training_completed: basic_training_completed || null,
+          basic_training_date: basic_training_date || null,
+          status_bcmt: status_bcmt ? 1 : 0,
+          status_adt: status_adt ? 1 : 0,
+          status_vadt: status_vadt ? 1 : 0,
+          status_rotc: status_rotc ? 1 : 0,
+          status_others: status_others || null,
+          emergency_contact_name: emergency_contact_name || null,
+          emergency_contact_phone: emergency_contact_phone || null,
+          emergency_contact_address: emergency_contact_address || null,
+          ...otherFields,
+          qr_code: generateUniqueQRCode()
+        };
 
         const columns = Object.keys(reservistData).map(col => `\`${col}\``);
         const values = Object.values(reservistData);
@@ -561,20 +686,22 @@ body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Ret
 /**
  * PUT /api/reservists/:id
  * Update a reservist's information
+ * Allowed: admin, admin_arsen
+ * admin_arsen: can only update reservists within their ARSEN scope
  */
 router.put(
   '/:id',
   authenticateToken,
-  requireAdmin,
+  requireAdminArsenOrHigher,
   [
-    body('first_name').optional().trim().isLength({ min: 2, max: 100 }),
-    body('last_name').optional().trim().isLength({ min: 2, max: 100 }),
-    body('rank').optional().trim(),
-    body('date_of_birth').optional().isISO8601(),
-    body('sex').optional().isIn(['Male', 'Female', 'Other']),
-    body('blood_type').optional().isIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown']),
-    body('phone_number').optional().trim(),
-    body('reserve_status').optional().isIn(['Ready Reserve', 'Standby Reserve', 'Retired'])
+    body('first_name').optional({ checkFalsy: true, nullable: true }).trim().isLength({ min: 2, max: 100 }),
+    body('last_name').optional({ checkFalsy: true, nullable: true }).trim().isLength({ min: 2, max: 100 }),
+    body('rank').optional({ checkFalsy: true, nullable: true }).trim(),
+    body('date_of_birth').optional({ checkFalsy: true, nullable: true }).isISO8601(),
+    body('sex').optional({ checkFalsy: true, nullable: true }).isIn(['Male', 'Female', 'Other']),
+    body('blood_type').optional({ checkFalsy: true, nullable: true }).isIn(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown']),
+    body('phone_number').optional({ checkFalsy: true, nullable: true }).trim(),
+    body('reserve_status').optional({ checkFalsy: true, nullable: true }).isIn(['Ready Reserve', 'Standby Reserve', 'Retired'])
   ],
   async (req, res) => {
     try {
@@ -599,6 +726,18 @@ router.put(
         });
       }
 
+      // ── Scope guard: admin_arsen may only update reservists inside their ARSEN ──
+      if (req.user.role === 'admin_arsen') {
+        const inScope = await isReservistInArsenScope(id, req.user.scope_arsen_id);
+        if (!inScope) {
+          return res.status(403).json({
+            status: 'error',
+            message: 'Access denied - reservist is outside your ARSEN scope',
+            code: 'OUT_OF_SCOPE'
+          });
+        }
+      }
+
       // Prepare update fields
       const updateFields = {};
       const allowedFields = [
@@ -610,6 +749,7 @@ router.put(
         'highest_education', 'course_degree', 'school', 'year_graduated',
         'occupation', 'employer', 'office_address',
         'basic_training_completed', 'basic_training_date',
+        'status_bcmt', 'status_adt', 'status_vadt', 'status_rotc', 'status_others',
         'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_address'
       ];
 
@@ -647,9 +787,34 @@ router.put(
         user_agent: req.headers['user-agent']
       });
 
-      // Fetch updated reservist
+      // Fetch updated reservist — use the same projection as the list endpoint
+      // so the response includes assignment, group, arcen, and squadron fields.
+      // Without these JOINs the frontend loses assignment details until page refresh.
       const [updated] = await db.query(
-        'SELECT r.*, u.email FROM reservists r JOIN users u ON r.user_id = u.id WHERE r.id = ?',
+        `SELECT
+          r.id, r.user_id, r.first_name, r.last_name, r.rank,
+          r.service_number, r.position, r.date_of_birth, r.place_of_birth,
+          r.age, r.sex, r.civil_status, r.citizenship, r.height, r.weight,
+          r.blood_type, r.phone_number, r.address,
+          r.reserve_center, r.category, r.date_enlisted, r.source_of_commission,
+          r.rank_date_appointment, r.specialization, r.reserve_status,
+          r.highest_education, r.course_degree, r.school, r.year_graduated,
+          r.occupation, r.employer, r.office_address,
+          r.basic_training_completed, r.basic_training_date,
+          r.status_bcmt, r.status_adt, r.status_vadt, r.status_rotc, r.status_others,
+          r.emergency_contact_name, r.emergency_contact_phone, r.emergency_contact_address,
+          r.is_active, r.created_at, r.updated_at,
+          u.email,
+          ra.id as assignment_id, ra.group_id, ra.squadron_id,
+          g.name as group_name, a.name as arcen_name,
+          s.name as squadron_name, s.location as squadron_location
+        FROM reservists r
+        LEFT JOIN users u ON r.user_id = u.id
+        LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+        LEFT JOIN \`groups\` g ON ra.group_id = g.id
+        LEFT JOIN arsens a ON g.arsen_id = a.id
+        LEFT JOIN squadron s ON ra.squadron_id = s.id
+        WHERE r.id = ?`,
         [id]
       );
 
@@ -672,8 +837,10 @@ router.put(
 /**
  * DELETE /api/reservists/:id
  * Soft delete - deactivate a reservist
+ * Allowed: admin, admin_arsen
+ * admin_arsen: can only delete reservists within their ARSEN scope
  */
-router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
+router.delete('/:id', authenticateToken, requireAdminArsenOrHigher, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -688,6 +855,18 @@ router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
         message: 'Reservist not found',
         code: 'NOT_FOUND'
       });
+    }
+
+    // ── Scope guard: admin_arsen may only delete reservists inside their ARSEN ──
+    if (req.user.role === 'admin_arsen') {
+      const inScope = await isReservistInArsenScope(id, req.user.scope_arsen_id);
+      if (!inScope) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Access denied - reservist is outside your ARSEN scope',
+          code: 'OUT_OF_SCOPE'
+        });
+      }
     }
 
     // Soft delete by setting is_active to false
@@ -760,17 +939,17 @@ router.get('/:id/assignments', authenticateToken, async (req, res) => {
       });
     }
 
-const query = `
-       SELECT 
-         ra.id, ra.group_id, ra.squadron_id, ra.assigned_date, ra.is_primary,
-         g.name as group_name, g.code as group_code,
-         s.name as squadron_name, s.location
-       FROM reservist_assignments ra
-       LEFT JOIN \`groups\` g ON ra.group_id = g.id
-       LEFT JOIN squadron s ON ra.squadron_id = s.id
-       WHERE ra.reservist_id = ?
-       ORDER BY ra.assigned_date DESC
-     `;
+    const query = `
+      SELECT 
+        ra.id, ra.group_id, ra.squadron_id, ra.assigned_date, ra.is_primary,
+        g.name as group_name, g.code as group_code,
+        s.name as squadron_name, s.location
+      FROM reservist_assignments ra
+      LEFT JOIN \`groups\` g ON ra.group_id = g.id
+      LEFT JOIN squadron s ON ra.squadron_id = s.id
+      WHERE ra.reservist_id = ?
+      ORDER BY ra.assigned_date DESC
+    `;
 
     const [assignments] = await db.query(query, [id]);
 
@@ -790,12 +969,14 @@ const query = `
 
 /**
  * POST /api/reservists/:id/assign
- * Assign reservist to a Group and City
+ * Assign reservist to a Group and Squadron
+ * Allowed: admin, admin_arsen
+ * admin_arsen: can only assign to groups within their ARSEN scope
  */
 router.post(
   '/:id/assign',
   authenticateToken,
-  requireAdmin,
+  requireAdminArsenOrHigher,
   [
     body('group_id').isInt(),
     body('squadron_id').isInt()
@@ -824,7 +1005,19 @@ router.post(
         });
       }
 
-      // Validate group and squadron
+      // Scope guard: admin_arsen may only reassign reservists currently in their ARSEN
+      if (req.user.role === 'admin_arsen') {
+        const inScope = await isReservistInArsenScope(id, req.user.scope_arsen_id);
+        if (!inScope) {
+          return res.status(403).json({
+            status: 'error',
+            message: 'Access denied - reservist is outside your ARSEN scope',
+            code: 'OUT_OF_SCOPE'
+          });
+        }
+      }
+
+      // Validate group and squadron exist and are active
       const [groupData] = await db.query(
         'SELECT id FROM `groups` WHERE id = ? AND is_active = TRUE',
         [group_id]
@@ -840,6 +1033,18 @@ router.post(
           message: 'Invalid group or squadron',
           code: 'INVALID_ASSIGNMENT'
         });
+      }
+
+      // ── Scope guard: admin_arsen may only assign to groups inside their ARSEN ──
+      if (req.user.role === 'admin_arsen') {
+        const inScope = await isGroupInArsenScope(group_id, req.user.scope_arsen_id);
+        if (!inScope) {
+          return res.status(403).json({
+            status: 'error',
+            message: 'Access denied - group is outside your ARSEN scope',
+            code: 'OUT_OF_SCOPE'
+          });
+        }
       }
 
       // Check if squadron belongs to group
@@ -917,11 +1122,13 @@ router.post(
 /**
  * POST /api/reservists/:id/reset-password
  * Admin reset password functionality
+ * Allowed: admin, admin_arsen
+ * admin_arsen: can only reset passwords for reservists within their ARSEN scope
  */
 router.post(
   '/:id/reset-password',
   authenticateToken,
-  requireAdmin,
+  requireAdminArsenOrHigher,
   [
     body('new_password').isLength({ min: 6 })
   ],
@@ -947,6 +1154,18 @@ router.post(
           message: 'Reservist not found',
           code: 'NOT_FOUND'
         });
+      }
+
+      // ── Scope guard: admin_arsen may only reset passwords inside their ARSEN ──
+      if (req.user.role === 'admin_arsen') {
+        const inScope = await isReservistInArsenScope(id, req.user.scope_arsen_id);
+        if (!inScope) {
+          return res.status(403).json({
+            status: 'error',
+            message: 'Access denied - reservist is outside your ARSEN scope',
+            code: 'OUT_OF_SCOPE'
+          });
+        }
       }
 
       const userId = reservist[0].user_id;
@@ -990,7 +1209,7 @@ router.post(
  * GET /api/reservists/export
  * Export reservists data as CSV/JSON
  */
-router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
+router.get('/export', authenticateToken, requireAdminArsenOrHigher, async (req, res) => {
   try {
     const { format = 'csv', group_id, squadron_id } = req.query;
 
@@ -1003,13 +1222,13 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
     }
 
     let query_str = `
-       SELECT 
-         r.id, r.first_name, r.last_name, r.rank, r.service_number,
-         r.position, r.date_of_birth, r.sex, r.phone_number, r.reserve_status,
-         r.is_active, r.created_at,
-         u.email,
-         g.name as group_name, s.name as squadron_name
-       FROM reservists r
+      SELECT 
+        r.id, r.first_name, r.last_name, r.rank, r.service_number,
+        r.position, r.date_of_birth, r.sex, r.phone_number, r.reserve_status,
+        r.is_active, r.created_at,
+        u.email,
+        g.name as group_name, s.name as squadron_name
+      FROM reservists r
       LEFT JOIN users u ON r.user_id = u.id
       LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
       LEFT JOIN \`groups\` g ON ra.group_id = g.id
@@ -1052,8 +1271,8 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
         }
       });
     } else {
-      // CSV format - simplified for now
-      const csv = rows.map(row => 
+      // CSV format
+      const csv = rows.map(row =>
         Object.values(row).join(',')
       ).join('\n');
       res.setHeader('Content-Type', 'text/csv');
@@ -1083,11 +1302,12 @@ router.get('/export', authenticateToken, requireAdmin, async (req, res) => {
 /**
  * POST /api/reservists/import
  * Bulk import reservists from CSV/JSON
+ * Allowed: admin, admin_arsen
  */
 router.post(
   '/import',
   authenticateToken,
-  requireAdmin,
+  requireAdminArsenOrHigher,
   [
     body('data').isArray(),
     body('format').isIn(['csv', 'json'])
@@ -1138,6 +1358,19 @@ router.post(
             continue;
           }
 
+          // ── Scope guard: admin_arsen may only import into their ARSEN ──
+          if (req.user.role === 'admin_arsen' && record.group_id) {
+            const inScope = await isGroupInArsenScope(parseInt(record.group_id), req.user.scope_arsen_id);
+            if (!inScope) {
+              failureCount++;
+              errors_list.push({
+                row: i + 1,
+                error: 'Group is outside your ARSEN scope'
+              });
+              continue;
+            }
+          }
+
           // Check for duplicates
           const [existing] = await connection.execute(
             'SELECT id FROM users WHERE email = ? UNION SELECT r.user_id FROM reservists r WHERE r.service_number = ?',
@@ -1161,31 +1394,31 @@ router.post(
             // Create user
             const [userResult] = await connection.execute(
               'INSERT INTO users (email, password_hash, role, is_active) VALUES (?, ?, ?, TRUE)',
-              [email, hashedPassword, 'reservist']
+              [record.email, hashedPassword, 'reservist']
             );
 
-// Create reservist
-             const reservistData = {
-               user_id: userResult.insertId,
-               first_name: record.first_name,
-               last_name: record.last_name,
-               rank: record.rank,
-               service_number: record.service_number,
-               date_of_birth: record.date_of_birth || null,
-               sex: record.sex || null,
-               blood_type: record.blood_type || 'Unknown',
-               phone_number: record.phone_number || null,
-                position: record.position || null,
-                reserve_status: record.reserve_status || 'Ready Reserve',
-                 is_active: true,
-                 qr_code: generateUniqueQRCode()
-              };
+            // Create reservist
+            const reservistData = {
+              user_id: userResult.insertId,
+              first_name: record.first_name,
+              last_name: record.last_name,
+              rank: record.rank,
+              service_number: record.service_number,
+              date_of_birth: record.date_of_birth || null,
+              sex: record.sex || null,
+              blood_type: record.blood_type || 'Unknown',
+              phone_number: record.phone_number || null,
+              position: record.position || null,
+              reserve_status: record.reserve_status || 'Ready Reserve',
+              is_active: true,
+              qr_code: generateUniqueQRCode()
+            };
 
             const columns = Object.keys(reservistData).map(col => `\`${col}\``);
             const values = Object.values(reservistData);
             const placeholders = columns.map(() => '?').join(',');
 
-            const [reservistResult] = await connection.execute(
+            await connection.execute(
               `INSERT INTO reservists (${columns.join(',')}) VALUES (${placeholders})`,
               values
             );
@@ -1230,12 +1463,12 @@ router.post(
 
 /**
  * POST /api/reservists/bulk-upload
- * Bulk upload reservists from Excel file
- * First sheet: Group positions
- * Other sheets: Squadron positions
+ * Bulk upload reservists from Excel file (position-based format)
+ * Allowed: admin, admin_arsen
+ * admin_arsen: can only upload into their own ARSEN
  */
 const multer = require('multer');
-const XLSX = require('xlsx');
+const Excel = require('exceljs');
 
 // Configure multer for file uploads
 const upload = multer({
@@ -1257,7 +1490,7 @@ const upload = multer({
 router.post(
   '/bulk-upload',
   authenticateToken,
-  requireAdmin,
+  requireAdminArsenOrHigher,
   upload.single('file'),
   async (req, res) => {
     let connection;
@@ -1270,199 +1503,234 @@ router.post(
         });
       }
 
-// Get optional group and squadron from form
-       const arsen_id = parseInt(req.body.arsen_id);
-       const group_id = req.body.group_id ? parseInt(req.body.group_id) : null;
-       const squadron_id = req.body.squadron_id ? parseInt(req.body.squadron_id) : null;
+      // Get optional group and squadron from form
+      const arsen_id = parseInt(req.body.arsen_id);
+      const group_id = req.body.group_id ? parseInt(req.body.group_id) : null;
+      const squadron_id = req.body.squadron_id ? parseInt(req.body.squadron_id) : null;
 
-       if (!arsen_id || isNaN(arsen_id)) {
-         return res.status(400).json({
-           status: 'error',
-           message: 'Valid ARSEN ID is required',
-           code: 'INVALID_ARSEN'
-         });
-       }
+      if (!arsen_id || isNaN(arsen_id)) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Valid ARSEN ID is required',
+          code: 'INVALID_ARSEN'
+        });
+      }
 
-       // Validate group belongs to the selected arsen if provided
-       if (group_id && !isNaN(group_id)) {
-         const [groupCheck] = await db.query(
-           'SELECT id FROM `groups` WHERE id = ? AND arsen_id = ?',
-           [group_id, arsen_id]
-         );
-         if (groupCheck.length === 0) {
-           return res.status(400).json({
-             status: 'error',
-             message: 'Selected group does not belong to the selected ARSEN',
-             code: 'INVALID_GROUP'
-           });
-         }
-       }
+      // ── Scope guard: admin_arsen may only bulk upload into their own ARSEN ──
+      if (req.user.role === 'admin_arsen' && arsen_id !== req.user.scope_arsen_id) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'You can only bulk upload into your assigned ARSEN',
+          code: 'OUT_OF_SCOPE'
+        });
+      }
 
-       // Validate squadron belongs to the selected group if provided
-       if (squadron_id && !isNaN(squadron_id)) {
-         const [squadronCheck] = await db.query(
-           'SELECT id FROM squadron WHERE id = ? AND group_id = ?',
-           [squadron_id, group_id]
-         );
-         if (squadronCheck.length === 0) {
-           return res.status(400).json({
-             status: 'error',
-             message: 'Selected squadron does not belong to the selected group',
-             code: 'INVALID_SQUADRON'
-           });
-         }
-       }
+      // Validate group belongs to the selected arsen if provided
+      if (group_id && !isNaN(group_id)) {
+        const [groupCheck] = await db.query(
+          'SELECT id FROM `groups` WHERE id = ? AND arsen_id = ?',
+          [group_id, arsen_id]
+        );
+        if (groupCheck.length === 0) {
+          return res.status(400).json({
+            status: 'error',
+            message: 'Selected group does not belong to the selected ARSEN',
+            code: 'INVALID_GROUP'
+          });
+        }
+      }
 
-// Parse Excel file
-       const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-       const sheetNames = workbook.SheetNames;
+      // Validate squadron belongs to the selected group if provided
+      if (squadron_id && !isNaN(squadron_id)) {
+        const [squadronCheck] = await db.query(
+          'SELECT id FROM squadron WHERE id = ? AND group_id = ?',
+          [squadron_id, group_id]
+        );
+        if (squadronCheck.length === 0) {
+          return res.status(400).json({
+            status: 'error',
+            message: 'Selected squadron does not belong to the selected group',
+            code: 'INVALID_SQUADRON'
+          });
+        }
+      }
 
-       if (sheetNames.length === 0) {
-         return res.status(400).json({
-           status: 'error',
-           message: 'Excel file has no sheets',
-           code: 'INVALID_FILE'
-         });
-       }
+      // Parse Excel/CSV file
+      const workbook = new Excel.Workbook();
+      if (req.file.mimetype === 'text/csv') {
+        const worksheet = workbook.addWorksheet('CSV');
+        const csvRows = req.file.buffer.toString('utf8').trim().split('\n');
+        csvRows.forEach(row => {
+          worksheet.addRow(row.split(','));
+        });
+      } else {
+        await workbook.xlsx.load(req.file.buffer);
+      }
 
-       // Get database connection with transaction
-       connection = await db.getConnection();
-       await connection.beginTransaction();
+      if (workbook.worksheets.length === 0) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Excel file has no sheets',
+          code: 'INVALID_FILE'
+        });
+      }
 
-       let successCount = 0;
-       let failureCount = 0;
-       const errors = [];
+      // Get database connection with transaction
+      connection = await db.getConnection();
+      await connection.beginTransaction();
 
-       // Process first sheet only
-       const sheetName = sheetNames[0];
-       const worksheet = workbook.Sheets[sheetName];
+      let successCount = 0;
+      let failureCount = 0;
+      const errors = [];
 
-       // Find the correct header row by looking for expected column names
-       const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-       let headerRowIndex = 0;
-       for (let i = 0; i < rawRows.length; i++) {
-         const row = rawRows[i];
-         if (row && row.some(cell => 
-           cell && typeof cell === 'string' && 
-           (cell === 'DESCRIPTION/POSITION' || cell === 'GRADE' || cell === 'AFSC' || 
-            cell === 'REQUIRED' || cell === 'NAME' || cell === 'Position' || cell === 'Name')
-         )) {
-           headerRowIndex = i;
-           break;
-         }
-       }
+      // Process first sheet only
+      const worksheet = workbook.worksheets[0];
 
-       // Extract header names from the detected header row and build data rows manually
-       const headers = rawRows[headerRowIndex] || [];
-       const dataRows = rawRows.slice(headerRowIndex + 1);
-       const rows = dataRows.map(row => {
-         const obj = {};
-         headers.forEach((key, idx) => {
-           if (key != null) obj[key] = row[idx];
-         });
-         return obj;
-       });
+      // Find the correct header row by looking for expected column names
+      const rawRows = [];
+      worksheet.eachRow({ includeEmpty: true }, (row) => {
+        rawRows.push(row.values.slice(1));
+      });
+      let headerRowIndex = 0;
+      for (let i = 0; i < rawRows.length; i++) {
+        const row = rawRows[i];
+        if (row && row.some(cell =>
+          cell && typeof cell === 'string' &&
+          (cell === 'DESCRIPTION/POSITION' || cell === 'GRADE' || cell === 'AFSC' ||
+           cell === 'REQUIRED' || cell === 'NAME' || cell === 'Position' || cell === 'Name')
+        )) {
+          headerRowIndex = i;
+          break;
+        }
+      }
 
-       // Process each row in the sheet using the selected ARSEN/Group/Squadron
-       for (const row of rows) {
-         try {
-           const position = row['DESCRIPTION/POSITION'] || row['Position'] || '';
-           const name = row['NAME'] || row['Name'] || '';
+      // Extract header names from the detected header row and build data rows manually
+      const headers = rawRows[headerRowIndex] || [];
+      const dataRows = rawRows.slice(headerRowIndex + 1);
+      const rows = dataRows.map(row => {
+        const obj = {};
+        headers.forEach((key, idx) => {
+          if (key != null) obj[key] = row[idx];
+        });
+        return obj;
+      });
 
-           // Skip rows with no name
-           if (!name || name.trim() === '') continue;
+      // Process each row in the sheet using the selected ARSEN/Group/Squadron
+      for (const row of rows) {
+        try {
+          const position = row['DESCRIPTION/POSITION'] || row['Position'] || '';
+          const name = row['NAME'] || row['Name'] || '';
 
-           // Parse fullname - handle "LTC JENNY LYN T NALUPA O-160092 PAF(RES)" format
-           const parsed = parseFullname(name);
-           const serviceNumber = parsed.serviceNumber;
-           const rank = parsed.rank;
-           const firstName = parsed.firstName;
-const lastName = parsed.lastName;
+          // Skip rows with no name
+          if (!name || name.trim() === '') continue;
 
-            let reservistId;
+          // Parse fullname - handle "LTC JENNY LYN T NALUPA O-160092 PAF(RES)" format
+          const parsed = parseFullname(name);
+          const serviceNumber = parsed.serviceNumber;
+          const rank = parsed.rank;
+          const firstName = parsed.firstName;
+          const lastName = parsed.lastName;
 
-            // Check if reservist exists by service number
-            const [existingReservists] = await connection.query(
-              'SELECT id FROM reservists WHERE service_number = ?',
-              [serviceNumber]
+          let reservistId;
+
+          // Check if reservist exists by service number
+          const [existingReservists] = await connection.query(
+            'SELECT id FROM reservists WHERE service_number = ?',
+            [serviceNumber]
+          );
+
+          if (existingReservists.length > 0) {
+            // Scope guard: admin_arsen may only update reservists in their ARSEN
+            if (req.user.role === 'admin_arsen') {
+              const [scopeCheck] = await connection.query(
+                `SELECT r.id FROM reservists r
+                 LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+                 LEFT JOIN \`groups\` g ON ra.group_id = g.id
+                 WHERE r.id = ? AND g.arsen_id = ?`,
+                [existingReservists[0].id, req.user.scope_arsen_id]
+              );
+              if (scopeCheck.length === 0) {
+                errors.push(`Row "${name}": Reservist is outside your ARSEN scope`);
+                failureCount++;
+                continue;
+              }
+            }
+            // Update existing reservist - only update rank and position
+            reservistId = existingReservists[0].id;
+            await connection.query(
+              'UPDATE reservists SET `rank` = ?, position = ? WHERE id = ?',
+              [rank, position, reservistId]
+            );
+          } else {
+            // Create new reservist - use service number as fallback if missing
+            const sn = serviceNumber || `TEMP-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+            // First create a user account
+            const email = `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@pafr.mil`;
+            const passwordHash = await hashPassword(sn);
+
+            // Check if user exists
+            const [existingUsers] = await connection.query(
+              'SELECT id FROM users WHERE email = ?',
+              [email]
             );
 
-            if (existingReservists.length > 0) {
-              // Update existing reservist - only update rank and position
-              reservistId = existingReservists[0].id;
-              await connection.query(
-                'UPDATE reservists SET `rank` = ?, position = ? WHERE id = ?',
-                [rank, position, reservistId]
-              );
+            let userId;
+
+            if (existingUsers.length > 0) {
+              userId = existingUsers[0].id;
             } else {
-              // Create new reservist - use service number as fallback if missing
-              const sn = serviceNumber || `TEMP-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-
-              // First create a user account
-              const email = `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@pafr.mil`;
-              const passwordHash = await hashPassword(sn);
-
-              // Check if user exists
-              const [existingUsers] = await connection.query(
-                'SELECT id FROM users WHERE email = ?',
-                [email]
+              const [userResult] = await connection.query(
+                'INSERT INTO users (email, password_hash, role, is_active) VALUES (?, ?, ?, TRUE)',
+                [email, passwordHash, 'reservist']
               );
-
-              let userId;
-
-              if (existingUsers.length > 0) {
-                userId = existingUsers[0].id;
-              } else {
-                const [userResult] = await connection.query(
-                  'INSERT INTO users (email, password_hash, role, is_active) VALUES (?, ?, ?, TRUE)',
-                  [email, passwordHash, 'reservist']
-                );
-                userId = userResult.insertId;
-              }
-
-              // Create reservist - only rank and position
-              const [reservistResult] = await connection.query(
-                `INSERT INTO reservists (
-                  user_id, first_name, last_name, service_number,
-                  position, reserve_status, qr_code, \`rank\`, is_active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
-                [userId, firstName, lastName, sn, position, 'Ready Reserve', generateUniqueQRCode(), rank]
-              );
-
-              reservistId = reservistResult.insertId;
+              userId = userResult.insertId;
             }
 
-            // Create or update assignment using selected group/squadron
-            if (group_id && !isNaN(group_id)) {
-              const [existingAssignments] = await connection.query(
-                'SELECT id FROM reservist_assignments WHERE reservist_id = ? AND group_id = ? AND squadron_id = ?',
+            // Create reservist - only rank and position
+            const [reservistResult] = await connection.query(
+              `INSERT INTO reservists (
+                user_id, first_name, last_name, service_number,
+                position, reserve_status, qr_code, \`rank\`, is_active
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+              [userId, firstName, lastName, sn, position, 'Ready Reserve', generateUniqueQRCode(), rank]
+            );
+
+            reservistId = reservistResult.insertId;
+          }
+
+          // Create or update assignment using selected group/squadron
+          if (group_id && !isNaN(group_id)) {
+            const [existingAssignments] = await connection.query(
+              'SELECT id FROM reservist_assignments WHERE reservist_id = ? AND group_id = ? AND squadron_id = ?',
+              [reservistId, group_id, squadron_id || null]
+            );
+
+            if (existingAssignments.length === 0) {
+              // Set other assignments to non-primary
+              await connection.query(
+                'UPDATE reservist_assignments SET is_primary = FALSE WHERE reservist_id = ? AND is_primary = TRUE',
+                [reservistId]
+              );
+
+              // Create new assignment
+              await connection.query(
+                `INSERT INTO reservist_assignments (
+                  reservist_id, group_id, squadron_id, assigned_date, is_primary
+                ) VALUES (?, ?, ?, CURDATE(), TRUE)`,
                 [reservistId, group_id, squadron_id || null]
               );
-
-              if (existingAssignments.length === 0) {
-                // Set other assignments to non-primary
-                await connection.query(
-                  'UPDATE reservist_assignments SET is_primary = FALSE WHERE reservist_id = ? AND is_primary = TRUE',
-                  [reservistId]
-                );
-
-                // Create new assignment
-                await connection.query(
-                  `INSERT INTO reservist_assignments (
-                    reservist_id, group_id, squadron_id, assigned_date, is_primary
-                  ) VALUES (?, ?, ?, CURDATE(), TRUE)`,
-                  [reservistId, group_id, squadron_id || null]
-                );
-              }
             }
-
-successCount++;
-          } catch (error) {
-            errors.push(`Row "${row['NAME'] || row['Name'] || 'unknown'}" in sheet "${sheetName}": ${error.message}`);
-            failureCount++;
           }
+
+          successCount++;
+        } catch (error) {
+          errors.push(`Row "${row['NAME'] || row['Name'] || 'unknown'}" in sheet "${sheetName}": ${error.message}`);
+          failureCount++;
         }
-       await connection.commit();
+      }
+
+      await connection.commit();
 
       // Log audit
       logAudit({
@@ -1510,6 +1778,9 @@ successCount++;
 /**
  * POST /api/reservists/bulk-upload-info
  * Bulk upload reservists from Excel file with detailed personal & military info
+ * Allowed: admin, admin_arsen
+ * admin_arsen: can only upload into their own ARSEN
+ *
  * Expected columns: Fullname, Rank, AFPSN (Serial Number), Date of Birth, Place of Birth,
  *   Age, Sex, Civil Status, Citizenship, Height, Weight, Blood Type, Home Address,
  *   Contact Number, Email Address, Branch of Service, Reserve Center, Group Command,
@@ -1522,7 +1793,7 @@ successCount++;
 router.post(
   '/bulk-upload-info',
   authenticateToken,
-  requireAdmin,
+  requireAdminArsenOrHigher,
   upload.single('file'),
   async (req, res) => {
     let connection;
@@ -1535,10 +1806,18 @@ router.post(
         });
       }
 
-      const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
-      const sheetNames = workbook.SheetNames;
+      const workbook = new Excel.Workbook();
+      if (req.file.mimetype === 'text/csv') {
+        const worksheet = workbook.addWorksheet('CSV');
+        const csvRows = req.file.buffer.toString('utf8').trim().split('\n');
+        csvRows.forEach(row => {
+          worksheet.addRow(row.split(','));
+        });
+      } else {
+        await workbook.xlsx.load(req.file.buffer);
+      }
 
-      if (sheetNames.length === 0) {
+      if (workbook.worksheets.length === 0) {
         return res.status(400).json({
           status: 'error',
           message: 'Excel file has no sheets',
@@ -1555,6 +1834,15 @@ router.post(
           status: 'error',
           message: 'Valid ARSEN ID is required',
           code: 'INVALID_ARSEN'
+        });
+      }
+
+      // ── Scope guard: admin_arsen may only bulk upload into their own ARSEN ──
+      if (req.user.role === 'admin_arsen' && bodyArsenId !== req.user.scope_arsen_id) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'You can only bulk upload into your assigned ARSEN',
+          code: 'OUT_OF_SCOPE'
         });
       }
 
@@ -1581,11 +1869,12 @@ router.post(
       let failureCount = 0;
       const errors = [];
 
-      for (let sheetIndex = 0; sheetIndex < sheetNames.length; sheetIndex++) {
-        const sheetName = sheetNames[sheetIndex];
-        const worksheet = workbook.Sheets[sheetName];
+      for (const worksheet of workbook.worksheets) {
+        const rawRows = [];
+        worksheet.eachRow({ includeEmpty: true }, (row) => {
+          rawRows.push(row.values.slice(1));
+        });
 
-        const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         let headerRowIndex = 0;
         for (let i = 0; i < rawRows.length; i++) {
           const row = rawRows[i];
@@ -1599,7 +1888,7 @@ router.post(
           }
         }
 
-        const headers = (rawRows[headerRowIndex] || []).map(h => h != null ? String(h).trim() : h);
+        const headers = (rawRows[headerRowIndex] || []).map(h => h != null ? String(h).replace(/\s+/g, ' ').trim() : h);
         const dataRows = rawRows.slice(headerRowIndex + 1);
 
         // Build header index map: for duplicate headers, store all indices
@@ -1623,80 +1912,69 @@ router.post(
 
         if (rows.length === 0) continue;
 
-        if (sheetIndex === 0) {
-          console.log('=== BULK UPLOAD DEBUG ===');
-          console.log('Headers:', JSON.stringify(headers));
-          console.log('First row raw:', JSON.stringify(rows[0].__raw));
-          console.log('First row sourceOfCommission:', JSON.stringify(rows[0]['Source of Commission/Enlistment (ROTC/ BCMT/ MOTC/ Direct Commission)']));
-          console.log('First row highestEducation:', JSON.stringify(rows[0]['Highest Educational Attainment']));
-          console.log('First row basicTraining:', JSON.stringify(rows[0]['Basic Training Completed (BCMT/ROTC)']));
-          console.log('First row occupation:', JSON.stringify(rows[0]['Occupation']));
-          console.log('========================');
-        }
-
         for (const row of rows) {
-           try {
-             const fullname = (row['Fullname'] || '').trim();
+          try {
+            const fullname = (row['Fullname'] || '').trim();
 
-             if (!fullname || fullname.length < 2) continue;
+            if (!fullname || fullname.length < 2) continue;
 
-             // Parse fullname - handle "LTC JENNY LYN T NALUPA O-160092 PAF(RES)" format
-             // If Rank column is empty, extract from Fullname
-             const rowRank = (row['Rank'] || '').trim();
-             const parsedName = parseFullname(fullname);
+            // Parse fullname - handle "LTC JENNY LYN T NALUPA O-160092 PAF(RES)" format
+            // If Rank column is empty, extract from Fullname
+            const rowRank = (row['Rank'] || '').trim();
+            const parsedName = parseFullname(fullname);
 
-             // Use rank from column if provided, otherwise use parsed rank
-             const finalRank = rowRank || parsedName.rank;
+            // Use rank from column if provided, otherwise use parsed rank
+            const finalRank = rowRank || parsedName.rank;
 
-             // Use service number from column if provided, otherwise use parsed service number
-             const rowServiceNumber = (row['AFPSN (Serial Number)'] || '').trim();
-             const finalServiceNumber = rowServiceNumber || parsedName.serviceNumber;
+            // Use service number from column if provided, otherwise use parsed service number
+            const rowServiceNumber = (row['AFPSN (Serial Number)'] || '').trim();
+            const finalServiceNumber = rowServiceNumber || parsedName.serviceNumber;
 
-             // Use parsed first/last name if columns are empty
-             const rowFirstName = (row['First Name'] || '').trim();
-             const rowLastName = (row['Last Name'] || '').trim();
+            // Use parsed first/last name if columns are empty
+            const rowFirstName = (row['First Name'] || '').trim();
+            const rowLastName = (row['Last Name'] || '').trim();
 
-             const firstName = rowFirstName || parsedName.firstName;
-             const lastName = rowLastName || parsedName.lastName;
+            const firstName = rowFirstName || parsedName.firstName;
+            const lastName = rowLastName || parsedName.lastName;
 
-              // Continue with other fields...
-              const dateOfBirth = row['Date of Birth'] || null;
-              const placeOfBirth = row['Place of Birth'] || null;
-              const age = (() => { const v = parseInt(row['Age'], 10); return isNaN(v) ? null : v; })();
-              const sex = row['Sex'] || null;
-              const civilStatus = row['Civil Status'] || null;
-              const citizenship = row['Citizenship'] || 'Filipino';
-              const height = (() => { const v = parseFloat(row['Height']); return isNaN(v) ? null : v; })();
-              const weight = (() => { const v = parseFloat(row['Weight']); return isNaN(v) ? null : v; })();
-              const bloodType = row['Blood Type'] || null;
-              const homeAddress = row['Home Address'] || null;
-              const contactNumber = (row.__headerIndexMap['Contact Number'] ? row.__raw[row.__headerIndexMap['Contact Number'][0]] : row['Contact Number']) || null;
-              const email = row['Email Address'] || null;
-              const branchOfService = row['Branch of Service'] || null;
-              const reserveCenter = row['Reserve Center'] || null;
-              const groupCommand = row['Group Command'] || null;
-              const squadron = row['Squadron'] || null;
-              const category = row['Category (1st / 2nd / 3rd Category)'] || null;
-              const sourceOfCommission = row['Source of Commission/Enlistment (ROTC/ BCMT/ MOTC/ Direct Commission)'] || null;
-              const dateEnlisted = row['Date Enlisted'] || null;
-              const rankDateOfAppointment = row['Rank Date of Appointment'] || null;
-              const specialization = row['Specialization/MOS'] || null;
-              const reserveStatus = row['Status (Ready Reserve/ Standby Reserve/ Retired)'] || 'Ready Reserve';
-              const highestEducation = row['Highest Educational Attainment'] || null;
-              const courseDegree = row['Course/Degree'] || null;
-              const school = row['School'] || null;
-              const yearGraduated = (() => { const v = parseInt(row['Year Graduated'], 10); return isNaN(v) ? null : v; })();
-              const occupation = row['Occupation'] || null;
-              const employer = row['Employer/Company'] || null;
-              const officeAddress = row['Office Address'] || null;
-              const basicTraining = row['Basic Training Completed (BCMT/ROTC)'] || null;
-              const dateCompleted = row['Date Completed'] || null;
-              const otherTraining = row['Other Military Courses/Training'] || null;
-              const awards = row['AWARDS AND DECORATIONS'] || null;
-              const emergencyContactName = row['Emergency contact name'] || null;
-              const emergencyRelationship = row['Relationship'] || null;
-              const emergencyContactNumber = (row.__headerIndexMap['Contact Number'] && row.__headerIndexMap['Contact Number'].length > 1 ? row.__raw[row.__headerIndexMap['Contact Number'][1]] : row['Contact Number']) || null;
-              const emergencyAddress = row['Address'] || null;
+            // Continue with other fields...
+            const dateOfBirth = row['Date of Birth'] || null;
+            const placeOfBirth = row['Place of Birth'] || null;
+            const age = (() => { const v = parseInt(row['Age'], 10); return isNaN(v) ? null : v; })();
+            const sex = row['Sex'] || null;
+            const civilStatus = row['Civil Status'] || null;
+            const citizenship = row['Citizenship'] || 'Filipino';
+            const height = (() => { const v = parseFloat(row['Height']); return isNaN(v) ? null : v; })();
+            const weight = (() => { const v = parseFloat(row['Weight']); return isNaN(v) ? null : v; })();
+            const bloodType = row['Blood Type'] || null;
+            const homeAddress = row['Home Address'] || null;
+            const contactNumber = (row.__headerIndexMap['Contact Number'] ? row.__raw[row.__headerIndexMap['Contact Number'][0]] : row['Contact Number']) || null;
+            const email = row['Email Address'] || null;
+            const branchOfService = row['Branch of Service'] || null;
+            const reserveCenter = row['Reserve Center'] || null;
+            const groupCommand = row['Group Command'] || null;
+            const squadron = row['Squadron'] || null;
+            const category = row['Category (1st / 2nd / 3rd Category)'] || null;
+            const sourceOfCommission = row['Source of Commission/Enlistment (ROTC/ BCMT/ MOTC/ Direct Commission)'] || null;
+            const dateEnlisted = row['Date Enlisted'] || null;
+            const rankDateOfAppointment = row['Rank Date of Appointment'] || null;
+            const specialization = row['Specialization/MOS'] || null;
+            const reserveStatus = row['Status (Ready Reserve/ Standby Reserve/ Retired)'] || 'Ready Reserve';
+            const highestEducation = row['Highest Educational Attainment'] || null;
+            const courseDegree = row['Course/Degree'] || null;
+            const school = row['School'] || null;
+            const yearGraduated = (() => { const v = parseInt(row['Year Graduated'], 10); return isNaN(v) ? null : v; })();
+            const occupation = row['Occupation'] || null;
+            const employer = row['Employer/Company'] || null;
+            const officeAddress = row['Office Address'] || null;
+            const basicTraining = row['Basic Training Completed (BCMT/ROTC)'] || null;
+            const dateCompleted = row['Date Completed'] || null;
+            const otherTraining = row['Other Military Courses/Training'] || null;
+            const awards = row['AWARDS AND DECORATIONS'] || null;
+            const emergencyContactName = row['Emergency contact name'] || null;
+            const emergencyRelationship = row['Relationship'] || null;
+            const emergencyContactNumber = (row.__headerIndexMap['Contact Number'] && row.__headerIndexMap['Contact Number'].length > 1 ? row.__raw[row.__headerIndexMap['Contact Number'][1]] : row['Contact Number']) || null;
+            const emergencyAddress = row['Address'] || null;
 
             // Check if reservist exists by service number
             let reservistId;
@@ -1708,36 +1986,51 @@ router.post(
                 [finalServiceNumber]
               );
 
-if (existingReservists.length > 0) {
-                 reservistId = existingReservists[0].id;
-                  const parsedUpdateDob = parseExcelDate(dateOfBirth);
-                  const parsedUpdateRankDate = parseExcelDate(rankDateOfAppointment);
-                  const parsedUpdateBasicDate = parseExcelDate(dateCompleted);
-                  const parsedUpdateDateEnlisted = parseExcelDate(dateEnlisted);
-                  await connection.query(
-                    `UPDATE reservists SET
-                      first_name = ?, last_name = ?, date_of_birth = ?,
-                      place_of_birth = ?, age = ?, sex = ?, civil_status = ?,
-                      citizenship = ?, height = ?, weight = ?, blood_type = ?,
-                      phone_number = ?, address = ?, reserve_center = ?, category = ?,
-                      source_of_commission = ?, date_enlisted = ?, rank_date_appointment = ?, specialization = ?,
-                      reserve_status = ?, highest_education = ?, course_degree = ?, school = ?,
-                      year_graduated = ?, occupation = ?, employer = ?, office_address = ?,
-                      basic_training_completed = ?, basic_training_date = ?,
-                      emergency_contact_name = ?, emergency_contact_phone = ?,
-                      emergency_contact_address = ?, \`rank\` = ?
-                    WHERE id = ?`,
-                      [
-                       firstName, lastName, parsedUpdateDob, placeOfBirth, age, sex,
-                       civilStatus, citizenship, height, weight, bloodType, contactNumber,
-                       homeAddress, reserveCenter, category, sourceOfCommission,
-                       parsedUpdateDateEnlisted, parsedUpdateRankDate, specialization, reserveStatus, highestEducation,
-                       courseDegree, school, yearGraduated, occupation, employer, officeAddress,
-                       basicTraining, parsedUpdateBasicDate, emergencyContactName, emergencyContactNumber,
-                       emergencyAddress, finalRank, reservistId
-                     ]
-                 );
-               }
+              if (existingReservists.length > 0) {
+                // Scope guard: admin_arsen may only update reservists in their ARSEN
+                if (req.user.role === 'admin_arsen') {
+                  const [scopeCheck] = await connection.query(
+                    `SELECT r.id FROM reservists r
+                     LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
+                     LEFT JOIN \`groups\` g ON ra.group_id = g.id
+                     WHERE r.id = ? AND g.arsen_id = ?`,
+                    [existingReservists[0].id, req.user.scope_arsen_id]
+                  );
+                  if (scopeCheck.length === 0) {
+                    errors.push(`Row "${fullname}": Reservist is outside your ARSEN scope`);
+                    failureCount++;
+                    continue;
+                  }
+                }
+                reservistId = existingReservists[0].id;
+                const parsedUpdateDob = parseExcelDate(dateOfBirth);
+                const parsedUpdateRankDate = parseExcelDate(rankDateOfAppointment);
+                const parsedUpdateBasicDate = parseExcelDate(dateCompleted);
+                const parsedUpdateDateEnlisted = parseExcelDate(dateEnlisted);
+                await connection.query(
+                  `UPDATE reservists SET
+                    first_name = ?, last_name = ?, date_of_birth = ?,
+                    place_of_birth = ?, age = ?, sex = ?, civil_status = ?,
+                    citizenship = ?, height = ?, weight = ?, blood_type = ?,
+                    phone_number = ?, address = ?, reserve_center = ?, category = ?,
+                    source_of_commission = ?, date_enlisted = ?, rank_date_appointment = ?, specialization = ?,
+                    reserve_status = ?, highest_education = ?, course_degree = ?, school = ?,
+                    year_graduated = ?, occupation = ?, employer = ?, office_address = ?,
+                    basic_training_completed = ?, basic_training_date = ?,
+                    emergency_contact_name = ?, emergency_contact_phone = ?,
+                    emergency_contact_address = ?, \`rank\` = ?
+                  WHERE id = ?`,
+                  [
+                    firstName, lastName, parsedUpdateDob, placeOfBirth, age, sex,
+                    civilStatus, citizenship, height, weight, bloodType, contactNumber,
+                    homeAddress, reserveCenter, category, sourceOfCommission,
+                    parsedUpdateDateEnlisted, parsedUpdateRankDate, specialization, reserveStatus, highestEducation,
+                    courseDegree, school, yearGraduated, occupation, employer, officeAddress,
+                    basicTraining, parsedUpdateBasicDate, emergencyContactName, emergencyContactNumber,
+                    emergencyAddress, finalRank, reservistId
+                  ]
+                );
+              }
             }
 
             // Create new reservist if not found by service number (or no service number provided)
@@ -1748,98 +2041,98 @@ if (existingReservists.length > 0) {
               const parsedBasicTrainingDate = parseExcelDate(dateCompleted);
               const parsedDateEnlisted = parseExcelDate(dateEnlisted);
 
-                 // Create new reservist — use service number as password
-                 const userEmail = email || `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@pafr.mil`;
-                 const tempPassword = finalServiceNumber;
-                 const passwordHash = await hashPassword(tempPassword);
+              // Create new reservist — use service number as password
+              const userEmail = email || `${firstName.toLowerCase()}.${lastName.toLowerCase().replace(/\s+/g, '')}@pafr.mil`;
+              const tempPassword = finalServiceNumber;
+              const passwordHash = await hashPassword(tempPassword);
 
-                const [existingUsers] = await connection.query(
-                  'SELECT id FROM users WHERE email = ?',
-                  [userEmail]
+              const [existingUsers] = await connection.query(
+                'SELECT id FROM users WHERE email = ?',
+                [userEmail]
+              );
+
+              let userId;
+              if (existingUsers.length > 0) {
+                userId = existingUsers[0].id;
+              } else {
+                const [userResult] = await connection.query(
+                  'INSERT INTO users (email, password_hash, role, is_active) VALUES (?, ?, ?, TRUE)',
+                  [userEmail, passwordHash, 'reservist']
                 );
+                userId = userResult.insertId;
+              }
 
-                let userId;
-                if (existingUsers.length > 0) {
-                  userId = existingUsers[0].id;
-                } else {
-                  const [userResult] = await connection.query(
-                    'INSERT INTO users (email, password_hash, role, is_active) VALUES (?, ?, ?, TRUE)',
-                    [userEmail, passwordHash, 'reservist']
-                  );
-                  userId = userResult.insertId;
-                }
+              const [reservistResult] = await connection.query(
+                `INSERT INTO reservists (user_id, first_name, last_name, service_number, date_of_birth,
+                  place_of_birth, age, sex, civil_status, citizenship, height, weight,
+                  blood_type, phone_number, address, reserve_center, category,
+                  source_of_commission, date_enlisted, rank_date_appointment, specialization,
+                  reserve_status, highest_education, course_degree, school, year_graduated,
+                  occupation, employer, office_address, basic_training_completed,
+                  basic_training_date, emergency_contact_name, emergency_contact_phone,
+                  emergency_contact_address, qr_code, \`rank\`, is_active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+                [
+                  userId, firstName, lastName, finalServiceNumber, parsedDateOfBirth,
+                  placeOfBirth, age, sex, civilStatus, citizenship, height, weight,
+                  bloodType, contactNumber, homeAddress, reserveCenter, category,
+                  sourceOfCommission, parsedDateEnlisted, parsedRankDateOfAppointment, specialization,
+                  reserveStatus, highestEducation, courseDegree, school, yearGraduated,
+                  occupation, employer, officeAddress, basicTraining, parsedBasicTrainingDate,
+                  emergencyContactName, emergencyContactNumber, emergencyAddress,
+                  generateUniqueQRCode(), finalRank
+                ]
+              );
 
-const [reservistResult] = await connection.query(
-                    `INSERT INTO reservists (user_id, first_name, last_name, service_number, date_of_birth,
-                      place_of_birth, age, sex, civil_status, citizenship, height, weight,
-                      blood_type, phone_number, address, reserve_center, category,
-                      source_of_commission, date_enlisted, rank_date_appointment, specialization,
-                      reserve_status, highest_education, course_degree, school, year_graduated,
-                      occupation, employer, office_address, basic_training_completed,
-                      basic_training_date, emergency_contact_name, emergency_contact_phone,
-                      emergency_contact_address, qr_code, \`rank\`, is_active
-                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
-                    [
-                       userId, firstName, lastName, finalServiceNumber, parsedDateOfBirth,
-                       placeOfBirth, age, sex, civilStatus, citizenship, height, weight,
-                       bloodType, contactNumber, homeAddress, reserveCenter, category,
-                       sourceOfCommission, parsedDateEnlisted, parsedRankDateOfAppointment, specialization,
-                       reserveStatus, highestEducation, courseDegree, school, yearGraduated,
-                       occupation, employer, officeAddress, basicTraining, parsedBasicTrainingDate,
-                        emergencyContactName, emergencyContactNumber, emergencyAddress,
-                        generateUniqueQRCode(), finalRank, true
-                      ]
-                  );
-
-                reservistId = reservistResult.insertId;
-                createdNew = true;
+              reservistId = reservistResult.insertId;
+              createdNew = true;
             }
 
             // Create or update assignment
             if (bodyGroupId) {
-                // Validate group belongs to the selected arsen
-                const [groupCheck] = await connection.query(
-                  'SELECT id FROM `groups` WHERE id = ? AND arsen_id = ?',
-                  [bodyGroupId, bodyArsenId]
-                );
-                if (groupCheck.length === 0) {
-                  errors.push(`Row "${fullname}": Selected group does not belong to the selected ARSEN`);
-                  failureCount++;
-                  continue;
-                }
-
-                // Validate squadron belongs to the selected group
-                const [squadronCheck] = await connection.query(
-                  'SELECT id FROM squadron WHERE id = ? AND group_id = ?',
-                  [bodySquadronId, bodyGroupId]
-                );
-                if (squadronCheck.length === 0) {
-                  errors.push(`Row "${fullname}": Selected squadron does not belong to the selected group`);
-                  failureCount++;
-                  continue;
-                }
-
-                const [existingAssignments] = await connection.query(
-                  'SELECT id FROM reservist_assignments WHERE reservist_id = ? AND group_id = ? AND squadron_id = ?',
-                  [reservistId, bodyGroupId, bodySquadronId]
-                );
-
-                if (existingAssignments.length === 0) {
-                  await connection.query(
-                    'UPDATE reservist_assignments SET is_primary = FALSE WHERE reservist_id = ? AND is_primary = TRUE',
-                    [reservistId]
-                  );
-
-                  await connection.query(
-                    `INSERT INTO reservist_assignments (
-                      reservist_id, group_id, squadron_id, assigned_date, is_primary
-                    ) VALUES (?, ?, ?, CURDATE(), TRUE)`,
-                    [reservistId, bodyGroupId, bodySquadronId]
-                  );
-                }
+              // Validate group belongs to the selected arsen
+              const [groupCheck] = await connection.query(
+                'SELECT id FROM `groups` WHERE id = ? AND arsen_id = ?',
+                [bodyGroupId, bodyArsenId]
+              );
+              if (groupCheck.length === 0) {
+                errors.push(`Row "${fullname}": Selected group does not belong to the selected ARSEN`);
+                failureCount++;
+                continue;
               }
 
-              successCount++;
+              // Validate squadron belongs to the selected group
+              const [squadronCheck] = await connection.query(
+                'SELECT id FROM squadron WHERE id = ? AND group_id = ?',
+                [bodySquadronId, bodyGroupId]
+              );
+              if (squadronCheck.length === 0) {
+                errors.push(`Row "${fullname}": Selected squadron does not belong to the selected group`);
+                failureCount++;
+                continue;
+              }
+
+              const [existingAssignments] = await connection.query(
+                'SELECT id FROM reservist_assignments WHERE reservist_id = ? AND group_id = ? AND squadron_id = ?',
+                [reservistId, bodyGroupId, bodySquadronId]
+              );
+
+              if (existingAssignments.length === 0) {
+                await connection.query(
+                  'UPDATE reservist_assignments SET is_primary = FALSE WHERE reservist_id = ? AND is_primary = TRUE',
+                  [reservistId]
+                );
+
+                await connection.query(
+                  `INSERT INTO reservist_assignments (
+                    reservist_id, group_id, squadron_id, assigned_date, is_primary
+                  ) VALUES (?, ?, ?, CURDATE(), TRUE)`,
+                  [reservistId, bodyGroupId, bodySquadronId]
+                );
+              }
+            }
+
+            successCount++;
           } catch (rowError) {
             errors.push(`Row "${row['Fullname'] || 'unknown'}" in sheet "${sheetName}": ${rowError.message}`);
             failureCount++;

@@ -1,27 +1,35 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const loginLimiter = require('./middleware/rateLimiter');
 require('dotenv').config();
 
 console.log('SERVER STARTING - Loading updated code...');
 
 const app = express();
 
-// Middleware
-const allowedOrigins = process.env.CORS_ORIGINS
-  ? process.env.CORS_ORIGINS.split(',')
-  : ['https://pafr-1prk.vercel.app', 'https://pafr.vercel.app'];
+// CORS configuration
+const allowedOrigins = [
+  'https://pafr-1prk-i7wulo9dy-wawikun21-clouds-projects.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
 
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, origin);
+      callback(null, true);
     } else {
-      callback(null, allowedOrigins[0]);
+      callback(new Error('Not allowed by CORS'));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+// Handle preflight requests
+app.options('*', cors());
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -50,7 +58,7 @@ const announcementsRoutes = require('./routes/announcements');
 const mapRoutes = require('./routes/map');
 
 // API Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', loginLimiter, authRoutes);
 app.use('/api/reservists', reservistsRoutes);
 app.use('/api/arsens', arsentsRoutes);
 app.use('/api/groups', groupsRoutes);
@@ -72,18 +80,6 @@ app.use('/api/hierarchy', hierarchyRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/map', mapRoutes);
 
-// Only serve static assets in combined deployment (non-serverless)
-if (!process.env.VERCEL) {
-  const clientBuildPath = path.join(__dirname, '../client/dist');
-  app.use(express.static(clientBuildPath));
-  app.use((req, res, next) => {
-    if (req.path.startsWith('/api')) {
-      return next();
-    }
-    res.sendFile(path.join(clientBuildPath, 'index.html'));
-  });
-}
-
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
@@ -101,7 +97,6 @@ app.use((err, req, res, next) => {
 
 // 404 handler
 app.use((req, res) => {
-  console.log(`404: ${req.method} ${req.originalUrl}`);
   res.status(404).json({
     status: 'error',
     message: 'Endpoint not found',
@@ -111,10 +106,8 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-if (require.main === module) {
-  app.listen(PORT, () => {
-    console.log(`PAFR Server running on port ${PORT}`);
-  });
-}
+app.listen(PORT, () => {
+  console.log(`PAFR Server running on port ${PORT}`);
+});
 
 module.exports = app;

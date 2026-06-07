@@ -75,12 +75,13 @@ function manualCheckInInternal(req, res) {
 
 function manualCheckInExternal(req, res) {
   const facilitatorId = req.user?.id;
+  const { reservist_id, registration_id, status } = req.body;
   attendanceService
-    .manualCheckInExternal(req.params.externalTrainingId, req.body.reservist_id, req.body.status, facilitatorId)
+    .manualCheckInExternal(req.params.externalTrainingId, reservist_id || registration_id, status, facilitatorId)
     .then((data) => {
       logAudit('attendance.manual', facilitatorId, {
         externalTrainingId: req.params.externalTrainingId,
-        reservistId: req.body.reservist_id,
+        reservistId: reservist_id || registration_id,
         status: req.body.status
       });
       return res.json(data);

@@ -10,7 +10,16 @@ const router = express.Router();
 const rejectInvalid = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, message: 'Validation failed', errors: errors.array() });
+    const errorDetails = errors.array().map(e => ({
+      field: e.path || e.param,
+      message: e.msg,
+      value: e.value
+    }));
+    return res.status(400).json({
+      success: false,
+      message: 'Validation failed',
+      errors: errorDetails
+    });
   }
   return next();
 };
@@ -29,7 +38,7 @@ router.post(
     ...trainingIdParam,
     body('qr_code').trim().notEmpty().withMessage('QR code is required'),
     body('scan_method').optional().isIn(['qr_scanner', 'camera', 'manual']),
-    body('device_info').optional().isString().isLength({ max: 500 }),
+    body('device_info').if((value) => value !== undefined).isString().isLength({ max: 500 }),
   ],
   rejectInvalid,
   attendanceController.scanInternal
@@ -43,7 +52,7 @@ router.post(
     ...externalTrainingIdParam,
     body('qr_code').trim().notEmpty().withMessage('QR code is required'),
     body('scan_method').optional().isIn(['qr_scanner', 'camera', 'manual']),
-    body('device_info').optional().isString().isLength({ max: 500 }),
+    body('device_info').if((value) => value !== undefined).isString().isLength({ max: 500 }),
   ],
   rejectInvalid,
   attendanceController.scanExternal
@@ -70,10 +79,36 @@ router.post(
   authorizeFacilitator(),
   [
     ...externalTrainingIdParam,
-    body('reservist_id').isInt({ min: 1 }).withMessage('reservist_id is required'),
+    body('reservist_id').optional().isInt({ min: 1 }).withMessage('reservist_id must be a positive integer'),
+    body('registration_id').optional().isInt({ min: 1 }).withMessage('registration_id must be a positive integer'),
     body('status').isIn(['present', 'absent', 'late', 'excused', 'pending']).withMessage('Invalid status'),
   ],
-  rejectInvalid,
+  (req, res, next) => {
+    const errors = validationResult(req);
+    // Additional validation: at least one ID must be provided
+    const hasReservistId = req.body.reservist_id !== undefined;
+    const hasRegistrationId = req.body.registration_id !== undefined;
+    if (!hasReservistId && !hasRegistrationId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: [{ field: 'reservist_id', message: 'Either reservist_id or registration_id is required' }]
+      });
+    }
+    if (!errors.isEmpty()) {
+      const errorDetails = errors.array().map(e => ({
+        field: e.path || e.param,
+        message: e.msg,
+        value: e.value
+      }));
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: errorDetails
+      });
+    }
+    return next();
+  },
   attendanceController.manualCheckInExternal
 );
 

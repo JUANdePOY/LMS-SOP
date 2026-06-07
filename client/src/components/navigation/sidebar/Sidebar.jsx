@@ -46,28 +46,27 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   };
 
   return (
-    <aside
-      className={cn(
-        "fixed inset-y-0 left-0 z-50 flex flex-col",
-"transition-all duration-200 ease-out",
-         collapsed ? "w-[64px]" : "w-[260px]",
-         "bg-white border-r border-neutral-200",
-        "dark:bg-neutral-950 dark:border-neutral-800",
-        // Mobile: hidden by default, shown when mobileOpen
-        "max-lg:-translate-x-full",
-        "max-lg:data-[mobile-open=true]:translate-x-0",
-        mobileOpen && "translate-x-0"
-      )}
-      data-mobile-open={mobileOpen}
-    >
-       {/* ── Brand ─────────────────────────────────────────────── */}
-       <div
-         className={cn(
-           "flex h-14 shrink-0 items-center",
-           "border-b border-neutral-200 dark:border-neutral-800",
-           collapsed ? "justify-center px-0" : "justify-between px-4"
-         )}
-       >
+<aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex flex-col",
+          "transition-all duration-200 ease-out",
+          collapsed ? "w-[64px]" : "w-[260px]",
+          "bg-[var(--bg-sidebar)] border-r border-[var(--border-sidebar)]",
+          // Mobile: hidden by default, shown when mobileOpen
+          "max-lg:-translate-x-full",
+          "max-lg:data-[mobile-open=true]:translate-x-0",
+          mobileOpen && "translate-x-0"
+        )}
+        data-mobile-open={mobileOpen}
+      >
+{/* ── Brand ─────────────────────────────────────────────── */}
+        <div
+          className={cn(
+            "flex h-14 shrink-0 items-center",
+            "border-b border-[var(--border-sidebar)]",
+            collapsed ? "justify-center px-0" : "justify-between px-4"
+          )}
+        >
          <Link
            to="/"
            onClick={handleNavClick}
@@ -77,7 +76,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
            )}
          >
            <img
-             src="/AirForce-logo.png"
+             src="/8th_ARCEN.png"
              alt="Air Force Logo"
              className={cn(
                "h-9 w-9 shrink-0",
@@ -85,15 +84,15 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
              )}
            />
 {!collapsed && (
-              <div className="flex flex-col leading-tight overflow-hidden">
-                <span className="text-[15px] font-black tracking-[0.12em] text-neutral-900 dark:text-neutral-50 leading-none">
-                  P.A.F.R
-                </span>
-                <span className="mt-[3px] text-[9px] font-medium tracking-[0.06em] uppercase text-neutral-400 dark:text-neutral-500 truncate leading-none">
-                  Philippine Air Force Reservists
-                </span>
-              </div>
-            )}
+            <div className="flex flex-col leading-tight overflow-hidden">
+              <span className="text-[15px] font-black tracking-[0.12em] text-[var(--text-on-sidebar)] leading-none">
+                P.A.F.R
+              </span>
+              <span className="mt-[3px] text-[9px] font-medium tracking-[0.06em] uppercase text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] truncate leading-none">
+                Philippine Air Force Reservists
+              </span>
+            </div>
+          )}
 </Link>
         </div>
 
@@ -103,43 +102,42 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
         aria-label="Main navigation"
       >
 {!collapsed && (
-           <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-600">
-             Navigation
-           </p>
-         )}
+            <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-on-sidebar)]">
+              Navigation
+            </p>
+          )}
 
-        <ul className="space-y-0.5" role="list">
-          {visibleMenuItems.map((item) => (
-            <li key={item.path}>
-              <SidebarItem item={item} isCollapsed={collapsed} onNavClick={handleNavClick} />
-            </li>
-          ))}
-        </ul>
+          <ul className="space-y-0.5" role="list">
+            {visibleMenuItems.map((item) => (
+              <li key={item.path}>
+                <SidebarItem item={item} isCollapsed={collapsed} onNavClick={handleNavClick} />
+              </li>
+            ))}
+          </ul>
 
-        <div className="my-3 border-t border-neutral-200 dark:border-neutral-800" />
+          <div className="my-3 border-t border-[var(--border-sidebar)]" />
 
-{!collapsed && (
-           <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-600">
-             System
-           </p>
-         )}
+          {!collapsed && (
+            <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-on-sidebar)]">
+              System
+            </p>
+          )}
 
 <ul className="space-y-0.5" role="list">
           <li>
-            <Link
+<Link
               to="/alerts"
               onClick={handleNavClick}
               className={cn(
                 "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5",
                 "text-sm font-medium leading-none tracking-[-0.01em]",
                 "transition-all duration-200 ease-out",
-                "text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100",
-                "dark:text-neutral-400 dark:hover:text-neutral-50 dark:hover:bg-neutral-800",
+                "text-[var(--text-on-sidebar)] hover:text-[color-mix(in_srgb,var(--text-on-sidebar)_120%,transparent)] hover:bg-[var(--bg-hover)]",
                 "hover:scale-[1.015]",
                 collapsed && "justify-center px-0"
               )}
             >
-              <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center text-neutral-400 dark:text-neutral-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+              <span className="flex h-[18px] w-[18px] shrink-0 items-center justify-center text-[var(--text-on-sidebar)] group-hover:text-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]">
                 <Bell size={17} strokeWidth={1.8} />
               </span>
               {!collapsed && <span className="truncate">Alerts</span>}
@@ -184,10 +182,10 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
         ref={dropdownRef}
         className={cn(
           "flex shrink-0 items-center",
-          "border-t border-neutral-200 dark:border-neutral-800",
-          "bg-neutral-50 dark:bg-neutral-900",
+          "border-t border-[var(--border-sidebar)]",
+          "bg-[var(--border-sidebar)]",
           collapsed ? "justify-center gap-2 p-3" : "gap-3 px-4 py-3",
-          "cursor-pointer hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+          "cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
         )}
         onClick={() => setShowProfileDropdown(prev => !prev)}
       >
@@ -199,52 +197,52 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
             )}
           >
             {user?.email ? user.email.substring(0, 2).toUpperCase() : 'CO'}
-            <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-white dark:border-neutral-900 bg-emerald-400" />
+            <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-[var(--bg-surface)] bg-emerald-400" />
           </span>
 
 {showProfileDropdown && (
-             <div
-               className={cn(
-                 "absolute bottom-0 top-auto",
-                 collapsed ? "left-14 ml-2" : "left-full ml-2",
-                 "min-w-[200px] rounded-lg",
-                 "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700",
-                 "shadow-lg z-50 py-2 overflow-hidden"
-               )}
-             >
-               <div className="px-3 py-2 border-b border-neutral-200 dark:border-neutral-800">
-                 <p className="text-[13px] font-medium text-neutral-800 dark:text-neutral-200 truncate">
-                   {user?.email || 'User'}
-                 </p>
-                 <p className="text-[11px] text-neutral-400 dark:text-neutral-500 truncate">
-                   {user?.role ? user.role.replace('admin_', 'Admin ').replace('_', ' ') : '—'}
-                 </p>
-               </div>
-               <button
-                 onClick={(e) => { e.stopPropagation(); setShowProfileDropdown(false); navigate('/profile'); }}
-                 className="w-full flex items-center gap-3 px-3 py-2 text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-               >
-                 <User size={16} />
-                 My Profile
-               </button>
-               <div className="border-t border-neutral-200 dark:border-neutral-800 my-1" />
-               <button
-                 onClick={(e) => { e.stopPropagation(); setShowProfileDropdown(false); logout(); }}
-                 className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
-               >
-                 <LogOut size={16} />
-                 Logout
-               </button>
-             </div>
-           )}
+            <div
+              className={cn(
+                "absolute bottom-0 top-auto",
+                collapsed ? "left-14 ml-2" : "left-full ml-2",
+                "min-w-[200px] rounded-lg",
+                "bg-[var(--bg-surface)] border border-[var(--border)]",
+                "shadow-lg z-50 py-2 overflow-hidden"
+              )}
+            >
+              <div className="px-3 py-2 border-b border-[var(--border)]">
+                <p className="text-[13px] font-medium text-[var(--text-primary)] truncate">
+                  {user?.email || 'User'}
+                </p>
+                <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                  {user?.role ? user.role.replace('admin_', 'Admin ').replace('_', ' ') : '—'}
+                </p>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowProfileDropdown(false); navigate('/profile'); }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                <User size={16} />
+                My Profile
+              </button>
+              <div className="border-t border-[var(--border)] my-1" />
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowProfileDropdown(false); logout(); }}
+                className="w-full flex items-center gap-3 px-3 py-2 text-sm text-[var(--accent-danger)] hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors"
+              >
+                <LogOut size={16} />
+                Logout
+              </button>
+            </div>
+          )}
         </div>
 
-{!collapsed && (
-           <div className="flex flex-1 flex-col leading-tight overflow-hidden">
-            <span className="truncate text-[13px] font-medium text-neutral-800 dark:text-neutral-200">
+        {!collapsed && (
+          <div className="flex flex-1 flex-col leading-tight overflow-hidden">
+            <span className="truncate text-[13px] font-medium text-[var(--text-on-sidebar)]">
               {user?.email || 'User'}
             </span>
-            <span className="truncate text-[11px] text-neutral-400 dark:text-neutral-500">
+            <span className="truncate text-[11px] text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)]">
               {user?.role ? user.role.replace('admin_', 'Admin ').replace('_', ' ') : '—'}
             </span>
           </div>
