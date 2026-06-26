@@ -15,10 +15,16 @@ console.log('SERVER STARTING - Loading updated code...');
 const app = express();
 
 // CORS configuration
-const allowedOrigins = [
+const defaultOrigins = [
   'http://localhost:5173',
   'http://localhost:3000'
 ];
+
+const envOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+  : [];
+
+const allowedOrigins = [...defaultOrigins, ...envOrigins];
 
 app.use(cors({
   origin: function (origin, callback) {
@@ -61,8 +67,13 @@ const mapRoutes = require('./routes/map');
 
 // Serve client static files
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
+console.log('Client dist path:', clientDist);
+console.log('Client dist exists:', fs.existsSync(clientDist));
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
+  console.log('Static file serving enabled from:', clientDist);
+} else {
+  console.error('WARNING: client/dist not found! Build may have failed.');
 }
 
 // API Routes
@@ -99,6 +110,19 @@ app.get('/api/health', async (req, res) => {
     result.dbError = err.message;
   }
   res.json(result);
+});
+
+// Diagnostic info
+app.get('/api/debug', (req, res) => {
+  res.json({
+    nodeEnv: process.env.NODE_ENV,
+    port: process.env.PORT,
+    dbHost: process.env.DB_HOST,
+    dbName: process.env.DB_NAME,
+    clientDist,
+    clientDistExists: fs.existsSync(clientDist),
+    distContents: fs.existsSync(clientDist) ? fs.readdirSync(clientDist) : []
+  });
 });
 
 // SPA fallback — serve index.html for non-API routes
