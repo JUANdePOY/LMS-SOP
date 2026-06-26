@@ -167,7 +167,7 @@ export const createUser = (data) => api.post('/settings/users', data);
 export const deleteUser = (id) => api.delete(`/settings/users/${id}`);
 
 // Alerts & Insights
-export const getAlerts = (params = {}) => api.get('/alerts', { params });
+export const getAlerts = (params = {}) => api.get('/alerts', { params, timeout: 60000 });
 export const createAlert = (data) => api.post('/alerts', data);
 export const markAlertRead = (id) => api.patch(`/alerts/${id}/read`);
 export const getAlertsInsights = () => api.get('/alerts/insights');
