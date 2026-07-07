@@ -17,7 +17,8 @@ const app = express();
 // CORS configuration
 const defaultOrigins = [
   'http://localhost:5173',
-  'http://localhost:3000'
+  'http://localhost:3000',
+  'http://localhost:5000'
 ];
 
 const envOrigins = process.env.CORS_ORIGINS
@@ -28,7 +29,7 @@ const allowedOrigins = [...defaultOrigins, ...envOrigins];
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || origin.endsWith('.hostingersite.com')) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
