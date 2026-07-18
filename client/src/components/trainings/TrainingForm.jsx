@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import { X, Upload, FileText, Image, File, Trash2 } from 'lucide-react';
 import {
   createInternalTraining,
@@ -9,9 +9,11 @@ import {
   uploadExternalLetterOrder,
   downloadInternalAttachment,
   downloadExternalAttachment,
+  deleteInternalAttachment,
+  deleteExternalAttachment,
 } from '@/services/trainingsService';
 import { useToast } from '@/components/ui/Toast';
-import RegistrationBuilder from './RegistrationBuilder';
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import SquadronParticipantBlocks from './SquadronParticipantBlocks';
 import SquadronSlotLimits from './SquadronSlotLimits';
 import SearchableFacilitatorDropdown from './SearchableFacilitatorDropdown';
@@ -108,6 +110,13 @@ function LetterOrderUpload({ file, onFileChange, existingAttachments = [], train
   const [dragOver, setDragOver] = useState(false);
   const [fileError, setFileError] = useState('');
   const [downloadingId, setDownloadingId] = useState(null);
+  const [attachments, setAttachments] = useState(existingAttachments);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    setAttachments(existingAttachments);
+  }, [existingAttachments]);
 
   const processFile = (f) => {
     setFileError('');
@@ -173,6 +182,26 @@ function LetterOrderUpload({ file, onFileChange, existingAttachments = [], train
     }
   };
 
+  const handleConfirmDelete = async () => {
+    if (!trainingId || !deleteTarget?.id) return;
+    setDeleting(true);
+    try {
+      const result = isExternal
+        ? await deleteExternalAttachment(trainingId, deleteTarget.id)
+        : await deleteInternalAttachment(trainingId, deleteTarget.id);
+      if (result.success) {
+        setAttachments((prev) => prev.filter((a) => a.id !== deleteTarget.id));
+        setDeleteTarget(null);
+      } else {
+        setFileError(result.message || 'Could not delete file.');
+      }
+    } catch {
+      setFileError('Could not delete file.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
@@ -184,12 +213,12 @@ function LetterOrderUpload({ file, onFileChange, existingAttachments = [], train
         </span>
       </div>
 
-      {Array.isArray(existingAttachments) && existingAttachments.length > 0 && (
+      {Array.isArray(attachments) && attachments.length > 0 && (
         <div className="space-y-2 mb-3">
           <p className="text-[10px] font-bold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
             Uploaded files
           </p>
-          {existingAttachments.map((att) => (
+          {attachments.map((att) => (
             <div
               key={att.id}
               className="flex items-center gap-3 p-3 bg-neutral-50 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg"
@@ -205,14 +234,32 @@ function LetterOrderUpload({ file, onFileChange, existingAttachments = [], train
                   {formatSize(att.size_bytes)}
                 </p>
               </div>
-              <button
-                type="button"
-                disabled={!trainingId || downloadingId === att.id}
-                onClick={() => handleDownloadExisting(att)}
-                className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50 shrink-0"
-              >
-                {downloadingId === att.id ? 'Downloading…' : 'Download'}
-              </button>
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  disabled={!trainingId || downloadingId === att.id}
+                  onClick={() => handleDownloadExisting(att)}
+                  className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline disabled:opacity-50"
+                >
+                  {downloadingId === att.id ? 'Downloading…' : 'Download'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-neutral-600 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors"
+                  title="Replace file"
+                >
+                  <Upload size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(att)}
+                  className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-500/10 text-neutral-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                  title="Remove file"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -290,6 +337,22 @@ function LetterOrderUpload({ file, onFileChange, existingAttachments = [], train
         onChange={(e) => { const f = e.target.files?.[0]; if (f) processFile(f); e.target.value = ''; }}
       />
       {fileError && <p className="mt-1 text-xs text-red-500">{fileError}</p>}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Remove attachment?"
+        description={
+          deleteTarget
+            ? `"${deleteTarget.original_filename || 'This file'}" will be permanently removed.`
+            : ''
+        }
+        confirmLabel="Remove"
+        cancelLabel="Keep file"
+        destructive
+        loading={deleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </div>
   );
 }
@@ -480,18 +543,8 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
       : TRAINING_TYPES.INTERNAL;
 
   const trainingType = initialType;
-  const [activeTab, setActiveTab]       = useState('details');
   const [submitting, setSubmitting]     = useState(false);
   const [errors, setErrors]             = useState({});
-  const [registrationFields, setRegistrationFields] = useState(
-    Array.isArray(training?.registration_fields) ? training.registration_fields : []
-  );
-  const handleRegistrationChange = (fields) => {
-    setRegistrationFields(fields);
-    if (errors.registration) {
-      setErrors(prev => ({ ...prev, registration: undefined }));
-    }
-  };
 
   // BUG FIX: use str() helper so null values from DB never crash .trim() or
   // controlled-input warnings. ?? '' keeps 0 and false but converts null/undefined.
@@ -555,9 +608,6 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
     } else {
       if (!externalForm.title?.trim()) errs.title     = 'Title is required.';
       if (!externalForm.startDate)     errs.startDate = 'Start date is required.';
-      if (!registrationFields || registrationFields.length === 0) {
-        errs.registration = 'Registration form must have at least one field.';
-      }
     }
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -609,7 +659,6 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
               slot_limit: Number(block.slotLimit),
             })),
           capacity:    null,
-          registration_fields: registrationFields,
         };
       }
 
@@ -697,41 +746,6 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
           </button>
         </div>
 
-        {/* ── Tab Bar (External only) ── */}
-        {isExternal && (
-          <div className="flex items-center px-6 border-b border-neutral-200 dark:border-neutral-800 shrink-0 gap-0.5">
-            {[
-              { id: 'details',      label: 'Details' },
-              { id: 'registration', label: 'Registration Form', count: registrationFields.length },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 -mb-px transition-all ${
-                  activeTab === tab.id
-                    ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
-                    : errors.registration && tab.id === 'registration'
-                      ? 'border-transparent text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300'
-                      : 'border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200'
-                }`}
-              >
-                {tab.label}
-                {tab.count > 0 && (
-                  <span className="bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-bold rounded-full px-1.5 py-0.5">
-                    {tab.count}
-                  </span>
-                )}
-                {tab.id === 'registration' && errors.registration && (
-                  <span className="bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400 text-[10px] font-bold rounded-full px-1.5 py-0.5">
-                    !
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* ── Scrollable Form Body ── */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
           <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -747,7 +761,7 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
               />
             )}
 
-            {isExternal && activeTab === 'details' && (
+            {isExternal && (
               <ExternalFields
                 form={externalForm}
                 onChange={handleExternalChange}
@@ -755,22 +769,6 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
                 trainingId={training?.id}
                 existingAttachments={training?.attachments}
               />
-            )}
-
-            {isExternal && activeTab === 'registration' && (
-              <div className="min-h-[420px] w-full">
-                <RegistrationBuilder
-                  initialFields={registrationFields}
-                  trainingTitle={externalForm.title || 'Training Registration'}
-                  onChange={handleRegistrationChange}
-                />
-              </div>
-            )}
-
-            {errors.registration && isExternal && activeTab === 'registration' && (
-              <div className="mt-4 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg text-xs text-red-600 dark:text-red-400">
-                {errors.registration}
-              </div>
             )}
 
             {errors.submit && (

@@ -174,10 +174,41 @@ async function removeAllFilesForTraining(trainingId) {
   await unlinkRelativePaths(paths);
 }
 
+/** Remove a single attachment: deletes its DB row and unlinks the file from disk. */
+async function deleteAttachment(attachmentId, trainingId) {
+  const row = await attachmentModel.findByIdForTraining(attachmentId, trainingId);
+  if (!row) {
+    const err = new Error('Attachment not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const conn = await trainingModel.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query(
+      `DELETE FROM internal_training_attachments WHERE id = ? AND training_id = ?`,
+      [attachmentId, trainingId]
+    );
+    await conn.commit();
+  } catch (e) {
+    await conn.rollback().catch(() => {});
+    throw e;
+  } finally {
+    conn.release();
+  }
+
+  const abs = absolutePathFromRelative(row.relative_path);
+  if (abs) await unlinkQuiet(abs);
+
+  return { id: attachmentId };
+}
+
 module.exports = {
   listPublicForTraining,
   registerLetterOrderUpload,
   getDownloadStreamContext,
   removeAllFilesForTraining,
+  deleteAttachment,
   mapPublicRow,
 };

@@ -215,6 +215,29 @@ const trainingsService = {
     }
   },
 
+  // Verify a reservist's service number for self-registration (step 2 of the
+  // squadron -> service number flow). Also flags if they're already
+  // registered for this training so the UI can short-circuit before the
+  // user picks anything else.
+  verifyReservist: async (trainingId, serviceNumber) => {
+    try {
+      const response = await api.get(`/trainings/external/${trainingId}/verify-reservist`, {
+        params: { service_number: serviceNumber },
+      });
+      const body = response.data;
+      return {
+        success: body?.success !== false,
+        message: body?.message,
+        data: body?.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to verify service number'
+      };
+    }
+  },
+
   // Get registrations for external training
   getRegistrationsByTrainingId: async (trainingId) => {
     try {
@@ -360,6 +383,23 @@ const trainingsService = {
     }
   },
 
+  deleteInternalAttachment: async (trainingId, attachmentId) => {
+    try {
+      const response = await api.delete(`/trainings/internal/${trainingId}/attachments/${attachmentId}`);
+      const body = response.data;
+      return {
+        success: body.success !== false,
+        message: body.message,
+        data: body.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to delete attachment',
+      };
+    }
+  },
+
   getExternalTrainingAttachments: async (trainingId) => {
     try {
       const response = await api.get(`/trainings/external/${trainingId}/attachments`);
@@ -373,6 +413,23 @@ const trainingsService = {
       return {
         success: false,
         message: error.response?.data?.message || 'Failed to fetch attachments',
+      };
+    }
+  },
+
+  deleteExternalAttachment: async (trainingId, attachmentId) => {
+    try {
+      const response = await api.delete(`/trainings/external/${trainingId}/attachments/${attachmentId}`);
+      const body = response.data;
+      return {
+        success: body.success !== false,
+        message: body.message,
+        data: body.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to delete attachment',
       };
     }
   },
@@ -421,6 +478,7 @@ export const deleteTraining = trainingsService.deleteInternalTraining; // Defaul
 export const createInternalTraining = trainingsService.createInternalTraining;
 export const updateInternalTraining = trainingsService.updateInternalTraining;
 export const createRegistration = trainingsService.createRegistration;
+export const verifyReservist = trainingsService.verifyReservist;
 export const getRegistrationsByTrainingId = trainingsService.getRegistrationsByTrainingId;
 export const uploadLetterOrder = trainingsService.uploadLetterOrder;
 export const uploadExternalLetterOrder = trainingsService.uploadExternalLetterOrder;
@@ -434,7 +492,9 @@ export const getTrainingSlotAvailability = trainingsService.getTrainingSlotAvail
 export const downloadInternalAttachment = trainingsService.downloadInternalAttachment;
 export const downloadExternalAttachment = trainingsService.downloadExternalAttachment;
 export const getInternalTrainingAttachments = trainingsService.getInternalTrainingAttachments;
+export const deleteInternalAttachment = trainingsService.deleteInternalAttachment;
 export const getExternalTrainingAttachments = trainingsService.getExternalTrainingAttachments;
+export const deleteExternalAttachment = trainingsService.deleteExternalAttachment;
 export const getInternalTrainingParticipants = trainingsService.getInternalTrainingParticipants;
 export const getExternalTrainingParticipants = trainingsService.getExternalTrainingParticipants;
 

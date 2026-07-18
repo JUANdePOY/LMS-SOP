@@ -205,6 +205,13 @@ function getTrainingSlotAvailability(req, res) {
     .catch((err) => sendError(res, err, 'Failed to get slot availability'));
 }
 
+function verifyReservist(req, res) {
+  trainingsService
+    .verifyReservistByServiceNumber(req.params.id, req.query.service_number, req.user?.id)
+    .then((data) => res.json({ success: true, message: 'OK', data }))
+    .catch((err) => sendError(res, err, 'Failed to verify service number'));
+}
+
 function listRegistrations(req, res) {
   const trainingId = Number(req.params.id);
   trainingsService
@@ -293,12 +300,38 @@ function listInternalAttachments(req, res) {
     .catch((err) => sendError(res, err, 'Failed to list attachments'));
 }
 
+function deleteInternalAttachment(req, res) {
+  const trainingId = Number(req.params.trainingId);
+  const attachmentId = Number(req.params.attachmentId);
+  const userId = req.user?.id;
+  trainingAttachmentService
+    .deleteAttachment(attachmentId, trainingId)
+    .then((data) => {
+      logAudit('attachment.delete', userId, { trainingId, attachmentId });
+      return res.json({ success: true, message: 'Attachment deleted', data });
+    })
+    .catch((err) => sendError(res, err, 'Failed to delete attachment'));
+}
+
 function listExternalAttachments(req, res) {
   const externalTrainingId = Number(req.params.id);
   externalTrainingAttachmentService
     .listPublicForExternalTraining(externalTrainingId)
     .then((attachments) => res.json({ success: true, message: 'OK', data: attachments }))
     .catch((err) => sendError(res, err, 'Failed to list attachments'));
+}
+
+function deleteExternalAttachment(req, res) {
+  const externalTrainingId = Number(req.params.id);
+  const attachmentId = Number(req.params.attachmentId);
+  const userId = req.user?.id;
+  externalTrainingAttachmentService
+    .deleteAttachment(attachmentId, externalTrainingId)
+    .then((data) => {
+      logAudit('external_attachment.delete', userId, { externalTrainingId, attachmentId });
+      return res.json({ success: true, message: 'Attachment deleted', data });
+    })
+    .catch((err) => sendError(res, err, 'Failed to delete attachment'));
 }
 
 module.exports = {
@@ -323,9 +356,12 @@ module.exports = {
   uploadExternalLetterOrder,
   downloadExternalTrainingAttachment,
   listInternalAttachments,
+  deleteInternalAttachment,
   listExternalAttachments,
+  deleteExternalAttachment,
   getTrainingStats,
   getTrainingSlotAvailability,
+  verifyReservist,
   getInternalTrainingParticipants,
   getExternalTrainingParticipants,
 };

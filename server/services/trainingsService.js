@@ -548,7 +548,6 @@ async function registerExternalParticipant(trainingId, participantData, registra
   try {
     await conn.beginTransaction();
 
-    // Lock the external training row to prevent race conditions while counting/inserting
     const [trows] = await conn.query(
       'SELECT id, title, status, capacity, squadron_limits FROM external_trainings WHERE id = ? FOR UPDATE',
       [trainingId]
@@ -586,11 +585,59 @@ async function registerExternalParticipant(trainingId, participantData, registra
       return rows[0]?.c ?? 0;
     }
 
-    // Parse participant data
     let pdObj = null;
     if (participantData != null && typeof participantData !== 'string') pdObj = participantData;
     else if (participantData != null && typeof participantData === 'string') {
       try { pdObj = JSON.parse(participantData); } catch (_) { pdObj = null; }
+    }
+
+    let alertReservistId = null;
+
+    if (pdObj && pdObj.service_number) {
+      const [rRows] = await conn.query(
+        `SELECT r.id as reservist_id, r.user_id, ra.squadron_id, r.first_name, r.last_name, r.rank
+         FROM reservists r
+         LEFT JOIN reservist_assignments ra ON ra.reservist_id = r.id AND ra.is_primary = 1
+         WHERE r.service_number = ? LIMIT 1`,
+        [pdObj.service_number]
+      );
+      if (!rRows || rRows.length === 0) {
+        const err = new Error('Reservist not found with this service number');
+        err.statusCode = 404;
+        throw err;
+      }
+      const r = rRows[0];
+
+      // A reservist may only self-register using their OWN service number —
+      // never someone else's, even if they happen to know it.
+      if (registrantUserId == null || Number(r.user_id) !== Number(registrantUserId)) {
+        const err = new Error('This service number does not belong to your account.');
+        err.statusCode = 403;
+        throw err;
+      }
+
+      alertReservistId = r.reservist_id;
+
+      // The reservist may choose to register under a squadron other than
+      // their own assigned one (e.g. attending on behalf of / alongside
+      // another unit). The client is responsible for confirming this with
+      // the user (override dialog) before sending chosen_squadron_id.
+      // Falls back to their home squadron if none was sent, preserving the
+      // previous behavior for any older clients.
+      const chosenSquadronId = pdObj.chosen_squadron_id != null
+        ? Number(pdObj.chosen_squadron_id)
+        : r.squadron_id;
+
+      pdObj = {
+        ...pdObj,
+        reservist_id: r.reservist_id,
+        squadron_id: chosenSquadronId,
+        home_squadron_id: r.squadron_id,
+        is_squadron_override: chosenSquadronId !== r.squadron_id,
+        first_name: r.first_name,
+        last_name: r.last_name,
+        rank: r.rank,
+      };
     }
 
     if (Array.isArray(sqLimits) && sqLimits.length > 0) {
@@ -600,9 +647,8 @@ async function registerExternalParticipant(trainingId, participantData, registra
         return sum + (v == null ? 0 : Number(v));
       }, 0);
 
-      if (pdObj && (pdObj.squadron_id != null || pdObj.squadronId != null)) {
-        const sid = pdObj.squadron_id ?? pdObj.squadronId;
-        // Check if THIS specific reservist is already registered (not just anyone from the squadron)
+      if (pdObj && pdObj.squadron_id != null) {
+        const sid = pdObj.squadron_id;
         if (pdObj.reservist_id != null) {
           const [existing] = await conn.query(
             'SELECT id FROM training_registrations WHERE training_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(participant_data, "$.reservist_id")) = ?',
@@ -631,7 +677,6 @@ async function registerExternalParticipant(trainingId, participantData, registra
           }
         }
       } else {
-        // Check for duplicate registration by reservist_id (if provided) even without squadron limits
         if (pdObj && pdObj.reservist_id != null) {
           const [existing] = await conn.query(
             'SELECT id FROM training_registrations WHERE training_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(participant_data, "$.reservist_id")) = ?',
@@ -653,7 +698,6 @@ async function registerExternalParticipant(trainingId, participantData, registra
         }
       }
     } else if (trow.capacity != null) {
-      // Check if THIS specific reservist is already registered (not just anyone from the capacity)
       if (pdObj && pdObj.reservist_id != null) {
         const [existing] = await conn.query(
           'SELECT id FROM training_registrations WHERE training_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(participant_data, "$.reservist_id")) = ?',
@@ -678,27 +722,12 @@ async function registerExternalParticipant(trainingId, participantData, registra
         ? null
         : typeof participantData === 'string'
           ? participantData
-          : JSON.stringify(participantData);
+          : JSON.stringify(pdObj);
     const [result] = await conn.query(
       'INSERT INTO training_registrations (training_id, participant_data) VALUES (?, ?)',
       [trainingId, pd]
     );
     await conn.commit();
-
-    // ── Send alert to the specific reservist ────────────────────────────────
-    // Priority: participant_data.reservist_id (injected by ExternalRegistration.jsx)
-    // Fallback: look up reservists.id from registrantUserId (user who made the request)
-    let alertReservistId = (pdObj && pdObj.reservist_id) ? Number(pdObj.reservist_id) : null;
-
-    if (!alertReservistId && registrantUserId) {
-      try {
-        const [rRows] = await pool.query(
-          'SELECT id FROM reservists WHERE user_id = ? LIMIT 1',
-          [registrantUserId]
-        );
-        if (rRows && rRows.length > 0) alertReservistId = rRows[0].id;
-      } catch (_) { /* non-fatal — don't break the registration */ }
-    }
 
     if (alertReservistId) {
       await sendTrainingAlertSafe(null, {
@@ -717,6 +746,57 @@ async function registerExternalParticipant(trainingId, participantData, registra
   } finally {
     try { conn.release(); } catch (_) {}
   }
+}
+
+async function verifyReservistByServiceNumber(trainingId, serviceNumber, requestingUserId) {
+  const serviceNo = String(serviceNumber || '').trim();
+  if (!serviceNo) {
+    const err = new Error('Service number is required');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const [rows] = await trainingModel.db.query(
+    `SELECT r.id AS reservist_id, r.user_id, r.first_name, r.last_name, r.rank, r.service_number,
+            ra.squadron_id, s.name AS squadron_name
+     FROM reservists r
+     LEFT JOIN reservist_assignments ra ON ra.reservist_id = r.id AND ra.is_primary = 1
+     LEFT JOIN squadron s ON s.id = ra.squadron_id
+     WHERE r.service_number = ? LIMIT 1`,
+    [serviceNo]
+  );
+  const r = rows && rows[0];
+  if (!r) {
+    const err = new Error('Incorrect service number');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // A reservist may only self-register using their OWN service number —
+  // never someone else's, even if they happen to know it.
+  if (requestingUserId == null || Number(r.user_id) !== Number(requestingUserId)) {
+    const err = new Error('This service number does not belong to your account.');
+    err.statusCode = 403;
+    throw err;
+  }
+
+  // Let the frontend warn the user up front if they're already registered,
+  // before they even pick a squadron / hit submit.
+  const [existing] = await trainingModel.db.query(
+    'SELECT id FROM training_registrations WHERE training_id = ? AND JSON_UNQUOTE(JSON_EXTRACT(participant_data, "$.reservist_id")) = ?',
+    [trainingId, String(r.reservist_id)]
+  );
+
+  return {
+    reservist_id: r.reservist_id,
+    first_name: r.first_name,
+    last_name: r.last_name,
+    rank: r.rank,
+    service_number: r.service_number,
+    squadron_id: r.squadron_id,
+    squadron_name: r.squadron_name,
+    already_registered: existing.length > 0,
+  };
 }
 
 async function getTrainingSlotAvailability(trainingId) {
@@ -762,7 +842,7 @@ async function getTrainingSlotAvailability(trainingId) {
       }
       squads.push({
         squadron_id: squadronId,
-        name: limit.name ?? null,
+        name: limit.squadron_name ?? limit.name ?? null,
         slot_limit: slotLimit,
         registered,
         remaining: remaining,
@@ -863,6 +943,7 @@ module.exports = {
   updateExternalTraining,
   deleteExternalTraining,
   registerExternalParticipant,
+  verifyReservistByServiceNumber,
   listExternalRegistrations,
   getTrainingSlotAvailability,
   getInternalTrainingParticipants,

@@ -123,7 +123,7 @@ export default function Login() {
               alt="8th Air Reserve Center — AFRC"
               className="login-logo"
             />
-            <h1 className="login-card-title">PAFR System</h1>
+            <h1 className="login-card-title">A R I E S - 8</h1>
             <p className="login-card-subtitle">
               Personnel &amp; Attendance Force Readiness
             </p>
