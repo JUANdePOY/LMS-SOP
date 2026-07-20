@@ -5,9 +5,9 @@ import AreaAccordion from "@/components/hierarchy/AreaAccordion";
 import SelectedSquadronPanel from "@/components/hierarchy/SelectedSquadronPanel";
 import MembersModal from "@/components/hierarchy/MembersModal";
 import { getGroups, getMapSquadrons, getMapSummary } from "@/services/api";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Search, X, RotateCcw, Loader, Users, MapPin, Shield, Layers, ChevronLeft, ZoomIn } from "lucide-react";
-import { MapContainer, TileLayer, Marker, Popup, useMap, Tooltip } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, Tooltip, Polygon, Circle } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -51,6 +51,42 @@ function createSquadronIcon(isActive, isHovered) {
   });
 }
 
+// ── Generic organizational node icon (ARSEN / Group) ──────────────
+function createNodeIcon(total, color, isSelected) {
+  const size = isSelected ? 42 : 34;
+  const border = isSelected ? 4 : 3;
+  const fontSize = isSelected ? 12 : 10;
+  return L.divIcon({
+    className: "custom-org-icon",
+    html: `<div style="width:${size}px;height:${size}px;background:${color};border:${border}px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:${fontSize}px;font-family:system-ui,sans-serif;">${total}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -(size / 2)],
+  });
+}
+
+// ── Reservist "hotspot" marker (aggregated by location) ───────────
+// Color is a heat scale: fewer reservists → blue, more → red.
+function createLocationIcon(total, maxTotal, isSelected) {
+  const t = maxTotal > 0 ? Math.min(total / maxTotal, 1) : 0;
+  const hue = 210 - t * 210; // 210 (blue) → 0 (red)
+  const color = `hsl(${hue}, 80%, 48%)`;
+  const size = isSelected ? 46 : 38;
+  const fontSize = isSelected ? 13 : 11;
+  return L.divIcon({
+    className: "custom-location-icon",
+    html: `
+      <div style="position:relative;width:${size}px;height:${size}px;">
+        <div style="position:absolute;width:${size}px;height:${size}px;background:${color};border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;">
+          <span style="transform:rotate(45deg);color:white;font-weight:800;font-size:${fontSize}px;font-family:system-ui,sans-serif;line-height:1;">${total}</span>
+        </div>
+      </div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+    popupAnchor: [0, -size],
+  });
+}
+
 function FlyTo({ center, zoom }) {
   const map = useMap();
   useEffect(() => {
@@ -70,6 +106,43 @@ function SummaryCard({ label, value }) {
       <span className="mt-0.5 text-[11px] font-medium text-neutral-500 dark:text-neutral-500">{label}</span>
     </div>
   );
+}
+
+// ── Heat-scale color (mirrors createLocationIcon) ────────────────
+function heatColor(total, max) {
+  const t = max > 0 ? Math.min(total / max, 1) : 0;
+  const hue = 210 - t * 210; // 210 (blue) → 0 (red)
+  return `hsl(${hue}, 80%, 48%)`;
+}
+
+// ── Convex hull (Andrew's monotone chain) ────────────────────────
+// points: [lat, lng][]. Treats lng as x, lat as y. Returns the hull
+// as [lat, lng][] (>= 3 points) or fewer points when degenerate.
+function computeConvexHull(points) {
+  const pts = points.map((p) => ({ x: p[1], y: p[0], lat: p[0], lng: p[1] }));
+  const seen = new Set();
+  const uniq = [];
+  for (const p of pts) {
+    const k = `${p.lat},${p.lng}`;
+    if (!seen.has(k)) { seen.add(k); uniq.push(p); }
+  }
+  if (uniq.length < 3) return uniq.map((p) => [p.lat, p.lng]);
+  const sorted = uniq.slice().sort((a, b) => a.x - b.x || a.y - b.y);
+  const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const lower = [];
+  for (const p of sorted) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop();
+    lower.push(p);
+  }
+  const upper = [];
+  for (let i = sorted.length - 1; i >= 0; i--) {
+    const p = sorted[i];
+    while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop();
+    upper.push(p);
+  }
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper).map((p) => [p.lat, p.lng]);
 }
 
 function transformApiData(apiData) {
@@ -114,17 +187,126 @@ function transformApiData(apiData) {
 // ── Inline Map Component ───────────────────────────────────────────
 function MindanaoMapInline() {
   const [squadrons, setSquadrons] = useState([]);
-  const [arsenSummaries, setArsenSummaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedSquadron, setSelectedSquadron] = useState(null);
-  const [selectedArsen, setSelectedArsen] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
   const [flyTo, setFlyTo] = useState(null);
-  const [viewMode, setViewMode] = useState("overview");
+  // Active spatial layer: which organizational level is plotted as markers.
+  const [layer, setLayer] = useState("arsen");
+  const [showBoundaries, setShowBoundaries] = useState(true);
+  // Currently drilled-into node for the summary sidebar.
+  const [selected, setSelected] = useState(null);
+  const loadInfoRef = useRef(null);
 
   const MINDANAO_CENTER = [7.5, 125.0];
   const MINDANAO_ZOOM = 7;
+
+  // Aggregate squadrons into organizational + geographic layers.
+  // NOTE: `Map` is shadowed by the lucide icon import, so we use plain
+  // objects keyed by id/string instead of `new Map()`.
+  const orgAgg = useMemo(() => {
+    const arsen = {};
+    const group = {};
+    const location = {};
+    squadrons.forEach((sq) => {
+      const aId = sq.arsen?.id;
+      if (aId != null) {
+        if (!arsen[aId]) {
+          arsen[aId] = { id: aId, name: sq.arsen.name, location: sq.arsen.location, total: 0, count: 0, sumLat: 0, sumLng: 0, groupIds: {}, squadrons: [] };
+        }
+        const a = arsen[aId];
+        a.total += sq.total_reservists || 0; a.count += 1;
+        a.sumLat += sq.latitude; a.sumLng += sq.longitude;
+        a.squadrons.push(sq); a.groupIds[sq.group.id] = true;
+      }
+      const gId = sq.group?.id;
+      if (gId != null) {
+        if (!group[gId]) {
+          group[gId] = { id: gId, name: sq.group.name, code: sq.group.code, arsenId: aId, arsenName: sq.arsen?.name, total: 0, count: 0, sumLat: 0, sumLng: 0, squadrons: [] };
+        }
+        const g = group[gId];
+        g.total += sq.total_reservists || 0; g.count += 1;
+        g.sumLat += sq.latitude; g.sumLng += sq.longitude;
+        g.squadrons.push(sq);
+      }
+      const key = (sq.location || "").trim();
+      if (key) {
+        if (!location[key]) {
+          location[key] = { id: key, name: key, total: 0, count: 0, sumLat: 0, sumLng: 0, squadrons: [] };
+        }
+        const l = location[key];
+        l.total += sq.total_reservists || 0; l.count += 1;
+        l.sumLat += sq.latitude; l.sumLng += sq.longitude;
+        l.squadrons.push(sq);
+      }
+    });
+    const finalize = (obj) => Object.values(obj).map((e) => ({
+      ...e,
+      lat: e.sumLat / e.count,
+      lng: e.sumLng / e.count,
+      groupCount: e.groupIds ? Object.keys(e.groupIds).length : undefined,
+    }));
+    return { arsen: finalize(arsen), group: finalize(group), location: finalize(location) };
+  }, [squadrons]);
+
+  const maxByKind = useMemo(() => ({
+    arsen: Math.max(1, ...orgAgg.arsen.map((a) => a.total)),
+    group: Math.max(1, ...orgAgg.group.map((g) => g.total)),
+    location: Math.max(1, ...orgAgg.location.map((l) => l.total)),
+  }), [orgAgg]);
+
+  // Territory shapes (convex hull polygon, or circle fallback for < 3 points)
+  // derived alongside orgAgg — no API changes. Boundaries only apply to
+  // arsen / group / location since squadrons are leaf nodes.
+  const territoryAgg = useMemo(() => {
+    const EARTH_R = 6371000;
+    const toNum = (v) => {
+      const n = typeof v === "string" ? parseFloat(v) : v;
+      return Number.isFinite(n) ? n : null;
+    };
+    const build = (list) => list.map((node) => {
+      // Only keep squadrons with valid, finite coordinates.
+      const validSq = node.squadrons.filter((sq) => {
+        const lat = toNum(sq.latitude);
+        const lng = toNum(sq.longitude);
+        return lat != null && lng != null;
+      });
+      const pts = validSq.map((sq) => [toNum(sq.latitude), toNum(sq.longitude)]);
+
+      let hullPoints = null;
+      if (pts.length >= 3) {
+        const hull = computeConvexHull(pts);
+        if (hull.length >= 3) hullPoints = hull;
+      }
+      let circle = null;
+      if (!hullPoints && pts.length > 0) {
+        const clat = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+        const clng = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+        let maxDist = 0;
+        for (const p of pts) {
+          const dLat = (p[0] - clat) * Math.PI / 180;
+          const dLng = (p[1] - clng) * Math.cos((clat * Math.PI) / 180) * Math.PI / 180;
+          const d = EARTH_R * Math.sqrt(dLat * dLat + dLng * dLng);
+          if (d > maxDist) maxDist = d;
+        }
+        circle = { center: [clat, clng], radiusMeters: Math.max(maxDist * 1.15, 3000) };
+      }
+      return { id: node.id, kind: node.kind, name: node.name, total: node.total, hullPoints, circle, raw: node };
+    });
+    return {
+      arsen: build(orgAgg.arsen.map((a) => ({ ...a, kind: "arsen" }))),
+      group: build(orgAgg.group.map((g) => ({ ...g, kind: "group" }))),
+      location: build(orgAgg.location.map((l) => ({ ...l, kind: "location" }))),
+    };
+  }, [orgAgg]);
+
+  const getNode = useCallback((kind, id) => {
+    if (kind === "arsen") return orgAgg.arsen.find((a) => a.id === id);
+    if (kind === "group") return orgAgg.group.find((g) => g.id === id);
+    if (kind === "squadron") return squadrons.find((s) => s.id === id);
+    if (kind === "location") return orgAgg.location.find((l) => l.id === id);
+    return null;
+  }, [orgAgg, squadrons]);
 
   useEffect(() => {
     const load = async () => {
@@ -139,10 +321,17 @@ function MindanaoMapInline() {
         const loadedArsenSummaries = sumRes.data?.status === "success"
           ? sumRes.data.data.filter((a) => a.id === 2 || a.id === 3)
           : [];
-        const mindanaoArsenIds = new Set(loadedArsenSummaries.map(a => a.id));
-        const mindanaoSquadrons = loadedSquadrons.filter(sq => mindanaoArsenIds.has(sq.arsen?.id));
+        const mindanaoArsenIds = new Set(loadedArsenSummaries.map((a) => a.id));
+        const mindanaoSquadrons = loadedSquadrons.filter((sq) => mindanaoArsenIds.has(sq.arsen?.id));
+        loadInfoRef.current = {
+          loadedSquadrons: loadedSquadrons.length,
+          summaryIds: Array.from(mindanaoArsenIds),
+          mindanaoSquadrons: mindanaoSquadrons.length,
+          sampleSq: loadedSquadrons[0] || null,
+        };
+        // DIAGNOSTIC
+        console.log("[load]", loadInfoRef.current);
         setSquadrons(mindanaoSquadrons);
-        setArsenSummaries(loadedArsenSummaries);
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load map data");
       } finally {
@@ -152,26 +341,38 @@ function MindanaoMapInline() {
     load();
   }, []);
 
-  const handleSelectArsen = useCallback((arsen) => {
-    const arsenSq = squadrons.filter((sq) => sq.arsen.id === arsen.id);
-    setSelectedArsen({ ...arsen, _squadrons: arsenSq });
-    setViewMode("arsen");
-    setFlyTo({ center: [arsen.center.lat, arsen.center.lng], zoom: 10 });
-    setSelectedSquadron(null);
-  }, [squadrons]);
+  // Select a node (ARSEN / Group / Squadron / Location) and open the
+  // drill-down summary sidebar. Children are pre-computed for the breakdown.
+  const selectNode = useCallback((kind, node) => {
+    let children = [];
+    if (kind === "arsen") {
+      children = orgAgg.group
+        .filter((g) => g.arsenId === node.id)
+        .map((g) => ({ kind: "group", id: g.id, name: g.name, total: g.total, count: g.count }));
+    } else if (kind === "group" || kind === "location") {
+      children = node.squadrons.map((sq) => ({ kind: "squadron", id: sq.id, name: sq.name, total: sq.total_reservists, count: 1 }));
+    }
+    const zoom = kind === "arsen" ? 9 : kind === "group" ? 10 : kind === "squadron" ? 13 : 11;
+    const lat = node.lat ?? node.latitude;
+    const lng = node.lng ?? node.longitude;
+    const total = kind === "squadron" ? (node.total_reservists || 0) : (node.total || 0);
+    setSelected({
+      kind, id: node.id, name: node.name,
+      total, count: node.count ?? 1,
+      lat, lng, children, raw: node,
+    });
+    setFlyTo({ center: [lat, lng], zoom });
+  }, [orgAgg]);
 
-  const handleSelectSq = useCallback((sq) => {
-    setSelectedSquadron(sq);
-    setViewMode("squadron");
-    setFlyTo({ center: [sq.latitude, sq.longitude], zoom: 13 });
-  }, []);
+  const handleChildClick = useCallback((child) => {
+    const node = getNode(child.kind, child.id);
+    if (node) selectNode(child.kind, node);
+  }, [getNode, selectNode]);
 
-  const handleBack = useCallback(() => {
-    setSelectedArsen(null);
-    setSelectedSquadron(null);
-    setViewMode("overview");
+  const clearSelection = useCallback(() => {
+    setSelected(null);
     setFlyTo({ center: MINDANAO_CENTER, zoom: MINDANAO_ZOOM });
-  }, []);
+  }, [MINDANAO_CENTER, MINDANAO_ZOOM]);
 
   if (loading) {
     return (
@@ -187,23 +388,59 @@ function MindanaoMapInline() {
     );
   }
 
+  const LAYERS = [
+    { key: "arsen", label: "ARSENs", icon: Shield },
+    { key: "group", label: "Groups", icon: Users },
+    { key: "squadron", label: "Squadrons", icon: Layers },
+    { key: "location", label: "Locations", icon: MapPin },
+  ];
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-neutral-500 dark:text-neutral-500">
-          Click an <strong>ARSEN marker</strong> to zoom into its area. Click a <strong>squadron dot</strong> for details.
+          Switch the <strong>layer</strong> to visualize ARSENs, Groups, Squadrons or Locations.
+          Click any marker or <strong>shaded boundary</strong> to <strong>drill down</strong> into its personnel summary.
+          Boundaries can be toggled off to reduce clutter.
         </p>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-4 text-xs text-neutral-500">
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Active
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-neutral-400" /> Inactive
-            </span>
+          {/* Layer switcher */}
+          <div className="flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-100/60 dark:bg-neutral-800/60 p-1">
+            {LAYERS.map((l) => {
+              const Icon = l.icon;
+              const isActive = layer === l.key;
+              return (
+                <button key={l.key} onClick={() => setLayer(l.key)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all duration-150",
+                    isActive
+                      ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
+                      : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300"
+                  )}
+                >
+                  <Icon size={13} /> {l.label}
+                </button>
+              );
+            })}
           </div>
-          {viewMode !== "overview" && (
-            <button onClick={handleBack}
+          {/* Boundary layer toggle (disabled on squadron layer — no territories) */}
+          <button
+            onClick={() => setShowBoundaries((v) => !v)}
+            disabled={layer === "squadron"}
+            title={layer === "squadron" ? "Boundaries are not available at squadron level" : "Toggle territory boundary polygons"}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+              layer === "squadron"
+                ? "border-neutral-200 bg-neutral-100 text-neutral-300 cursor-not-allowed dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-600"
+                : showBoundaries
+                  ? "border-indigo-300 bg-indigo-50 text-indigo-700 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-300"
+                  : "border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+            )}
+          >
+            <MapPin size={14} /> {showBoundaries ? "Boundaries On" : "Boundaries Off"}
+          </button>
+          {selected && (
+            <button onClick={clearSelection}
               className="flex items-center gap-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
             >
               <ChevronLeft size={14} /> Overview
@@ -220,12 +457,68 @@ function MindanaoMapInline() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          {/* DIAGNOSTIC TEST SHAPE — remove after isolating render vs data issue */}
+          <Circle
+            center={MINDANAO_CENTER}
+            radius={80000}
+            pathOptions={{ color: "red", weight: 4, fillColor: "red", fillOpacity: 0.5 }}
+            eventHandlers={{ click: () => alert("test circle clicked") }}
+          />
           {flyTo && <FlyTo center={flyTo.center} zoom={flyTo.zoom} />}
 
-          {viewMode === "overview" && arsenSummaries.map((arsen) => (
-            <Marker key={arsen.id} position={[arsen.center.lat, arsen.center.lng]}
-              icon={createArsenIcon(arsen.id, selectedArsen?.id === arsen.id)}
-              eventHandlers={{ click: () => handleSelectArsen(arsen) }}
+          {/* ── Territory boundary shapes (rendered beneath markers) ── */}
+          {showBoundaries && layer !== "squadron" && (() => {
+            // DIAGNOSTIC
+            console.log("[territory] layer=", layer,
+              "squadrons.len=", squadrons.length,
+              "orgAgg arsen/group/loc=", orgAgg.arsen.length, orgAgg.group.length, orgAgg.location.length,
+              "loadInfo=", loadInfoRef.current,
+              "shapes=", (territoryAgg[layer] || []).map((t) => ({
+                id: t.id, kind: t.kind,
+                sqCount: t.raw?.squadrons?.length,
+                hull: !!t.hullPoints,
+                circleR: t.circle ? t.circle.radiusMeters : null,
+                sampleSq: t.raw?.squadrons?.[0] ? { lat: t.raw.squadrons[0].latitude, lng: t.raw.squadrons[0].longitude } : null,
+              })));
+            return territoryAgg[layer].map((t) => {
+              const isSel = selected?.kind === t.kind && selected?.id === t.id;
+              const color = t.kind === "arsen"
+              ? (ARSEN_COLORS[t.id] || "#6B7280")
+              : t.kind === "group"
+                ? "#3B82F6"
+                : heatColor(t.total, maxByKind.location);
+            const pathOptions = {
+              color,
+              weight: isSel ? 4 : 2.5,
+              opacity: isSel ? 1 : 0.85,
+              fillColor: color,
+              fillOpacity: isSel ? 0.3 : 0.2,
+              dashArray: isSel ? undefined : "6 4",
+              interactive: true,
+              bubblingMouseEvents: false,
+            };
+            if (t.circle) {
+              return (
+                <Circle key={`b-${t.kind}-${t.id}`} center={t.circle.center} radius={t.circle.radiusMeters}
+                  pathOptions={pathOptions} eventHandlers={{ click: () => selectNode(t.kind, t.raw) }} />
+              );
+            }
+            if (t.hullPoints) {
+              return (
+                <Polygon key={`b-${t.kind}-${t.id}`} positions={t.hullPoints}
+                  pathOptions={pathOptions} eventHandlers={{ click: () => selectNode(t.kind, t.raw) }} />
+              );
+            }
+            return null;
+          });
+          })()}
+
+          {/* ── Active layer markers ── */}
+          {layer === "arsen" && orgAgg.arsen.map((arsen) => (
+            <Marker key={`arsen-${arsen.id}`} position={[arsen.lat, arsen.lng]}
+              icon={createArsenIcon(arsen.id, selected?.kind === "arsen" && selected.id === arsen.id)}
+              eventHandlers={{ click: () => selectNode("arsen", arsen) }}
+              zIndexOffset={400}
             >
               <Tooltip direction="top" offset={[0, -20]} opacity={0.95}>
                 <span className="text-[12px] font-bold">{arsen.name}</span>
@@ -235,24 +528,113 @@ function MindanaoMapInline() {
                   <p className="text-sm font-bold text-neutral-900 mb-1">{arsen.name}</p>
                   <p className="text-xs text-neutral-500 mb-2">{arsen.location}</p>
                   <div className="flex gap-3 text-xs text-neutral-600 mb-2">
-                    <span className="flex items-center gap-1"><Layers size={11} /> {arsen.total_squadrons} sqdn</span>
-                    <span className="flex items-center gap-1"><Users size={11} /> {arsen.total_reservists} rsrv</span>
+                    <span className="flex items-center gap-1"><Users size={11} /> {arsen.total.toLocaleString()} rsrv</span>
+                    <span className="flex items-center gap-1"><Layers size={11} /> {arsen.groupCount} grp</span>
                   </div>
-                  <button onClick={() => handleSelectArsen(arsen)}
+                  <button onClick={() => selectNode("arsen", arsen)}
                     className="w-full rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors"
                   >
-                    <span className="flex items-center justify-center gap-1"><ZoomIn size={12} /> Zoom to Area</span>
+                    <span className="flex items-center justify-center gap-1"><ZoomIn size={12} /> View Breakdown</span>
                   </button>
                 </div>
               </Popup>
             </Marker>
           ))}
 
-          {(viewMode === "arsen" || viewMode === "squadron") && selectedArsen?._squadrons?.map((sq) => (
-            <Marker key={sq.id} position={[sq.latitude, sq.longitude]}
+          {layer === "group" && orgAgg.group.map((g) => (
+            <Marker key={`group-${g.id}`} position={[g.lat, g.lng]}
+              icon={createNodeIcon(g.total, "#3B82F6", selected?.kind === "group" && selected.id === g.id)}
+              eventHandlers={{ click: () => selectNode("group", g) }}
+              zIndexOffset={400}
+            >
+              <Tooltip direction="top" offset={[0, -18]} opacity={0.95}>
+                <span className="text-[11px] font-bold">{g.name}</span>
+              </Tooltip>
+              <Popup>
+                <div className="min-w-[200px] p-1">
+                  <p className="text-sm font-bold text-neutral-900 mb-1">{g.name}</p>
+                  <p className="text-xs text-neutral-500 mb-2">{g.arsenName}</p>
+                  <div className="flex gap-3 text-xs text-neutral-600 mb-2">
+                    <span className="flex items-center gap-1"><Users size={11} /> {g.total.toLocaleString()} rsrv</span>
+                    <span className="flex items-center gap-1"><Layers size={11} /> {g.count} sqdn</span>
+                  </div>
+                  <button onClick={() => selectNode("group", g)}
+                    className="w-full rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors"
+                  >
+                    <span className="flex items-center justify-center gap-1"><ZoomIn size={12} /> View Breakdown</span>
+                  </button>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {layer === "squadron" && squadrons.map((sq) => (
+            <Marker key={`sq-${sq.id}`} position={[sq.latitude, sq.longitude]}
               icon={createSquadronIcon(sq.is_active, hoveredId === sq.id)}
               eventHandlers={{
-                click: () => handleSelectSq(sq),
+                click: () => selectNode("squadron", sq),
+                mouseover: () => setHoveredId(sq.id),
+                mouseout: () => setHoveredId(null),
+              }}
+              zIndexOffset={300}
+            >
+              <Tooltip direction="top" offset={[0, -12]} opacity={0.95}>
+                <span className="text-[11px] font-semibold">{sq.name}</span>
+              </Tooltip>
+              <Popup>
+                <div className="min-w-[180px] p-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className={cn("h-2.5 w-2.5 rounded-full", sq.is_active ? "bg-emerald-500" : "bg-neutral-400")} />
+                    <span className="text-sm font-bold">{sq.name}</span>
+                  </div>
+                  <div className="space-y-0.5 text-xs text-neutral-600">
+                    <p><span className="font-medium">Location:</span> {sq.location}</p>
+                    <p><span className="font-medium">Specialization:</span> {sq.specialization}</p>
+                    <p><span className="font-medium">Reservists:</span> {sq.total_reservists}</p>
+                  </div>
+                  <button onClick={() => selectNode("squadron", sq)}
+                    className="mt-2 w-full rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors"
+                  >
+                    View Details →
+                  </button>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {layer === "location" && orgAgg.location.map((loc) => (
+            <Marker key={`loc-${loc.id}`} position={[loc.lat, loc.lng]}
+              icon={createLocationIcon(loc.total, maxByKind.location, selected?.kind === "location" && selected.id === loc.id)}
+              eventHandlers={{ click: () => selectNode("location", loc) }}
+              zIndexOffset={500}
+            >
+              <Tooltip direction="top" offset={[0, -40]} opacity={0.95}>
+                <span className="text-[11px] font-semibold">{loc.name}</span>
+              </Tooltip>
+              <Popup>
+                <div className="min-w-[220px] p-1">
+                  <p className="text-sm font-bold text-neutral-900 mb-0.5">{loc.name}</p>
+                  <p className="text-[11px] text-neutral-500 mb-2">{loc.count} {loc.count === 1 ? "squadron" : "squadrons"}</p>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-600 mb-2">
+                    <Users size={12} /> {loc.total.toLocaleString()} reservists
+                  </div>
+                  <button onClick={() => selectNode("location", loc)}
+                    className="w-full rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors"
+                  >
+                    View Breakdown
+                  </button>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+
+          {/* Drill-down: when an ARSEN or Group is selected, reveal its
+              individual squadron positions on the map for spatial context. */}
+          {selected && (selected.kind === "arsen" || selected.kind === "group") && selected.raw.squadrons.map((sq) => (
+            <Marker key={`drill-${sq.id}`} position={[sq.latitude, sq.longitude]}
+              icon={createSquadronIcon(sq.is_active, hoveredId === sq.id)}
+              eventHandlers={{
+                click: () => selectNode("squadron", sq),
                 mouseover: () => setHoveredId(sq.id),
                 mouseout: () => setHoveredId(null),
               }}
@@ -271,7 +653,7 @@ function MindanaoMapInline() {
                     <p><span className="font-medium">Specialization:</span> {sq.specialization}</p>
                     <p><span className="font-medium">Reservists:</span> {sq.total_reservists}</p>
                   </div>
-                  <button onClick={() => handleSelectSq(sq)}
+                  <button onClick={() => selectNode("squadron", sq)}
                     className="mt-2 w-full rounded bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors"
                   >
                     View Details →
@@ -282,97 +664,176 @@ function MindanaoMapInline() {
           ))}
         </MapContainer>
 
-        {/* Arsen sidebar */}
-        {viewMode === "arsen" && selectedArsen && (
-          <div className="absolute left-4 top-4 z-[1000] w-64 rounded-xl border border-neutral-200 bg-white shadow-xl dark:bg-neutral-900 dark:border-neutral-700 overflow-hidden">
-            <div className="flex items-center gap-2 border-b border-neutral-200 dark:border-neutral-700 px-3 py-2.5">
-              <button onClick={handleBack} className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800">
-                <ChevronLeft size={15} />
-              </button>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-xs font-bold text-neutral-900 dark:text-neutral-100 truncate">{selectedArsen.name}</h3>
-                <p className="text-[10px] text-neutral-400 truncate">{selectedArsen.location}</p>
-              </div>
-            </div>
-            <div className="p-2.5 space-y-1.5 max-h-[50vh] overflow-y-auto">
-              <div className="flex gap-3 text-[10px] text-neutral-500 mb-1">
-                <span className="flex items-center gap-1"><Layers size={10} /> {selectedArsen.total_squadrons} squadrons</span>
-                <span className="flex items-center gap-1"><Users size={10} /> {selectedArsen.total_reservists} reservists</span>
-              </div>
-              {selectedArsen._squadrons?.map((sq) => (
-                <button key={sq.id} onClick={() => handleSelectSq(sq)}
-                  className="w-full rounded-lg border border-neutral-100 dark:border-neutral-700 p-2 text-left hover:border-indigo-200 hover:bg-indigo-50/50 dark:hover:border-indigo-500/30 dark:hover:bg-indigo-500/5 transition-colors"
+        {/* ── Unified drill-down summary sidebar ── */}
+        {selected && (() => {
+          const meta = {
+            arsen: { label: "ARSEN", Icon: Shield, accent: "text-indigo-600 dark:text-indigo-400" },
+            group: { label: "GROUP", Icon: Users, accent: "text-blue-600 dark:text-blue-400" },
+            squadron: { label: "SQUADRON", Icon: Layers, accent: "text-sky-600 dark:text-sky-400" },
+            location: { label: "LOCATION", Icon: MapPin, accent: "text-emerald-600 dark:text-emerald-400" },
+          }[selected.kind];
+          const Icon = meta.Icon;
+          const isSquadron = selected.kind === "squadron";
+          const secondary = isSquadron
+            ? (selected.raw.is_active ? "Active" : "Inactive")
+            : `${selected.count} ${selected.count === 1 ? "unit" : "units"}`;
+          return (
+            <div className="absolute right-4 top-4 z-[1000] w-80 rounded-xl border border-neutral-200 bg-white shadow-xl dark:bg-neutral-900 dark:border-neutral-700 overflow-hidden">
+              <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-3 py-2.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Icon size={15} className={cn("shrink-0", meta.accent)} />
+                  <div className="min-w-0">
+                    <h3 className="text-xs font-bold text-neutral-900 dark:text-neutral-100 truncate">{selected.name}</h3>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-neutral-400">{meta.label}</span>
+                  </div>
+                </div>
+                <button onClick={clearSelection}
+                  className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800"
                 >
-                  <div className="flex items-center gap-2">
-                    <span className={cn("h-2 w-2 rounded-full shrink-0", sq.is_active ? "bg-emerald-500" : "bg-neutral-400")} />
-                    <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 truncate">{sq.name}</span>
-                  </div>
-                  <div className="mt-0.5 flex items-center gap-2 text-[10px] text-neutral-400">
-                    <span className="truncate">{sq.location}</span>
-                    <span className="flex items-center gap-0.5 shrink-0"><Users size={8} /> {sq.total_reservists}</span>
-                  </div>
+                  <X size={14} />
                 </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Squadron detail panel */}
-        {selectedSquadron && (
-          <div className="absolute right-4 top-4 z-[1000] w-72 rounded-xl border border-neutral-200 bg-white shadow-xl dark:bg-neutral-900 dark:border-neutral-700 overflow-hidden">
-            <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-3 py-2.5">
-              <div className="flex items-center gap-2">
-                <span className={cn("h-2.5 w-2.5 rounded-full", selectedSquadron.is_active ? "bg-emerald-500" : "bg-neutral-400")} />
-                <h3 className="text-xs font-bold text-neutral-900 dark:text-neutral-100">{selectedSquadron.name}</h3>
               </div>
-              <button onClick={() => { setSelectedSquadron(null); if (!selectedArsen) setViewMode("overview"); }}
-                className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800"
-              >
-                <X size={14} />
-              </button>
-            </div>
-            <div className="p-3 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: "Code", value: selectedSquadron.code },
-                  { label: "Status", value: selectedSquadron.is_active ? "Active" : "Inactive" },
-                  { label: "Spec", value: selectedSquadron.specialization },
-                  { label: "Reservists", value: String(selectedSquadron.total_reservists) },
-                ].map((item) => (
-                  <div key={item.label} className="rounded-lg border border-neutral-100 dark:border-neutral-700 p-1.5">
-                    <p className="text-[8px] font-semibold uppercase tracking-wider text-neutral-400">{item.label}</p>
-                    <p className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 truncate">{item.value}</p>
+
+              <div className="p-3 space-y-3">
+                {/* Headline personnel count */}
+                <div className="rounded-xl border border-neutral-100 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/60 p-3">
+                  <p className="text-[9px] font-semibold uppercase tracking-wider text-neutral-400">Total Personnel (Reservists)</p>
+                  <p className={cn("text-2xl font-extrabold leading-none", meta.accent)}>{selected.total.toLocaleString()}</p>
+                  <p className="mt-1 text-[10px] text-neutral-500">{secondary}</p>
+                </div>
+
+                {/* Squadron (lowest level) → show details */}
+                {isSquadron && (
+                  <div className="rounded-lg border border-neutral-100 dark:border-neutral-700 p-2.5 space-y-1.5">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-[8px] font-semibold uppercase tracking-wider text-neutral-400">Code</p>
+                        <p className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">{selected.raw.code || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-[8px] font-semibold uppercase tracking-wider text-neutral-400">Specialization</p>
+                        <p className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200">{selected.raw.specialization || "—"}</p>
+                      </div>
+                    </div>
+                    <div className="rounded-lg bg-neutral-50 dark:bg-neutral-800 p-2 space-y-1">
+                      <div className="flex items-center gap-1.5 text-[10px] text-neutral-500"><MapPin size={10} /> {selected.raw.location}</div>
+                      <div className="flex items-center gap-1.5 text-[10px] text-neutral-500"><Layers size={10} /> {selected.raw.group?.name}</div>
+                      <div className="flex items-center gap-1.5 text-[10px] text-neutral-500"><Shield size={10} /> {selected.raw.arsen?.name}</div>
+                    </div>
                   </div>
+                )}
+
+                {/* Drill-down breakdown of members within this zone */}
+                {!isSquadron && (
+                  <div>
+                    <p className="text-[8px] font-semibold uppercase tracking-wider text-neutral-400 mb-1.5">
+                      Breakdown — {selected.kind === "arsen" ? "Groups" : "Squadrons"}
+                    </p>
+                    <div className="space-y-1 max-h-[260px] overflow-y-auto pr-0.5">
+                      {selected.children.length === 0 && (
+                        <p className="text-[11px] text-neutral-400">No subordinate units.</p>
+                      )}
+                      {selected.children.map((child) => (
+                        <button key={`${child.kind}-${child.id}`} onClick={() => handleChildClick(child)}
+                          className="w-full flex items-center justify-between gap-2 rounded-lg border border-neutral-100 dark:border-neutral-700 p-2 text-left hover:border-indigo-200 hover:bg-indigo-50/50 dark:hover:border-indigo-500/30 dark:hover:bg-indigo-500/5 transition-colors"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 truncate">{child.name}</p>
+                            <p className="text-[9px] capitalize text-neutral-400">{child.kind}</p>
+                          </div>
+                          <span className="flex items-center gap-1 shrink-0 text-[10px] font-medium text-neutral-600 dark:text-neutral-300">
+                            <Users size={9} /> {child.total.toLocaleString()}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-1.5 text-[9px] text-neutral-400">Click a unit to drill down further →</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Legend — reflects the active layer */}
+        <div className="absolute bottom-4 left-4 z-[1000] rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm px-3 py-2 shadow-sm max-h-[40vh] overflow-y-auto">
+          {layer === "arsen" && (
+            <>
+              <p className="text-[8px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">ARSEN Regions</p>
+              <div className="space-y-0.5">
+                {orgAgg.arsen.map((arsen) => (
+                  <button key={arsen.id} onClick={() => selectNode("arsen", arsen)}
+                    className={cn(
+                      "flex items-center gap-2 w-full text-left rounded px-1.5 py-0.5 transition-colors",
+                      selected?.kind === "arsen" && selected.id === arsen.id ? "bg-indigo-50 dark:bg-indigo-500/10" : "hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                    )}
+                  >
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: ARSEN_COLORS[arsen.id] || "#6B7280" }} />
+                    <span className="text-[10px] font-medium text-neutral-700 dark:text-neutral-300 truncate">{arsen.name}</span>
+                    <span className="text-[9px] text-neutral-400 ml-auto">{arsen.total.toLocaleString()}</span>
+                  </button>
                 ))}
               </div>
-              <div className="rounded-lg bg-neutral-50 dark:bg-neutral-800 p-2 space-y-1">
-                <div className="flex items-center gap-1.5 text-[10px] text-neutral-500"><MapPin size={10} /> {selectedSquadron.location}</div>
-                <div className="flex items-center gap-1.5 text-[10px] text-neutral-500"><Layers size={10} /> {selectedSquadron.group.name}</div>
-                <div className="flex items-center gap-1.5 text-[10px] text-neutral-500"><Shield size={10} /> {selectedSquadron.arsen.name}</div>
-              </div>
-              <p className="text-[9px] text-neutral-400 font-mono">{selectedSquadron.latitude.toFixed(4)}°N, {selectedSquadron.longitude.toFixed(4)}°E</p>
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
-        {/* Legend */}
-        <div className="absolute bottom-4 left-4 z-[1000] rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm px-3 py-2 shadow-sm">
-          <p className="text-[8px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">ARSEN Regions</p>
-          <div className="space-y-0.5">
-            {arsenSummaries.map((arsen) => (
-              <button key={arsen.id} onClick={() => handleSelectArsen(arsen)}
-                className={cn(
-                  "flex items-center gap-2 w-full text-left rounded px-1.5 py-0.5 transition-colors",
-                  selectedArsen?.id === arsen.id ? "bg-indigo-50 dark:bg-indigo-500/10" : "hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                )}
-              >
-                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: ARSEN_COLORS[arsen.id] || "#6B7280" }} />
-                <span className="text-[10px] font-medium text-neutral-700 dark:text-neutral-300 truncate">{arsen.name}</span>
-                <span className="text-[9px] text-neutral-400 ml-auto">{arsen.total_reservists}</span>
-              </button>
-            ))}
-           </div>
-         </div>
+          {layer === "group" && (
+            <>
+              <p className="text-[8px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Groups (by Reservists)</p>
+              <div className="space-y-0.5">
+                {[...orgAgg.group].sort((a, b) => b.total - a.total).map((g) => (
+                  <button key={g.id} onClick={() => selectNode("group", g)}
+                    className={cn(
+                      "flex items-center gap-2 w-full text-left rounded px-1.5 py-0.5 transition-colors",
+                      selected?.kind === "group" && selected.id === g.id ? "bg-indigo-50 dark:bg-indigo-500/10" : "hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                    )}
+                  >
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-blue-500" />
+                    <span className="text-[10px] font-medium text-neutral-700 dark:text-neutral-300 truncate">{g.name}</span>
+                    <span className="text-[9px] text-neutral-400 ml-auto">{g.total.toLocaleString()}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {layer === "squadron" && (
+            <div className="space-y-1">
+              <p className="text-[8px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Squadron Status</p>
+              <div className="flex items-center gap-1.5 text-[10px] text-neutral-500">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Active
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-neutral-500">
+                <span className="h-2.5 w-2.5 rounded-full bg-neutral-400" /> Inactive
+              </div>
+            </div>
+          )}
+
+          {layer === "location" && (
+            <>
+              <p className="text-[8px] font-semibold uppercase tracking-wider text-neutral-400 mb-1">Reservist Hotspots</p>
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-[9px] text-neutral-400">Low</span>
+                <span className="h-2 flex-1 rounded-full" style={{ background: "linear-gradient(90deg, hsl(210,80%,48%), hsl(120,80%,45%), hsl(45,90%,50%), hsl(0,80%,48%))" }} />
+                <span className="text-[9px] text-neutral-400">High</span>
+              </div>
+              <div className="space-y-0.5 mt-1">
+                {[...orgAgg.location].sort((a, b) => b.total - a.total).map((loc) => (
+                  <button key={loc.id} onClick={() => selectNode("location", loc)}
+                    className={cn(
+                      "flex items-center gap-2 w-full text-left rounded px-1.5 py-0.5 transition-colors",
+                      selected?.kind === "location" && selected.id === loc.id ? "bg-indigo-50 dark:bg-indigo-500/10" : "hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                    )}
+                  >
+                    <MapPin size={10} className="shrink-0 text-neutral-400" />
+                    <span className="text-[10px] font-medium text-neutral-700 dark:text-neutral-300 truncate">{loc.name}</span>
+                    <span className="text-[9px] text-neutral-400 ml-auto">{loc.total.toLocaleString()}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
 
       </div>
     </div>

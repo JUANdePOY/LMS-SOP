@@ -126,13 +126,17 @@ app.get('/api/debug', (req, res) => {
   });
 });
 
-// SPA fallback — serve index.html for non-API routes
+// SPA fallback — serve index.html for non-API routes (only when client build exists)
 app.use((req, res, next) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(clientDist, 'index.html'));
-  } else {
-    next();
+  if (req.path.startsWith('/api')) {
+    return next();
   }
+  const indexPath = path.join(clientDist, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  // API-only deployment (client hosted elsewhere): return clean 404 instead of ENOENT
+  return res.status(404).json({ status: 'error', message: 'Not found', code: 'NOT_FOUND' });
 });
 
 // Error handling middleware
