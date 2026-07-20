@@ -139,6 +139,15 @@ router.get(
   trainingsController.listInternalAttachments
 );
 
+router.delete(
+  '/internal/:trainingId/attachments/:attachmentId',
+  authenticateToken,
+  requireAdmin,
+  [...trainingIdParam, ...attachmentIdParam],
+  rejectInvalid,
+  trainingsController.deleteInternalAttachment
+);
+
 // ── External trainings ───────────────────────────────────────────────────────
 
 router.get(
@@ -173,6 +182,15 @@ router.get(
   [...idParam],
   rejectInvalid,
   trainingsController.listExternalAttachments
+);
+
+router.delete(
+  '/external/:id/attachments/:attachmentId',
+  authenticateToken,
+  requireAdmin,
+  [...idParam, ...attachmentIdParam],
+  rejectInvalid,
+  trainingsController.deleteExternalAttachment
 );
 
 router.get(
@@ -225,7 +243,7 @@ router.delete(
 
 router.post(
   '/external/:id/register',
-  optionalAuthenticateToken,
+  authenticateToken,
   [...idParam,
     body('participantData').custom((val) => {
       // participantData must be an object or JSON string
@@ -249,6 +267,14 @@ router.post(
           throw new Error('participantData.squadron_id must be a positive integer');
         }
       }
+      // chosen_squadron_id is what the reservist self-registration flow sends
+      // to pick which squadron's slot limit the registration counts against
+      // (may differ from their assigned squadron — the override flow).
+      if (obj.chosen_squadron_id != null) {
+        if (!Number.isInteger(Number(obj.chosen_squadron_id)) || Number(obj.chosen_squadron_id) < 1) {
+          throw new Error('participantData.chosen_squadron_id must be a positive integer');
+        }
+      }
       return true;
     })],
   rejectInvalid,
@@ -261,6 +287,14 @@ router.get(
   [...idParam],
   rejectInvalid,
   trainingsController.getTrainingSlotAvailability
+);
+
+router.get(
+  '/external/:id/verify-reservist',
+  authenticateToken,
+  [...idParam, query('service_number').trim().notEmpty()],
+  rejectInvalid,
+  trainingsController.verifyReservist
 );
 
 router.get(
