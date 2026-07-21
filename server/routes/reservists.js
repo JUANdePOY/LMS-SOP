@@ -376,9 +376,19 @@ router.get(
  * GET /api/reservists/:id
  * Get detailed information for a specific reservist
  */
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res, next) => {
   try {
     const { id } = req.params;
+
+    // Only claim numeric ids here — this route is registered before several
+    // static sibling routes (/export, /filters/metadata, /my/profile, etc.),
+    // so without this guard a request like GET /api/reservists/export would
+    // be swallowed by this handler (id="export") and never reach the real
+    // route further down the file. Falling through with next() lets Express
+    // keep trying the rest of the router for non-numeric paths.
+    if (!/^\d+$/.test(id)) {
+      return next();
+    }
 
     // Authorization: admin or own record
     if (req.user.role === 'reservist' && req.user.id !== parseInt(id)) {

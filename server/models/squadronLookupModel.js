@@ -30,7 +30,7 @@ async function searchReservistsForSquadron({ squadronId, search, limit }) {
   if (!sid) return [];
   const term = search && String(search).trim() ? `%${String(search).trim()}%` : '%';
   const [rows] = await pool.query(
-    `SELECT DISTINCT r.id, r.first_name, r.last_name, r.rank, r.service_number
+    `SELECT DISTINCT r.id, r.first_name, r.last_name, r.rank, r.service_number, r.user_id
       FROM reservist_assignments ra
       INNER JOIN reservists r ON r.id = ra.reservist_id
       WHERE ra.squadron_id = ?
@@ -56,18 +56,18 @@ async function searchReservistsForSquadrons({ squadronIds, search, limit }) {
   const term = search && String(search).trim() ? `%${String(search).trim()}%` : '%';
   const placeholders = ids.map(() => '?').join(', ');
   const [rows] = await pool.query(
-    `SELECT DISTINCT r.id, r.first_name, r.last_name, r.rank, r.service_number
-     FROM reservist_assignments ra
-     INNER JOIN reservists r ON r.id = ra.reservist_id
-     WHERE ra.squadron_id IN (${placeholders})
-       AND r.is_active = 1
-       AND (
-         CONCAT(r.first_name, ' ', r.last_name) LIKE ?
-         OR r.service_number LIKE ?
-         OR IFNULL(r.rank, '') LIKE ?
-       )
-     ORDER BY r.last_name ASC, r.first_name ASC
-     LIMIT ?`,
+    `SELECT DISTINCT r.id, r.first_name, r.last_name, r.rank, r.service_number, r.user_id
+      FROM reservist_assignments ra
+      INNER JOIN reservists r ON r.id = ra.reservist_id
+      WHERE ra.squadron_id IN (${placeholders})
+        AND r.is_active = 1
+        AND (
+          CONCAT(r.first_name, ' ', r.last_name) LIKE ?
+          OR r.service_number LIKE ?
+          OR IFNULL(r.rank, '') LIKE ?
+        )
+      ORDER BY r.last_name ASC, r.first_name ASC
+      LIMIT ?`,
     [...ids, term, term, term, l]
   );
   return rows;

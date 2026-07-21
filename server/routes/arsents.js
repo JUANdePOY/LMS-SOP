@@ -3,7 +3,7 @@ const router = express.Router();
 const { body, query, param, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
-const { getUserScopeFilter } = require('../middleware/rbac');
+const { attachCanManage, attachHierarchyScope } = require('../middleware/rbac');
 const { logAudit } = require('../utils/auditLogger');
 
 // Validation middleware
@@ -19,14 +19,17 @@ const validateId = [
   param('id').isInt({ min: 1 }).withMessage('ID must be a positive integer')
 ];
 
-// GET /api/arsens - List ARSENs with pagination, filtering by status, search
+// GET /api/arsens - List ALL ARSENs (no longer scope-filtered).
+// NOTE: only full `admin` can create/edit/delete an ARSEN record itself —
+// admin_arsen/group/squadron manage what's *below* it, never the ARSEN entity.
+// So can_manage here is simply "is this user a full admin".
 router.get('/', [
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
   query('is_active').optional().isBoolean(),
   query('search').optional().trim().isLength({ max: 100 }),
   query('sort_by').optional().isIn(['name', 'code', 'created_at', 'updated_at']).trim()
-], authenticateToken, async (req, res) => {
+], authenticateToken, attachHierarchyScope(), async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -38,8 +41,8 @@ router.get('/', [
       });
     }
 
-    const page = req.query.page || 1;
-    const limit = req.query.limit || 25;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
     const offset = (page - 1) * limit;
     const { is_active: is_active_raw, search, sort_by } = req.query;
     const is_active = is_active_raw !== undefined ? is_active_raw === 'true' : undefined;
@@ -58,19 +61,12 @@ router.get('/', [
       queryParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
 
-    // For unit admins, enforce scope
-    if (req.user.role !== 'admin') {
-      // For admin_group, filter via their group's ARSEN relationship
-      if (req.user.scope_group_id) {
-        const [groupRows] = await db.query('SELECT arsen_id FROM `groups` WHERE id = ?', [req.user.scope_group_id]);
-        if (groupRows.length > 0) {
-          whereConditions.push('a.id = ?');
-          queryParams.push(groupRows[0].arsen_id);
-        }
-      } else if (req.user.scope_arsen_id) {
-        whereConditions.push('a.id = ?');
-        queryParams.push(req.user.scope_arsen_id);
-      }
+    // Scoped admins (admin_arsen/admin_group/admin_squadron) only see their
+    // own ARSEN — everything above/beside it is hidden, not just read-only.
+    // Full `admin` has req.hierarchyScope === null, so no filter is applied.
+    if (req.hierarchyScope) {
+      whereConditions.push('a.id = ?');
+      queryParams.push(req.hierarchyScope.arsen_id);
     }
 
     const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
@@ -102,9 +98,16 @@ router.get('/', [
 
     const [arsens] = await db.query(dataQuery, [...queryParams, limit, offset]);
 
+    const data = attachCanManage(
+      arsens,
+      req.user,
+      (row) => ({ arsen_id: row.id, group_id: null, squadron_id: null }),
+      'arsen'
+    );
+
     res.json({
       status: 'success',
-      data: arsens,
+      data,
       pagination: {
         page,
         limit,
@@ -123,7 +126,7 @@ router.get('/', [
 });
 
 // GET /api/arsens/:id - Get single ARSEN details with statistics
-router.get('/:id', validateId, authenticateToken, async (req, res) => {
+router.get('/:id', validateId, authenticateToken, attachHierarchyScope(), async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -132,6 +135,16 @@ router.get('/:id', validateId, authenticateToken, async (req, res) => {
         message: 'Validation failed',
         code: 'VALIDATION_ERROR',
         errors: errors.array()
+      });
+    }
+
+    // Scoped admins can only look up their own ARSEN — treat any other id
+    // as not found so its existence isn't leaked.
+    if (req.hierarchyScope && parseInt(req.params.id, 10) !== req.hierarchyScope.arsen_id) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'ARSEN not found',
+        code: 'NOT_FOUND'
       });
     }
 
@@ -176,12 +189,16 @@ router.get('/:id', validateId, authenticateToken, async (req, res) => {
       WHERE a.id = ?
     `, [req.params.id]);
 
+    const data = attachCanManage(
+      { ...arsen, statistics: stats[0] },
+      req.user,
+      (row) => ({ arsen_id: row.id, group_id: null, squadron_id: null }),
+      'arsen'
+    );
+
     res.json({
       status: 'success',
-      data: {
-        ...arsen,
-        statistics: stats[0]
-      }
+      data
     });
   } catch (error) {
     console.error('Error fetching ARSEN:', error);
@@ -193,7 +210,8 @@ router.get('/:id', validateId, authenticateToken, async (req, res) => {
   }
 });
 
-// POST /api/arsens - Create new ARSEN (admin only)
+// POST /api/arsens - Create new ARSEN (full admin only — no scoped role
+// creates ARSENs, per business rule)
 router.post('/', validateArsen, authenticateToken, requireAdmin, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -254,7 +272,7 @@ router.post('/', validateArsen, authenticateToken, requireAdmin, async (req, res
   }
 });
 
-// PUT /api/arsens/:id - Update ARSEN (admin only)
+// PUT /api/arsens/:id - Update ARSEN (full admin only)
 router.put('/:id', [...validateId, ...validateArsen], authenticateToken, requireAdmin, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -344,7 +362,7 @@ router.put('/:id', [...validateId, ...validateArsen], authenticateToken, require
   }
 });
 
-// DELETE /api/arsens/:id - Soft delete ARSEN (admin only)
+// DELETE /api/arsens/:id - Soft delete ARSEN (full admin only)
 router.delete('/:id', validateId, authenticateToken, requireAdmin, async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -420,14 +438,15 @@ router.delete('/:id', validateId, authenticateToken, requireAdmin, async (req, r
   }
 });
 
-// GET /api/arsens/:id/groups - Get groups belonging to ARSEN
+// GET /api/arsens/:id/groups - Get groups belonging to ARSEN (unchanged;
+// this is a read view, not the primary groups list)
 router.get('/:id/groups', [
   param('id').isInt({ min: 1 }).withMessage('ID must be a positive integer'),
   query('page').optional().isInt({ min: 1 }).toInt(),
   query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
   query('is_active').optional().isBoolean(),
   query('search').optional().trim().isLength({ max: 100 })
-], authenticateToken, async (req, res) => {
+], authenticateToken, attachHierarchyScope(), async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -436,6 +455,15 @@ router.get('/:id/groups', [
         message: 'Validation failed',
         code: 'VALIDATION_ERROR',
         errors: errors.array()
+      });
+    }
+
+    // Scoped admins can only drill into their own ARSEN's groups.
+    if (req.hierarchyScope && parseInt(req.params.id, 10) !== req.hierarchyScope.arsen_id) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'ARSEN not found',
+        code: 'NOT_FOUND'
       });
     }
 
@@ -450,14 +478,23 @@ router.get('/:id/groups', [
       });
     }
 
-    const page = req.query.page || 1;
-    const limit = req.query.limit || 25;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 25));
     const offset = (page - 1) * limit;
     const { is_active: is_active_raw, search } = req.query;
     const is_active = is_active_raw !== undefined ? is_active_raw === 'true' : undefined;
 
     let whereConditions = ['g.arsen_id = ?'];
     let queryParams = [req.params.id];
+
+    // admin_arsen manages every group under their ARSEN, so no further
+    // narrowing. admin_group/admin_squadron only "own" a single group within
+    // this ARSEN (the ARSEN itself is just read-only ancestor context for
+    // them), so narrow down to that one group.
+    if (req.hierarchyScope && req.user.role !== 'admin_arsen') {
+      whereConditions.push('g.id = ?');
+      queryParams.push(req.hierarchyScope.group_id);
+    }
 
     if (is_active !== undefined) {
       whereConditions.push('g.is_active = ?');

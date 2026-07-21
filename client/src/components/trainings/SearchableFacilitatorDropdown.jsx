@@ -30,7 +30,7 @@ function formatReservistSub(r) {
   return r.service_number || '';
 }
 
-export default function SearchableFacilitatorDropdown({ value, onChange, squadronIds, disabled }) {
+export default function SearchableFacilitatorDropdown({ value, onChange, onSelect, squadronIds, disabled }) {
   const [query, setQuery] = useState('');
   const [options, setOptions] = useState([]);
   const [open, setOpen] = useState(false);
@@ -71,7 +71,19 @@ export default function SearchableFacilitatorDropdown({ value, onChange, squadro
   }, [open]);
 
   const selectReservist = (r) => {
-    onChange(formatReservistLabel(r));
+    const label = formatReservistLabel(r);
+    onChange(label);
+    if (onSelect) {
+      onSelect({
+        id: r.id,
+        userId: r.user_id,
+        label,
+        rank: r.rank,
+        firstName: r.first_name,
+        lastName: r.last_name,
+        serviceNumber: r.service_number,
+      });
+    }
     setOpen(false);
     setQuery('');
     setOptions([]);
@@ -79,6 +91,9 @@ export default function SearchableFacilitatorDropdown({ value, onChange, squadro
 
   const clearSelection = () => {
     onChange('');
+    if (onSelect) {
+      onSelect(null);
+    }
     setQuery('');
     setOptions([]);
     setOpen(false);

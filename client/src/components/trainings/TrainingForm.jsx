@@ -12,6 +12,7 @@ import {
   deleteInternalAttachment,
   deleteExternalAttachment,
 } from '@/services/trainingsService';
+import { assignFacilitator, getFacilitators } from '@/services/attendanceApiService';
 import { useToast } from '@/components/ui/Toast';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import SquadronParticipantBlocks from './SquadronParticipantBlocks';
@@ -357,8 +358,26 @@ function LetterOrderUpload({ file, onFileChange, existingAttachments = [], train
   );
 }
 
+// ─── Existing Facilitators (read-only list) ─────────────────────────────────────
+function ExistingFacilitatorsList({ facilitators }) {
+  if (!Array.isArray(facilitators) || facilitators.length === 0) return null;
+  return (
+    <div className="mb-1.5 flex flex-wrap gap-1.5">
+      {facilitators.map((f) => (
+        <span
+          key={f.user_id}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20"
+          title={f.service_number || ''}
+        >
+          {[f.rank, `${f.last_name || ''}, ${f.first_name || ''}`].filter(Boolean).join(' ')}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // ─── Internal Training Fields ──────────────────────────────────────────────────
-function InternalFields({ form, onChange, onFileChange, errors, disabled, trainingId, existingAttachments }) {
+function InternalFields({ form, onChange, onFileChange, errors, disabled, trainingId, existingAttachments, existingFacilitators }) {
   const selectedSquadronIds = useMemo(
     () => (form.participantBlocks || [])
       .filter((b) => b.squadronId)
@@ -408,9 +427,11 @@ function InternalFields({ form, onChange, onFileChange, errors, disabled, traini
             className={inputCls} placeholder="Training venue..." />
         </FormGroup>
         <FormGroup label="Facilitator">
+          <ExistingFacilitatorsList facilitators={existingFacilitators} />
           <SearchableFacilitatorDropdown
             value={form.instructor}
             onChange={(val) => onChange('instructor', val)}
+            onSelect={(reservist) => onChange('facilitatorUserId', reservist?.userId ?? null)}
             squadronIds={selectedSquadronIds}
             disabled={disabled}
           />
@@ -444,7 +465,7 @@ function InternalFields({ form, onChange, onFileChange, errors, disabled, traini
 }
 
 // ─── External Training Fields ──────────────────────────────────────────────────
-function ExternalFields({ form, onChange, errors, trainingId, existingAttachments }) {
+function ExternalFields({ form, onChange, errors, trainingId, existingAttachments, existingFacilitators }) {
   const selectedSquadronIds = useMemo(
     () => (form.squadronSlotLimits || [])
       .filter((b) => b.squadronId)
@@ -486,9 +507,11 @@ function ExternalFields({ form, onChange, errors, trainingId, existingAttachment
           </select>
         </FormGroup>
         <FormGroup label="Facilitator">
+          <ExistingFacilitatorsList facilitators={existingFacilitators} />
           <SearchableFacilitatorDropdown
             value={form.instructor}
             onChange={(val) => onChange('instructor', val)}
+            onSelect={(reservist) => onChange('facilitatorUserId', reservist?.userId ?? null)}
             squadronIds={selectedSquadronIds}
             disabled={false}
           />
@@ -520,14 +543,14 @@ function ExternalFields({ form, onChange, errors, trainingId, existingAttachment
 const defaultInternal = {
   title: '', description: '', startDate: '', endDate: '',
   activityType: '', status: 'published', location: '',
-  instructor: '',
+  instructor: '', facilitatorUserId: null,
   requirements: '', letterOrderFile: null,
   participantBlocks: [],
 };
 const defaultExternal = {
   title: '', description: '', startDate: '', startTime: '',
   venue: '', status: 'draft', capacity: '',
-  instructor: '',
+  instructor: '', facilitatorUserId: null,
   squadronSlotLimits: [],
   letterOrderFile: null,
 };
@@ -545,6 +568,7 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
   const trainingType = initialType;
   const [submitting, setSubmitting]     = useState(false);
   const [errors, setErrors]             = useState({});
+  const [existingFacilitators, setExistingFacilitators] = useState([]);
 
   // BUG FIX: use str() helper so null values from DB never crash .trim() or
   // controlled-input warnings. ?? '' keeps 0 and false but converts null/undefined.
@@ -553,16 +577,14 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
     ...(training && initialType === TRAINING_TYPES.INTERNAL ? {
       title:           str(training.title),
       description:     str(training.description),
-      // start_datetime is what the backend SELECT returns for internal trainings
       startDate:       toDateString(training.start_datetime || training.start_date),
       endDate:         toDateString(training.end_datetime   || training.end_date),
-      // backend aliases activity_type -> type in the SELECT
       activityType:    str(training.type),
-      // map legacy 'upcoming' -> 'published' so the select doesn't show blank
       status:          training.status === 'upcoming' ? 'published' : (training.status || 'published'),
-      // backend aliases venue -> location in the SELECT
       location:        str(training.location || training.venue),
       instructor:      str(training.instructor),
+      // ASSUMPTION: field name on the training GET response not yet confirmed — verify against actual API shape
+      facilitatorUserId: training.facilitator_user_id ?? training.facilitatorUserId ?? null,
       requirements:    str(training.requirements),
       letterOrderFile: null,
       participantBlocks: buildParticipantBlocksFromGroups(training.participant_groups),
@@ -586,9 +608,26 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
         slotLimit: limit.slot_limit ?? '',
       })) : [],
       instructor: str(training.instructor),
+      // ASSUMPTION: field name on the training GET response not yet confirmed — verify against actual API shape
+      facilitatorUserId: training.facilitator_user_id ?? training.facilitatorUserId ?? null,
       letterOrderFile: null,
     } : {}),
   });
+
+  // Load currently-assigned facilitators for display when editing (read-only list —
+  // backend allows multiple facilitators per training, no removal in this form).
+  useEffect(() => {
+    if (!training?.id) {
+      setExistingFacilitators([]);
+      return;
+    }
+    const params = trainingType === TRAINING_TYPES.INTERNAL
+      ? { training_id: training.id }
+      : { external_training_id: training.id };
+    getFacilitators(params)
+      .then((res) => setExistingFacilitators(res?.data?.data || []))
+      .catch(() => setExistingFacilitators([]));
+  }, [training?.id, trainingType]);
 
   const handleInternalChange = (key, value) => {
     setInternalForm(prev => ({ ...prev, [key]: value }));
@@ -708,6 +747,29 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
         }
       }
 
+      const facilitatorUserId = trainingType === TRAINING_TYPES.INTERNAL
+        ? internalForm.facilitatorUserId
+        : externalForm.facilitatorUserId;
+
+      if (facilitatorUserId) {
+        const savedId = result.data?.id ?? training?.id;
+        if (savedId) {
+          const assignPayload = trainingType === TRAINING_TYPES.INTERNAL
+            ? { user_id: facilitatorUserId, training_id: savedId }
+            : { user_id: facilitatorUserId, external_training_id: savedId };
+          try {
+            await assignFacilitator(assignPayload);
+          } catch (assignErr) {
+            setErrors({
+              submit:
+                assignErr.response?.data?.message ||
+                'Training was saved, but assigning the facilitator failed. You can try again from edit.',
+            });
+            return;
+          }
+        }
+      }
+
       onSubmit?.();
     } catch (error) {
       const errorMsg = error.response?.data?.message || 'Failed to save training. Please try again.';
@@ -758,6 +820,7 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
                 disabled={submitting}
                 trainingId={training?.id}
                 existingAttachments={training?.attachments}
+                existingFacilitators={existingFacilitators}
               />
             )}
 
@@ -768,6 +831,7 @@ export default function TrainingForm({ training, onClose, onSubmit, initialKind 
                 errors={errors}
                 trainingId={training?.id}
                 existingAttachments={training?.attachments}
+                existingFacilitators={existingFacilitators}
               />
             )}
 
