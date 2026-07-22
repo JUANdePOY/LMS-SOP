@@ -111,7 +111,7 @@ router.get('/', [
         (
           SELECT COUNT(DISTINCT ra.reservist_id)
           FROM reservist_assignments ra
-          WHERE (ra.group_id = s.group_id OR ra.squadron_id = s.id)
+          WHERE ra.squadron_id = s.id
         ) as members
       FROM squadron s
       LEFT JOIN \`groups\` g ON s.group_id = g.id
@@ -184,7 +184,7 @@ router.get('/:id', validateId, authenticateToken, attachHierarchyScope(), async 
         (
           SELECT COUNT(DISTINCT ra.reservist_id)
           FROM reservist_assignments ra
-          WHERE (ra.group_id = s.group_id OR ra.squadron_id = s.id)
+          WHERE ra.squadron_id = s.id
         ) as members
       FROM squadron s
       LEFT JOIN \`groups\` g ON s.group_id = g.id
@@ -417,12 +417,13 @@ router.put(
           s.*,
           g.name as group_name,
           g.code as group_code,
+          g.arsen_id as arsen_id,
           a.name as arsen_name,
           a.code as arsen_code,
           (
             SELECT COUNT(DISTINCT ra.reservist_id)
             FROM reservist_assignments ra
-            WHERE (ra.group_id = s.group_id OR ra.squadron_id = s.id)
+            WHERE ra.squadron_id = s.id
           ) as members
         FROM squadron s
         LEFT JOIN \`groups\` g ON s.group_id = g.id

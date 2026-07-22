@@ -19,8 +19,8 @@ export const scanExternalTraining = (externalTrainingId, qrCode, scanMethod = 'q
 export const manualCheckInInternal = (trainingId, reservistId, status) =>
   api.post(`/attendance/manual/internal/${trainingId}`, { reservist_id: reservistId, status });
 
-export const manualCheckInExternal = (externalTrainingId, reservistId, status) =>
-  api.post(`/attendance/manual/external/${externalTrainingId}`, { reservist_id: reservistId, status });
+export const manualCheckInExternal = (externalTrainingId, reservistId, registrationId, status) =>
+  api.post(`/attendance/manual/external/${externalTrainingId}`, { reservist_id: reservistId, registration_id: registrationId, status });
 
 // ── Attendance lists ─────────────────────────────────────────────────────────
 
