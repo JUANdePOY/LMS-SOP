@@ -53,7 +53,7 @@ export function AuthProvider({ children }) {
       const rateLimitData = {};
       if (err.response?.status === 429) {
         rateLimitData.attemptsRemaining = 0;
-        rateLimitData.cooldownSeconds = parseInt(err.response.headers['retry-after'] || '900', 10);
+        rateLimitData.cooldownSeconds = parseInt(err.response.headers['retry-after'] || '120', 10);
       } else if (err.response?.headers) {
         const remaining = err.response.headers['x-ratelimit-remaining'];
         if (remaining !== undefined) {

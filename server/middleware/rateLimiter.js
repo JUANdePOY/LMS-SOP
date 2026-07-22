@@ -1,13 +1,13 @@
 const rateLimit = require('express-rate-limit');
 
 const loginLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
+  windowMs: 2 * 60 * 1000, // 2 minutes
   max: 5,
   keyGenerator: (req) => req.ip,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
   handler: (req, res) => {
-    const retryAfter = 300;
+    const retryAfter = 120; // 2 minutes in seconds
 
     res.set({
       'X-RateLimit-Limit': '5',
@@ -17,7 +17,7 @@ const loginLimiter = rateLimit({
 
     res.status(429).json({
       status: 'error',
-      message: 'Too many login attempts. Please try again later.',
+      message: 'Too many login attempts. Please try again in 2 minutes.',
       code: 'RATE_LIMITED',
     });
   },

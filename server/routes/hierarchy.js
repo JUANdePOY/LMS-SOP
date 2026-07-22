@@ -3,7 +3,7 @@ const router = express.Router();
 const { query, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
-const { getUserScopeFilter } = require('../middleware/rbac');
+const { attachHierarchyScope } = require('../middleware/rbac');
 
 /**
  * GET /api/hierarchy
@@ -17,7 +17,7 @@ const { getUserScopeFilter } = require('../middleware/rbac');
 router.get('/', [
   query('hierarchical').optional().isBoolean(),
   query('active_only').optional().isBoolean()
-], authenticateToken, async (req, res) => {
+], authenticateToken, attachHierarchyScope(), async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -40,13 +40,15 @@ router.get('/', [
       arsensWhere = 'WHERE a.is_active = TRUE';
     }
 
-    // For unit admins, enforce scope
-    if (req.user.role !== 'admin') {
-      const { conditions, params: scopeP } = getUserScopeFilter(req.user, { arsen: 'a.id' });
-      if (conditions.length > 0) {
-        arsensWhere = 'WHERE (' + conditions.join(' OR ') + ')';
-        arsensParams = scopeP;
-      }
+    // Scoped visibility: scoped admins (admin_arsen/admin_group/
+    // admin_squadron) only see their own branch of the tree — everything
+    // else is pruned out, not just marked read-only. Full admin
+    // (req.hierarchyScope === null) sees the whole tree, unfiltered.
+    if (req.hierarchyScope) {
+      arsensWhere = arsensWhere
+        ? `${arsensWhere} AND a.id = ?`
+        : 'WHERE a.id = ?';
+      arsensParams.push(req.hierarchyScope.arsen_id);
     }
 
     const [arsens] = await db.query(`
@@ -72,6 +74,15 @@ router.get('/', [
     if (arsenIds.length > 0) {
       let groupsWhere = `WHERE g.arsen_id IN (${arsenIds.map(() => '?').join(',')})`;
       let groupsParams = [...arsenIds];
+
+      // admin_group/admin_squadron only own a single group within their
+      // (already-pruned-to-one) ARSEN — narrow further to just that group.
+      // admin_arsen sees every group under their ARSEN, so no extra filter.
+      if (req.hierarchyScope && req.user.role !== 'admin_arsen') {
+        groupsWhere += ' AND g.id = ?';
+        groupsParams.push(req.hierarchyScope.group_id);
+      }
+
       if (activeOnly) {
         groupsWhere += ' AND g.is_active = TRUE';
       }
@@ -107,6 +118,13 @@ router.get('/', [
       if (groupIds.length > 0) {
         let squadronsWhere = `WHERE s.group_id IN (${groupIds.map(() => '?').join(',')})`;
         let squadronsParams = [...groupIds];
+
+        // admin_squadron only owns a single squadron — narrow down to it.
+        if (req.hierarchyScope && req.user.role === 'admin_squadron') {
+          squadronsWhere += ' AND s.id = ?';
+          squadronsParams.push(req.hierarchyScope.squadron_id);
+        }
+
         if (activeOnly) {
           squadronsWhere += ' AND s.is_active = TRUE';
         }
@@ -170,6 +188,7 @@ router.get('/', [
       location: arsen.location || '',
       commander: arsen.commander_name || '',
       is_active: arsen.is_active,
+      can_manage: req.user.role === 'admin',
       reservists: arsen.group_count > 0
         ? groupsMap[arsen.id]?.reduce((sum, g) => sum + (g.reservist_count || 0), 0)
         : 0,

@@ -53,6 +53,10 @@ function wrap(Component) {
   );
 }
 
+// Auth-only wrapper — every authenticated role (including reservist) can
+// reach the page. Used for pages that are visible to everyone but render
+// read-only vs. manageable content per-row based on the backend's
+// `can_manage` flag (Airbase Overview / ARCENs / Groups / Squadrons).
 function ProtectedWrapper(Component) {
   return (
     <Suspense fallback={<PageLoader />}>
@@ -121,10 +125,13 @@ const router = createBrowserRouter([
       { path: "reports", element: ProtectedWrapper(Reports), handle: { title: "Reports" } },
       { path: "settings", element: SuperAdminProtectedWrapper(Settings), handle: { title: "Settings" } },
       { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
-      { path: "airbase", element: AdminProtectedWrapper(AirbaseOverview), handle: { title: "Airbase Overview" } },
-      { path: "airbase/arcens", element: SuperAdminProtectedWrapper(ManageArcens), handle: { title: "Manage Arcens" } },
-      { path: "airbase/groups", element: AdminProtectedWrapper(ManageGroups), handle: { title: "Manage Groups" } },
-      { path: "airbase/squadrons", element: AdminProtectedWrapper(ManageSquadrons), handle: { title: "Manage Squadrons" } },
+      // Airbase hierarchy pages: open to every authenticated role. Each page
+      // renders manage controls or read-only content per-row based on the
+      // backend's `can_manage` flag — the route itself no longer gates by role.
+      { path: "airbase", element: ProtectedWrapper(AirbaseOverview), handle: { title: "Airbase Overview" } },
+      { path: "airbase/arcens", element: ProtectedWrapper(ManageArcens), handle: { title: "Manage Arcens" } },
+      { path: "airbase/groups", element: ProtectedWrapper(ManageGroups), handle: { title: "Manage Groups" } },
+      { path: "airbase/squadrons", element: ProtectedWrapper(ManageSquadrons), handle: { title: "Manage Squadrons" } },
     ],
   },
 ]);
