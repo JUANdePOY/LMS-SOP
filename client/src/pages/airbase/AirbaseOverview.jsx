@@ -7,7 +7,7 @@ import MembersModal from "@/components/hierarchy/MembersModal";
 import { getGroups, getMapSquadrons, getMapSummary } from "@/services/api";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { Search, X, RotateCcw, Loader, Users, MapPin, Shield, Layers, ChevronLeft, ZoomIn } from "lucide-react";
-import { MapContainer, TileLayer, Marker, Popup, useMap, Tooltip, Polygon, Circle } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, Tooltip, Polygon, Circle, Polyline } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -185,21 +185,20 @@ function transformApiData(apiData) {
 }
 
 // ── Inline Map Component ───────────────────────────────────────────
+const MINDANAO_CENTER = [7.5, 125.0];
+const MINDANAO_ZOOM = 7;
+
+// Inline Map Component
 function MindanaoMapInline() {
   const [squadrons, setSquadrons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
   const [flyTo, setFlyTo] = useState(null);
-  // Active spatial layer: which organizational level is plotted as markers.
   const [layer, setLayer] = useState("arsen");
   const [showBoundaries, setShowBoundaries] = useState(true);
-  // Currently drilled-into node for the summary sidebar.
   const [selected, setSelected] = useState(null);
   const loadInfoRef = useRef(null);
-
-  const MINDANAO_CENTER = [7.5, 125.0];
-  const MINDANAO_ZOOM = 7;
 
   // Aggregate squadrons into organizational + geographic layers.
   // NOTE: `Map` is shadowed by the lucide icon import, so we use plain
@@ -208,35 +207,41 @@ function MindanaoMapInline() {
     const arsen = {};
     const group = {};
     const location = {};
+    const toNum = (v) => {
+      const n = typeof v === "string" ? parseFloat(v) : v;
+      return Number.isFinite(n) ? n : null;
+    };
     squadrons.forEach((sq) => {
       const aId = sq.arsen?.id;
-      if (aId != null) {
+      const lat = toNum(sq.latitude);
+      const lng = toNum(sq.longitude);
+      if (aId != null && lat != null && lng != null) {
         if (!arsen[aId]) {
           arsen[aId] = { id: aId, name: sq.arsen.name, location: sq.arsen.location, total: 0, count: 0, sumLat: 0, sumLng: 0, groupIds: {}, squadrons: [] };
         }
         const a = arsen[aId];
         a.total += sq.total_reservists || 0; a.count += 1;
-        a.sumLat += sq.latitude; a.sumLng += sq.longitude;
+        a.sumLat += lat; a.sumLng += lng;
         a.squadrons.push(sq); a.groupIds[sq.group.id] = true;
       }
       const gId = sq.group?.id;
-      if (gId != null) {
+      if (gId != null && lat != null && lng != null) {
         if (!group[gId]) {
           group[gId] = { id: gId, name: sq.group.name, code: sq.group.code, arsenId: aId, arsenName: sq.arsen?.name, total: 0, count: 0, sumLat: 0, sumLng: 0, squadrons: [] };
         }
         const g = group[gId];
         g.total += sq.total_reservists || 0; g.count += 1;
-        g.sumLat += sq.latitude; g.sumLng += sq.longitude;
+        g.sumLat += lat; g.sumLng += lng;
         g.squadrons.push(sq);
       }
       const key = (sq.location || "").trim();
-      if (key) {
+      if (key && lat != null && lng != null) {
         if (!location[key]) {
           location[key] = { id: key, name: key, total: 0, count: 0, sumLat: 0, sumLng: 0, squadrons: [] };
         }
         const l = location[key];
         l.total += sq.total_reservists || 0; l.count += 1;
-        l.sumLat += sq.latitude; l.sumLng += sq.longitude;
+        l.sumLat += lat; l.sumLng += lng;
         l.squadrons.push(sq);
       }
     });
@@ -308,6 +313,27 @@ function MindanaoMapInline() {
     return null;
   }, [orgAgg, squadrons]);
 
+  const connectionLines = useMemo(() => {
+    if (!selected || selected.kind === "squadron") return [];
+    const parentLat = selected.lat ?? selected.latitude;
+    const parentLng = selected.lng ?? selected.longitude;
+    if (parentLat == null || parentLng == null) return [];
+    return selected.children
+      .filter((child) => child.kind !== "squadron" || (child.lat && child.lng))
+      .map((child) => {
+        const childNode = getNode(child.kind, child.id);
+        if (!childNode) return null;
+        const cLat = childNode.lat ?? childNode.latitude;
+        const cLng = childNode.lng ?? childNode.longitude;
+        if (cLat == null || cLng == null) return null;
+        return {
+          positions: [[parentLat, parentLng], [cLat, cLng]],
+          kind: child.kind,
+        };
+      })
+      .filter(Boolean);
+  }, [selected, getNode]);
+
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -329,8 +355,6 @@ function MindanaoMapInline() {
           mindanaoSquadrons: mindanaoSquadrons.length,
           sampleSq: loadedSquadrons[0] || null,
         };
-        // DIAGNOSTIC
-        console.log("[load]", loadInfoRef.current);
         setSquadrons(mindanaoSquadrons);
       } catch (err) {
         setError(err.response?.data?.message || "Failed to load map data");
@@ -372,7 +396,7 @@ function MindanaoMapInline() {
   const clearSelection = useCallback(() => {
     setSelected(null);
     setFlyTo({ center: MINDANAO_CENTER, zoom: MINDANAO_ZOOM });
-  }, [MINDANAO_CENTER, MINDANAO_ZOOM]);
+  }, []);
 
   if (loading) {
     return (
@@ -457,29 +481,10 @@ function MindanaoMapInline() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          {/* DIAGNOSTIC TEST SHAPE — remove after isolating render vs data issue */}
-          <Circle
-            center={MINDANAO_CENTER}
-            radius={80000}
-            pathOptions={{ color: "red", weight: 4, fillColor: "red", fillOpacity: 0.5 }}
-            eventHandlers={{ click: () => alert("test circle clicked") }}
-          />
           {flyTo && <FlyTo center={flyTo.center} zoom={flyTo.zoom} />}
 
           {/* ── Territory boundary shapes (rendered beneath markers) ── */}
           {showBoundaries && layer !== "squadron" && (() => {
-            // DIAGNOSTIC
-            console.log("[territory] layer=", layer,
-              "squadrons.len=", squadrons.length,
-              "orgAgg arsen/group/loc=", orgAgg.arsen.length, orgAgg.group.length, orgAgg.location.length,
-              "loadInfo=", loadInfoRef.current,
-              "shapes=", (territoryAgg[layer] || []).map((t) => ({
-                id: t.id, kind: t.kind,
-                sqCount: t.raw?.squadrons?.length,
-                hull: !!t.hullPoints,
-                circleR: t.circle ? t.circle.radiusMeters : null,
-                sampleSq: t.raw?.squadrons?.[0] ? { lat: t.raw.squadrons[0].latitude, lng: t.raw.squadrons[0].longitude } : null,
-              })));
             return territoryAgg[layer].map((t) => {
               const isSel = selected?.kind === t.kind && selected?.id === t.id;
               const color = t.kind === "arsen"
@@ -662,6 +667,25 @@ function MindanaoMapInline() {
               </Popup>
             </Marker>
           ))}
+
+          {/* Hierarchical connection lines: parent → child groups/locations */}
+          {selected && connectionLines.length > 0 && (
+            <>
+              {connectionLines.map((cl) => (
+                <Polyline
+                  key={`conn-${selected.id}-${cl.kind}`}
+                  positions={cl.positions}
+                  pathOptions={{
+                    color: "#6366F1",
+                    weight: 1.5,
+                    opacity: 0.45,
+                    dashArray: "5 6",
+                    interactive: false,
+                  }}
+                />
+              ))}
+            </>
+          )}
         </MapContainer>
 
         {/* ── Unified drill-down summary sidebar ── */}
@@ -672,27 +696,54 @@ function MindanaoMapInline() {
             squadron: { label: "SQUADRON", Icon: Layers, accent: "text-sky-600 dark:text-sky-400" },
             location: { label: "LOCATION", Icon: MapPin, accent: "text-emerald-600 dark:text-emerald-400" },
           }[selected.kind];
-          const Icon = meta.Icon;
-          const isSquadron = selected.kind === "squadron";
-          const secondary = isSquadron
-            ? (selected.raw.is_active ? "Active" : "Inactive")
-            : `${selected.count} ${selected.count === 1 ? "unit" : "units"}`;
-          return (
-            <div className="absolute right-4 top-4 z-[1000] w-80 rounded-xl border border-neutral-200 bg-white shadow-xl dark:bg-neutral-900 dark:border-neutral-700 overflow-hidden">
-              <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-3 py-2.5">
-                <div className="flex items-center gap-2 min-w-0">
-                  <Icon size={15} className={cn("shrink-0", meta.accent)} />
-                  <div className="min-w-0">
-                    <h3 className="text-xs font-bold text-neutral-900 dark:text-neutral-100 truncate">{selected.name}</h3>
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-neutral-400">{meta.label}</span>
-                  </div>
+           const Icon = meta.Icon;
+           const isSquadron = selected.kind === "squadron";
+           const secondary = isSquadron
+             ? (selected.raw.is_active ? "Active" : "Inactive")
+              : `${selected.count} ${selected.count === 1 ? "unit" : "units"}`;
+            const breadcrumb = (() => {
+              const parts = [];
+              if (selected.kind === "arsen") {
+                parts.push({ label: selected.name, kind: "arsen" });
+              } else if (selected.kind === "group") {
+                if (selected.raw.arsenName) parts.push({ label: selected.raw.arsenName, kind: "arsen" });
+                parts.push({ label: selected.name, kind: "group" });
+              } else if (selected.kind === "location") {
+                parts.push({ label: selected.name, kind: "location" });
+              } else if (selected.kind === "squadron") {
+                if (selected.raw.arsen?.name) parts.push({ label: selected.raw.arsen.name, kind: "arsen" });
+                if (selected.raw.group?.name) parts.push({ label: selected.raw.group.name, kind: "group" });
+                parts.push({ label: selected.name, kind: "squadron" });
+              }
+              return parts;
+            })();
+           return (
+             <div className="absolute right-4 top-4 z-[1000] w-80 rounded-xl border border-neutral-200 bg-white shadow-xl dark:bg-neutral-900 dark:border-neutral-700 overflow-hidden">
+               <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-3 py-2.5">
+                 <div className="flex items-center gap-2 min-w-0">
+                   <Icon size={15} className={cn("shrink-0", meta.accent)} />
+                   <div className="min-w-0">
+                     <h3 className="text-xs font-bold text-neutral-900 dark:text-neutral-100 truncate">{selected.name}</h3>
+                     <span className="text-[9px] font-semibold uppercase tracking-wider text-neutral-400">{meta.label}</span>
+                   </div>
+                 </div>
+                 <button onClick={clearSelection}
+                   className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800"
+                 >
+                   <X size={14} />
+                  </button>
                 </div>
-                <button onClick={clearSelection}
-                  className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800"
-                >
-                  <X size={14} />
-                </button>
-              </div>
+
+                {breadcrumb.length > 1 && (
+                  <div className="border-b border-neutral-200 dark:border-neutral-700 px-3 py-1.5 flex items-center gap-1 text-[9px] text-neutral-500 dark:text-neutral-400 overflow-x-auto">
+                    {breadcrumb.map((part, i) => (
+                      <span key={`${part.kind}-${i}`} className="flex items-center gap-1">
+                        {i > 0 && <span className="text-neutral-300 dark:text-neutral-600">›</span>}
+                        <span className={cn("font-medium", part.kind === "arsen" && "text-indigo-600 dark:text-indigo-400", part.kind === "group" && "text-blue-600 dark:text-blue-400", part.kind === "squadron" && "text-sky-600 dark:text-sky-400", part.kind === "location" && "text-emerald-600 dark:text-emerald-400")}>{part.label}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
 
               <div className="p-3 space-y-3">
                 {/* Headline personnel count */}
@@ -845,7 +896,6 @@ function HierarchyView() {
   const [search, setSearch] = useState("");
   const [hierarchyData, setHierarchyData] = useState([]);
   const [summary, setSummary] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState(null);
   const { resetAll, selectedSquadron, modalSquadron, closeMembersModal } = useHierarchy();
 
@@ -863,7 +913,6 @@ function HierarchyView() {
   }, [authError]);
 
   const fetchHierarchy = async () => {
-    setLoading(true);
     try {
       const response = await getGroups({ hierarchical: true }, { skipAuthRedirect: true });
       if (response.data.status === "success") {
@@ -879,8 +928,6 @@ function HierarchyView() {
         return;
       }
       console.warn("Could not load hierarchy from API:", err.message);
-    } finally {
-      setLoading(false);
     }
   };
 

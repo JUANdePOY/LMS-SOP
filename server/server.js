@@ -74,7 +74,7 @@ if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));
   console.log('Static file serving enabled from:', clientDist);
 } else {
-  console.error('WARNING: client/dist not found! Build may have failed.');
+    console.warn('WARNING: client/dist not found! Build may have failed.');
 }
 
 // API Routes

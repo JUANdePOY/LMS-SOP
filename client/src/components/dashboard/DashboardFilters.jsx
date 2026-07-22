@@ -1,12 +1,13 @@
-import { Filter, ChevronDown, RefreshCw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Filter, ChevronDown, RefreshCw, Loader } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { filterOptions } from "@/data/dashboardData";
+import { getReservistFilterMetadata } from "@/services/api";
 
 /**
  * FilterSelect
  * Reusable styled <select> wrapper.
  */
-function FilterSelect({ label, value, options, onChange }) {
+function FilterSelect({ label, value, options, onChange, placeholder }) {
   return (
     <div className="flex flex-col gap-1">
       <label className="text-[10px] font-semibold uppercase tracking-widest text-neutral-400 dark:text-neutral-600 px-0.5">
@@ -25,8 +26,9 @@ function FilterSelect({ label, value, options, onChange }) {
             "transition-all duration-150 cursor-pointer min-w-[140px]"
           )}
         >
+          <option value="">{placeholder || "All"}</option>
           {options.map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
         <ChevronDown
@@ -45,15 +47,41 @@ function FilterSelect({ label, value, options, onChange }) {
  * @param {{ filters: object, onChange: (patch: object) => void }} props
  */
 export default function DashboardFilters({ filters, onChange }) {
+  const [metadata, setMetadata] = useState(null);
+  const [metaLoading, setMetaLoading] = useState(true);
+  const handleArsenChange = (val) => onChange({ ...filters, arsenId: val, groupId: "", squadronId: "" });
+  const handleGroupChange = (val) => onChange({ ...filters, groupId: val, squadronId: "" });
   const patch = (key) => (val) => onChange({ ...filters, [key]: val });
+
+  useEffect(() => {
+    let cancelled = false;
+    setMetaLoading(true);
+    getReservistFilterMetadata()
+      .then((res) => {
+        if (!cancelled && res.data.status === "success") setMetadata(res.data.data);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setMetaLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   const handleReset = () =>
     onChange({
-      dateRange: filterOptions.dateRanges[0],
-      group:     filterOptions.groups[0],
-      area:      filterOptions.areas[0],
-      status:    filterOptions.statuses[0],
+      arsenId: "",
+      groupId: "",
+      squadronId: "",
+      reserveStatus: "",
+      sourceOfCommission: "",
+      category: "",
+      dateRange: "May 1 – May 31, 2025",
     });
+
+  const arsenOptions = metadata?.arsens?.map((a) => ({ value: String(a.id), label: a.name })) ?? [];
+  const groupOptions = metadata?.groups?.map((g) => ({ value: String(g.id), label: g.name })) ?? [];
+  const squadronOptions = metadata?.squadrons?.map((s) => ({ value: String(s.id), label: s.name })) ?? [];
+  const reserveStatusOptions = metadata?.reserveStatuses?.map((rs) => ({ value: rs, label: rs })) ?? [];
+  const sourceOptions = metadata?.sourcesOfCommission?.map((s) => ({ value: s, label: s })) ?? [];
+  const categoryOptions = metadata?.categories?.map((c) => ({ value: c, label: c })) ?? [];
 
   return (
     <div className={cn(
@@ -68,29 +96,49 @@ export default function DashboardFilters({ filters, onChange }) {
       </div>
 
       <FilterSelect
-        label="Date Range"
-        value={filters.dateRange}
-        options={filterOptions.dateRanges}
-        onChange={patch("dateRange")}
+        label="ARSEN"
+        value={filters.arsenId}
+        options={arsenOptions}
+        onChange={handleArsenChange}
+        placeholder="All ARSENs"
       />
       <FilterSelect
         label="Group"
-        value={filters.group}
-        options={filterOptions.groups}
-        onChange={patch("group")}
+        value={filters.groupId}
+        options={groupOptions}
+        onChange={handleGroupChange}
+        placeholder="All Groups"
       />
       <FilterSelect
-        label="Area"
-        value={filters.area}
-        options={filterOptions.areas}
-        onChange={patch("area")}
+        label="Squadron"
+        value={filters.squadronId}
+        options={squadronOptions}
+        onChange={patch("squadronId")}
+        placeholder="All Squadrons"
       />
       <FilterSelect
-        label="Status"
-        value={filters.status}
-        options={filterOptions.statuses}
-        onChange={patch("status")}
+        label="Reserve Status"
+        value={filters.reserveStatus}
+        options={reserveStatusOptions}
+        onChange={patch("reserveStatus")}
+        placeholder="All Reserve Statuses"
       />
+      <FilterSelect
+        label="Source"
+        value={filters.sourceOfCommission}
+        options={sourceOptions}
+        onChange={patch("sourceOfCommission")}
+        placeholder="All Sources"
+      />
+      <FilterSelect
+        label="Category"
+        value={filters.category}
+        options={categoryOptions}
+        onChange={patch("category")}
+        placeholder="All Categories"
+      />
+
+      {metaLoading && <Loader size={12} className="animate-spin text-neutral-400 dark:text-neutral-500 shrink-0 self-end mb-1" />}
 
       {/* Reset */}
       <div className="flex flex-col gap-1 self-end">

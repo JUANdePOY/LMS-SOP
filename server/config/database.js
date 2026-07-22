@@ -19,11 +19,11 @@ const dbConfig = {
 const pool = mysql.createPool(dbConfig);
 
 const MIGRATIONS = [
-  `ALTER TABLE reservists ADD COLUMN status_bcmt tinyint(1) NOT NULL DEFAULT 0`,
-  `ALTER TABLE reservists ADD COLUMN status_adt tinyint(1) NOT NULL DEFAULT 0`,
-  `ALTER TABLE reservists ADD COLUMN status_vadt tinyint(1) NOT NULL DEFAULT 0`,
-  `ALTER TABLE reservists ADD COLUMN status_rotc tinyint(1) NOT NULL DEFAULT 0`,
-  `ALTER TABLE reservists ADD COLUMN status_others varchar(255) DEFAULT NULL`,
+  `ALTER TABLE reservists ADD COLUMN IF NOT EXISTS status_bcmt tinyint(1) NOT NULL DEFAULT 0`,
+  `ALTER TABLE reservists ADD COLUMN IF NOT EXISTS status_adt tinyint(1) NOT NULL DEFAULT 0`,
+  `ALTER TABLE reservists ADD COLUMN IF NOT EXISTS status_vadt tinyint(1) NOT NULL DEFAULT 0`,
+  `ALTER TABLE reservists ADD COLUMN IF NOT EXISTS status_rotc tinyint(1) NOT NULL DEFAULT 0`,
+  `ALTER TABLE reservists ADD COLUMN IF NOT EXISTS status_others varchar(255) DEFAULT NULL`,
   `CREATE TABLE IF NOT EXISTS announcements (
     id VARCHAR(36) NOT NULL DEFAULT (UUID()),
     title VARCHAR(255) NOT NULL,
@@ -48,9 +48,15 @@ async function runMigrations() {
     try {
       await promisePool.query(sql);
     } catch (err) {
-      const ignoreCodes = ['ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR'];
-      if (ignoreCodes.includes(err.code)) {
-        // already exists, skip
+      const ignoreCodes = [
+        'ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR',
+        1060, 1050
+      ];
+      if (
+        ignoreCodes.includes(err.code) ||
+        ignoreCodes.includes(err.errno)
+      ) {
+        // already exists or duplicate, skip
       } else {
         console.error('Migration error:', err.message);
       }

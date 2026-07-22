@@ -46,7 +46,7 @@ export const getProfile = () => api.get('/auth/profile');
 export const updateProfile = (data) => api.put('/auth/profile', data, { skipAuthRedirect: true });
 
 // Dashboard
-export const getDashboard = () => api.get('/dashboard');
+export const getDashboard = (params = {}) => api.get('/dashboard', { params });
 
 // Reservists
 export const getReservists = (params = {}) => api.get('/reservists', { params });

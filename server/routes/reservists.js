@@ -293,10 +293,10 @@ router.get(
           SUM(r.reserve_status = 'Standby Reserve')         AS standby,
           SUM(r.reserve_status = 'Retired')                 AS retired,
           SUM(r.reserve_status = 'Ready Reserve')           AS ready,
-           0 AS bcmt,
+          SUM(CASE WHEN r.source_of_commission = 'BCMT' THEN 1 ELSE 0 END) AS bcmt,
+          SUM(CASE WHEN r.source_of_commission = 'ROTC' THEN 1 ELSE 0 END) AS rotc,
            0 AS adt,
-           0 AS vadt,
-           0 AS rotc
+           0 AS vadt
         FROM reservists r
         LEFT JOIN users u ON r.user_id = u.id
         LEFT JOIN reservist_assignments ra ON r.id = ra.reservist_id AND ra.is_primary = TRUE
