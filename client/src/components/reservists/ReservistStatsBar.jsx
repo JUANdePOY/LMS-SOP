@@ -1,14 +1,14 @@
 import { cn } from "@/lib/utils";
-import { Users, UserCheck, UserX, AlertCircle, Shield, Star } from "lucide-react";
+import { Users, UserCheck, ShieldCheck, Zap, UserPlus, Award } from "lucide-react";
 
 export default function ReservistStatsBar({ stats = {} }) {
   const {
-    total    = 0,
-    active   = 0,
-    inactive = 0,
-    standby  = 0,
-    retired  = 0,
-    ready    = 0,
+    total = 0,
+    active = 0,
+    bcmt = 0,
+    adt = 0,
+    vadt = 0,
+    rotc = 0,
   } = stats;
 
   const cards = [
@@ -27,32 +27,32 @@ export default function ReservistStatsBar({ stats = {} }) {
       bg:    "bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100 dark:border-emerald-500/20",
     },
     {
-      label: "Inactive",
-      value: inactive,
-      icon:  UserX,
-      color: "text-red-500 dark:text-red-400",
-      bg:    "bg-red-50 dark:bg-red-500/10 border-red-100 dark:border-red-500/20",
-    },
-    {
-      label: "Ready Reserve",
-      value: ready,
-      icon:  Shield,
+      label: "BCMT",
+      value: bcmt,
+      icon:  ShieldCheck,
       color: "text-blue-600 dark:text-blue-400",
       bg:    "bg-blue-50 dark:bg-blue-500/10 border-blue-100 dark:border-blue-500/20",
     },
     {
-      label: "Standby Reserve",
-      value: standby,
-      icon:  AlertCircle,
+      label: "ADT",
+      value: adt,
+      icon:  Zap,
       color: "text-amber-600 dark:text-amber-400",
       bg:    "bg-amber-50 dark:bg-amber-500/10 border-amber-100 dark:border-amber-500/20",
     },
     {
-      label: "Retired",
-      value: retired,
-      icon:  Star,
-      color: "text-neutral-500 dark:text-neutral-400",
-      bg:    "bg-neutral-50 dark:bg-neutral-800/50 border-neutral-200 dark:border-neutral-700",
+      label: "VADT",
+      value: vadt,
+      icon:  UserPlus,
+      color: "text-purple-600 dark:text-purple-400",
+      bg:    "bg-purple-50 dark:bg-purple-500/10 border-purple-100 dark:border-purple-500/20",
+    },
+    {
+      label: "ROTC",
+      value: rotc,
+      icon:  Award,
+      color: "text-rose-600 dark:text-rose-400",
+      bg:    "bg-rose-50 dark:bg-rose-500/10 border-rose-100 dark:border-rose-500/20",
     },
   ];
 

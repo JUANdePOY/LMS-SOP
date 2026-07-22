@@ -14,7 +14,9 @@
     "build:client": "cd client && npm run build",
     "build:server": "cd server && npm install",
     "build": "cd client && npm install && chmod +x node_modules/.bin/* 2>/dev/null; npm run build && cd ../server && npm install",
-    "start": "cd server && npm start"
+    "start": "cd server && npm start",
+    "hostinger:build": "cd client && npm install && npm run build",
+    "hostinger:start": "node server/server.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

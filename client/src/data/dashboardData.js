@@ -155,7 +155,4 @@ export const filterOptions = {
     "Q2 2025",
     "Year to Date",
   ],
-  groups: ["All Groups", "TCG10", "Butuan Airbase", "Surigao Airbase", "Tandag Detachment", "Bayugan Detachment"],
-  areas:  ["All Areas", "Butuan", "Surigao", "Tandag", "Bayugan", "Cabadbaran"],
-  statuses: ["All Status", "Active", "Standby", "Inactive"],
 };
