@@ -1,11 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
-/**
- * ProtectedRoute
- * Requires authentication to access.
- * Optionally accepts allowedRoles to restrict by role.
- */
 export default function ProtectedRoute({ children, allowedRoles }) {
   const { isAuthenticated, loading, user } = useAuth();
 

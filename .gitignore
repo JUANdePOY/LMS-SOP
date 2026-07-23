@@ -23,6 +23,8 @@ server/uploads
 .env
 server/.env
 .env.docker
+.env.hostinger
+server/.env.hostinger
 
 # Docker
 *.log

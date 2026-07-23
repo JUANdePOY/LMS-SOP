@@ -1,15 +1,13 @@
 ﻿const jwt = require('jsonwebtoken');
 const db = require('../config/database');
 
-// JWT secret from environment
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
-/**
- * Middleware to authenticate JWT token
- */
-const authenticateToken = async (req, res, next) => {
+const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
+
+async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
     return res.status(401).json({
@@ -22,20 +20,10 @@ const authenticateToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    // Verify user still exists and is active
-    let users;
-    try {
-      [users] = await db.query(
-        'SELECT id, role, is_active, scope_arsen_id, scope_group_id, scope_squadron_id FROM users WHERE id = ?',
-        [decoded.userId]
-      );
-    } catch (dbError) {
-      return res.status(500).json({
-        status: 'error',
-        message: 'Database error',
-        code: 'DB_ERROR'
-      });
-    }
+    const [users] = await db.query(
+      'SELECT id, role, is_active, department_id, full_name, email, position_title, employee_id FROM users WHERE id = ?',
+      [decoded.userId]
+    );
 
     if (users.length === 0) {
       return res.status(401).json({
@@ -54,14 +42,14 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    // Attach user info to request
     req.user = {
       id: user.id,
       role: user.role,
-      id_number: decoded.id_number,
-      scope_arsen_id: user.scope_arsen_id || null,
-      scope_group_id: user.scope_group_id || null,
-      scope_squadron_id: user.scope_squadron_id || null,
+      department_id: user.department_id,
+      full_name: user.full_name,
+      email: user.email,
+      position_title: user.position_title,
+      employee_id: user.employee_id,
     };
 
     next();
@@ -80,12 +68,9 @@ const authenticateToken = async (req, res, next) => {
       code: 'INVALID_TOKEN'
     });
   }
-};
+}
 
-/**
- * Sets req.user when a valid token is present; never blocks the request.
- */
-const optionalAuthenticateToken = async (req, res, next) => {
+async function optionalAuthenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -96,7 +81,7 @@ const optionalAuthenticateToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const [users] = await db.query(
-      'SELECT id, role, is_active FROM users WHERE id = ?',
+      'SELECT id, role, is_active, department_id, full_name, email FROM users WHERE id = ?',
       [decoded.userId]
     );
 
@@ -104,7 +89,9 @@ const optionalAuthenticateToken = async (req, res, next) => {
       req.user = {
         id: users[0].id,
         role: users[0].role,
-        id_number: decoded.id_number
+        department_id: users[0].department_id,
+        full_name: users[0].full_name,
+        email: users[0].email,
       };
     }
   } catch {
@@ -112,44 +99,22 @@ const optionalAuthenticateToken = async (req, res, next) => {
   }
 
   next();
-};
+}
 
-/**
- * Middleware to check if user is any type of admin
- */
-const requireAdmin = (req, res, next) => {
-  const adminRoles = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'];
-  if (!adminRoles.includes(req.user.role)) {
+function requireSuperAdmin(req, res, next) {
+  if (req.user?.role !== 'super_admin') {
     return res.status(403).json({
       status: 'error',
-      message: 'Admin access required',
-      code: 'ADMIN_REQUIRED'
-    });
-  }
-  next();
-};
-
-/**
- * Middleware to check if user is a super admin (full system access)
- */
-const requireSuperAdmin = (req, res, next) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({
-      status: 'error',
-      message: 'System administrator access required',
+      message: 'Super admin access required',
       code: 'SUPER_ADMIN_REQUIRED'
     });
   }
   next();
-};
+}
 
-/**
-  * Middleware to check if user is a unit admin that can mutate squadron data
-  * (admin_arsen, admin_group) - admin_squadron can only view
-  */
-const requireAdminOrHigher = (req, res, next) => {
-  const adminRoles = ['admin', 'admin_arsen', 'admin_group'];
-  if (!adminRoles.includes(req.user.role)) {
+function requireAdmin(req, res, next) {
+  const adminRoles = ['super_admin', 'admin', 'department_head'];
+  if (!adminRoles.includes(req.user?.role)) {
     return res.status(403).json({
       status: 'error',
       message: 'Admin access required',
@@ -157,50 +122,53 @@ const requireAdminOrHigher = (req, res, next) => {
     });
   }
   next();
-};
+}
 
-/**
- * Middleware to check if user is admin_arsen or higher (can manage groups)
- */
-const requireAdminArsenOrHigher = (req, res, next) => {
-  const adminRoles = ['admin', 'admin_arsen'];
-  if (!adminRoles.includes(req.user.role)) {
+function requireDepartmentHead(req, res, next) {
+  if (req.user?.role !== 'department_head' && req.user?.role !== 'super_admin' && req.user?.role !== 'admin') {
     return res.status(403).json({
       status: 'error',
-      message: 'Admin ARSEN access required',
-      code: 'ADMIN_ARSEN_REQUIRED'
+      message: 'Department head access required',
+      code: 'DEPT_HEAD_REQUIRED'
     });
   }
   next();
-};
+}
 
-/**
- * Middleware to check if user is admin or the resource owner
- */
-const requireAdminOrOwner = (req, res, next) => {
-  const adminRoles = ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'];
-  if (!adminRoles.includes(req.user.role) && req.user.id !== parseInt(req.params.id)) {
-    return res.status(403).json({
-      status: 'error',
-      message: 'Access denied',
-      code: 'ACCESS_DENIED'
-    });
-  }
-};
+function authorize(...roles) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Unauthorized - No user information',
+        code: 'UNAUTHORIZED'
+      });
+    }
 
-/**
- * Check if user role is any admin variant
- */
-const isAdminRole = (role) => ['admin', 'admin_arsen', 'admin_group', 'admin_squadron'].includes(role);
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        status: 'error',
+        message: `Access denied. Required roles: ${roles.join(', ')}`,
+        code: 'FORBIDDEN'
+      });
+    }
+
+    next();
+  };
+}
+
+function isAdminRole(role) {
+  return ['super_admin', 'admin', 'department_head'].includes(role);
+}
 
 module.exports = {
-   authenticateToken,
-   optionalAuthenticateToken,
-   requireAdmin,
-   requireSuperAdmin,
-   requireAdminOrOwner,
-   requireAdminOrHigher,
-   requireAdminArsenOrHigher,
-   isAdminRole,
-   JWT_SECRET
+  authenticateToken,
+  optionalAuthenticateToken,
+  requireSuperAdmin,
+  requireAdmin,
+  requireDepartmentHead,
+  authorize,
+  isAdminRole,
+  JWT_SECRET,
+  LMS_ROLES,
 };

@@ -1,7 +1,7 @@
 {
-  "name": "pafr-server",
+  "name": "lms-sop-server",
   "version": "1.0.0",
-  "description": "PAFR Backend API Server",
+  "description": "LMS-SOP Backend API Server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

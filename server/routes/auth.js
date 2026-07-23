@@ -7,408 +7,398 @@ const { logAudit } = require('../utils/auditLogger');
 
 const router = express.Router();
 
-/**
- * POST /auth/login
- * Authenticate user with ID Number (service_number) and password
- * Returns JWT token on success
- */
 router.post('/login', [
-    body('id_number')
-        .notEmpty()
-        .trim()
-        .withMessage('ID Number is required'),
-    body('password')
-        .notEmpty()
-        .trim()
-        .withMessage('Password is required')
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email is required'),
+  body('password')
+    .notEmpty()
+    .trim()
+    .withMessage('Password is required')
 ], async (req, res) => {
-    try {
-        // Check for validation errors
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Validation failed',
-                code: 'VALIDATION_ERROR',
-                errors: errors.array()
-            });
-        }
-
-        const { id_number, password } = req.body;
-
-        // Find user by ID Number (service_number in reservists table)
-         const [results] = await db.query(
-             `SELECT u.id, u.password_hash, u.role, u.is_active, u.scope_arsen_id, u.scope_group_id, u.scope_squadron_id,
-                     r.service_number as id_number 
-              FROM users u
-              JOIN reservists r ON u.id = r.user_id
-              WHERE r.service_number = ?`,
-             [id_number]
-         );
-
-        // Check if user exists
-        if (!results || results.length === 0) {
-            return res.status(401).json({
-                status: 'error',
-                message: 'Invalid ID Number or password',
-                code: 'INVALID_CREDENTIALS'
-            });
-        }
-
-        const user = results[0];
-
-        // Check if user is active
-        if (!user.is_active) {
-            return res.status(403).json({
-                status: 'error',
-                message: 'User account is deactivated',
-                code: 'ACCOUNT_DEACTIVATED'
-            });
-        }
-
-        try {
-            // Compare password
-            const isPasswordValid = await comparePassword(password, user.password_hash);
-
-            if (!isPasswordValid) {
-                return res.status(401).json({
-                    status: 'error',
-                    message: 'Invalid ID Number or password',
-                    code: 'INVALID_CREDENTIALS'
-                });
-            }
-
-            // Generate JWT token
-            const token = generateToken({
-                userId: user.id,
-                id_number: user.id_number,
-                role: user.role
-            });
-
-            // Update last login timestamp
-            db.query(
-                'UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?',
-                [user.id]
-            ).catch(err => console.error('Failed to update last_login_at:', err));
-
-            logAudit({
-                user_id: user.id,
-                action: 'user.login',
-                entity_type: 'user',
-                entity_id: user.id,
-                new_values: { id_number: user.id_number, role: user.role }
-            });
-
-            return res.status(200).json({
-                status: 'success',
-                message: 'Login successful',
-                data: {
-                    token,
-                    user: {
-                        id: user.id,
-                        id_number: user.id_number,
-                        role: user.role,
-                        scope_arsen_id: user.scope_arsen_id || null,
-                        scope_group_id: user.scope_group_id || null,
-                        scope_squadron_id: user.scope_squadron_id || null,
-                    }
-                }
-            });
-        } catch (error) {
-            return res.status(500).json({
-                status: 'error',
-                message: 'Authentication failed',
-                code: 'AUTH_ERROR'
-            });
-        }
-    } catch (error) {
-        console.error('Login error:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Server error',
-            code: 'SERVER_ERROR'
-        });
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        errors: errors.array()
+      });
     }
+
+    const { email, password } = req.body;
+
+    const [results] = await db.query(
+      'SELECT u.*, d.name AS department_name FROM users u LEFT JOIN departments d ON u.department_id = d.id WHERE u.email = ?',
+      [email]
+    );
+
+    if (!results || results.length === 0) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid email or password',
+        code: 'INVALID_CREDENTIALS'
+      });
+    }
+
+    const user = results[0];
+
+    if (!user.is_active) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'User account is deactivated',
+        code: 'ACCOUNT_DEACTIVATED'
+      });
+    }
+
+    const isPasswordValid = await comparePassword(password, user.password_hash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid email or password',
+        code: 'INVALID_CREDENTIALS'
+      });
+    }
+
+    const token = generateToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role
+    });
+
+    await db.query(
+      'UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [user.id]
+    );
+
+    logAudit({
+      user_id: user.id,
+      action: 'user.login',
+      entity_type: 'user',
+      entity_id: user.id,
+      new_values: { email: user.email, role: user.role }
+    });
+
+    return res.status(200).json({
+      status: 'success',
+      message: 'Login successful',
+      data: {
+        token,
+        user: {
+          id: user.id,
+          full_name: user.full_name,
+          email: user.email,
+          role: user.role,
+          department_id: user.department_id,
+          department_name: user.department_name,
+          position_title: user.position_title,
+          employee_id: user.employee_id,
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error',
+      code: 'SERVER_ERROR'
+    });
+  }
 });
 
-/**
- * POST /auth/logout
- * Client-side logout - token removal is handled by frontend
- * This endpoint mainly for symmetry and future session invalidation
- */
 router.post('/logout', authenticateToken, (req, res) => {
-    try {
-        logAudit({
-            user_id: req.user.id,
-            action: 'user.logout',
-            entity_type: 'user',
-            entity_id: req.user.id
-        });
+  try {
+    logAudit({
+      user_id: req.user.id,
+      action: 'user.logout',
+      entity_type: 'user',
+      entity_id: req.user.id
+    });
 
-        res.status(200).json({
-            status: 'success',
-            message: 'Logout successful. Please delete the token from local storage.',
-            code: 'LOGOUT_SUCCESS'
-        });
-    } catch (error) {
-        res.status(500).json({
-            status: 'error',
-            message: 'Logout failed',
-            code: 'LOGOUT_ERROR'
-        });
-    }
+    res.status(200).json({
+      status: 'success',
+      message: 'Logout successful'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: 'Logout failed',
+      code: 'LOGOUT_ERROR'
+    });
+  }
 });
 
-/**
- * POST /auth/register
- * Create a new user account (admin users only)
- * Reservist accounts should be created through admin panel
- */
 router.post('/register', authenticateToken, [
-    body('email')
-        .isEmail()
-        .normalizeEmail()
-        .withMessage('Valid email is required'),
-    body('password')
-        .isLength({ min: 8 })
-        .withMessage('Password must be at least 8 characters'),
-    body('role')
-        .isIn(['admin', 'admin_arsen', 'admin_group', 'admin_squadron', 'reservist'])
-        .withMessage('Role must be admin, admin_arsen, admin_group, admin_squadron, or reservist')
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Valid email is required'),
+  body('password')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters'),
+  body('role')
+    .isIn(['super_admin', 'admin', 'department_head', 'employee'])
+    .withMessage('Role must be super_admin, admin, department_head, or employee'),
+  body('full_name')
+    .trim()
+    .isLength({ min: 2 })
+    .withMessage('Full name is required'),
 ], async (req, res) => {
-    try {
-        // Check for validation errors
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Validation failed',
-                code: 'VALIDATION_ERROR',
-                errors: errors.array()
-            });
-        }
-
-        // Only admins can create users
-        if (req.user.role !== 'admin') {
-            return res.status(403).json({
-                status: 'error',
-                message: 'Only administrators can create user accounts',
-                code: 'ADMIN_ONLY'
-            });
-        }
-
-        const { email, password, role } = req.body;
-
-        // Check if email already exists
-        const [results] = await db.query(
-            'SELECT id FROM users WHERE email = ?',
-            [email]
-        );
-
-        if (results && results.length > 0) {
-            return res.status(409).json({
-                status: 'error',
-                message: 'Email already registered',
-                code: 'EMAIL_EXISTS'
-            });
-        }
-
-        try {
-            // Hash password
-            const passwordHash = await hashPassword(password);
-
-            // Create user
-            const [insertResults] = await db.query(
-                'INSERT INTO users (email, password_hash, role) VALUES (?, ?, ?)',
-                [email, passwordHash, role]
-            );
-
-            logAudit({
-                user_id: req.user.id,
-                action: 'user.created',
-                entity_type: 'user',
-                entity_id: insertResults.insertId,
-                new_values: { email, role }
-            });
-
-            res.status(201).json({
-                status: 'success',
-                message: 'User created successfully',
-                data: {
-                    userId: insertResults.insertId,
-                    email,
-                    role
-                }
-            });
-        } catch (error) {
-            return res.status(500).json({
-                status: 'error',
-                message: 'Password hashing failed',
-                code: 'AUTH_ERROR'
-            });
-        }
-    } catch (error) {
-        console.error('Register error:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Server error',
-            code: 'SERVER_ERROR'
-        });
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        errors: errors.array()
+      });
     }
+
+    if (req.user.role !== 'super_admin') {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Only super admins can create user accounts',
+        code: 'ADMIN_ONLY'
+      });
+    }
+
+    const { full_name, email, password, role, department_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address } = req.body;
+
+    const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
+    if (existing.length > 0) {
+      return res.status(409).json({
+        status: 'error',
+        message: 'Email already registered',
+        code: 'EMAIL_EXISTS'
+      });
+    }
+
+    const passwordHash = await hashPassword(password);
+
+    const [insertResults] = await db.query(
+      `INSERT INTO users (full_name, email, password_hash, role, department_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [full_name, email, passwordHash, role, department_id ?? null, position_title ?? null, employee_id ?? null, contact_number ?? null, employment_status ?? 'Regular', date_hired ?? null, birthdate ?? null, address ?? null]
+    );
+
+    logAudit({
+      user_id: req.user.id,
+      action: 'user.created',
+      entity_type: 'user',
+      entity_id: insertResults.insertId,
+      new_values: { email, role }
+    });
+
+    res.status(201).json({
+      status: 'success',
+      message: 'User created successfully',
+      data: {
+        userId: insertResults.insertId,
+        email,
+        role
+      }
+    });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error',
+      code: 'SERVER_ERROR'
+    });
+  }
 });
 
-/**
- * GET /auth/profile
- * Get current user profile information
- */
 router.get('/profile', authenticateToken, async (req, res) => {
-    try {
-         const [results] = await db.query(
-              `SELECT u.id, u.email, u.role, u.scope_arsen_id, u.scope_group_id, u.scope_squadron_id,
-                      r.service_number as id_number 
-               FROM users u
-               LEFT JOIN reservists r ON u.id = r.user_id
-               WHERE u.id = ?`,
-              [req.user.id]
-         );
+  try {
+    const [results] = await db.query(
+      `SELECT u.*, d.name AS department_name
+       FROM users u
+       LEFT JOIN departments d ON u.department_id = d.id
+       WHERE u.id = ?`,
+      [req.user.id]
+    );
 
-        if (!results || results.length === 0) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'User not found',
-                code: 'NOT_FOUND'
-            });
-        }
-
-         const user = results[0];
-         res.status(200).json({
-             status: 'success',
-             data: {
-                 userId: user.id,
-                 id_number: user.id_number,
-                 email: user.email,
-                 role: user.role,
-                 scope_arsen_id: user.scope_arsen_id || null,
-                 scope_group_id: user.scope_group_id || null,
-                 scope_squadron_id: user.scope_squadron_id || null,
-             }
-         });
-    } catch (error) {
-        console.error('Profile error:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Database error',
-            code: 'DB_ERROR'
-        });
+    if (!results || results.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found',
+        code: 'NOT_FOUND'
+      });
     }
+
+    const user = results[0];
+    res.status(200).json({
+      status: 'success',
+      data: {
+        id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        role: user.role,
+        department_id: user.department_id,
+        department_name: user.department_name,
+        position_title: user.position_title,
+        employee_id: user.employee_id,
+        contact_number: user.contact_number,
+        employment_status: user.employment_status,
+        date_hired: user.date_hired,
+        birthdate: user.birthdate,
+        address: user.address,
+        avatar_url: user.avatar_url,
+      }
+    });
+  } catch (error) {
+    console.error('Profile error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Database error',
+      code: 'DB_ERROR'
+    });
+  }
 });
 
-/**
- * PUT /auth/profile
- * Update current user's email and/or password
- */
 router.put('/profile', authenticateToken, [
-    body('email').optional().isEmail().normalizeEmail().withMessage('Valid email required'),
-    body('current_password').optional().notEmpty().withMessage('Current password is required when changing password'),
-    body('new_password').optional().isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+  body('full_name').optional().trim().isLength({ min: 2 }).withMessage('Full name must be at least 2 characters'),
+  body('email').optional().isEmail().normalizeEmail().withMessage('Valid email required'),
+  body('position_title').optional().trim(),
+  body('contact_number').optional().trim(),
+  body('employment_status').optional().isIn(['Regular', 'Probationary', 'Contractual', 'Resigned/Terminated', 'Retired', 'On Leave']),
+  body('date_hired').optional().isISO8601(),
+  body('birthdate').optional().isISO8601(),
+  body('address').optional(),
 ], async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'Validation failed',
-                code: 'VALIDATION_ERROR',
-                errors: errors.array()
-            });
-        }
-
-        const { email, current_password, new_password } = req.body;
-        const updates = [];
-        const params = [];
-
-        // Get current user
-        const [userResults] = await db.query(
-            'SELECT id, email, password_hash FROM users WHERE id = ?',
-            [req.user.id]
-        );
-
-        if (!userResults || userResults.length === 0) {
-            return res.status(404).json({
-                status: 'error',
-                message: 'User not found',
-                code: 'NOT_FOUND'
-            });
-        }
-
-        const user = userResults[0];
-
-        // Handle email update
-        if (email && email !== user.email) {
-            const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
-            if (existing.length > 0) {
-                return res.status(409).json({
-                    status: 'error',
-                    message: 'Email already in use',
-                    code: 'EMAIL_EXISTS'
-                });
-            }
-            updates.push('email = ?');
-            params.push(email);
-        }
-
-        // Handle password update
-        if (new_password) {
-            if (!current_password) {
-                return res.status(400).json({
-                    status: 'error',
-                    message: 'Current password is required to set new password',
-                    code: 'VALIDATION_ERROR'
-                });
-            }
-
-            const isCurrentValid = await comparePassword(current_password, user.password_hash);
-            if (!isCurrentValid) {
-                return res.status(401).json({
-                    status: 'error',
-                    message: 'Current password is incorrect',
-                    code: 'INVALID_PASSWORD'
-                });
-            }
-
-            const newPasswordHash = await hashPassword(new_password);
-            updates.push('password_hash = ?');
-            params.push(newPasswordHash);
-        }
-
-        if (updates.length === 0) {
-            return res.status(400).json({
-                status: 'error',
-                message: 'No changes provided',
-                code: 'VALIDATION_ERROR'
-            });
-        }
-
-        params.push(req.user.id);
-        await db.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
-
-        logAudit({
-            user_id: req.user.id,
-            action: 'user.profile_updated',
-            entity_type: 'user',
-            entity_id: req.user.id,
-            new_values: email ? { email } : { password_changed: true }
-        });
-
-        res.json({ status: 'success', message: 'Profile updated' });
-    } catch (error) {
-        console.error('Profile update error:', error);
-        res.status(500).json({
-            status: 'error',
-            message: 'Failed to update profile',
-            code: 'DB_ERROR'
-        });
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        errors: errors.array()
+      });
     }
+
+    const updates = {};
+    const allowed = ['full_name', 'email', 'position_title', 'contact_number', 'employment_status', 'date_hired', 'birthdate', 'address'];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) {
+        updates[key] = req.body[key];
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'No changes provided',
+        code: 'VALIDATION_ERROR'
+      });
+    }
+
+    if (updates.email) {
+      const [existing] = await db.query('SELECT id FROM users WHERE email = ? AND id != ?', [updates.email, req.user.id]);
+      if (existing.length > 0) {
+        return res.status(409).json({
+          status: 'error',
+          message: 'Email already in use',
+          code: 'EMAIL_EXISTS'
+        });
+      }
+    }
+
+    await db.query(
+      `UPDATE users SET ${Object.keys(updates).map(k => `${k} = ?`).join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+      [...Object.values(updates), req.user.id]
+    );
+
+    logAudit({
+      user_id: req.user.id,
+      action: 'user.profile_updated',
+      entity_type: 'user',
+      entity_id: req.user.id,
+      new_values: updates
+    });
+
+    res.json({ status: 'success', message: 'Profile updated' });
+  } catch (error) {
+    console.error('Profile update error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to update profile',
+      code: 'DB_ERROR'
+    });
+  }
+});
+
+router.put('/profile/password', authenticateToken, [
+  body('current_password')
+    .notEmpty()
+    .withMessage('Current password is required'),
+  body('new_password')
+    .isLength({ min: 8 })
+    .withMessage('New password must be at least 8 characters'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        errors: errors.array()
+      });
+    }
+
+    const { current_password, new_password } = req.body;
+
+    const [userResults] = await db.query(
+      'SELECT id, password_hash FROM users WHERE id = ?',
+      [req.user.id]
+    );
+
+    if (!userResults || userResults.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'User not found',
+        code: 'NOT_FOUND'
+      });
+    }
+
+    const user = userResults[0];
+    const isCurrentValid = await comparePassword(current_password, user.password_hash);
+
+    if (!isCurrentValid) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Current password is incorrect',
+        code: 'INVALID_PASSWORD'
+      });
+    }
+
+    const newPasswordHash = await hashPassword(new_password);
+    await db.query(
+      'UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [newPasswordHash, req.user.id]
+    );
+
+    logAudit({
+      user_id: req.user.id,
+      action: 'user.password_changed',
+      entity_type: 'user',
+      entity_id: req.user.id
+    });
+
+    res.json({ status: 'success', message: 'Password changed successfully' });
+  } catch (error) {
+    console.error('Password change error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Failed to change password',
+      code: 'DB_ERROR'
+    });
+  }
 });
 
 module.exports = router;

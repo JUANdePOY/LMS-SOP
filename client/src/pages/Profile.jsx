@@ -1,24 +1,19 @@
 import { useState, useEffect } from 'react';
-import QRCode from 'qrcode';
-import { User, Calendar, Phone, MapPin, Droplet, Shield, Loader2, Save, Lock, QrCode } from 'lucide-react';
-import { getMyProfile, updateMyProfile, updateProfile, generateMyQR } from '@/services/api';
+import { User, Calendar, Phone, MapPin, Droplet, Shield, Loader2, Save, Lock, Mail } from 'lucide-react';
+import { getProfile, updateProfile, changePassword } from '@/services/api';
 import { useToast } from '@/components/ui/Toast';
 import { cn } from '@/lib/utils';
 
 const FORM_FIELDS = [
-  { key: 'first_name', label: 'First Name', icon: User, type: 'text' },
-  { key: 'last_name', label: 'Last Name', icon: User, type: 'text' },
-  { key: 'rank', label: 'Rank', icon: Shield, type: 'text' },
-  { key: 'phone_number', label: 'Phone Number', icon: Phone, type: 'tel' },
+  { key: 'full_name', label: 'Full Name', icon: User, type: 'text' },
+  { key: 'email', label: 'Email Address', icon: Mail, type: 'email' },
+  { key: 'position_title', label: 'Position / Job Title', icon: Shield, type: 'text' },
+  { key: 'employee_id', label: 'Employee ID', icon: Shield, type: 'text' },
+  { key: 'contact_number', label: 'Contact Number', icon: Phone, type: 'tel' },
+  { key: 'employment_status', label: 'Employment Status', icon: null, type: 'select', options: ['Regular', 'Probationary', 'Contractual', 'Resigned/Terminated', 'Retired', 'On Leave'] },
+  { key: 'date_hired', label: 'Date Hired', icon: Calendar, type: 'date' },
+  { key: 'birthdate', label: 'Birthdate', icon: Calendar, type: 'date' },
   { key: 'address', label: 'Address', icon: MapPin, type: 'textarea' },
-  { key: 'date_of_birth', label: 'Date of Birth', icon: Calendar, type: 'date' },
-  { key: 'sex', label: 'Sex', icon: null, type: 'select', options: ['Male', 'Female', 'Other'] },
-  { key: 'blood_type', label: 'Blood Type', icon: Droplet, type: 'select', options: ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown'] },
-  { key: 'emergency_contact_name', label: 'Emergency Contact Name', icon: User, type: 'text' },
-  { key: 'emergency_contact_phone', label: 'Emergency Contact Phone', icon: Phone, type: 'tel' },
-  { key: 'emergency_contact_address', label: 'Emergency Contact Address', icon: MapPin, type: 'textarea' },
-  { key: 'civil_status', label: 'Civil Status', icon: null, type: 'select', options: ['Single', 'Married', 'Widowed', 'Separated', 'Divorced'] },
-  { key: 'citizenship', label: 'Citizenship', icon: null, type: 'text' },
 ];
 
 const SectionCard = ({ title, icon: Icon, children, className }) => (
@@ -45,39 +40,12 @@ export default function Profile() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '' });
   const [error, setError] = useState(null);
-  const [qrDataUrl, setQrDataUrl] = useState('');
-
-  useEffect(() => {
-    loadProfile();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!profile) return;
-    const qrValue = profile.qr_code;
-    if (!qrValue) return;
-    QRCode.toDataURL(qrValue, { width: 256, margin: 2, color: { dark: '#1e293b', light: '#ffffff' } })
-      .then(setQrDataUrl)
-      .catch(() => {});
-  }, [profile]);
-
-  const handleGenerateQR = async () => {
-    try {
-      const res = await generateMyQR();
-      if (res.data?.status === 'success') {
-        setProfile(prev => ({ ...prev, qr_code: res.data.data.qr_code }));
-        addToast('QR code generated successfully', 'success');
-      }
-    } catch (err) {
-      const message = err.response?.data?.message || 'Failed to generate QR code';
-      addToast(message, 'error');
-    }
-  };
 
   const loadProfile = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await getMyProfile();
+      const res = await getProfile();
       if (res.data?.status === 'success') {
         setProfile(res.data.data);
       }
@@ -89,6 +57,8 @@ export default function Profile() {
       setLoading(false);
     }
   };
+
+  useEffect(() => { loadProfile(); }, []);
 
   const handleInputChange = (key, value) => {
     setProfile(prev => ({ ...prev, [key]: value }));
@@ -104,14 +74,13 @@ export default function Profile() {
     });
 
     try {
-      const res = await updateMyProfile(updateData);
+      const res = await updateProfile(updateData);
       if (res.data?.status === 'success') {
-        setProfile(res.data.data);
         addToast('Profile updated successfully', 'success');
       } else {
         throw new Error(res.data?.message || 'Failed to update profile');
       }
-} catch (err) {
+    } catch (err) {
       const message = err.response?.data?.message || err.message || 'Failed to update profile';
       addToast(message, 'error');
     } finally {
@@ -124,14 +93,14 @@ export default function Profile() {
       addToast('Both current and new password are required', 'error');
       return;
     }
-    if (passwordData.new_password.length < 6) {
-      addToast('New password must be at least 6 characters', 'error');
+    if (passwordData.new_password.length < 8) {
+      addToast('New password must be at least 8 characters', 'error');
       return;
     }
 
     setChangingPassword(true);
     try {
-      const res = await updateProfile(passwordData);
+      const res = await changePassword(passwordData);
       if (res.data?.status === 'success') {
         addToast('Password changed successfully', 'success');
         setPasswordData({ current_password: '', new_password: '' });
@@ -181,10 +150,9 @@ export default function Profile() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Basic Info Section */}
         <SectionCard title="Personal Information" icon={User}>
           <div className="space-y-4">
-            {FORM_FIELDS.slice(0, 6).map(field => (
+            {FORM_FIELDS.slice(0, 5).map(field => (
               <div key={field.key}>
                 <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
                   {field.label}
@@ -235,10 +203,9 @@ export default function Profile() {
           </div>
         </SectionCard>
 
-        {/* Contact & Emergency Section */}
-        <SectionCard title="Contact & Emergency" icon={Phone}>
+        <SectionCard title="Employment Details" icon={Shield}>
           <div className="space-y-4">
-            {FORM_FIELDS.slice(6, 12).map(field => (
+            {FORM_FIELDS.slice(5).map(field => (
               <div key={field.key}>
                 <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
                   {field.label}
@@ -290,101 +257,55 @@ export default function Profile() {
         </SectionCard>
       </div>
 
-      {/* QR Code Section */}
-      <SectionCard title="My QR Code" icon={QrCode}>
-        <div className="flex flex-col sm:flex-row items-center gap-6">
-          <div className="shrink-0 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white p-3">
-            {qrDataUrl ? (
-              <img src={qrDataUrl} alt="Profile QR Code" className="w-48 h-48" />
-            ) : profile?.qr_code ? (
-              <div className="w-48 h-48 flex items-center justify-center bg-neutral-50 dark:bg-neutral-800">
-                <Loader2 className="h-8 w-8 animate-spin text-neutral-400" />
-              </div>
-            ) : (
-              <div className="w-48 h-48 flex items-center justify-center bg-neutral-50 dark:bg-neutral-800">
-                <QrCode className="h-16 w-16 text-neutral-300" />
-              </div>
-            )}
+      <SectionCard title="Change Password" icon={Lock}>
+        <div className="space-y-4 max-w-md">
+          <div>
+            <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
+              Current Password
+            </label>
+            <input
+              type="password"
+              value={passwordData.current_password}
+              onChange={e => setPasswordData(prev => ({ ...prev, current_password: e.target.value }))}
+              className={cn(
+                "w-full rounded-md border border-neutral-300 dark:border-neutral-600",
+                "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
+                "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              )}
+              placeholder="Enter current password"
+            />
           </div>
-          <div className="text-sm text-neutral-600 dark:text-neutral-400 space-y-2">
-            <p className="font-medium text-neutral-900 dark:text-neutral-100">Reservist Identification QR</p>
-            {profile?.qr_code ? (
-              <>
-                <p>This QR code can be scanned at events and trainings to mark your attendance.</p>
-                <p className="font-mono text-xs bg-neutral-100 dark:bg-neutral-800 rounded px-2 py-1 inline-block">
-                  {profile.qr_code}
-                </p>
-              </>
-            ) : (
-              <>
-                <p>You don't have a QR code yet. Generate one to check in at events and trainings.</p>
-                <button
-                  onClick={handleGenerateQR}
-                  className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm",
-                    "bg-blue-600 hover:bg-blue-700 text-white",
-                    "transition-colors duration-200 mt-2"
-                  )}
-                >
-                  <QrCode size={16} />
-                  Generate QR Code
-                </button>
-              </>
-            )}
+          <div>
+            <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
+              New Password
+            </label>
+            <input
+              type="password"
+              value={passwordData.new_password}
+              onChange={e => setPasswordData(prev => ({ ...prev, new_password: e.target.value }))}
+              className={cn(
+                "w-full rounded-md border border-neutral-300 dark:border-neutral-600",
+                "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
+                "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              )}
+              placeholder="Enter new password (min 8 characters)"
+            />
           </div>
+          <button
+            onClick={handlePasswordChange}
+            disabled={changingPassword}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm",
+              "bg-neutral-800 hover:bg-neutral-900 text-white",
+              "disabled:opacity-50 disabled:cursor-not-allowed",
+              "transition-colors duration-200"
+            )}
+          >
+            {changingPassword ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
+            Change Password
+          </button>
         </div>
       </SectionCard>
-
-      {/* Password Change Section */}
-       <SectionCard title="Change Password" icon={Lock}>
-         <div className="space-y-4 max-w-md">
-           <div>
-             <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
-               Current Password
-             </label>
-             <input
-               type="password"
-               value={passwordData.current_password}
-               onChange={e => setPasswordData(prev => ({ ...prev, current_password: e.target.value }))}
-               className={cn(
-                 "w-full rounded-md border border-neutral-300 dark:border-neutral-600",
-                 "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
-                 "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-               )}
-               placeholder="Enter current password"
-             />
-           </div>
-           <div>
-             <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
-               New Password
-             </label>
-             <input
-               type="password"
-               value={passwordData.new_password}
-               onChange={e => setPasswordData(prev => ({ ...prev, new_password: e.target.value }))}
-               className={cn(
-                 "w-full rounded-md border border-neutral-300 dark:border-neutral-600",
-                 "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
-                 "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-               )}
-               placeholder="Enter new password (min 6 characters)"
-             />
-           </div>
-           <button
-             onClick={handlePasswordChange}
-             disabled={changingPassword}
-             className={cn(
-               "flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-sm",
-               "bg-neutral-800 hover:bg-neutral-900 text-white",
-               "disabled:opacity-50 disabled:cursor-not-allowed",
-               "transition-colors duration-200"
-             )}
-           >
-             {changingPassword ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-             Change Password
-           </button>
-         </div>
-       </SectionCard>
-     </div>
-   );
- }
+    </div>
+  );
+}

@@ -4,6 +4,7 @@ build
 *.log
 .env
 .env.hostinger
+server/.env
 server/.env.hostinger
 .git
 .gitignore
@@ -12,3 +13,4 @@ server/.env.hostinger
 .DS_Store
 *.md
 !README.md
+server/uploads

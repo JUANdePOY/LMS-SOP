@@ -5,7 +5,6 @@ import {
 } from "recharts";
 import { Info, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getReadiness } from "@/services/api";
 
 function ChartCard({ title, icon: Icon, children, className }) {
   return (
@@ -49,26 +48,34 @@ function readinessColor(score) {
   return { bar: "#ef4444", text: "text-red-600 dark:text-red-400" };
 }
 
-export default function ReadinessScoreChart() {
-  const [byArsen, setByArsen] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function ReadinessScoreChart({ data }) {
+  const byArsen = data?.by_arsen || [];
+  const [loading, setLoading] = useState(!data);
 
   useEffect(() => {
-    const fetchReadiness = async () => {
+    if (data) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    (async () => {
       try {
-        const res = await getReadiness({ endpoint: 'arsens' });
-        if (res.data?.success) {
-          setByArsen(res.data.data || []);
+        const token = localStorage.getItem('token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch('/api/readiness/arsens', { headers });
+        const json = await res.json();
+        if (!cancelled && json.status === 'success' && json.data) {
+          setByArsen(json.data);
         }
       } catch (err) {
         console.error('Failed to load readiness data', err);
-        setByArsen([]);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    };
-    fetchReadiness();
-  }, []);
+    })();
+    return () => { cancelled = true; };
+  }, [data]);
 
   const composition = [
     { name: 'Training Participation', value: 40, color: '#6366f1' },

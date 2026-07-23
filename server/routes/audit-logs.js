@@ -105,8 +105,7 @@ router.get(
             a.action,
             a.entity_type,
             a.entity_id,
-            a.old_values,
-            a.new_values,
+            a.metadata,
             a.ip_address,
             a.user_agent,
             a.created_at,
@@ -123,13 +122,11 @@ router.get(
 
       const logs = rows.map((r) => ({
         ...r,
-        old_values: safeParseJson(r.old_values),
-        new_values: safeParseJson(r.new_values),
+        metadata: safeParseJson(r.metadata),
       }));
 
       return res.json({
-        success: true,
-        message: 'OK',
+        status: 'success',
         data: {
           logs,
           pagination: {
@@ -175,10 +172,13 @@ router.get(
       }
 
       const log = rows[0];
-      log.old_values = safeParseJson(log.old_values);
-      log.new_values = safeParseJson(log.new_values);
+      log.metadata = safeParseJson(log.metadata);
+      
 
-      return res.json({ success: true, message: 'OK', data: log });
+      return res.json({
+        status: 'success',
+        data: log,
+      });
     } catch (err) {
       console.error('Audit log detail error:', err);
       return res.status(500).json({ success: false, message: 'Failed to fetch audit log' });

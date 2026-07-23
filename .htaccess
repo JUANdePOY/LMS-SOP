@@ -1,0 +1,24 @@
+RewriteEngine On
+
+# Handle API requests - proxy to Node.js server
+RewriteCond %{HTTP:Upgrade} websocket [NC]
+RewriteCond %{HTTP:Connection} upgrade [NC]
+RewriteRule ^/?(.*)$ http://127.0.0.1:5000/$1 [P,L]
+
+RewriteCond %{REQUEST_URI} ^/api [NC]
+RewriteRule ^/?(.*)$ http://127.0.0.1:5000/$1 [P,L]
+
+# Serve static files from client/dist
+RewriteCond %{REQUEST_URI} !^/api [NC]
+RewriteCond %{REQUEST_URI} !\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|pdf|txt|map|json)$ [NC]
+RewriteCond %{DOCUMENT_ROOT}/client/dist/index.html -f
+RewriteRule ^/?(.*)$ /client/dist/index.html [L]
+
+# Security headers
+Header set X-Content-Type-Options "nosniff"
+Header set X-Frame-Options "SAMEORIGIN"
+Header set X-XSS-Protection "1; mode=block"
+Header set Referrer-Policy "strict-origin-when-cross-origin"
+
+# Disable directory listing
+Options -Indexes

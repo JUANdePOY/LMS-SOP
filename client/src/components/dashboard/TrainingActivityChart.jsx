@@ -6,8 +6,6 @@ import {
 import { Info, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
-
 function ChartCard({ title, icon: Icon, children, className }) {
   return (
     <div className={cn(
@@ -29,20 +27,22 @@ function ChartCard({ title, icon: Icon, children, className }) {
   );
 }
 
-
-
-export default function TrainingActivityChart() {
-  const [hierarchyData, setHierarchyData] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function TrainingActivityChart({ data }) {
+  const [hierarchyData, setHierarchyData] = useState(data || []);
+  const [loading, setLoading] = useState(!data);
   const [selectedArsen, setSelectedArsen] = useState("All");
 
-  // Fetch real training stats from backend (current year, by Arsen → Group → Squadron)
   useEffect(() => {
+    if (data) {
+      setHierarchyData(data || []);
+      setLoading(false);
+      return;
+    }
     const fetchStats = async () => {
       try {
         const token = localStorage.getItem('token');
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const res = await fetch(`${API_BASE}/trainings/stats`, { headers });
+        const res = await fetch('/api/trainings/stats', { headers });
         const json = await res.json();
         if (json.success) {
           setHierarchyData(json.data || []);
@@ -55,17 +55,14 @@ export default function TrainingActivityChart() {
       }
     };
     fetchStats();
-  }, []);
+  }, [data]);
 
-  // Unique Arsens for the filter
   const arsenOptions = ["All", ...new Set(hierarchyData.map(d => d.arsen_name))];
 
-  // Filter data by selected Arsen only
   const filteredData = hierarchyData.filter(row => {
     return selectedArsen === "All" || row.arsen_name === selectedArsen;
   });
 
-  // Bar chart: Trainings by Group within the selected Arsen (or all if "All")
   const groupedByGroup = filteredData.reduce((acc, row) => {
     if (!acc[row.group_name]) acc[row.group_name] = 0;
     acc[row.group_name] += row.trainings;
@@ -77,7 +74,6 @@ export default function TrainingActivityChart() {
     trainings,
   }));
 
-  // Top squadrons under the selected Arsen (across all its groups)
   const topSquadrons = [...filteredData]
     .sort((a, b) => b.trainings - a.trainings)
     .slice(0, 6);
@@ -86,9 +82,7 @@ export default function TrainingActivityChart() {
 
   return (
     <ChartCard>
-      {/* Custom header with title on left + filters on right */}
       <div className="flex items-center justify-between mb-4">
-        {/* Left: Title + Icon */}
         <div className="flex items-center gap-2">
           <Dumbbell size={15} className="text-indigo-500 dark:text-indigo-400" />
           <h3 className="text-[15px] font-semibold text-neutral-900 dark:text-neutral-100 tracking-tight">
@@ -97,7 +91,6 @@ export default function TrainingActivityChart() {
           <Info size={14} className="text-neutral-400 dark:text-neutral-500" />
         </div>
 
-        {/* Right: Arsen filter only */}
         <div className="flex items-center gap-2 text-[10px]">
           <select
             value={selectedArsen}
@@ -112,7 +105,6 @@ export default function TrainingActivityChart() {
       </div>
 
       <div className="flex flex-col xl:flex-row gap-5">
-        {/* Left: Horizontal Bar Chart - pushed further left */}
         <div className="xl:w-[50%]">
           <div className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3">
             Trainings by Group (This Year)
@@ -130,10 +122,10 @@ export default function TrainingActivityChart() {
                 margin={{ top: 5, right: 15, left: -40, bottom: 40 }}
               >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" className="dark:stroke-neutral-800" />
-                <XAxis dataKey="group" 
-                  type="category" 
-                  angle={-90} 
-                  textAnchor="end" 
+                <XAxis dataKey="group"
+                  type="category"
+                  angle={-90}
+                  textAnchor="end"
                   height={90}
                   interval={0}
                   tick={{ fontSize: 10 }} />
@@ -161,7 +153,6 @@ export default function TrainingActivityChart() {
           )}
         </div>
 
-        {/* Right: Top Squadrons Table */}
         <div className="xl:w-2/5">
           <div className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">
             Top Conducting Squadrons
