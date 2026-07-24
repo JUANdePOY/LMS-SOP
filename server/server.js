@@ -5,9 +5,7 @@ const fs = require('fs');
 const db = require('./config/database');
 const loginLimiter = require('./middleware/rateLimiter');
 
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
-}
+require('dotenv').config();
 
 console.log('LMS-SOP Server starting...');
 

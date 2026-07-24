@@ -1,6 +1,4 @@
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
-}
+require('dotenv').config();
 const mysql = require('mysql2');
 
 const dbConfig = {
@@ -51,7 +49,7 @@ const MIGRATIONS = [
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS position_title VARCHAR(255) DEFAULT NULL`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_id VARCHAR(100) DEFAULT NULL`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_number VARCHAR(50) DEFAULT NULL`,
-  `ALTER TABLE users ADD COLUMN IF NOT EXISTS employment_status ENUM('Regular','Probationary','Contractual','Resigned/Terminated','Retired','On Leave') DEFAULT 'Regular',`
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS employment_status ENUM('Regular','Probationary','Contractual','Resigned/Terminated','Retired','On Leave') DEFAULT 'Regular'`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS date_hired DATE DEFAULT NULL`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS birthdate DATE DEFAULT NULL`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT DEFAULT NULL`,
@@ -134,6 +132,7 @@ const MIGRATIONS = [
 async function runMigrations() {
   const promisePool = pool.promise();
   for (const sql of MIGRATIONS) {
+    if (!sql || !sql.trim()) continue;
     try {
       await promisePool.query(sql);
     } catch (err) {
@@ -145,9 +144,10 @@ async function runMigrations() {
         ignoreCodes.includes(err.code) ||
         ignoreCodes.includes(err.errno)
       ) {
-        // already exists or duplicate, skip
+        console.log('Migration skipped (already exists):', sql.split('\n')[0]);
       } else {
         console.error('Migration error:', err.message);
+        console.error('Offending SQL:', sql);
       }
     }
   }
@@ -170,10 +170,13 @@ pool.getConnection((err, connection) => {
   if (err) {
     console.error('Database connection failed:', err.message);
     if (process.env.DB_HOST && process.env.DB_HOST !== 'localhost') {
-      console.error('Remote MySQL connection failed. Ensure:');
-      console.error('  - Remote MySQL is enabled in Hostinger phpMyAdmin');
-      console.error('  - Your IP is whitelisted in Hostinger MySQL settings');
-      console.error('  - The database user has remote access permissions');
+      console.error('Remote MySQL connection failed. Your local IP must be whitelisted in Hostinger.');
+      console.error('Steps to fix:');
+      console.error('  1. Log in to Hostinger hPanel');
+      console.error('  2. Go to Databases → Remote MySQL');
+      console.error('  3. Add your current IP to the whitelist');
+      console.error('  4. Ensure the MySQL user has permissions on the database');
+      console.error('Current local IP detected from error message above.');
     }
     console.error('Server will start but DB-dependent features will fail');
   } else {

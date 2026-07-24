@@ -92,9 +92,18 @@ npm run hostinger:start
 ## Troubleshooting
 
 ### Database connection fails
-- Verify the remote MySQL host is correct (check Hostinger's phpMyAdmin for the remote MySQL host)
-- Ensure your IP is whitelisted in Hostinger's MySQL remote access settings
-- Check that the database user has permission to connect from your server's IP
+- Error: `Access denied for user 'u607968802_sop'@'your-ip' (using password: YES)`
+- This means your local IP is **not whitelisted** in Hostinger Remote MySQL settings
+- **How to fix:**
+  1. Log in to Hostinger hPanel
+  2. Go to **Databases** → **Remote MySQL**
+  3. Add your current IP address to the whitelist
+  4. The server error message will show your current IP (e.g., `2001:4455:1cd:df00:81f0:f675:b005:2a0a`)
+  5. Add both IPv4 and IPv6 versions if needed
+  6. Also ensure the MySQL user `u607968802_sop` has full permissions on database `u607968802_lms_sop`
+- Verify the remote MySQL host is correct: `srv2101.hstgr.io`
+- Verify the database name is correct: `u607968802_lms_sop`
+- Verify the username is correct: `u607968802_sop`
 
 ### API routes return 404
 - Ensure the `.htaccess` file is in the document root

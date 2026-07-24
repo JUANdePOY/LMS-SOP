@@ -4,7 +4,7 @@
 
 This document describes the complete database schema for the LMS-SOP system. The database uses MySQL and is hosted remotely on Hostinger (phpMyAdmin).
 
-## Database: `lms_sop`
+## Database: `u607968802_lms_sop`
 
 ---
 
