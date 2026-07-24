@@ -553,7 +553,6 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
           onCancel={() => { setShowDeleteConfirm(false); setDeletingUser(null); }}
         />
       )}
-      )}
     </div>
   );
 }

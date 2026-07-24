@@ -64,4 +64,8 @@ export const deleteRole = (id) => api.delete(`/roles/${id}`);
 export const getPermissions = () => api.get('/roles/permissions');
 export const updateRolePermissions = (roleName, permission_names) => api.put(`/roles/permissions/${roleName}`, { permission_names });
 
+export const getSettings = () => api.get('/settings');
+export const createSetting = (data) => api.post('/settings', data);
+export const updateSetting = (key, data) => api.put(`/settings/${key}`, data);
+
 export default api;
