@@ -21,7 +21,10 @@
     "hostinger:start": "node server/server.js",
     "hostinger:setup": "node -e \"const fs=require('fs');const src='.env.hostinger';const dst='.env';if(fs.existsSync(src)){fs.copyFileSync(src,dst);console.log('Copied .env.hostinger to .env');}const src2='server/.env.hostinger';const dst2='server/.env';if(fs.existsSync(src2)){fs.copyFileSync(src2,dst2);console.log('Copied server/.env.hostinger to server/.env');}\"",
     "hostinger:deploy": "npm run hostinger:setup && npm run hostinger:build && npm run hostinger:start",
-    "hostinger:seed": "cd server && node seed.js"
+    "hostinger:seed": "cd server && node seed.js",
+    "db:schema": "mysql -u root -p u607968802_lms_sop < sql/schema.sql",
+    "db:seed": "mysql -u root -p u607968802_lms_sop < sql/seed.sql",
+    "db:reset": "npm run db:schema && npm run db:seed"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

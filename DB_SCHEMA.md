@@ -199,27 +199,6 @@ User notification system.
 
 ---
 
-## Legacy PAFR Tables (Preserved for Backward Compatibility)
-
-The following tables from the original PAFR system are preserved:
-
-- `reservists` — Reservist records with status columns
-- `announcements` — System announcements
-- `arsens` — Arsenal scope data
-- `groups` — Group scope data
-- `squadron` — Squadron scope data
-- `squadron_lookup` — Squadron lookup table
-- `reservist_assignments` — Reservist assignment records
-- `trainings` — Training records
-- `activities` — Training activity records
-- `attendance` — Attendance records
-- `external_trainings` — External training records
-- `external_training_attachments` — External training attachments
-- `training_attachments` — Training attachments
-- `reports` — Report records
-
----
-
 ## Role Hierarchy
 
 ```

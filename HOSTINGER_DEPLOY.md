@@ -8,11 +8,11 @@
 ## Database Setup (phpMyAdmin)
 
 1. Log in to phpMyAdmin (remote MySQL)
-2. Create a new database named `lms_sop`
+2. Create a new database named `u607968802_lms_sop`
 3. Create a MySQL user with access to the database
 4. Note the connection details:
-   - Host: `srv1980.hstgr.io` (or your Hostinger remote MySQL host)
-   - User: `u591572634_reservist`
+   - Host: `srv2101.hstgr.io` (or your Hostinger remote MySQL host)
+   - User: `u607968802_sop`
    - Password: your database password
    - Port: `3306`
 
@@ -25,10 +25,10 @@
 
 2. Or manually create `.env` and `server/.env` with your Hostinger credentials:
    ```
-   DB_HOST=srv1980.hstgr.io
-   DB_USER=u591572634_reservist
-   DB_PASSWORD=your_password
-   DB_NAME=lms_sop
+DB_HOST=srv2101.hstgr.io
+DB_USER=u607968802_sop
+DB_PASSWORD=your_password
+DB_NAME=u607968802_lms_sop
    DB_PORT=3306
    JWT_SECRET=your_random_secret
    CORS_ORIGINS=https://yourdomain.com
