@@ -23,6 +23,8 @@ router.use((req, res, next) => {
   next();
 });
 
+const LOGIN_TIMEOUT_MS = 12000;
+
 router.post('/login', [
   body('email')
     .isEmail()
@@ -33,16 +35,31 @@ router.post('/login', [
     .trim()
     .withMessage('Password is required')
 ], async (req, res) => {
+  const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  console.log(`[login:${requestId}] start`, {
+    method: req.method,
+    path: req.path,
+    contentType: req.get('content-type') || null,
+    body: LOGIN_BODY_SAMPLE(req.body),
+  });
+
+  const loginTimer = setTimeout(() => {
+    console.error(`[login:${requestId}] timeout after ${LOGIN_TIMEOUT_MS}ms`);
+    if (!res.headersSent) {
+      res.status(503).json({
+        status: 'error',
+        message: 'Login timed out. Please try again.',
+        code: 'LOGIN_TIMEOUT',
+        retry: true,
+      });
+    }
+  }, LOGIN_TIMEOUT_MS);
+
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.warn('Login validation failed', {
-        method: req.method,
-        path: req.path,
-        contentType: req.get('content-type'),
-        body: LOGIN_BODY_SAMPLE(req.body),
-        errors: errors.array()
-      });
+      clearTimeout(loginTimer);
+      console.warn(`[login:${requestId}] validation failed`, errors.array());
       return res.status(400).json({
         status: 'error',
         message: 'Validation failed',
@@ -53,13 +70,34 @@ router.post('/login', [
 
     const { email, password } = req.body;
 
-    const [results] = await db.query(
-      'SELECT u.*, d.name AS department_name FROM users u LEFT JOIN departments d ON u.department_id = d.id WHERE u.email = ?',
-      [email]
-    );
+    let results;
+    try {
+      [results] = await db.query(
+        'SELECT u.*, d.name AS department_name FROM users u LEFT JOIN departments d ON u.department_id = d.id WHERE u.email = ?',
+        [email]
+      );
+    } catch (dbErr) {
+      clearTimeout(loginTimer);
+      const dbErrCode = dbErr?.code || dbErr?.errno || 'DB_ERROR';
+      console.error('Login DB query failed:', {
+        email,
+        dbHost: process.env.DB_HOST,
+        dbName: process.env.DB_NAME,
+        code: dbErrCode,
+        message: dbErr?.message,
+        stack: dbErr?.stack,
+      });
+      return res.status(503).json({
+        status: 'error',
+        message: 'Database temporarily unavailable. Please try again.',
+        code: 'DB_UNAVAILABLE',
+        retry: true,
+      });
+    }
 
     if (!results || results.length === 0) {
-      console.warn('Login failed: user not found', { email, dbHost: process.env.DB_HOST, dbName: process.env.DB_NAME });
+      clearTimeout(loginTimer);
+      console.warn(`[login:${requestId}] user not found`, { email, dbHost: process.env.DB_HOST, dbName: process.env.DB_NAME });
       return res.status(401).json({
         status: 'error',
         message: 'Invalid email or password',
@@ -70,7 +108,8 @@ router.post('/login', [
     const user = results[0];
 
     if (!user.is_active) {
-      console.warn('Login failed: deactivated account', { email, userId: user.id });
+      clearTimeout(loginTimer);
+      console.warn(`[login:${requestId}] deactivated account`, { email, userId: user.id });
       return res.status(403).json({
         status: 'error',
         message: 'User account is deactivated',
@@ -83,7 +122,8 @@ router.post('/login', [
     const hashSelfTest = await bcrypt.compare('password123', rawHash);
 
     if (!isPasswordValid) {
-      console.warn('Login failed: invalid password', {
+      clearTimeout(loginTimer);
+      console.warn(`[login:${requestId}] invalid password`, {
         email,
         userId: user.id,
         receivedPassword: JSON.stringify(password),
@@ -120,6 +160,8 @@ router.post('/login', [
       new_values: { email: user.email, role: user.role }
     });
 
+    console.log(`[login:${requestId}] success`, { email, userId: user.id, role: user.role });
+    clearTimeout(loginTimer);
     return res.status(200).json({
       status: 'success',
       message: 'Login successful',
@@ -138,7 +180,30 @@ router.post('/login', [
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    clearTimeout(loginTimer);
+    const errCode = error?.code || error?.errno || null;
+    const errMessage = error?.message || String(error);
+    console.error(`[login:${requestId}] server error`, {
+      method: req.method,
+      path: req.path,
+      contentType: req.get('content-type') || null,
+      body: LOGIN_BODY_SAMPLE(req.body),
+      error: {
+        code: errCode,
+        message: errMessage,
+        stack: error?.stack,
+      },
+      dbHost: process.env.DB_HOST,
+      dbName: process.env.DB_NAME,
+    });
+    if (errCode === 'ECONNRESET' || errCode === 'PROTOCOL_CONNECTION_LOST') {
+      return res.status(503).json({
+        status: 'error',
+        message: 'Database temporarily unavailable. Please try again.',
+        code: 'DB_UNAVAILABLE',
+        retry: true,
+      });
+    }
     res.status(500).json({
       status: 'error',
       message: 'Server error',
