@@ -41,7 +41,7 @@ const MENU_ITEMS = [
       { name: "Course Library", path: "/course-library", icon: Library },
       { name: "Assessments", path: "/assessments", icon: ClipboardCheck, sub: ["Leaderboard", "Report"] },
       { name: "Certificates", path: "/certificates", icon: Award },
-      { name: "Users & Departments", path: "/users", icon: Users },
+      { name: "Administration", path: "/users", icon: Users },
     ],
   },
   {

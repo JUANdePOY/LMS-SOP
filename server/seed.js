@@ -111,7 +111,8 @@ async function seed() {
   for (const user of users) {
     await db.query(
       `INSERT INTO users (full_name, email, password_hash, role, department_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+       ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), role = VALUES(role), department_id = VALUES(department_id), position_title = VALUES(position_title), employee_id = VALUES(employee_id), contact_number = VALUES(contact_number), employment_status = VALUES(employment_status), date_hired = VALUES(date_hired), birthdate = VALUES(birthdate), address = VALUES(address), is_active = TRUE`,
       [user.full_name, user.email, hashedPassword, user.role, user.department_id, user.position_title, user.employee_id, user.contact_number, user.employment_status, user.date_hired, user.birthdate, user.address]
     );
   }

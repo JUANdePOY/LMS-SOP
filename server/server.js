@@ -45,6 +45,7 @@ const departmentsRoutes = require('./routes/departments');
 const dashboardRoutes = require('./routes/dashboard');
 const auditLogsRoutes = require('./routes/audit-logs');
 const settingsRoutes = require('./routes/settings');
+const rolesRoutes = require('./routes/roles');
 
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 console.log('Client dist path:', clientDist);
@@ -62,6 +63,7 @@ app.use('/api/departments', departmentsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audit-logs', auditLogsRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/roles', rolesRoutes);
 
 app.get('/api/health', async (req, res) => {
   const result = { status: 'OK', timestamp: new Date().toISOString(), env: process.env.NODE_ENV };

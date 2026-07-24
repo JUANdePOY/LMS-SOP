@@ -10,7 +10,8 @@ const Dashboard     = lazy(() => import("@/pages/Dashboard"));
 const Profile       = lazy(() => import("@/pages/Profile"));
 const Login         = lazy(() => import("@/pages/Login"));
 const Users         = lazy(() => import("@/pages/Users"));
-const Departments   = lazy(() => import("@/pages/Departments"));
+const Settings      = lazy(() => import("@/pages/Settings"));
+const AuditLogs     = lazy(() => import("@/pages/AuditLogs"));
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
@@ -67,8 +68,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: LMSProtectedWrapper(Dashboard), handle: { title: "Dashboard" } },
       { path: "profile", element: LMSProtectedWrapper(Profile), handle: { title: "Profile" } },
-      { path: "users", element: LMSProtectedWrapper(Users), handle: { title: "Users" } },
-      { path: "departments", element: LMSProtectedWrapper(Departments), handle: { title: "Departments" } },
+      { path: "users", element: LMSProtectedWrapper(Users), handle: { title: "Administration" } },
       { path: "settings", element: SuperAdminProtectedWrapper(Settings), handle: { title: "Settings" } },
       { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
     ],

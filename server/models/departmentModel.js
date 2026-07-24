@@ -8,7 +8,7 @@ async function findAll(filters = {}) {
 
   let sql = `
     SELECT d.*, 
-           CONCAT(m.first_name, ' ', m.last_name) AS head_name,
+           m.full_name AS head_name,
            (SELECT COUNT(*) FROM users u WHERE u.department_id = d.id AND u.is_active = TRUE) AS user_count
     FROM departments d
     LEFT JOIN users m ON d.head_user_id = m.id
@@ -30,7 +30,7 @@ async function findAll(filters = {}) {
 
   const [rows] = await db.query(sql, params);
 
-  const countSql = `SELECT COUNT(*) AS total FROM departments d WHERE 1 = 1`;
+  let countSql = `SELECT COUNT(*) AS total FROM departments d WHERE 1 = 1`;
   const countParams = [];
   if (search) {
     countSql += ' AND (d.name LIKE ? OR d.code LIKE ?)';
@@ -53,7 +53,7 @@ async function findAll(filters = {}) {
 
 async function findById(id) {
   const [rows] = await db.query(
-    `SELECT d.*, CONCAT(m.first_name, ' ', m.last_name) AS head_name
+    `SELECT d.*, m.full_name AS head_name
      FROM departments d
      LEFT JOIN users m ON d.head_user_id = m.id
      WHERE d.id = ?`,
@@ -109,7 +109,7 @@ async function remove(id) {
 
 async function getHierarchy() {
   const [rows] = await db.query(
-    `SELECT d.*, CONCAT(m.first_name, ' ', m.last_name) AS head_name,
+    `SELECT d.*, m.full_name AS head_name,
             (SELECT COUNT(*) FROM users u WHERE u.department_id = d.id AND u.is_active = TRUE) AS user_count
      FROM departments d
      LEFT JOIN users m ON d.head_user_id = m.id
@@ -126,7 +126,7 @@ async function getHierarchy() {
 
 async function getChildren(parentId) {
   const [rows] = await db.query(
-    `SELECT d.*, CONCAT(m.first_name, ' ', m.last_name) AS head_name,
+    `SELECT d.*, m.full_name AS head_name,
             (SELECT COUNT(*) FROM users u WHERE u.department_id = d.id AND u.is_active = TRUE) AS user_count
      FROM departments d
      LEFT JOIN users m ON d.head_user_id = m.id

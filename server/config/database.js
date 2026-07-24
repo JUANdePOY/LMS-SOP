@@ -13,7 +13,9 @@ const dbConfig = {
   connectTimeout: 30000,
   timezone: '+00:00',
   multipleStatements: true,
-  charset: 'utf8mb4'
+  charset: 'utf8mb4',
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 60000
 };
 
 const pool = mysql.createPool(dbConfig);

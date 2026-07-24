@@ -19,7 +19,8 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
-    if (status === 401 && !error.config?.skipAuthRedirect) {
+    const code = error.response?.data?.code;
+    if ((status === 401 || status === 403) && code && ['NO_TOKEN', 'TOKEN_EXPIRED', 'INVALID_TOKEN', 'ACCOUNT_DEACTIVATED', 'USER_NOT_FOUND'].includes(code) && !error.config?.skipAuthRedirect) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
@@ -54,5 +55,13 @@ export const createDepartment = (data) => api.post('/departments', data);
 export const updateDepartment = (id, data) => api.put(`/departments/${id}`, data);
 export const deleteDepartment = (id) => api.delete(`/departments/${id}`);
 export const getDepartmentUsers = (id) => api.get(`/departments/${id}/users`);
+
+export const getRoles = (params = {}) => api.get('/roles', { params });
+export const getRole = (id) => api.get(`/roles/${id}`);
+export const createRole = (data) => api.post('/roles', data);
+export const updateRole = (id, data) => api.put(`/roles/${id}`, data);
+export const deleteRole = (id) => api.delete(`/roles/${id}`);
+export const getPermissions = () => api.get('/roles/permissions');
+export const updateRolePermissions = (roleName, permission_names) => api.put(`/roles/permissions/${roleName}`, { permission_names });
 
 export default api;

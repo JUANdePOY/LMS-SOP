@@ -1,4 +1,5 @@
 const express = require('express');
+const bcrypt = require('bcrypt');
 const { body, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { comparePassword, generateToken, hashPassword } = require('../app/auth');
@@ -36,6 +37,7 @@ router.post('/login', [
     );
 
     if (!results || results.length === 0) {
+      console.warn('Login failed: user not found', { email, dbHost: process.env.DB_HOST, dbName: process.env.DB_NAME });
       return res.status(401).json({
         status: 'error',
         message: 'Invalid email or password',
@@ -46,6 +48,7 @@ router.post('/login', [
     const user = results[0];
 
     if (!user.is_active) {
+      console.warn('Login failed: deactivated account', { email, userId: user.id });
       return res.status(403).json({
         status: 'error',
         message: 'User account is deactivated',
@@ -53,9 +56,22 @@ router.post('/login', [
       });
     }
 
-    const isPasswordValid = await comparePassword(password, user.password_hash);
+    const rawHash = String(user.password_hash);
+    const isPasswordValid = await comparePassword(password, rawHash);
+    const hashSelfTest = await bcrypt.compare('password123', rawHash);
 
     if (!isPasswordValid) {
+      console.warn('Login failed: invalid password', {
+        email,
+        userId: user.id,
+        receivedPassword: JSON.stringify(password),
+        receivedPasswordLength: password?.length,
+        hasHash: !!rawHash,
+        hashLength: rawHash.length,
+        hashPrefix: rawHash.slice(0, 30),
+        hashSelfTestMatch: hashSelfTest,
+        hashFull: rawHash
+      });
       return res.status(401).json({
         status: 'error',
         message: 'Invalid email or password',

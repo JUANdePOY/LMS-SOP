@@ -17,12 +17,19 @@ export const ToastProvider = ({ children }) => {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
+  const toast = {
+    success: (message, duration) => addToast(message, 'success', duration),
+    error: (message, duration) => addToast(message, 'error', duration),
+    warning: (message, duration) => addToast(message, 'warning', duration),
+    info: (message, duration) => addToast(message, 'info', duration),
+  };
+
   return (
-    <ToastContext.Provider value={{ addToast, removeToast }}>
+    <ToastContext.Provider value={{ toast, addToast, removeToast }}>
       {children}
       <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none">
-        {toasts.map(toast => (
-          <ToastItem key={toast.id} {...toast} onClose={removeToast} />
+        {toasts.map(toastItem => (
+          <ToastItem key={toastItem.id} {...toastItem} onClose={removeToast} />
         ))}
       </div>
     </ToastContext.Provider>

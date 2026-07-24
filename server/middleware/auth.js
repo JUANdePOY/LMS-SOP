@@ -54,18 +54,18 @@ async function authenticateToken(req, res, next) {
 
     next();
   } catch (error) {
-    if (error.name === 'TokenExpiredError') {
+    if (error.name === 'TokenExpiredError' || error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         status: 'error',
-        message: 'Token expired',
-        code: 'TOKEN_EXPIRED'
+        message: 'Invalid or expired token',
+        code: 'INVALID_TOKEN'
       });
     }
 
-    return res.status(403).json({
+    return res.status(401).json({
       status: 'error',
-      message: 'Invalid token',
-      code: 'INVALID_TOKEN'
+      message: 'Token verification failed',
+      code: 'TOKEN_ERROR'
     });
   }
 }

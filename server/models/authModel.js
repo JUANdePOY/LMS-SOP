@@ -74,7 +74,7 @@ async function listUsers(filters = {}) {
 
   let sql = `
     SELECT u.*, d.name AS department_name,
-           CONCAT(u.first_name, ' ', u.last_name) AS display_name
+           u.full_name AS display_name
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
     WHERE 1 = 1
