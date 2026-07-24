@@ -8,6 +8,13 @@ const { logAudit } = require('../utils/auditLogger');
 
 const router = express.Router();
 
+const LOGIN_BODY_SAMPLE = (data) => {
+  if (!data || typeof data !== 'object') return JSON.stringify(data);
+  const out = { ...data };
+  if (out.password) out.password = '***';
+  return JSON.stringify(out);
+};
+
 router.post('/login', [
   body('email')
     .isEmail()
@@ -21,6 +28,13 @@ router.post('/login', [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.warn('Login validation failed', {
+        method: req.method,
+        path: req.path,
+        contentType: req.get('content-type'),
+        body: LOGIN_BODY_SAMPLE(req.body),
+        errors: errors.array()
+      });
       return res.status(400).json({
         status: 'error',
         message: 'Validation failed',

@@ -1,5 +1,7 @@
 require('dotenv').config();
 const mysql = require('mysql2');
+const fs = require('fs');
+const path = require('path');
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
@@ -8,17 +10,130 @@ const dbConfig = {
   database: process.env.DB_NAME || 'pafr',
   port: parseInt(process.env.DB_PORT, 10) || 3306,
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 3,
   queueLimit: 0,
   connectTimeout: 30000,
   timezone: '+00:00',
   multipleStatements: true,
   charset: 'utf8mb4',
   enableKeepAlive: true,
-  keepAliveInitialDelay: 60000
+  keepAliveInitialDelay: 10000
 };
 
-const pool = mysql.createPool(dbConfig);
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 800;
+
+async function withRetry(fn, label = 'query') {
+  let lastErr;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastErr = err;
+      const msg = (err && err.message) ? err.message : String(err);
+      const transient = msg.includes('ECONNRESET') || msg.includes('PROTOCOL_CONNECTION_LOST') || msg.includes('ENOTFOUND') || msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED');
+      if (!transient || attempt === MAX_RETRIES) {
+        throw err;
+      }
+      console.warn(`MySQL ${label} transient error (attempt ${attempt}/${MAX_RETRIES}): ${msg}`);
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY * attempt));
+    }
+  }
+  throw lastErr;
+}
+
+let pool = null;
+let dbInstance = null;
+let initPromise = null;
+
+function patchPoolMethods(target, source) {
+  for (const method of ['query', 'getConnection', 'execute']) {
+    if (typeof source[method] === 'function') {
+      const original = source[method].bind(source);
+      target[method] = function (...args) {
+        const cb = typeof args[args.length - 1] === 'function' ? args[args.length - 1] : null;
+        const wrappedArgs = cb ? args.slice(0, -1) : args;
+        const run = async () => {
+          if (cb) {
+            return new Promise((resolve, reject) => {
+              original(...wrappedArgs, (err, ...rest) => {
+                if (err) return reject(err);
+                resolve(...rest);
+              });
+            });
+          }
+          return original(...wrappedArgs);
+        };
+        if (cb) {
+          withRetry(() => run()).then(
+            (result) => cb(null, result),
+            (err) => cb(err)
+          );
+        } else {
+          return withRetry(() => run());
+        }
+      };
+    }
+  }
+}
+
+function getPool() {
+  if (dbInstance) return dbInstance;
+  if (!pool) {
+    pool = mysql.createPool(dbConfig);
+    const rawPromise = pool.promise();
+
+    pool.on('error', (err) => {
+      const msg = (err && err.message) ? err.message : String(err);
+      if (msg.includes('ECONNRESET') || msg.includes('PROTOCOL_CONNECTION_LOST')) return;
+      console.error('MySQL pool error:', msg);
+    });
+
+    pool.on('connection', (connection) => {
+      connection.on('error', (err) => {
+        const msg = (err && err.message) ? err.message : String(err);
+        if (msg.includes('ECONNRESET') || msg.includes('PROTOCOL_CONNECTION_LOST')) return;
+        console.error('MySQL connection error:', msg);
+      });
+      connection.on('close', () => {
+        console.log('MySQL connection closed');
+      });
+    });
+
+    patchPoolMethods(rawPromise, pool.promise());
+    patchPoolMethods(rawPromise, rawPromise);
+
+    dbInstance = rawPromise;
+    dbInstance.getConnection = () => pool.promise().getConnection();
+    dbInstance.rawPool = pool;
+  }
+  return dbInstance;
+}
+
+function ensureStartupLock() {
+  try {
+    const lockDir = path.join(__dirname, '..', '.tmp');
+    if (!fs.existsSync(lockDir)) {
+      fs.mkdirSync(lockDir, { recursive: true });
+    }
+    const lockFile = path.join(lockDir, 'db-init.lock');
+    if (fs.existsSync(lockFile)) {
+      const pid = parseInt(fs.readFileSync(lockFile, 'utf8'), 10);
+      try {
+        process.kill(pid, 0);
+        console.warn(`Another Node process (pid ${pid}) appears to already be running. Exiting duplicate instance.`);
+        setTimeout(() => process.exit(0), 100);
+        return false;
+      } catch {
+        fs.unlinkSync(lockFile);
+      }
+    }
+    fs.writeFileSync(lockFile, String(process.pid));
+    return true;
+  } catch {
+    return true;
+  }
+}
 
 const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS departments (
@@ -132,11 +247,11 @@ const MIGRATIONS = [
 ];
 
 async function runMigrations() {
-  const promisePool = pool.promise();
+  const db = getPool();
   for (const sql of MIGRATIONS) {
     if (!sql || !sql.trim()) continue;
     try {
-      await promisePool.query(sql);
+      await db.query(sql);
     } catch (err) {
       const ignoreCodes = [
         'ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR',
@@ -155,43 +270,46 @@ async function runMigrations() {
   }
 }
 
-pool.on('error', (err) => {
-  console.error('MySQL pool error:', err.message);
-});
-
-pool.on('connection', (connection) => {
-  connection.on('error', (err) => {
-    console.error('MySQL connection error:', err.message);
-  });
-  connection.on('close', () => {
-    console.log('MySQL connection closed');
-  });
-});
-
-pool.getConnection((err, connection) => {
-  if (err) {
-    console.error('Database connection failed:', err.message);
-    if (process.env.DB_HOST && process.env.DB_HOST !== 'localhost') {
-      console.error('Remote MySQL connection failed. Your local IP must be whitelisted in Hostinger.');
-      console.error('Steps to fix:');
-      console.error('  1. Log in to Hostinger hPanel');
-      console.error('  2. Go to Databases → Remote MySQL');
-      console.error('  3. Add your current IP to the whitelist');
-      console.error('  4. Ensure the MySQL user has permissions on the database');
-      console.error('Current local IP detected from error message above.');
+async function initDatabase() {
+  if (initPromise) return initPromise;
+  initPromise = (async () => {
+    const shouldInit = ensureStartupLock();
+    if (!shouldInit) {
+      console.warn('Skipping duplicate DB init. Server will continue with existing pool.');
+      return;
     }
-    console.error('Server will start but DB-dependent features will fail');
-  } else {
-    console.log('Database connected successfully');
-    connection.release();
-  }
-  runMigrations();
-});
+    const db = getPool();
+    try {
+      await db.query('SELECT 1 as test');
+      console.log('Database connected successfully');
+    } catch (err) {
+      console.error('Database connection failed:', err.message);
+      if (process.env.DB_HOST && process.env.DB_HOST !== 'localhost') {
+        console.error('Remote MySQL connection failed. Your local IP must be whitelisted in Hostinger.');
+        console.error('Steps to fix:');
+        console.error('  1. Log in to Hostinger hPanel');
+        console.error('  2. Go to Databases → Remote MySQL');
+        console.error('  3. Add your current IP to the whitelist');
+        console.error('  4. Ensure the MySQL user has permissions on the database');
+      }
+      console.error('Server will start but DB-dependent features will fail');
+    }
+    await runMigrations();
+  })();
+  return initPromise;
+}
 
-const db = pool.promise();
+const db = getPool();
 
-db.getConnection = () => pool.promise().getConnection();
+db.getConnection = () => {
+  const p = getPool();
+  return p.getConnection();
+};
 
 db.rawPool = pool;
+
+initDatabase().catch((err) => {
+  console.error('Database init error:', err);
+});
 
 module.exports = db;

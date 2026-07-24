@@ -47,6 +47,19 @@ const auditLogsRoutes = require('./routes/audit-logs');
 const settingsRoutes = require('./routes/settings');
 const rolesRoutes = require('./routes/roles');
 
+const loginDebug = process.env.LOGIN_DEBUG === 'true';
+if (loginDebug) {
+  app.use('/api/auth', (req, res, next) => {
+    console.log('[auth-debug]', req.method, req.path, {
+      origin: req.get('origin'),
+      contentType: req.get('content-type'),
+      authorization: req.get('authorization') ? 'Bearer ***' : null,
+      bodySample: req.body && typeof req.body === 'object' ? { ...req.body, password: req.body?.password ? '***' : req.body?.password } : req.body,
+    });
+    next();
+  });
+}
+
 const clientDist = path.join(__dirname, '..', 'client', 'dist');
 console.log('Client dist path:', clientDist);
 console.log('Client dist exists:', fs.existsSync(clientDist));
