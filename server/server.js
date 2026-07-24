@@ -90,6 +90,10 @@ app.get('/api/health', async (req, res) => {
   res.json(result);
 });
 
+app.get('/api/ping', (req, res) => {
+  res.json({ status: 'pong', timestamp: new Date().toISOString(), uptime: process.uptime() });
+});
+
 app.get('/api/debug', (req, res) => {
   res.json({
     nodeEnv: process.env.NODE_ENV,
