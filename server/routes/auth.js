@@ -15,6 +15,14 @@ const LOGIN_BODY_SAMPLE = (data) => {
   return JSON.stringify(out);
 };
 
+router.use((req, res, next) => {
+  console.log('[auth-request]', req.method, req.path, {
+    contentType: req.get('content-type') || null,
+    body: LOGIN_BODY_SAMPLE(req.body),
+  });
+  next();
+});
+
 router.post('/login', [
   body('email')
     .isEmail()
