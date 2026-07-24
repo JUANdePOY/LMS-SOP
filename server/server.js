@@ -132,10 +132,20 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`LMS-SOP Server running on port ${PORT}`);
   console.log(`Database: ${process.env.DB_HOST}/${process.env.DB_NAME}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Port ${PORT} is already in use. Another instance may already be running.`);
+    console.error('If you see multiple "LMS-SOP Server starting..." lines, stop the duplicate process.');
+    setTimeout(() => process.exit(0), 100);
+  } else {
+    console.error('Server error:', err);
+  }
 });
 
 module.exports = app;

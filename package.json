@@ -15,7 +15,7 @@
     "build:client": "cd client && npm install --no-audit --no-fund && npm run build",
     "build:server": "cd server && npm install",
     "build": "cd client && npm install --no-audit --no-fund && npm run build && cd ../server && npm install",
-    "start": "cd server && npm start",
+    "start": "node server/server.js",
     "seed": "cd server && node seed.js",
     "hostinger:build": "cd client && npm install --no-audit --no-fund && npm run build:hostinger",
     "hostinger:start": "node server/server.js",
