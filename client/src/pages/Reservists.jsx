@@ -13,7 +13,7 @@ import ReservistDetailPanel from "@/components/reservists/ReservistDetailPanel";
 import SearchAndFilters, { DEFAULT_FILTERS } from "@/components/reservists/SearchAndFilters";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/Toast";
-import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const EMPTY_FORM = {
   id: '', userId: '', assignmentId: '',
