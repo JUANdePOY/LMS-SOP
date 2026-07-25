@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   FileText,
@@ -8,7 +8,6 @@ import {
   ClipboardCheck,
   Award,
   Users,
-  Building2,
   MessageSquare,
   Megaphone,
   Calendar,
@@ -20,7 +19,7 @@ import {
   LogOut,
   User,
   ChevronDown,
-  ChevronRight,
+  PanelLeftClose,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
@@ -78,10 +77,16 @@ const MENU_ITEMS = [
   },
 ];
 
+const SIDEBAR_WIDTH = {
+  expanded: "w-[260px]",
+  collapsed: "w-[72px]",
+};
+
 export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   const [expandedGroups, setExpandedGroups] = useState({});
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const location = useLocation();
 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -105,8 +110,8 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   };
 
   const isActive = (path) => {
-    if (path === '/') return window.location.pathname === '/';
-    return window.location.pathname.startsWith(path);
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
   };
 
   return (
@@ -114,9 +119,14 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
       className={cn(
         "fixed inset-y-0 left-0 z-50 flex flex-col",
         "transition-all duration-200 ease-out",
-        collapsed ? "w-[64px]" : "w-[260px]",
+        "bg-white/95 dark:bg-neutral-900/95",
+        "backdrop-blur-md",
+        "border-r border-[var(--border-sidebar)]",
+        SIDEBAR_WIDTH.expanded,
         "max-lg:-translate-x-full",
-        mobileOpen && "translate-x-0"
+        mobileOpen && "translate-x-0",
+        collapsed && SIDEBAR_WIDTH.collapsed,
+        "shadow-lg lg:shadow-none"
       )}
     >
       {/* Brand */}
@@ -135,7 +145,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
             collapsed && "justify-center"
           )}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600">
             <LayoutDashboard size={18} className="text-white" />
           </div>
           {!collapsed && (
@@ -154,25 +164,25 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
           <button
             onClick={() => {}}
             aria-label="Collapse sidebar"
-            className="hidden lg:flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:text-neutral-600 transition-colors"
+            className="hidden lg:flex h-6 w-6 shrink-0 items-center justify-center rounded text-neutral-400 hover:text-neutral-600 transition-colors"
           >
-            <ChevronRight size={14} />
+            <PanelLeftClose size={14} />
           </button>
         )}
       </div>
 
       {/* Navigation */}
       <nav
-        className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 scrollbar-none"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-2.5 py-3 scrollbar-none"
         aria-label="Main navigation"
       >
         {MENU_ITEMS.map((item) => {
           if (item.group) {
             const isExpanded = expandedGroups[item.name] !== false;
             return (
-              <div key={item.name} className="mb-4">
+              <div key={item.name} className="mb-3 sm:mb-4">
                 {!collapsed && (
-                  <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-500">
+                  <p className="mb-1.5 px-2 sm:px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-500">
                     {item.name}
                   </p>
                 )}
@@ -194,7 +204,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                               }
                             }}
                             className={cn(
-                              "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                              "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-colors",
                               isActive(sub.path)
                                 ? "bg-blue-600 text-white"
                                 : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
@@ -203,11 +213,11 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                             <sub.icon size={18} className="shrink-0" />
                             {!collapsed && (
                               <>
-                                <span className="flex-1 text-left">{sub.name}</span>
+                                <span className="flex-1 text-left truncate">{sub.name}</span>
                                 <ChevronDown
                                   size={14}
                                   className={cn(
-                                    "transition-transform duration-200",
+                                    "transition-transform duration-200 shrink-0",
                                     isExpanded ? "rotate-180" : ""
                                   )}
                                 />
@@ -215,14 +225,14 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                             )}
                           </button>
                           {isExpanded && !collapsed && sub.sub && (
-                            <ul className="mt-0.5 space-y-0.5 px-3">
+                            <ul className="mt-0.5 space-y-0.5 pl-2 sm:pl-3">
                               {sub.sub.map((subItem) => (
                                 <li key={subItem}>
                                   <Link
                                     to={`${sub.path}/${subItem.toLowerCase().replace(/\s+/g, '-')}`}
                                     onClick={handleNavClick}
                                     className={cn(
-                                      "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors",
+                                      "flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs transition-colors truncate",
                                       isActive(`${sub.path}/${subItem.toLowerCase().replace(/\s+/g, '-')}`)
                                         ? "bg-blue-600 text-white"
                                         : "text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
@@ -269,7 +279,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
         className={cn(
           "flex shrink-0 items-center",
           "border-t border-[var(--border-sidebar)]",
-          collapsed ? "justify-center gap-2 p-3" : "gap-3 px-4 py-3",
+          collapsed ? "justify-center gap-2 p-3" : "gap-3 px-3 sm:px-4 py-3",
           "cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
         )}
         onClick={() => setProfileMenuOpen((v) => !v)}

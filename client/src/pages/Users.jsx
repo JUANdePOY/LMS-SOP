@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import UsersPanel from '@/pages/management/UsersPanel';
+import UsersPanel from '@/pages/management/userspanel';
 import DepartmentsPanel from '@/pages/management/DepartmentsPanel';
 import RolesPanel from '@/pages/management/RolesPanel';
 import { Button } from '@/components/ui/button';

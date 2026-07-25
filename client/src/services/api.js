@@ -47,6 +47,7 @@ export const updateUser = (id, data) => api.put(`/users/${id}`, data);
 export const updateUserPassword = (id, data) => api.put(`/users/${id}/password`, data);
 export const deleteUser = (id) => api.delete(`/users/${id}`);
 export const getUserStats = () => api.get('/users/stats');
+export const bulkUploadUsers = (formData) => api.post('/users/bulk-upload', formData);
 
 export const getDepartments = (params = {}) => api.get('/departments', { params });
 export const getDepartmentHierarchy = () => api.get('/departments/hierarchy');
