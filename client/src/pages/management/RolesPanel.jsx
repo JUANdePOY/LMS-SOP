@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getRoles, createRole, updateRole, deleteRole, getPermissions, updateRolePermissions } from '@/services/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { Card } from '@/components/ui/card';
-import { Modal } from '@/components/ui/modal';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Select } from '@/shared/components/ui/select';
+import { Card } from '@/shared/components/ui/card';
+import { Modal } from '@/shared/components/ui/modal';
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { Search, Plus, Edit2, Trash2, Shield, Users, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/shared/components/ui/Toast';
 
 const CATEGORY_LABELS = {
   dashboard: 'Dashboard',

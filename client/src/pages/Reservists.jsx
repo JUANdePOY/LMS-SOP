@@ -3,17 +3,17 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { Plus, Loader, Upload, Download } from "lucide-react";
 import { getReservists, createReservist, updateReservist, deleteReservist } from "@/services/api";
 import * as XLSX from "xlsx";
-import { PrimaryButton } from "@/components/airbase/AirbaseUI";
-import ReservistStatsBar    from "@/components/reservists/ReservistStatsBar";
-import ReservistTable       from "@/components/reservists/ReservistTable";
-import ReservistModal       from "@/components/reservists/ReservistModal";
-import ReservistViewModal from "@/components/reservists/ReservistViewModal";
-import BulkUploadModal from "@/components/reservists/BulkUploadModal";
-import ReservistDetailPanel from "@/components/reservists/ReservistDetailPanel";
-import SearchAndFilters, { DEFAULT_FILTERS } from "@/components/reservists/SearchAndFilters";
+import { PrimaryButton } from "@/shared/components/airbase/AirbaseUI";
+import ReservistStatsBar    from "@/shared/components/reservists/ReservistStatsBar";
+import ReservistTable       from "@/shared/components/reservists/ReservistTable";
+import ReservistModal       from "@/shared/components/reservists/ReservistModal";
+import ReservistViewModal from "@/shared/components/reservists/ReservistViewModal";
+import BulkUploadModal from "@/shared/components/reservists/BulkUploadModal";
+import ReservistDetailPanel from "@/shared/components/reservists/ReservistDetailPanel";
+import SearchAndFilters, { DEFAULT_FILTERS } from "@/shared/components/reservists/SearchAndFilters";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/components/ui/Toast";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/shared/components/ui/Toast";
+import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
 
 const EMPTY_FORM = {
   id: '', userId: '', assignmentId: '',

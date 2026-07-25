@@ -2,14 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUsers, createUser, updateUser, deleteUser, getUserStats } from '@/services/api';
 import { getDepartments } from '@/services/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { Card } from '@/components/ui/card';
-import { Modal } from '@/components/ui/modal';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Select } from '@/shared/components/ui/select';
+import { Card } from '@/shared/components/ui/card';
+import { Modal } from '@/shared/components/ui/modal';
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { Search, Plus, Edit2, Trash2, Shield, Users, Briefcase, Loader2 } from 'lucide-react';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/shared/components/ui/Toast';
 
 const ROLE_META = {
   super_admin: { label: 'Super Admin', dot: 'bg-rose-500 dark:bg-rose-400', chip: 'bg-rose-100 text-rose-800 dark:bg-rose-500/25 dark:text-rose-100 border-rose-200 dark:border-rose-500/40', icon: Shield },

@@ -3,7 +3,7 @@ import { Outlet, useMatches } from "react-router-dom";
 import { Sun, Moon, Menu, X, PanelRightClose, PanelLeftClose, Search, Bell, Mail, Calendar, ChevronDown, LogOut, Settings, User, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import Sidebar from "@/components/navigation/sidebar/Sidebar";
+import Sidebar from "@/shared/components/navigation/sidebar/Sidebar";
 import { useTheme } from "@/hooks/useTheme";
 
 export default function AppLayout() {

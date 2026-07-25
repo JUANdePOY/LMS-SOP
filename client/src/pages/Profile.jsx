@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { User, Calendar, Phone, MapPin, Droplet, Shield, Loader2, Save, Lock, Mail } from 'lucide-react';
 import { getProfile, updateProfile, changePassword } from '@/services/api';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/shared/components/ui/Toast';
 import { cn } from '@/lib/utils';
 
 const FORM_FIELDS = [

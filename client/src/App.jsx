@@ -2,9 +2,9 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import AppLayout from "@/layout/AppLayout";
 import { lazy, Suspense } from "react";
 
-import { ToastProvider } from "@/components/Toast";
-import ErrorBoundary from "@/components/ErrorBoundary";
-import ProtectedRoute from "@/components/ProtectedRoute";
+import { ToastProvider } from "@/shared/components/Toast";
+import ErrorBoundary from "@/shared/components/ErrorBoundary";
+import ProtectedRoute from "@/shared/components/ProtectedRoute";
 
 const Dashboard     = lazy(() => import("@/pages/Dashboard"));
 const Profile       = lazy(() => import("@/pages/Profile"));

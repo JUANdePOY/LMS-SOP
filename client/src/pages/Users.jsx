@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import UsersPanel from '@/pages/management/UsersPanel';
 import DepartmentsPanel from '@/pages/management/DepartmentsPanel';
 import RolesPanel from '@/pages/management/RolesPanel';
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/components/ui/button';
 import { Users, Building2, Shield } from 'lucide-react';
 
 const TABS = [

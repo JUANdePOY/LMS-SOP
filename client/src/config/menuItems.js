@@ -44,7 +44,7 @@ export const menuItems = [
   },
   {
     name: "SOP Management",
-    path: "/sops",
+    path: "/SOPListPage",
     icon: FileText,
     description: "Create and manage SOPs",
     roles: LMS_ROLES,

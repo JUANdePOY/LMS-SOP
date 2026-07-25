@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getDepartments, createDepartment, updateDepartment, deleteDepartment, getDepartmentHierarchy } from '@/services/api';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { Card } from '@/components/ui/card';
-import { Modal } from '@/components/ui/modal';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Button } from '@/shared/components/ui/button';
+import { Input } from '@/shared/components/ui/input';
+import { Select } from '@/shared/components/ui/select';
+import { Card } from '@/shared/components/ui/card';
+import { Modal } from '@/shared/components/ui/modal';
+import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { Search, Plus, Edit2, Trash2, Building2, ChevronRight, FolderTree, Loader2, AlertTriangle } from 'lucide-react';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/shared/components/ui/Toast';
 
 export default function DepartmentsPage() {
   const { toast } = useToast();

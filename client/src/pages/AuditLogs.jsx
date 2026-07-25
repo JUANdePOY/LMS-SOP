@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { History, Search, Eye, X, User, Database } from 'lucide-react';
-import { useToast } from '@/components/ui/Toast';
+import { useToast } from '@/shared/components/ui/Toast';
 import { getAuditLogs, getAuditLogById } from '@/services/auditLogsService';
 import { cn } from '@/lib/utils';
 

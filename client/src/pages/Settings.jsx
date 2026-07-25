@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Settings as SettingsIcon, Users, Shield, Plus, Pencil, Save, X, Trash2, ChevronRight, History, Building2, CheckCircle, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/components/Toast";
+import { useToast } from "@/shared/components/Toast";
 import {
   getSettings, updateSetting, createSetting,
   getUsers, createUser, updateUser, deleteUser,
