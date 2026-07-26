@@ -1,10 +1,8 @@
-import { useState, useEffect } from "react";
-import { Outlet, useMatches } from "react-router-dom";
+import { useState } from "react";
+import { Outlet } from "react-router-dom";
 import {
   PanelLeftClose,
   PanelRightClose,
-  Menu,
-  X,
   Search,
   Bell,
   Mail,
@@ -13,21 +11,18 @@ import {
   LogOut,
   Settings,
   User,
-  LayoutDashboard,
   Home,
   BookOpen,
   FileText,
   Users,
   BarChart3,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-<<<<<<< HEAD
 import Sidebar from "@/shared/components/navigation/sidebar/Sidebar";
 import { useTheme } from "@/hooks/useTheme";
-=======
-import Sidebar from "@/components/navigation/sidebar/Sidebar";
-import { ThemeToggle } from "@/theme/components/ThemeToggle";
 
 const MOBILE_BOTTOM_NAV = [
   { name: "Home", path: "/", icon: Home },
@@ -36,32 +31,15 @@ const MOBILE_BOTTOM_NAV = [
   { name: "Users", path: "/users", icon: Users },
   { name: "Reports", path: "/reports", icon: BarChart3 },
 ];
->>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const matches = useMatches();
-  const routeMatch = matches[matches.length - 1];
-  const pageTitle = routeMatch?.handle?.title || null;
   const { user, logout } = useAuth();
+  const { toggleTheme, isDark } = useTheme();
 
-<<<<<<< HEAD
-  const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const roleLabel = typeof user?.role === 'string' ? user.role.replace('_', ' ') : '';
-=======
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 1024) {
-        setMobileOpen(false);
-      }
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
->>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
 
   return (
     <div
@@ -105,11 +83,7 @@ export default function AppLayout() {
           <button
             onClick={() => setCollapsed((v) => !v)}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-<<<<<<< HEAD
             className="hidden lg:flex h-9 w-9 items-center justify-center text-white/70 hover:text-white transition-colors duration-150"
-=======
-            className="hidden lg:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors duration-150"
->>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
           >
             {collapsed ? (
               <PanelRightClose size={20} />
@@ -118,45 +92,9 @@ export default function AppLayout() {
             )}
           </button>
 
-<<<<<<< HEAD
+          
+
           <div className="flex-1 max-w-md mx-auto hidden md:block">
-=======
-          <div className="flex items-center gap-2 lg:hidden">
-            <button
-              onClick={() => setMobileOpen((v) => !v)}
-              aria-label={mobileOpen ? "Close menu" : "Open menu"}
-              className={cn(
-                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                "border border-[var(--border)]",
-                "bg-[var(--bg-surface)]",
-                "text-[var(--text-secondary)]",
-                "hover:bg-[var(--bg-hover)]",
-                "transition-colors duration-150"
-              )}
-            >
-              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
-            </button>
-            <div className="flex items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600">
-                <LayoutDashboard size={16} className="text-white" />
-              </div>
-              <span className="text-sm font-bold tracking-tight text-[var(--text-primary)]">
-                SOP
-              </span>
-            </div>
-          </div>
-
-          <div className="hidden lg:flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/10">
-              <LayoutDashboard size={18} className="text-blue-600" />
-            </div>
-            <h1 className="text-base font-bold text-[var(--text-primary)]">
-              {pageTitle || 'Dashboard'}
-            </h1>
-          </div>
-
-          <div className="flex-1 max-w-xl mx-auto hidden md:block">
->>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
               <input
@@ -170,29 +108,20 @@ export default function AppLayout() {
           <div className="flex items-center gap-0.5 sm:gap-1">
             <button
               aria-label="Notifications"
-<<<<<<< HEAD
               className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
-=======
-              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
->>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
             >
               <Bell size={18} />
               <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">3</span>
             </button>
             <button
               aria-label="Messages"
-<<<<<<< HEAD
               className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
-=======
-              className="relative hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
->>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
             >
               <Mail size={18} />
               <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">5</span>
             </button>
             <button
               aria-label="Calendar"
-<<<<<<< HEAD
               className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
             >
               <Calendar size={18} />
@@ -204,13 +133,6 @@ export default function AppLayout() {
             >
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-=======
-              className="hidden md:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
-            >
-              <Calendar size={18} />
-            </button>
-            <ThemeToggle />
->>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
           </div>
 
           <div className="relative">
@@ -219,11 +141,7 @@ export default function AppLayout() {
               aria-label="User menu"
               className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white/15 transition-colors"
             >
-<<<<<<< HEAD
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--btn-bg)] text-white text-xs font-bold">
-=======
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">
->>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
                 {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
               <div className="hidden lg:flex flex-col items-start">
@@ -264,7 +182,7 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <div className="flex-1 w-full">
+        <div className="flex-1 w-full px-4 sm:px-6 py-4 sm:py-6">
           <Outlet />
         </div>
 
