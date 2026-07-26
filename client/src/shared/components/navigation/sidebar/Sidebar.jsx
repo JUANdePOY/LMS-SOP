@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   FileText,
@@ -76,10 +76,16 @@ const MENU_ITEMS = [
   },
 ];
 
+const SIDEBAR_WIDTH = {
+  expanded: "w-[260px]",
+  collapsed: "w-[72px]",
+};
+
 export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   const [expandedGroups, setExpandedGroups] = useState({});
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const location = useLocation();
 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -104,8 +110,8 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   };
 
   const isActive = (path) => {
-    if (path === '/') return window.location.pathname === '/';
-    return window.location.pathname.startsWith(path);
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
   };
 
   return (
@@ -114,9 +120,14 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
         "fixed inset-y-0 left-0 z-50 flex flex-col",
         "bg-[var(--bg-sidebar)] text-[var(--text-on-sidebar)]",
         "transition-all duration-200 ease-out",
-        collapsed ? "w-[64px]" : "w-[260px]",
+        "bg-white/95 dark:bg-neutral-900/95",
+        "backdrop-blur-md",
+        "border-r border-[var(--border-sidebar)]",
+        SIDEBAR_WIDTH.expanded,
         "max-lg:-translate-x-full",
-        mobileOpen && "translate-x-0"
+        mobileOpen && "translate-x-0",
+        collapsed && SIDEBAR_WIDTH.collapsed,
+        "shadow-lg lg:shadow-none"
       )}
     >
       {/* Brand */}
@@ -153,14 +164,14 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
 
       {/* Navigation */}
       <nav
-        className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3 scrollbar-none"
+        className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-2.5 py-3 scrollbar-none"
         aria-label="Main navigation"
       >
         {MENU_ITEMS.map((item) => {
           if (item.group) {
             const isExpanded = expandedGroups[item.name] !== false;
             return (
-              <div key={item.name} className="mb-4">
+              <div key={item.name} className="mb-3 sm:mb-4">
                 {!collapsed && (
                   <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[color-mix(in_srgb,var(--text-on-sidebar)_55%,transparent)]">
                     {item.name}
@@ -213,7 +224,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                                 <ChevronDown
                                   size={13}
                                   className={cn(
-                                    "transition-transform duration-200",
+                                    "transition-transform duration-200 shrink-0",
                                     isExpanded ? "rotate-180" : ""
                                   )}
                                 />
@@ -290,7 +301,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
         className={cn(
           "flex shrink-0 items-center",
           "border-t border-[var(--border-sidebar)]",
-          collapsed ? "justify-center gap-2 p-3" : "gap-3 px-4 py-3",
+          collapsed ? "justify-center gap-2 p-3" : "gap-3 px-3 sm:px-4 py-3",
           "cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
         )}
         onClick={() => setProfileMenuOpen((v) => !v)}

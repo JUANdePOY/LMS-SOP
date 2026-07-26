@@ -2,20 +2,16 @@ import { useState } from 'react';
 import {
   Users, UserCheck, FileText, BookOpen,
   ClipboardCheck, Award, TrendingUp,
-  BarChart3, PieChart, Calendar,
-  MessageSquare, Bell, Megaphone,
-  CheckSquare, AlertTriangle, ChevronRight,
+  Calendar, Megaphone,
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart as RePieChart, Pie, Cell, Legend,
+  PieChart as RePieChart, Pie, Cell,
 } from 'recharts';
 import { Card } from '@/shared/components/ui/card';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const COLORS = ['#2F6FED', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'];
 
 const STAT_CARDS = [
   { label: 'Total Users', value: '128', delta: '+12%', icon: Users, color: 'blue' },
@@ -100,41 +96,45 @@ export default function Dashboard() {
   const [period, setPeriod] = useState('month');
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="w-full max-w-none space-y-4 sm:space-y-5 lg:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">Dashboard</h1>
-          <p className="text-sm text-neutral-500 mt-1">Welcome back, Admin!</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100">Dashboard</h1>
+          <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">Welcome back, Admin!</p>
         </div>
-        <div className="text-sm text-neutral-500">
-          Today is {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} | {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+        <div className="flex items-center gap-2 text-[11px] sm:text-xs text-neutral-500">
+          <Calendar size={14} className="hidden sm:block" />
+          <span>
+            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+            <span className="hidden sm:inline">, {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</span>
+          </span>
         </div>
       </div>
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Stat Cards - fluid grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
         {STAT_CARDS.map((card) => {
           const Icon = card.icon;
           return (
-            <Card key={card.label} className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+            <Card key={card.label} className="p-3 sm:p-4">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                   <div className={cn(
-                    "flex h-10 w-10 items-center justify-center rounded-lg",
-                    card.color === 'blue' ? 'bg-blue-50 text-blue-600' :
-                    card.color === 'emerald' ? 'bg-emerald-50 text-emerald-600' :
-                    card.color === 'amber' ? 'bg-amber-50 text-amber-600' :
-                    'bg-red-50 text-red-600'
+                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                    card.color === 'blue' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' :
+                    card.color === 'emerald' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' :
+                    card.color === 'amber' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400' :
+                    'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
                   )}>
-                    <Icon size={20} />
+                    <Icon size={18} />
                   </div>
-                  <div>
-                    <p className="text-xs text-neutral-500">{card.label}</p>
-                    <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">{card.value}</p>
+                  <div className="min-w-0">
+                    <p className="text-[10px] sm:text-xs text-neutral-500 truncate">{card.label}</p>
+                    <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 leading-tight">{card.value}</p>
                   </div>
                 </div>
-                <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+                <span className="flex items-center gap-0.5 text-[10px] sm:text-xs font-medium text-emerald-600 shrink-0">
                   <TrendingUp size={12} />
                   {card.delta}
                 </span>
@@ -145,21 +145,21 @@ export default function Dashboard() {
       </div>
 
       {/* Training Completion Overview */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-4">
+      <Card className="p-3 sm:p-4 lg:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-4">
           <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Training Completion Overview</h2>
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
-            className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-blue-500/20 w-full sm:w-auto"
           >
             <option value="month">This Month</option>
             <option value="week">This Week</option>
             <option value="quarter">This Quarter</option>
           </select>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          <div className="lg:col-span-3" style={{ height: 300 }}>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
+          <div className="lg:col-span-3 min-h-[250px] sm:min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={TRAINING_COMPLETION_DATA}>
                 <defs>
@@ -183,34 +183,36 @@ export default function Dashboard() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-          <div className="lg:col-span-2 flex items-center justify-center">
-            <div className="relative" style={{ width: 180, height: 180 }}>
-              <RePieChart>
-                <Pie
-                  data={DONUT_DATA}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {DONUT_DATA.map((entry, index) => (
+          <div className="lg:col-span-2 flex flex-col sm:flex-row lg:flex-col items-center justify-center gap-4 sm:gap-6">
+            <div className="relative shrink-0" style={{ width: 180, height: 180 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <RePieChart>
+                  <Pie
+                    data={DONUT_DATA}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                  {DONUT_DATA.map((entry) => (
                     <Cell key={entry.name} fill={entry.color} />
                   ))}
-                </Pie>
-              </RePieChart>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  </Pie>
+                </RePieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <span className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">78%</span>
                 <span className="text-xs text-neutral-500">Overall</span>
               </div>
             </div>
-            <div className="flex flex-col gap-2 ml-4">
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
               {DONUT_DATA.map((item) => (
-                <div key={item.name} className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-xs text-neutral-600 dark:text-neutral-400">{item.name}</span>
-                  <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">{item.value}% ({item.count})</span>
+                <div key={item.name} className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                  <span className="text-[11px] sm:text-xs text-neutral-600 dark:text-neutral-400">{item.name}</span>
+                  <span className="text-[11px] sm:text-xs font-semibold text-neutral-900 dark:text-neutral-100">{item.value}% ({item.count})</span>
                 </div>
               ))}
             </div>
@@ -219,22 +221,22 @@ export default function Dashboard() {
       </Card>
 
       {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-5 lg:gap-6">
         {/* Recent Announcements */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Recent Announcements</h2>
-            <a href="#" className="text-xs font-medium text-blue-600 hover:text-blue-700">View All</a>
+            <a href="#" className="text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-700">View All</a>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2.5 sm:space-y-3">
             {ANNOUNCEMENTS.map((item, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+              <div key={i} className="flex items-start gap-2.5 sm:gap-3">
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                   <Megaphone size={14} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{item.title}</p>
-                  <p className="text-xs text-neutral-500 mt-0.5">{item.date} · {item.author}</p>
+                  <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{item.title}</p>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">{item.date} · {item.author}</p>
                 </div>
               </div>
             ))}
@@ -242,46 +244,48 @@ export default function Dashboard() {
         </Card>
 
         {/* SOPs by Category */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">SOPs by Category</h2>
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-blue-500/20"
             >
               <option value="month">This Month</option>
               <option value="week">This Week</option>
             </select>
           </div>
-          <div className="flex items-center justify-center" style={{ height: 200 }}>
-            <div className="relative" style={{ width: 160, height: 160 }}>
-              <RePieChart>
-                <Pie
-                  data={SOP_BY_CATEGORY_DATA}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={70}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {SOP_BY_CATEGORY_DATA.map((entry, index) => (
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
+            <div className="relative shrink-0" style={{ width: 150, height: 150 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <RePieChart>
+                  <Pie
+                    data={SOP_BY_CATEGORY_DATA}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={65}
+                    dataKey="value"
+                    stroke="none"
+                  >
+                  {SOP_BY_CATEGORY_DATA.map((entry) => (
                     <Cell key={entry.name} fill={entry.color} />
                   ))}
-                </Pie>
-              </RePieChart>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-xl font-bold text-neutral-900 dark:text-neutral-100">42</span>
-                <span className="text-xs text-neutral-500">Total</span>
+                  </Pie>
+                </RePieChart>
+              </ResponsiveContainer>
+              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                <span className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-neutral-100">42</span>
+                <span className="text-[10px] sm:text-xs text-neutral-500">Total</span>
               </div>
             </div>
-            <div className="flex flex-col gap-1.5 ml-4">
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
               {SOP_BY_CATEGORY_DATA.map((item) => (
-                <div key={item.name} className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-xs text-neutral-600 dark:text-neutral-400">{item.name}</span>
-                  <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">{item.count}</span>
+                <div key={item.name} className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                  <span className="text-[11px] sm:text-xs text-neutral-600 dark:text-neutral-400">{item.name}</span>
+                  <span className="text-[11px] sm:text-xs font-semibold text-neutral-900 dark:text-neutral-100">{item.count}</span>
                 </div>
               ))}
             </div>
@@ -289,35 +293,27 @@ export default function Dashboard() {
         </Card>
 
         {/* User Activity */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">User Activity</h2>
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-blue-500/20"
             >
               <option value="week">This Week</option>
               <option value="month">This Month</option>
             </select>
           </div>
-          <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             {USER_ACTIVITY_DATA.map((item) => (
-              <div key={item.label} className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+              <div key={item.label} className="flex flex-col items-center text-center gap-1.5 sm:gap-2">
+                <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                   <item.icon size={16} />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-neutral-600 dark:text-neutral-400">{item.label}</span>
-                    <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">{item.value}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800">
-                    <div
-                      className="h-full rounded-full bg-blue-500 transition-all duration-500"
-                      style={{ width: `${(item.value / 100) * 100}%` }}
-                    />
-                  </div>
+                <div>
+                  <p className="text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100">{item.value}</p>
+                  <p className="text-[10px] sm:text-xs text-neutral-500">{item.label}</p>
                 </div>
               </div>
             ))}
@@ -326,14 +322,14 @@ export default function Dashboard() {
       </div>
 
       {/* Internal Tasks + Department Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-5 lg:gap-6">
         {/* Internal Tasks Overview */}
-        <Card className="p-4 lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-3 sm:p-4 lg:col-span-2">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Internal Tasks Overview</h2>
-            <a href="#" className="text-xs font-medium text-blue-600 hover:text-blue-700">View All</a>
+            <a href="#" className="text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-700">View All</a>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             {TASK_OVERVIEW.map((task) => (
               <div key={task.label} className={cn(
                 "rounded-xl p-3 text-center",
@@ -343,26 +339,26 @@ export default function Dashboard() {
                 'bg-blue-50 dark:bg-blue-500/10'
               )}>
                 <p className={cn(
-                  "text-2xl font-bold",
+                  "text-xl sm:text-2xl font-bold",
                   task.color === 'red' ? 'text-red-600 dark:text-red-400' :
                   task.color === 'amber' ? 'text-amber-600 dark:text-amber-400' :
                   task.color === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' :
                   'text-blue-600 dark:text-blue-400'
                 )}>{task.value}</p>
-                <p className="text-xs text-neutral-500 mt-1">{task.label}</p>
+                <p className="text-[10px] sm:text-xs text-neutral-500 mt-0.5">{task.label}</p>
               </div>
             ))}
           </div>
         </Card>
 
         {/* Department Performance */}
-        <Card className="p-4 lg:col-span-3 overflow-x-auto">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-3 sm:p-4 lg:col-span-3 overflow-x-auto">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Department Performance</h2>
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-blue-500/20"
             >
               <option value="month">This Month</option>
               <option value="week">This Week</option>
@@ -371,37 +367,37 @@ export default function Dashboard() {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-neutral-200 dark:border-neutral-800">
-                <th className="px-3 py-2 text-left font-semibold text-neutral-500">Department</th>
-                <th className="px-3 py-2 text-left font-semibold text-neutral-500">Total Users</th>
-                <th className="px-3 py-2 text-left font-semibold text-neutral-500">Training Completion</th>
-                <th className="px-3 py-2 text-left font-semibold text-neutral-500">Assessments Passed</th>
-                <th className="px-3 py-2 text-left font-semibold text-neutral-500">SOPs Read</th>
-                <th className="px-3 py-2 text-left font-semibold text-neutral-500">Certificates Issued</th>
+                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap">Department</th>
+                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap">Total Users</th>
+                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap hidden sm:table-cell">Training Completion</th>
+                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap hidden sm:table-cell">Assessments</th>
+                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap hidden md:table-cell">SOPs Read</th>
+                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap hidden md:table-cell">Certificates</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {DEPARTMENT_DATA.map((row) => (
                 <tr key={row.department} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30 transition-colors">
-                  <td className="px-3 py-2.5 font-medium text-neutral-900 dark:text-neutral-100">{row.department}</td>
-                  <td className="px-3 py-2.5 text-neutral-600">{row.totalUsers}</td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-2 sm:px-3 py-2.5 font-medium text-neutral-900 dark:text-neutral-100 whitespace-nowrap">{row.department}</td>
+                  <td className="px-2 sm:px-3 py-2.5 text-neutral-600 whitespace-nowrap">{row.totalUsers}</td>
+                  <td className="px-2 sm:px-3 py-2.5 hidden sm:table-cell">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800">
+                      <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 min-w-[60px]">
                         <div className="h-full rounded-full bg-blue-500" style={{ width: `${row.trainingCompletion}%` }} />
                       </div>
                       <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 w-10 text-right">{row.trainingCompletion}%</span>
                     </div>
                   </td>
-                  <td className="px-3 py-2.5">
+                  <td className="px-2 sm:px-3 py-2.5 hidden sm:table-cell">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800">
+                      <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 min-w-[60px]">
                         <div className="h-full rounded-full bg-emerald-500" style={{ width: `${row.assessmentsPassed}%` }} />
                       </div>
                       <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 w-10 text-right">{row.assessmentsPassed}%</span>
                     </div>
                   </td>
-                  <td className="px-3 py-2.5 text-neutral-600">{row.sopsRead}</td>
-                  <td className="px-3 py-2.5 text-neutral-600">{row.certificatesIssued}</td>
+                  <td className="px-2 sm:px-3 py-2.5 text-neutral-600 whitespace-nowrap hidden md:table-cell">{row.sopsRead}</td>
+                  <td className="px-2 sm:px-3 py-2.5 text-neutral-600 whitespace-nowrap hidden md:table-cell">{row.certificatesIssued}</td>
                 </tr>
               ))}
             </tbody>
@@ -410,22 +406,22 @@ export default function Dashboard() {
       </div>
 
       {/* Upcoming Events + Recent Messages */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
         {/* Upcoming Events */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Upcoming Events</h2>
-            <a href="#" className="text-xs font-medium text-blue-600 hover:text-blue-700">View All</a>
+            <a href="#" className="text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-700">View All</a>
           </div>
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2.5 sm:gap-3">
             {UPCOMING_EVENTS.map((event, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+              <div key={i} className="flex items-center gap-2.5 sm:gap-3 p-2.5 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors">
+                <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
                   <Calendar size={14} />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{event.title}</p>
-                  <p className="text-xs text-neutral-500 mt-0.5">{event.date} · {event.time}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{event.title}</p>
+                  <p className="text-[11px] text-neutral-500">{event.date} · {event.time}</p>
                 </div>
               </div>
             ))}
@@ -433,25 +429,25 @@ export default function Dashboard() {
         </Card>
 
         {/* Recent Messages */}
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Recent Messages</h2>
-            <a href="#" className="text-xs font-medium text-blue-600 hover:text-blue-700">View All</a>
+            <a href="#" className="text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-700">View All</a>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2.5 sm:space-y-3">
             {RECENT_MESSAGES.map((msg, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 text-white text-xs font-bold">
+              <div key={i} className="flex items-start gap-2.5 sm:gap-3">
+                <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 text-white text-xs font-bold">
                   {msg.sender.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{msg.sender}</span>
+                    <span className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{msg.sender}</span>
                     {msg.unread > 0 && (
-                      <span className="flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">{msg.unread}</span>
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">{msg.unread}</span>
                     )}
                   </div>
-                  <p className="text-xs text-neutral-500 truncate">{msg.preview}</p>
+                  <p className="text-[11px] sm:text-xs text-neutral-500 truncate">{msg.preview}</p>
                   <p className="text-[10px] text-neutral-400 mt-0.5">{msg.time}</p>
                 </div>
               </div>

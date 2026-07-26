@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, XCircle, Send, Archive, FileText, Layout, ListOrdered, Paperclip, Users, ThumbsUp, GitBranch, History, Pencil } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Send, Archive, FileText, Layout, ListOrdered, Paperclip, Users, ThumbsUp, GitBranch, History, Pencil, Trash2, Share2 } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { useSOPContext } from '../context/SOPContext';
 import { useSOPPermission } from '../context/SOPPermissionContext';
@@ -14,14 +14,6 @@ import ProcedureTab from '../components/tabs/ProcedureTab';
 import AttachmentsTab from '../components/tabs/AttachmentsTab';
 import AssignmentsTab from '../components/tabs/AssignmentsTab';
 import ApprovalsTab from '../components/tabs/ApprovalsTab';
-import VersionsTab from '../components/tabs/VersionsTab';
-import AuditTab from '../components/tabs/AuditTab';
-import ApproveModal from '../components/modals/ApproveModal';
-import RejectModal from '../components/modals/RejectModal';
-import PublishModal from '../components/modals/PublishModal';
-import ArchiveModal from '../components/modals/ArchiveModal';
-import EditBasicInfoModal from '../components/modals/EditBasicInfoModal';
-import { useUpdateSOP } from '../hooks/useUpdateSOP';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: FileText },

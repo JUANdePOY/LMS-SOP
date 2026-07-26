@@ -1,13 +1,44 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet, useMatches } from "react-router-dom";
-import { Sun, Moon, Menu, X, PanelRightClose, PanelLeftClose, Search, Bell, Mail, Calendar, ChevronDown, LogOut, Settings, User, LayoutDashboard } from "lucide-react";
+import {
+  PanelLeftClose,
+  PanelRightClose,
+  Menu,
+  X,
+  Search,
+  Bell,
+  Mail,
+  Calendar,
+  ChevronDown,
+  LogOut,
+  Settings,
+  User,
+  LayoutDashboard,
+  Home,
+  BookOpen,
+  FileText,
+  Users,
+  BarChart3,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+<<<<<<< HEAD
 import Sidebar from "@/shared/components/navigation/sidebar/Sidebar";
 import { useTheme } from "@/hooks/useTheme";
+=======
+import Sidebar from "@/components/navigation/sidebar/Sidebar";
+import { ThemeToggle } from "@/theme/components/ThemeToggle";
+
+const MOBILE_BOTTOM_NAV = [
+  { name: "Home", path: "/", icon: Home },
+  { name: "Courses", path: "/courses", icon: BookOpen },
+  { name: "SOPs", path: "/sops", icon: FileText },
+  { name: "Users", path: "/users", icon: Users },
+  { name: "Reports", path: "/reports", icon: BarChart3 },
+];
+>>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
 
 export default function AppLayout() {
-  const { isDark, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -16,21 +47,34 @@ export default function AppLayout() {
   const pageTitle = routeMatch?.handle?.title || null;
   const { user, logout } = useAuth();
 
+<<<<<<< HEAD
   const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const roleLabel = typeof user?.role === 'string' ? user.role.replace('_', ' ') : '';
+=======
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 1024) {
+        setMobileOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+>>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
 
   return (
     <div
       className={cn(
         "flex min-h-screen",
         "bg-[var(--bg-page)] text-[var(--text-primary)]",
-        "transition-colors duration-300"
+        "transition-colors duration-300",
+        "pb-16 lg:pb-0"
       )}
     >
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-[var(--bg-cover-overlay)] backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm lg:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -44,15 +88,15 @@ export default function AppLayout() {
       <main
         id="main-content"
         className={cn(
-          "flex-1 min-h-screen flex flex-col",
+          "flex-1 min-w-0 flex flex-col",
           "transition-all duration-200 ease-out",
-          collapsed ? "lg:ml-[64px]" : "lg:ml-[260px]",
+          collapsed ? "lg:ml-[72px]" : "lg:ml-[260px]",
           "ml-0"
         )}
       >
         <header
           className={cn(
-            "sticky top-0 z-30 flex h-14 items-center gap-3 px-4 lg:px-2",
+            "sticky top-0 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 h-14",
             "border-b border-[var(--border)]",
             "bg-[var(--bg-topbar)]",
             "transition-colors duration-300"
@@ -61,43 +105,94 @@ export default function AppLayout() {
           <button
             onClick={() => setCollapsed((v) => !v)}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+<<<<<<< HEAD
             className="hidden lg:flex h-9 w-9 items-center justify-center text-white/70 hover:text-white transition-colors duration-150"
+=======
+            className="hidden lg:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors duration-150"
+>>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
           >
             {collapsed ? (
-              <PanelLeftClose size={22} />
+              <PanelRightClose size={20} />
             ) : (
-              <PanelRightClose size={22} />
+              <PanelLeftClose size={20} />
             )}
           </button>
 
+<<<<<<< HEAD
           <div className="flex-1 max-w-md mx-auto hidden md:block">
+=======
+          <div className="flex items-center gap-2 lg:hidden">
+            <button
+              onClick={() => setMobileOpen((v) => !v)}
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+              className={cn(
+                "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                "border border-[var(--border)]",
+                "bg-[var(--bg-surface)]",
+                "text-[var(--text-secondary)]",
+                "hover:bg-[var(--bg-hover)]",
+                "transition-colors duration-150"
+              )}
+            >
+              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600">
+                <LayoutDashboard size={16} className="text-white" />
+              </div>
+              <span className="text-sm font-bold tracking-tight text-[var(--text-primary)]">
+                SOP
+              </span>
+            </div>
+          </div>
+
+          <div className="hidden lg:flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/10">
+              <LayoutDashboard size={18} className="text-blue-600" />
+            </div>
+            <h1 className="text-base font-bold text-[var(--text-primary)]">
+              {pageTitle || 'Dashboard'}
+            </h1>
+          </div>
+
+          <div className="flex-1 max-w-xl mx-auto hidden md:block">
+>>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
               <input
                 type="text"
                 placeholder="Search users, SOPs, trainings, tasks…"
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-10 py-2 text-sm text-[var(--text-primary)] placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-9 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 sm:gap-1">
             <button
               aria-label="Notifications"
+<<<<<<< HEAD
               className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
+=======
+              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+>>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
             >
               <Bell size={18} />
               <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">3</span>
             </button>
             <button
               aria-label="Messages"
+<<<<<<< HEAD
               className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
+=======
+              className="relative hidden sm:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+>>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
             >
               <Mail size={18} />
               <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">5</span>
             </button>
             <button
               aria-label="Calendar"
+<<<<<<< HEAD
               className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
             >
               <Calendar size={18} />
@@ -109,6 +204,13 @@ export default function AppLayout() {
             >
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
+=======
+              className="hidden md:flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              <Calendar size={18} />
+            </button>
+            <ThemeToggle />
+>>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
           </div>
 
           <div className="relative">
@@ -117,7 +219,11 @@ export default function AppLayout() {
               aria-label="User menu"
               className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white/15 transition-colors"
             >
+<<<<<<< HEAD
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--btn-bg)] text-white text-xs font-bold">
+=======
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">
+>>>>>>> 61bba9141fabaf45046bd83854f3e9deb0345245
                 {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
               <div className="hidden lg:flex flex-col items-start">
@@ -128,7 +234,7 @@ export default function AppLayout() {
                   {roleLabel}
                 </span>
               </div>
-              <ChevronDown size={14} className="text-neutral-400" />
+              <ChevronDown size={14} className="text-neutral-400 hidden lg:block" />
             </button>
 
             {userMenuOpen && (
@@ -158,16 +264,48 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <div className="flex-1 p-3 sm:p-4 lg:p-6">
+        <div className="flex-1 w-full">
           <Outlet />
         </div>
 
-        <footer className="border-t border-[var(--border)] py-3 text-center">
-          <p className="text-xs text-neutral-400">
+        <footer className="border-t border-[var(--border)] py-2.5 text-center">
+          <p className="text-[11px] sm:text-xs text-neutral-400">
             © {new Date().getFullYear()} SOP Training Platform. All rights reserved.
           </p>
         </footer>
       </main>
+
+      <nav
+        className={cn(
+          "fixed bottom-0 left-0 right-0 z-50 lg:hidden",
+          "bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md",
+          "border-t border-[var(--border)]",
+          "flex items-center justify-around px-2 py-1.5",
+          "safe-area-inset-bottom"
+        )}
+        aria-label="Mobile navigation"
+      >
+        {MOBILE_BOTTOM_NAV.map((item) => {
+          const Icon = item.icon;
+          const active = window.location.pathname === item.path || (item.path !== '/' && window.location.pathname.startsWith(item.path));
+          return (
+            <a
+              key={item.path}
+              href={item.path}
+              className={cn(
+                "flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg min-w-[56px]",
+                "transition-colors duration-150",
+                active
+                  ? "text-blue-600"
+                  : "text-neutral-500 hover:text-neutral-700"
+              )}
+            >
+              <Icon size={20} strokeWidth={active ? 2.5 : 2} />
+              <span className="text-[10px] font-medium truncate w-full text-center">{item.name}</span>
+            </a>
+          );
+        })}
+      </nav>
     </div>
   );
 }

@@ -253,4 +253,175 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+const multer = require('multer');
+const Excel = require('exceljs');
+
+const userUpload = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/csv'
+    ];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only Excel/CSV files are allowed'));
+    }
+  }
+});
+
+router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ status: 'error', message: 'No file uploaded', code: 'NO_FILE' });
+    }
+
+    const defaultPassword = (req.body.password || '').trim();
+    const defaultRole = (req.body.role || 'employee').trim();
+
+    if (!defaultPassword || defaultPassword.length < 8) {
+      return res.status(400).json({ status: 'error', message: 'Default password must be at least 8 characters', code: 'INVALID_PASSWORD' });
+    }
+
+    const [depts] = await db.query('SELECT id, name FROM departments');
+    const deptMap = {};
+    depts.forEach(d => { deptMap[String(d.name).toLowerCase()] = d.id; });
+
+    const passwordHash = await require('../app/auth').hashPassword(defaultPassword);
+
+    const workbook = new Excel.Workbook();
+    if (req.file.mimetype === 'text/csv') {
+      const ws = workbook.addWorksheet('CSV');
+      const rows = req.file.buffer.toString('utf8').trim().split('\n');
+      rows.forEach(r => ws.addRow(r.split(',')));
+    } else {
+      await workbook.xlsx.load(req.file.buffer);
+    }
+
+    if (!workbook.worksheets.length) {
+      return res.status(400).json({ status: 'error', message: 'Empty Excel file', code: 'INVALID_FILE' });
+    }
+
+    const ws = workbook.worksheets[0];
+    const raw = [];
+    ws.eachRow({ includeEmpty: true }, row => raw.push(row.values.slice(1)));
+
+    let headerIdx = 0;
+    for (let i = 0; i < raw.length; i++) {
+      if (raw[i] && raw[i].some(c => c && typeof c === 'string' && /full\s*name|email|employee\s*id|department/i.test(c))) {
+        headerIdx = i;
+        break;
+      }
+    }
+
+    const headers = raw[headerIdx] || [];
+    const rows = raw.slice(headerIdx + 1);
+
+    const headerLookup = {};
+    headers.forEach((h, idx) => {
+      if (h != null) {
+        const k = String(h).trim().toLowerCase();
+        headerLookup[k] = idx;
+        headerLookup[k.replace(/[\s/()]+/g, '')] = idx;
+      }
+    });
+
+    const get = (name) => {
+      const k = String(name).trim().toLowerCase();
+      const idx = headerLookup[k] ?? headerLookup[k.replace(/[\s/()]+/g, '')];
+      if (idx == null) return '';
+      const val = rows.map(r => r[idx]).filter(v => v != null);
+      return val.length ? String(val[0]).trim() : '';
+    };
+
+    const formatDate = (val) => {
+      if (!val) return null;
+      if (val instanceof Date && !isNaN(val)) return val.toISOString().split('T')[0];
+      const s = String(val).trim();
+      if (!s) return null;
+      const d = new Date(s);
+      if (!isNaN(d)) return d.toISOString().split('T')[0];
+      return s;
+    };
+
+    const cleanRole = ['super_admin', 'admin', 'department_head', 'employee'].includes(defaultRole) ? defaultRole : 'employee';
+
+    let success = 0, failed = 0;
+    const results = [];
+
+    for (const row of rows) {
+      try {
+        const fullName = get('Full Name') || get('Fullname') || get('Name');
+        const email = get('Email Address') || get('Email');
+        if (!fullName || !email) {
+          failed++;
+          results.push({ row, error: 'Missing full name or email' });
+          continue;
+        }
+
+        const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email.toLowerCase()]);
+        if (existing.length > 0) {
+          failed++;
+          results.push({ row, error: `Email ${email} already exists` });
+          continue;
+        }
+
+        const employeeId = get('Employee ID') || null;
+        const deptName = get('Department');
+        const departmentId = deptName ? (deptMap[deptName.toLowerCase()] || null) : null;
+        const positionTitle = get('Position/Job Title') || get('Position Title') || get('Position') || null;
+        const contactNumber = get('Contact Number') || get('Contact') || null;
+        const employmentStatus = get('Employment Status') || 'Regular';
+        const dateHired = formatDate(get('Date Hired') || get('DateHired'));
+        const birthdate = formatDate(get('Birthdate') || get('Birth Date'));
+        const address = get('Address') || null;
+
+        const userId = await authModel.create({
+          full_name: fullName,
+          email: email.toLowerCase(),
+          password_hash: passwordHash,
+          role: cleanRole,
+          department_id: departmentId,
+          position_title: positionTitle,
+          employee_id: employeeId,
+          contact_number: contactNumber,
+          employment_status: employmentStatus,
+          date_hired: dateHired,
+          birthdate: birthdate,
+          address,
+        });
+
+        logAudit({
+          user_id: req.user.id,
+          action: 'user.bulk_created',
+          entity_type: 'user',
+          entity_id: userId,
+          new_values: { email: email.toLowerCase(), role: cleanRole, full_name: fullName }
+        });
+
+        success++;
+      } catch (err) {
+        failed++;
+        results.push({ row, error: err.message });
+        console.error('Bulk user upload row error:', err);
+      }
+    }
+
+    res.json({
+      status: 'success',
+      data: {
+        total: rows.length,
+        successful: success,
+        failed,
+        errors: results.filter(r => r.error).map(r => ({ row: r.row, error: r.error }))
+      }
+    });
+  } catch (err) {
+    console.error('Bulk user upload error:', err);
+    res.status(500).json({ status: 'error', message: 'Bulk upload failed: ' + err.message, code: 'SERVER_ERROR' });
+  }
+});
+
 module.exports = router;
