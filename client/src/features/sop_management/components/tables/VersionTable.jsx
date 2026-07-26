@@ -1,4 +1,5 @@
 import { RotateCcw } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
 
 function VersionStatusBadge({ status }) {
   const colors = {
@@ -65,15 +66,9 @@ export default function VersionTable({ versions, onRestore, loading, saving }) {
               </td>
               <td className="px-4 py-3 text-right">
                 {onRestore && (
-                  <button
-                    type="button"
-                    onClick={() => onRestore(version.id)}
-                    disabled={saving}
-                    className="rounded-lg p-1.5 text-gray-400 hover:text-blue-600 disabled:opacity-50"
-                    title="Restore this version"
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => onRestore(version.id)} disabled={saving} title="Restore this version">
                     <RotateCcw className="h-4 w-4" />
-                  </button>
+                  </Button>
                 )}
               </td>
             </tr>

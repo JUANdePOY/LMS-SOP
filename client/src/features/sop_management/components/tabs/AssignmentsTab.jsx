@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
 import { useAssignments } from '../../hooks/useAssignments';
 import { useAcknowledgements } from '../../hooks/useAcknowledgements';
 import AssignmentTable from '../tables/AssignmentTable';
@@ -40,14 +41,14 @@ export default function AssignmentsTab({ sopId }) {
   return (
     <div className="space-y-6">
       {/* Tab toggle */}
-      <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 w-fit">
+      <div className="flex gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-subtle)] p-1 w-fit">
         <button
           type="button"
           onClick={() => setTab('assignments')}
           className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
             tab === 'assignments'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
           Assignments
@@ -57,8 +58,8 @@ export default function AssignmentsTab({ sopId }) {
           onClick={() => setTab('acknowledgements')}
           className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
             tab === 'acknowledgements'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-sm'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
           }`}
         >
           Acknowledgements
@@ -69,33 +70,23 @@ export default function AssignmentsTab({ sopId }) {
       {tab === 'assignments' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold text-gray-900">
+            <h3 className="text-base font-semibold text-[var(--text-primary)]">
               Assignments ({assignments.length})
             </h3>
             <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={refreshAssignments}
-                disabled={assignmentsLoading}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-              >
+              <Button variant="outline" onClick={refreshAssignments} disabled={assignmentsLoading}>
                 <RefreshCw className={`h-4 w-4 ${assignmentsLoading ? 'animate-spin' : ''}`} />
                 Refresh
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowModal(true)}
-                disabled={assignmentsSaving}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="default" onClick={() => setShowModal(true)} disabled={assignmentsSaving}>
                 <Plus className="h-4 w-4" />
                 Add Assignment
-              </button>
+              </Button>
             </div>
           </div>
 
           {assignmentsError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
               {assignmentsError}
             </div>
           )}
@@ -113,22 +104,17 @@ export default function AssignmentsTab({ sopId }) {
       {tab === 'acknowledgements' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold text-gray-900">
+            <h3 className="text-base font-semibold text-[var(--text-primary)]">
               Acknowledgements
             </h3>
-            <button
-              type="button"
-              onClick={refreshAcknowledgements}
-              disabled={ackLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            >
+            <Button variant="outline" onClick={refreshAcknowledgements} disabled={ackLoading}>
               <RefreshCw className={`h-4 w-4 ${ackLoading ? 'animate-spin' : ''}`} />
               Refresh
-            </button>
+            </Button>
           </div>
 
           {ackError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
               {ackError}
             </div>
           )}
@@ -151,4 +137,3 @@ export default function AssignmentsTab({ sopId }) {
     </div>
   );
 }
-

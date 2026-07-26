@@ -61,7 +61,7 @@ export default function AppLayout() {
           <button
             onClick={() => setCollapsed((v) => !v)}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="hidden lg:flex h-9 w-9 items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors duration-150"
+            className="hidden lg:flex h-9 w-9 items-center justify-center text-white/70 hover:text-white transition-colors duration-150"
           >
             {collapsed ? (
               <PanelLeftClose size={22} />
@@ -84,23 +84,30 @@ export default function AppLayout() {
           <div className="flex items-center gap-1">
             <button
               aria-label="Notifications"
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
             >
               <Bell size={18} />
               <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">3</span>
             </button>
             <button
               aria-label="Messages"
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
             >
               <Mail size={18} />
               <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">5</span>
             </button>
             <button
               aria-label="Calendar"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
             >
               <Calendar size={18} />
+            </button>
+            <button
+              onClick={toggleTheme}
+              aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
+            >
+              {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
           </div>
 
@@ -108,7 +115,7 @@ export default function AppLayout() {
             <button
               onClick={() => setUserMenuOpen((v) => !v)}
               aria-label="User menu"
-              className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-[var(--bg-hover)] transition-colors"
+              className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white/15 transition-colors"
             >
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--btn-bg)] text-white text-xs font-bold">
                 {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}

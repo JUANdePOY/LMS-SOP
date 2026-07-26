@@ -14,4 +14,3 @@ export default function StepModal({ open, onClose, steps, onCreate, onUpdate, on
     </Modal>
   );
 }
-

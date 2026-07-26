@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
 import { useSOPList } from '../hooks/useSOPList';
 import { useSOPPermission } from '../context/SOPPermissionContext';
 import { useSOPModal } from '../context/SOPModalContext';
@@ -79,24 +80,20 @@ export default function SOPListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-6 shadow-sm lg:flex-row lg:items-end lg:justify-between">
+      {/* Header — matches Dashboard's flat header style */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <p className="text-sm font-medium uppercase tracking-[0.24em] text-blue-600">SOP Management</p>
-          <h1 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">Standard operating procedures</h1>
-          <p className="mt-2 text-sm text-[var(--text-muted)]">
+          <h1 className="mt-1 text-2xl font-bold text-[var(--text-primary)]">SOP Management</h1>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">
             Browse, review, and publish SOPs from one central workspace.
           </p>
         </div>
 
         {canCreate && (
-          <button
-            type="button"
-            onClick={() => openModal('create')}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-          >
+          <Button onClick={() => openModal('create')}>
             <Plus className="h-4 w-4" />
             Create SOP
-          </button>
+          </Button>
         )}
       </div>
 
@@ -142,13 +139,9 @@ export default function SOPListPage() {
             </select>
 
             {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="text-sm font-medium text-blue-600 hover:text-blue-800"
-              >
+              <Button variant="link" onClick={clearFilters}>
                 Clear
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -159,7 +152,7 @@ export default function SOPListPage() {
           Loading SOPs…
         </div>
       ) : error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
           {error}
         </div>
       ) : filteredSops.length === 0 ? (
@@ -169,37 +162,52 @@ export default function SOPListPage() {
             : 'No SOPs found yet. Create the first one to get started.'}
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredSops.map((sop) => (
             <button
               key={sop.id}
               type="button"
               onClick={() => navigate(`/sops/${sop.id}`)}
-              className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              className="group flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="rounded-xl bg-blue-50 p-2 text-blue-600">
-                    <FileText className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className="truncate text-base font-semibold text-[var(--text-primary)]">{sop.title || 'Untitled SOP'}</h2>
-                    <p className="text-sm text-[var(--text-muted)]">{sop.code || 'No code'}</p>
-                  </div>
+              {/* Icon avatar + status badge */}
+              <div className="flex items-start justify-between">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
+                  <FileText className="h-5 w-5" />
                 </div>
-                <span className="shrink-0 rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-gray-600">
+                <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--bg-subtle)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--text-secondary)]">
                   {sop.status || 'Draft'}
                 </span>
               </div>
 
-              <p className="mt-4 line-clamp-2 text-sm text-[var(--text-muted)]">
-                {sop.description || 'No description provided yet.'}
-              </p>
+              {/* Subtitle + title */}
+              <div className="min-w-0">
+                <p className="truncate text-xs text-[var(--text-muted)]">
+                  {sop.code || 'No code'} · Updated {formatDate(sop.updated_at)}
+                </p>
+                <h2 className="mt-1 truncate text-lg font-semibold text-[var(--text-primary)]">
+                  {sop.title || 'Untitled SOP'}
+                </h2>
+              </div>
 
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--border)] pt-3 text-xs text-[var(--text-muted)]">
-                <span>Dept: <span className="font-medium text-[var(--text-primary)]">{sop.department_name || (sop.department_id ? `#${sop.department_id}` : '—')}</span></span>
-                <span>Owner: <span className="font-medium text-[var(--text-primary)]">{sop.owner_name || '—'}</span></span>
-                <span>Updated: <span className="font-medium text-[var(--text-primary)]">{formatDate(sop.updated_at)}</span></span>
+              {/* Tag pills */}
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+                  {sop.department_name || (sop.department_id ? `Dept #${sop.department_id}` : 'No department')}
+                </span>
+                <span className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--text-secondary)]">
+                  {sop.owner_name || 'Unassigned'}
+                </span>
+              </div>
+
+              {/* Bottom row: description + action */}
+              <div className="mt-auto flex items-end justify-between gap-3 border-t border-[var(--border)] pt-4">
+                <p className="line-clamp-1 min-w-0 flex-1 text-sm text-[var(--text-muted)]">
+                  {sop.description || 'No description provided yet.'}
+                </p>
+                <span className="shrink-0 rounded-lg bg-[var(--btn-bg)] px-4 py-2 text-sm font-medium text-white transition group-hover:bg-[var(--btn-bg-hover)]">
+                  View SOP
+                </span>
               </div>
             </button>
           ))}

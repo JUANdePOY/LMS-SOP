@@ -8,4 +8,3 @@ export default function AssignmentModal({ open, onClose, onSubmit, saving }) {
     </Modal>
   );
 }
-

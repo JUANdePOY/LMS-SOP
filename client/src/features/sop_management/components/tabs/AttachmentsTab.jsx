@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { Paperclip, Trash2, Upload } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
 import { useAttachments } from '../../hooks/useAttachments';
 
 export default function AttachmentsTab({ sopId }) {
@@ -24,12 +25,12 @@ export default function AttachmentsTab({ sopId }) {
   };
 
   if (loading && attachments.length === 0) {
-    return <div className="text-sm text-gray-500 py-4">Loading attachments…</div>;
+    return <div className="text-sm text-[var(--text-muted)] py-4">Loading attachments…</div>;
   }
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+      <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
         {error}
       </div>
     );
@@ -39,8 +40,8 @@ export default function AttachmentsTab({ sopId }) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Paperclip className="h-5 w-5 text-blue-600" />
-          <h3 className="text-base font-semibold text-gray-900">
+          <Paperclip className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <h3 className="text-base font-semibold text-[var(--text-primary)]">
             Attachments ({attachments.length})
           </h3>
         </div>
@@ -53,30 +54,29 @@ export default function AttachmentsTab({ sopId }) {
             className="hidden"
             id="attachment-upload"
           />
-          <label
-            htmlFor="attachment-upload"
-            className={`inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-blue-700 cursor-pointer ${saving ? 'opacity-50 pointer-events-none' : ''}`}
-          >
-            <Upload className="h-4 w-4" />
-            {saving ? 'Uploading…' : 'Upload'}
-          </label>
+          <Button variant="default" asChild disabled={saving}>
+            <label htmlFor="attachment-upload" className="cursor-pointer">
+              <Upload className="h-4 w-4" />
+              {saving ? 'Uploading…' : 'Upload'}
+            </label>
+          </Button>
         </div>
       </div>
 
       {uploadError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
           {uploadError}
         </div>
       )}
 
       {!attachments || attachments.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 py-8 text-center text-sm text-gray-500">
+        <div className="rounded-lg border border-dashed border-[var(--border)] py-8 text-center text-sm text-[var(--text-muted)]">
           No attachments yet. Upload a file to attach it to this SOP.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-gray-200">
+        <div className="overflow-hidden rounded-lg border border-[var(--border)]">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+            <thead className="bg-[var(--bg-subtle)] text-left text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
               <tr>
                 <th className="px-4 py-3">Filename</th>
                 <th className="px-4 py-3">Type</th>
@@ -85,33 +85,27 @@ export default function AttachmentsTab({ sopId }) {
                 <th className="w-16 px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-[var(--border-light)]">
               {attachments.map((attachment) => (
-                <tr key={attachment.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">
+                <tr key={attachment.id} className="hover:bg-[var(--bg-hover)]">
+                  <td className="px-4 py-3 font-medium text-[var(--text-primary)]">
                     {attachment.original_name || attachment.filename}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 uppercase">
+                    <span className="rounded bg-[var(--bg-subtle)] px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)] uppercase">
                       {attachment.mime_type || attachment.document_type || '—'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
+                  <td className="px-4 py-3 text-[var(--text-muted)]">
                     {attachment.file_size ? `${(attachment.file_size / 1024).toFixed(1)} KB` : '—'}
                   </td>
-                  <td className="px-4 py-3 text-gray-500">
+                  <td className="px-4 py-3 text-[var(--text-muted)]">
                     {attachment.created_at ? new Date(attachment.created_at).toLocaleDateString() : '—'}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => remove(attachment.id)}
-                      disabled={saving}
-                      className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                      title="Delete attachment"
-                    >
+                    <Button variant="ghost" size="icon" onClick={() => remove(attachment.id)} disabled={saving} title="Delete attachment">
                       <Trash2 className="h-4 w-4" />
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -122,4 +116,3 @@ export default function AttachmentsTab({ sopId }) {
     </div>
   );
 }
-

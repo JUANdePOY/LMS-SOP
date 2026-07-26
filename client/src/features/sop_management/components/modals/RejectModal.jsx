@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
 
 export default function RejectModal({ open, onClose, onReject, saving }) {
   const [reason, setReason] = useState('');
@@ -14,44 +15,39 @@ export default function RejectModal({ open, onClose, onReject, saving }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md rounded-2xl bg-[var(--bg-surface)] p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Reject SOP</h3>
-          <button onClick={onClose} className="rounded-lg p-1 text-gray-400 hover:text-gray-600">
+          <h3 className="text-lg font-semibold text-foreground">Reject SOP</h3>
+          <button onClick={onClose} className="rounded-lg p-1 text-muted-foreground hover:text-foreground">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-muted-foreground mb-4">
           Provide a reason for rejecting this SOP. This will be visible to the author.
         </p>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Reason for rejection *</label>
+          <label className="block text-sm font-medium text-foreground mb-1">Reason for rejection *</label>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={4}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm outline-none focus:border-destructive focus:ring-1 focus:ring-destructive"
             placeholder="Explain why this SOP is being rejected…"
             required
           />
         </div>
 
         <div className="mt-4 flex justify-end gap-3">
-          <button onClick={onClose} disabled={saving} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
-          </button>
-          <button
-            onClick={handleReject}
-            disabled={!reason.trim() || saving}
-            className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
-          >
+          </Button>
+          <Button variant="destructive" onClick={handleReject} disabled={!reason.trim() || saving}>
             {saving ? 'Rejecting…' : 'Reject'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
   );
 }
-

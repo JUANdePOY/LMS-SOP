@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, FileText, Layout, ListOrdered, Users, ClipboardList, X, AlertTriangle } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
 import { useCreateSOP } from '../../hooks/useCreateSOP';
+import { useDepartmentList } from '../../hooks/useDepartmentList';
 import SOPBasicInfoForm from '../forms/SOPBasicInfoForm';
 import SOPSectionForm from '../forms/SOPSectionForm';
 import SOPStepForm from '../forms/SOPStepForm';
@@ -23,6 +25,7 @@ const INIT = { title: '', code: '', description: '', department_id: '', category
 export default function SOPCreateWizard({ open, onClose, onCreated }) {
   const navigate = useNavigate();
   const { create, loading: creating } = useCreateSOP();
+  const { departments } = useDepartmentList();
   const [step, setStep] = useState(1);
   const [sop, setSop] = useState({ ...INIT });
   const [sections, setSections] = useState([]);
@@ -184,52 +187,52 @@ export default function SOPCreateWizard({ open, onClose, onCreated }) {
     return (
       <div key={s.id} className="flex items-center">
         <div className="flex items-center gap-1.5">
-          <div className={'flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors ' + (active ? 'bg-blue-600 text-white ring-2 ring-blue-200' : done ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500')}>
+          <div className={'flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-bold transition-colors ' + (active ? 'bg-primary text-primary-foreground ring-2 ring-primary/30' : done ? 'bg-[var(--status-green)] text-white' : 'bg-muted text-muted-foreground')}>
             {done ? <Check className="h-3 w-3" /> : n}
           </div>
-          <span className={'hidden text-[11px] font-medium sm:inline ' + (active ? 'text-blue-700' : done ? 'text-emerald-700' : 'text-gray-500')}>{s.label}</span>
+          <span className={'hidden text-[11px] font-medium sm:inline ' + (active ? 'text-primary' : done ? 'text-[var(--status-green)]' : 'text-muted-foreground')}>{s.label}</span>
         </div>
-        {i < 4 && <div className={'mx-1.5 h-px w-6 sm:w-10 ' + (done ? 'bg-emerald-300' : 'bg-gray-200')} />}
+        {i < 4 && <div className={'mx-1.5 h-px w-6 sm:w-10 ' + (done ? 'bg-[var(--status-green)]/40' : 'bg-muted')} />}
       </div>
     );
   };
 
   const renderBody = () => {
     if (step === 1) {
-      return <div><h3 className="text-lg font-semibold text-gray-900 mb-1">Basic Information</h3><p className="text-sm text-gray-500 mb-5">Start by giving your SOP a title and description.</p><SOPBasicInfoForm formData={sop} onChange={setSop} errors={errors} /></div>;
+      return <div><h3 className="text-lg font-semibold text-foreground mb-1">Basic Information</h3><p className="text-sm text-muted-foreground mb-5">Start by giving your SOP a title and description.</p><SOPBasicInfoForm formData={sop} onChange={setSop} errors={errors} departments={departments} /></div>;
     }
     if (step === 2) {
-      return <div><h3 className="text-lg font-semibold text-gray-900 mb-1">Sections</h3><p className="text-sm text-gray-500 mb-5">Add structured sections to organize your SOP content.</p><SOPSectionForm sections={sections} onCreate={(s) => setSections((p) => [...p, { ...s, _tempId: Date.now() }])} onUpdate={(id, d) => setSections((p) => p.map((x) => (x._tempId === id || x.id === id ? { ...x, ...d } : x)))} onRemove={(id) => setSections((p) => p.filter((x) => x._tempId !== id && x.id !== id))} saving={false} /></div>;
+      return <div><h3 className="text-lg font-semibold text-foreground mb-1">Sections</h3><p className="text-sm text-muted-foreground mb-5">Add structured sections to organize your SOP content.</p><SOPSectionForm sections={sections} onCreate={(s) => setSections((p) => [...p, { ...s, _tempId: Date.now() }])} onUpdate={(id, d) => setSections((p) => p.map((x) => (x._tempId === id || x.id === id ? { ...x, ...d } : x)))} onRemove={(id) => setSections((p) => p.filter((x) => x._tempId !== id && x.id !== id))} saving={false} /></div>;
     }
     if (step === 3) {
-      return <div><h3 className="text-lg font-semibold text-gray-900 mb-1">Procedure Steps</h3><p className="text-sm text-gray-500 mb-5">Define the ordered procedural steps for this SOP.</p><SOPStepForm steps={steps} onCreate={(s) => setSteps((p) => [...p, { ...s, _tempId: Date.now() }])} onUpdate={(id, d) => setSteps((p) => p.map((x) => (x._tempId === id || x.id === id ? { ...x, ...d } : x)))} onRemove={(id) => setSteps((p) => p.filter((x) => x._tempId !== id && x.id !== id))} saving={false} /></div>;
+      return <div><h3 className="text-lg font-semibold text-foreground mb-1">Procedure Steps</h3><p className="text-sm text-muted-foreground mb-5">Define the ordered procedural steps for this SOP.</p><SOPStepForm steps={steps} onCreate={(s) => setSteps((p) => [...p, { ...s, _tempId: Date.now() }])} onUpdate={(id, d) => setSteps((p) => p.map((x) => (x._tempId === id || x.id === id ? { ...x, ...d } : x)))} onRemove={(id) => setSteps((p) => p.filter((x) => x._tempId !== id && x.id !== id))} saving={false} /></div>;
     }
     if (step === 4) {
       return (
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">Assignments</h3>
-          <p className="text-sm text-gray-500 mb-5">Assign this SOP to departments, positions, or users.</p>
+          <h3 className="text-lg font-semibold text-foreground mb-1">Assignments</h3>
+          <p className="text-sm text-muted-foreground mb-5">Assign this SOP to departments, positions, or users.</p>
           {assignments.length > 0 && (
-            <div className="mb-4 overflow-hidden rounded-lg border border-gray-200">
+            <div className="mb-4 overflow-hidden rounded-lg border border-[var(--border)]">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+                <thead className="bg-muted text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   <tr><th className="px-4 py-2">Type</th><th className="px-4 py-2">Target</th><th className="w-20 px-4 py-2">Action</th></tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-[var(--border)]">
                   {assignments.map((a) => (
-                    <tr key={a._tempId} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 font-medium text-gray-800">{a.assignment_type}</td>
-                      <td className="px-4 py-2 text-gray-600">
+                    <tr key={a._tempId} className="hover:bg-muted">
+                      <td className="px-4 py-2 font-medium text-foreground">{a.assignment_type}</td>
+                      <td className="px-4 py-2 text-muted-foreground">
                         {a.assignment_type === 'Department' ? 'Department #' + a.department_id : a.assignment_type === 'Position' ? a.position_title : 'User #' + a.user_id}
                       </td>
-                      <td className="px-4 py-2"><button type="button" onClick={() => setAssignments((p) => p.filter((x) => x._tempId !== a._tempId))} className="text-xs font-medium text-red-600 hover:text-red-800">Remove</button></td>
+                      <td className="px-4 py-2"><button type="button" onClick={() => setAssignments((p) => p.filter((x) => x._tempId !== a._tempId))} className="text-xs font-medium text-destructive hover:text-destructive/80">Remove</button></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-          <SOPAssignmentForm onSubmit={(v) => setAssignments((p) => [...p, { ...v, _tempId: Date.now() }])} saving={false} />
+          <SOPAssignmentForm onSubmit={(v) => setAssignments((p) => [...p, { ...v, _tempId: Date.now() }])} saving={false} departments={departments} />
         </div>
       );
     }
@@ -237,63 +240,63 @@ export default function SOPCreateWizard({ open, onClose, onCreated }) {
     // Step 5 — Review
     return (
       <div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-1">Review &amp; Create</h3>
-        <p className="text-sm text-gray-500 mb-5">Review everything below before creating the SOP.</p>
+        <h3 className="text-lg font-semibold text-foreground mb-1">Review &amp; Create</h3>
+        <p className="text-sm text-muted-foreground mb-5">Review everything below before creating the SOP.</p>
 
         {isPartialFailure && (
-          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="mb-4 rounded-lg border border-[var(--accent-gold)]/30 bg-[var(--accent-gold)]/10 p-4">
             <div className="flex items-start gap-2 mb-2">
-              <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5" />
-              <p className="text-sm font-medium text-amber-800">
+              <AlertTriangle className="h-4 w-4 text-[var(--accent-gold)] mt-0.5" />
+              <p className="text-sm font-medium text-[var(--accent-gold)]">
                 The SOP was created, but {failures.length} item{failures.length > 1 ? 's' : ''} failed to save:
               </p>
             </div>
-            <ul className="list-disc pl-9 text-sm text-amber-700 space-y-0.5">
+            <ul className="list-disc pl-9 text-sm text-[var(--accent-gold)] space-y-0.5">
               {failures.map((f, i) => <li key={i}>{f.label}</li>)}
             </ul>
           </div>
         )}
 
         <div className="space-y-4">
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div className="flex items-center gap-2 mb-3"><FileText className="h-4 w-4 text-blue-600" /><h4 className="text-sm font-semibold text-gray-800">Basic Information</h4></div>
+          <div className="rounded-lg border border-[var(--border)] bg-muted p-4">
+            <div className="flex items-center gap-2 mb-3"><FileText className="h-4 w-4 text-primary" /><h4 className="text-sm font-semibold text-foreground">Basic Information</h4></div>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-              <div><dt className="text-gray-500">Title</dt><dd className="font-medium text-gray-900">{sop.title || '-'}</dd></div>
-              <div><dt className="text-gray-500">Code</dt><dd className="font-medium text-gray-900">{sop.code || 'Auto-generated'}</dd></div>
-              <div className="col-span-2"><dt className="text-gray-500">Description</dt><dd className="text-gray-700">{sop.description || '-'}</dd></div>
-              <div><dt className="text-gray-500">Dept</dt><dd className="font-medium text-gray-900">{sop.department_id || '-'}</dd></div>
-              <div><dt className="text-gray-500">Category</dt><dd className="font-medium text-gray-900">{sop.category_id || '-'}</dd></div>
+              <div><dt className="text-muted-foreground">Title</dt><dd className="font-medium text-foreground">{sop.title || '-'}</dd></div>
+              <div><dt className="text-muted-foreground">Code</dt><dd className="font-medium text-foreground">{sop.code || 'Auto-generated'}</dd></div>
+              <div className="col-span-2"><dt className="text-muted-foreground">Description</dt><dd className="text-foreground">{sop.description || '-'}</dd></div>
+              <div><dt className="text-muted-foreground">Dept</dt><dd className="font-medium text-foreground">{sop.department_id || '-'}</dd></div>
+              <div><dt className="text-muted-foreground">Category</dt><dd className="font-medium text-foreground">{sop.category_id || '-'}</dd></div>
             </dl>
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div className="flex items-center gap-2 mb-3"><Layout className="h-4 w-4 text-blue-600" /><h4 className="text-sm font-semibold text-gray-800">Sections ({sections.length})</h4></div>
+          <div className="rounded-lg border border-[var(--border)] bg-muted p-4">
+            <div className="flex items-center gap-2 mb-3"><Layout className="h-4 w-4 text-primary" /><h4 className="text-sm font-semibold text-foreground">Sections ({sections.length})</h4></div>
             {sections.length === 0 ? (
-              <p className="text-sm text-gray-500">No sections added.</p>
+              <p className="text-sm text-muted-foreground">No sections added.</p>
             ) : (
-              <ul className="space-y-1 text-sm text-gray-700">
+              <ul className="space-y-1 text-sm text-foreground">
                 {sections.map((s) => <li key={s._tempId || s.id}>• {s.title || 'Untitled section'}</li>)}
               </ul>
             )}
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div className="flex items-center gap-2 mb-3"><ListOrdered className="h-4 w-4 text-blue-600" /><h4 className="text-sm font-semibold text-gray-800">Procedure Steps ({steps.length})</h4></div>
+          <div className="rounded-lg border border-[var(--border)] bg-muted p-4">
+            <div className="flex items-center gap-2 mb-3"><ListOrdered className="h-4 w-4 text-primary" /><h4 className="text-sm font-semibold text-foreground">Procedure Steps ({steps.length})</h4></div>
             {steps.length === 0 ? (
-              <p className="text-sm text-gray-500">No steps added.</p>
+              <p className="text-sm text-muted-foreground">No steps added.</p>
             ) : (
-              <ol className="space-y-1 text-sm text-gray-700 list-decimal pl-5">
+              <ol className="space-y-1 text-sm text-foreground list-decimal pl-5">
                 {steps.map((s) => <li key={s._tempId || s.id}>{s.title || s.instruction}</li>)}
               </ol>
             )}
           </div>
 
-          <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-            <div className="flex items-center gap-2 mb-3"><Users className="h-4 w-4 text-blue-600" /><h4 className="text-sm font-semibold text-gray-800">Assignments ({assignments.length})</h4></div>
+          <div className="rounded-lg border border-[var(--border)] bg-muted p-4">
+            <div className="flex items-center gap-2 mb-3"><Users className="h-4 w-4 text-primary" /><h4 className="text-sm font-semibold text-foreground">Assignments ({assignments.length})</h4></div>
             {assignments.length === 0 ? (
-              <p className="text-sm text-gray-500">No assignments added.</p>
+              <p className="text-sm text-muted-foreground">No assignments added.</p>
             ) : (
-              <ul className="space-y-1 text-sm text-gray-700">
+              <ul className="space-y-1 text-sm text-foreground">
                 {assignments.map((a) => (
                   <li key={a._tempId}>
                     • {a.assignment_type}: {a.assignment_type === 'Department' ? 'Department #' + a.department_id : a.assignment_type === 'Position' ? a.position_title : 'User #' + a.user_id}
@@ -310,36 +313,36 @@ export default function SOPCreateWizard({ open, onClose, onCreated }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50" onClick={handleClose} />
-      <div className="relative z-10 flex w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl max-h-[90vh]">
-        <button onClick={handleClose} className="absolute right-4 top-4 z-20 rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"><X className="h-5 w-5" /></button>
-        <div className="flex items-center justify-center border-b border-gray-200 bg-gray-50/50 px-6 py-2">{STEPS.map((s, i) => renderBadge(s, i))}</div>
+      <div className="relative z-10 flex w-full max-w-3xl flex-col rounded-2xl bg-[var(--bg-surface)] shadow-2xl max-h-[90vh]">
+        <button onClick={handleClose} className="absolute right-4 top-4 z-20 rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-5 w-5" /></button>
+        <div className="flex items-center justify-center border-b border-[var(--border)] bg-muted/50 px-6 py-2">{STEPS.map((s, i) => renderBadge(s, i))}</div>
         <div className="flex-1 overflow-y-auto px-6 py-5">
           {submitError && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {submitError}
             </div>
           )}
           {renderBody()}
         </div>
-        <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50/50 px-6 py-4">
-          <div>{step > 1 && !isPartialFailure && <button type="button" onClick={prev} disabled={isBusy} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"><ArrowLeft className="h-4 w-4" /> Back</button>}</div>
+        <div className="flex items-center justify-between border-t border-[var(--border)] bg-muted/50 px-6 py-4">
+          <div>{step > 1 && !isPartialFailure && <Button variant="outline" onClick={prev} disabled={isBusy}><ArrowLeft className="h-4 w-4" /> Back</Button>}</div>
           <div className="flex items-center gap-3">
-            {!isPartialFailure && <span className="text-xs text-gray-400">Step {step} of 5</span>}
+            {!isPartialFailure && <span className="text-xs text-muted-foreground">Step {step} of 5</span>}
             {step < 5 && !isPartialFailure ? (
-              <button type="button" onClick={next} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white hover:bg-blue-700">Next <ArrowRight className="h-4 w-4" /></button>
+              <Button variant="default" onClick={next}>Next <ArrowRight className="h-4 w-4" /></Button>
             ) : isPartialFailure ? (
               <>
-                <button type="button" onClick={handleContinueAnyway} disabled={isBusy} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                <Button variant="outline" onClick={handleContinueAnyway} disabled={isBusy}>
                   Continue to SOP anyway
-                </button>
-                <button type="button" onClick={handleSubmit} disabled={isBusy} className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-5 py-2 text-sm font-medium text-white hover:bg-amber-700 disabled:opacity-50">
+                </Button>
+                <Button variant="default" onClick={handleSubmit} disabled={isBusy}>
                   {isBusy ? 'Retrying…' : `Retry Failed (${failures.length})`}
-                </button>
+                </Button>
               </>
             ) : (
-              <button type="button" onClick={handleSubmit} disabled={isBusy} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-5 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+              <Button variant="default" onClick={handleSubmit} disabled={isBusy}>
                 {isBusy ? <><svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> Creating...</> : <><Check className="h-4 w-4" /> Create SOP</>}
-              </button>
+              </Button>
             )}
           </div>
         </div>

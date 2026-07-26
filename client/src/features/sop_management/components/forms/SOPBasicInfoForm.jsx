@@ -1,4 +1,4 @@
-export default function SOPBasicInfoForm({ formData, onChange, errors = {} }) {
+export default function SOPBasicInfoForm({ formData, onChange, errors = {}, departments = [] }) {
   const handleChange = (field) => (event) => {
     const value = event.target.value;
     onChange({ ...formData, [field]: value });
@@ -7,8 +7,8 @@ export default function SOPBasicInfoForm({ formData, onChange, errors = {} }) {
   return (
     <div className="space-y-4">
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="sop-title">
-          Title <span className="text-red-500">*</span>
+        <label className="mb-1 block text-sm font-medium text-foreground" htmlFor="sop-title">
+          Title <span className="text-destructive">*</span>
         </label>
         <input
           id="sop-title"
@@ -16,15 +16,15 @@ export default function SOPBasicInfoForm({ formData, onChange, errors = {} }) {
           value={formData.title}
           onChange={handleChange('title')}
           placeholder="e.g. Fire Evacuation Procedure"
-          className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 ${
-            errors.title ? 'border-red-400' : 'border-gray-300'
+          className={`w-full rounded-lg border bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring ${
+            errors.title ? 'border-destructive' : 'border-[var(--border)]'
           }`}
         />
-        {errors.title && <p className="mt-1 text-xs text-red-600">{errors.title}</p>}
+        {errors.title && <p className="mt-1 text-xs text-destructive">{errors.title}</p>}
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="sop-code">
+        <label className="mb-1 block text-sm font-medium text-foreground" htmlFor="sop-code">
           Code
         </label>
         <input
@@ -33,12 +33,12 @@ export default function SOPBasicInfoForm({ formData, onChange, errors = {} }) {
           value={formData.code}
           onChange={handleChange('code')}
           placeholder="Leave blank to auto-generate"
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="sop-description">
+        <label className="mb-1 block text-sm font-medium text-foreground" htmlFor="sop-description">
           Description
         </label>
         <textarea
@@ -47,26 +47,34 @@ export default function SOPBasicInfoForm({ formData, onChange, errors = {} }) {
           value={formData.description}
           onChange={handleChange('description')}
           placeholder="What is this SOP for?"
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="sop-department">
-            Department ID
+          <label className="mb-1 block text-sm font-medium text-foreground" htmlFor="sop-department">
+            Department
           </label>
-          <input
+          <select
             id="sop-department"
-            type="number"
             value={formData.department_id}
             onChange={handleChange('department_id')}
-            placeholder="Optional"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-          />
+            className={`w-full rounded-lg border bg-[var(--bg-input)] text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring ${
+              errors.department_id ? 'border-destructive' : 'border-[var(--border)]'
+            }`}
+          >
+            <option value="">— Select department —</option>
+            {departments.map((dept) => (
+              <option key={dept.id} value={dept.id}>
+                {dept.name}
+              </option>
+            ))}
+          </select>
+          {errors.department_id && <p className="mt-1 text-xs text-destructive">{errors.department_id}</p>}
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="sop-category">
+          <label className="mb-1 block text-sm font-medium text-foreground" htmlFor="sop-category">
             Category ID
           </label>
           <input
@@ -75,12 +83,12 @@ export default function SOPBasicInfoForm({ formData, onChange, errors = {} }) {
             value={formData.category_id}
             onChange={handleChange('category_id')}
             placeholder="Optional"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
       </div>
 
-      <p className="text-xs text-gray-500">
+      <p className="text-xs text-muted-foreground">
         New SOPs always start as <span className="font-medium">Draft</span>. Status changes happen through the review workflow.
       </p>
     </div>

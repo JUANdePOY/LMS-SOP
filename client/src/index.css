@@ -9,10 +9,10 @@
 :root {
   --bg-page:        #F2F2F0;
   --bg-surface:     #ffffff;
-  --bg-sidebar:     #132F45;
+  --bg-sidebar:     #ffffff;
   --bg-topbar:      #F25C05;
-  --bg-hover:       rgba(255, 255, 255, 0.15);
-  --bg-active:      rgba(255, 255, 255, 0.2);
+  --bg-hover:       rgba(19, 47, 69, 0.06);
+  --bg-active:      rgba(19, 47, 69, 0.09);
   --bg-input:       #ffffff;
   --bg-subtle:      #f6fafd;
   --bg-cover-overlay: rgba(0, 0, 0, 0.4);
@@ -21,12 +21,12 @@
 
   --border:         #dde8ef;
   --border-light:   #edf3f7;
-  --border-sidebar: #1d3f57;
+  --border-sidebar: #e5eaf0;
 
   --text-primary:   #132F45;
   --text-secondary: #32667F;
   --text-muted:     #405b6b;
-  --text-on-sidebar:#a0c4d8;
+  --text-on-sidebar:#2f5770;
 
   --accent-danger:   #cc1f1f;
   --accent-amber:    #1D3067;
@@ -47,7 +47,7 @@
   --card-foreground: var(--text-primary);
   --popover: var(--bg-surface);
   --popover-foreground: var(--text-primary);
-  --primary: 25 60% 30%;
+  --primary: 60 2% 18%;
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 96%;
   --secondary-foreground: 0 0% 25%;
@@ -59,41 +59,43 @@
   --destructive-foreground: 0 0% 100%;
   --input: var(--bg-input);
   --ring: 25 60% 30%;
-  --radius: 0.5rem;
+  --radius: 0.75rem;
 }
 
 .dark {
-  --bg-page:        #0d1b2a;
-  --bg-surface:     #112233;
-  --bg-sidebar:     #0a1520;
-  --bg-topbar:      #F25C05;
-  --bg-hover:       rgba(255, 255, 255, 0.08);
-  --bg-active:      rgba(255, 255, 255, 0.12);
-  --bg-input:       #1a2e42;
-  --bg-subtle:      #0d1b2a;
-  --bg-cover-overlay: rgba(0, 0, 0, 0.5);
-  --btn-bg:         #F25C05;
-  --btn-bg-hover:   #ff7222;
+  --bg-page:        #262624;
+  --bg-surface:     #30302e;
+  --bg-sidebar:     #1f1e1d;
+  --bg-topbar:      #bd5d3a;
+  --bg-hover:       rgba(255, 255, 255, 0.06);
+  --bg-active:      rgba(255, 255, 255, 0.1);
+  --bg-input:       #30302e;
+  --bg-subtle:      #262624;
+  --bg-cover-overlay: rgba(0, 0, 0, 0.6);
+  --btn-bg:         #da7756;
+  --btn-bg-hover:   #e08d6f;
 
-  --border:         #1e3448;
-  --border-light:   #1a2e42;
-  --border-sidebar: #162840;
+  --border:         #3a3937;
+  --border-light:   #333230;
+  --border-sidebar: #333230;
 
-  --text-primary:   #e2ecf4;
-  --text-secondary: #7aafc4;
-  --text-muted:     #3d6880;
-  --text-on-sidebar:#5a8fa8;
+  --text-primary:   #e8e6dc;
+  --text-secondary: #a8a6a0;
+  --text-muted:     #78766f;
+  --text-on-sidebar:#a8a6a0;
 
-  --accent-amber:   #1D3067;
-  --accent-orange:  #fffd18;
-  --accent-gold:    #F3B940;
+  --accent-amber:   #da7756;
+  --accent-orange:  #da7756;
+  --accent-gold:    #da7756;
+  --status-green:   #5a9d6f;
+  --status-red:     #d97a6c;
 
   --shadow-sm:  0 1px 3px rgba(0,0,0,0.3);
   --shadow-md:  0 4px 12px rgba(0,0,0,0.35);
   --shadow-lg:  0 8px 24px rgba(0,0,0,0.4);
   --shadow-xl:  0 24px 60px rgba(0,0,0,0.5);
-  --glass-bg: rgba(17, 34, 51, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(38, 38, 36, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
 
   --background: var(--bg-page);
   --foreground: var(--text-primary);
@@ -101,18 +103,481 @@
   --card-foreground: var(--text-primary);
   --popover: var(--bg-surface);
   --popover-foreground: var(--text-primary);
-  --primary: 210 40% 65%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 210 30% 15%;
-  --secondary-foreground: 0 0% 98%;
-  --muted: 210 30% 15%;
-  --muted-foreground: 210 40% 65%;
-  --accent: 210 40% 65%;
-  --accent-foreground: 0 0% 100%;
-  --destructive: 0 62% 30%;
+  --primary: 60 2% 88%;
+  --primary-foreground: 0 0% 12%;
+  --secondary: 30 4% 20%;
+  --secondary-foreground: 40 15% 90%;
+  --muted: 30 4% 20%;
+  --muted-foreground: 30 6% 60%;
+  --accent: 15 55% 60%;
+  --accent-foreground: 30 20% 12%;
+  --destructive: 8 55% 55%;
   --destructive-foreground: 0 0% 98%;
   --input: var(--bg-input);
-  --ring: 210 40% 65%;
+  --ring: 15 55% 60%;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    @apply transition-colors duration-300;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .styled-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--text-secondary) transparent;
+  }
+
+  .styled-scroll::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .styled-scroll::-webkit-scrollbar-track {
+    background: transparent;
+    border-radius: 999px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+  }
+
+  .styled-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--text-secondary);
+    border-radius: 999px;
+    transition: background-color 0.2s ease;
+  }
+
+  .styled-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: var(--accent-amber);
+  }
+
+  .dark .styled-scroll {
+    scrollbar-color: var(--text-secondary) transparent;
+  }
+
+  .dark .styled-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--text-secondary);
+  }
+
+  .dark .styled-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: var(--accent-amber);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   LOGIN PAGE  — layout mirrors the card-with-coloured-header pattern
+   All colours reference existing design tokens.
+───────────────────────────────────────────────────────────────────────────── */
+@layer components {
+
+  /* ── Full-page wrapper ── */
+  .login-page {
+    display: flex;
+    min-height: 100svh;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5rem 1rem;
+    background-color: var(--bg-page);
+    background-image: linear-gradient(135deg, var(--bg-subtle) 0%, var(--bg-page) 100%);
+  }
+
+  .login-container {
+    width: 100%;
+    max-width: 26rem;           /* matches ~md card in screenshot */
+  }
+
+  /* ── Card shell ── */
+  .login-card {
+    border-radius: 0.75rem;
+    border: 1px solid var(--border);
+    background-color: var(--bg-surface);
+    overflow: hidden;
+    box-shadow: var(--shadow-xl);
+    animation: loginFadeUp 0.5s ease both;
+  }
+
+  @keyframes loginFadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Coloured header block (navy — mirrors screenshot's dark header) ── */
+  .login-card-header {
+    background-color: var(--bg-sidebar);   /* #132F45 navy */
+    padding: 2rem 2rem 1.75rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.875rem;
+  }
+
+  /* Logo image — circular, with a subtle gold ring that echoes the ARCEN seal */
+  .login-logo {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: contain;
+    border: 2.5px solid var(--accent-gold);
+    box-shadow: 0 0 0 4px rgba(217, 163, 0, 0.18);
+    background-color: transparent;
+  }
+
+  .login-card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: #ffffff;
+    margin: 0;
+  }
+
+  .login-card-subtitle {
+    font-size: 0.8125rem;
+    color: rgba(255, 255, 255, 0.55);
+    margin: 0;
+    line-height: 1.5;
+  }
+
+  /* ── Form body (white background, matches screenshot) ── */
+  .login-card-body {
+    background-color: var(--bg-surface);
+    padding: 1.75rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  /* Error alert */
+  .login-error {
+    display: flex;
+    gap: 0.625rem;
+    align-items: flex-start;
+    padding: 0.75rem 1rem;
+    border-radius: 0.375rem;
+    background-color: rgba(204, 31, 31, 0.07);
+    border: 1px solid rgba(204, 31, 31, 0.2);
+  }
+
+  .login-error-icon {
+    flex-shrink: 0;
+    margin-top: 0.0625rem;
+    color: var(--accent-danger);
+  }
+
+  .login-error-text {
+    font-size: 0.8125rem;
+    color: var(--accent-danger);
+    line-height: 1.45;
+  }
+
+  /* Field group */
+  .login-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+
+  .login-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* Input with left-icon wrapper — matches the Lexora screenshot input style */
+  .login-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .login-input-icon {
+    position: absolute;
+    left: 0.875rem;
+    color: var(--text-muted);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+  }
+
+  .login-input {
+    width: 100%;
+    padding: 0.625rem 1rem 0.625rem 2.625rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--border);
+    background-color: var(--bg-subtle);
+    font-size: 0.9375rem;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  }
+
+  .login-input::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+  }
+
+  .login-input:focus {
+    border-color: var(--bg-sidebar);
+    background-color: var(--bg-surface);
+    box-shadow: 0 0 0 3px rgba(19, 47, 69, 0.1);
+  }
+
+  .login-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Password eye toggle */
+  .login-eye-btn {
+    position: absolute;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: color 0.15s ease;
+  }
+
+  .login-eye-btn:hover { color: var(--bg-sidebar); }
+
+  /* Submit button — full-width solid navy */
+  .login-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    margin-top: 0.375rem;
+    padding: 0.7rem 1rem;
+    border-radius: 0.375rem;
+    border: none;
+    background-color: var(--btn-bg);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: #ffffff;
+    cursor: pointer;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  }
+
+  .login-btn:hover:not(:disabled) {
+    background-color: var(--btn-bg-hover);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
+
+  .login-btn:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+
+  .login-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* ── Card footer (parchment-tint, matches screenshot) ── */
+  .login-card-footer {
+    background-color: var(--bg-subtle);
+    border-top: 1px solid var(--border);
+    padding: 1.125rem 2rem 1.25rem;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.625rem;
+  }
+
+  .login-footer-text {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .login-footer-text strong {
+    color: var(--bg-sidebar);
+    font-weight: 600;
+  }
+
+  /* ── Page footer (below card) ── */
+  .login-page-footer {
+    margin-top: 1.25rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  /* ── Dark-mode tweaks ── */
+  .dark .login-card-header {
+    background-color: var(--bg-sidebar);
+  }
+
+  .dark .login-input {
+    background-color: var(--bg-input);
+    border-color: var(--border);
+  }
+
+  .dark .login-input:focus {
+    border-color: var(--accent-gold);
+    box-shadow: 0 0 0 3px rgba(243, 185, 64, 0.1);
+  }
+
+  .dark .login-card-footer {
+    background-color: var(--bg-subtle);
+    border-color: var(--border);
+  }
+
+  .dark .login-back-btn {
+    background-color: var(--bg-input);
+    border-color: var(--border);
+    color: var(--text-primary);
+  }
+
+  .dark .login-error {
+    background-color: rgba(204, 31, 31, 0.12);
+    border-color: rgba(204, 31, 31, 0.28);
+  }
+}@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  ── DESIGN TOKENS — light (default) & dark theme ───────────────────────────────────────────
+  Palette: #132F45 · #32667F · #EEA23A · #F3B940 · #EA8B33
+*/
+:root {
+  --bg-page:        #F2F2F0;
+  --bg-surface:     #ffffff;
+  --bg-sidebar:     #ffffff;
+  --bg-topbar:      #F25C05;
+  --bg-hover:       rgba(19, 47, 69, 0.06);
+  --bg-active:      rgba(19, 47, 69, 0.09);
+  --bg-input:       #ffffff;
+  --bg-subtle:      #f6fafd;
+  --bg-cover-overlay: rgba(0, 0, 0, 0.4);
+  --btn-bg:         #1F1D1C;
+  --btn-bg-hover:   #322f2d;
+
+  --border:         #dde8ef;
+  --border-light:   #edf3f7;
+  --border-sidebar: #e5eaf0;
+
+  --text-primary:   #132F45;
+  --text-secondary: #32667F;
+  --text-muted:     #405b6b;
+  --text-on-sidebar:#2f5770;
+
+  --accent-danger:   #cc1f1f;
+  --accent-amber:    #1D3067;
+  --accent-orange:   #1D3067;
+  --accent-gold:     #d9a300;
+  --status-green:    #205733;
+  --status-red:      #cc1f1f;
+
+  --shadow-sm:  0 1px 3px rgba(19,47,69,0.06);
+  --shadow-md:  0 4px 12px rgba(19,47,69,0.10);
+  --shadow-lg:  0 8px 24px rgba(19,47,69,0.13);
+  --shadow-xl:  0 24px 60px rgba(0,0,0,0.25);
+  --shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --primary: 60 2% 18%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 0 0% 96%;
+  --secondary-foreground: 0 0% 25%;
+  --muted: 0 0% 96%;
+  --muted-foreground: 210 40% 50%;
+  --accent: 25 60% 30%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --input: var(--bg-input);
+  --ring: 25 60% 30%;
+  --radius: 0.75rem;
+}
+
+.dark {
+  --bg-page:        #262624;
+  --bg-surface:     #30302e;
+  --bg-sidebar:     #1f1e1d;
+  --bg-topbar:      #bd5d3a;
+  --bg-hover:       rgba(255, 255, 255, 0.06);
+  --bg-active:      rgba(255, 255, 255, 0.1);
+  --bg-input:       #30302e;
+  --bg-subtle:      #262624;
+  --bg-cover-overlay: rgba(0, 0, 0, 0.6);
+  --btn-bg:         #da7756;
+  --btn-bg-hover:   #e08d6f;
+
+  --border:         #3a3937;
+  --border-light:   #333230;
+  --border-sidebar: #333230;
+
+  --text-primary:   #e8e6dc;
+  --text-secondary: #a8a6a0;
+  --text-muted:     #78766f;
+  --text-on-sidebar:#a8a6a0;
+
+  --accent-amber:   #da7756;
+  --accent-orange:  #da7756;
+  --accent-gold:    #da7756;
+  --status-green:   #5a9d6f;
+  --status-red:     #d97a6c;
+
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md:  0 4px 12px rgba(0,0,0,0.35);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,0.4);
+  --shadow-xl:  0 24px 60px rgba(0,0,0,0.5);
+  --glass-bg: rgba(38, 38, 36, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.08);
+
+  --background: var(--bg-page);
+  --foreground: var(--text-primary);
+  --card: var(--bg-surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--bg-surface);
+  --popover-foreground: var(--text-primary);
+  --primary: 60 2% 88%;
+  --primary-foreground: 0 0% 12%;
+  --secondary: 30 4% 20%;
+  --secondary-foreground: 40 15% 90%;
+  --muted: 30 4% 20%;
+  --muted-foreground: 30 6% 60%;
+  --accent: 15 55% 60%;
+  --accent-foreground: 30 20% 12%;
+  --destructive: 8 55% 55%;
+  --destructive-foreground: 0 0% 98%;
+  --input: var(--bg-input);
+  --ring: 15 55% 60%;
 }
 
 @layer base {
@@ -460,3 +925,5 @@
     border-color: rgba(204, 31, 31, 0.28);
   }
 }
+
+/* ===== END OF FILE ===== */

@@ -14,4 +14,3 @@ export default function SectionModal({ open, onClose, sections, onCreate, onUpda
     </Modal>
   );
 }
-

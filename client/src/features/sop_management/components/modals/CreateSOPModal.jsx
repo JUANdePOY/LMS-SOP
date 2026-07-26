@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Modal } from '@/shared/components/ui/modal';
+import { Button } from '@/shared/components/ui/button';
 import { useSOPModal } from '../../context/SOPModalContext';
 import { useCreateSOP } from '../../hooks/useCreateSOP';
+import { useDepartmentList } from '../../hooks/useDepartmentList';
 import SOPBasicInfoForm from '../forms/SOPBasicInfoForm';
 
 const EMPTY_FORM = {
@@ -15,6 +17,7 @@ const EMPTY_FORM = {
 export default function CreateSOPModal({ onCreated }) {
   const { modalState, closeModal } = useSOPModal();
   const { create, loading } = useCreateSOP();
+  const { departments } = useDepartmentList();
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
@@ -69,32 +72,22 @@ export default function CreateSOPModal({ onCreated }) {
       title="Create SOP"
       footer={
         <>
-          <button
-            type="button"
-            onClick={handleClose}
-            disabled={loading}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
+          <Button variant="outline" onClick={handleClose} disabled={loading}>
             Cancel
-          </button>
-          <button
-            type="submit"
-            form="create-sop-form"
-            disabled={loading}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" form="create-sop-form" disabled={loading}>
             {loading ? 'Creating…' : 'Create SOP'}
-          </button>
+          </Button>
         </>
       }
     >
       <form id="create-sop-form" onSubmit={handleSubmit}>
         {submitError && (
-          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
             {submitError}
           </div>
         )}
-        <SOPBasicInfoForm formData={formData} onChange={setFormData} errors={errors} />
+        <SOPBasicInfoForm formData={formData} onChange={setFormData} errors={errors} departments={departments} />
       </form>
     </Modal>
   );

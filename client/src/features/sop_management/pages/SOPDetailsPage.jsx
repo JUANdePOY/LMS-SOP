@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, XCircle, Send, Archive, FileText, Layout, ListOrdered, Paperclip, Users, ThumbsUp, GitBranch, History } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Send, Archive, FileText, Layout, ListOrdered, Paperclip, Users, ThumbsUp, GitBranch, History, Pencil } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
 import { useSOPContext } from '../context/SOPContext';
 import { useSOPPermission } from '../context/SOPPermissionContext';
 import { useSOPDetails } from '../hooks/useSOPDetails';
@@ -19,6 +20,8 @@ import ApproveModal from '../components/modals/ApproveModal';
 import RejectModal from '../components/modals/RejectModal';
 import PublishModal from '../components/modals/PublishModal';
 import ArchiveModal from '../components/modals/ArchiveModal';
+import EditBasicInfoModal from '../components/modals/EditBasicInfoModal';
+import { useUpdateSOP } from '../hooks/useUpdateSOP';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: FileText },
@@ -46,6 +49,9 @@ export default function SOPDetailsPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [showEditBasicInfoModal, setShowEditBasicInfoModal] = useState(false);
+
+  const { update: updateSop, loading: updating } = useUpdateSOP();
 
   useEffect(() => { setSelectedSopId(Number(id)); }, [id, setSelectedSopId]);
 
@@ -95,10 +101,22 @@ export default function SOPDetailsPage() {
     catch (err) { showError(err?.response?.data?.message || err?.message || 'Unable to archive'); }
   };
 
-  if (loading) { return <div className="text-sm text-gray-500 py-4">Loading SOP details...</div>; }
+  const handleEditSave = async (data) => {
+    try {
+      await updateSop(id, data);
+      success('SOP updated successfully');
+      setShowEditBasicInfoModal(false);
+      await refresh();
+    } catch (err) {
+      showError(err?.response?.data?.message || err?.message || 'Unable to update SOP');
+      throw err; // Let modal know the save failed
+    }
+  };
+
+  if (loading) { return <div className="text-sm text-muted-foreground py-4">Loading SOP details...</div>; }
 
   if (error || !sop) {
-    return <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error || 'SOP not found.'}</div>;
+    return <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error || 'SOP not found.'}</div>;
   }
 
   const isDraft = sop.status === 'Draft';
@@ -109,80 +127,83 @@ export default function SOPDetailsPage() {
 
   return (
     <div className="space-y-6">
-      <button onClick={() => navigate('/sops')} className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800">
-        <ArrowLeft className="h-4 w-4" /> Back to library
-      </button>
+      <Button variant="link" onClick={() => navigate('/sops')}>
+        <ArrowLeft className="h-4 w-4" /> Back to SOP List
+      </Button>
 
       {/* Header Card */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-6 shadow-sm">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium uppercase tracking-[0.24em] text-blue-600">SOP Details</p>
+            <p className="text-sm font-medium uppercase tracking-[0.24em] text-primary">SOP Details</p>
             <div className="mt-1 flex items-center gap-3">
-              <h1 className="text-2xl font-semibold text-gray-900 truncate">{sop.title || 'Untitled SOP'}</h1>
+              <h1 className="text-2xl font-semibold text-foreground truncate">{sop.title || 'Untitled SOP'}</h1>
               <span
                 className={'shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ' +
                   (isPublished
-                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    ? 'border-[var(--status-green)]/30 bg-[var(--status-green)]/10 text-[var(--status-green)]'
                     : isArchived
-                      ? 'border-red-200 bg-red-50 text-red-700'
+                      ? 'border-destructive/30 bg-destructive/10 text-destructive'
                       : isApproved
-                        ? 'border-blue-200 bg-blue-50 text-blue-700'
+                        ? 'border-primary/30 bg-primary/10 text-primary'
                         : isForReview
-                          ? 'border-amber-200 bg-amber-50 text-amber-700'
-                          : 'border-gray-200 bg-gray-50 text-gray-600')}
+                          ? 'border-[var(--accent-gold)]/30 bg-[var(--accent-gold)]/10 text-[var(--accent-gold)]'
+                          : 'border-[var(--border)] bg-muted text-muted-foreground')}
               >
                 {sop.status || 'Draft'}
               </span>
             </div>
-            {sop.description && <p className="mt-2 text-sm text-gray-500 line-clamp-2">{sop.description}</p>}
+            {sop.description && <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{sop.description}</p>}
           </div>
 
           {/* Action Buttons */}
           <div className="flex shrink-0 flex-wrap gap-2">
             {isDraft && (
-              <button type="button" onClick={handleSubmitForReview} className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700">
-                <Send className="h-4 w-4" /> Submit for Review
-              </button>
+              <>
+                <Button variant="outline" onClick={() => setShowEditBasicInfoModal(true)}>
+                  <Pencil className="h-4 w-4" /> Edit
+                </Button>
+                <Button variant="default" onClick={handleSubmitForReview}>
+                  <Send className="h-4 w-4" /> Submit for Review
+                </Button>
+              </>
             )}
             {isForReview && canApprove && (
               <>
-                <button type="button" onClick={() => setShowApproveModal(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700">
+                <Button variant="default" onClick={() => setShowApproveModal(true)}>
                   <CheckCircle2 className="h-4 w-4" /> Approve
-                </button>
-                <button type="button" onClick={() => setShowRejectModal(true)} className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700">
+                </Button>
+                <Button variant="destructive" onClick={() => setShowRejectModal(true)}>
                   <XCircle className="h-4 w-4" /> Reject
-                </button>
+                </Button>
               </>
             )}
             {isApproved && canPublish && (
-              <button type="button" onClick={() => setShowPublishModal(true)} disabled={publishing}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
+              <Button variant="default" onClick={() => setShowPublishModal(true)} disabled={publishing}>
                 <CheckCircle2 className="h-4 w-4" /> {publishing ? 'Publishing...' : 'Publish'}
-              </button>
+              </Button>
             )}
             {isPublished && canArchive && (
-              <button type="button" onClick={() => setShowArchiveModal(true)} disabled={archiving}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">
+              <Button variant="destructive" onClick={() => setShowArchiveModal(true)} disabled={archiving}>
                 <Archive className="h-4 w-4" /> {archiving ? 'Archiving...' : 'Archive'}
-              </button>
+              </Button>
             )}
           </div>
         </div>
 
         {/* Metadata Chips */}
-        <div className="mt-6 flex flex-wrap gap-4 text-sm text-gray-500">
-          <span>Code: <strong className="text-gray-800">{sop.code || '-'}</strong></span>
-          <span>Version: <strong className="text-gray-800">{sop.version || '1.0'}</strong></span>
-          <span>Department: <strong className="text-gray-800">{sop.department_name || sop.department_id || '-'}</strong></span>
-          <span>Owner: <strong className="text-gray-800">{sop.owner_name || '-'}</strong></span>
+        <div className="mt-6 flex flex-wrap gap-4 text-sm text-muted-foreground">
+          <span>Code: <strong className="text-foreground">{sop.code || '-'}</strong></span>
+          <span>Version: <strong className="text-foreground">{sop.version || '1.0'}</strong></span>
+          <span>Department: <strong className="text-foreground">{sop.department_name || sop.department_id || '-'}</strong></span>
+          <span>Owner: <strong className="text-foreground">{sop.owner_name || '-'}</strong></span>
         </div>
       </div>
 
       {/* Tabs Navigation */}
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-6 shadow-sm">
         <div className="overflow-x-auto">
-          <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1 w-fit min-w-max">
+          <div className="flex gap-1 rounded-lg border border-[var(--border)] bg-muted p-1 w-fit min-w-max">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -193,8 +214,8 @@ export default function SOPDetailsPage() {
                   className={
                     'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition whitespace-nowrap ' +
                     (activeTab === tab.id
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900')
+                      ? 'bg-[var(--bg-surface)] text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground')
                   }
                 >
                   <Icon className="h-4 w-4" /> {tab.label}
@@ -222,6 +243,13 @@ export default function SOPDetailsPage() {
       <RejectModal open={showRejectModal} onClose={() => setShowRejectModal(false)} onReject={handleReject} saving={false} />
       <PublishModal open={showPublishModal} onClose={() => setShowPublishModal(false)} onPublish={handlePublish} saving={publishing} />
       <ArchiveModal open={showArchiveModal} onClose={() => setShowArchiveModal(false)} onArchive={handleArchive} saving={archiving} />
+      <EditBasicInfoModal
+        open={showEditBasicInfoModal}
+        onClose={() => setShowEditBasicInfoModal(false)}
+        onSave={handleEditSave}
+        sop={sop}
+        saving={updating}
+      />
     </div>
   );
 }

@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { Button } from '@/shared/components/ui/button';
 import { ASSIGNMENT_TYPE, ASSIGNMENT_TYPE_LABELS, ASSIGNMENT_TYPE_LIST } from '../../constants/assignmentTypes';
 import { validateAssignmentForm } from '../../validators/assignment.validator';
 
-export default function SOPAssignmentForm({ onSubmit, saving }) {
+export default function SOPAssignmentForm({ onSubmit, saving, departments = [] }) {
   const [assignmentType, setAssignmentType] = useState(ASSIGNMENT_TYPE.DEPARTMENT);
   const [departmentId, setDepartmentId] = useState('');
   const [positionTitle, setPositionTitle] = useState('');
@@ -47,17 +48,17 @@ export default function SOPAssignmentForm({ onSubmit, saving }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       {submitError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {submitError}
         </div>
       )}
 
       <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">Assignment Type</label>
+        <label className="mb-1 block text-sm font-medium text-foreground">Assignment Type</label>
         <select
           value={assignmentType}
           onChange={(e) => handleTypeChange(e.target.value)}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
         >
           {ASSIGNMENT_TYPE_LIST.map((type) => (
             <option key={type} value={type}>
@@ -69,68 +70,68 @@ export default function SOPAssignmentForm({ onSubmit, saving }) {
 
       {assignmentType === ASSIGNMENT_TYPE.DEPARTMENT && (
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Department ID <span className="text-red-500">*</span>
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            Department <span className="text-destructive">*</span>
           </label>
-          <input
-            type="number"
+          <select
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
-            placeholder="Enter department ID"
-            className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 ${
-              errors.department_id ? 'border-red-400' : 'border-gray-300'
+            className={`w-full rounded-lg border bg-[var(--bg-input)] text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring ${
+              errors.department_id ? 'border-destructive' : 'border-[var(--border)]'
             }`}
-          />
-          {errors.department_id && <p className="mt-1 text-xs text-red-600">{errors.department_id}</p>}
+          >
+            <option value="">— Select department —</option>
+            {departments.map((dept) => (
+              <option key={dept.id} value={dept.id}>
+                {dept.name}
+              </option>
+            ))}
+          </select>
+          {errors.department_id && <p className="mt-1 text-xs text-destructive">{errors.department_id}</p>}
         </div>
       )}
 
       {assignmentType === ASSIGNMENT_TYPE.POSITION && (
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            Position Title <span className="text-red-500">*</span>
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            Position Title <span className="text-destructive">*</span>
           </label>
           <input
             type="text"
             value={positionTitle}
             onChange={(e) => setPositionTitle(e.target.value)}
             placeholder="e.g. QA Officer, Safety Inspector"
-            className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 ${
-              errors.position_title ? 'border-red-400' : 'border-gray-300'
+            className={`w-full rounded-lg border bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring ${
+              errors.position_title ? 'border-destructive' : 'border-[var(--border)]'
             }`}
           />
-          {errors.position_title && <p className="mt-1 text-xs text-red-600">{errors.position_title}</p>}
+          {errors.position_title && <p className="mt-1 text-xs text-destructive">{errors.position_title}</p>}
         </div>
       )}
 
       {assignmentType === ASSIGNMENT_TYPE.USER && (
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            User ID <span className="text-red-500">*</span>
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            User ID <span className="text-destructive">*</span>
           </label>
           <input
             type="number"
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
             placeholder="Enter user ID"
-            className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 ${
-              errors.user_id ? 'border-red-400' : 'border-gray-300'
+            className={`w-full rounded-lg border bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring ${
+              errors.user_id ? 'border-destructive' : 'border-[var(--border)]'
             }`}
           />
-          {errors.user_id && <p className="mt-1 text-xs text-red-600">{errors.user_id}</p>}
+          {errors.user_id && <p className="mt-1 text-xs text-destructive">{errors.user_id}</p>}
         </div>
       )}
 
       <div className="flex justify-end gap-2 pt-2">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-        >
+        <Button type="submit" variant="default" disabled={saving}>
           {saving ? 'Adding…' : 'Add Assignment'}
-        </button>
+        </Button>
       </div>
     </form>
   );
 }
-

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Trash2, Plus } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
 import { SECTION_TYPE, SECTION_TYPE_LABELS, SECTION_TYPE_LIST } from '../../constants/sectionTypes';
 import { validateSection } from '../../validators/section.validator';
 
@@ -61,9 +62,9 @@ export default function SOPSectionForm({ sections, onCreate, onUpdate, onRemove,
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-lg border border-gray-200">
+      <div className="overflow-hidden rounded-lg border border-[var(--border)]">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
+          <thead className="bg-muted text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-2">Section</th>
               <th className="px-4 py-2">Content</th>
@@ -71,33 +72,28 @@ export default function SOPSectionForm({ sections, onCreate, onUpdate, onRemove,
               <th className="w-16 px-4 py-2">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-[var(--border)]">
             {PRESET_TYPES.map((type, index) => {
               const existing = findSection(type);
               return (
                 <tr key={type}>
-                  <td className="px-4 py-2 font-medium text-gray-700">{SECTION_TYPE_LABELS[type]}</td>
+                  <td className="px-4 py-2 font-medium text-foreground">{SECTION_TYPE_LABELS[type]}</td>
                   <td className="px-4 py-2">
                     <input
                       type="text"
                       defaultValue={existing?.content || ''}
                       onBlur={(e) => handlePresetContentChange(type, e.target.value)}
                       placeholder={`Enter ${SECTION_TYPE_LABELS[type].toLowerCase()}...`}
-                      className="w-full rounded border border-gray-300 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-ring"
                     />
-                    {rowErrors[type] && <p className="mt-1 text-xs text-red-600">{rowErrors[type]}</p>}
+                    {rowErrors[type] && <p className="mt-1 text-xs text-destructive">{rowErrors[type]}</p>}
                   </td>
-                  <td className="px-4 py-2 text-gray-500">{index + 1}</td>
+                  <td className="px-4 py-2 text-muted-foreground">{index + 1}</td>
                   <td className="px-4 py-2">
-                    {existing && (
-                      <button
-                        type="button"
-                        onClick={() => onRemove(existing.id)}
-                        disabled={saving}
-                        className="text-gray-400 hover:text-red-600 disabled:opacity-50"
-                      >
+{existing && (
+                      <Button variant="ghost" size="icon" onClick={() => onRemove(existing.id)} disabled={saving} title="Remove section">
                         <Trash2 className="h-4 w-4" />
-                      </button>
+                      </Button>
                     )}
                   </td>
                 </tr>
@@ -106,25 +102,20 @@ export default function SOPSectionForm({ sections, onCreate, onUpdate, onRemove,
 
             {customSections.map((section, index) => (
               <tr key={section.id}>
-                <td className="px-4 py-2 font-medium text-gray-700">{section.title}</td>
+                <td className="px-4 py-2 font-medium text-foreground">{section.title}</td>
                 <td className="px-4 py-2">
                   <input
                     type="text"
                     defaultValue={section.content || ''}
                     onBlur={(e) => onUpdate(section.id, { content: e.target.value })}
-                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-ring"
                   />
                 </td>
-                <td className="px-4 py-2 text-gray-500">{PRESET_TYPES.length + index + 1}</td>
+                <td className="px-4 py-2 text-muted-foreground">{PRESET_TYPES.length + index + 1}</td>
                 <td className="px-4 py-2">
-                  <button
-                    type="button"
-                    onClick={() => onRemove(section.id)}
-                    disabled={saving}
-                    className="text-gray-400 hover:text-red-600 disabled:opacity-50"
-                  >
+<Button variant="ghost" size="icon" onClick={() => onRemove(section.id)} disabled={saving} title="Remove section">
                     <Trash2 className="h-4 w-4" />
-                  </button>
+                  </Button>
                 </td>
               </tr>
             ))}
@@ -132,33 +123,28 @@ export default function SOPSectionForm({ sections, onCreate, onUpdate, onRemove,
         </table>
       </div>
 
-      <div className="rounded-lg border border-dashed border-gray-300 p-3">
+      <div className="rounded-lg border border-dashed border-[var(--border)] p-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
           <input
             type="text"
             value={customTitle}
             onChange={(e) => setCustomTitle(e.target.value)}
             placeholder="Custom section title"
-            className="w-full rounded border border-gray-300 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500 sm:w-48"
+            className="w-full rounded border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring sm:w-48"
           />
           <input
             type="text"
             value={customContent}
             onChange={(e) => setCustomContent(e.target.value)}
             placeholder="Content"
-            className="w-full flex-1 rounded border border-gray-300 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full flex-1 rounded border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
-          <button
-            type="button"
-            onClick={handleAddCustom}
-            disabled={saving}
-            className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200 disabled:opacity-50"
-          >
+          <Button variant="outline" onClick={handleAddCustom} disabled={saving}>
             <Plus className="h-4 w-4" />
             Add Section
-          </button>
+          </Button>
         </div>
-        {addError && <p className="mt-1 text-xs text-red-600">{addError}</p>}
+        {addError && <p className="mt-1 text-xs text-destructive">{addError}</p>}
       </div>
     </div>
   );

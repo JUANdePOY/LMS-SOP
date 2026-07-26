@@ -1,4 +1,5 @@
 import { Trash2, Building2, Briefcase, User } from 'lucide-react';
+import { Button } from '@/shared/components/ui/button';
 import { ASSIGNMENT_TYPE } from '../../constants/assignmentTypes';
 
 const TYPE_ICONS = {
@@ -68,15 +69,9 @@ export default function AssignmentTable({ assignments, onDelete, loading, disabl
               </td>
               <td className="px-4 py-3 text-right">
                 {onDelete && (
-                  <button
-                    type="button"
-                    onClick={() => onDelete(assignment.id)}
-                    disabled={disabled}
-                    className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                    title="Remove assignment"
-                  >
+                  <Button variant="ghost" size="icon" onClick={() => onDelete(assignment.id)} disabled={disabled} title="Remove assignment">
                     <Trash2 className="h-4 w-4" />
-                  </button>
+                  </Button>
                 )}
               </td>
             </tr>

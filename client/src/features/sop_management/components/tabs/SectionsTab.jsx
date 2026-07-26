@@ -14,12 +14,12 @@ export default function SectionsTab({ sopId }) {
   } = useSOPSections(sopId);
 
   if (loading && sections.length === 0) {
-    return <div className="text-sm text-gray-500 py-4">Loading sections…</div>;
+    return <div className="text-sm text-[var(--text-muted)] py-4">Loading sections…</div>;
   }
 
   if (error) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+      <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
         {error}
       </div>
     );
@@ -28,8 +28,8 @@ export default function SectionsTab({ sopId }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <FileText className="h-5 w-5 text-blue-600" />
-        <h3 className="text-base font-semibold text-gray-900">
+        <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+        <h3 className="text-base font-semibold text-[var(--text-primary)]">
           Sections ({sections.length})
         </h3>
       </div>
@@ -44,4 +44,3 @@ export default function SectionsTab({ sopId }) {
     </div>
   );
 }
-

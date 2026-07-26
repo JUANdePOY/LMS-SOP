@@ -19,7 +19,6 @@ import {
   LogOut,
   User,
   ChevronDown,
-  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
@@ -113,6 +112,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
     <aside
       className={cn(
         "fixed inset-y-0 left-0 z-50 flex flex-col",
+        "bg-[var(--bg-sidebar)] text-[var(--text-on-sidebar)]",
         "transition-all duration-200 ease-out",
         collapsed ? "w-[64px]" : "w-[260px]",
         "max-lg:-translate-x-full",
@@ -123,7 +123,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
       <div
         className={cn(
           "flex h-14 shrink-0 items-center",
-          "border-b border-[var(--border-sidebar)]",
+          "bg-[var(--bg-topbar)] shadow-[0_1px_0_rgba(0,0,0,0.15)]",
           collapsed ? "justify-center px-0" : "justify-between px-4"
         )}
       >
@@ -135,30 +135,20 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
             collapsed && "justify-center"
           )}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
             <LayoutDashboard size={18} className="text-white" />
           </div>
           {!collapsed && (
             <div className="flex flex-col leading-tight overflow-hidden">
-              <span className="text-[13px] font-black tracking-[0.08em] text-neutral-900 dark:text-neutral-100 leading-none">
+              <span className="text-[13px] font-black tracking-[0.08em] text-white leading-none">
                 SOP TRAINING
               </span>
-              <span className="mt-[2px] text-[9px] font-medium tracking-[0.06em] uppercase text-neutral-500 leading-none">
+              <span className="mt-[2px] text-[9px] font-medium tracking-[0.06em] uppercase text-white/70 leading-none">
                 PLATFORM
               </span>
             </div>
           )}
         </Link>
-
-        {!collapsed && (
-          <button
-            onClick={() => {}}
-            aria-label="Collapse sidebar"
-            className="hidden lg:flex h-6 w-6 items-center justify-center rounded text-neutral-400 hover:text-neutral-600 transition-colors"
-          >
-            <ChevronRight size={14} />
-          </button>
-        )}
       </div>
 
       {/* Navigation */}
@@ -172,18 +162,18 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
             return (
               <div key={item.name} className="mb-4">
                 {!collapsed && (
-                  <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-neutral-400 dark:text-neutral-500">
+                  <p className="mb-1.5 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[color-mix(in_srgb,var(--text-on-sidebar)_55%,transparent)]">
                     {item.name}
                   </p>
                 )}
                 {collapsed && (
-                  <div className="mx-2 mb-2 h-px bg-neutral-200 dark:bg-neutral-700" />
+                  <div className="mx-2 mb-2 h-px bg-[var(--border-sidebar)]" />
                 )}
                 <ul className="space-y-0.5" role="list">
                   {item.items.map((sub) => (
                     <li key={sub.path}>
                       {sub.sub ? (
-                        <div>
+                        <div className="w-full">
                           <button
                             onClick={() => {
                               if (collapsed) {
@@ -194,18 +184,34 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                               }
                             }}
                             className={cn(
-                              "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                              "relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5",
+                              "text-sm font-medium leading-none tracking-[-0.01em]",
+                              "transition-all duration-200 ease-out",
+                              "outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-amber)_60%,transparent)]",
                               isActive(sub.path)
-                                ? "bg-blue-600 text-white"
-                                : "text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                                ? [
+                                    "text-[var(--text-on-sidebar)] bg-[var(--bg-active)]",
+                                    "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
+                                    "before:h-[18px] before:w-0.5 before:rounded-full",
+                                    "before:bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]",
+                                  ]
+                                : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:text-[var(--text-on-sidebar)] hover:bg-[var(--bg-hover)]",
+                              collapsed && "justify-center px-0"
                             )}
                           >
-                            <sub.icon size={18} className="shrink-0" />
+                            <span
+                              className={cn(
+                                "flex h-[18px] w-[18px] shrink-0 items-center justify-center transition-colors duration-200",
+                                isActive(sub.path) ? "text-[var(--text-on-sidebar)]" : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)]"
+                              )}
+                            >
+                              <sub.icon size={17} strokeWidth={isActive(sub.path) ? 2.2 : 1.8} />
+                            </span>
                             {!collapsed && (
                               <>
-                                <span className="flex-1 text-left">{sub.name}</span>
+                                <span className="flex-1 text-left truncate">{sub.name}</span>
                                 <ChevronDown
-                                  size={14}
+                                  size={13}
                                   className={cn(
                                     "transition-transform duration-200",
                                     isExpanded ? "rotate-180" : ""
@@ -215,24 +221,39 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                             )}
                           </button>
                           {isExpanded && !collapsed && sub.sub && (
-                            <ul className="mt-0.5 space-y-0.5 px-3">
-                              {sub.sub.map((subItem) => (
-                                <li key={subItem}>
-                                  <Link
-                                    to={`${sub.path}/${subItem.toLowerCase().replace(/\s+/g, '-')}`}
-                                    onClick={handleNavClick}
-                                    className={cn(
-                                      "flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-colors",
-                                      isActive(`${sub.path}/${subItem.toLowerCase().replace(/\s+/g, '-')}`)
-                                        ? "bg-blue-600 text-white"
-                                        : "text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                                    )}
-                                  >
-                                    {subItem}
-                                  </Link>
-                                </li>
-                              ))}
-                            </ul>
+                            <div className="overflow-hidden transition-all duration-200 ease-out">
+                              <div className="relative ml-[22px] mt-0.5 border-l border-[var(--border-sidebar)] pb-0.5">
+                                <ul className="space-y-0.5 py-0.5" role="list">
+                                  {sub.sub.map((subItem) => {
+                                    const subPath = `${sub.path}/${subItem.toLowerCase().replace(/\s+/g, '-')}`;
+                                    const active = isActive(subPath);
+                                    return (
+                                      <li key={subItem}>
+                                        <Link
+                                          to={subPath}
+                                          onClick={handleNavClick}
+                                          className={cn(
+                                            "relative flex items-center gap-2.5 rounded-lg py-2 pl-9 pr-3 w-full",
+                                            "text-[13px] font-medium leading-none tracking-[-0.01em]",
+                                            "transition-all duration-150 ease-out",
+                                            active
+                                              ? [
+                                                  "text-[var(--text-on-sidebar)] bg-[var(--bg-active)]",
+                                                  "before:absolute before:left-[18px] before:top-1/2 before:-translate-y-1/2",
+                                                  "before:h-[14px] before:w-0.5 before:rounded-full",
+                                                  "before:bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]",
+                                                ]
+                                              : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:text-[var(--text-on-sidebar)] hover:bg-[var(--bg-hover)]"
+                                          )}
+                                        >
+                                          {subItem}
+                                        </Link>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            </div>
                           )}
                         </div>
                       ) : (
@@ -288,7 +309,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
           {profileMenuOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setProfileMenuOpen(false)} />
-              <div className="absolute bottom-0 top-auto z-50 w-48 rounded-xl border border-[var(--border)] bg-white dark:bg-neutral-900 shadow-lg py-1">
+              <div className="absolute left-full bottom-0 top-auto z-50 ml-2 w-48 rounded-xl border border-[var(--border)] bg-white dark:bg-neutral-900 shadow-lg py-1">
                 <div className="px-3 py-2 border-b border-neutral-100 dark:border-neutral-800">
                   <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100 truncate">
                     {user?.full_name || 'User'}
@@ -323,10 +344,10 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
 
         {!collapsed && (
           <div className="flex flex-1 flex-col leading-tight overflow-hidden">
-            <span className="truncate text-[13px] font-medium text-neutral-900 dark:text-neutral-100">
+            <span className="truncate text-[13px] font-medium text-[var(--text-on-sidebar)]">
               {user?.full_name || user?.email || 'User'}
             </span>
-            <span className="truncate text-[11px] text-neutral-500">
+            <span className="truncate text-[11px] text-[var(--text-on-sidebar)]">
               {roleLabel}
             </span>
           </div>
