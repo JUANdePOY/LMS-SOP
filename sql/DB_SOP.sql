@@ -17,7 +17,7 @@
 --   - created_by / updated_by / created_at / updated_at on every core table
 --   - Composite indexes tuned to real query patterns
 --   - Config-driven approval workflow engine (no hardcoded approval chains)
---   - Full audit trail via audit_logs + triggers
+--   - Full audit trail via sop_audit_logs + triggers
 --   - Naming convention: pk_ fk_ idx_ uq_ ck_
 --
 -- SQL File Structure
@@ -64,14 +64,14 @@ SET FOREIGN_KEY_CHECKS = 0;
 --   categories  (1) ---- (N) sops
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS categories (
-    id              BIGINT UNSIGNED AUTO_INCREMENT,
+    id              INT AUTO_INCREMENT,
     public_id       CHAR(36)      NOT NULL DEFAULT (UUID()),
-    department_id   BIGINT UNSIGNED NULL,
+    department_id   INT NULL,
     name            VARCHAR(100)  NOT NULL,
     description     TEXT NULL,
     is_active       TINYINT(1)    NOT NULL DEFAULT 1,
-    created_by      BIGINT UNSIGNED NULL,
-    updated_by      BIGINT UNSIGNED NULL,
+    created_by      INT NULL,
+    updated_by      INT NULL,
     created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at      DATETIME      NULL,
@@ -92,10 +92,10 @@ CREATE TABLE IF NOT EXISTS categories (
 --   Free-form labels for search/discovery, many-to-many with sops.
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS tags (
-    id          BIGINT UNSIGNED AUTO_INCREMENT,
+    id          INT AUTO_INCREMENT,
     public_id   CHAR(36)     NOT NULL DEFAULT (UUID()),
     name        VARCHAR(100) NOT NULL,
-    created_by  BIGINT UNSIGNED NULL,
+    created_by  INT NULL,
     created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at  DATETIME     NULL,
     CONSTRAINT pk_tags PRIMARY KEY (id),
@@ -122,18 +122,18 @@ CREATE TABLE IF NOT EXISTS tags (
 --   sops        (1) ---- (N) sop_versions
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS sops (
-    id                  BIGINT UNSIGNED AUTO_INCREMENT,
+    id                  INT AUTO_INCREMENT,
     public_id           CHAR(36)      NOT NULL DEFAULT (UUID()),
     sop_code            VARCHAR(50)   NOT NULL,
     title               VARCHAR(255)  NOT NULL,
     description         TEXT NULL,
-    department_id       BIGINT UNSIGNED NOT NULL,
-    category_id         BIGINT UNSIGNED NULL,
-    owner_id            BIGINT UNSIGNED NOT NULL,
-    current_version_id  BIGINT UNSIGNED NULL,   -- FK added later (see section 16, avoids circular dependency)
+    department_id       INT NOT NULL,
+    category_id         INT NULL,
+    owner_id            INT NOT NULL,
+    current_version_id  INT NULL,   -- FK added later (see section 16, avoids circular dependency)
     status              ENUM('Draft','For Review','Approved','Published','Archived') NOT NULL DEFAULT 'Draft',
-    created_by          BIGINT UNSIGNED NOT NULL,
-    updated_by          BIGINT UNSIGNED NULL,
+    created_by          INT NOT NULL,
+    updated_by          INT NULL,
     created_at          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at          DATETIME      NULL,
@@ -152,8 +152,8 @@ CREATE TABLE IF NOT EXISTS sops (
 -- Table: sop_tags (junction)
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS sop_tags (
-    sop_id  BIGINT UNSIGNED NOT NULL,
-    tag_id  BIGINT UNSIGNED NOT NULL,
+    sop_id  INT NOT NULL,
+    tag_id  INT NOT NULL,
     CONSTRAINT pk_sop_tags PRIMARY KEY (sop_id, tag_id),
     CONSTRAINT fk_sop_tags_sop FOREIGN KEY (sop_id) REFERENCES sops(id) ON DELETE CASCADE,
     CONSTRAINT fk_sop_tags_tag FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
@@ -173,9 +173,9 @@ CREATE TABLE IF NOT EXISTS sop_tags (
 --   sops (1) ---- (N) sop_versions
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS sop_versions (
-    id              BIGINT UNSIGNED AUTO_INCREMENT,
+    id              INT AUTO_INCREMENT,
     public_id       CHAR(36)      NOT NULL DEFAULT (UUID()),
-    sop_id          BIGINT UNSIGNED NOT NULL,
+    sop_id          INT NOT NULL,
     version         VARCHAR(20)   NOT NULL,        -- e.g. '1.0', '1.1', '2.0'
     is_current      TINYINT(1)    NOT NULL DEFAULT 0,
     change_summary  TEXT NULL,
@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS sop_versions (
     status          ENUM('Draft','For Review','Approved','Published','Archived') NOT NULL DEFAULT 'Draft',
     published_at    DATETIME NULL,
     archived_at     DATETIME NULL,
-    created_by      BIGINT UNSIGNED NOT NULL,
+    created_by      INT NOT NULL,
     created_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at      DATETIME      NULL,
     CONSTRAINT pk_sop_versions PRIMARY KEY (id),
@@ -201,12 +201,12 @@ CREATE TABLE IF NOT EXISTS sop_versions (
 --   review ("who changed what, when").
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS sop_change_logs (
-    id              BIGINT UNSIGNED AUTO_INCREMENT,
-    sop_version_id  BIGINT UNSIGNED NOT NULL,
+    id              INT AUTO_INCREMENT,
+    sop_version_id  INT NOT NULL,
     field_name      VARCHAR(100) NOT NULL,
     old_value       LONGTEXT NULL,
     new_value       LONGTEXT NULL,
-    changed_by      BIGINT UNSIGNED NULL,
+    changed_by      INT NULL,
     changed_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_sop_change_logs PRIMARY KEY (id),
     CONSTRAINT fk_changelog_version FOREIGN KEY (sop_version_id) REFERENCES sop_versions(id) ON DELETE CASCADE,
@@ -223,14 +223,14 @@ CREATE TABLE IF NOT EXISTS sop_change_logs (
 --   belonging to one specific version.
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS sop_sections (
-    id              BIGINT UNSIGNED AUTO_INCREMENT,
-    sop_version_id  BIGINT UNSIGNED NOT NULL,
+    id              INT AUTO_INCREMENT,
+    sop_version_id  INT NOT NULL,
     section_type    ENUM('Purpose','Scope','Objectives','Responsibilities','Definitions','Safety Notes','References','Appendix') NOT NULL,
     title           VARCHAR(255) NULL,
     content         LONGTEXT NOT NULL,
     sort_order      INT NOT NULL DEFAULT 1,
-    created_by      BIGINT UNSIGNED NULL,
-    updated_by      BIGINT UNSIGNED NULL,
+    created_by      INT NULL,
+    updated_by      INT NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at      DATETIME NULL,
@@ -250,15 +250,15 @@ CREATE TABLE IF NOT EXISTS sop_sections (
 --   reordering, insertion, and duplication via sort_order.
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS sop_steps (
-    id                  BIGINT UNSIGNED AUTO_INCREMENT,
-    sop_version_id      BIGINT UNSIGNED NOT NULL,
+    id                  INT AUTO_INCREMENT,
+    sop_version_id      INT NOT NULL,
     step_number         INT NOT NULL,
     title               VARCHAR(255) NULL,
     instruction         LONGTEXT NOT NULL,
     estimated_minutes   INT NULL,
     sort_order          INT NOT NULL,
-    created_by          BIGINT UNSIGNED NULL,
-    updated_by          BIGINT UNSIGNED NULL,
+    created_by          INT NULL,
+    updated_by          INT NULL,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at          DATETIME NULL,
@@ -280,12 +280,12 @@ CREATE TABLE IF NOT EXISTS sop_steps (
 --   (e.g. during "For Review" status), independent of formal approvals.
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS sop_step_comments (
-    id           BIGINT UNSIGNED AUTO_INCREMENT,
-    step_id      BIGINT UNSIGNED NOT NULL,
-    user_id      BIGINT UNSIGNED NOT NULL,
+    id           INT AUTO_INCREMENT,
+    step_id      INT NOT NULL,
+    user_id      INT NOT NULL,
     comment      TEXT NOT NULL,
     resolved_at  DATETIME NULL,
-    resolved_by  BIGINT UNSIGNED NULL,
+    resolved_by  INT NULL,
     created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at   DATETIME NULL,
     CONSTRAINT pk_sop_step_comments PRIMARY KEY (id),
@@ -306,14 +306,14 @@ CREATE TABLE IF NOT EXISTS sop_step_comments (
 --   are version-wide deliverables.
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS sop_section_files (
-    id             BIGINT UNSIGNED AUTO_INCREMENT,
-    section_id     BIGINT UNSIGNED NOT NULL,
+    id             INT AUTO_INCREMENT,
+    section_id     INT NOT NULL,
     filename       VARCHAR(255) NOT NULL,
     original_name  VARCHAR(255) NOT NULL,
     storage_path   VARCHAR(500) NOT NULL,
     mime_type      VARCHAR(100) NULL,
     file_size      BIGINT NULL,
-    uploaded_by    BIGINT UNSIGNED NULL,
+    uploaded_by    INT NULL,
     created_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at     DATETIME NULL,
     CONSTRAINT pk_sop_section_files PRIMARY KEY (id),
@@ -330,8 +330,8 @@ CREATE TABLE IF NOT EXISTS sop_section_files (
 --   Version-level file attachments (PDF, Word, Excel, Image, Video).
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS sop_documents (
-    id              BIGINT UNSIGNED AUTO_INCREMENT,
-    sop_version_id  BIGINT UNSIGNED NOT NULL,
+    id              INT AUTO_INCREMENT,
+    sop_version_id  INT NOT NULL,
     filename        VARCHAR(255) NOT NULL,
     original_name   VARCHAR(255) NOT NULL,
     storage_path    VARCHAR(500) NOT NULL,
@@ -339,7 +339,7 @@ CREATE TABLE IF NOT EXISTS sop_documents (
     file_size       BIGINT NULL,
     document_type   ENUM('PDF','Word','Excel','Image','Video','Attachment') NOT NULL,
     display_order   INT NOT NULL DEFAULT 1,
-    uploaded_by     BIGINT UNSIGNED NULL,
+    uploaded_by     INT NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at      DATETIME NULL,
     CONSTRAINT pk_sop_documents PRIMARY KEY (id),
@@ -359,13 +359,13 @@ CREATE TABLE IF NOT EXISTS sop_documents (
 --   data changes, never code changes.
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS approval_workflows (
-    id             BIGINT UNSIGNED AUTO_INCREMENT,
+    id             INT AUTO_INCREMENT,
     public_id      CHAR(36)     NOT NULL DEFAULT (UUID()),
     name           VARCHAR(150) NOT NULL,
-    department_id  BIGINT UNSIGNED NULL,   -- NULL = organization-wide default workflow
+    department_id  INT NULL,   -- NULL = organization-wide default workflow
     description    TEXT NULL,
     is_active      TINYINT(1)   NOT NULL DEFAULT 1,
-    created_by     BIGINT UNSIGNED NOT NULL,
+    created_by     INT NOT NULL,
     created_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at     TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     deleted_at     DATETIME     NULL,
@@ -376,12 +376,12 @@ CREATE TABLE IF NOT EXISTS approval_workflows (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS workflow_steps (
-    id                    BIGINT UNSIGNED AUTO_INCREMENT,
-    workflow_id           BIGINT UNSIGNED NOT NULL,
+    id                    INT AUTO_INCREMENT,
+    workflow_id           INT NOT NULL,
     step_order            INT NOT NULL,
     step_name             VARCHAR(150) NOT NULL,        -- e.g. 'Department Review', 'QA Review'
     approver_type         ENUM('User','Role','Department') NOT NULL DEFAULT 'Role',
-    approver_reference_id BIGINT UNSIGNED NULL,          -- user_id or department_id depending on approver_type
+    approver_reference_id INT NULL,          -- user_id or department_id depending on approver_type
     approver_role         VARCHAR(100) NULL,             -- role name when approver_type = 'Role'
     is_required            TINYINT(1) NOT NULL DEFAULT 1,
     created_at            TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -392,15 +392,15 @@ CREATE TABLE IF NOT EXISTS workflow_steps (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS workflow_instances (
-    id                 BIGINT UNSIGNED AUTO_INCREMENT,
+    id                 INT AUTO_INCREMENT,
     public_id          CHAR(36) NOT NULL DEFAULT (UUID()),
-    sop_version_id     BIGINT UNSIGNED NOT NULL,
-    workflow_id        BIGINT UNSIGNED NOT NULL,
+    sop_version_id     INT NOT NULL,
+    workflow_id        INT NOT NULL,
     current_step_order INT NOT NULL DEFAULT 1,
     status             ENUM('In Progress','Approved','Rejected','Cancelled') NOT NULL DEFAULT 'In Progress',
     started_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at       DATETIME NULL,
-    created_by         BIGINT UNSIGNED NOT NULL,
+    created_by         INT NOT NULL,
     CONSTRAINT pk_workflow_instances PRIMARY KEY (id),
     CONSTRAINT uq_workflowinstance_public_id UNIQUE (public_id),
     CONSTRAINT fk_workflowinstance_version  FOREIGN KEY (sop_version_id) REFERENCES sop_versions(id) ON DELETE CASCADE,
@@ -410,10 +410,10 @@ CREATE TABLE IF NOT EXISTS workflow_instances (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS workflow_actions (
-    id                   BIGINT UNSIGNED AUTO_INCREMENT,
-    workflow_instance_id BIGINT UNSIGNED NOT NULL,
-    workflow_step_id     BIGINT UNSIGNED NOT NULL,
-    actor_id             BIGINT UNSIGNED NOT NULL,
+    id                   INT AUTO_INCREMENT,
+    workflow_instance_id INT NOT NULL,
+    workflow_step_id     INT NOT NULL,
+    actor_id             INT NOT NULL,
     action               ENUM('Submitted','Approved','Rejected','Delegated','Commented') NOT NULL,
     comments              TEXT NULL,
     action_at             DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -435,10 +435,10 @@ CREATE TABLE IF NOT EXISTS workflow_actions (
 --   so each compliance target type is queryable and indexable on its own.
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS sop_assignments (
-    id              BIGINT UNSIGNED AUTO_INCREMENT,
+    id              INT AUTO_INCREMENT,
     public_id       CHAR(36) NOT NULL DEFAULT (UUID()),
-    sop_version_id  BIGINT UNSIGNED NOT NULL,
-    assigned_by     BIGINT UNSIGNED NOT NULL,
+    sop_version_id  INT NOT NULL,
+    assigned_by     INT NOT NULL,
     assigned_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     due_date        DATE NULL,
     notes           TEXT NULL,
@@ -449,9 +449,9 @@ CREATE TABLE IF NOT EXISTS sop_assignments (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS assignment_departments (
-    id             BIGINT UNSIGNED AUTO_INCREMENT,
-    assignment_id  BIGINT UNSIGNED NOT NULL,
-    department_id  BIGINT UNSIGNED NOT NULL,
+    id             INT AUTO_INCREMENT,
+    assignment_id  INT NOT NULL,
+    department_id  INT NOT NULL,
     CONSTRAINT pk_assignment_departments PRIMARY KEY (id),
     CONSTRAINT uq_assignment_department UNIQUE (assignment_id, department_id),
     CONSTRAINT fk_assigndept_assignment FOREIGN KEY (assignment_id) REFERENCES sop_assignments(id) ON DELETE CASCADE,
@@ -459,8 +459,8 @@ CREATE TABLE IF NOT EXISTS assignment_departments (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS assignment_positions (
-    id             BIGINT UNSIGNED AUTO_INCREMENT,
-    assignment_id  BIGINT UNSIGNED NOT NULL,
+    id             INT AUTO_INCREMENT,
+    assignment_id  INT NOT NULL,
     position_name  VARCHAR(100) NOT NULL,   -- NOTE: no dedicated positions table exists yet;
                                               -- swap to a FK once one is introduced.
     CONSTRAINT pk_assignment_positions PRIMARY KEY (id),
@@ -469,9 +469,9 @@ CREATE TABLE IF NOT EXISTS assignment_positions (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS assignment_users (
-    id             BIGINT UNSIGNED AUTO_INCREMENT,
-    assignment_id  BIGINT UNSIGNED NOT NULL,
-    user_id        BIGINT UNSIGNED NOT NULL,
+    id             INT AUTO_INCREMENT,
+    assignment_id  INT NOT NULL,
+    user_id        INT NOT NULL,
     CONSTRAINT pk_assignment_users PRIMARY KEY (id),
     CONSTRAINT uq_assignment_user UNIQUE (assignment_id, user_id),
     CONSTRAINT fk_assignuser_assignment FOREIGN KEY (assignment_id) REFERENCES sop_assignments(id) ON DELETE CASCADE,
@@ -488,10 +488,10 @@ CREATE TABLE IF NOT EXISTS assignment_users (
 --   version, plus a full status-change history for audit purposes.
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS sop_acknowledgements (
-    id              BIGINT UNSIGNED AUTO_INCREMENT,
+    id              INT AUTO_INCREMENT,
     public_id       CHAR(36) NOT NULL DEFAULT (UUID()),
-    sop_version_id  BIGINT UNSIGNED NOT NULL,
-    user_id         BIGINT UNSIGNED NOT NULL,
+    sop_version_id  INT NOT NULL,
+    user_id         INT NOT NULL,
     status          ENUM('Pending','Acknowledged','Reopened','Expired') NOT NULL DEFAULT 'Pending',
     acknowledged_at DATETIME NULL,
     ip_address      VARCHAR(45) NULL,
@@ -506,11 +506,11 @@ CREATE TABLE IF NOT EXISTS sop_acknowledgements (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS acknowledgement_history (
-    id                BIGINT UNSIGNED AUTO_INCREMENT,
-    acknowledgement_id BIGINT UNSIGNED NOT NULL,
+    id                INT AUTO_INCREMENT,
+    acknowledgement_id INT NOT NULL,
     previous_status   ENUM('Pending','Acknowledged','Reopened','Expired') NULL,
     new_status        ENUM('Pending','Acknowledged','Reopened','Expired') NOT NULL,
-    changed_by        BIGINT UNSIGNED NULL,
+    changed_by        INT NULL,
     changed_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     remarks           TEXT NULL,
     CONSTRAINT pk_acknowledgement_history PRIMARY KEY (id),
@@ -522,26 +522,26 @@ CREATE TABLE IF NOT EXISTS acknowledgement_history (
 -- ============================================================================
 -- 14. AUDIT LOGS
 -- ==========================================================
--- Table: audit_logs
+-- Table: sop_audit_logs
 -- Purpose:
 --   Generalized, entity-agnostic audit trail. Populated by triggers
 --   (section 20) and directly by application/service code for actions
 --   that have no table-level UPDATE/DELETE signature (Download, Print,
 --   Login, Logout, Publish, Restore).
 -- ==========================================================
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id           BIGINT UNSIGNED AUTO_INCREMENT,
+CREATE TABLE IF NOT EXISTS sop_audit_logs (
+    id           INT AUTO_INCREMENT,
     public_id    CHAR(36) NOT NULL DEFAULT (UUID()),
     entity_type  VARCHAR(50) NOT NULL,     -- e.g. 'sop', 'sop_version', 'sop_acknowledgement'
-    entity_id    BIGINT UNSIGNED NOT NULL,
+    entity_id    INT NOT NULL,
     action       ENUM('Create','Update','Delete','Publish','Restore','Download','Print','Login','Logout') NOT NULL,
-    performed_by BIGINT UNSIGNED NULL,
+    performed_by INT NULL,
     ip_address   VARCHAR(45) NULL,
     user_agent   VARCHAR(255) NULL,
     old_values   JSON NULL,
     new_values   JSON NULL,
     created_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT pk_audit_logs PRIMARY KEY (id),
+    CONSTRAINT pk_sop_audit_logs PRIMARY KEY (id),
     CONSTRAINT uq_audit_public_id UNIQUE (public_id),
     CONSTRAINT fk_audit_user FOREIGN KEY (performed_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -558,11 +558,11 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 --   Management module is built; add the constraint at that time.
 -- ==========================================================
 CREATE TABLE IF NOT EXISTS sop_course_links (
-    id          BIGINT UNSIGNED AUTO_INCREMENT,
-    sop_id      BIGINT UNSIGNED NOT NULL,
-    course_id   BIGINT UNSIGNED NULL,   -- future FK -> courses(id)
+    id          INT AUTO_INCREMENT,
+    sop_id      INT NOT NULL,
+    course_id   INT NULL,   -- future FK -> courses(id)
     link_type   ENUM('Prerequisite','Reference','Companion') NOT NULL DEFAULT 'Reference',
-    created_by  BIGINT UNSIGNED NULL,
+    created_by  INT NULL,
     created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at  DATETIME NULL,
     CONSTRAINT pk_sop_course_links PRIMARY KEY (id),
@@ -597,8 +597,8 @@ CREATE INDEX idx_version_sop_current   ON sop_versions(sop_id, is_current);
 CREATE INDEX idx_ack_user_status       ON sop_acknowledgements(user_id, status);
 CREATE INDEX idx_ack_version_status    ON sop_acknowledgements(sop_version_id, status);
 
-CREATE INDEX idx_audit_entity          ON audit_logs(entity_type, entity_id);
-CREATE INDEX idx_audit_actor_time      ON audit_logs(performed_by, created_at);
+CREATE INDEX idx_sop_audit_entity          ON sop_audit_logs(entity_type, entity_id);
+CREATE INDEX idx_sop_audit_actor_time      ON sop_audit_logs(performed_by, created_at);
 
 
 -- ============================================================================
@@ -693,14 +693,14 @@ DELIMITER $$
 -- published record.
 -- ----------------------------------------------------------------------------
 CREATE PROCEDURE sp_create_new_version (
-    IN  p_sop_id         BIGINT UNSIGNED,
-    IN  p_created_by     BIGINT UNSIGNED,
+    IN  p_sop_id         INT,
+    IN  p_created_by     INT,
     IN  p_change_summary TEXT,
     IN  p_new_version    VARCHAR(20),
-    OUT p_new_version_id BIGINT UNSIGNED
+    OUT p_new_version_id INT
 )
 BEGIN
-    DECLARE v_source_version_id BIGINT UNSIGNED;
+    DECLARE v_source_version_id INT;
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -732,7 +732,7 @@ BEGIN
         WHERE sop_version_id = v_source_version_id AND deleted_at IS NULL;
     END IF;
 
-    INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, new_values)
+    INSERT INTO sop_audit_logs (entity_type, entity_id, action, performed_by, new_values)
     VALUES ('sop_version', p_new_version_id, 'Create', p_created_by,
             JSON_OBJECT('sop_id', p_sop_id, 'version', p_new_version));
 
@@ -747,12 +747,12 @@ END$$
 -- Fully transactional — any failure rolls back the entire publish.
 -- ----------------------------------------------------------------------------
 CREATE PROCEDURE sp_publish_sop (
-    IN p_sop_id     BIGINT UNSIGNED,
-    IN p_version_id BIGINT UNSIGNED,
-    IN p_actor_id   BIGINT UNSIGNED
+    IN p_sop_id     INT,
+    IN p_version_id INT,
+    IN p_actor_id   INT
 )
 BEGIN
-    DECLARE v_previous_version_id BIGINT UNSIGNED;
+    DECLARE v_previous_version_id INT;
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -799,7 +799,7 @@ BEGIN
     JOIN users u ON u.department_id = ad.department_id
     WHERE a.sop_version_id = p_version_id;
 
-    INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, new_values)
+    INSERT INTO sop_audit_logs (entity_type, entity_id, action, performed_by, new_values)
     VALUES ('sop_version', p_version_id, 'Publish', p_actor_id,
             JSON_OBJECT('sop_id', p_sop_id, 'previous_version_id', v_previous_version_id));
 
@@ -812,14 +812,14 @@ END$$
 -- Call once per target from the application layer.
 -- ----------------------------------------------------------------------------
 CREATE PROCEDURE sp_assign_sop (
-    IN p_sop_version_id BIGINT UNSIGNED,
-    IN p_assigned_by    BIGINT UNSIGNED,
-    IN p_user_id        BIGINT UNSIGNED,
-    IN p_department_id  BIGINT UNSIGNED,
+    IN p_sop_version_id INT,
+    IN p_assigned_by    INT,
+    IN p_user_id        INT,
+    IN p_department_id  INT,
     IN p_due_date       DATE
 )
 BEGIN
-    DECLARE v_assignment_id BIGINT UNSIGNED;
+    DECLARE v_assignment_id INT;
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
@@ -852,12 +852,12 @@ END$$
 -- Records a user's acknowledgement and appends a history row.
 -- ----------------------------------------------------------------------------
 CREATE PROCEDURE sp_acknowledge_sop (
-    IN p_sop_version_id BIGINT UNSIGNED,
-    IN p_user_id        BIGINT UNSIGNED,
+    IN p_sop_version_id INT,
+    IN p_user_id        INT,
     IN p_ip_address     VARCHAR(45)
 )
 BEGIN
-    DECLARE v_ack_id BIGINT UNSIGNED;
+    DECLARE v_ack_id INT;
     DECLARE v_previous_status VARCHAR(20);
 
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
@@ -910,7 +910,7 @@ CREATE TRIGGER trg_audit_sops_insert
 AFTER INSERT ON sops
 FOR EACH ROW
 BEGIN
-    INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, new_values)
+    INSERT INTO sop_audit_logs (entity_type, entity_id, action, performed_by, new_values)
     VALUES ('sop', NEW.id, 'Create', NEW.created_by,
             JSON_OBJECT('sop_code', NEW.sop_code, 'title', NEW.title, 'status', NEW.status));
 END$$
@@ -920,10 +920,10 @@ AFTER UPDATE ON sops
 FOR EACH ROW
 BEGIN
     IF NEW.deleted_at IS NOT NULL AND OLD.deleted_at IS NULL THEN
-        INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, old_values)
+        INSERT INTO sop_audit_logs (entity_type, entity_id, action, performed_by, old_values)
         VALUES ('sop', NEW.id, 'Delete', NEW.updated_by, JSON_OBJECT('status', OLD.status));
     ELSE
-        INSERT INTO audit_logs (entity_type, entity_id, action, performed_by, old_values, new_values)
+        INSERT INTO sop_audit_logs (entity_type, entity_id, action, performed_by, old_values, new_values)
         VALUES ('sop', NEW.id, 'Update', NEW.updated_by,
                 JSON_OBJECT('status', OLD.status, 'title', OLD.title),
                 JSON_OBJECT('status', NEW.status, 'title', NEW.title));

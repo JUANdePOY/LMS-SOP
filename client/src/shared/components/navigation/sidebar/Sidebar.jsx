@@ -8,7 +8,6 @@ import {
   ClipboardCheck,
   Award,
   Users,
-  Building2,
   MessageSquare,
   Megaphone,
   Calendar,
@@ -85,6 +84,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const roleLabel = typeof user?.role === 'string' ? user.role.replace('_', ' ') : '';
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -294,7 +294,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                     {user?.full_name || 'User'}
                   </p>
                   <p className="text-[10px] text-neutral-500 truncate">
-                    {user?.role?.replace('_', ' ') || ''}
+                    {roleLabel}
                   </p>
                 </div>
                 <button
@@ -327,7 +327,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
               {user?.full_name || user?.email || 'User'}
             </span>
             <span className="truncate text-[11px] text-neutral-500">
-              {user?.role?.replace('_', ' ') || ''}
+              {roleLabel}
             </span>
           </div>
         )}

@@ -5,6 +5,9 @@ import { lazy, Suspense } from "react";
 import { ToastProvider } from "@/shared/components/Toast";
 import ErrorBoundary from "@/shared/components/ErrorBoundary";
 import ProtectedRoute from "@/shared/components/ProtectedRoute";
+import { SOPModalProvider } from "@/features/sop_management/context/SOPModalContext";
+import { SOPPermissionProvider } from "@/features/sop_management/context/SOPPermissionContext";
+import { SOPProvider } from "@/features/sop_management/context/SOPContext";
 
 const Dashboard     = lazy(() => import("@/pages/Dashboard"));
 const Profile       = lazy(() => import("@/pages/Profile"));
@@ -12,6 +15,8 @@ const Login         = lazy(() => import("@/pages/Login"));
 const Users         = lazy(() => import("@/pages/Users"));
 const Settings      = lazy(() => import("@/pages/Settings"));
 const AuditLogs     = lazy(() => import("@/pages/AuditLogs"));
+const SOPListPage    = lazy(() => import("@/features/sop_management/pages/SOPListPage"));
+const SOPDetailsPage = lazy(() => import("@/features/sop_management/pages/SOPDetailsPage"));
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
@@ -71,10 +76,20 @@ const router = createBrowserRouter([
       { path: "users", element: LMSProtectedWrapper(Users), handle: { title: "Administration" } },
       { path: "settings", element: SuperAdminProtectedWrapper(Settings), handle: { title: "Settings" } },
       { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
+      { path: "sops", element: LMSProtectedWrapper(SOPListPage), handle: { title: "SOP Library" } },
+      { path: "sops/:id", element: LMSProtectedWrapper(SOPDetailsPage), handle: { title: "SOP Details" } },
     ],
   },
 ]);
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <SOPProvider>
+      <SOPModalProvider>
+        <SOPPermissionProvider>
+          <RouterProvider router={router} />
+        </SOPPermissionProvider>
+      </SOPModalProvider>
+    </SOPProvider>
+  );
 }

@@ -6,7 +6,6 @@ import {
   ClipboardCheck,
   Award,
   Users,
-  Building2,
   MessageSquare,
   Megaphone,
   Calendar,
@@ -44,7 +43,7 @@ export const menuItems = [
   },
   {
     name: "SOP Management",
-    path: "/SOPListPage",
+    path: "/sops",
     icon: FileText,
     description: "Create and manage SOPs",
     roles: LMS_ROLES,

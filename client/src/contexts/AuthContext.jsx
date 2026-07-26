@@ -3,6 +3,22 @@ import api from '@/services/api';
 
 const AuthContext = createContext(null);
 
+function normalizeUser(userData) {
+  if (!userData || typeof userData !== 'object') {
+    return userData;
+  }
+
+  const rawRole = userData.role;
+  const normalizedRole = typeof rawRole === 'string'
+    ? rawRole
+    : (rawRole && typeof rawRole === 'object' ? (rawRole.name || rawRole.role || '') : '');
+
+  return {
+    ...userData,
+    role: normalizedRole,
+  };
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -14,7 +30,8 @@ export function AuthProvider({ children }) {
 
     if (token && storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        setUser(normalizeUser(parsedUser));
       } catch {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -32,12 +49,13 @@ export function AuthProvider({ children }) {
 
       if (response.data.status === 'success') {
         const { token, user: userData } = response.data.data;
+        const normalizedUser = normalizeUser(userData);
 
         localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('user', JSON.stringify(normalizedUser));
 
-        setUser(userData);
-        return { success: true, user: userData };
+        setUser(normalizedUser);
+        return { success: true, user: normalizedUser };
       } else {
         throw new Error(response.data.message || 'Login failed');
       }

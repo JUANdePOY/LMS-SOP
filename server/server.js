@@ -46,6 +46,13 @@ const dashboardRoutes = require('./routes/dashboard');
 const auditLogsRoutes = require('./routes/audit-logs');
 const settingsRoutes = require('./routes/settings');
 const rolesRoutes = require('./routes/roles');
+const sopsRoutes = require('./routes/sops');
+const sopContentRoutes = require('./routes/sopContent');
+const sopVersionsRoutes = require('./routes/sopVersions');
+const sopAttachmentsRoutes = require('./routes/sopAttachments');
+const sopComplianceRoutes = require('./routes/sopCompliance');
+const sopWorkflowRoutes = require('./routes/sopWorkflow');
+const sopSharesRoutes = require('./routes/sopShares');
 
 const loginDebug = process.env.LOGIN_DEBUG === 'true';
 if (loginDebug) {
@@ -77,6 +84,13 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audit-logs', auditLogsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/roles', rolesRoutes);
+app.use('/api/sops', sopsRoutes);
+app.use('/api/sops', sopContentRoutes);
+app.use('/api/sops', sopVersionsRoutes);
+app.use('/api/sops', sopAttachmentsRoutes);
+app.use('/api/sops', sopComplianceRoutes);
+app.use('/api/sops', sopWorkflowRoutes);
+app.use('/api/sops', sopSharesRoutes);
 
 app.get('/api/health', async (req, res) => {
   const result = { status: 'OK', timestamp: new Date().toISOString(), env: process.env.NODE_ENV };

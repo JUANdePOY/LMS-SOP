@@ -1,0 +1,104 @@
+const complianceModel = require('../models/sopComplianceModel');
+const sopModel = require('../models/sopModel');
+const assignmentService = require('./sopAssignmentService');
+
+async function listAcknowledgements(sopId, filters = {}) {
+  const sop = await sopModel.findById(sopId);
+  if (!sop) {
+    const error = new Error('SOP not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+  return complianceModel.listAcknowledgements(sopId, filters);
+}
+
+async function listPendingAcknowledgements(sopId) {
+  return listAcknowledgements(sopId, { status: 'Pending' });
+}
+
+async function listUserAcknowledgements(userId, filters = {}) {
+  return complianceModel.listAcknowledgementsByUser(userId, filters);
+}
+
+async function getAcknowledgementStats(sopId) {
+  const sop = await sopModel.findById(sopId);
+  if (!sop) {
+    const error = new Error('SOP not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+  return complianceModel.getAcknowledgementStats(sopId);
+}
+
+async function createAcknowledgement(sopId, userId, status = 'Pending') {
+  const sop = await sopModel.findById(sopId);
+  if (!sop) {
+    const error = new Error('SOP not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+
+  const existing = await complianceModel.findAcknowledgementBySopAndUser(sopId, userId);
+  if (existing) {
+    const error = new Error('Acknowledgement already exists for this user');
+    error.code = 'DUPLICATE_ACKNOWLEDGEMENT';
+    throw error;
+  }
+
+  const id = await complianceModel.createAcknowledgement({ sop_id: sopId, user_id: userId, status });
+  const rows = await complianceModel.listAcknowledgements(sopId);
+  return rows.find((row) => row.id === id) || { id, sop_id: sopId, user_id: userId, status };
+}
+
+async function acknowledgeSop(sopId, userId) {
+  const existing = await complianceModel.findAcknowledgementBySopAndUser(sopId, userId);
+  if (!existing) {
+    const error = new Error('No acknowledgement record found for this SOP');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+
+  if (existing.status === 'Acknowledged') {
+    return existing;
+  }
+
+  await complianceModel.acknowledge(sopId, userId);
+  return complianceModel.findAcknowledgementBySopAndUser(sopId, userId);
+}
+
+async function generateAcknowledgementsOnPublish(sopId) {
+  const sop = await sopModel.findById(sopId);
+  if (!sop) {
+    const error = new Error('SOP not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+
+  const userIds = await assignmentService.resolveAssignedUserIds(sopId);
+  const results = { created: 0, reset: 0, skipped: 0, userIds };
+
+  for (const userId of userIds) {
+    const existing = await complianceModel.findAcknowledgementBySopAndUser(sopId, userId);
+    if (!existing) {
+      await complianceModel.createAcknowledgement({ sop_id: sopId, user_id: userId, status: 'Pending' });
+      results.created += 1;
+    } else if (existing.status === 'Acknowledged') {
+      await complianceModel.updateAcknowledgementStatus(sopId, userId, 'Pending');
+      results.reset += 1;
+    } else {
+      results.skipped += 1;
+    }
+  }
+
+  return results;
+}
+
+module.exports = {
+  listAcknowledgements,
+  listPendingAcknowledgements,
+  listUserAcknowledgements,
+  getAcknowledgementStats,
+  createAcknowledgement,
+  acknowledgeSop,
+  generateAcknowledgementsOnPublish,
+};

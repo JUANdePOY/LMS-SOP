@@ -18,6 +18,7 @@ export default function AppLayout() {
 
   const currentDate = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const currentTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const roleLabel = typeof user?.role === 'string' ? user.role.replace('_', ' ') : '';
 
   return (
     <div
@@ -53,7 +54,7 @@ export default function AppLayout() {
           className={cn(
             "sticky top-0 z-30 flex h-14 items-center gap-3 px-4 lg:px-2",
             "border-b border-[var(--border)]",
-            "bg-[var(--glass-bg)] backdrop-blur-md",
+            "bg-[var(--bg-topbar)]",
             "transition-colors duration-300"
           )}
         >
@@ -68,33 +69,6 @@ export default function AppLayout() {
               <PanelRightClose size={22} />
             )}
           </button>
-
-          <div className="flex items-center gap-3 lg:hidden">
-            <button
-              onClick={() => setMobileOpen((v) => !v)}
-              aria-label={mobileOpen ? "Close menu" : "Open menu"}
-              className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-lg",
-                "border border-[var(--border)]",
-                "bg-[var(--bg-surface)]",
-                "text-[var(--text-secondary)]",
-                "hover:bg-[var(--bg-hover)]",
-                "transition-colors duration-150"
-              )}
-            >
-              {mobileOpen ? <X size={16} /> : <Menu size={16} />}
-            </button>
-            <span className="text-sm font-bold tracking-tight text-[var(--text-primary)]">
-              SOP TRAINING PLATFORM
-            </span>
-          </div>
-
-          <div className="hidden lg:flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/10">
-              <LayoutDashboard size={18} className="text-blue-600" />
-            </div>
-            <h1 className="text-lg font-bold text-[var(--text-primary)]">SOP TRAINING PLATFORM</h1>
-          </div>
 
           <div className="flex-1 max-w-md mx-auto hidden md:block">
             <div className="relative">
@@ -136,7 +110,7 @@ export default function AppLayout() {
               aria-label="User menu"
               className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-[var(--bg-hover)] transition-colors"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white text-xs font-bold">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--btn-bg)] text-white text-xs font-bold">
                 {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
               </div>
               <div className="hidden lg:flex flex-col items-start">
@@ -144,7 +118,7 @@ export default function AppLayout() {
                   {user?.full_name || 'User'}
                 </span>
                 <span className="text-[10px] text-neutral-500 leading-none mt-0.5">
-                  {user?.role?.replace('_', ' ') || ''}
+                  {roleLabel}
                 </span>
               </div>
               <ChevronDown size={14} className="text-neutral-400" />
