@@ -18,19 +18,20 @@ async function getSectionById(id) {
 async function createSection(data) {
   const { sop_id, title, section_type, content, order_index = 0 } = data;
   const [result] = await db.query(`
-    INSERT INTO sop_sections (sop_id, title, section_type, content, order_index, is_deleted, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-  `, [sop_id, title, section_type, content || null, order_index]);
+    INSERT INTO sop_sections (sop_id, title, section_type, content, order_index)
+    VALUES (?, ?, ?, ?, ?)
+  `, [sop_id, title || null, section_type, content || '', order_index]);
   return result.insertId;
 }
 
 async function updateSection(id, data) {
+  const fieldMap = { title: 'title', section_type: 'section_type', content: 'content', order_index: 'order_index' };
   const sets = [];
   const params = [];
-  for (const field of ['title', 'section_type', 'content', 'order_index']) {
-    if (data[field] !== undefined) {
-      sets.push(`${field} = ?`);
-      params.push(data[field]);
+  for (const [inputField, column] of Object.entries(fieldMap)) {
+    if (data[inputField] !== undefined) {
+      sets.push(`${column} = ?`);
+      params.push(data[inputField]);
     }
   }
   if (!sets.length) return 0;
@@ -60,26 +61,34 @@ async function getStepById(id) {
 }
 
 async function createStep(data) {
-  const { sop_id, section_id, title, description, order_index = 0, step_number = 1 } = data;
+  const { sop_id, section_id, title, description, order_index = 0, step_number = 1, estimated_minutes } = data;
   const [result] = await db.query(`
-    INSERT INTO sop_steps (sop_id, section_id, title, description, step_number, order_index, is_deleted, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-  `, [sop_id, section_id || null, title, description || null, step_number, order_index]);
+    INSERT INTO sop_steps (sop_id, section_id, step_number, title, description, estimated_minutes, order_index)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `, [sop_id, section_id || null, step_number, title || null, description || '', estimated_minutes || null, order_index]);
   return result.insertId;
 }
 
 async function updateStep(id, data) {
+  const fieldMap = {
+    title: 'title',
+    description: 'description',
+    step_number: 'step_number',
+    order_index: 'order_index',
+    estimated_minutes: 'estimated_minutes',
+    section_id: 'section_id',
+  };
   const sets = [];
   const params = [];
-  for (const field of ['section_id', 'title', 'description', 'step_number', 'order_index']) {
-    if (data[field] !== undefined) {
-      sets.push(`${field} = ?`);
-      params.push(data[field]);
+  for (const [inputField, column] of Object.entries(fieldMap)) {
+    if (data[inputField] !== undefined) {
+      sets.push(`${column} = ?`);
+      params.push(data[inputField]);
     }
   }
   if (!sets.length) return 0;
   params.push(id);
-  const [result] = await db.query(`UPDATE sop_steps SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, params);
+  const [result] = await db.query(`UPDATE sop_steps SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = FALSE`, params);
   return result.affectedRows;
 }
 

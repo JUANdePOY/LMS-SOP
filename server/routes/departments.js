@@ -12,10 +12,11 @@ router.use(authenticateToken);
 
 router.get('/', async (req, res) => {
   try {
-    const { search, status, page = 1, limit = 50 } = req.query;
+    const { search, status, business_id, page = 1, limit = 50 } = req.query;
     const result = await departmentModel.findAll({
       search: search || undefined,
       status: status || undefined,
+      business_id: business_id || undefined,
       page: parseInt(page),
       limit: parseInt(limit),
     });
@@ -55,6 +56,7 @@ router.post('/', [
   body('description').optional().trim(),
   body('parent_department_id').optional().isInt(),
   body('head_user_id').optional().isInt(),
+  body('business_id').optional().isInt().withMessage('Business ID must be an integer'),
   body('status').optional().isIn(['active', 'inactive', 'archived']),
 ], async (req, res) => {
   try {
@@ -67,14 +69,14 @@ router.post('/', [
       return res.status(403).json({ status: 'error', message: 'Admin access required', code: 'ADMIN_REQUIRED' });
     }
 
-    const { name, code, description, parent_department_id, head_user_id, status } = req.body;
+    const { name, code, description, parent_department_id, head_user_id, business_id, status } = req.body;
 
     const existing = await departmentModel.findByCode(code);
     if (existing) {
       return res.status(409).json({ status: 'error', message: 'Department code already exists', code: 'CODE_EXISTS' });
     }
 
-    const departmentId = await departmentModel.create({ name, code, description, parent_department_id, head_user_id, status });
+    const departmentId = await departmentModel.create({ name, code, description, parent_department_id, head_user_id, business_id, status });
 
     logAudit({
       user_id: req.user.id,
@@ -97,6 +99,7 @@ router.put('/:id', [
   body('description').optional().trim(),
   body('parent_department_id').optional().isInt(),
   body('head_user_id').optional().isInt(),
+  body('business_id').optional().isInt().withMessage('Business ID must be an integer'),
   body('status').optional().isIn(['active', 'inactive', 'archived']),
 ], async (req, res) => {
   try {
@@ -116,7 +119,7 @@ router.put('/:id', [
     }
 
     const updates = {};
-    const allowed = ['name', 'code', 'description', 'parent_department_id', 'head_user_id', 'status'];
+    const allowed = ['name', 'code', 'description', 'parent_department_id', 'head_user_id', 'business_id', 'status'];
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];

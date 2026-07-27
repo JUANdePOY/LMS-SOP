@@ -14,7 +14,7 @@ export default function SOPSectionForm({ sections, onCreate, onUpdate, onRemove,
 
   const findSection = (type) => sections.find((s) => s.section_type === type);
 
-  const handlePresetContentChange = (type, content) => {
+  const handlePresetContentChange = async (type, content) => {
     const existing = findSection(type);
     const title = SECTION_TYPE_LABELS[type];
 

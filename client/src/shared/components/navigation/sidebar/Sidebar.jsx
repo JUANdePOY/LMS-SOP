@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
-  FileText,
   BookOpen,
   Library,
   ClipboardCheck,
@@ -19,6 +18,7 @@ import {
   LogOut,
   User,
   ChevronDown,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
@@ -34,7 +34,12 @@ const MENU_ITEMS = [
     name: "CORE MODULES",
     group: true,
     items: [
-      { name: "SOP Management", path: "/sops", icon: FileText },
+      {
+        name: "Organization Management",
+        path: "/admin/organization",
+        icon: Building2,
+        sub: ["Hierarchy", "Businesses", "Departments", "SOP Management"],
+      },
       { name: "Course Management", path: "/courses", icon: BookOpen },
       { name: "Course Library", path: "/course-library", icon: Library },
       { name: "Assessments", path: "/assessments", icon: ClipboardCheck, sub: ["Leaderboard", "Report"] },
@@ -82,7 +87,7 @@ const SIDEBAR_WIDTH = {
 };
 
 export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
-  const [expandedGroups, setExpandedGroups] = useState({});
+  const [expandedSubMenus, setExpandedSubMenus] = useState({});
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
   const location = useLocation();
@@ -101,8 +106,15 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const toggleGroup = (name) => {
-    setExpandedGroups((prev) => ({ ...prev, [name]: !prev[name] }));
+  // Auto-expand Organization Management when on its child routes
+  useEffect(() => {
+    if (location.pathname.startsWith("/admin/organization") || location.pathname.startsWith("/sops")) {
+      setExpandedSubMenus(prev => ({ ...prev, "Organization Management": true }));
+    }
+  }, [location.pathname]);
+
+  const toggleSubMenu = (name) => {
+    setExpandedSubMenus((prev) => ({ ...prev, [name]: !prev[name] }));
   };
 
   const handleNavClick = () => {
@@ -112,6 +124,16 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   const isActive = (path) => {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
+  };
+
+  const isAnySubActive = (subItems, basePath) => {
+    return subItems.some((subItem) => {
+      if (subItem === "SOP Management") {
+        return location.pathname.startsWith("/sops");
+      }
+      const subPath = `${basePath}/${subItem.toLowerCase().replace(/\s+/g, '-')}`;
+      return location.pathname.startsWith(subPath);
+    });
   };
 
   return (
@@ -130,7 +152,6 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
         "shadow-lg lg:shadow-none"
       )}
     >
-      {/* Brand */}
       <div
         className={cn(
           "flex h-14 shrink-0 items-center",
@@ -162,14 +183,12 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
         </Link>
       </div>
 
-      {/* Navigation */}
       <nav
         className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-2.5 py-3 scrollbar-none"
         aria-label="Main navigation"
       >
         {MENU_ITEMS.map((item) => {
           if (item.group) {
-            const isExpanded = expandedGroups[item.name] !== false;
             return (
               <div key={item.name} className="mb-3 sm:mb-4">
                 {!collapsed && (
@@ -177,9 +196,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                     {item.name}
                   </p>
                 )}
-                {collapsed && (
-                  <div className="mx-2 mb-2 h-px bg-[var(--border-sidebar)]" />
-                )}
+                {collapsed && <div className="mx-2 mb-2 h-px bg-[var(--border-sidebar)]" />}
                 <ul className="space-y-0.5" role="list">
                   {item.items.map((sub) => (
                     <li key={sub.path}>
@@ -191,7 +208,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                                 navigate(sub.path);
                                 handleNavClick();
                               } else {
-                                toggleGroup(sub.name);
+                                toggleSubMenu(sub.name);
                               }
                             }}
                             className={cn(
@@ -199,7 +216,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                               "text-sm font-medium leading-none tracking-[-0.01em]",
                               "transition-all duration-200 ease-out",
                               "outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-amber)_60%,transparent)]",
-                              isActive(sub.path)
+                              (isActive(sub.path) || isAnySubActive(sub.sub, sub.path))
                                 ? [
                                     "text-[var(--text-on-sidebar)] bg-[var(--bg-active)]",
                                     "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
@@ -213,10 +230,10 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                             <span
                               className={cn(
                                 "flex h-[18px] w-[18px] shrink-0 items-center justify-center transition-colors duration-200",
-                                isActive(sub.path) ? "text-[var(--text-on-sidebar)]" : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)]"
+                                (isActive(sub.path) || isAnySubActive(sub.sub, sub.path)) ? "text-[var(--text-on-sidebar)]" : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)]"
                               )}
                             >
-                              <sub.icon size={17} strokeWidth={isActive(sub.path) ? 2.2 : 1.8} />
+                              <sub.icon size={17} strokeWidth={(isActive(sub.path) || isAnySubActive(sub.sub, sub.path)) ? 2.2 : 1.8} />
                             </span>
                             {!collapsed && (
                               <>
@@ -225,18 +242,19 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                                   size={13}
                                   className={cn(
                                     "transition-transform duration-200 shrink-0",
-                                    isExpanded ? "rotate-180" : ""
+                                    expandedSubMenus[sub.name] ? "rotate-180" : ""
                                   )}
                                 />
                               </>
                             )}
                           </button>
-                          {isExpanded && !collapsed && sub.sub && (
+                          {expandedSubMenus[sub.name] && !collapsed && sub.sub && (
                             <div className="overflow-hidden transition-all duration-200 ease-out">
                               <div className="relative ml-[22px] mt-0.5 border-l border-[var(--border-sidebar)] pb-0.5">
                                 <ul className="space-y-0.5 py-0.5" role="list">
                                   {sub.sub.map((subItem) => {
-                                    const subPath = `${sub.path}/${subItem.toLowerCase().replace(/\s+/g, '-')}`;
+                                    const isSopMgmt = subItem === "SOP Management";
+                                    const subPath = isSopMgmt ? "/sops" : `${sub.path}/${subItem.toLowerCase().replace(/\s+/g, '-')}`;
                                     const active = isActive(subPath);
                                     return (
                                       <li key={subItem}>
@@ -295,7 +313,6 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
         })}
       </nav>
 
-      {/* User footer */}
       <div
         ref={dropdownRef}
         className={cn(

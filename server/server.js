@@ -46,6 +46,9 @@ const dashboardRoutes = require('./routes/dashboard');
 const auditLogsRoutes = require('./routes/audit-logs');
 const settingsRoutes = require('./routes/settings');
 const rolesRoutes = require('./routes/roles');
+const categoriesRoutes = require('./routes/categories');
+const businessesRoutes = require('./routes/businesses');
+const hierarchyRoutes = require('./routes/hierarchy');
 const sopsRoutes = require('./routes/sops');
 const sopContentRoutes = require('./routes/sopContent');
 const sopVersionsRoutes = require('./routes/sopVersions');
@@ -84,6 +87,9 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audit-logs', auditLogsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/roles', rolesRoutes);
+app.use('/api/categories', categoriesRoutes);
+app.use('/api/businesses', businessesRoutes);
+app.use('/api/hierarchy', hierarchyRoutes);
 app.use('/api/sops', sopsRoutes);
 app.use('/api/sops', sopContentRoutes);
 app.use('/api/sops', sopVersionsRoutes);
@@ -91,6 +97,11 @@ app.use('/api/sops', sopAttachmentsRoutes);
 app.use('/api/sops', sopComplianceRoutes);
 app.use('/api/sops', sopWorkflowRoutes);
 app.use('/api/sops', sopSharesRoutes);
+
+const uploadsRoot = path.join(__dirname, 'uploads');
+if (fs.existsSync(uploadsRoot)) {
+  app.use('/api/uploads', express.static(uploadsRoot));
+}
 
 app.get('/api/health', async (req, res) => {
   const result = { status: 'OK', timestamp: new Date().toISOString(), env: process.env.NODE_ENV };

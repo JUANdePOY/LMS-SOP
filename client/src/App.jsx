@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import AppLayout from "@/layout/AppLayout";
 import { lazy, Suspense } from "react";
 
@@ -17,6 +17,11 @@ const Settings      = lazy(() => import("@/pages/Settings"));
 const AuditLogs     = lazy(() => import("@/pages/AuditLogs"));
 const SOPListPage    = lazy(() => import("@/features/sop_management/pages/SOPListPage"));
 const SOPDetailsPage = lazy(() => import("@/features/sop_management/pages/SOPDetailsPage"));
+
+// Organization Management
+const OrgHierarchyPage = lazy(() => import("@/features/organization-management/pages/HierarchyOverviewPage"));
+const OrgBusinessPage = lazy(() => import("@/features/organization-management/pages/BusinessPage"));
+const OrgDepartmentPage = lazy(() => import("@/features/organization-management/pages/DepartmentPage"));
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
@@ -78,6 +83,13 @@ const router = createBrowserRouter([
       { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
       { path: "sops", element: LMSProtectedWrapper(SOPListPage), handle: { title: "SOP Library" } },
       { path: "sops/:id", element: LMSProtectedWrapper(SOPDetailsPage), handle: { title: "SOP Details" } },
+
+      // Organization Management routes
+      { path: "admin/organization", element: LMSProtectedWrapper(OrgHierarchyPage), handle: { title: "Organization Hierarchy" } },
+      { path: "admin/organization/hierarchy", element: LMSProtectedWrapper(OrgHierarchyPage), handle: { title: "Hierarchy Overview" } },
+      { path: "admin/organization/businesses", element: LMSProtectedWrapper(OrgBusinessPage), handle: { title: "Businesses" } },
+      { path: "admin/organization/departments", element: LMSProtectedWrapper(OrgDepartmentPage), handle: { title: "Departments" } },
+      { path: "admin/organization/sop-management", element: <Navigate to="/sops" replace /> },
     ],
   },
 ]);

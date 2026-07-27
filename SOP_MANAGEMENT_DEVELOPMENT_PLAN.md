@@ -201,7 +201,7 @@ Build order follows the dependency chain bottom-up: **DB → backend services/AP
 
 ---
 
-## Suggested Milestone Grouping
+## Suggested Milestone Grouping  
 
 | Milestone | Phases | Outcome |
 |---|---|---|

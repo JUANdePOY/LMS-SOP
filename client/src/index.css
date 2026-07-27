@@ -529,7 +529,7 @@
   --bg-page:        #262624;
   --bg-surface:     #30302e;
   --bg-sidebar:     #1f1e1d;
-  --bg-topbar:      #bd5d3a;
+   --bg-topbar:     #F25C05; /*the Actual Dark  #bd5d3a */
   --bg-hover:       rgba(255, 255, 255, 0.06);
   --bg-active:      rgba(255, 255, 255, 0.1);
   --bg-input:       #30302e;

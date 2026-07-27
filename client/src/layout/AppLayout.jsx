@@ -7,10 +7,6 @@ import {
   Bell,
   Mail,
   Calendar,
-  ChevronDown,
-  LogOut,
-  Settings,
-  User,
   Home,
   BookOpen,
   FileText,
@@ -20,7 +16,7 @@ import {
   Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
+// import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/shared/components/navigation/sidebar/Sidebar";
 import { useTheme } from "@/hooks/useTheme";
 
@@ -35,11 +31,10 @@ const MOBILE_BOTTOM_NAV = [
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
+  // const [userMenuOpen, setUserMenuOpen] = useState(false);
+  // const { user, logout } = useAuth();
   const { toggleTheme, isDark } = useTheme();
 
-  const roleLabel = typeof user?.role === 'string' ? user.role.replace('_', ' ') : '';
 
   return (
     <div
@@ -133,52 +128,6 @@ export default function AppLayout() {
             >
               {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-          </div>
-
-          <div className="relative">
-            <button
-              onClick={() => setUserMenuOpen((v) => !v)}
-              aria-label="User menu"
-              className="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white/15 transition-colors"
-            >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--btn-bg)] text-white text-xs font-bold">
-                {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
-              </div>
-              <div className="hidden lg:flex flex-col items-start">
-                <span className="text-xs font-medium text-[var(--text-primary)] leading-none">
-                  {user?.full_name || 'User'}
-                </span>
-                <span className="text-[10px] text-neutral-500 leading-none mt-0.5">
-                  {roleLabel}
-                </span>
-              </div>
-              <ChevronDown size={14} className="text-neutral-400 hidden lg:block" />
-            </button>
-
-            {userMenuOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
-                <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl border border-[var(--border)] bg-white dark:bg-neutral-900 shadow-lg py-1">
-                  <div className="px-4 py-2 border-b border-neutral-100 dark:border-neutral-800">
-                    <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100">{user?.full_name || 'User'}</p>
-                    <p className="text-[10px] text-neutral-500">{user?.email || ''}</p>
-                  </div>
-                  <button className="flex w-full items-center gap-2 px-4 py-2 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
-                    <User size={14} /> Profile
-                  </button>
-                  <button className="flex w-full items-center gap-2 px-4 py-2 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">
-                    <Settings size={14} /> Settings
-                  </button>
-                  <div className="border-t border-neutral-100 dark:border-neutral-800 my-1" />
-                  <button
-                    onClick={() => { setUserMenuOpen(false); logout(); }}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                  >
-                    <LogOut size={14} /> Logout
-                  </button>
-                </div>
-              </>
-            )}
           </div>
         </header>
 

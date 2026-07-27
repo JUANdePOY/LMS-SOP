@@ -1,4 +1,4 @@
-export default function SOPBasicInfoForm({ formData, onChange, errors = {}, departments = [] }) {
+export default function SOPBasicInfoForm({ formData, onChange, errors = {}, departments = [], categories = [] }) {
   const handleChange = (field) => (event) => {
     const value = event.target.value;
     onChange({ ...formData, [field]: value });
@@ -54,7 +54,7 @@ export default function SOPBasicInfoForm({ formData, onChange, errors = {}, depa
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="mb-1 block text-sm font-medium text-foreground" htmlFor="sop-department">
-            Department
+            Department <span className="text-destructive">*</span>
           </label>
           <select
             id="sop-department"
@@ -75,16 +75,21 @@ export default function SOPBasicInfoForm({ formData, onChange, errors = {}, depa
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-foreground" htmlFor="sop-category">
-            Category ID
+            Category
           </label>
-          <input
+          <select
             id="sop-category"
-            type="number"
             value={formData.category_id}
             onChange={handleChange('category_id')}
-            placeholder="Optional"
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-          />
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="">— Select category (optional) —</option>
+            {categories.map((cat) => (
+              <option key={cat.id} value={cat.id}>
+                {cat.name}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

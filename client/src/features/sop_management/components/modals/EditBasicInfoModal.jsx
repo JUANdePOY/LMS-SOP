@@ -77,7 +77,9 @@ export default function EditBasicInfoModal({ open, onClose, onSave, sop, saving 
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1">Department</label>
+            <label className="block text-sm font-medium text-foreground mb-1">
+              Department <span className="text-destructive">*</span>
+            </label>
             <select
               value={departmentId}
               onChange={(e) => setDepartmentId(e.target.value)}

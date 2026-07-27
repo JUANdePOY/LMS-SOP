@@ -1,62 +1,28 @@
-# SOP Button Refactoring — Option B
+# TODO: Fix `/api/hierarchy` DB_ERROR
 
-**Goal**: Replace all hardcoded Tailwind button classes in the SOP feature with the shared `Button` component (`@/shared/components/ui/button`).
+## Root Cause
+The `business_id` column is missing from the `departments` table due to incompatible `ADD COLUMN IF NOT EXISTS` migration syntax.
 
-## Variant Mapping
+## Steps
 
-| Current Hardcoded Style | Button Variant | Notes |
-|---|---|---|
-| `bg-blue-600 hover:bg-blue-700` | `variant="default"` | Primary actions |
-| `bg-amber-600 hover:bg-amber-700` | `variant="default"` | Primary actions (submit for review) |
-| `bg-emerald-600 hover:bg-emerald-700` | `variant="default"` | Primary actions (approve/publish) |
-| `bg-red-600 hover:bg-red-700` | `variant="destructive"` | Destructive actions (reject/delete/archive) |
-| `border border-gray-300 bg-white text-gray-700 hover:bg-gray-50` | `variant="outline"` | Cancel/Back/Refresh buttons |
-| `bg-gray-100 text-gray-700 hover:bg-gray-200` | `variant="secondary"` | Secondary actions (Add Section) |
-| `text-blue-600 hover:text-blue-800` | `variant="link"` | Text links |
-| Icon-only buttons (Trash, RotateCcw) | `variant="ghost"` `size="icon"` | Table action icons |
+### 1. Fix migration in `server/config/database.js`
+- [x] Replaced `ADD COLUMN IF NOT EXISTS` with `ADD COLUMN` (compatible with all MySQL/MariaDB versions; caught by existing error handler as `ER_DUP_COLUMN`/1060)
 
-## Files to Edit
+### 2. Fix `server/routes/departments.js` — Add `business_id` support
+- [x] Added `body('business_id').optional().isInt()` to POST validation chain
+- [x] Added `business_id` to body destructuring in POST handler
+- [x] Passed `business_id` to `departmentModel.create()`
+- [x] Added `body('business_id').optional().isInt()` to PUT validation chain
+- [x] Added `'business_id'` to allowed updates array in PUT handler
 
-### Pages
-- [x] **SOPListPage.jsx** — Create SOP button, Clear link
-- [x] **SOPDetailsPage.jsx** — All action buttons + tab buttons + back link
+### 3. Verify `server/models/departmentModel.js` — Handle `business_id` in create/update
+- [x] `create()` already destructures and inserts `business_id` ✅
+- [x] `update()` already destructures and updates `business_id` ✅
 
-### Modals
-- [x] **ApproveModal.jsx** — Cancel + Approve buttons
-- [x] **RejectModal.jsx** — Cancel + Reject buttons
-- [x] **PublishModal.jsx** — Cancel + Publish buttons
-- [x] **ArchiveModal.jsx** — Cancel + Archive buttons
-- [x] **DeleteSOPModal.jsx** — Cancel + Delete buttons
-- [x] **ShareSOPModal.jsx** — Cancel + Create Share buttons
-- [x] **EditBasicInfoModal.jsx** — Cancel + Save Changes buttons
-- [x] **AttachmentModal.jsx** — Cancel + Upload buttons
-- [x] **RestoreVersionModal.jsx** — Cancel + Restore Version buttons
-- [x] **CreateSOPModal.jsx** — Cancel + Create SOP buttons
-
-### Wizard
-- [x] **SOPCreateWizard.jsx** — All navigation + action buttons
-
-### Tabs
-- [x] **AssignmentsTab.jsx** — Refresh + Add Assignment buttons + tab toggle
-- [x] **AttachmentsTab.jsx** — Upload button + trash icons
-- [x] **AuditTab.jsx** — Refresh button
-- [x] **SectionsTab.jsx** — (no buttons directly)
-- [x] **ProcedureTab.jsx** — (no buttons directly)
-
-### Forms
-- [x] **SOPSectionForm.jsx** — Add Section button + trash icons
-- [x] **SOPStepForm.jsx** — Add Step button (already done)
-- [x] **SOPAssignmentForm.jsx** — Add Assignment button
-- [x] **SOPAttachmentForm.jsx** — Upload button
-- [x] **SOPPublishForm.jsx** — Cancel + Publish SOP buttons
-
-### Tables
-- [x] **AssignmentTable.jsx** — Trash icon buttons
-- [x] **AcknowledgementTable.jsx** — (no buttons)
-- [x] **VersionTable.jsx** — Restore icon buttons
-- [x] **ApprovalTable.jsx** — (no buttons)
-- [x] **SOPTable.jsx** — (uses row click, no buttons)
-
-## Status: COMPLETE ✅
-All hardcoded buttons in the SOP feature have been replaced with the shared `Button` component.
+### 4. Verify and Test
+- [x] Server restarted successfully — DB connected, migrations applied
+- [x] Migration output confirms `business_id` column already exists
+- [x] `/api/health` returns `{"status":"OK","db":"connected"}`
+- [x] `/api/hierarchy` returns `NO_TOKEN` (auth middleware working) — no more `DB_ERROR`
+- [x] All code changes verified ✅
 

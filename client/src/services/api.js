@@ -57,6 +57,9 @@ export const updateDepartment = (id, data) => api.put(`/departments/${id}`, data
 export const deleteDepartment = (id) => api.delete(`/departments/${id}`);
 export const getDepartmentUsers = (id) => api.get(`/departments/${id}/users`);
 
+export const getCategories = (params = {}) => api.get('/categories', { params });
+export const getCategory = (id) => api.get(`/categories/${id}`);
+
 export const getRoles = (params = {}) => api.get('/roles', { params });
 export const getRole = (id) => api.get(`/roles/${id}`);
 export const createRole = (data) => api.post('/roles', data);

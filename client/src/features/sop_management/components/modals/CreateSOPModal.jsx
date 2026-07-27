@@ -4,6 +4,7 @@ import { Button } from '@/shared/components/ui/button';
 import { useSOPModal } from '../../context/SOPModalContext';
 import { useCreateSOP } from '../../hooks/useCreateSOP';
 import { useDepartmentList } from '../../hooks/useDepartmentList';
+import { useCategoryList } from '../../hooks/useCategoryList';
 import SOPBasicInfoForm from '../forms/SOPBasicInfoForm';
 
 const EMPTY_FORM = {
@@ -18,6 +19,7 @@ export default function CreateSOPModal({ onCreated }) {
   const { modalState, closeModal } = useSOPModal();
   const { create, loading } = useCreateSOP();
   const { departments } = useDepartmentList();
+  const { categories } = useCategoryList();
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
@@ -87,7 +89,7 @@ export default function CreateSOPModal({ onCreated }) {
             {submitError}
           </div>
         )}
-        <SOPBasicInfoForm formData={formData} onChange={setFormData} errors={errors} departments={departments} />
+        <SOPBasicInfoForm formData={formData} onChange={setFormData} errors={errors} departments={departments} categories={categories} />
       </form>
     </Modal>
   );

@@ -7,6 +7,7 @@ import { useSOPPermission } from '../context/SOPPermissionContext';
 import { useSOPDetails } from '../hooks/useSOPDetails';
 import { usePublishSOP } from '../hooks/usePublishSOP';
 import { useArchiveSOP } from '../hooks/useArchiveSOP';
+import { useUpdateSOP } from '../hooks/useUpdateSOP';
 import { useToast } from '@/shared/components/Toast';
 import OverviewTab from '../components/tabs/OverviewTab';
 import SectionsTab from '../components/tabs/SectionsTab';
@@ -14,6 +15,13 @@ import ProcedureTab from '../components/tabs/ProcedureTab';
 import AttachmentsTab from '../components/tabs/AttachmentsTab';
 import AssignmentsTab from '../components/tabs/AssignmentsTab';
 import ApprovalsTab from '../components/tabs/ApprovalsTab';
+import VersionsTab from '../components/tabs/VersionsTab';
+import AuditTab from '../components/tabs/AuditTab';
+import ApproveModal from '../components/modals/ApproveModal';
+import RejectModal from '../components/modals/RejectModal';
+import PublishModal from '../components/modals/PublishModal';
+import ArchiveModal from '../components/modals/ArchiveModal';
+import EditBasicInfoModal from '../components/modals/EditBasicInfoModal';
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: FileText },

@@ -3,15 +3,17 @@ const db = require('../config/database');
 const DEPARTMENT_STATUSES = ['active', 'inactive', 'archived'];
 
 async function findAll(filters = {}) {
-  const { search, status, page = 1, limit = 50 } = filters;
+  const { search, status, business_id, page = 1, limit = 50 } = filters;
   const offset = (page - 1) * limit;
 
   let sql = `
     SELECT d.*, 
            m.full_name AS head_name,
+           b.business_name,
            (SELECT COUNT(*) FROM users u WHERE u.department_id = d.id AND u.is_active = TRUE) AS user_count
     FROM departments d
     LEFT JOIN users m ON d.head_user_id = m.id
+    LEFT JOIN businesses b ON d.business_id = b.id
     WHERE 1 = 1
   `;
   const params = [];
@@ -23,6 +25,10 @@ async function findAll(filters = {}) {
   if (status && status !== 'all') {
     sql += ' AND d.status = ?';
     params.push(status);
+  }
+  if (business_id) {
+    sql += ' AND d.business_id = ?';
+    params.push(business_id);
   }
 
   sql += ' ORDER BY d.name ASC LIMIT ? OFFSET ?';
@@ -39,6 +45,10 @@ async function findAll(filters = {}) {
   if (status && status !== 'all') {
     countSql += ' AND d.status = ?';
     countParams.push(status);
+  }
+  if (business_id) {
+    countSql += ' AND d.business_id = ?';
+    countParams.push(business_id);
   }
   const [countRows] = await db.query(countSql, countParams);
 
@@ -71,17 +81,17 @@ async function findByCode(code) {
 }
 
 async function create(data) {
-  const { name, code, description, parent_department_id, head_user_id, status } = data;
+  const { name, code, description, parent_department_id, head_user_id, status, business_id } = data;
   const [result] = await db.query(
-    `INSERT INTO departments (name, code, description, parent_department_id, head_user_id, status)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [name, code, description ?? null, parent_department_id ?? null, head_user_id ?? null, status || 'active']
+    `INSERT INTO departments (name, code, description, parent_department_id, head_user_id, status, business_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [name, code, description ?? null, parent_department_id ?? null, head_user_id ?? null, status || 'active', business_id ?? null]
   );
   return result.insertId;
 }
 
 async function update(id, data) {
-  const { name, code, description, parent_department_id, head_user_id, status } = data;
+  const { name, code, description, parent_department_id, head_user_id, status, business_id } = data;
   const sets = [];
   const params = [];
 
@@ -91,6 +101,7 @@ async function update(id, data) {
   if (parent_department_id !== undefined) { sets.push('parent_department_id = ?'); params.push(parent_department_id); }
   if (head_user_id !== undefined) { sets.push('head_user_id = ?'); params.push(head_user_id); }
   if (status !== undefined) { sets.push('status = ?'); params.push(status); }
+  if (business_id !== undefined) { sets.push('business_id = ?'); params.push(business_id); }
 
   if (!sets.length) return 0;
 

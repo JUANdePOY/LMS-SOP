@@ -33,8 +33,9 @@ router.post('/:sopId/sections', [
       content: req.body.content || '',
       order_index: req.body.order_index ?? 0,
     });
+    const created = await contentModel.getSectionById(id);
     logAudit({ user_id: req.user.id, action: 'sop.section.created', entity_type: 'sop_section', entity_id: id, metadata: { sop_id: req.params.sopId } });
-    res.status(201).json({ status: 'success', message: 'Section created', data: { id } });
+    res.status(201).json({ status: 'success', message: 'Section created', data: created });
   } catch (error) {
     console.error('Create section error:', error);
     res.status(500).json({ status: 'error', message: 'Failed to create section', code: 'DB_ERROR' });
@@ -93,8 +94,9 @@ router.post('/:sopId/steps', [
       step_number: req.body.step_number || 1,
       order_index: req.body.order_index ?? 0,
     });
+    const created = await contentModel.getStepById(id);
     logAudit({ user_id: req.user.id, action: 'sop.step.created', entity_type: 'sop_step', entity_id: id, metadata: { sop_id: req.params.sopId } });
-    res.status(201).json({ status: 'success', message: 'Step created', data: { id } });
+    res.status(201).json({ status: 'success', message: 'Step created', data: created });
   } catch (error) {
     console.error('Create step error:', error);
     res.status(500).json({ status: 'error', message: 'Failed to create step', code: 'DB_ERROR' });

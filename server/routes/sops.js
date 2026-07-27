@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const sopr = require('../models/sopModel');
+const sopVersionModel = require('../models/sopVersionModel');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 const { generateSopCode } = require('../utils/sopUtils');
@@ -27,10 +28,12 @@ router.get('/', async (req, res) => {
 
 router.get('/stats', async (req, res) => {
   try {
+    // sops uses `deleted_at`, not `is_deleted` — the old is_deleted filter
+    // referenced a column that doesn't exist on this table.
     const [rows] = await require('../config/database').query(`
       SELECT status, COUNT(*) AS count
       FROM sops
-      WHERE is_deleted = FALSE
+      WHERE deleted_at IS NULL
       GROUP BY status
     `);
     res.json({ status: 'success', data: rows });
@@ -56,7 +59,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', [
   body('title').trim().isLength({ min: 2 }).withMessage('Title is required'),
   body('description').optional({ values: 'falsy' }).trim(),
-  body('department_id').optional().isInt(),
+  body('department_id').isInt().withMessage('Department is required'),
   body('category_id').optional().isInt(),
   body('status').optional().isIn(['Draft', 'For Review', 'Approved', 'Published', 'Archived']),
 ], async (req, res) => {
@@ -88,6 +91,16 @@ router.post('/', [
       status: status || 'Draft',
       version: version || '1.0',
     });
+
+    // Content (sections, steps, documents, acknowledgements, assignments)
+    // all hang off a sop_versions row, so a SOP needs one from the start
+    // or every content-creation call downstream has to create it lazily.
+    await sopVersionModel.createVersion({
+      sop_id: id,
+      version: version || '1.0',
+      status: status || 'Draft',
+      created_by: req.user.id,
+    }, { makeCurrent: true });
 
     logAudit({
       user_id: req.user.id,
@@ -124,7 +137,9 @@ router.put('/:id', [
     }
 
     const updates = {};
-    ['title', 'description', 'department_id', 'category_id', 'status', 'version', 'metadata'].forEach((field) => {
+    // `metadata` is intentionally left out here — sopModel.update() drops it
+    // silently now, but there's no column for it on either schema variant.
+    ['title', 'description', 'department_id', 'category_id', 'status', 'version'].forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
 
