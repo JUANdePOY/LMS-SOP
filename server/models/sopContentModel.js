@@ -61,11 +61,22 @@ async function getStepById(id) {
 }
 
 async function createStep(data) {
-  const { sop_id, section_id, title, description, order_index = 0, step_number = 1, estimated_minutes } = data;
+  const {
+    sop_id, section_id, title, description, instruction,
+    order_index = 0, step_number = 1, estimated_minutes, sort_order,
+  } = data;
+
+  // sop_steps.instruction (LONGTEXT NOT NULL) and sort_order (INT NOT NULL)
+  // have no DB-side defaults. The UI only ever sends `description`, so
+  // instruction falls back to it; sort_order falls back to order_index+1
+  // (1-based) so existing callers that only pass order_index still work.
+  const resolvedInstruction = instruction || description || '';
+  const resolvedSortOrder = sort_order ?? (order_index + 1);
+
   const [result] = await db.query(`
-    INSERT INTO sop_steps (sop_id, section_id, step_number, title, description, estimated_minutes, order_index)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `, [sop_id, section_id || null, step_number, title || null, description || '', estimated_minutes || null, order_index]);
+    INSERT INTO sop_steps (sop_id, section_id, step_number, title, description, instruction, estimated_minutes, order_index, sort_order)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `, [sop_id, section_id || null, step_number, title || null, description || '', resolvedInstruction, estimated_minutes || null, order_index, resolvedSortOrder]);
   return result.insertId;
 }
 
@@ -73,10 +84,12 @@ async function updateStep(id, data) {
   const fieldMap = {
     title: 'title',
     description: 'description',
+    instruction: 'instruction',
     step_number: 'step_number',
     order_index: 'order_index',
     estimated_minutes: 'estimated_minutes',
     section_id: 'section_id',
+    sort_order: 'sort_order',
   };
   const sets = [];
   const params = [];

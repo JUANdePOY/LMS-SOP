@@ -2,33 +2,32 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 
 const STATUS_VARIANTS = {
-  active: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-900',
-  inactive: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/40 dark:text-gray-400 dark:border-gray-800',
-  archived: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-900',
+  1: 'bg-green-100 text-green-800 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-900',
+  0: 'bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-900/40 dark:text-gray-400 dark:border-gray-800',
 };
 
-export default function DepartmentTable({ departments = [], loading, onEdit, onDelete }) {
+export default function CategoryTable({ categories = [], loading, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState({});
 
   const tree = useMemo(() => {
     const map = new Map();
     const roots = [];
 
-    for (const dept of departments) {
-      map.set(dept.id, { ...dept, children: [] });
+    for (const cat of categories) {
+      map.set(cat.id, { ...cat, children: [] });
     }
 
-    for (const dept of departments) {
-      const node = map.get(dept.id);
-      if (dept.parent_department_id && map.has(dept.parent_department_id)) {
-        map.get(dept.parent_department_id).children.push(node);
+    for (const cat of categories) {
+      const node = map.get(cat.id);
+      if (cat.parent_category_id && map.has(cat.parent_category_id)) {
+        map.get(cat.parent_category_id).children.push(node);
       } else {
         roots.push(node);
       }
     }
 
     return roots;
-  }, [departments]);
+  }, [categories]);
 
   const toggleExpand = useCallback((id) => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -37,15 +36,15 @@ export default function DepartmentTable({ departments = [], loading, onEdit, onD
   if (loading) {
     return (
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-6 text-sm text-[var(--text-muted)]">
-        Loading departments...
+        Loading categories...
       </div>
     );
   }
 
-  if (!departments || departments.length === 0) {
+  if (!categories || categories.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--bg-surface)] p-10 text-center">
-        <p className="text-sm text-[var(--text-muted)]">No departments found.</p>
+        <p className="text-sm text-[var(--text-muted)]">No categories found. Create one to get started.</p>
       </div>
     );
   }
@@ -72,17 +71,11 @@ export default function DepartmentTable({ departments = [], loading, onEdit, onD
               <span className="text-sm font-medium text-[var(--text-primary)]">{node.name}</span>
             </div>
           </td>
-          <td className="px-4 py-3 text-sm text-[var(--text-muted)]">{node.code}</td>
-          <td className="px-4 py-3 text-sm text-[var(--text-primary)]">{node.business_name || '—'}</td>
-          <td className="px-4 py-3 text-sm text-[var(--text-primary)]">{node.head_name || '—'}</td>
-          <td className="px-4 py-3 text-center">
-            <span className="inline-flex items-center gap-1 text-sm text-[var(--text-muted)]">
-              {node.user_count || 0}
-            </span>
-          </td>
+          <td className="px-4 py-3 text-sm text-[var(--text-muted)]">{node.department_name || '—'}</td>
+          <td className="px-4 py-3 text-sm text-[var(--text-primary)]">{node.description || '—'}</td>
           <td className="px-4 py-3">
-            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${STATUS_VARIANTS[node.status] || STATUS_VARIANTS.inactive}`}>
-              {node.status || 'inactive'}
+            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${STATUS_VARIANTS[node.is_active] || STATUS_VARIANTS[0]}`}>
+              {node.is_active ? 'Active' : 'Inactive'}
             </span>
           </td>
           <td className="px-4 py-3 text-right">
@@ -115,11 +108,9 @@ export default function DepartmentTable({ departments = [], loading, onEdit, onD
         <table className="w-full">
           <thead>
             <tr className="border-b border-[var(--border)] bg-[var(--bg-subtle)]">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Category</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Department</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Code</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Business</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Head</th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Users</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Description</th>
               <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Status</th>
               <th className="px-4 py-3 text-right text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Actions</th>
             </tr>

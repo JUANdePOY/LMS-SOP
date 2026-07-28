@@ -22,6 +22,7 @@ const SOPDetailsPage = lazy(() => import("@/features/sop_management/pages/SOPDet
 const OrgHierarchyPage = lazy(() => import("@/features/organization-management/pages/HierarchyOverviewPage"));
 const OrgBusinessPage = lazy(() => import("@/features/organization-management/pages/BusinessPage"));
 const OrgDepartmentPage = lazy(() => import("@/features/organization-management/pages/DepartmentPage"));
+const OrgCategoryPage = lazy(() => import("@/features/organization-management/pages/CategoryPage"));
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
@@ -89,6 +90,7 @@ const router = createBrowserRouter([
       { path: "admin/organization/hierarchy", element: LMSProtectedWrapper(OrgHierarchyPage), handle: { title: "Hierarchy Overview" } },
       { path: "admin/organization/businesses", element: LMSProtectedWrapper(OrgBusinessPage), handle: { title: "Businesses" } },
       { path: "admin/organization/departments", element: LMSProtectedWrapper(OrgDepartmentPage), handle: { title: "Departments" } },
+      { path: "admin/organization/categories", element: LMSProtectedWrapper(OrgCategoryPage), handle: { title: "Categories" } },
       { path: "admin/organization/sop-management", element: <Navigate to="/sops" replace /> },
     ],
   },

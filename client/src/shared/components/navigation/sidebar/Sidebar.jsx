@@ -38,7 +38,7 @@ const MENU_ITEMS = [
         name: "Organization Management",
         path: "/admin/organization",
         icon: Building2,
-        sub: ["Hierarchy", "Businesses", "Departments", "SOP Management"],
+        sub: ["Hierarchy", "Businesses", "Departments", "Categories", "SOP Management"],
       },
       { name: "Course Management", path: "/courses", icon: BookOpen },
       { name: "Course Library", path: "/course-library", icon: Library },

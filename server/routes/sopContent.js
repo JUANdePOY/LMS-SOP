@@ -17,9 +17,15 @@ router.get('/:sopId/sections', async (req, res) => {
   }
 });
 
+// Real column: sop_sections.section_type ENUM('Purpose','Scope','Objectives',
+// 'Responsibilities','Definitions','Safety Notes','References','Appendix')
+// NOT NULL — there is no 'custom' member and no default, so it must be
+// validated against this exact list rather than defaulted.
+const SECTION_TYPES = ['Purpose', 'Scope', 'Objectives', 'Responsibilities', 'Definitions', 'Safety Notes', 'References', 'Appendix'];
+
 router.post('/:sopId/sections', [
   body('title').trim().isLength({ min: 2 }).withMessage('Section title is required'),
-  body('section_type').optional().isString(),
+  body('section_type').isIn(SECTION_TYPES).withMessage(`section_type must be one of: ${SECTION_TYPES.join(', ')}`),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -29,7 +35,7 @@ router.post('/:sopId/sections', [
     const id = await contentModel.createSection({
       sop_id: parseInt(req.params.sopId, 10),
       title: req.body.title,
-      section_type: req.body.section_type || 'custom',
+      section_type: req.body.section_type,
       content: req.body.content || '',
       order_index: req.body.order_index ?? 0,
     });
@@ -44,6 +50,7 @@ router.post('/:sopId/sections', [
 
 router.put('/sections/:id', [
   body('title').optional().trim().isLength({ min: 2 }),
+  body('section_type').optional().isIn(SECTION_TYPES).withMessage(`section_type must be one of: ${SECTION_TYPES.join(', ')}`),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -91,8 +98,10 @@ router.post('/:sopId/steps', [
       section_id: req.body.section_id || null,
       title: req.body.title,
       description: req.body.description || '',
+      instruction: req.body.instruction || req.body.description || '',
       step_number: req.body.step_number || 1,
       order_index: req.body.order_index ?? 0,
+      sort_order: req.body.sort_order,
     });
     const created = await contentModel.getStepById(id);
     logAudit({ user_id: req.user.id, action: 'sop.step.created', entity_type: 'sop_step', entity_id: id, metadata: { sop_id: req.params.sopId } });

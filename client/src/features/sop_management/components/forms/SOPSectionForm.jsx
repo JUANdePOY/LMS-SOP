@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trash2, Plus } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { SECTION_TYPE, SECTION_TYPE_LABELS, SECTION_TYPE_LIST } from '../../constants/sectionTypes';
@@ -12,28 +12,80 @@ export default function SOPSectionForm({ sections, onCreate, onUpdate, onRemove,
   const [rowErrors, setRowErrors] = useState({});
   const [addError, setAddError] = useState(null);
 
-  const findSection = (type) => sections.find((s) => s.section_type === type);
+  // Controlled values for preset inputs, keyed by section_type.
+  // Kept in local state (instead of defaultValue) so we can diff against
+  // the saved content and know whether a blur actually changed anything.
+  const [presetValues, setPresetValues] = useState({});
+  const [customValues, setCustomValues] = useState({});
 
-  const handlePresetContentChange = async (type, content) => {
+  // Re-sync local input state whenever the sections prop changes
+  // (initial load, after a save, after a remove, etc).
+  useEffect(() => {
+    const nextPresets = {};
+    PRESET_TYPES.forEach((type) => {
+      const existing = sections.find((s) => s.section_type === type);
+      nextPresets[type] = existing?.content ?? '';
+    });
+    setPresetValues(nextPresets);
+
+    const nextCustom = {};
+    sections
+      .filter((s) => s.section_type === SECTION_TYPE.CUSTOM)
+      .forEach((s) => {
+        nextCustom[s._tempId ?? s.id] = s.content ?? '';
+      });
+    setCustomValues(nextCustom);
+  }, [sections]);
+
+  const findSection = (type) => sections.find((s) => s.section_type === type);
+  const rowKey = (section) => section._tempId ?? section.id;
+
+  const handlePresetChange = (type, value) => {
+    setPresetValues((prev) => ({ ...prev, [type]: value }));
+  };
+
+  const handlePresetBlur = async (type) => {
+    const value = presetValues[type] ?? '';
     const existing = findSection(type);
-    const title = SECTION_TYPE_LABELS[type];
+
+    // Field was never touched (still empty) and nothing exists yet — do nothing.
+    // This is the fix for "clicking the input adds a section": previously this
+    // ran unconditionally on every blur, so simply focusing then leaving an
+    // empty field created a brand-new section with empty content.
+    if (!existing && value.trim() === '') return;
+
+    // Nothing actually changed since the last save — skip the network call.
+    if (existing && (existing.content || '') === value) return;
 
     if (existing) {
-      onUpdate(existing.id, { content });
-    } else {
-      const { isValid, errors } = validateSection({ title });
-      if (!isValid) {
-        setRowErrors((prev) => ({ ...prev, [type]: errors.title }));
-        return;
-      }
-      setRowErrors((prev) => ({ ...prev, [type]: undefined }));
-      onCreate({
-        section_type: type,
-        title,
-        content,
-        order_index: PRESET_TYPES.indexOf(type),
-      });
+      onUpdate(rowKey(existing), { content: value });
+      return;
     }
+
+    const title = SECTION_TYPE_LABELS[type];
+    const { isValid, errors } = validateSection({ title });
+    if (!isValid) {
+      setRowErrors((prev) => ({ ...prev, [type]: errors.title }));
+      return;
+    }
+    setRowErrors((prev) => ({ ...prev, [type]: undefined }));
+    onCreate({
+      section_type: type,
+      title,
+      content: value,
+      order_index: PRESET_TYPES.indexOf(type),
+    });
+  };
+
+  const handleCustomChange = (key, value) => {
+    setCustomValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleCustomBlur = (section) => {
+    const key = rowKey(section);
+    const value = customValues[key] ?? '';
+    if ((section.content || '') === value) return;
+    onUpdate(key, { content: value });
   };
 
   const handleAddCustom = async () => {
@@ -81,8 +133,9 @@ export default function SOPSectionForm({ sections, onCreate, onUpdate, onRemove,
                   <td className="px-4 py-2">
                     <input
                       type="text"
-                      defaultValue={existing?.content || ''}
-                      onBlur={(e) => handlePresetContentChange(type, e.target.value)}
+                      value={presetValues[type] ?? ''}
+                      onChange={(e) => handlePresetChange(type, e.target.value)}
+                      onBlur={() => handlePresetBlur(type)}
                       placeholder={`Enter ${SECTION_TYPE_LABELS[type].toLowerCase()}...`}
                       className="w-full rounded border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-ring"
                     />
@@ -90,8 +143,8 @@ export default function SOPSectionForm({ sections, onCreate, onUpdate, onRemove,
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">{index + 1}</td>
                   <td className="px-4 py-2">
-{existing && (
-                      <Button variant="ghost" size="icon" onClick={() => onRemove(existing.id)} disabled={saving} title="Remove section">
+                    {existing && (
+                      <Button variant="ghost" size="icon" onClick={() => onRemove(rowKey(existing))} disabled={saving} title="Remove section">
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     )}
@@ -100,25 +153,29 @@ export default function SOPSectionForm({ sections, onCreate, onUpdate, onRemove,
               );
             })}
 
-            {customSections.map((section, index) => (
-              <tr key={section.id}>
-                <td className="px-4 py-2 font-medium text-foreground">{section.title}</td>
-                <td className="px-4 py-2">
-                  <input
-                    type="text"
-                    defaultValue={section.content || ''}
-                    onBlur={(e) => onUpdate(section.id, { content: e.target.value })}
-                    className="w-full rounded border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </td>
-                <td className="px-4 py-2 text-muted-foreground">{PRESET_TYPES.length + index + 1}</td>
-                <td className="px-4 py-2">
-<Button variant="ghost" size="icon" onClick={() => onRemove(section.id)} disabled={saving} title="Remove section">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
+            {customSections.map((section, index) => {
+              const key = rowKey(section);
+              return (
+                <tr key={key}>
+                  <td className="px-4 py-2 font-medium text-foreground">{section.title}</td>
+                  <td className="px-4 py-2">
+                    <input
+                      type="text"
+                      value={customValues[key] ?? ''}
+                      onChange={(e) => handleCustomChange(key, e.target.value)}
+                      onBlur={() => handleCustomBlur(section)}
+                      className="w-full rounded border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </td>
+                  <td className="px-4 py-2 text-muted-foreground">{PRESET_TYPES.length + index + 1}</td>
+                  <td className="px-4 py-2">
+                    <Button variant="ghost" size="icon" onClick={() => onRemove(key)} disabled={saving} title="Remove section">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

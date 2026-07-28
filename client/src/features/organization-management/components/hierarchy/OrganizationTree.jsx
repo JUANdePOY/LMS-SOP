@@ -1,8 +1,6 @@
 import { Building2 } from 'lucide-react';
 import { HierarchyProvider } from '../hierarchy/HierarchyContext';
 import BusinessAccordion from './BusinessAccordion';
-import SelectedDepartmentPanel from './SelectedDepartmentPanel';
-import SOPModal from './SOPModal';
 
 // Non-mutating replacement for the old filterDepartments that mutated
 // `dept.children` in place during render. Returns new arrays/objects only.
@@ -49,12 +47,6 @@ export default function OrganizationTree({ hierarchy = [], searchQuery = '' }) {
           );
         })}
       </div>
-
-      <div className="mt-4">
-        <SelectedDepartmentPanel />
-      </div>
-
-      <SOPModal />
     </HierarchyProvider>
   );
 }

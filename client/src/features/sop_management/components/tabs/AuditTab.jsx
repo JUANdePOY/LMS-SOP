@@ -59,7 +59,7 @@ export default function AuditTab({ sopId }) {
                   </span>
                 </td>
                 <td className="px-4 py-3 font-medium text-[var(--text-primary)]">
-                  {log.user_name || log.performed_by_name || `User #${log.performed_by || log.user_id}` || 'System'}
+                  {log.user_name || log.performed_by_name || (log.performed_by != null || log.user_id != null ? `User #${log.performed_by || log.user_id}` : 'System')}
                 </td>
                 <td className="px-4 py-3 text-[var(--text-secondary)] max-w-xs truncate">
                   {typeof log.metadata === 'object'

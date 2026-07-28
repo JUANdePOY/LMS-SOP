@@ -40,7 +40,7 @@ export default function SOPModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-lg rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-xl">
+      <div className="w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
             <p className="font-semibold text-[var(--text-primary)]">SOPs</p>
@@ -55,7 +55,7 @@ export default function SOPModal() {
           </button>
         </div>
 
-        <div className="max-h-96 overflow-y-auto px-5 py-4">
+        <div className="max-h-[28rem] overflow-y-auto px-5 py-4">
           {loading && (
             <div className="flex items-center justify-center gap-2 py-8 text-sm text-[var(--text-muted)]">
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -76,24 +76,43 @@ export default function SOPModal() {
           )}
 
           {!loading && !error && sops.length > 0 && (
-            <ul className="space-y-2">
-              {sops.map((sop) => (
-                <li
-                  key={sop.id}
-                  className="flex items-center gap-3 rounded-lg border border-[var(--border)] px-3 py-2"
-                >
-                  <FileText className="h-4 w-4 text-[var(--text-muted)] shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-[var(--text-primary)]">{sop.title}</p>
-                    {sop.updated_at && (
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Updated {new Date(sop.updated_at).toLocaleDateString()}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {sops.map((sop) => {
+                const href = sop.file_url || sop.url || null;
+                return (
+                  <button
+                    key={sop.id}
+                    type="button"
+                    onClick={() => href && window.open(href, '_blank', 'noopener')}
+                    className={`flex flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--bg-page)] p-4 text-left transition-colors ${
+                      href ? 'hover:border-blue-300 cursor-pointer' : 'cursor-default'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 shrink-0">
+                        <FileText className="h-4 w-4 text-blue-500" />
+                      </span>
+                      <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--text-primary)]">
+                        {sop.title}
                       </p>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {sop.version && (
+                        <span className="rounded-full bg-[var(--bg-hover)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)]">
+                          v{sop.version}
+                        </span>
+                      )}
+                      {sop.updated_at && (
+                        <p className="text-xs text-[var(--text-muted)]">
+                          Updated {new Date(sop.updated_at).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>

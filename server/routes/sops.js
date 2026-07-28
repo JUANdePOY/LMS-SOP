@@ -28,12 +28,13 @@ router.get('/', async (req, res) => {
 
 router.get('/stats', async (req, res) => {
   try {
-    // sops uses `deleted_at`, not `is_deleted` — the old is_deleted filter
-    // referenced a column that doesn't exist on this table.
+    // sopModel.softDelete() writes to `is_deleted` (that's the column this
+    // schema actually maintains on delete); `deleted_at` is never set, so
+    // filtering on deleted_at here let soft-deleted SOPs keep counting.
     const [rows] = await require('../config/database').query(`
       SELECT status, COUNT(*) AS count
       FROM sops
-      WHERE deleted_at IS NULL
+      WHERE (is_deleted = 0 OR is_deleted IS NULL)
       GROUP BY status
     `);
     res.json({ status: 'success', data: rows });
@@ -92,15 +93,19 @@ router.post('/', [
       version: version || '1.0',
     });
 
-    // Content (sections, steps, documents, acknowledgements, assignments)
-    // all hang off a sop_versions row, so a SOP needs one from the start
-    // or every content-creation call downstream has to create it lazily.
-    await sopVersionModel.createVersion({
-      sop_id: id,
-      version: version || '1.0',
-      status: status || 'Draft',
-      created_by: req.user.id,
-    }, { makeCurrent: true });
+    // Best-effort initial version: don't fail the whole request if
+    // sop_versions is unavailable or schema is in flux. Content routes
+    // can recover through ensureCurrentVersion() / lazy creation later.
+    try {
+      await sopVersionModel.createVersion({
+        sop_id: id,
+        version: version || '1.0',
+        status: status || 'Draft',
+        created_by: req.user.id,
+      }, { makeCurrent: true });
+    } catch (versionError) {
+      console.error('Create SOP: initial version creation failed (non-fatal):', versionError);
+    }
 
     logAudit({
       user_id: req.user.id,

@@ -150,6 +150,16 @@ async function create(data) {
   const insertCols = ['title', cols.code, 'description', 'department_id', 'category_id', cols.owner, 'status'];
   const insertVals = [title, code || null, description || null, department_id || null, category_id || null, owner_user_id || null, status || 'Draft'];
 
+  // The real table has BOTH owner_user_id (nullable) and owner_id
+  // (NOT NULL, no default). getSopsColumns() only detects/writes whichever
+  // one it picks as `cols.owner` (owner_user_id, since it exists) — leaving
+  // owner_id NULL on insert, which fails under strict SQL mode. Mirror the
+  // same value into owner_id whenever it isn't already the chosen column.
+  if (cols.owner !== 'owner_id') {
+    insertCols.push('owner_id');
+    insertVals.push(owner_user_id || null);
+  }
+
   // `version` and `is_published`/`is_archived` only get written if the
   // table actually has those columns — on the real schema it doesn't
   // (version lives in sop_versions instead), so these are no-ops there.
@@ -194,6 +204,11 @@ async function update(id, data) {
   if (data.owner_user_id !== undefined && cols.owner === 'owner_user_id') {
     sets.push('owner_user_id = ?');
     params.push(data.owner_user_id);
+    if (data.owner_user_id != null) {
+      // owner_id is NOT NULL on the real table — keep it mirrored.
+      sets.push('owner_id = ?');
+      params.push(data.owner_user_id);
+    }
   }
   if (data.owner_id !== undefined && cols.owner === 'owner_id') {
     sets.push('owner_id = ?');

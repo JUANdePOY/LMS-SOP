@@ -1,7 +1,19 @@
+import { useMemo } from 'react';
+import { generateSOPCode } from '../../utils/generateSOPCode';
+
 export default function SOPBasicInfoForm({ formData, onChange, errors = {}, departments = [], categories = [] }) {
+  const displayCode = useMemo(() => {
+    if (formData.code) return formData.code;
+    return formData.title.trim() ? generateSOPCode(formData.title) : '';
+  }, [formData.title, formData.code]);
+
   const handleChange = (field) => (event) => {
     const value = event.target.value;
-    onChange({ ...formData, [field]: value });
+    const next = { ...formData, [field]: value };
+    if (!next.code && next.title.trim()) {
+      next.code = generateSOPCode(next.title);
+    }
+    onChange(next);
   };
 
   return (
@@ -30,9 +42,9 @@ export default function SOPBasicInfoForm({ formData, onChange, errors = {}, depa
         <input
           id="sop-code"
           type="text"
-          value={formData.code}
+          value={displayCode}
           onChange={handleChange('code')}
-          placeholder="Leave blank to auto-generate"
+          placeholder={formData.title.trim() ? 'Auto-generated from title' : 'Leave blank to auto-generate'}
           className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-input)] text-foreground placeholder:text-muted-foreground px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
         />
       </div>

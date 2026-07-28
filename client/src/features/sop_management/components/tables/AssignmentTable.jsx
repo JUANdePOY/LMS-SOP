@@ -57,10 +57,10 @@ export default function AssignmentTable({ assignments, onDelete, loading, disabl
                   ? assignment.department_name || `Department #${assignment.department_id}`
                   : assignment.assignment_type === ASSIGNMENT_TYPE.POSITION
                   ? assignment.position_title
-                  : assignment.user_name || `User #${assignment.user_id}`}
+                  : assignment.user_name || (assignment.user_id != null ? `User #${assignment.user_id}` : '—')}
               </td>
               <td className="px-4 py-3 text-gray-600">
-                {assignment.assigned_by_name || `User #${assignment.assigned_by}` || '—'}
+                {assignment.assigned_by_name || (assignment.assigned_by != null ? `User #${assignment.assigned_by}` : '—')}
               </td>
               <td className="px-4 py-3 text-gray-500">
                 {assignment.created_at

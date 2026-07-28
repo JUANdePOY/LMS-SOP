@@ -43,15 +43,26 @@ async function ensureCurrentVersion(sopId, actorId) {
   const existing = await getCurrentVersion(sopId);
   if (existing) return existing.id;
 
+  // sop_versions.created_by is NOT NULL with no default. Some callers
+  // (e.g. sopComplianceModel.createAcknowledgement) call this with a null
+  // actorId, which would otherwise fail the insert outright. sops.created_by
+  // is itself NOT NULL, so it's always a safe fallback.
+  let resolvedActorId = actorId;
+  if (!resolvedActorId) {
+    const [rows] = await db.query('SELECT created_by FROM sops WHERE id = ?', [sopId]);
+    resolvedActorId = rows[0]?.created_by || null;
+  }
+
   return createVersion({
     sop_id: sopId,
     version: '1.0',
     status: 'Draft',
-    created_by: actorId,
+    created_by: resolvedActorId,
   }, { makeCurrent: true });
 }
 
-async function createVersion(data, { makeCurrent = false } = {}) {
+async function createVersion(data, { makeCurrent = false, transaction } = {}) {
+  const dbConn = transaction || db;
   const {
     sop_id,
     version,
@@ -63,10 +74,10 @@ async function createVersion(data, { makeCurrent = false } = {}) {
   } = data;
 
   if (makeCurrent) {
-    await db.query('UPDATE sop_versions SET is_current = FALSE WHERE sop_id = ?', [sop_id]);
+    await dbConn.query('UPDATE sop_versions SET is_current = FALSE WHERE sop_id = ?', [sop_id]);
   }
 
-  const [result] = await db.query(`
+  const [result] = await dbConn.query(`
     INSERT INTO sop_versions (
       sop_id, version, is_current, change_summary, effective_date, review_date, status, created_by, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
@@ -75,7 +86,7 @@ async function createVersion(data, { makeCurrent = false } = {}) {
   const versionId = result.insertId;
 
   if (makeCurrent) {
-    await db.query(
+    await dbConn.query(
       'UPDATE sops SET current_version_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [versionId, status, sop_id],
     );

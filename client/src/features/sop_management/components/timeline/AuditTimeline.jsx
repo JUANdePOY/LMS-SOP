@@ -40,7 +40,7 @@ export default function AuditTimeline({ logs, loading }) {
 
               <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
                 <User className="h-3 w-3" />
-                <span>{log.user_name || log.performed_by_name || `User #${log.performed_by || log.user_id}` || 'System'}</span>
+                <span>{log.user_name || log.performed_by_name || (log.performed_by != null || log.user_id != null ? `User #${log.performed_by || log.user_id}` : 'System')}</span>
               </div>
 
               {log.details || log.description ? (

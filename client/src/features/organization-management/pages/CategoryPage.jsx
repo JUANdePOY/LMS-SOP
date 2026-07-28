@@ -1,45 +1,40 @@
 import { useState, useMemo } from 'react';
 import { Plus, Search } from 'lucide-react';
-import DepartmentTable from '../components/department/DepartmentTable';
-import DepartmentModal from '../components/department/DepartmentModal';
+import CategoryTable from '../components/category/CategoryTable';
+import CategoryModal from '../components/category/CategoryModal';
+import { useCategories } from '../hooks/useCategories';
 import { useDepartments } from '../hooks/useDepartments';
-import { useBusinesses } from '../hooks/useBusinesses';
-import { useUsers } from '../hooks/useUsers';
 
-export default function DepartmentPage() {
-  const { departments, loading, error, create, update, remove } = useDepartments();
-  const { businesses } = useBusinesses();
-  const { users: allUsers, loading: usersLoading } = useUsers();
-  const users = allUsers.filter(
-    (u) => u.role === 'admin' || u.role === 'department_head'
-  );
+export default function CategoryPage() {
+  const { categories, loading, error, create, update, remove } = useCategories();
+  const { departments } = useDepartments();
   const [modalOpen, setModalOpen] = useState(false);
   const [editData, setEditData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [businessFilter, setBusinessFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
 
-  const filteredDepartments = useMemo(() => {
+  const filteredCategories = useMemo(() => {
     const term = query.trim().toLowerCase();
-    let result = departments || [];
+    let result = categories || [];
     if (term) {
       result = result.filter(
-        (d) =>
-          (d.name || '').toLowerCase().includes(term) ||
-          (d.code || '').toLowerCase().includes(term)
+        (c) =>
+          (c.name || '').toLowerCase().includes(term) ||
+          (c.description || '').toLowerCase().includes(term)
       );
     }
     if (statusFilter !== 'all') {
-      result = result.filter((d) => d.status === statusFilter);
+      result = result.filter((c) => String(c.is_active) === statusFilter);
     }
-    if (businessFilter !== 'all') {
-      result = result.filter((d) => String(d.business_id) === businessFilter);
+    if (departmentFilter !== 'all') {
+      result = result.filter((c) => String(c.department_id) === departmentFilter);
     }
     return result;
-  }, [query, departments, statusFilter, businessFilter]);
+  }, [query, categories, statusFilter, departmentFilter]);
 
-  const hasActiveFilters = query.trim() || statusFilter !== 'all' || businessFilter !== 'all';
+  const hasActiveFilters = query.trim() || statusFilter !== 'all' || departmentFilter !== 'all';
 
   const handleCreate = async (data) => {
     setSubmitting(true);
@@ -48,7 +43,7 @@ export default function DepartmentPage() {
       setModalOpen(false);
       setEditData(null);
     } catch (err) {
-      console.error('Failed to create department:', err);
+      console.error('Failed to create category:', err);
     } finally {
       setSubmitting(false);
     }
@@ -62,23 +57,23 @@ export default function DepartmentPage() {
       setModalOpen(false);
       setEditData(null);
     } catch (err) {
-      console.error('Failed to update department:', err);
+      console.error('Failed to update category:', err);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleEdit = (dept) => {
-    setEditData(dept);
+  const handleEdit = (category) => {
+    setEditData(category);
     setModalOpen(true);
   };
 
-  const handleDelete = async (dept) => {
-    if (!window.confirm(`Are you sure you want to delete "${dept.name}"? This action cannot be undone.`)) return;
+  const handleDelete = async (category) => {
+    if (!window.confirm(`Are you sure you want to delete "${category.name}"? This action cannot be undone.`)) return;
     try {
-      await remove(dept.id);
+      await remove(category.id);
     } catch (err) {
-      console.error('Failed to delete department:', err);
+      console.error('Failed to delete category:', err);
     }
   };
 
@@ -86,9 +81,9 @@ export default function DepartmentPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Departments</h1>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Categories</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
-            Manage departments within your businesses.
+            Manage categories within departments.
           </p>
         </div>
         <button
@@ -96,7 +91,7 @@ export default function DepartmentPage() {
           className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
         >
           <Plus className="h-4 w-4" />
-          Create Department
+          Create Category
         </button>
       </div>
 
@@ -113,18 +108,18 @@ export default function DepartmentPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search departments by name or code..."
+              placeholder="Search categories by name or description..."
               className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] py-2 pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none"
             />
           </div>
           <select
-            value={businessFilter}
-            onChange={(e) => setBusinessFilter(e.target.value)}
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
             className="rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
           >
-            <option value="all">All businesses</option>
-            {(businesses || []).map((b) => (
-              <option key={b.id} value={b.id}>{b.business_name}</option>
+            <option value="all">All departments</option>
+            {(departments || []).map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </select>
           <select
@@ -133,13 +128,12 @@ export default function DepartmentPage() {
             className="rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
           >
             <option value="all">All statuses</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-            <option value="archived">Archived</option>
+            <option value="1">Active</option>
+            <option value="0">Inactive</option>
           </select>
           {hasActiveFilters && (
             <button
-              onClick={() => { setQuery(''); setStatusFilter('all'); setBusinessFilter('all'); }}
+              onClick={() => { setQuery(''); setStatusFilter('all'); setDepartmentFilter('all'); }}
               className="text-sm text-blue-600 hover:underline"
             >
               Clear
@@ -148,24 +142,21 @@ export default function DepartmentPage() {
         </div>
       </div>
 
-      <DepartmentTable
-        departments={filteredDepartments}
+      <CategoryTable
+        categories={filteredCategories}
         loading={loading}
         onEdit={handleEdit}
         onDelete={handleDelete}
       />
 
-      <DepartmentModal
+      <CategoryModal
         open={modalOpen}
         onClose={() => { setModalOpen(false); setEditData(null); }}
         onSubmit={editData ? handleUpdate : handleCreate}
         initialData={editData}
         loading={submitting}
-        businesses={businesses}
         departments={departments}
-        users={users}
       />
     </div>
   );
 }
-

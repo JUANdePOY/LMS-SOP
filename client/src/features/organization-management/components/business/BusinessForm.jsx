@@ -46,7 +46,6 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
   const [form, setForm] = useState(defaultForm);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
-  const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -72,11 +71,10 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
       setForm(defaultForm);
       setLogoPreview('');
     }
-    setLogoFile(null);
     setUploadError('');
     setErrors({});
     setTouched({});
-  }, [initialData, setLogoFile]);
+  }, [initialData]);
 
   const processFile = useCallback(async (file) => {
     if (!file) return;
@@ -92,7 +90,6 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
 
     setUploadError('');
     setUploading(true);
-    setLogoFile(file);
 
     setLogoPreview((prev) => {
       if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
@@ -110,7 +107,6 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
     } catch (err) {
       console.error('Failed to upload logo:', err);
       setUploadError('Upload failed. Please try again.');
-      setLogoFile(null);
       setLogoPreview(initialData?.logo_url || '');
     } finally {
       setUploading(false);
@@ -157,7 +153,6 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
       if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
       return '';
     });
-    setLogoFile(null);
     setForm((prev) => ({ ...prev, logo_url: '' }));
     setUploadError('');
   }, []);

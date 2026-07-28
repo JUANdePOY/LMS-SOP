@@ -66,7 +66,7 @@ export default function AcknowledgementTable({ acknowledgements, stats, loading 
             {acknowledgements.map((ack) => (
               <tr key={ack.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 font-medium text-gray-900">
-                  {ack.user_name || `User #${ack.user_id}`}
+                  {ack.user_name || (ack.user_id != null ? `User #${ack.user_id}` : '—')}
                 </td>
                 <td className="px-4 py-3 text-gray-600">
                   {ack.user_email || '—'}

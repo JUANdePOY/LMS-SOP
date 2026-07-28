@@ -51,7 +51,7 @@ async function listAssignments(sopId) {
     SELECT sa.*, u.full_name AS assigned_by_name
     FROM sop_assignments sa
     LEFT JOIN users u ON sa.assigned_by = u.id
-    WHERE sa.sop_version_id = ?
+    WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE
     ORDER BY sa.assigned_at DESC
   `, [versionId]);
 
@@ -137,7 +137,7 @@ async function findDuplicateAssignment({ sop_id, assignment_type, department_id,
     const [rows] = await db.query(`
       SELECT sa.id FROM sop_assignments sa
       INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
-      WHERE sa.sop_version_id = ? AND ad.department_id = ?
+      WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE AND ad.department_id = ?
       LIMIT 1
     `, [versionId, department_id]);
     return rows[0] || null;
@@ -147,7 +147,7 @@ async function findDuplicateAssignment({ sop_id, assignment_type, department_id,
     const [rows] = await db.query(`
       SELECT sa.id FROM sop_assignments sa
       INNER JOIN assignment_positions ap ON ap.assignment_id = sa.id
-      WHERE sa.sop_version_id = ? AND LOWER(ap.position_name) = LOWER(?)
+      WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE AND LOWER(ap.position_name) = LOWER(?)
       LIMIT 1
     `, [versionId, position_title]);
     return rows[0] || null;
@@ -156,7 +156,7 @@ async function findDuplicateAssignment({ sop_id, assignment_type, department_id,
   const [rows] = await db.query(`
     SELECT sa.id FROM sop_assignments sa
     INNER JOIN assignment_users au ON au.assignment_id = sa.id
-    WHERE sa.sop_version_id = ? AND au.user_id = ?
+    WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE AND au.user_id = ?
     LIMIT 1
   `, [versionId, user_id]);
   return rows[0] || null;
@@ -200,13 +200,12 @@ async function createAssignment(data) {
   return assignmentId;
 }
 
-// sop_assignments has no soft-delete column, so this removes the
-// assignment event and its targeting rows outright.
+// sop_assignments DOES have an is_deleted column on the real schema, so
+// mark it deleted rather than hard-deleting the row (and its junction
+// rows, which cascade-delete via FK anyway once the parent is gone — but
+// we're keeping the parent row now, so leave the targeting rows alone too).
 async function softDeleteAssignment(id) {
-  await db.query('DELETE FROM assignment_departments WHERE assignment_id = ?', [id]);
-  await db.query('DELETE FROM assignment_positions WHERE assignment_id = ?', [id]);
-  await db.query('DELETE FROM assignment_users WHERE assignment_id = ?', [id]);
-  const [result] = await db.query('DELETE FROM sop_assignments WHERE id = ?', [id]);
+  const [result] = await db.query('UPDATE sop_assignments SET is_deleted = TRUE WHERE id = ?', [id]);
   return result.affectedRows;
 }
 
@@ -378,6 +377,7 @@ async function updateApproval(id, data) {
 module.exports = {
   listAssignments,
   findAssignmentById,
+  findDuplicateAssignment,
   createAssignment,
   softDeleteAssignment,
   resolveUsersForDepartment,

@@ -35,7 +35,7 @@ export default function AuditDrawer({ open, onClose, logs, loading }) {
                     </span>
                   </div>
                   <div className="mt-1.5 text-sm text-gray-700">
-                    By: {log.user_name || log.performed_by_name || `User #${log.performed_by || log.user_id}` || 'System'}
+                    By: {log.user_name || log.performed_by_name || (log.performed_by != null || log.user_id != null ? `User #${log.performed_by || log.user_id}` : 'System')}
                   </div>
                   {log.details || log.description ? (
                     <div className="mt-1 text-xs text-gray-500">
