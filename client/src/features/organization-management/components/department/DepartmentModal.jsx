@@ -8,7 +8,6 @@ export default function DepartmentModal({
   initialData,
   loading,
   businesses = [],
-  departments = [],
   users = [],
 }) {
   if (!open) return null;
@@ -35,7 +34,6 @@ export default function DepartmentModal({
             onCancel={onClose}
             loading={loading}
             businesses={businesses}
-            departments={departments}
             users={users}
           />
         </div>

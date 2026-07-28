@@ -41,24 +41,24 @@ export function useDepartments(initialParams = {}) {
     const payload = response.data;
     const created = payload?.data || payload;
     if (payload?.status === 'success') {
-      setDepartments((prev) => [created, ...prev]);
+      await refresh();
     }
     return created;
-  }, []);
+  }, [refresh]);
 
   const update = useCallback(async (id, data) => {
     const response = await updateDepartment(id, data);
     const payload = response.data;
     if (payload?.status === 'success') {
-      setDepartments((prev) => prev.map((d) => (d.id === id ? { ...d, ...data } : d)));
+      await refresh();
     }
     return payload;
-  }, []);
+  }, [refresh]);
 
   const remove = useCallback(async (id) => {
     await deleteDepartment(id);
-    setDepartments((prev) => prev.filter((d) => d.id !== id));
-  }, []);
+    await refresh();
+  }, [refresh]);
 
   useEffect(() => {
     if (authLoading || !isAuthenticated) return;
@@ -69,4 +69,3 @@ export function useDepartments(initialParams = {}) {
 }
 
 export default useDepartments;
-

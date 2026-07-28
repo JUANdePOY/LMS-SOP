@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, XCircle, Send, Archive, FileText, Layout, ListOrdered, Paperclip, Users, ThumbsUp, GitBranch, History, Pencil, Trash2, Share2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, XCircle, Send, Archive, FileText, Layout, ListOrdered, Paperclip, Users, ThumbsUp, GitBranch, History, Pencil } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { useSOPContext } from '../context/SOPContext';
 import { useSOPPermission } from '../context/SOPPermissionContext';

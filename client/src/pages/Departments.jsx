@@ -9,6 +9,7 @@ import { Modal } from '@/shared/components/ui/modal';
 import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { Search, Plus, Edit2, Trash2, Building2, ChevronRight, FolderTree, Loader2, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/shared/components/ui/Toast';
+import { generateDepartmentCode } from '@/features/organization-management/utils/generateDepartmentCode';
 
 export default function DepartmentsPage() {
   const { toast } = useToast();
@@ -120,7 +121,6 @@ export default function DepartmentsPage() {
       name: d.name || '',
       code: d.code || '',
       description: d.description || '',
-      parent_department_id: d.parent_department_id || '',
       head_user_id: d.head_user_id || '',
       status: d.status || 'active',
     });
@@ -273,7 +273,16 @@ export default function DepartmentsPage() {
                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Name <span className="text-red-500">*</span></label>
                 <Input
                   value={formData.name || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData((prev) => {
+                      const next = { ...prev, name: val };
+                      if (!next.code && val.trim()) {
+                        next.code = generateDepartmentCode(val);
+                      }
+                      return next;
+                    });
+                  }}
                   placeholder="e.g. Operations"
                 />
               </div>
@@ -281,8 +290,10 @@ export default function DepartmentsPage() {
                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Code <span className="text-red-500">*</span></label>
                 <Input
                   value={formData.code || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-                  placeholder="e.g. OPS"
+                  readOnly
+                  disabled
+                  placeholder="Auto-generated from name"
+                  className="opacity-70 cursor-not-allowed"
                 />
               </div>
             </div>
@@ -294,19 +305,6 @@ export default function DepartmentsPage() {
                 placeholder="Optional description"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Parent Department</label>
-                <Select
-                  value={formData.parent_department_id || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, parent_department_id: e.target.value }))}
-                >
-                  <option value="">None (Top-level)</option>
-                  {departments.filter(d => !d.parent_department_id).map(d => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </Select>
-              </div>
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Status</label>
                 <Select
@@ -342,14 +340,26 @@ export default function DepartmentsPage() {
                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Name</label>
                 <Input
                   value={formData.name || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData((prev) => {
+                      const next = { ...prev, name: val };
+                      if (!next.code && val.trim()) {
+                        next.code = generateDepartmentCode(val);
+                      }
+                      return next;
+                    });
+                  }}
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Code</label>
                 <Input
                   value={formData.code || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
+                  readOnly
+                  disabled
+                  placeholder="Auto-generated from name"
+                  className="opacity-70 cursor-not-allowed"
                 />
               </div>
             </div>
@@ -360,19 +370,6 @@ export default function DepartmentsPage() {
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Parent Department</label>
-                <Select
-                  value={formData.parent_department_id || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, parent_department_id: e.target.value }))}
-                >
-                  <option value="">None (Top-level)</option>
-                  {departments.filter(d => d.id !== editingDept.id && !d.parent_department_id).map(d => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </Select>
-              </div>
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Status</label>
                 <Select

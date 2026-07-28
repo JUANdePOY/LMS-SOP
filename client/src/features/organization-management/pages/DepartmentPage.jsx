@@ -5,11 +5,13 @@ import DepartmentModal from '../components/department/DepartmentModal';
 import { useDepartments } from '../hooks/useDepartments';
 import { useBusinesses } from '../hooks/useBusinesses';
 import { useUsers } from '../hooks/useUsers';
+import { useToast } from '@/shared/components/Toast';
 
 export default function DepartmentPage() {
   const { departments, loading, error, create, update, remove } = useDepartments();
   const { businesses } = useBusinesses();
-  const { users: allUsers, loading: usersLoading } = useUsers();
+  const { users: allUsers } = useUsers();
+  const { success, error: showError } = useToast();
   const users = allUsers.filter(
     (u) => u.role === 'admin' || u.role === 'department_head'
   );
@@ -45,9 +47,12 @@ export default function DepartmentPage() {
     setSubmitting(true);
     try {
       await create(data);
+      success('Department created successfully');
       setModalOpen(false);
       setEditData(null);
     } catch (err) {
+      const message = err.response?.data?.message || 'Failed to create department';
+      showError(message);
       console.error('Failed to create department:', err);
     } finally {
       setSubmitting(false);
@@ -59,9 +64,12 @@ export default function DepartmentPage() {
     setSubmitting(true);
     try {
       await update(editData.id, data);
+      success('Department updated successfully');
       setModalOpen(false);
       setEditData(null);
     } catch (err) {
+      const message = err.response?.data?.message || 'Failed to update department';
+      showError(message);
       console.error('Failed to update department:', err);
     } finally {
       setSubmitting(false);
@@ -77,7 +85,10 @@ export default function DepartmentPage() {
     if (!window.confirm(`Are you sure you want to delete "${dept.name}"? This action cannot be undone.`)) return;
     try {
       await remove(dept.id);
+      success('Department deleted successfully');
     } catch (err) {
+      const message = err.response?.data?.message || 'Failed to delete department';
+      showError(message);
       console.error('Failed to delete department:', err);
     }
   };
@@ -162,7 +173,6 @@ export default function DepartmentPage() {
         initialData={editData}
         loading={submitting}
         businesses={businesses}
-        departments={departments}
         users={users}
       />
     </div>

@@ -124,16 +124,11 @@ id
 name
 code
 description
-parent_department_id
+business_id
 head_user_id
 status
 created_at
 updated_at
-
-
-Add:
-
-business_id INT
 
 
 Relationship:
@@ -148,7 +143,7 @@ departments.business_id
 Support:
 
 - Multiple departments per business
-- Parent-child department hierarchy
+- Flat department structure (no nesting)
 
 
 Example:

@@ -54,9 +54,9 @@ router.post('/', [
   body('name').trim().isLength({ min: 2 }).withMessage('Department name is required'),
   body('code').trim().isLength({ min: 2 }).withMessage('Department code is required'),
   body('description').optional().trim(),
-  body('parent_department_id').optional().isInt(),
-  body('head_user_id').optional().isInt(),
-  body('business_id').optional().isInt().withMessage('Business ID must be an integer'),
+  body('parent_department_id').optional({ nullable: true }).isInt(),
+  body('head_user_id').optional({ nullable: true }).isInt(),
+  body('business_id').optional({ nullable: true }).isInt().withMessage('Business ID must be an integer'),
   body('status').optional().isIn(['active', 'inactive', 'archived']),
 ], async (req, res) => {
   try {
@@ -97,9 +97,9 @@ router.put('/:id', [
   body('name').optional().trim().isLength({ min: 2 }),
   body('code').optional().trim().isLength({ min: 2 }),
   body('description').optional().trim(),
-  body('parent_department_id').optional().isInt(),
-  body('head_user_id').optional().isInt(),
-  body('business_id').optional().isInt().withMessage('Business ID must be an integer'),
+  body('parent_department_id').optional({ nullable: true }).isInt(),
+  body('head_user_id').optional({ nullable: true }).isInt(),
+  body('business_id').optional({ nullable: true }).isInt().withMessage('Business ID must be an integer'),
   body('status').optional().isIn(['active', 'inactive', 'archived']),
 ], async (req, res) => {
   try {
