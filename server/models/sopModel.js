@@ -35,6 +35,14 @@ async function getSopsColumns() {
 // The real table uses `deleted_at IS NULL`, not `is_deleted = 0` — the old
 // `s.deleted_at = 0` comparison silently matched nothing (or the wrong
 // rows), which is why findAll()/findById() were returning empty results.
+function normalizeSopRow(row, cols) {
+  if (!row) return row;
+  if (cols.code === 'sop_code' && row.sop_code !== undefined) {
+    return { ...row, code: row.sop_code };
+  }
+  return row;
+}
+
 function notDeletedClause(cols, alias = 's') {
   return cols.softDelete === 'is_deleted'
     ? `(${alias}.is_deleted = 0 OR ${alias}.is_deleted IS NULL)`
@@ -104,7 +112,7 @@ async function findAll(filters = {}) {
   const [countRows] = await db.query(countSql, countParams);
 
   return {
-    rows,
+    rows: rows.map((r) => normalizeSopRow(r, cols)),
     total: countRows[0]?.total ?? 0,
     page,
     limit,
@@ -122,7 +130,7 @@ async function findById(id) {
     LEFT JOIN users u ON s.${cols.owner} = u.id
     WHERE s.id = ? AND ${notDeletedClause(cols)}
   `, [id]);
-  return rows[0] || null;
+  return normalizeSopRow(rows[0] || null, cols);
 }
 
 async function findByCode(code) {

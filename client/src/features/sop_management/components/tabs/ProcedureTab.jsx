@@ -1,8 +1,9 @@
 import { useSOPSteps } from '../../hooks/useSOPSteps';
-import { ListOrdered, GripVertical } from 'lucide-react';
+import { ListOrdered } from 'lucide-react';
+import SOPStepForm from '../forms/SOPStepForm';
 
 export default function ProcedureTab({ sopId }) {
-  const { steps, loading, error } = useSOPSteps(sopId);
+  const { steps, loading, saving, error, create, update, remove } = useSOPSteps(sopId);
 
   if (loading) {
     return <div className="text-sm text-[var(--text-muted)] py-4">Loading steps…</div>;
@@ -16,14 +17,6 @@ export default function ProcedureTab({ sopId }) {
     );
   }
 
-  if (!steps || steps.length === 0) {
-    return (
-      <div className="rounded-lg border border-dashed border-[var(--border)] py-8 text-center text-sm text-[var(--text-muted)]">
-        No steps defined yet. Add steps to build the procedure.
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -33,36 +26,13 @@ export default function ProcedureTab({ sopId }) {
         </h3>
       </div>
 
-      <div className="space-y-3">
-        {steps
-          .sort((a, b) => (a.sort_order || a.step_number || 0) - (b.sort_order || b.step_number || 0))
-          .map((step, index) => (
-            <div
-              key={step.id}
-              className="flex gap-4 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-4 shadow-sm"
-            >
-              <div className="flex items-start pt-1">
-                <GripVertical className="h-4 w-4 text-[var(--text-muted)] opacity-50" />
-              </div>
-              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-semibold text-blue-700 dark:bg-blue-950/40 dark:text-blue-400">
-                {index + 1}
-              </div>
-              <div className="flex-1 min-w-0">
-                {step.title && (
-                  <h4 className="text-sm font-semibold text-[var(--text-primary)]">{step.title}</h4>
-                )}
-                <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)] whitespace-pre-wrap">
-                  {step.instruction || step.content || 'No content'}
-                </p>
-                {step.estimated_minutes && (
-                  <p className="mt-1 text-xs text-[var(--text-muted)]">
-                    Estimated: {step.estimated_minutes} min
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
-      </div>
+      <SOPStepForm
+        steps={steps}
+        onCreate={create}
+        onUpdate={update}
+        onRemove={remove}
+        saving={saving}
+      />
     </div>
   );
 }

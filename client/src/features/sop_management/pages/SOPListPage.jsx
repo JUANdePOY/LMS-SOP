@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { FileText, Plus, Search, SlidersHorizontal, Archive } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { useSOPList } from '../hooks/useSOPList';
+import { useArchiveSOP } from '../hooks/useArchiveSOP';
 import { useSOPPermission } from '../context/SOPPermissionContext';
 import { useSOPModal } from '../context/SOPModalContext';
+import { useToast } from '@/shared/components/Toast';
 import SOPCreateWizard from '../components/modals/SOPCreateWizard';
+import ArchiveModal from '../components/modals/ArchiveModal';
 
 const STATUS_OPTIONS = ['Draft', 'For Review', 'Approved', 'Published', 'Archived'];
 
@@ -26,12 +29,16 @@ function formatDate(value) {
 export default function SOPListPage() {
   const navigate = useNavigate();
   const { sops, loading, error, refresh } = useSOPList();
-  const { canCreate } = useSOPPermission();
+  const { canCreate, canArchive } = useSOPPermission();
   const { modalState, openModal, closeModal } = useSOPModal();
+  const { archive, loading: archiving } = useArchiveSOP();
+  const { success, error: showError } = useToast();
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [sort, setSort] = useState('updated_desc');
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState(null);
 
   const departmentOptions = useMemo(() => {
     const seen = new Map();
@@ -76,6 +83,19 @@ export default function SOPListPage() {
     setQuery('');
     setStatusFilter('all');
     setDepartmentFilter('all');
+  };
+
+  const handleArchive = async () => {
+    if (!archiveTarget) return;
+    try {
+      await archive(archiveTarget);
+      success('SOP archived');
+      setShowArchiveModal(false);
+      setArchiveTarget(null);
+      await refresh();
+    } catch (err) {
+      showError(err?.response?.data?.message || err?.message || 'Unable to archive');
+    }
   };
 
   return (
@@ -175,9 +195,25 @@ export default function SOPListPage() {
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
                   <FileText className="h-5 w-5" />
                 </div>
-                <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--bg-subtle)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--text-secondary)]">
-                  {sop.status || 'Draft'}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {sop.status === 'Published' && canArchive && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setArchiveTarget(sop.id);
+                        setShowArchiveModal(true);
+                      }}
+                      className="rounded-lg p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                      title="Archive SOP"
+                    >
+                      <Archive className="h-4 w-4" />
+                    </button>
+                  )}
+                  <span className="shrink-0 rounded-full border border-[var(--border)] bg-[var(--bg-subtle)] px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.2em] text-[var(--text-secondary)]">
+                    {sop.status || 'Draft'}
+                  </span>
+                </div>
               </div>
 
               {/* Subtitle + title */}
@@ -218,6 +254,12 @@ export default function SOPListPage() {
         open={modalState.create}
         onClose={() => closeModal('create')}
         onCreated={() => refresh()}
+      />
+      <ArchiveModal
+        open={showArchiveModal}
+        onClose={() => setShowArchiveModal(false)}
+        onArchive={handleArchive}
+        saving={archiving}
       />
     </div>
   );
