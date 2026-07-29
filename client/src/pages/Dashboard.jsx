@@ -38,17 +38,17 @@ const TRAINING_COMPLETION_DATA = [
 ];
 
 const DONUT_DATA = [
-  { name: 'Completed', value: 78, count: 100, color: '#2F6FED' },
-  { name: 'In Progress', value: 15, count: 19, color: '#F59E0B' },
-  { name: 'Not Started', value: 7, count: 9, color: '#94A3B8' },
+  { name: 'Completed', value: 78, count: 100, color: '#F25C05' },
+  { name: 'In Progress', value: 15, count: 19, color: '#da7756' },
+  { name: 'Not Started', value: 7, count: 9, color: '#d97a6c' },
 ];
 
 const SOP_BY_CATEGORY_DATA = [
-  { name: 'Operations', value: 45, count: 19, color: '#2F6FED' },
-  { name: 'HR & Admin', value: 24, count: 10, color: '#10B981' },
-  { name: 'Sales & Marketing', value: 17, count: 7, color: '#F59E0B' },
-  { name: 'Finance', value: 9, count: 4, color: '#8B5CF6' },
-  { name: 'IT', value: 5, count: 2, color: '#EF4444' },
+  { name: 'Operations', value: 45, count: 19, color: '#F25C05' },
+  { name: 'HR & Admin', value: 24, count: 10, color: '#da7756' },
+  { name: 'Sales & Marketing', value: 17, count: 7, color: '#d97a6c' },
+  { name: 'Finance', value: 9, count: 4, color: '#1D3067' },
+  { name: 'IT', value: 5, count: 2, color: '#32667F' },
 ];
 
 const USER_ACTIVITY_DATA = [
@@ -130,11 +130,11 @@ export default function Dashboard() {
                     <Icon size={18} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] sm:text-xs text-neutral-500 truncate">{card.label}</p>
+                     <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate">{card.label}</p>
                     <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 leading-tight">{card.value}</p>
                   </div>
                 </div>
-                <span className="flex items-center gap-0.5 text-[10px] sm:text-xs font-medium text-emerald-600 shrink-0">
+                 <span className="flex items-center gap-0.5 text-[10px] sm:text-xs font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
                   <TrendingUp size={12} />
                   {card.delta}
                 </span>
@@ -163,23 +163,24 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={TRAINING_COMPLETION_DATA}>
                 <defs>
-                  <linearGradient id="blueGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#2F6FED" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#2F6FED" stopOpacity={0} />
+                  <linearGradient id="orangeGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#F25C05" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#F25C05" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} />
                 <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#94A3B8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `${v}%`} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#fff',
-                    border: '1px solid #e2e8f0',
+                    backgroundColor: 'var(--card)',
+                    border: '1px solid var(--border)',
                     borderRadius: '8px',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    boxShadow: 'var(--shadow-md)',
+                    color: 'var(--card-foreground)',
                   }}
                   formatter={(value) => [`${value}%`, 'Completion']}
                 />
-                <Area type="monotone" dataKey="completed" stroke="#2F6FED" strokeWidth={2} fill="url(#blueGradient)" dot={{ fill: '#2F6FED', r: 3 }} activeDot={{ r: 5, fill: '#2F6FED' }} />
+                <Area type="monotone" dataKey="completed" stroke="#F25C05" strokeWidth={2} fill="url(#orangeGradient)" dot={{ fill: '#F25C05', r: 3 }} activeDot={{ r: 5, fill: '#F25C05' }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -231,12 +232,12 @@ export default function Dashboard() {
           <div className="space-y-2.5 sm:space-y-3">
             {ANNOUNCEMENTS.map((item, i) => (
               <div key={i} className="flex items-start gap-2.5 sm:gap-3">
-                <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
                   <Megaphone size={14} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{item.title}</p>
-                  <p className="text-[11px] text-neutral-500 mt-0.5">{item.date} · {item.author}</p>
+                   <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{item.title}</p>
+                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">{item.date} · {item.author}</p>
                 </div>
               </div>
             ))}
@@ -308,7 +309,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             {USER_ACTIVITY_DATA.map((item) => (
               <div key={item.label} className="flex flex-col items-center text-center gap-1.5 sm:gap-2">
-                <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
                   <item.icon size={16} />
                 </div>
                 <div>
@@ -345,7 +346,7 @@ export default function Dashboard() {
                   task.color === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' :
                   'text-blue-600 dark:text-blue-400'
                 )}>{task.value}</p>
-                <p className="text-[10px] sm:text-xs text-neutral-500 mt-0.5">{task.label}</p>
+                 <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{task.label}</p>
               </div>
             ))}
           </div>
@@ -367,19 +368,19 @@ export default function Dashboard() {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-neutral-200 dark:border-neutral-800">
-                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap">Department</th>
-                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap">Total Users</th>
-                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap hidden sm:table-cell">Training Completion</th>
-                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap hidden sm:table-cell">Assessments</th>
-                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap hidden md:table-cell">SOPs Read</th>
-                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 whitespace-nowrap hidden md:table-cell">Certificates</th>
+                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap">Department</th>
+                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap">Total Users</th>
+                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap hidden sm:table-cell">Training Completion</th>
+                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap hidden sm:table-cell">Assessments</th>
+                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap hidden md:table-cell">SOPs Read</th>
+                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap hidden md:table-cell">Certificates</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {DEPARTMENT_DATA.map((row) => (
                 <tr key={row.department} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30 transition-colors">
                   <td className="px-2 sm:px-3 py-2.5 font-medium text-neutral-900 dark:text-neutral-100 whitespace-nowrap">{row.department}</td>
-                  <td className="px-2 sm:px-3 py-2.5 text-neutral-600 whitespace-nowrap">{row.totalUsers}</td>
+                   <td className="px-2 sm:px-3 py-2.5 text-neutral-600 dark:text-neutral-400 whitespace-nowrap">{row.totalUsers}</td>
                   <td className="px-2 sm:px-3 py-2.5 hidden sm:table-cell">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 min-w-[60px]">
@@ -396,8 +397,8 @@ export default function Dashboard() {
                       <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 w-10 text-right">{row.assessmentsPassed}%</span>
                     </div>
                   </td>
-                  <td className="px-2 sm:px-3 py-2.5 text-neutral-600 whitespace-nowrap hidden md:table-cell">{row.sopsRead}</td>
-                  <td className="px-2 sm:px-3 py-2.5 text-neutral-600 whitespace-nowrap hidden md:table-cell">{row.certificatesIssued}</td>
+                   <td className="px-2 sm:px-3 py-2.5 text-neutral-600 dark:text-neutral-400 whitespace-nowrap hidden md:table-cell">{row.sopsRead}</td>
+                   <td className="px-2 sm:px-3 py-2.5 text-neutral-600 dark:text-neutral-400 whitespace-nowrap hidden md:table-cell">{row.certificatesIssued}</td>
                 </tr>
               ))}
             </tbody>
@@ -416,12 +417,12 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2.5 sm:gap-3">
             {UPCOMING_EVENTS.map((event, i) => (
               <div key={i} className="flex items-center gap-2.5 sm:gap-3 p-2.5 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors">
-                <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
                   <Calendar size={14} />
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{event.title}</p>
-                  <p className="text-[11px] text-neutral-500">{event.date} · {event.time}</p>
+                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{event.date} · {event.time}</p>
                 </div>
               </div>
             ))}
@@ -447,8 +448,8 @@ export default function Dashboard() {
                       <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">{msg.unread}</span>
                     )}
                   </div>
-                  <p className="text-[11px] sm:text-xs text-neutral-500 truncate">{msg.preview}</p>
-                  <p className="text-[10px] text-neutral-400 mt-0.5">{msg.time}</p>
+                   <p className="text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate">{msg.preview}</p>
+                   <p className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5">{msg.time}</p>
                 </div>
               </div>
             ))}

@@ -2,10 +2,11 @@ const db = require('../config/database');
 const acknowledgementService = require('../services/sopAcknowledgementService');
 const { ensureCurrentVersion } = require('./sopVersionModel');
 
-// Real schema: sop_change_logs(id, sop_version_id, field_name, old_value,
-// new_value, changed_by, changed_at) — no `sop_id`, `action`, or `metadata`
-// columns, and it's keyed off sop_version_id. sops.status is a denormalized
-// mirror of the current version's status, so both get updated on transition.
+ // Deployed DB schema: sop_change_logs(id, sop_version_id, field_name,
+ // old_value, new_value, changed_by, changed_at). The database was deployed
+ // with this schema; server/config/database.js had a newer target shape that
+ // was never migrated. sops.status is a denormalized mirror of the current
+ // version's status, so both get updated on transition.
 
 async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
   const [rows] = await db.query('SELECT status FROM sops WHERE id = ? AND deleted_at IS NULL', [sopId]);
@@ -30,9 +31,6 @@ async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
   versionParams.push(versionId);
   await db.query(`UPDATE sop_versions SET ${versionSets.join(', ')} WHERE id = ?`, versionParams);
 
-  // NOTE: `metadata` is accepted for API-compatibility but there's no JSON
-  // column left to persist it in on this table — only field_name/old_value/
-  // new_value are stored.
   await db.query(`
     INSERT INTO sop_change_logs (sop_version_id, field_name, old_value, new_value, changed_by, changed_at)
     VALUES (?, 'status', ?, ?, ?, CURRENT_TIMESTAMP)

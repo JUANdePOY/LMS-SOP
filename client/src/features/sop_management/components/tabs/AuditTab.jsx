@@ -55,19 +55,22 @@ export default function AuditTab({ sopId }) {
               <tr key={log.id} className="hover:bg-[var(--bg-hover)]">
                 <td className="px-4 py-3">
                   <span className="rounded bg-[var(--bg-subtle)] px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)] uppercase">
-                    {log.action || log.event_type || '—'}
+                    {log.field_name || log.event_type || '—'}
                   </span>
                 </td>
                 <td className="px-4 py-3 font-medium text-[var(--text-primary)]">
                   {log.user_name || log.performed_by_name || (log.performed_by != null || log.user_id != null ? `User #${log.performed_by || log.user_id}` : 'System')}
                 </td>
                 <td className="px-4 py-3 text-[var(--text-secondary)] max-w-xs truncate">
-                  {typeof log.metadata === 'object'
+                  {typeof log.metadata === 'object' && log.metadata !== null
                     ? JSON.stringify(log.metadata)
-                    : log.metadata || log.description || '—'}
+                    : log.description
+                    || (log.old_value != null && log.new_value != null
+                       ? `${log.old_value} → ${log.new_value}`
+                       : '—')}
                 </td>
                 <td className="px-4 py-3 text-[var(--text-muted)]">
-                  {log.created_at ? new Date(log.created_at).toLocaleString() : '—'}
+                  {log.created_at ? new Date(log.created_at).toLocaleString() : log.changed_at ? new Date(log.changed_at).toLocaleString() : '—'}
                 </td>
               </tr>
             ))}

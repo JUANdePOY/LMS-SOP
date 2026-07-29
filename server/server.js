@@ -56,6 +56,7 @@ const sopAttachmentsRoutes = require('./routes/sopAttachments');
 const sopComplianceRoutes = require('./routes/sopCompliance');
 const sopWorkflowRoutes = require('./routes/sopWorkflow');
 const sopSharesRoutes = require('./routes/sopShares');
+const sopApprovalRoutes = require('./routes/sopApprovals');
 
 const loginDebug = process.env.LOGIN_DEBUG === 'true';
 if (loginDebug) {
@@ -97,6 +98,7 @@ app.use('/api/sops', sopAttachmentsRoutes);
 app.use('/api/sops', sopComplianceRoutes);
 app.use('/api/sops', sopWorkflowRoutes);
 app.use('/api/sops', sopSharesRoutes);
+app.use('/api/sops', sopApprovalRoutes);
 
 const uploadsRoot = path.join(__dirname, 'uploads');
 if (fs.existsSync(uploadsRoot)) {

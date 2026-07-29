@@ -1,6 +1,8 @@
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, PlusCircle } from 'lucide-react';
+import { useState } from 'react';
 import { useSOPVersions } from '../../hooks/useSOPVersions';
 import { SOP_STATUS } from '../../constants/sopStatus';
+import CreateVersionModal from '../modals/CreateVersionModal';
 
 function VersionStatusBadge({ status }) {
   const colors = {
@@ -19,7 +21,28 @@ function VersionStatusBadge({ status }) {
 }
 
 export default function VersionsTab({ sopId }) {
-  const { versions, loading, error, restore, saving } = useSOPVersions(sopId);
+  const { versions, loading, error, restore, create, saving } = useSOPVersions(sopId);
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const getNextVersion = () => {
+    if (!versions || versions.length === 0) return '1.0';
+    const maxVersion = versions.reduce((max, v) => {
+      const parts = String(v.version || '1.0').split('.').map((p) => parseInt(p, 10) || 0);
+      const maxParts = String(max).split('.').map((p) => parseInt(p, 10) || 0);
+      if (parts[0] > maxParts[0]) return v.version;
+      if (parts[0] === maxParts[0] && parts[1] > maxParts[1]) return v.version;
+      return max;
+    }, '0.0');
+    const parts = String(maxVersion).split('.').map((p) => parseInt(p, 10) || 0);
+    if (parts.length < 2) parts.push(0);
+    parts[1] += 1;
+    return `${parts[0]}.${parts[1]}`;
+  };
+
+  const handleCreateVersion = async (data) => {
+    await create({ ...data, version: getNextVersion() });
+    setCreateOpen(false);
+  };
 
   if (loading) {
     return <div className="text-sm text-[var(--text-muted)] py-4">Loading versions…</div>;
@@ -43,7 +66,17 @@ export default function VersionsTab({ sopId }) {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-base font-semibold text-[var(--text-primary)]">Version History ({versions.length})</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-semibold text-[var(--text-primary)]">Version History ({versions.length})</h3>
+        <button
+          type="button"
+          onClick={() => setCreateOpen(true)}
+          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+        >
+          <PlusCircle className="h-4 w-4" />
+          Create New Version
+        </button>
+      </div>
 
       <div className="overflow-hidden rounded-lg border border-[var(--border)]">
         <table className="w-full text-sm">
@@ -94,6 +127,14 @@ export default function VersionsTab({ sopId }) {
           </tbody>
         </table>
       </div>
+
+      <CreateVersionModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreate={handleCreateVersion}
+        saving={saving}
+        nextVersion={getNextVersion()}
+      />
     </div>
   );
 }

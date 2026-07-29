@@ -3,6 +3,7 @@ import { Plus, Search } from 'lucide-react';
 import BusinessTable from '../components/business/BusinessTable';
 import BusinessModal from '../components/business/BusinessModal';
 import { useBusinesses } from '../hooks/useBusinesses';
+import KPICards from '../components/KPICards';
 
 export default function BusinessPage() {
   const { businesses, loading, error, create, update, remove } = useBusinesses();
@@ -29,6 +30,15 @@ export default function BusinessPage() {
   }, [query, businesses, statusFilter]);
 
   const hasActiveFilters = query.trim() || statusFilter !== 'all';
+
+  const kpiCards = useMemo(() => {
+    const list = businesses || [];
+    return [
+      { label: 'Total Businesses', value: list.length, sub: { icon: 'Building2' }, color: 'blue' },
+      { label: 'Active', value: list.filter((b) => b.status === 'active').length, sub: { icon: 'Building2' }, color: 'emerald' },
+      { label: 'Inactive', value: list.filter((b) => b.status === 'inactive').length, sub: { icon: 'Building2' }, color: 'amber' },
+    ];
+  }, [businesses]);
 
   const handleCreate = async (data) => {
     setSubmitting(true);
@@ -103,6 +113,8 @@ export default function BusinessPage() {
           {error}
         </div>
       )}
+
+      <KPICards cards={kpiCards} />
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

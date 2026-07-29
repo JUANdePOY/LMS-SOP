@@ -6,6 +6,7 @@ import { useDepartments } from '../hooks/useDepartments';
 import { useBusinesses } from '../hooks/useBusinesses';
 import { useUsers } from '../hooks/useUsers';
 import { useToast } from '@/shared/components/Toast';
+import KPICards from '../components/KPICards';
 
 export default function DepartmentPage() {
   const { departments, loading, error, create, update, remove } = useDepartments();
@@ -42,6 +43,15 @@ export default function DepartmentPage() {
   }, [query, departments, statusFilter, businessFilter]);
 
   const hasActiveFilters = query.trim() || statusFilter !== 'all' || businessFilter !== 'all';
+
+  const kpiCards = useMemo(() => {
+    const list = departments || [];
+    return [
+      { label: 'Total Departments', value: list.length, sub: { icon: 'Layers' }, color: 'blue' },
+      { label: 'Active', value: list.filter((d) => d.status === 'active').length, sub: { icon: 'Layers' }, color: 'emerald' },
+      { label: 'Inactive', value: list.filter((d) => d.status === 'inactive' || d.status === 'archived').length, sub: { icon: 'Layers' }, color: 'amber' },
+    ];
+  }, [departments]);
 
   const handleCreate = async (data) => {
     setSubmitting(true);
@@ -116,6 +126,8 @@ export default function DepartmentPage() {
           {error}
         </div>
       )}
+
+      <KPICards cards={kpiCards} />
 
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">

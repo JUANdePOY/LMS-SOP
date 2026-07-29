@@ -18,7 +18,7 @@ router.get('/:sopId/versions', async (req, res) => {
 });
 
 router.post('/:sopId/versions', [
-  body('version_number').optional().isString(),
+  body('version').optional().isString(),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -27,13 +27,10 @@ router.post('/:sopId/versions', [
     }
     const id = await versionModel.createVersion({
       sop_id: parseInt(req.params.sopId, 10),
-      version_number: req.body.version_number || '1.0',
-      title: req.body.title || 'Version',
-      description: req.body.description || null,
-      content_snapshot: req.body.content_snapshot || null,
+      version: req.body.version || '1.0',
+      change_summary: req.body.change_summary || null,
       status: req.body.status || 'Draft',
       created_by: req.user.id,
-      is_published: Boolean(req.body.is_published),
     });
     logAudit({ user_id: req.user.id, action: 'sop.version.created', entity_type: 'sop_version', entity_id: id, metadata: { sop_id: req.params.sopId } });
     res.status(201).json({ status: 'success', message: 'Version created', data: { id } });

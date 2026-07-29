@@ -134,13 +134,15 @@ const SOP_TABLES = [
   `CREATE TABLE IF NOT EXISTS sop_approvals (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sop_id INT NOT NULL,
+    sop_version_id INT DEFAULT NULL,
     approver_user_id INT DEFAULT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
     comments TEXT DEFAULT NULL,
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at DATETIME DEFAULT NULL,
     INDEX idx_sop_approvals_sop (sop_id),
+    INDEX idx_sop_approvals_version (sop_version_id),
     INDEX idx_sop_approvals_status (status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
