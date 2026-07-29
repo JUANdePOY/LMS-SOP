@@ -48,7 +48,7 @@ export default function ApprovalTimeline({ actions, loading }) {
               <div className="flex-1 min-w-0 pt-0.5">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-gray-900">
-                    {action.actor_name || `User #${action.actor_id}`}
+                    {action.actor_name || (action.actor_id != null ? `User #${action.actor_id}` : '—')}
                   </span>
                   <span className="text-xs text-gray-500">
                     {action.action_at || action.created_at ? new Date(action.action_at || action.created_at).toLocaleString() : '—'}

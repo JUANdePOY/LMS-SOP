@@ -6,9 +6,7 @@ export const validateSopDraft = (values = {}) => {
   if (!values.department_id) {
     errors.department_id = 'Department is required';
   }
-  if (!values.category_id) {
-    errors.category_id = 'Category is required';
-  }
+  // category_id is nullable in database (DEFAULT NULL)
   return {
     isValid: Object.keys(errors).length === 0,
     errors,

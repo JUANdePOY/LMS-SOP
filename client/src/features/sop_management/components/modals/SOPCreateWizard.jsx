@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, FileText, Layout, ListOrdered, Users, Cli
 import { Button } from '@/shared/components/ui/button';
 import { useCreateSOP } from '../../hooks/useCreateSOP';
 import { useDepartmentList } from '../../hooks/useDepartmentList';
+import { useCategoryList } from '../../hooks/useCategoryList';
 import SOPBasicInfoForm from '../forms/SOPBasicInfoForm';
 import SOPSectionForm from '../forms/SOPSectionForm';
 import SOPStepForm from '../forms/SOPStepForm';
@@ -26,6 +27,7 @@ export default function SOPCreateWizard({ open, onClose, onCreated }) {
   const navigate = useNavigate();
   const { create, loading: creating } = useCreateSOP();
   const { departments } = useDepartmentList();
+  const { categories } = useCategoryList();
   const [step, setStep] = useState(1);
   const [sop, setSop] = useState({ ...INIT });
   const [sections, setSections] = useState([]);
@@ -198,8 +200,8 @@ export default function SOPCreateWizard({ open, onClose, onCreated }) {
   };
 
   const renderBody = () => {
-    if (step === 1) {
-      return <div><h3 className="text-lg font-semibold text-foreground mb-1">Basic Information</h3><p className="text-sm text-muted-foreground mb-5">Start by giving your SOP a title and description.</p><SOPBasicInfoForm formData={sop} onChange={setSop} errors={errors} departments={departments} /></div>;
+if (step === 1) {
+       return <div><h3 className="text-lg font-semibold text-foreground mb-1">Basic Information</h3><p className="text-sm text-muted-foreground mb-5">Start by giving your SOP a title and description.</p><SOPBasicInfoForm formData={sop} onChange={setSop} errors={errors} departments={departments} categories={categories} /></div>;
     }
     if (step === 2) {
       return <div><h3 className="text-lg font-semibold text-foreground mb-1">Sections</h3><p className="text-sm text-muted-foreground mb-5">Add structured sections to organize your SOP content.</p><SOPSectionForm sections={sections} onCreate={(s) => setSections((p) => [...p, { ...s, _tempId: Date.now() }])} onUpdate={(id, d) => setSections((p) => p.map((x) => (x._tempId === id || x.id === id ? { ...x, ...d } : x)))} onRemove={(id) => setSections((p) => p.filter((x) => x._tempId !== id && x.id !== id))} saving={false} /></div>;

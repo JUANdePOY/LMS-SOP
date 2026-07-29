@@ -13,6 +13,7 @@ export function SOPPermissionProvider({ children }) {
     canPublish: ['super_admin', 'admin', 'department_head'].includes(role),
     canShare: ['super_admin', 'admin', 'department_head'].includes(role),
     canApprove: ['super_admin', 'admin', 'department_head'].includes(role),
+    canArchive: ['super_admin', 'admin', 'department_head'].includes(role),
   }), [role]);
 
   return <SOPPermissionContext.Provider value={permissions}>{children}</SOPPermissionContext.Provider>;

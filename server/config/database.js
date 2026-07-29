@@ -244,6 +244,27 @@ const MIGRATIONS = [
     INDEX idx_notifications_user (user_id),
     INDEX idx_notifications_read (is_read)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS businesses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    business_code VARCHAR(50) NOT NULL,
+    business_name VARCHAR(255) NOT NULL,
+    description TEXT DEFAULT NULL,
+    logo_url VARCHAR(500) DEFAULT NULL,
+    email VARCHAR(255) DEFAULT NULL,
+    phone VARCHAR(50) DEFAULT NULL,
+    address TEXT DEFAULT NULL,
+    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    created_by INT DEFAULT NULL,
+    updated_by INT DEFAULT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
+    UNIQUE KEY uk_business_code (business_code),
+    INDEX idx_businesses_status (status)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `ALTER TABLE departments ADD COLUMN business_id INT DEFAULT NULL`,
+  `CREATE INDEX idx_departments_business ON departments(business_id)`,
   `CREATE TABLE IF NOT EXISTS categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -257,127 +278,19 @@ const MIGRATIONS = [
     UNIQUE KEY uk_categories_code (code),
     INDEX idx_categories_parent (parent_category_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-  `CREATE TABLE IF NOT EXISTS sops (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    code VARCHAR(100) NOT NULL,
-    description TEXT DEFAULT NULL,
-    department_id INT DEFAULT NULL,
-    category_id INT DEFAULT NULL,
-    owner_user_id INT DEFAULT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'Draft',
-    version VARCHAR(50) NOT NULL DEFAULT '1.0',
-    is_published BOOLEAN NOT NULL DEFAULT FALSE,
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    metadata JSON DEFAULT NULL,
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL,
-    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL,
-    FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE SET NULL,
-    UNIQUE KEY uk_sops_code (code),
-    INDEX idx_sop_code (code),
-    INDEX idx_sop_title (title),
-    INDEX idx_status (status),
-    INDEX idx_sops_department (department_id),
-    INDEX idx_sops_owner (owner_user_id)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-  `CREATE TABLE IF NOT EXISTS sop_sections (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sop_id INT NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    section_type VARCHAR(100) NOT NULL DEFAULT 'custom',
-    content TEXT DEFAULT NULL,
-    order_index INT NOT NULL DEFAULT 0,
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (sop_id) REFERENCES sops(id) ON DELETE CASCADE,
-    INDEX idx_sop_sections_sop (sop_id),
-    INDEX idx_sop_sections_order (sop_id, order_index)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-  `CREATE TABLE IF NOT EXISTS sop_steps (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sop_id INT NOT NULL,
-    section_id INT DEFAULT NULL,
-    title VARCHAR(255) NOT NULL,
-    description TEXT DEFAULT NULL,
-    step_number INT NOT NULL DEFAULT 1,
-    order_index INT NOT NULL DEFAULT 0,
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (sop_id) REFERENCES sops(id) ON DELETE CASCADE,
-    FOREIGN KEY (section_id) REFERENCES sop_sections(id) ON DELETE SET NULL,
-    INDEX idx_sop_steps_sop (sop_id),
-    INDEX idx_sop_steps_order (sop_id, order_index)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-  `CREATE TABLE IF NOT EXISTS sop_versions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sop_id INT NOT NULL,
-    version_number VARCHAR(50) NOT NULL DEFAULT '1.0',
-    title VARCHAR(255) NOT NULL,
-    description TEXT DEFAULT NULL,
-    content_snapshot JSON DEFAULT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'Draft',
-    created_by INT DEFAULT NULL,
-    is_published BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (sop_id) REFERENCES sops(id) ON DELETE CASCADE,
-    FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_status (status),
-    INDEX idx_sop_versions_sop (sop_id)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-  `CREATE TABLE IF NOT EXISTS sop_documents (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sop_id INT NOT NULL,
-    file_name VARCHAR(255) NOT NULL,
-    original_name VARCHAR(255) NOT NULL,
-    mime_type VARCHAR(100) DEFAULT NULL,
-    file_size INT DEFAULT NULL,
-    storage_path VARCHAR(500) NOT NULL,
-    uploaded_by INT DEFAULT NULL,
-    document_type VARCHAR(100) NOT NULL DEFAULT 'PDF',
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (sop_id) REFERENCES sops(id) ON DELETE CASCADE,
-    FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_sop_documents_sop (sop_id),
-    INDEX idx_sop_documents_deleted (is_deleted)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-  `CREATE TABLE IF NOT EXISTS sop_assignments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sop_id INT NOT NULL,
-    assignment_type VARCHAR(100) NOT NULL DEFAULT 'User',
-    department_id INT DEFAULT NULL,
-    position_title VARCHAR(255) DEFAULT NULL,
-    user_id INT DEFAULT NULL,
-    assigned_by INT DEFAULT NULL,
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (sop_id) REFERENCES sops(id) ON DELETE CASCADE,
-    FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-    FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_sop_assignments_sop (sop_id)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-  `CREATE TABLE IF NOT EXISTS sop_acknowledgements (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sop_id INT NOT NULL,
-    user_id INT NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (sop_id) REFERENCES sops(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_ack_user_status (user_id, status),
-    INDEX idx_sop_ack_sop (sop_id)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // ---------------------------------------------------------------------
+  // NOTE: the legacy v1 flat-schema definitions for sops / sop_sections /
+  // sop_steps / sop_versions / sop_documents / sop_assignments /
+  // sop_acknowledgements that used to live here have been removed. They
+  // described a completely different (and in places invalid — e.g.
+  // section_type defaulting to 'custom', which isn't a member of the real
+  // ENUM) schema than the one the app's models actually target (public_id/
+  // sop_code/sop_version_id-keyed tables). On an existing database they
+  // were harmless no-ops (CREATE TABLE IF NOT EXISTS), but on a fresh
+  // database they would have bootstrapped the wrong schema entirely. The
+  // real schema lives in the project's .sql dump/migration tool now — this
+  // file should not be trying to (re)create those tables.
+  // ---------------------------------------------------------------------
   `CREATE TABLE IF NOT EXISTS sop_approvals (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sop_id INT NOT NULL,
@@ -420,23 +333,68 @@ const MIGRATIONS = [
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_sop_shares_sop (sop_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-  `ALTER TABLE sops ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
-  `ALTER TABLE sop_documents ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
-  `ALTER TABLE sop_sections ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
-  `ALTER TABLE sop_steps ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
-  `ALTER TABLE sop_assignments ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
-  `ALTER TABLE sop_acknowledgements ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
-  `ALTER TABLE sop_approvals ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
-  `ALTER TABLE sop_shares ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
-  `ALTER TABLE sops ADD COLUMN owner_user_id INT DEFAULT NULL AFTER category_id`,
-  `CREATE TABLE IF NOT EXISTS system_settings (
-    \`key\` VARCHAR(255) NOT NULL PRIMARY KEY,
-    \`value\` TEXT NOT NULL,
-    description TEXT DEFAULT NULL,
-    updated_by INT DEFAULT NULL,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // =========================================================================
+  // SOP schema compatibility fix
+  // DB_SOP.sql (v2.0) creates tables with sop_version_id NOT NULL and FKs to
+  // sop_versions. But the app code uses flat sop_id / order_index / is_deleted.
+  // This migration drops the v2.0 FK constraints, makes sop_version_id nullable,
+  // adds the missing columns the app expects, and backfills existing data.
+  // =========================================================================
+  // --- sop_sections: drop v2.0 FK constraint on sop_version_id ---
+  `ALTER TABLE sop_sections
+    DROP FOREIGN KEY IF EXISTS fk_section_version`,
+  `ALTER TABLE sop_sections
+    MODIFY COLUMN sop_version_id INT DEFAULT NULL`,
+  // --- sop_sections: add app-expected columns ---
+  `ALTER TABLE sop_sections
+    ADD COLUMN IF NOT EXISTS sop_id INT DEFAULT NULL AFTER id,
+    ADD COLUMN IF NOT EXISTS order_index INT NOT NULL DEFAULT 0 AFTER content,
+    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE AFTER order_index`,
+  // Backfill sop_id from sop_version_id → sop_versions.sop_id
+  `UPDATE sop_sections ss
+    JOIN sop_versions sv ON sv.id = ss.sop_version_id
+    SET ss.sop_id = sv.sop_id
+    WHERE ss.sop_id IS NULL AND ss.sop_version_id IS NOT NULL`,
+  // --- sop_steps: drop v2.0 FK constraint on sop_version_id ---
+  `ALTER TABLE sop_steps
+    DROP FOREIGN KEY IF EXISTS fk_step_version`,
+  `ALTER TABLE sop_steps
+    MODIFY COLUMN sop_version_id INT DEFAULT NULL`,
+  // --- sop_steps: add app-expected columns ---
+  `ALTER TABLE sop_steps
+    ADD COLUMN IF NOT EXISTS sop_id INT DEFAULT NULL AFTER id,
+    ADD COLUMN IF NOT EXISTS section_id INT DEFAULT NULL AFTER sop_id,
+    ADD COLUMN IF NOT EXISTS description TEXT DEFAULT NULL AFTER title,
+    ADD COLUMN IF NOT EXISTS order_index INT NOT NULL DEFAULT 0 AFTER description,
+    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE AFTER order_index`,
+  // Backfill sop_id from sop_version_id → sop_versions.sop_id
+  `UPDATE sop_steps ss
+    JOIN sop_versions sv ON sv.id = ss.sop_version_id
+    SET ss.sop_id = sv.sop_id
+    WHERE ss.sop_id IS NULL AND ss.sop_version_id IS NOT NULL`,
+  // Copy sop_steps.instruction → description (v2.0 uses 'instruction')
+  `UPDATE sop_steps
+    SET description = instruction
+    WHERE description IS NULL AND instruction IS NOT NULL`,
+  // Copy sort_order → order_index (v2.0 uses 'sort_order')
+  `UPDATE sop_sections
+    SET order_index = sort_order
+    WHERE order_index = 0 AND sort_order IS NOT NULL AND sort_order > 0`,
+  `UPDATE sop_steps
+    SET order_index = sort_order
+    WHERE order_index = 0 AND sort_order IS NOT NULL AND sort_order > 0`,
+  // Set is_deleted based on deleted_at for soft-deleted rows
+  `UPDATE sop_sections
+    SET is_deleted = TRUE
+    WHERE is_deleted = FALSE AND deleted_at IS NOT NULL`,
+  `UPDATE sop_steps
+    SET is_deleted = TRUE
+    WHERE is_deleted = FALSE AND deleted_at IS NOT NULL`,
+  // Create missing indexes
+  `CREATE INDEX IF NOT EXISTS idx_sop_sections_sop ON sop_sections(sop_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_sop_sections_order ON sop_sections(sop_id, order_index)`,
+  `CREATE INDEX IF NOT EXISTS idx_sop_steps_sop ON sop_steps(sop_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_sop_steps_order ON sop_steps(sop_id, order_index)`,
 ];
 
 async function runMigrations() {
@@ -447,8 +405,8 @@ async function runMigrations() {
       await db.query(sql);
     } catch (err) {
       const ignoreCodes = [
-        'ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR',
-        1060, 1050
+        'ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME',
+        1060, 1050, 1061
       ];
       if (
         ignoreCodes.includes(err.code) ||

@@ -45,7 +45,7 @@ export default function ApprovalTable({ approvals, loading }) {
           {approvals.map((approval) => (
             <tr key={approval.id} className="hover:bg-gray-50">
               <td className="px-4 py-3 font-medium text-gray-900">
-                {approval.approver_name || `User #${approval.approver_user_id}`}
+                {approval.approver_name || (approval.approver_user_id != null ? `User #${approval.approver_user_id}` : '—')}
               </td>
               <td className="px-4 py-3">
                 <ApprovalStatusBadge status={approval.status} />

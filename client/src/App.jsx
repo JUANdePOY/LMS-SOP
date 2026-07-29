@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider } from "react-router-dom";
+import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import AppLayout from "@/layout/AppLayout";
 import { lazy, Suspense } from "react";
 
@@ -26,6 +26,12 @@ const CourseDetailsPage = lazy(() => import("@/features/course_management/pages/
 const CourseLearnerView = lazy(() => import("@/features/course_management/pages/CourseLearnerView"));
 const LessonPage = lazy(() => import("@/features/course_management/pages/LessonPage"));
 const CourseBuilderPage = lazy(() => import("@/features/course_management/pages/CourseBuilderPage"));
+
+// Organization Management
+const OrgHierarchyPage = lazy(() => import("@/features/organization-management/pages/HierarchyOverviewPage"));
+const OrgBusinessPage = lazy(() => import("@/features/organization-management/pages/BusinessPage"));
+const OrgDepartmentPage = lazy(() => import("@/features/organization-management/pages/DepartmentPage"));
+const OrgCategoryPage = lazy(() => import("@/features/organization-management/pages/CategoryPage"));
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
@@ -92,6 +98,14 @@ const router = createBrowserRouter([
       { path: "courses/:id/builder", element: LMSProtectedWrapper(CourseBuilderPage), handle: { title: "Course Builder" } },
       { path: "courses/view/:id", element: LMSProtectedWrapper(CourseLearnerView), handle: { title: "My Course" } },
       { path: "courses/view/:id/lesson/:lessonId", element: LMSProtectedWrapper(LessonPage), handle: { title: "Lesson" } },
+
+      // Organization Management routes
+      { path: "admin/organization", element: LMSProtectedWrapper(OrgHierarchyPage), handle: { title: "Organization Hierarchy" } },
+      { path: "admin/organization/hierarchy", element: LMSProtectedWrapper(OrgHierarchyPage), handle: { title: "Hierarchy Overview" } },
+      { path: "admin/organization/businesses", element: LMSProtectedWrapper(OrgBusinessPage), handle: { title: "Businesses" } },
+      { path: "admin/organization/departments", element: LMSProtectedWrapper(OrgDepartmentPage), handle: { title: "Departments" } },
+      { path: "admin/organization/categories", element: LMSProtectedWrapper(OrgCategoryPage), handle: { title: "Categories" } },
+      { path: "admin/organization/sop-management", element: <Navigate to="/sops" replace /> },
     ],
   },
 ]);

@@ -1,26 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createSop, deleteSop, getSops } from '../api/sop.api';
-
-// Module-level constant so the default param has a stable reference across
-// renders. Previously this was `initialParams = {}` in the function
-// signature, which created a brand-new object on every render, which
-// recreated `refresh`, which re-fired the effect below, which called
-// setState, which caused another render — an infinite fetch loop.
-const EMPTY_PARAMS = {};
 
 function getErrorMessage(err, fallback) {
   return err?.response?.data?.message || err?.message || fallback;
 }
 
-export function useSOPList(initialParams = EMPTY_PARAMS) {
+export function useSOPList(initialParams = {}) {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [sops, setSops] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 });
 
-  const refresh = useCallback(async (params = initialParams) => {
+  const initialParamsRef = useRef(initialParams);
+  initialParamsRef.current = initialParams;
+
+  const refresh = useCallback(async (params = initialParamsRef.current) => {
     if (!isAuthenticated) {
       return [];
     }
@@ -43,7 +39,7 @@ export function useSOPList(initialParams = EMPTY_PARAMS) {
     } finally {
       setLoading(false);
     }
-  }, [initialParams, isAuthenticated]);
+  }, [isAuthenticated]);
 
   const create = useCallback(async (data) => {
     const response = await createSop(data);

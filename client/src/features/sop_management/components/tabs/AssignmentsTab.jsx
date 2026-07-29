@@ -3,6 +3,7 @@ import { Plus, RefreshCw } from 'lucide-react';
 import { Button } from '@/shared/components/ui/button';
 import { useAssignments } from '../../hooks/useAssignments';
 import { useAcknowledgements } from '../../hooks/useAcknowledgements';
+import { useDepartmentList } from '../../hooks/useDepartmentList';
 import AssignmentTable from '../tables/AssignmentTable';
 import AcknowledgementTable from '../tables/AcknowledgementTable';
 import AssignmentModal from '../modals/AssignmentModal';
@@ -25,6 +26,8 @@ export default function AssignmentsTab({ sopId }) {
     error: ackError,
     refresh: refreshAcknowledgements,
   } = useAcknowledgements(sopId);
+
+  const { departments } = useDepartmentList();
 
   const [showModal, setShowModal] = useState(false);
   const [tab, setTab] = useState('assignments');
@@ -133,6 +136,7 @@ export default function AssignmentsTab({ sopId }) {
         onClose={() => setShowModal(false)}
         onSubmit={handleCreateAssignment}
         saving={assignmentsSaving}
+        departments={departments}
       />
     </div>
   );

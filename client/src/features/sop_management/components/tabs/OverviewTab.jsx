@@ -44,7 +44,7 @@ export default function OverviewTab({ sop }) {
         <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-4">
           <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Owner</div>
           <div className="mt-1 text-sm text-foreground">
-            {sop.owner_name || `User #${sop.owner_user_id}` || '—'}
+            {sop.owner_name || (sop.owner_user_id != null ? `User #${sop.owner_user_id}` : '—')}
           </div>
         </div>
       </div>
