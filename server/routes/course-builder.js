@@ -1,9 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const courseBuildController = require('../controllers/courseBuildController');
-const { authenticateToken, authorize } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 
 router.use(authenticateToken);
+
+router.get('/', courseBuildController.listCourses);
+router.get('/:id', courseBuildController.getCourse);
+
 router.use((req, res, next) => {
   if (!['super_admin', 'admin', 'department_head'].includes(req.user?.role)) {
     return res.status(403).json({ success: false, message: 'Forbidden', code: 'FORBIDDEN' });
@@ -11,8 +15,6 @@ router.use((req, res, next) => {
   next();
 });
 
-router.get('/', courseBuildController.listCourses);
-router.get('/:id', courseBuildController.getCourse);
 router.post('/', courseBuildController.createCourse);
 router.put('/:id', courseBuildController.updateCourse);
 router.delete('/:id', courseBuildController.deleteCourse);
