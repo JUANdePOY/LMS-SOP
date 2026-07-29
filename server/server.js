@@ -56,6 +56,7 @@ const sopAttachmentsRoutes = require('./routes/sopAttachments');
 const sopComplianceRoutes = require('./routes/sopCompliance');
 const sopWorkflowRoutes = require('./routes/sopWorkflow');
 const sopSharesRoutes = require('./routes/sopShares');
+const sopApprovalRoutes = require('./routes/sopApprovals');
 const coursesRoutes = require('./routes/courses');
 const enrollmentsRoutes = require('./routes/enrollments');
 const { courseRoutes: progressCourseRoutes, lessonRoutes: progressLessonRoutes } = require('./routes/progress');
