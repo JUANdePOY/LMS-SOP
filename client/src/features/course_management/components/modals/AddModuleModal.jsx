@@ -1,0 +1,25 @@
+export default function AddModuleModal({ open, onClose, onSubmit }) {
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    onSubmit(Object.fromEntries(fd.entries()));
+  };
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="w-[450px] max-h-[90vh] overflow-y-auto rounded-xl bg-white dark:bg-neutral-900 p-6 shadow-2xl">
+        <h2 className="text-lg font-semibold">Add Module</h2>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <input name="title" placeholder="Module title" required className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm" />
+          <select name="type" className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm">
+            <option value="chapter">Chapter</option>
+            <option value="unit">Unit</option>
+            <option value="lesson">Lesson</option>
+          </select>
+          <button type="submit" className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white">Add Module</button>
+        </form>
+      </div>
+    </div>
+  );
+}

@@ -1,7 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 
 function Modal({ open, onClose, title, children, footer }) {
   if (!open) return null;
+
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
@@ -12,8 +20,9 @@ function Modal({ open, onClose, title, children, footer }) {
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 text-xl leading-none shrink-0"
+            aria-label="Close"
           >
-            &times;
+            ×
           </button>
         </div>
         <div className="px-4 sm:px-6 py-4 overflow-y-auto">{children}</div>

@@ -420,6 +420,23 @@ const MIGRATIONS = [
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_sop_shares_sop (sop_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `ALTER TABLE sops ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
+  `ALTER TABLE sop_documents ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
+  `ALTER TABLE sop_sections ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
+  `ALTER TABLE sop_steps ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
+  `ALTER TABLE sop_assignments ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
+  `ALTER TABLE sop_acknowledgements ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
+  `ALTER TABLE sop_approvals ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
+  `ALTER TABLE sop_shares ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT FALSE`,
+  `ALTER TABLE sops ADD COLUMN owner_user_id INT DEFAULT NULL AFTER category_id`,
+  `CREATE TABLE IF NOT EXISTS system_settings (
+    \`key\` VARCHAR(255) NOT NULL PRIMARY KEY,
+    \`value\` TEXT NOT NULL,
+    description TEXT DEFAULT NULL,
+    updated_by INT DEFAULT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 async function runMigrations() {
@@ -443,6 +460,14 @@ async function runMigrations() {
         console.error('Offending SQL:', sql);
       }
     }
+  }
+
+  try {
+    const { runCourseMigrations } = require('../migrations/courseManagement');
+    await runCourseMigrations();
+    console.log('Course management migrations applied');
+  } catch (err) {
+    console.error('Course management migration error:', err.message);
   }
 }
 
@@ -476,11 +501,6 @@ async function initDatabase() {
 }
 
 const db = getPool();
-
-db.getConnection = () => {
-  const p = getPool();
-  return p.getConnection();
-};
 
 db.rawPool = pool;
 

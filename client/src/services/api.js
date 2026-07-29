@@ -69,4 +69,20 @@ export const getSettings = () => api.get('/settings');
 export const createSetting = (data) => api.post('/settings', data);
 export const updateSetting = (key, data) => api.put(`/settings/${key}`, data);
 
+export const getCourses = (params = {}) => api.get('/courses', { params });
+export const getCourse = (id) => api.get(`/courses/${id}`);
+export const createCourse = (data) => api.post('/courses', data);
+export const updateCourse = (id, data) => api.put(`/courses/${id}`, data);
+export const deleteCourse = (id) => api.delete(`/courses/${id}`);
+export const publishCourse = (id) => api.patch(`/courses/${id}/publish`);
+export const archiveCourse = (id) => api.patch(`/courses/${id}/archive`);
+export const getCourseModules = (courseId, params = {}) => api.get(`/courses/${courseId}/modules`, { params });
+export const createCourseModule = (courseId, data) => api.post(`/courses/${courseId}/modules`, data);
+export const updateCourseModule = (courseId, moduleId, data) => api.put(`/courses/${courseId}/modules/${moduleId}`, data);
+export const deleteCourseModule = (courseId, moduleId) => api.delete(`/courses/${courseId}/modules/${moduleId}`);
+export const getCourseContent = (courseId, moduleId, params = {}) => api.get(`/courses/${courseId}/modules/${moduleId}/content`, { params });
+export const createCourseContent = (courseId, moduleId, data) => api.post(`/courses/${courseId}/modules/${moduleId}/content`, data);
+export const updateCourseContent = (courseId, moduleId, contentId, data) => api.put(`/courses/${courseId}/modules/${moduleId}/content/${contentId}`, data);
+export const deleteCourseContent = (courseId, moduleId, contentId) => api.delete(`/courses/${courseId}/modules/${moduleId}/content/${contentId}`);
+
 export default api;

@@ -65,7 +65,7 @@ export default function Settings() {
         setEmail(res.data.data.email || "");
       }
     } catch { /* ignore */ }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     const load = async () => {

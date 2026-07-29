@@ -30,7 +30,7 @@ export default function ManagementHub() {
           </div>
           <div>
             <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">Administration</h1>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 hidden sm:block">Manage users, departments, and roles in one place</p>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 hidden sm:block">Manage users, departments, and roles</p>
           </div>
         </div>
 

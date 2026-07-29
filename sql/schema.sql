@@ -159,3 +159,15 @@ CREATE TABLE IF NOT EXISTS notifications (
   INDEX idx_notifications_user (user_id),
   INDEX idx_notifications_read (is_read)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Table: system_settings
+-- ============================================================
+CREATE TABLE IF NOT EXISTS system_settings (
+  `key` VARCHAR(255) NOT NULL PRIMARY KEY,
+  `value` TEXT NOT NULL,
+  description TEXT DEFAULT NULL,
+  updated_by INT DEFAULT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

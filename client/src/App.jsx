@@ -8,6 +8,10 @@ import ProtectedRoute from "@/shared/components/ProtectedRoute";
 import { SOPModalProvider } from "@/features/sop_management/context/SOPModalContext";
 import { SOPPermissionProvider } from "@/features/sop_management/context/SOPPermissionContext";
 import { SOPProvider } from "@/features/sop_management/context/SOPContext";
+import { CourseProvider } from "@/features/course_management/context/CourseContext";
+import { CourseModalProvider } from "@/features/course_management/context/CourseModalContext";
+import { EnrollmentProvider } from "@/features/course_management/context/EnrollmentContext";
+import { GradingProvider } from "@/features/course_management/context/GradingContext";
 
 const Dashboard     = lazy(() => import("@/pages/Dashboard"));
 const Profile       = lazy(() => import("@/pages/Profile"));
@@ -17,6 +21,11 @@ const Settings      = lazy(() => import("@/pages/Settings"));
 const AuditLogs     = lazy(() => import("@/pages/AuditLogs"));
 const SOPListPage    = lazy(() => import("@/features/sop_management/pages/SOPListPage"));
 const SOPDetailsPage = lazy(() => import("@/features/sop_management/pages/SOPDetailsPage"));
+const Courses = lazy(() => import("@/pages/courses"));
+const CourseDetailsPage = lazy(() => import("@/features/course_management/pages/CourseDetailsPage"));
+const CourseLearnerView = lazy(() => import("@/features/course_management/pages/CourseLearnerView"));
+const LessonPage = lazy(() => import("@/features/course_management/pages/LessonPage"));
+const CourseBuilderPage = lazy(() => import("@/features/course_management/pages/CourseBuilderPage"));
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
@@ -78,6 +87,11 @@ const router = createBrowserRouter([
       { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
       { path: "sops", element: LMSProtectedWrapper(SOPListPage), handle: { title: "SOP Library" } },
       { path: "sops/:id", element: LMSProtectedWrapper(SOPDetailsPage), handle: { title: "SOP Details" } },
+      { path: "courses", element: LMSProtectedWrapper(Courses), handle: { title: "Course Catalog" } },
+      { path: "courses/:id", element: LMSProtectedWrapper(CourseDetailsPage), handle: { title: "Course Details" } },
+      { path: "courses/:id/builder", element: LMSProtectedWrapper(CourseBuilderPage), handle: { title: "Course Builder" } },
+      { path: "courses/view/:id", element: LMSProtectedWrapper(CourseLearnerView), handle: { title: "My Course" } },
+      { path: "courses/view/:id/lesson/:lessonId", element: LMSProtectedWrapper(LessonPage), handle: { title: "Lesson" } },
     ],
   },
 ]);
@@ -87,7 +101,15 @@ export default function App() {
     <SOPProvider>
       <SOPModalProvider>
         <SOPPermissionProvider>
-          <RouterProvider router={router} />
+          <CourseProvider>
+            <CourseModalProvider>
+              <EnrollmentProvider>
+                <GradingProvider>
+                  <RouterProvider router={router} />
+                </GradingProvider>
+              </EnrollmentProvider>
+            </CourseModalProvider>
+          </CourseProvider>
         </SOPPermissionProvider>
       </SOPModalProvider>
     </SOPProvider>

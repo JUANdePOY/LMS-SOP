@@ -103,7 +103,7 @@ async function listUsers(filters = {}) {
 
   const [rows] = await db.query(sql, params);
 
-  const countSql = `SELECT COUNT(*) AS total FROM users u WHERE 1 = 1`;
+  let countSql = `SELECT COUNT(*) AS total FROM users u WHERE 1 = 1`;
   const countParams = [];
   if (search) {
     countSql += ' AND (u.full_name LIKE ? OR u.email LIKE ? OR u.employee_id LIKE ?)';

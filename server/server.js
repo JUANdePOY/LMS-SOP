@@ -53,6 +53,12 @@ const sopAttachmentsRoutes = require('./routes/sopAttachments');
 const sopComplianceRoutes = require('./routes/sopCompliance');
 const sopWorkflowRoutes = require('./routes/sopWorkflow');
 const sopSharesRoutes = require('./routes/sopShares');
+const coursesRoutes = require('./routes/courses');
+const enrollmentsRoutes = require('./routes/enrollments');
+const { courseRoutes: progressCourseRoutes, lessonRoutes: progressLessonRoutes } = require('./routes/progress');
+const gradesRoutes = require('./routes/grades');
+const discussionsRoutes = require('./routes/discussions');
+const courseBuilderRoutes = require('./routes/course-builder');
 
 const loginDebug = process.env.LOGIN_DEBUG === 'true';
 if (loginDebug) {
@@ -91,6 +97,14 @@ app.use('/api/sops', sopAttachmentsRoutes);
 app.use('/api/sops', sopComplianceRoutes);
 app.use('/api/sops', sopWorkflowRoutes);
 app.use('/api/sops', sopSharesRoutes);
+
+app.use('/api/courses', coursesRoutes);
+app.use('/api/courses', progressCourseRoutes);
+app.use('/api/enrollments', enrollmentsRoutes);
+app.use('/api/lessons', progressLessonRoutes);
+app.use('/api/course-builder', courseBuilderRoutes);
+app.use('/api/grades', gradesRoutes);
+app.use('/api/discussions', discussionsRoutes);
 
 app.get('/api/health', async (req, res) => {
   const result = { status: 'OK', timestamp: new Date().toISOString(), env: process.env.NODE_ENV };

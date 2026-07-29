@@ -7,8 +7,9 @@ import { Select } from '@/shared/components/ui/select';
 import { Card } from '@/shared/components/ui/card';
 import { Modal } from '@/shared/components/ui/modal';
 import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
-import { Search, Plus, Edit2, Trash2, Shield, Users, Briefcase, Loader2 } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Shield, Users, Briefcase, Loader2, Upload, Download, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/shared/components/ui/Toast';
+import BulkUploadModal from './BulkUploadModal';
 
 const ROLE_META = {
   super_admin: { label: 'Super Admin', dot: 'bg-rose-500 dark:bg-rose-400', chip: 'bg-rose-100 text-rose-800 dark:bg-rose-500/25 dark:text-rose-100 border-rose-200 dark:border-rose-500/40', icon: Shield },
@@ -71,6 +72,10 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   const [editingUser, setEditingUser] = useState(null);
   const [deletingUser, setDeletingUser] = useState(null);
   const [formData, setFormData] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [sortField, setSortField] = useState('full_name');
+  const [sortDirection, setSortDirection] = useState('asc');
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -80,7 +85,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       if (deptFilter) params.department_id = deptFilter;
       const res = await getUsers(params);
       if (res.data.status === 'success') {
-        setUsers(res.data.data.rows);
+        setUsers(res.data.data.rows || []);
       }
     } catch {
       toast.error('Failed to load users');
@@ -104,16 +109,6 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       }
     } catch { /* ignore */ }
   }, []);
-
-  useEffect(() => {
-    if (activeTab !== 'users') return;
-    const load = async () => {
-      setLoading(true);
-      await Promise.all([fetchUsers(), fetchStats(), fetchDepartments()]);
-      setLoading(false);
-    };
-    load();
-  }, [activeTab, fetchUsers, fetchStats, fetchDepartments]);
 
   const handleAddUser = async () => {
     setSaving(true);
@@ -204,78 +199,155 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
     return true;
   });
 
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
+    const aVal = a[sortField] || '';
+    const bVal = b[sortField] || '';
+    const cmp = String(aVal).localeCompare(String(bVal), undefined, { numeric: true, sensitivity: 'base' });
+    return sortDirection === 'asc' ? cmp : -cmp;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(sortedUsers.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedUsers = sortedUsers.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const startIdx = sortedUsers.length === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const endIdx = Math.min(safePage * pageSize, sortedUsers.length);
+
+  const handleExport = () => {
+    const headers = ['Full Name', 'Email', 'Role', 'Department', 'Position', 'Employee ID', 'Contact', 'Status', 'Date Hired'];
+    const rows = filteredUsers.map(u => [
+      u.full_name || '',
+      u.email || '',
+      u.role || '',
+      u.department_name || '',
+      u.position_title || '',
+      u.employee_id || '',
+      u.contact_number || '',
+      u.employment_status || '',
+      u.date_hired || '',
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `users_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('Users exported to CSV');
+  };
+
+  const SortIcon = ({ field }) => {
+    if (sortField !== field) return <ChevronsUpDown size={14} className="text-neutral-400" />;
+    if (sortDirection === 'asc') return <ChevronUp size={14} className="text-neutral-700 dark:text-neutral-200" />;
+    return <ChevronDown size={14} className="text-neutral-700 dark:text-neutral-200" />;
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'users') return;
+    const load = async () => {
+      setLoading(true);
+      setCurrentPage(1);
+      await Promise.all([fetchUsers(), fetchStats(), fetchDepartments()]);
+      setLoading(false);
+    };
+    load();
+  }, [activeTab, fetchUsers, fetchStats, fetchDepartments]);
+
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500 dark:text-blue-400" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600 dark:text-blue-400" />
+          </div>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Loading users...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-none space-y-4 sm:space-y-5 lg:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100">Users</h1>
-          <p className="text-xs sm:text-sm text-neutral-500 mt-0.5 sm:mt-1">Manage user accounts and assignments</p>
-        </div>
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowBulkUploadModal(true)}
-          >
-            <Upload size={16} className="mr-2" />
-            Bulk Upload
-          </Button>
-          <Button onClick={() => { setFormData({}); setShowAddModal(true); }}>
-            <Plus size={16} className="mr-2" />
-            Add User
-          </Button>
+    <div className="w-full max-w-none space-y-5 sm:space-y-6">
+      <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-gradient-to-br from-white to-neutral-50/80 dark:from-neutral-900 dark:to-neutral-800/60 p-5 sm:p-6 shadow-sm dark:shadow-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.06),transparent_40%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.08),transparent_40%)]" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center justify-between">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Users</h1>
+            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">Manage user accounts, roles, and assignments</p>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowBulkUploadModal(true)}
+              className="border-neutral-200 dark:border-neutral-700 hover:border-blue-300 dark:hover:border-blue-500/60 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
+            >
+              <Upload size={16} className="mr-2" />
+              Bulk Upload
+            </Button>
+            <Button onClick={() => { setFormData({}); setShowAddModal(true); }} className="shadow-sm hover:shadow-md transition-all">
+              <Plus size={16} className="mr-2" />
+              Add User
+            </Button>
+          </div>
         </div>
       </div>
 
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="p-3 sm:p-4 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+          <Card className="group relative overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-500/40 transition-all duration-200">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/60 to-transparent dark:from-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+            <div className="relative flex items-center gap-2 sm:gap-3">
+              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center ring-1 ring-blue-200/60 dark:ring-blue-500/30">
                 <Users size={18} className="text-blue-600 dark:text-blue-300" />
               </div>
               <div>
-                <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100">{stats.total}</p>
+                <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{stats.total}</p>
                 <p className="text-[10px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-300">Total Users</p>
               </div>
             </div>
           </Card>
-          <Card className="p-3 sm:p-4 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+          <Card className="group relative overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-500/40 transition-all duration-200">
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/60 to-transparent dark:from-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+            <div className="relative flex items-center gap-2 sm:gap-3">
+              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center ring-1 ring-emerald-200/60 dark:ring-emerald-500/30">
                 <Users size={18} className="text-emerald-600 dark:text-emerald-300" />
               </div>
               <div>
-                <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100">{stats.active}</p>
+                <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{stats.active}</p>
                 <p className="text-[10px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-300">Active Users</p>
               </div>
             </div>
           </Card>
-          <Card className="p-3 sm:p-4 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center">
+          <Card className="group relative overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-purple-200 dark:hover:border-purple-500/40 transition-all duration-200">
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-50/60 to-transparent dark:from-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+            <div className="relative flex items-center gap-2 sm:gap-3">
+              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center ring-1 ring-purple-200/60 dark:ring-purple-500/30">
                 <Shield size={18} className="text-purple-600 dark:text-purple-300" />
               </div>
               <div>
-                <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100">{stats.admins}</p>
+                <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{stats.admins}</p>
                 <p className="text-[10px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-300">Admins</p>
               </div>
             </div>
           </Card>
-          <Card className="p-3 sm:p-4 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center">
+          <Card className="group relative overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-amber-200 dark:hover:border-amber-500/40 transition-all duration-200">
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-50/60 to-transparent dark:from-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+            <div className="relative flex items-center gap-2 sm:gap-3">
+              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center ring-1 ring-amber-200/60 dark:ring-amber-500/30">
                 <Briefcase size={18} className="text-amber-600 dark:text-amber-300" />
               </div>
               <div>
-                <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100">{stats.employees}</p>
+                <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{stats.employees}</p>
                 <p className="text-[10px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-300">Employees</p>
               </div>
             </div>
@@ -283,55 +355,89 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col lg:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
           <Input
             placeholder="Search users by name, email, or employee ID…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 sm:pl-10"
+            className="pl-9 sm:pl-10 border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 transition-all"
           />
         </div>
-        <Select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="w-full sm:w-auto">
-          <option value="">All Roles</option>
-          {Object.entries(ROLE_META).map(([key, meta]) => (
-            <option key={key} value={key}>{meta.label}</option>
-          ))}
-        </Select>
-        <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="w-full sm:w-auto">
-          <option value="">All Departments</option>
-          {departments.map((d) => (
-            <option key={d.id} value={d.id}>{d.name}</option>
-          ))}
-        </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="w-full sm:w-auto border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400">
+            <option value="">All Roles</option>
+            {Object.entries(ROLE_META).map(([key, meta]) => (
+              <option key={key} value={key}>{meta.label}</option>
+            ))}
+          </Select>
+          <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="w-full sm:w-auto border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400">
+            <option value="">All Departments</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </Select>
+          <Button variant="outline" onClick={handleExport} disabled={filteredUsers.length === 0} className="border-neutral-200 dark:border-neutral-700 hover:border-blue-300 dark:hover:border-blue-500/60 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all">
+            <Download size={16} className="mr-2" />
+            Export
+          </Button>
+        </div>
       </div>
 
-      <Card className="overflow-hidden border border-neutral-200 dark:border-neutral-700 shadow-sm dark:shadow-neutral-900/50 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100">
+      <Card className="overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-sm dark:shadow-none">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b-2 border-neutral-300 dark:border-neutral-600 bg-neutral-100 dark:bg-neutral-700">
-                <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-100">Full Name</th>
-                <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-100">Employee ID</th>
-                <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-100">Department</th>
-                <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-100">Position/Job Title</th>
-                <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-100">Email Address</th>
-                <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-100">Contact Number</th>
-                <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-100">Employment Status</th>
-                <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-100">Date Hired</th>
-                <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-100">Birthdate</th>
-                <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-100">Address</th>
-                <th className="px-3 py-3 text-right text-xs font-bold uppercase tracking-wider text-neutral-800 dark:text-neutral-100">Actions</th>
+              <tr className="border-b-2 border-neutral-200 dark:border-neutral-700 bg-gradient-to-r from-neutral-50 to-neutral-100/80 dark:from-neutral-800 dark:to-neutral-700/80">
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+                  <button onClick={() => handleSort('full_name')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                    Full Name <SortIcon field="full_name" />
+                  </button>
+                </th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+                  <button onClick={() => handleSort('employee_id')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                    Employee ID <SortIcon field="employee_id" />
+                  </button>
+                </th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+                  <button onClick={() => handleSort('department_name')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                    Department <SortIcon field="department_name" />
+                  </button>
+                </th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+                  <button onClick={() => handleSort('position_title')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                    Position/Job Title <SortIcon field="position_title" />
+                  </button>
+                </th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+                  <button onClick={() => handleSort('email')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                    Email Address <SortIcon field="email" />
+                  </button>
+                </th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">Contact Number</th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+                  <button onClick={() => handleSort('employment_status')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                    Employment Status <SortIcon field="employment_status" />
+                  </button>
+                </th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+                  <button onClick={() => handleSort('date_hired')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                    Date Hired <SortIcon field="date_hired" />
+                  </button>
+                </th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">Birthdate</th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">Address</th>
+                <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700">
-              {filteredUsers.length === 0 ? (
+            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-700/80">
+              {paginatedUsers.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-3">
-                      <div className="h-12 w-12 rounded-full bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center">
-                        <Users size={24} className="text-neutral-400 dark:text-neutral-500" />
+                      <div className="h-14 w-14 rounded-2xl bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center">
+                        <Users size={28} className="text-neutral-400 dark:text-neutral-500" />
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">No users found</p>
@@ -341,21 +447,21 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((u) => {
+                paginatedUsers.map((u, idx) => {
                   const avatarColor = getAvatarColor(u.full_name || u.email);
                   return (
-                    <tr key={u.id} className="group hover:bg-blue-50/70 dark:hover:bg-neutral-700/60 transition-colors duration-150">
+                    <tr key={u.id} className={`group transition-all duration-150 hover:bg-blue-50/70 dark:hover:bg-neutral-700/60 ${idx % 2 === 0 ? 'bg-white dark:bg-neutral-800' : 'bg-neutral-50/40 dark:bg-neutral-800/60'}`}>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-3">
-                          <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${avatarColor}`}>
+                          <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${avatarColor} ring-2 ring-white dark:ring-neutral-700 shadow-sm`}>
                             {getInitials(u.full_name || u.email)}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-bold text-neutral-900 dark:text-white truncate">{u.full_name || '—'}</p>
+                            <p className="text-sm font-semibold text-neutral-900 dark:text-white truncate">{u.full_name || '—'}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200">
+                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200 font-mono text-xs">
                         {u.employee_id || <span className="text-neutral-400 dark:text-neutral-500">—</span>}
                       </td>
                       <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200">
@@ -364,7 +470,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                       <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200">
                         {u.position_title || <span className="text-neutral-400 dark:text-neutral-500">—</span>}
                       </td>
-                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200 truncate" title={u.email}>
+                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200 truncate max-w-[200px]" title={u.email}>
                         {u.email || '—'}
                       </td>
                       <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200">
@@ -373,10 +479,10 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                       <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200">
                         {u.employment_status || <span className="text-neutral-400 dark:text-neutral-500">—</span>}
                       </td>
-                      <td className="px-3 py-3 text-sm text-neutral-600 dark:text-neutral-300">
+                      <td className="px-3 py-3 text-sm text-neutral-600 dark:text-neutral-300 whitespace-nowrap">
                         {formatDate(u.date_hired)}
                       </td>
-                      <td className="px-3 py-3 text-sm text-neutral-600 dark:text-neutral-300">
+                      <td className="px-3 py-3 text-sm text-neutral-600 dark:text-neutral-300 whitespace-nowrap">
                         {formatDate(u.birthdate)}
                       </td>
                       <td className="px-3 py-3 text-sm text-neutral-600 dark:text-neutral-300 max-w-[180px] truncate" title={u.address || ''}>
@@ -386,7 +492,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => openEdit(u)}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-indigo-600 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 dark:hover:text-indigo-300 transition-colors"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 dark:hover:text-indigo-300 transition-all"
                             title="Edit user"
                           >
                             <Edit2 size={15} />
@@ -394,7 +500,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                           {u.role !== 'super_admin' && (
                             <button
                               onClick={() => openDelete(u)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 dark:hover:text-red-300 transition-colors"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 dark:hover:text-red-300 transition-all"
                               title="Deactivate user"
                             >
                               <Trash2 size={15} />
@@ -411,27 +517,54 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
         </div>
       </Card>
 
+      {filteredUsers.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-1">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            Showing {startIdx}–{endIdx} of {filteredUsers.length} user{filteredUsers.length !== 1 ? 's' : ''}
+          </p>
+          <div className="flex items-center gap-2">
+            <Select value={String(pageSize)} onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }} className="w-20 border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </Select>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={safePage <= 1} className="border-neutral-200 dark:border-neutral-700 hover:border-blue-300 dark:hover:border-blue-500/60 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all">
+                Previous
+              </Button>
+              <span className="text-xs text-neutral-600 dark:text-neutral-300 min-w-[3rem] text-center font-medium">
+                {safePage} / {totalPages}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={safePage >= totalPages} className="border-neutral-200 dark:border-neutral-700 hover:border-blue-300 dark:hover:border-blue-500/60 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all">
+                Next
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAddModal && (
         <Modal open={showAddModal} title="Add New User" onClose={() => { setShowAddModal(false); setFormData({}); }}>
-          <div className="flex flex-col gap-3 sm:gap-4">
+          <div className="flex flex-col gap-4 sm:gap-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Full Name <span className="text-red-500">*</span></label>
-                <Input value={formData.full_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))} placeholder="Enter full name" />
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Full Name <span className="text-red-500">*</span></label>
+                <Input value={formData.full_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))} placeholder="Enter full name" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Email <span className="text-red-500">*</span></label>
-                <Input type="email" value={formData.email || ''} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="user@organization.com" />
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Email <span className="text-red-500">*</span></label>
+                <Input type="email" value={formData.email || ''} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="user@organization.com" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Password <span className="text-red-500">*</span></label>
-              <Input type="password" value={formData.password || ''} onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))} placeholder="Min 8 characters" />
+              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Password <span className="text-red-500">*</span></label>
+              <Input type="password" value={formData.password || ''} onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))} placeholder="Min 8 characters" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Role <span className="text-red-500">*</span></label>
-                <Select value={formData.role || ''} onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role <span className="text-red-500">*</span></label>
+                <Select value={formData.role || ''} onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
                   <option value="">Select role…</option>
                   {Object.entries(ROLE_META).map(([key, meta]) => (
                     <option key={key} value={key}>{meta.label}</option>
@@ -439,8 +572,8 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                 </Select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Department</label>
-                <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))}>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
+                <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
                   <option value="">Select department…</option>
                   {departments.map((d) => (
                     <option key={d.id} value={d.id}>{d.name}</option>
@@ -450,22 +583,22 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Position Title</label>
-                <Input value={formData.position_title || ''} onChange={(e) => setFormData(prev => ({ ...prev, position_title: e.target.value }))} placeholder="e.g. Manager" />
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Position Title</label>
+                <Input value={formData.position_title || ''} onChange={(e) => setFormData(prev => ({ ...prev, position_title: e.target.value }))} placeholder="e.g. Manager" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Employee ID</label>
-                <Input value={formData.employee_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, employee_id: e.target.value }))} placeholder="Optional" />
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Employee ID</label>
+                <Input value={formData.employee_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, employee_id: e.target.value }))} placeholder="Optional" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Contact Number</label>
-                <Input value={formData.contact_number || ''} onChange={(e) => setFormData(prev => ({ ...prev, contact_number: e.target.value }))} placeholder="Optional" />
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Contact Number</label>
+                <Input value={formData.contact_number || ''} onChange={(e) => setFormData(prev => ({ ...prev, contact_number: e.target.value }))} placeholder="Optional" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Employment Status</label>
-                <Select value={formData.employment_status || ''} onChange={(e) => setFormData(prev => ({ ...prev, employment_status: e.target.value }))}>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Employment Status</label>
+                <Select value={formData.employment_status || ''} onChange={(e) => setFormData(prev => ({ ...prev, employment_status: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
                   <option value="">Select…</option>
                   {EMPLOYMENT_STATUSES.map((s) => (
                     <option key={s} value={s}>{s}</option>
@@ -474,12 +607,12 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Address</label>
-              <Input value={formData.address || ''} onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))} placeholder="Optional" />
+              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Address</label>
+              <Input value={formData.address || ''} onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))} placeholder="Optional" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
             </div>
             <div className="flex justify-end gap-2 pt-1">
-              <Button variant="outline" onClick={() => { setShowAddModal(false); setFormData({}); }}>Cancel</Button>
-              <Button onClick={handleAddUser} disabled={saving}>
+              <Button variant="outline" onClick={() => { setShowAddModal(false); setFormData({}); }} className="border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600">Cancel</Button>
+              <Button onClick={handleAddUser} disabled={saving} className="shadow-sm hover:shadow-md transition-all">
                 {saving ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
                 Create User
               </Button>
@@ -490,21 +623,21 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
 
       {showEditModal && editingUser && (
         <Modal open={showEditModal} title="Edit User" onClose={() => { setShowEditModal(false); setEditingUser(null); setFormData({}); }}>
-          <div className="flex flex-col gap-3 sm:gap-4">
+          <div className="flex flex-col gap-4 sm:gap-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Full Name</label>
-                <Input value={formData.full_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))} />
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Full Name</label>
+                <Input value={formData.full_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Email</label>
-                <Input type="email" value={formData.email || ''} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} />
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Email</label>
+                <Input type="email" value={formData.email || ''} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Role</label>
-                <Select value={formData.role || ''} onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role</label>
+                <Select value={formData.role || ''} onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
                   <option value="">Select role…</option>
                   {Object.entries(ROLE_META).map(([key, meta]) => (
                     <option key={key} value={key}>{meta.label}</option>
@@ -512,8 +645,8 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                 </Select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Department</label>
-                <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))}>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
+                <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
                   <option value="">Select department…</option>
                   {departments.map((d) => (
                     <option key={d.id} value={d.id}>{d.name}</option>
@@ -523,22 +656,22 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Position Title</label>
-                <Input value={formData.position_title || ''} onChange={(e) => setFormData(prev => ({ ...prev, position_title: e.target.value }))} />
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Position Title</label>
+                <Input value={formData.position_title || ''} onChange={(e) => setFormData(prev => ({ ...prev, position_title: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Employee ID</label>
-                <Input value={formData.employee_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, employee_id: e.target.value }))} />
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Employee ID</label>
+                <Input value={formData.employee_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, employee_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Contact Number</label>
-                <Input value={formData.contact_number || ''} onChange={(e) => setFormData(prev => ({ ...prev, contact_number: e.target.value }))} />
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Contact Number</label>
+                <Input value={formData.contact_number || ''} onChange={(e) => setFormData(prev => ({ ...prev, contact_number: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Employment Status</label>
-                <Select value={formData.employment_status || ''} onChange={(e) => setFormData(prev => ({ ...prev, employment_status: e.target.value }))}>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Employment Status</label>
+                <Select value={formData.employment_status || ''} onChange={(e) => setFormData(prev => ({ ...prev, employment_status: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
                   <option value="">Select…</option>
                   {EMPLOYMENT_STATUSES.map((s) => (
                     <option key={s} value={s}>{s}</option>
@@ -547,12 +680,12 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
               </div>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">Address</label>
-              <Input value={formData.address || ''} onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))} />
+              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Address</label>
+              <Input value={formData.address || ''} onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
             </div>
             <div className="flex justify-end gap-2 pt-1">
-              <Button variant="outline" onClick={() => { setShowEditModal(false); setEditingUser(null); setFormData({}); }}>Cancel</Button>
-              <Button onClick={handleEditUser} disabled={saving}>
+              <Button variant="outline" onClick={() => { setShowEditModal(false); setEditingUser(null); setFormData({}); }} className="border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600">Cancel</Button>
+              <Button onClick={handleEditUser} disabled={saving} className="shadow-sm hover:shadow-md transition-all">
                 {saving ? <Loader2 size={16} className="animate-spin mr-2" /> : null}
                 Save Changes
               </Button>

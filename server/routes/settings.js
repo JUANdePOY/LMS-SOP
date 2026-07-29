@@ -2,7 +2,7 @@ const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
-const { requireSuperAdmin } = require('../middleware/rbac');
+const { requireSuperAdmin } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 const {
   canManageUser,
