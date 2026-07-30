@@ -16,9 +16,9 @@ import api from '@/lib/api';
 
 function SidebarCard({ title, children, className }) {
   return (
-    <div className={`bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-sm ${className || ''}`}>
-      <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50/50 dark:bg-neutral-800/50">
-        <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm">{title}</h3>
+    <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-sm ${className || ''}`}>
+      <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-subtle)]">
+        <h3 className="font-semibold text-[var(--text-primary)] text-sm">{title}</h3>
       </div>
       <div className="p-4">{children}</div>
     </div>

@@ -1,12 +1,11 @@
 import { useState, useEffect, useCallback, useRef, useId } from 'react';
 import { X, Loader2, CheckCircle2, AlertCircle, ImagePlus } from 'lucide-react';
-import { uploadBusinessLogo } from '@/features/organization-management/api/business.api';
+import { uploadBusinessLogo, deleteBusinessLogo, getBusinessLogo } from '@/features/organization-management/api/business.api';
 
 const defaultForm = {
   business_code: '',
   business_name: '',
   description: '',
-  logo_url: '',
   email: '',
   phone: '',
   address: '',
@@ -43,10 +42,12 @@ function FieldError({ id, message }) {
 }
 
 export default function BusinessForm({ initialData, onSubmit, onCancel, loading }) {
+  const businessId = initialData?.id || null;
   const [form, setForm] = useState(defaultForm);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
-  const [logoPreview, setLogoPreview] = useState('');
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState('');
+  const [logoFile, setLogoFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -60,21 +61,37 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
         business_code: initialData.business_code || '',
         business_name: initialData.business_name || '',
         description: initialData.description || '',
-        logo_url: initialData.logo_url || '',
         email: initialData.email || '',
         phone: initialData.phone || '',
         address: initialData.address || '',
         status: initialData.status || 'active',
       });
-      setLogoPreview(initialData.logo_url || '');
+      setLogoFile(null);
+      setUploadError('');
+      if (initialData.logo_data) {
+        setLogoPreviewUrl(URL.createObjectURL(new Blob([initialData.logo_data], { type: initialData.logo_mime_type })));
+      } else if (initialData.logo_url) {
+        setLogoPreviewUrl(initialData.logo_url);
+      } else {
+        setLogoPreviewUrl('');
+      }
     } else {
       setForm(defaultForm);
-      setLogoPreview('');
+      setLogoPreviewUrl('');
+      setLogoFile(null);
     }
     setUploadError('');
     setErrors({});
     setTouched({});
   }, [initialData]);
+
+  useEffect(() => {
+    return () => {
+      if (logoPreviewUrl && logoPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(logoPreviewUrl);
+      }
+    };
+  }, [logoPreviewUrl]);
 
   const processFile = useCallback(async (file) => {
     if (!file) return;
@@ -91,27 +108,32 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
     setUploadError('');
     setUploading(true);
 
-    setLogoPreview((prev) => {
+    const blobUrl = URL.createObjectURL(file);
+    setLogoPreviewUrl((prev) => {
       if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
+      return blobUrl;
     });
+    setLogoFile(file);
 
-    try {
-      const formData = new FormData();
-      formData.append('logo', file);
-      const response = await uploadBusinessLogo(formData);
-      const returnedUrl = response.data?.data?.logo_url;
-      if (returnedUrl) {
-        setForm((prev) => ({ ...prev, logo_url: returnedUrl }));
+    if (businessId) {
+      try {
+        const formData = new FormData();
+        formData.append('logo', file);
+        await uploadBusinessLogo(businessId, formData);
+        setLogoFile(null);
+      } catch (err) {
+        console.error('Failed to upload logo:', err);
+        setUploadError('Upload failed. Please try again.');
+        setLogoPreviewUrl(initialData?.logo_data
+          ? URL.createObjectURL(new Blob([initialData.logo_data], { type: initialData.logo_mime_type }))
+          : (initialData?.logo_url || ''));
+      } finally {
+        setUploading(false);
       }
-    } catch (err) {
-      console.error('Failed to upload logo:', err);
-      setUploadError('Upload failed. Please try again.');
-      setLogoPreview(initialData?.logo_url || '');
-    } finally {
+    } else {
       setUploading(false);
     }
-  }, [initialData]);
+  }, [businessId, initialData]);
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -149,13 +171,16 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
 
   const clearLogo = useCallback((e) => {
     e?.stopPropagation();
-    setLogoPreview((prev) => {
+    setLogoPreviewUrl((prev) => {
       if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
       return '';
     });
-    setForm((prev) => ({ ...prev, logo_url: '' }));
+    setLogoFile(null);
     setUploadError('');
-  }, []);
+    if (businessId) {
+      deleteBusinessLogo(businessId).catch(() => {});
+    }
+  }, [businessId]);
 
   const validateField = (field, value) => {
     switch (field) {
@@ -185,7 +210,7 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
     e.preventDefault();
     setTouched({ business_code: true, business_name: true, email: true });
     if (!validate()) return;
-    onSubmit(form);
+    onSubmit({ ...form, logoFile });
   };
 
   const handleChange = (field) => (e) => {
@@ -231,8 +256,8 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
           } ${isBusy ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
         >
           <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)]">
-            {logoPreview ? (
-              <img src={logoPreview} alt="Logo preview" className="h-full w-full object-cover" />
+            {logoPreviewUrl ? (
+              <img src={logoPreviewUrl} alt="Logo preview" className="h-full w-full object-cover" />
             ) : (
               <ImagePlus className="h-6 w-6 text-[var(--text-muted)]" />
             )}
@@ -245,10 +270,10 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
 
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-[var(--text-primary)]">
-              {isDragging ? 'Drop image to upload' : logoPreview ? 'Change logo' : 'Drag an image here, or click to browse'}
+              {isDragging ? 'Drop image to upload' : logoPreviewUrl ? 'Change logo' : 'Drag an image here, or click to browse'}
             </p>
             <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-              {uploading ? 'Uploading…' : 'Square images look best'}
+              {uploading ? 'Uploadingâ€¦' : 'Square images look best'}
             </p>
             <input
               ref={fileInputRef}
@@ -261,7 +286,7 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
             {uploadError && <FieldError message={uploadError} />}
           </div>
 
-          {logoPreview && !uploading && (
+          {logoPreviewUrl && !uploading && (
             <button
               type="button"
               onClick={clearLogo}

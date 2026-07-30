@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Pencil, Trash2, Building2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { getBusinessLogo } from '@/features/organization-management/api/business.api';
 
 function initials(name = '') {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -14,6 +15,41 @@ const COLUMNS = [
   { key: 'department_count', label: 'Departments', sortable: true, className: 'hidden md:table-cell' },
   { key: 'status', label: 'Status', sortable: true },
 ];
+
+function LogoCell({ business }) {
+  const [blobUrl, setBlobUrl] = useState(null);
+
+  useEffect(() => {
+    if (!business?.id) return;
+    let cancelled = false;
+    const fetchLogo = async () => {
+      try {
+        const response = await getBusinessLogo(business.id);
+        if (!cancelled && response?.data) {
+          const url = URL.createObjectURL(new Blob([response.data], { type: response.headers['content-type'] || 'image/png' }));
+          setBlobUrl(url);
+        }
+      } catch {
+        // No logo available
+      }
+    };
+    fetchLogo();
+    return () => {
+      cancelled = true;
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  }, [business?.id]);
+
+  return (
+    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--bg-page)]">
+      {blobUrl ? (
+        <img src={blobUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <span className="text-xs font-semibold text-[var(--text-muted)]">{initials(business.business_name)}</span>
+      )}
+    </div>
+  );
+}
 
 function SkeletonRow() {
   return (
@@ -128,16 +164,8 @@ export default function BusinessTable({ businesses = [], loading, onEdit, onDele
                   return (
                     <tr key={business.id} className="group hover:bg-[var(--bg-hover)] transition-colors">
                       <td className="px-4 py-3">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--border)] bg-[var(--bg-page)]">
-                          {business.logo_url ? (
-                            <img src={business.logo_url} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <span className="text-xs font-semibold text-[var(--text-muted)]">
-                              {initials(business.business_name) || <Building2 className="h-4 w-4" />}
-                            </span>
-                          )}
-                        </div>
-                      </td>
+                          <LogoCell business={business} />
+                        </td>
                       <td className="px-4 py-3">
                         <p className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[220px]">
                           {business.business_name}

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import TextAlign from '@tiptap/extension-text-align';
 import {
   Bold,
   Italic,
@@ -14,6 +15,10 @@ import {
   Redo2,
   Link as LinkIcon,
   Heading2,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
 } from 'lucide-react';
 
 function ToolbarButton({ onClick, active, disabled, title, children }) {
@@ -116,6 +121,37 @@ function EditorToolbar({ editor }) {
       <span className="w-px h-5 bg-neutral-200 dark:bg-neutral-700 mx-1" />
 
       <ToolbarButton
+        title="Align left"
+        active={editor.isActive({ textAlign: 'left' })}
+        onClick={() => editor.chain().focus().setTextAlign('left').run()}
+      >
+        <AlignLeft className="w-4 h-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        title="Align center"
+        active={editor.isActive({ textAlign: 'center' })}
+        onClick={() => editor.chain().focus().setTextAlign('center').run()}
+      >
+        <AlignCenter className="w-4 h-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        title="Align right"
+        active={editor.isActive({ textAlign: 'right' })}
+        onClick={() => editor.chain().focus().setTextAlign('right').run()}
+      >
+        <AlignRight className="w-4 h-4" />
+      </ToolbarButton>
+      <ToolbarButton
+        title="Justify"
+        active={editor.isActive({ textAlign: 'justify' })}
+        onClick={() => editor.chain().focus().setTextAlign('justify').run()}
+      >
+        <AlignJustify className="w-4 h-4" />
+      </ToolbarButton>
+
+      <span className="w-px h-5 bg-neutral-200 dark:bg-neutral-700 mx-1" />
+
+      <ToolbarButton
         title="Undo"
         disabled={!editor.can().undo()}
         onClick={() => editor.chain().focus().undo().run()}
@@ -133,11 +169,33 @@ function EditorToolbar({ editor }) {
   );
 }
 
+// Styles the editor's content directly (headings, lists, quote, links) instead of
+// depending on @tailwindcss/typography's `prose` class, which may not be installed.
+// Tailwind's Preflight reset strips native h1-h6 and ul/ol styling, so without this
+// (or the typography plugin) Heading/Bullet List/Numbered List buttons *do* work —
+// they just render with no visible difference from a plain paragraph.
+const EDITOR_CONTENT_STYLES = [
+  'max-w-none px-3 py-2 min-h-[180px] focus:outline-none',
+  'text-neutral-800 dark:text-neutral-200',
+  '[&_h2]:text-xl [&_h2]:font-bold [&_h2]:mt-3 [&_h2]:mb-2',
+  '[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-2',
+  '[&_p]:mb-2 [&_p:last-child]:mb-0',
+  '[&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-2',
+  '[&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-2',
+  '[&_li]:mb-1',
+  '[&_blockquote]:border-l-4 [&_blockquote]:border-neutral-300 dark:[&_blockquote]:border-neutral-600 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-neutral-600 dark:[&_blockquote]:text-neutral-400',
+  '[&_a]:text-indigo-600 dark:[&_a]:text-indigo-400 [&_a]:underline',
+  '[&_strong]:font-bold [&_em]:italic',
+].join(' ');
+
 function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Enter module content...' }) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
         link: { openOnClick: false, autolink: true },
+      }),
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
       }),
       Placeholder.configure({ placeholder }),
     ],
@@ -148,8 +206,7 @@ function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Ente
     },
     editorProps: {
       attributes: {
-        class:
-          'prose prose-sm dark:prose-invert max-w-none px-3 py-2 min-h-[180px] focus:outline-none text-neutral-800 dark:text-neutral-200',
+        class: EDITOR_CONTENT_STYLES,
       },
     },
   });

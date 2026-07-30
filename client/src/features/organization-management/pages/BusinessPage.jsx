@@ -3,6 +3,7 @@ import { Plus, Search } from 'lucide-react';
 import BusinessTable from '../components/business/BusinessTable';
 import BusinessModal from '../components/business/BusinessModal';
 import { useBusinesses } from '../hooks/useBusinesses';
+import { uploadBusinessLogo } from '../api/business.api';
 import KPICards from '../components/KPICards';
 
 export default function BusinessPage() {
@@ -43,7 +44,13 @@ export default function BusinessPage() {
   const handleCreate = async (data) => {
     setSubmitting(true);
     try {
-      await create(data);
+      const { logoFile, ...businessData } = data;
+      const created = await create(businessData);
+      if (logoFile && created?.id) {
+        const logoFormData = new FormData();
+        logoFormData.append('logo', logoFile);
+        await uploadBusinessLogo(created.id, logoFormData);
+      }
       setModalOpen(false);
       setEditData(null);
     } catch (err) {
@@ -57,7 +64,13 @@ export default function BusinessPage() {
     if (!editData) return;
     setSubmitting(true);
     try {
-      await update(editData.id, data);
+      const { logoFile, ...businessData } = data;
+      await update(editData.id, businessData);
+      if (logoFile) {
+        const logoFormData = new FormData();
+        logoFormData.append('logo', logoFile);
+        await uploadBusinessLogo(editData.id, logoFormData);
+      }
       setModalOpen(false);
       setEditData(null);
     } catch (err) {
