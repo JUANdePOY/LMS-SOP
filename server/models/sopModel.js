@@ -51,7 +51,7 @@ function notDeletedClause(cols, alias = 's') {
 
 async function findAll(filters = {}) {
   const cols = await getSopsColumns();
-  const { search, status, department_id, category_id, page = 1, limit = 20 } = filters;
+  const { search, status, department_id, category_id, exclude_status, page = 1, limit = 20 } = filters;
   const offset = (page - 1) * limit;
 
   let sql = `
@@ -71,6 +71,10 @@ async function findAll(filters = {}) {
   if (status) {
     sql += ' AND s.status = ?';
     params.push(status);
+  }
+  if (exclude_status) {
+    sql += ' AND s.status != ?';
+    params.push(exclude_status);
   }
   if (department_id && cols.hasDepartment) {
     sql += ' AND s.department_id = ?';

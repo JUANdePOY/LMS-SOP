@@ -1,6 +1,4 @@
 const db = require('../config/database');
-const fs = require('fs');
-const path = require('path');
 
 const BUSINESS_STATUSES = ['active', 'inactive'];
 
@@ -78,24 +76,38 @@ async function findByCode(code) {
 }
 
 async function create(data, userId) {
-  const { business_code, business_name, description, logo_url, email, phone, address, status } = data;
+  const {
+    business_code, business_name, description, email, phone, address, status,
+    logo_data, logo_name, logo_mime_type, logo_size,
+  } = data;
   const [result] = await db.query(
-    `INSERT INTO businesses (business_code, business_name, description, logo_url, email, phone, address, status, created_by, updated_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [business_code, business_name, description ?? null, logo_url ?? null, email ?? null, phone ?? null, address ?? null, status || 'active', userId, userId]
+    `INSERT INTO businesses
+       (business_code, business_name, description, logo_data, logo_name, logo_mime_type, logo_size, email, phone, address, status, created_by, updated_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      business_code, business_name, description ?? null,
+      logo_data ?? null, logo_name ?? null, logo_mime_type ?? null, logo_size ?? null,
+      email ?? null, phone ?? null, address ?? null, status || 'active', userId, userId,
+    ]
   );
   return result.insertId;
 }
 
 async function update(id, data, userId) {
-  const { business_code, business_name, description, logo_url, email, phone, address, status } = data;
+  const {
+    business_code, business_name, description, email, phone, address, status,
+    logo_data, logo_name, logo_mime_type, logo_size,
+  } = data;
   const sets = [];
   const params = [];
 
   if (business_code !== undefined) { sets.push('business_code = ?'); params.push(business_code); }
   if (business_name !== undefined) { sets.push('business_name = ?'); params.push(business_name); }
   if (description !== undefined) { sets.push('description = ?'); params.push(description); }
-  if (logo_url !== undefined) { sets.push('logo_url = ?'); params.push(logo_url); }
+  if (logo_data !== undefined) { sets.push('logo_data = ?'); params.push(logo_data); }
+  if (logo_name !== undefined) { sets.push('logo_name = ?'); params.push(logo_name); }
+  if (logo_mime_type !== undefined) { sets.push('logo_mime_type = ?'); params.push(logo_mime_type); }
+  if (logo_size !== undefined) { sets.push('logo_size = ?'); params.push(logo_size); }
   if (email !== undefined) { sets.push('email = ?'); params.push(email); }
   if (phone !== undefined) { sets.push('phone = ?'); params.push(phone); }
   if (address !== undefined) { sets.push('address = ?'); params.push(address); }
@@ -114,6 +126,32 @@ async function update(id, data, userId) {
   return result.affectedRows;
 }
 
+async function saveLogo(id, { buffer, name, mime, size }) {
+  const [result] = await db.query(
+    `UPDATE businesses
+     SET logo_data = ?, logo_name = ?, logo_mime_type = ?, logo_size = ?, updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [buffer, name, mime, size, id]
+  );
+  return result.affectedRows;
+}
+
+async function getLogo(id) {
+  const [rows] = await db.query(
+    `SELECT logo_data, logo_mime_type, logo_name, logo_size FROM businesses WHERE id = ?`,
+    [id]
+  );
+  return rows[0] || null;
+}
+
+async function clearLogo(id) {
+  const [result] = await db.query(
+    `UPDATE businesses SET logo_data = NULL, logo_name = NULL, logo_mime_type = NULL, logo_size = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [id]
+  );
+  return result.affectedRows;
+}
+
 async function remove(id) {
   const [deptCheck] = await db.query(
     'SELECT COUNT(*) AS count FROM departments WHERE business_id = ?',
@@ -126,19 +164,6 @@ async function remove(id) {
   }
   const [result] = await db.query('DELETE FROM businesses WHERE id = ?', [id]);
   return result.affectedRows;
-}
-
-async function removeOldLogo(logoUrl) {
-  if (!logoUrl || typeof logoUrl !== 'string') return;
-  const relativePath = logoUrl.replace(/^\/api\//, '');
-  const absPath = path.join(__dirname, '..', relativePath);
-  if (fs.existsSync(absPath)) {
-    try {
-      fs.unlinkSync(absPath);
-    } catch (err) {
-      console.error('Failed to remove old business logo:', err);
-    }
-  }
 }
 
 async function getHierarchy() {
@@ -202,7 +227,9 @@ module.exports = {
   create,
   update,
   remove,
-  removeOldLogo,
+  saveLogo,
+  getLogo,
+  clearLogo,
   getHierarchy,
   BUSINESS_STATUSES,
 };
