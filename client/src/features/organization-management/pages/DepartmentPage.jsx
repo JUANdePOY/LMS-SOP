@@ -7,6 +7,7 @@ import { useBusinesses } from '../hooks/useBusinesses';
 import { useUsers } from '../hooks/useUsers';
 import { useToast } from '@/shared/components/Toast';
 import KPICards from '../components/KPICards';
+import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
 
 export default function DepartmentPage() {
   const { departments, loading, error, create, update, remove } = useDepartments();
@@ -23,8 +24,10 @@ export default function DepartmentPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [businessFilter, setBusinessFilter] = useState('all');
 
+  const safeQuery = sanitizeSearchQuery(query);
+
   const filteredDepartments = useMemo(() => {
-    const term = query.trim().toLowerCase();
+    const term = safeQuery.toLowerCase();
     let result = departments || [];
     if (term) {
       result = result.filter(
@@ -40,9 +43,9 @@ export default function DepartmentPage() {
       result = result.filter((d) => String(d.business_id) === businessFilter);
     }
     return result;
-  }, [query, departments, statusFilter, businessFilter]);
+  }, [safeQuery, departments, statusFilter, businessFilter]);
 
-  const hasActiveFilters = query.trim() || statusFilter !== 'all' || businessFilter !== 'all';
+  const hasActiveFilters = safeQuery || statusFilter !== 'all' || businessFilter !== 'all';
 
   const kpiCards = useMemo(() => {
     const list = departments || [];
@@ -103,6 +106,13 @@ export default function DepartmentPage() {
     }
   };
 
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    const err = validateSearchQuery(value);
+    if (err) return;
+    setQuery(value);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -135,8 +145,9 @@ export default function DepartmentPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={handleSearchChange}
               placeholder="Search departments by name or code..."
+              maxLength={100}
               className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] py-2 pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none"
             />
           </div>

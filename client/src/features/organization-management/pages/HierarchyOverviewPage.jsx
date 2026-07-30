@@ -3,11 +3,21 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, RefreshCw } from 'lucide-react';
 import OrganizationTree from '../components/hierarchy/OrganizationTree';
 import { useHierarchy } from '../hooks/useHierarchy';
+import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
 
 export default function HierarchyOverviewPage() {
   const navigate = useNavigate();
   const { hierarchy, loading, error, refresh } = useHierarchy();
   const [searchQuery, setSearchQuery] = useState('');
+
+  const safeQuery = sanitizeSearchQuery(searchQuery);
+
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    const err = validateSearchQuery(value);
+    if (err) return;
+    setSearchQuery(value);
+  };
 
   return (
     <div className="space-y-6">
@@ -54,8 +64,9 @@ export default function HierarchyOverviewPage() {
             <div className="relative flex-1 max-w-md">
               <input
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={handleSearchChange}
                 placeholder="Search businesses or departments..."
+                maxLength={100}
                 className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] py-2 px-3 pl-9 text-sm text-[var(--text-primary)] outline-none"
               />
               <svg className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -66,7 +77,7 @@ export default function HierarchyOverviewPage() {
 
           <OrganizationTree
             hierarchy={hierarchy}
-            searchQuery={searchQuery}
+            searchQuery={safeQuery}
           />
         </>
       )}

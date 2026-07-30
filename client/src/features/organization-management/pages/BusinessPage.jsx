@@ -5,6 +5,7 @@ import BusinessModal from '../components/business/BusinessModal';
 import { useBusinesses } from '../hooks/useBusinesses';
 import { uploadBusinessLogo } from '../api/business.api';
 import KPICards from '../components/KPICards';
+import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
 
 export default function BusinessPage() {
   const { businesses, loading, error, create, update, remove } = useBusinesses();
@@ -14,8 +15,10 @@ export default function BusinessPage() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
 
+  const safeQuery = sanitizeSearchQuery(query);
+
   const filteredBusinesses = useMemo(() => {
-    const term = query.trim().toLowerCase();
+    const term = safeQuery.toLowerCase();
     let result = businesses || [];
     if (term) {
       result = result.filter(
@@ -28,9 +31,9 @@ export default function BusinessPage() {
       result = result.filter((b) => b.status === statusFilter);
     }
     return result;
-  }, [query, businesses, statusFilter]);
+  }, [safeQuery, businesses, statusFilter]);
 
-  const hasActiveFilters = query.trim() || statusFilter !== 'all';
+  const hasActiveFilters = safeQuery || statusFilter !== 'all';
 
   const kpiCards = useMemo(() => {
     const list = businesses || [];
@@ -103,6 +106,13 @@ export default function BusinessPage() {
     }
   };
 
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    const err = validateSearchQuery(value);
+    if (err) return;
+    setQuery(value);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -135,8 +145,9 @@ export default function BusinessPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={handleSearchChange}
               placeholder="Search businesses by name or code..."
+              maxLength={100}
               className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] py-2 pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none"
             />
           </div>

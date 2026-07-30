@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getCategories, createCategory, updateCategory, deleteCategory } from '../api/category.api';
+import { validatePagination, sanitizeSearchQuery } from '../utils/validation';
 
 function getErrorMessage(err, fallback) {
   return err?.response?.data?.message || err?.message || fallback;
@@ -21,7 +22,12 @@ export function useCategories(initialParams = {}) {
     setLoading(true);
     setError(null);
     try {
-      const response = await getCategories(params);
+      const { valid, errors, sanitized } = validatePagination(params);
+      if (!valid) {
+        console.warn('Invalid pagination params:', errors);
+      }
+      const query = params.query ? sanitizeSearchQuery(params.query) : '';
+      const response = await getCategories({ ...sanitized, query, ...params });
       const payload = response.data;
       const list = payload?.data?.rows || payload?.data || [];
       const meta = payload?.data || {};

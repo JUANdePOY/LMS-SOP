@@ -69,10 +69,9 @@ async function createAssignment(sopId, payload, assignedBy) {
 
   const duplicate = await complianceModel.findDuplicateAssignment({
     sop_id: sopId,
-    assignment_type: normalized.assignment_type,
-    department_id: normalized.department_id,
-    position_title: normalized.position_title,
-    user_id: normalized.user_id,
+    department_ids: normalized.department_id ? [normalized.department_id] : [],
+    position_names: normalized.position_title ? [normalized.position_title] : [],
+    user_ids: normalized.user_id ? [normalized.user_id] : [],
   });
 
   if (duplicate) {

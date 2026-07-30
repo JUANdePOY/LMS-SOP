@@ -1,4 +1,5 @@
-import { lazy } from 'react';
+import { lazy, Suspense } from 'react';
+import { Navigate } from 'react-router-dom';
 
 const HierarchyOverviewPage = lazy(() => import('../pages/HierarchyOverviewPage'));
 const BusinessPage = lazy(() => import('../pages/BusinessPage'));
@@ -27,6 +28,10 @@ const organizationRoutes = [
         path: 'departments',
         element: DepartmentPage,
         handle: { title: 'Departments' },
+      },
+      {
+        path: '*',
+        element: <Navigate to="hierarchy" replace />,
       },
     ],
   },

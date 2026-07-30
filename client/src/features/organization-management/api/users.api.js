@@ -1,3 +1,8 @@
 import api from '../../../lib/api';
+import { validatePagination, sanitizeSearchQuery } from '../../organization-management/utils/validation';
 
-export const getUsers = (params = {}) => api.get('/users', { params });
+export const getUsers = (params = {}) => {
+  const { sanitized } = validatePagination(params);
+  const query = params.query ? sanitizeSearchQuery(params.query) : '';
+  return api.get('/users', { params: { ...sanitized, query, ...params } });
+};

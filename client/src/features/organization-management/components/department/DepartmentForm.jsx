@@ -45,8 +45,16 @@ export default function DepartmentForm({
   const validate = () => {
     const errs = {};
     if (!form.name.trim()) errs.name = 'Department name is required';
+    if (form.name.trim().length > 100) errs.name = 'Department name must be at most 100 characters';
     if (!form.code.trim()) errs.code = 'Department code is required';
+    if (form.code.trim().length > 20) errs.code = 'Department code must be at most 20 characters';
     if (!form.business_id) errs.business_id = 'Business is required';
+    if (form.head_user_id && !/^\d+$/.test(String(form.head_user_id))) {
+      errs.head_user_id = 'Department head must be a valid user ID';
+    }
+    if (form.description && form.description.length > 500) {
+      errs.description = 'Description must be at most 500 characters';
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -81,6 +89,7 @@ export default function DepartmentForm({
             value={form.name}
             onChange={handleChange('name')}
             placeholder="e.g. Operations"
+            maxLength={100}
             className={`w-full rounded-lg border ${errors.name ? 'border-red-500' : 'border-[var(--border)]'} bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none`} />
           {errors.name && <p className="mt-1 text-xs text-red-500">{errors.name}</p>}
         </div>
@@ -123,7 +132,9 @@ export default function DepartmentForm({
           onChange={handleChange('description')}
           placeholder="Brief description of the department"
           rows={2}
+          maxLength={500}
           className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none resize-none" />
+        {errors.description && <p className="mt-1 text-xs text-red-500">{errors.description}</p>}
       </div>
 
       <div>

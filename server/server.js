@@ -134,7 +134,12 @@ app.use((req, res, next) => {
   }
   const indexPath = path.join(clientDist, 'index.html');
   if (fs.existsSync(indexPath)) {
-    return res.sendFile(indexPath);
+    return res.sendFile(indexPath, (err) => {
+      if (err) {
+        console.error('SPA index.html send error:', err.message);
+        return res.status(404).json({ status: 'error', message: 'Not found', code: 'NOT_FOUND' });
+      }
+    });
   }
   return res.status(404).json({ status: 'error', message: 'Not found', code: 'NOT_FOUND' });
 });
