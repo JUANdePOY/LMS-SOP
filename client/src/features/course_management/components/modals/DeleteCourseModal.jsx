@@ -17,7 +17,7 @@ export default function DeleteCourseModal({ open, onClose, course, onConfirm, lo
     <ConfirmDialog
       open={open}
       title="Delete Course"
-      message={`Are you sure you want to delete "${course.title || 'this course'}"? This will soft-delete the course and its modules.`}
+      message={`Are you sure you want to delete "${course.title || 'this course'}"? This will move the course and its modules to the trash.`}
       confirmLabel="Delete"
       variant="danger"
       onConfirm={onConfirm}

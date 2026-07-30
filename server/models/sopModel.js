@@ -256,6 +256,84 @@ async function softDelete(id) {
   return result.affectedRows;
 }
 
+async function restore(id) {
+  const cols = await getSopsColumns();
+  if (cols.softDelete === 'is_deleted') {
+    const [result] = await db.query('UPDATE sops SET is_deleted = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = TRUE', [id]);
+    return result.affectedRows;
+  }
+  const [result] = await db.query('UPDATE sops SET deleted_at = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NOT NULL', [id]);
+  return result.affectedRows;
+}
+
+async function permanentDelete(id) {
+  const [result] = await db.query('DELETE FROM sops WHERE id = ?', [id]);
+  return result.affectedRows;
+}
+
+async function listTrashed(filters = {}) {
+  const cols = await getSopsColumns();
+  const { search, department_id, category_id, page = 1, limit = 20 } = filters;
+  const offset = (page - 1) * limit;
+
+  let sql = `
+    SELECT s.*, d.name AS department_name, c.name AS category_name, u.full_name AS owner_name
+    FROM sops s
+    LEFT JOIN departments d ON s.department_id = d.id
+    LEFT JOIN categories c ON s.category_id = c.id
+    LEFT JOIN users u ON s.${cols.owner} = u.id
+    WHERE ${cols.softDelete === 'is_deleted' ? 's.is_deleted = TRUE' : 's.deleted_at IS NOT NULL'}
+  `;
+  const params = [];
+
+  if (search) {
+    sql += ' AND (s.title LIKE ? OR s.' + cols.code + ' LIKE ? OR s.description LIKE ?)';
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+  if (department_id && cols.hasDepartment) {
+    sql += ' AND s.department_id = ?';
+    params.push(department_id);
+  }
+  if (category_id && cols.hasCategory) {
+    sql += ' AND s.category_id = ?';
+    params.push(category_id);
+  }
+
+  sql += ' ORDER BY s.updated_at DESC LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+
+  const [rows] = await db.query(sql, params);
+
+  let countSql = `
+    SELECT COUNT(*) AS total
+    FROM sops s
+    WHERE ${cols.softDelete === 'is_deleted' ? 's.is_deleted = TRUE' : 's.deleted_at IS NOT NULL'}
+  `;
+  const countParams = [];
+  if (search) {
+    countSql += ' AND (s.title LIKE ? OR s.' + cols.code + ' LIKE ? OR s.description LIKE ?)';
+    countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+  if (department_id && cols.hasDepartment) {
+    countSql += ' AND s.department_id = ?';
+    countParams.push(department_id);
+  }
+  if (category_id && cols.hasCategory) {
+    countSql += ' AND s.category_id = ?';
+    countParams.push(category_id);
+  }
+
+  const [countRows] = await db.query(countSql, countParams);
+
+  return {
+    rows: rows.map((r) => normalizeSopRow(r, cols)),
+    total: countRows[0]?.total ?? 0,
+    page,
+    limit,
+    totalPages: Math.ceil((countRows[0]?.total ?? 0) / limit),
+  };
+}
+
 module.exports = {
   findAll,
   findById,
@@ -263,4 +341,7 @@ module.exports = {
   create,
   update,
   softDelete,
+  restore,
+  permanentDelete,
+  listTrashed,
 };

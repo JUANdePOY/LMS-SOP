@@ -1,11 +1,11 @@
 const db = require('../config/database');
 
 // Real schema: sop_approvals(id, sop_id, sop_version_id, approver_user_id,
-// status, comments, created_at, updated_at, deleted_at)
+// status, comments, created_at, updated_at, is_deleted) — NOT deleted_at
 
 async function getApprovals(sopId) {
   const [rows] = await db.query(
-    'SELECT a.* FROM sop_approvals a WHERE a.sop_id = ? AND a.deleted_at IS NULL ORDER BY a.created_at ASC',
+    'SELECT a.* FROM sop_approvals a WHERE a.sop_id = ? AND a.is_deleted = FALSE ORDER BY a.created_at ASC',
     [sopId]
   );
   return rows;
@@ -13,7 +13,7 @@ async function getApprovals(sopId) {
 
 async function getApprovalById(id) {
   const [rows] = await db.query(
-    'SELECT * FROM sop_approvals WHERE id = ? AND deleted_at IS NULL',
+    'SELECT * FROM sop_approvals WHERE id = ? AND is_deleted = FALSE',
     [id]
   );
   return rows[0] || null;

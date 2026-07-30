@@ -18,8 +18,10 @@ export function ThemeProvider({ children, defaultTheme = SYSTEM }) {
     const root = document.documentElement;
     if (resolvedTheme === DARK) {
       root.classList.add(DARK);
+      root.style.colorScheme = 'dark';
     } else {
       root.classList.remove(DARK);
+      root.style.colorScheme = 'light';
     }
   }, [resolvedTheme]);
 
@@ -33,8 +35,10 @@ export function ThemeProvider({ children, defaultTheme = SYSTEM }) {
       const root = document.documentElement;
       if (preference === DARK) {
         root.classList.add(DARK);
+        root.style.colorScheme = 'dark';
       } else {
         root.classList.remove(DARK);
+        root.style.colorScheme = 'light';
       }
     });
   }, [theme]);

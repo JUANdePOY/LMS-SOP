@@ -291,20 +291,77 @@ const MIGRATIONS = [
   // real schema lives in the project's .sql dump/migration tool now — this
   // file should not be trying to (re)create those tables.
   // ---------------------------------------------------------------------
-  `CREATE TABLE IF NOT EXISTS sop_approvals (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    sop_id INT NOT NULL,
-    approver_user_id INT DEFAULT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-    comments TEXT DEFAULT NULL,
-    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (sop_id) REFERENCES sops(id) ON DELETE CASCADE,
-    FOREIGN KEY (approver_user_id) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_sop_approvals_sop (sop_id),
-    INDEX idx_sop_approvals_status (status)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+   `CREATE TABLE IF NOT EXISTS sop_approvals (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     sop_id INT NOT NULL,
+     sop_version_id INT NULL,
+     approver_user_id INT DEFAULT NULL,
+     status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+     comments TEXT DEFAULT NULL,
+     is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+     FOREIGN KEY (sop_id) REFERENCES sops(id) ON DELETE CASCADE,
+     FOREIGN KEY (sop_version_id) REFERENCES sop_versions(id) ON DELETE SET NULL,
+     FOREIGN KEY (approver_user_id) REFERENCES users(id) ON DELETE SET NULL,
+     INDEX idx_sop_approvals_sop (sop_id),
+     INDEX idx_sop_approvals_version (sop_version_id),
+     INDEX idx_sop_approvals_status (status)
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+   // --- approval_workflows, workflow_steps, workflow_instances, workflow_actions ---
+   `CREATE TABLE IF NOT EXISTS approval_workflows (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     public_id CHAR(36) NOT NULL DEFAULT (UUID()),
+     name VARCHAR(150) NOT NULL,
+     department_id INT NULL,
+     description TEXT NULL,
+     is_active TINYINT(1) NOT NULL DEFAULT 1,
+     created_by INT NOT NULL,
+     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+     deleted_at DATETIME NULL,
+     FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL,
+     FOREIGN KEY (created_by) REFERENCES users(id)
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+   `CREATE TABLE IF NOT EXISTS workflow_steps (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     workflow_id INT NOT NULL,
+     step_order INT NOT NULL,
+     step_name VARCHAR(150) NOT NULL,
+     approver_type ENUM('User','Role','Department') NOT NULL DEFAULT 'Role',
+     approver_reference_id INT NULL,
+     approver_role VARCHAR(100) NULL,
+     is_required TINYINT(1) NOT NULL DEFAULT 1,
+     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     deleted_at DATETIME NULL,
+     FOREIGN KEY (workflow_id) REFERENCES approval_workflows(id) ON DELETE CASCADE
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+   `CREATE TABLE IF NOT EXISTS workflow_instances (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     public_id CHAR(36) NOT NULL DEFAULT (UUID()),
+     sop_version_id INT NOT NULL,
+     workflow_id INT NOT NULL,
+     current_step_order INT NOT NULL DEFAULT 1,
+     status ENUM('In Progress','Approved','Rejected','Cancelled') NOT NULL DEFAULT 'In Progress',
+     started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     completed_at DATETIME NULL,
+     created_by INT NOT NULL,
+     FOREIGN KEY (sop_version_id) REFERENCES sop_versions(id) ON DELETE CASCADE,
+     FOREIGN KEY (workflow_id) REFERENCES approval_workflows(id),
+     FOREIGN KEY (created_by) REFERENCES users(id)
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+   `CREATE TABLE IF NOT EXISTS workflow_actions (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     workflow_instance_id INT NOT NULL,
+     workflow_step_id INT NOT NULL,
+     actor_id INT NOT NULL,
+     action ENUM('Submitted','Approved','Rejected','Delegated','Commented') NOT NULL,
+     comments TEXT NULL,
+     action_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     FOREIGN KEY (workflow_instance_id) REFERENCES workflow_instances(id) ON DELETE CASCADE,
+     FOREIGN KEY (workflow_step_id) REFERENCES workflow_steps(id),
+     FOREIGN KEY (actor_id) REFERENCES users(id)
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS sop_change_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     sop_id INT NOT NULL,
@@ -395,6 +452,16 @@ const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS idx_sop_sections_order ON sop_sections(sop_id, order_index)`,
   `CREATE INDEX IF NOT EXISTS idx_sop_steps_sop ON sop_steps(sop_id)`,
   `CREATE INDEX IF NOT EXISTS idx_sop_steps_order ON sop_steps(sop_id, order_index)`,
+  // --- sop_module_attachments: add missing columns (is_deleted, original_name, updated_at) ---
+  `ALTER TABLE sop_module_attachments
+    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE AFTER download_count,
+    ADD COLUMN IF NOT EXISTS original_name VARCHAR(255) DEFAULT NULL AFTER file_name,
+    ADD COLUMN IF NOT EXISTS updated_at DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP AFTER created_at`,
+   // Create index for is_deleted on sop_module_attachments
+   `CREATE INDEX IF NOT EXISTS idx_sop_module_attachments_deleted ON sop_module_attachments(is_deleted)`,
+   // --- sop_approvals: add sop_version_id column ---
+   `ALTER TABLE sop_approvals ADD COLUMN IF NOT EXISTS sop_version_id INT NULL AFTER sop_id`,
+   `CREATE INDEX IF NOT EXISTS idx_sop_approvals_version ON sop_approvals(sop_version_id)`,
 ];
 
 async function runMigrations() {

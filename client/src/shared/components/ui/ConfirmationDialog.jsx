@@ -12,8 +12,8 @@ export default function ConfirmationDialog({ isOpen, onClose, onConfirm, title, 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-md rounded-xl bg-white dark:bg-neutral-900 p-6 shadow-xl border border-neutral-200 dark:border-neutral-800">
+      <div className="fixed inset-0 bg-black/50 transition-opacity duration-200" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-md rounded-xl bg-white dark:bg-neutral-900 p-6 shadow-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 transform scale-100 opacity-100">
         <div className="flex items-start gap-4">
           <div className={cn(
             'h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0',

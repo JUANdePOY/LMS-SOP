@@ -443,7 +443,7 @@ export default function Courses({ departments = [] }) {
           <div className="w-full max-w-md rounded-xl bg-white dark:bg-neutral-900 shadow-2xl p-6 space-y-4">
             <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Delete Course</h2>
             <p className="text-sm text-neutral-600 dark:text-neutral-300">
-              Are you sure you want to delete "{deletingCourse.title || "this course"}"? This will soft-delete the course and its modules.
+               Are you sure you want to delete "{deletingCourse.title || "this course"}"? This will move the course and its modules to the trash.
             </p>
             <div className="flex justify-end gap-2 pt-2">
               <button onClick={closeModals} className="rounded-lg px-4 py-2 text-sm border border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 transition-all">

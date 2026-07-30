@@ -124,42 +124,44 @@ async function findAssignmentById(id) {
   };
 }
 
-// Reconstructed for sopAssignmentService.js, which still checks for a
-// duplicate single-target assignment before creating a new one. "Duplicate"
-// here means the current version already has an assignment targeting that
-// same department/position/user, regardless of which assignment row it's
-// attached to.
-async function findDuplicateAssignment({ sop_id, assignment_type, department_id, position_title, user_id }) {
+async function findDuplicateAssignment({ sop_id, department_ids, position_names, user_ids }) {
   const versionId = await getCurrentVersionId(sop_id);
   if (!versionId) return null;
 
-  if (assignment_type === 'Department') {
+  const allTargets = [];
+
+  if (department_ids && department_ids.length) {
     const [rows] = await db.query(`
       SELECT sa.id FROM sop_assignments sa
       INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
-      WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE AND ad.department_id = ?
-      LIMIT 1
-    `, [versionId, department_id]);
-    return rows[0] || null;
+      WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE
+      AND ad.department_id IN (${department_ids.map(() => '?').join(',')})
+    `, [versionId, ...department_ids]);
+    rows.forEach((r) => allTargets.push({ type: 'department', ref: r.id, dept_id: r.department_id }));
   }
 
-  if (assignment_type === 'Position') {
+  if (position_names && position_names.length) {
+    const placeholders = position_names.map(() => '?').join(',');
     const [rows] = await db.query(`
-      SELECT sa.id FROM sop_assignments sa
+      SELECT sa.id, ap.position_name FROM sop_assignments sa
       INNER JOIN assignment_positions ap ON ap.assignment_id = sa.id
-      WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE AND LOWER(ap.position_name) = LOWER(?)
-      LIMIT 1
-    `, [versionId, position_title]);
-    return rows[0] || null;
+      WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE
+      AND LOWER(ap.position_name) IN (${placeholders})
+    `, [versionId, ...position_names.map((p) => p.toLowerCase())]);
+    rows.forEach((r) => allTargets.push({ type: 'position', ref: r.id, position_name: r.position_name }));
   }
 
-  const [rows] = await db.query(`
-    SELECT sa.id FROM sop_assignments sa
-    INNER JOIN assignment_users au ON au.assignment_id = sa.id
-    WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE AND au.user_id = ?
-    LIMIT 1
-  `, [versionId, user_id]);
-  return rows[0] || null;
+  if (user_ids && user_ids.length) {
+    const [rows] = await db.query(`
+      SELECT sa.id, au.user_id FROM sop_assignments sa
+      INNER JOIN assignment_users au ON au.assignment_id = sa.id
+      WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE
+      AND au.user_id IN (${user_ids.map(() => '?').join(',')})
+    `, [versionId, ...user_ids]);
+    rows.forEach((r) => allTargets.push({ type: 'user', ref: r.id, user_id: r.user_id }));
+  }
+
+  return allTargets.length ? allTargets : null;
 }
 
 async function createAssignment(data) {

@@ -19,6 +19,7 @@ import {
   User,
   ChevronDown,
   Building2,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
@@ -35,14 +36,15 @@ const MENU_ITEMS = [
     group: true,
     items: [
       {
-        name: "Organization Management",
+        name: "SOP Management",
         path: "/admin/organization",
         icon: Building2,
-        sub: ["Hierarchy", "Businesses", "Departments", "Categories", "SOP Management"],
+        sub: ["hierarchy", "Businesses", "Departments", "Categories", "SOP Management"],
       },
-      { name: "Course Management", path: "/courses", icon: BookOpen },
-      { name: "Course Library", path: "/course-library", icon: Library },
-      { name: "Assessments", path: "/assessments", icon: ClipboardCheck, sub: ["Leaderboard", "Report"] },
+       { name: "Course Management", path: "/courses", icon: BookOpen },
+       { name: "Course Library", path: "/course-library", icon: Library },
+       { name: "Trash", path: "/trash", icon: Trash2 },
+       { name: "Assessments", path: "/assessments", icon: ClipboardCheck, sub: ["Leaderboard", "Report"] },
       { name: "Certificates", path: "/certificates", icon: Award },
       { name: "Administration", path: "/users", icon: Users },
     ],

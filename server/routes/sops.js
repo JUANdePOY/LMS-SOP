@@ -1,205 +1,140 @@
 const express = require('express');
-const { body, validationResult } = require('express-validator');
-const sopr = require('../models/sopModel');
-const sopVersionModel = require('../models/sopVersionModel');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
-const { logAudit } = require('../utils/auditLogger');
-const { generateSopCode } = require('../utils/sopUtils');
+const { authenticateToken } = require('../middleware/auth');
+const { sopController, moduleController, attachmentController, versionController, approvalController, workflowController, auditController, shareController, assignmentController, acknowledgementController, approvalWorkflowController } = require('../controllers/sopController');
+const assignmentCascadeController = require('../controllers/assignmentCascadeController');
+const { sopAttachmentUploadMiddleware } = require('../middleware/sopUpload');
 
 const router = express.Router();
 router.use(authenticateToken);
 
-router.get('/', async (req, res) => {
-  try {
-    const result = await sopr.findAll({
-      search: req.query.search,
-      status: req.query.status,
-      department_id: req.query.department_id ? parseInt(req.query.department_id, 10) : undefined,
-      category_id: req.query.category_id ? parseInt(req.query.category_id, 10) : undefined,
-      page: parseInt(req.query.page || '1', 10),
-      limit: parseInt(req.query.limit || '20', 10),
-    });
-    res.json({ status: 'success', data: result });
-  } catch (error) {
-    console.error('List SOPs error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to fetch SOPs', code: 'DB_ERROR' });
-  }
-});
+router.route('/')
+  .get(sopController.list)
+  .post(sopController.create);
 
-router.get('/stats', async (req, res) => {
-  try {
-    // sopModel.softDelete() writes to `is_deleted` (that's the column this
-    // schema actually maintains on delete); `deleted_at` is never set, so
-    // filtering on deleted_at here let soft-deleted SOPs keep counting.
-    const [rows] = await require('../config/database').query(`
-      SELECT status, COUNT(*) AS count
-      FROM sops
-      WHERE (is_deleted = 0 OR is_deleted IS NULL)
-      GROUP BY status
-    `);
-    res.json({ status: 'success', data: rows });
-  } catch (error) {
-    console.error('SOP stats error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to fetch SOP stats', code: 'DB_ERROR' });
-  }
-});
+router.route('/stats')
+  .get(sopController.getStats);
 
-router.get('/:id', async (req, res) => {
-  try {
-    const sop = await sopr.findById(parseInt(req.params.id, 10));
-    if (!sop) {
-      return res.status(404).json({ status: 'error', message: 'SOP not found', code: 'NOT_FOUND' });
-    }
-    res.json({ status: 'success', data: sop });
-  } catch (error) {
-    console.error('Fetch SOP error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to fetch SOP', code: 'DB_ERROR' });
-  }
-});
+router.route('/trashed')
+  .get(sopController.listTrashed);
 
-router.post('/', [
-  body('title').trim().isLength({ min: 2 }).withMessage('Title is required'),
-  body('description').optional({ values: 'falsy' }).trim(),
-  body('department_id').isInt().withMessage('Department is required'),
-  body('category_id').optional().isInt(),
-  body('status').optional().isIn(['Draft', 'For Review', 'Approved', 'Published', 'Archived']),
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
-    }
+router.route('/:id')
+  .get(sopController.getById)
+  .put(sopController.update)
+  .delete(sopController.remove);
 
-    if (req.user.role !== 'super_admin' && req.user.role !== 'admin' && req.user.role !== 'department_head') {
-      return res.status(403).json({ status: 'error', message: 'Admin access required', code: 'ADMIN_REQUIRED' });
-    }
+router.route('/:id/restore')
+  .post(sopController.restore);
 
-    const { title, description, department_id, category_id, status, version } = req.body;
-    const code = req.body.code || generateSopCode(title);
+router.route('/:id/permanent')
+  .delete(sopController.permanentDelete);
 
-    const existing = await sopr.findByCode(code);
-    if (existing) {
-      return res.status(409).json({ status: 'error', message: 'SOP code already exists', code: 'CODE_EXISTS' });
-    }
+router.route('/trashed/empty')
+  .delete(sopController.emptyTrash);
 
-    const id = await sopr.create({
-      title,
-      code,
-      description,
-      department_id,
-      category_id,
-      owner_user_id: req.user.id,
-      status: status || 'Draft',
-      version: version || '1.0',
-    });
+router.route('/:sopId/modules')
+  .get(moduleController.list)
+  .post(moduleController.create);
 
-    // Best-effort initial version: don't fail the whole request if
-    // sop_versions is unavailable or schema is in flux. Content routes
-    // can recover through ensureCurrentVersion() / lazy creation later.
-    try {
-      await sopVersionModel.createVersion({
-        sop_id: id,
-        version: version || '1.0',
-        status: status || 'Draft',
-        created_by: req.user.id,
-      }, { makeCurrent: true });
-    } catch (versionError) {
-      console.error('Create SOP: initial version creation failed (non-fatal):', versionError);
-    }
+router.route('/modules/:moduleId')
+  .put(moduleController.update)
+  .delete(moduleController.remove);
 
-    logAudit({
-      user_id: req.user.id,
-      action: 'sop.created',
-      entity_type: 'sop',
-      entity_id: id,
-      metadata: { title, code, status: status || 'Draft' },
-    });
+router.route('/modules/:moduleId/restore')
+  .post(moduleController.restore);
 
-    res.status(201).json({ status: 'success', message: 'SOP created successfully', data: { id, title, code, status: status || 'Draft' } });
-  } catch (error) {
-    console.error('Create SOP error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to create SOP', code: 'DB_ERROR' });
-  }
-});
+router.route('/modules/:moduleId/permanent')
+  .delete(moduleController.permanentDelete);
 
-router.put('/:id', [
-  body('title').optional().trim().isLength({ min: 2 }),
-  body('description').optional({ values: 'falsy' }).trim(),
-  body('department_id').optional().isInt(),
-  body('category_id').optional().isInt(),
-  body('status').optional().isIn(['Draft', 'For Review', 'Approved', 'Published', 'Archived']),
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
-    }
+router.route('/:sopId/modules/trashed')
+  .get(moduleController.listTrashed);
 
-    const sopId = parseInt(req.params.id, 10);
-    const existing = await sopr.findById(sopId);
-    if (!existing) {
-      return res.status(404).json({ status: 'error', message: 'SOP not found', code: 'NOT_FOUND' });
-    }
+router.route('/:sopId/modules/sort')
+  .put(moduleController.updateSortOrder);
 
-    const updates = {};
-    // `metadata` is intentionally left out here — sopModel.update() drops it
-    // silently now, but there's no column for it on either schema variant.
-    ['title', 'description', 'department_id', 'category_id', 'status', 'version'].forEach((field) => {
-      if (req.body[field] !== undefined) updates[field] = req.body[field];
-    });
+router.route('/modules/:moduleId/attachments')
+  .get(attachmentController.list)
+  .post(sopAttachmentUploadMiddleware, attachmentController.upload);
 
-    if (Object.keys(updates).length === 0) {
-      return res.status(400).json({ status: 'error', message: 'No changes provided', code: 'VALIDATION_ERROR' });
-    }
+router.route('/attachments/:attachmentId')
+  .delete(attachmentController.remove);
 
-    if (req.user.role !== 'super_admin' && req.user.role !== 'admin' && req.user.role !== 'department_head') {
-      return res.status(403).json({ status: 'error', message: 'Admin access required', code: 'ADMIN_REQUIRED' });
-    }
+router.route('/attachments/:attachmentId/restore')
+  .post(attachmentController.restore);
 
-    await sopr.update(sopId, updates);
+router.route('/attachments/:attachmentId/permanent')
+  .delete(attachmentController.permanentDelete);
 
-    logAudit({
-      user_id: req.user.id,
-      action: 'sop.updated',
-      entity_type: 'sop',
-      entity_id: sopId,
-      metadata: updates,
-    });
+router.route('/modules/:moduleId/attachments/trashed')
+  .get(attachmentController.listTrashed);
 
-    res.json({ status: 'success', message: 'SOP updated successfully' });
-  } catch (error) {
-    console.error('Update SOP error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to update SOP', code: 'DB_ERROR' });
-  }
-});
+router.route('/:sopId/versions')
+  .get(versionController.list)
+  .post(versionController.create);
 
-router.delete('/:id', async (req, res) => {
-  try {
-    const sopId = parseInt(req.params.id, 10);
-    const existing = await sopr.findById(sopId);
-    if (!existing) {
-      return res.status(404).json({ status: 'error', message: 'SOP not found', code: 'NOT_FOUND' });
-    }
+router.route('/:sopId/versions/:versionId/restore')
+  .post(versionController.restore);
 
-    if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
-      return res.status(403).json({ status: 'error', message: 'Admin access required', code: 'ADMIN_REQUIRED' });
-    }
+router.route('/:sopId/approvals')
+  .get(approvalController.list)
+  .post(approvalController.create);
 
-    await sopr.softDelete(sopId);
+router.route('/:sopId/approvals/:approvalId')
+  .put(approvalController.update)
+  .post(approvalController.approve)
+  .post(approvalController.reject);
 
-    logAudit({
-      user_id: req.user.id,
-      action: 'sop.deleted',
-      entity_type: 'sop',
-      entity_id: sopId,
-      metadata: { title: existing.title },
-    });
+router.route('/:sopId/workflow')
+  .get(approvalWorkflowController.getInstance);
 
-    res.json({ status: 'success', message: 'SOP deleted successfully' });
-  } catch (error) {
-    console.error('Delete SOP error:', error);
-    res.status(500).json({ status: 'error', message: 'Failed to delete SOP', code: 'DB_ERROR' });
-  }
-});
+router.route('/:sopId/workflow/start')
+  .post(approvalWorkflowController.start);
+
+router.route('/:sopId/workflow/advance')
+  .post(approvalWorkflowController.advance);
+
+router.route('/:sopId/transition')
+  .post(workflowController.transition);
+
+router.route('/:sopId/submit')
+  .post(workflowController.submit);
+
+router.route('/:sopId/approve')
+  .post(workflowController.approve);
+
+router.route('/:sopId/reject')
+  .post(workflowController.reject);
+
+router.route('/:sopId/publish')
+  .post(workflowController.publish);
+
+router.route('/:sopId/audit')
+  .get(auditController.list);
+
+router.route('/:sopId/shares')
+  .get(shareController.list)
+  .post(shareController.create);
+
+router.route('/assignment/departments').get(assignmentCascadeController.listDepartments);
+
+router.route('/assignment/positions/:departmentId').get(assignmentCascadeController.listPositions);
+
+router.route('/assignment/users/:departmentId').get(assignmentCascadeController.listUsers);
+
+router.route('/:sopId/assignments')
+  .get(assignmentController.list)
+  .post(assignmentController.create);
+
+router.route('/:sopId/assigned')
+  .get(assignmentCascadeController.listAssigned);
+
+router.route('/assignments/:id')
+  .delete(assignmentController.remove);
+
+router.route('/:sopId/acknowledgements')
+  .get(acknowledgementController.list)
+  .post(acknowledgementController.create);
+
+router.route('/:sopId/acknowledgements/:ackId/acknowledge')
+  .post(acknowledgementController.acknowledge);
 
 module.exports = router;

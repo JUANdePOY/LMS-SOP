@@ -1,6 +1,8 @@
 const db = require('../config/database');
 const complianceModel = require('../models/sopComplianceModel');
 const sopModel = require('../models/sopModel');
+const assignmentCascadeService = require('../services/assignmentCascadeService');
+const sopComplianceModel = require('../models/sopComplianceModel');
 const {
   normalizeAssignmentType,
   validateAssignmentPayload,
@@ -127,4 +129,8 @@ module.exports = {
   createAssignment,
   deleteAssignment,
   resolveAssignedUserIds,
+  getAssignmentDropdowns: assignmentCascadeService.getDepartments,
+  getPositionsFromDepartment: assignmentCascadeService.getPositionsForDepartment,
+  getUsersFromDepartment: assignmentCascadeService.getUsersForDepartment,
+  getAssignedAssignments: assignmentCascadeService.getAssignedAssignments,
 };
