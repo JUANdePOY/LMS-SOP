@@ -4,6 +4,7 @@ import CategoryTable from '../components/category/CategoryTable';
 import CategoryModal from '../components/category/CategoryModal';
 import { useCategories } from '../hooks/useCategories';
 import { useDepartments } from '../hooks/useDepartments';
+import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
 
 export default function CategoryPage() {
   const { categories, loading, error, create, update, remove } = useCategories();
@@ -15,8 +16,10 @@ export default function CategoryPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
 
+  const safeQuery = sanitizeSearchQuery(query);
+
   const filteredCategories = useMemo(() => {
-    const term = query.trim().toLowerCase();
+    const term = safeQuery.toLowerCase();
     let result = categories || [];
     if (term) {
       result = result.filter(
@@ -32,9 +35,9 @@ export default function CategoryPage() {
       result = result.filter((c) => String(c.department_id) === departmentFilter);
     }
     return result;
-  }, [query, categories, statusFilter, departmentFilter]);
+  }, [safeQuery, categories, statusFilter, departmentFilter]);
 
-  const hasActiveFilters = query.trim() || statusFilter !== 'all' || departmentFilter !== 'all';
+  const hasActiveFilters = safeQuery || statusFilter !== 'all' || departmentFilter !== 'all';
 
   const handleCreate = async (data) => {
     setSubmitting(true);
@@ -77,6 +80,13 @@ export default function CategoryPage() {
     }
   };
 
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    const err = validateSearchQuery(value);
+    if (err) return;
+    setQuery(value);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -107,8 +117,9 @@ export default function CategoryPage() {
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={handleSearchChange}
               placeholder="Search categories by name or description..."
+              maxLength={100}
               className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] py-2 pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none"
             />
           </div>
