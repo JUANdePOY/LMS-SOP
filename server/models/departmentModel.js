@@ -114,6 +114,51 @@ async function update(id, data) {
 }
 
 async function remove(id) {
+  // Check for dependent SOPs (soft-deleted ones are excluded)
+  const [sops] = await db.query(
+    'SELECT COUNT(*) AS count FROM sops WHERE department_id = ? AND deleted_at IS NULL',
+    [id]
+  );
+
+  // Check for active users in this department
+  const [users] = await db.query(
+    'SELECT COUNT(*) AS count FROM users WHERE department_id = ? AND is_active = TRUE',
+    [id]
+  );
+
+  // Check for approval workflows tied to this department
+  const [workflows] = await db.query(
+    'SELECT COUNT(*) AS count FROM approval_workflows WHERE department_id = ?',
+    [id]
+  );
+
+  // Check for categories tied to this department
+  const [categories] = await db.query(
+    'SELECT COUNT(*) AS count FROM categories WHERE department_id = ?',
+    [id]
+  );
+
+  // Check for assignment_departments entries
+  const [assignments] = await db.query(
+    'SELECT COUNT(*) AS count FROM assignment_departments WHERE department_id = ?',
+    [id]
+  );
+
+  const blockers = [];
+  if (sops[0]?.count > 0) blockers.push(`${sops[0].count} SOP(s)`);
+  if (users[0]?.count > 0) blockers.push(`${users[0].count} active user(s)`);
+  if (workflows[0]?.count > 0) blockers.push(`${workflows[0].count} approval workflow(s)`);
+  if (categories[0]?.count > 0) blockers.push(`${categories[0].count} categor(y/ies)`);
+  if (assignments[0]?.count > 0) blockers.push(`${assignments[0].count} assignment(s)`);
+
+  if (blockers.length > 0) {
+    const err = new Error(
+      `Cannot delete department because the following records still reference it: ${blockers.join(', ')}. Please reassign or remove these records first.`
+    );
+    err.code = 'HAS_DEPENDENCIES';
+    throw err;
+  }
+
   const [result] = await db.query('DELETE FROM departments WHERE id = ?', [id]);
   return result.affectedRows;
 }

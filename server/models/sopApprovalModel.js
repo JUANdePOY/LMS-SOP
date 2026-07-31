@@ -5,7 +5,11 @@ const db = require('../config/database');
 
 async function getApprovals(sopId) {
   const [rows] = await db.query(
-    'SELECT a.* FROM sop_approvals a WHERE a.sop_id = ? AND a.is_deleted = FALSE ORDER BY a.created_at ASC',
+    `SELECT a.*, u.full_name AS approver_name
+     FROM sop_approvals a
+     LEFT JOIN users u ON a.approver_user_id = u.id
+     WHERE a.sop_id = ? AND a.is_deleted = FALSE
+     ORDER BY a.created_at ASC`,
     [sopId]
   );
   return rows;

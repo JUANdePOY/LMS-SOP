@@ -1,15 +1,11 @@
 import { useState } from 'react';
 import { X, TrashIcon, Undo2, Trash2 } from 'lucide-react';
 import { useTrashSops } from '@/features/sop-management/hooks/useTrashSops';
-import { useTrashModules } from '@/features/sop-management/hooks/useTrashModules';
-import { useTrashAttachments } from '@/features/sop-management/hooks/useTrashAttachments';
 import { TRASH_TABS } from '@/features/sop-management/constants/sopConstants';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 
 function TrashPanel() {
   const sopTrash = useTrashSops();
-  const moduleTrash = useTrashModules(null);
-  const attachmentTrash = useTrashAttachments(null);
 
   const [trashTab, setTrashTab] = useState(TRASH_TABS.SOPS);
   const [confirmDialog, setConfirmDialog] = useState({
@@ -24,15 +20,13 @@ function TrashPanel() {
 
   const tabs = [
     { key: TRASH_TABS.SOPS, label: 'SOPs', count: sopTrash.total },
-    { key: TRASH_TABS.MODULES, label: 'Modules', count: moduleTrash.modules.length },
-    { key: TRASH_TABS.ATTACHMENTS, label: 'Attachments', count: attachmentTrash.attachments.length },
   ];
 
-  const handleRestore = (entityType, id) => {
+  const handleRestore = (id) => {
     setConfirmDialog({
       isOpen: true,
       type: 'restore',
-      entityType,
+      entityType: TRASH_TABS.SOPS,
       id,
       title: 'Restore Item',
       message: 'Are you sure you want to restore this item? It will reappear in its original location.',
@@ -40,11 +34,11 @@ function TrashPanel() {
     });
   };
 
-  const handlePermanentDelete = (entityType, id) => {
+  const handlePermanentDelete = (id) => {
     setConfirmDialog({
       isOpen: true,
       type: 'permanent',
-      entityType,
+      entityType: TRASH_TABS.SOPS,
       id,
       title: 'Permanently Delete',
       message: 'This action cannot be undone. The item will be permanently removed from the database.',
@@ -65,17 +59,13 @@ function TrashPanel() {
 
   const confirmAction = async () => {
     if (!confirmDialog || !confirmDialog.isOpen) return;
-    const { type, entityType, id } = confirmDialog;
+    const { type, id } = confirmDialog;
 
     try {
       if (type === 'restore') {
-        if (entityType === TRASH_TABS.SOPS) await sopTrash.restore(id);
-        else if (entityType === TRASH_TABS.MODULES) await moduleTrash.restore(id);
-        else if (entityType === TRASH_TABS.ATTACHMENTS) await attachmentTrash.restore(id);
+        await sopTrash.restore(id);
       } else if (type === 'permanent') {
-        if (entityType === TRASH_TABS.SOPS) await sopTrash.permanentlyDelete(id);
-        else if (entityType === TRASH_TABS.MODULES) await moduleTrash.permanentlyDelete(id);
-        else if (entityType === TRASH_TABS.ATTACHMENTS) await attachmentTrash.permanentlyDelete(id);
+        await sopTrash.permanentlyDelete(id);
       } else if (type === 'empty') {
         await sopTrash.emptyAll();
       }
@@ -101,58 +91,10 @@ function TrashPanel() {
           <p className="text-xs text-[var(--text-muted)] mt-1">Deleted: {sop.updated_at ? new Date(sop.updated_at).toLocaleDateString() : 'N/A'}</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => handleRestore('sops', sop.id)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors">
+          <button onClick={() => handleRestore(sop.id)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors">
             <Undo2 size={14} className="inline mr-1" /> Restore
           </button>
-          <button onClick={() => handlePermanentDelete('sops', sop.id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors">
-            <TrashIcon size={14} className="inline mr-1" /> Delete Forever
-          </button>
-        </div>
-      </div>
-    ));
-  };
-
-  const renderModuleTrashItems = () => {
-    if (moduleTrash.loading) return <p className="text-[var(--text-muted)] text-center py-8">Loading trashed modules...</p>;
-    if (moduleTrash.error) return <p className="text-red-600 dark:text-red-400 text-center py-8">Failed to load trashed modules</p>;
-    if (!moduleTrash.loading && !moduleTrash.error && moduleTrash.modules.length === 0) {
-      return <p className="text-[var(--text-muted)] text-center py-8">No trashed modules.</p>;
-    }
-    return moduleTrash.modules.map((mod) => (
-      <div key={mod.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-4 hover:shadow-sm transition-shadow">
-        <div>
-          <span className="font-medium text-[var(--text-primary)]">{mod.title}</span>
-          <p className="text-xs text-[var(--text-muted)] mt-1">Deleted: {mod.updated_at ? new Date(mod.updated_at).toLocaleDateString() : 'N/A'}</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => handleRestore('modules', mod.id)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors">
-            <Undo2 size={14} className="inline mr-1" /> Restore
-          </button>
-          <button onClick={() => handlePermanentDelete('modules', mod.id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors">
-            <TrashIcon size={14} className="inline mr-1" /> Delete Forever
-          </button>
-        </div>
-      </div>
-    ));
-  };
-
-  const renderAttachmentTrashItems = () => {
-    if (attachmentTrash.loading) return <p className="text-[var(--text-muted)] text-center py-8">Loading trashed attachments...</p>;
-    if (attachmentTrash.error) return <p className="text-red-600 dark:text-red-400 text-center py-8">Failed to load trashed attachments</p>;
-    if (!attachmentTrash.loading && !attachmentTrash.error && attachmentTrash.attachments.length === 0) {
-      return <p className="text-[var(--text-muted)] text-center py-8">No trashed attachments.</p>;
-    }
-    return attachmentTrash.attachments.map((att) => (
-      <div key={att.id} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-4 hover:shadow-sm transition-shadow">
-        <div>
-          <span className="font-medium text-[var(--text-primary)]">{att.original_name || att.file_name}</span>
-          <p className="text-xs text-[var(--text-muted)] mt-1">Deleted: {att.updated_at ? new Date(att.updated_at).toLocaleDateString() : 'N/A'}</p>
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => handleRestore('attachments', att.id)} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors">
-            <Undo2 size={14} className="inline mr-1" /> Restore
-          </button>
-          <button onClick={() => handlePermanentDelete('attachments', att.id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors">
+          <button onClick={() => handlePermanentDelete(sop.id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors">
             <TrashIcon size={14} className="inline mr-1" /> Delete Forever
           </button>
         </div>
@@ -162,7 +104,7 @@ function TrashPanel() {
 
   return (
     <div className="space-y-4">
-      {trashTab === TRASH_TABS.SOPS && sopTrash.total > 0 && (
+      {sopTrash.total > 0 && (
         <div className="mb-2">
           <button onClick={handleEmptyTrash} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
             Empty Trash
@@ -187,8 +129,6 @@ function TrashPanel() {
       </div>
 
       {trashTab === TRASH_TABS.SOPS && renderSopTrashItems()}
-      {trashTab === TRASH_TABS.MODULES && renderModuleTrashItems()}
-      {trashTab === TRASH_TABS.ATTACHMENTS && renderAttachmentTrashItems()}
 
       <ConfirmationDialog
         isOpen={confirmDialog?.isOpen || false}
@@ -196,7 +136,7 @@ function TrashPanel() {
         onConfirm={confirmAction}
         title={confirmDialog?.title || ''}
         message={confirmDialog?.message || ''}
-        confirmText={confirmDialog?.type === 'permanent' ? 'Permanently Delete' : confirmDialog?.type === 'empty' ? 'Empty Trash' : confirmDialog?.type === 'delete' ? 'Delete' : 'Restore'}
+        confirmText={confirmDialog?.type === 'permanent' ? 'Permanently Delete' : confirmDialog?.type === 'empty' ? 'Empty Trash' : 'Restore'}
         variant={confirmDialog?.variant || 'default'}
       />
     </div>

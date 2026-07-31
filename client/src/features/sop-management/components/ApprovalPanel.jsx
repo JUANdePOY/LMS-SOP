@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-function ApprovalPanel({ approvals, onApprove, onReject, loading = false }) {
+function ApprovalPanel({ approvals = [], onApprove, onReject, loading = false }) {
   const [actionLoading, setActionLoading] = useState(null);
   const [actionError, setActionError] = useState(null);
 

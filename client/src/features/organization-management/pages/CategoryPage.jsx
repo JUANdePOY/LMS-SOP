@@ -5,10 +5,12 @@ import CategoryModal from '../components/category/CategoryModal';
 import { useCategories } from '../hooks/useCategories';
 import { useDepartments } from '../hooks/useDepartments';
 import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
+import { useToast } from '@/shared/components/ui/Toast';
 
 export default function CategoryPage() {
   const { categories, loading, error, create, update, remove } = useCategories();
   const { departments } = useDepartments();
+  const { toast } = useToast();
   const [modalOpen, setModalOpen] = useState(false);
   const [editData, setEditData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -45,8 +47,9 @@ export default function CategoryPage() {
       await create(data);
       setModalOpen(false);
       setEditData(null);
+      toast.success('Category created successfully');
     } catch (err) {
-      console.error('Failed to create category:', err);
+      toast.error(err.response?.data?.message || 'Failed to create category');
     } finally {
       setSubmitting(false);
     }
@@ -59,8 +62,9 @@ export default function CategoryPage() {
       await update(editData.id, data);
       setModalOpen(false);
       setEditData(null);
+      toast.success('Category updated successfully');
     } catch (err) {
-      console.error('Failed to update category:', err);
+      toast.error(err.response?.data?.message || 'Failed to update category');
     } finally {
       setSubmitting(false);
     }
@@ -75,8 +79,9 @@ export default function CategoryPage() {
     if (!window.confirm(`Are you sure you want to delete "${category.name}"? This action cannot be undone.`)) return;
     try {
       await remove(category.id);
+      toast.success('Category deleted successfully');
     } catch (err) {
-      console.error('Failed to delete category:', err);
+      toast.error(err.response?.data?.message || 'Failed to delete category');
     }
   };
 
@@ -98,9 +103,9 @@ export default function CategoryPage() {
         </div>
         <button
           onClick={() => { setEditData(null); setModalOpen(true); }}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
         >
-          <Plus className="h-4 w-4" />
+          <Plus size={16} />
           Create Category
         </button>
       </div>

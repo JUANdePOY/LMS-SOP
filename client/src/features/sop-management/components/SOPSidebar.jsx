@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Plus, Share2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import ApprovalPanel from '@/features/sop-management/components/ApprovalPanel';
 import VersionTimeline from '@/features/sop-management/components/VersionTimeline';
 import AuditTimeline from '@/features/sop-management/components/AuditTimeline';
+import ShareLinkDrawer from '@/features/sop-management/components/ShareLinkDrawer';
 import { useVersions } from '@/features/sop-management/hooks/useVersions';
-import api from '@/lib/api';
+import { createVersion } from '@/features/sop-management/services/versionService';
+import { approveApproval, rejectApproval, getApprovals } from '@/features/sop-management/services/sopService';
 
 function SidebarCard({ title, children, className }) {
   return (
@@ -18,31 +20,92 @@ function SidebarCard({ title, children, className }) {
   );
 }
 
-export default function SOPSidebar({ sopId, approvals, setApprovals, auditLogs, versions, versionsLoading, versionsError, onVersionRestore }) {
+export default function SOPSidebar({ sopId, approvals, setApprovals, auditLogs, versions, versionsLoading, versionsError, approvalsLoading = false, auditLogsLoading = false, onVersionRestore, onAuditRefresh, onSopRefresh, refetchVersions }) {
   const [showVersionTimeline, setShowVersionTimeline] = useState(false);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
+  const [showNewVersionForm, setShowNewVersionForm] = useState(false);
+  const [showShareDrawer, setShowShareDrawer] = useState(false);
+  const [newVersion, setNewVersion] = useState('');
+  const [changeSummary, setChangeSummary] = useState('');
+  const [creatingVersion, setCreatingVersion] = useState(false);
 
   return (
     <>
       <SidebarCard title="Approvals">
         <ApprovalPanel
           approvals={approvals}
+          loading={approvalsLoading}
           onApprove={async (id) => {
-            await api.post(`/sops/approvals/${id}/approve`);
-            const { data } = await api.get(`/sops/${sopId}/approvals`);
+            await approveApproval(sopId, id);
+            const { data } = await getApprovals(sopId);
             setApprovals(data?.data || []);
+            if (onAuditRefresh) onAuditRefresh();
+            if (onSopRefresh) onSopRefresh();
           }}
           onReject={async (id) => {
-            await api.post(`/sops/approvals/${id}/reject`, { comments: 'Rejected by reviewer' });
-            const { data } = await api.get(`/sops/${sopId}/approvals`);
+            await rejectApproval(sopId, id, 'Rejected by reviewer');
+            const { data } = await getApprovals(sopId);
             setApprovals(data?.data || []);
+            if (onAuditRefresh) onAuditRefresh();
+            if (onSopRefresh) onSopRefresh();
           }}
         />
       </SidebarCard>
       <SidebarCard title="Version History">
-        <button onClick={() => { setShowVersionTimeline(true); }} className="w-full text-left text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
-          View All Versions
-        </button>
+        <div className="flex items-center gap-2 mb-2">
+          <button onClick={() => { setShowVersionTimeline(true); }} className="flex-1 text-left text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
+            View All Versions
+          </button>
+          <button onClick={() => { setShowNewVersionForm(!showNewVersionForm); setNewVersion(''); setChangeSummary(''); }} className="p-1 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors" title="Create new version">
+            <Plus size={16} className="text-indigo-600 dark:text-indigo-400" />
+          </button>
+        </div>
+        {showNewVersionForm && (
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!newVersion.trim()) return;
+              setCreatingVersion(true);
+              try {
+                await createVersion(sopId, { version: newVersion, change_summary: changeSummary || null, status: 'Draft' });
+                setShowNewVersionForm(false);
+                setNewVersion('');
+                setChangeSummary('');
+                if (refetchVersions) await refetchVersions();
+                if (onSopRefresh) onSopRefresh();
+              } catch (err) {
+                console.error('Failed to create version:', err);
+              } finally {
+                setCreatingVersion(false);
+              }
+            }}
+            className="mt-2 space-y-2 p-2 border border-neutral-200 dark:border-neutral-700 rounded-lg"
+          >
+            <input
+              type="text"
+              value={newVersion}
+              onChange={(e) => setNewVersion(e.target.value)}
+              placeholder="Version (e.g. 1.1)"
+              className="w-full px-2 py-1 text-sm border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100"
+              required
+            />
+            <textarea
+              value={changeSummary}
+              onChange={(e) => setChangeSummary(e.target.value)}
+              placeholder="Change summary (optional)"
+              className="w-full px-2 py-1 text-sm border border-neutral-300 dark:border-neutral-600 rounded bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 resize-none"
+              rows={2}
+            />
+            <div className="flex gap-2">
+              <button type="submit" disabled={creatingVersion} className="px-3 py-1 text-xs bg-indigo-600 text-white rounded-md disabled:opacity-50">
+                {creatingVersion ? 'Creating...' : 'Create'}
+              </button>
+              <button type="button" onClick={() => { setShowNewVersionForm(false); setNewVersion(''); setChangeSummary(''); }} className="px-3 py-1 text-xs border border-neutral-300 dark:border-neutral-600 rounded-md text-neutral-700 dark:text-neutral-300">
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
         {versionsLoading && <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-2">Loading...</p>}
         {versionsError && <p className="text-sm text-red-600 dark:text-red-400 mt-2">Failed to load versions</p>}
         {!versionsLoading && !versionsError && versions.length > 0 && (
@@ -73,6 +136,15 @@ export default function SOPSidebar({ sopId, approvals, setApprovals, auditLogs, 
         ) : (
           <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-2">No audit entries.</p>
         )}
+        <div className="mt-4 pt-3 border-t border-neutral-200 dark:border-neutral-700">
+          <button
+            onClick={() => setShowShareDrawer(true)}
+            className="w-full flex items-center justify-center gap-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-4 py-3 text-sm font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors min-h-[44px]"
+          >
+            <Share2 size={18} />
+            Share
+          </button>
+        </div>
       </SidebarCard>
 
       {showVersionTimeline && (
@@ -86,7 +158,7 @@ export default function SOPSidebar({ sopId, approvals, setApprovals, auditLogs, 
               </button>
             </div>
             <div className="p-4">
-              <VersionTimeline versions={versions} onRestore={onVersionRestore} />
+              <VersionTimeline versions={versions} onRestore={onVersionRestore} sopId={sopId} />
             </div>
           </div>
         </div>
@@ -103,11 +175,13 @@ export default function SOPSidebar({ sopId, approvals, setApprovals, auditLogs, 
               </button>
             </div>
             <div className="p-4">
-              <AuditTimeline logs={auditLogs} />
+              <AuditTimeline logs={auditLogs} loading={auditLogsLoading} />
             </div>
           </div>
         </div>
       )}
+
+      <ShareLinkDrawer open={showShareDrawer} onClose={() => setShowShareDrawer(false)} sopId={sopId} />
     </>
   );
 }

@@ -1,5 +1,6 @@
 const sopModuleModel = require('../models/sopModuleModel');
 const { logAudit } = require('../utils/auditLogger');
+const sopAuditLogService = require('./sopAuditLogService');
 
 async function listModules(sopId) {
   return sopModuleModel.listModules(sopId);
@@ -32,6 +33,14 @@ async function createModule(sopId, data, actorId) {
     metadata: { sop_id: sopId },
   });
 
+  sopAuditLogService.logEntry({
+    entity_type: 'sop',
+    entity_id: sopId,
+    action: 'sop.module.created',
+    performed_by: actorId,
+    new_values: { module_id: id, title: data.title },
+  });
+
   return { id, title: data.title, content: data.content || null, sort_order: data.sort_order || 1 };
 }
 
@@ -56,6 +65,15 @@ async function updateModule(moduleId, data, actorId) {
     metadata: { sop_id: existing.sop_id },
   });
 
+  sopAuditLogService.logEntry({
+    entity_type: 'sop',
+    entity_id: existing.sop_id,
+    action: 'sop.module.updated',
+    performed_by: actorId,
+    old_values: { title: existing.title, content: existing.content },
+    new_values: { module_id: moduleId, ...data },
+  });
+
   return { affectedRows: 1 };
 }
 
@@ -77,11 +95,20 @@ async function deleteModule(moduleId, actorId) {
     metadata: { sop_id: existing.sop_id },
   });
 
+  sopAuditLogService.logEntry({
+    entity_type: 'sop',
+    entity_id: existing.sop_id,
+    action: 'sop.module.deleted',
+    performed_by: actorId,
+    old_values: { module_id: moduleId, title: existing.title },
+    new_values: { is_deleted: true },
+  });
+
   return { affectedRows: 1 };
 }
 
 async function restoreModule(moduleId, actorId) {
-  const existing = await sopModuleModel.getModuleById(moduleId);
+  const existing = await sopModuleModel.getModuleByIdIncludingDeleted(moduleId);
   if (!existing) {
     const error = new Error('Module not found');
     error.code = 'NOT_FOUND';
@@ -98,11 +125,20 @@ async function restoreModule(moduleId, actorId) {
     metadata: { sop_id: existing.sop_id },
   });
 
+  sopAuditLogService.logEntry({
+    entity_type: 'sop',
+    entity_id: existing.sop_id,
+    action: 'sop.module.restored',
+    performed_by: actorId,
+    old_values: { is_deleted: true },
+    new_values: { is_deleted: false },
+  });
+
   return { affectedRows: 1 };
 }
 
 async function permanentDeleteModule(moduleId, actorId) {
-  const existing = await sopModuleModel.getModuleById(moduleId);
+  const existing = await sopModuleModel.getModuleByIdIncludingDeleted(moduleId);
   if (!existing) {
     const error = new Error('Module not found');
     error.code = 'NOT_FOUND';
@@ -117,6 +153,14 @@ async function permanentDeleteModule(moduleId, actorId) {
     entity_type: 'sop_module',
     entity_id: moduleId,
     metadata: { sop_id: existing.sop_id },
+  });
+
+  sopAuditLogService.logEntry({
+    entity_type: 'sop',
+    entity_id: existing.sop_id,
+    action: 'sop.module.permanently_deleted',
+    performed_by: actorId,
+    new_values: { permanently_deleted: true },
   });
 
   return { affectedRows: 1 };
@@ -135,6 +179,14 @@ async function updateSortOrder(sopId, moduleOrders, actorId) {
     entity_type: 'sop_module',
     entity_id: sopId,
     metadata: { sop_id: sopId, orders: moduleOrders },
+  });
+
+  sopAuditLogService.logEntry({
+    entity_type: 'sop',
+    entity_id: sopId,
+    action: 'sop.module.sort_updated',
+    performed_by: actorId,
+    new_values: { orders: moduleOrders },
   });
 
   return true;

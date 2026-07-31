@@ -45,6 +45,15 @@ async function getById(attachmentId) {
   return rows[0] || null;
 }
 
+async function getByIdIncludingDeleted(attachmentId) {
+  const cols = await getCachedAttachmentColumns();
+  const [rows] = await db.query(
+    `SELECT * FROM sop_module_attachments a WHERE a.id = ?`,
+    [attachmentId]
+  );
+  return rows[0] || null;
+}
+
 async function createAttachment(data) {
   const { module_id, file_name, original_name, mime_type, file_size, file_extension, file_data, uploaded_by } = data;
   const cols = await getCachedAttachmentColumns();
@@ -157,6 +166,7 @@ async function incrementDownloadCount(attachmentId) {
 module.exports = {
   listByModule,
   getById,
+  getByIdIncludingDeleted,
   createAttachment,
   softDeleteAttachment,
   restoreAttachment,

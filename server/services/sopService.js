@@ -6,6 +6,7 @@ const sopShareService = require('./sopShareService');
 const sopApprovalService = require('./sopApprovalService');
 const { generateSopCode } = require('../utils/sopUtils');
 const { logAudit } = require('../utils/auditLogger');
+const sopAuditLogService = require('./sopAuditLogService');
 
 async function listSops(filters = {}) {
   return sopModel.findAll(filters);
@@ -58,6 +59,14 @@ async function createSop(data, actorId) {
     metadata: { title, code, status: status || 'Draft' },
   });
 
+  sopAuditLogService.logEntry({
+    entity_type: 'sop',
+    entity_id: id,
+    action: 'sop.created',
+    performed_by: actorId,
+    new_values: { title, code, status: status || 'Draft', department_id, category_id },
+  });
+
   return { id, title, code, status: status || 'Draft' };
 }
 
@@ -90,6 +99,15 @@ async function updateSop(id, data, actorId) {
     metadata: updates,
   });
 
+  sopAuditLogService.logEntry({
+    entity_type: 'sop',
+    entity_id: id,
+    action: 'sop.updated',
+    performed_by: actorId,
+    old_values: { title: existing.title, description: existing.description, status: existing.status },
+    new_values: updates,
+  });
+
   return { affectedRows: 1 };
 }
 
@@ -111,11 +129,20 @@ async function deleteSop(id, actorId) {
     metadata: { title: existing.title },
   });
 
+  sopAuditLogService.logEntry({
+    entity_type: 'sop',
+    entity_id: id,
+    action: 'sop.deleted',
+    performed_by: actorId,
+    old_values: { is_deleted: false },
+    new_values: { is_deleted: true },
+  });
+
   return { affectedRows: 1 };
 }
 
 async function restoreSop(id, actorId) {
-  const existing = await sopModel.findById(id);
+  const existing = await sopModel.findByIdIncludingDeleted(id);
   if (!existing) {
     const error = new Error('SOP not found');
     error.code = 'NOT_FOUND';
@@ -132,11 +159,20 @@ async function restoreSop(id, actorId) {
     metadata: { title: existing.title },
   });
 
+  sopAuditLogService.logEntry({
+    entity_type: 'sop',
+    entity_id: id,
+    action: 'sop.restored',
+    performed_by: actorId,
+    old_values: { is_deleted: true },
+    new_values: { is_deleted: false },
+  });
+
   return { affectedRows: 1 };
 }
 
 async function permanentDeleteSop(id, actorId) {
-  const existing = await sopModel.findById(id);
+  const existing = await sopModel.findByIdIncludingDeleted(id);
   if (!existing) {
     const error = new Error('SOP not found');
     error.code = 'NOT_FOUND';
@@ -151,6 +187,14 @@ async function permanentDeleteSop(id, actorId) {
     entity_type: 'sop',
     entity_id: id,
     metadata: { title: existing.title },
+  });
+
+  sopAuditLogService.logEntry({
+    entity_type: 'sop',
+    entity_id: id,
+    action: 'sop.permanently_deleted',
+    performed_by: actorId,
+    new_values: { permanently_deleted: true },
   });
 
   return { affectedRows: 1 };
@@ -172,6 +216,15 @@ async function emptyTrash(actorId) {
       entity_type: 'sop',
       entity_id: row.id,
       metadata: { title: row.title, trashed: true },
+    });
+
+    sopAuditLogService.logEntry({
+      entity_type: 'sop',
+      entity_id: row.id,
+      action: 'sop.permanently_deleted',
+      performed_by: actorId,
+      metadata: { trashed: true },
+      new_values: { permanently_deleted: true },
     });
   }
 

@@ -259,6 +259,20 @@ const attachmentController = {
 };
 
 const versionController = {
+  async getById(req, res) {
+    try {
+      const result = await sopVersionService.getVersionById(parseInt(req.params.versionId, 10));
+      if (!result) {
+        const error = new Error('Version not found');
+        error.code = 'NOT_FOUND';
+        throw error;
+      }
+      res.json({ success: true, data: result });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
   async list(req, res) {
     try {
       const result = await sopVersionService.listVersions(parseInt(req.params.sopId, 10));

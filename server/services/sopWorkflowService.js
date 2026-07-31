@@ -2,9 +2,11 @@ const sopModel = require('../models/sopModel');
 const sopVersionModel = require('../models/sopVersionModel');
 const sopApprovalModel = require('../models/sopApprovalModel');
 const sopAcknowledgementService = require('./sopAcknowledgementService');
+const sopApprovalService = require('./sopApprovalService');
 const { canTransitionTo } = require('../utils/sopUtils');
 const { logAudit } = require('../utils/auditLogger');
 const db = require('../config/database');
+const sopAuditLogService = require('./sopAuditLogService');
 
 async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
   const sop = await sopModel.findById(sopId);
@@ -18,6 +20,10 @@ async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
     const error = new Error(`Invalid transition from ${sop.status} to ${nextStatus}`);
     error.code = 'INVALID_TRANSITION';
     throw error;
+  }
+
+  if (nextStatus === 'For Review') {
+    await sopApprovalService.createSopApprovals(sopId, actorId);
   }
 
   if (nextStatus === 'Approved' || nextStatus === 'Published') {
@@ -64,6 +70,15 @@ async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
     entity_type: 'sop',
     entity_id: sopId,
     metadata: { from: sop.status, to: nextStatus, ...metadata },
+  });
+
+  await sopAuditLogService.logEntry({
+    entity_type: 'sop',
+    entity_id: sopId,
+    action: 'sop.status_transitioned',
+    performed_by: actorId,
+    old_values: { status: sop.status },
+    new_values: { status: nextStatus },
   });
 
   let acknowledgements = null;

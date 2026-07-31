@@ -62,8 +62,14 @@ export function useDepartments(initialParams = {}) {
   }, [refresh]);
 
   const remove = useCallback(async (id) => {
-    await deleteDepartment(id);
-    await refresh();
+    setError(null);
+    try {
+      await deleteDepartment(id);
+      await refresh();
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to delete department'));
+      throw err;
+    }
   }, [refresh]);
 
   useEffect(() => {

@@ -1,13 +1,85 @@
 import { useState, useEffect } from 'react';
-import { Search, LayoutGrid, LayoutList } from 'lucide-react';
+import { Search, LayoutGrid, LayoutList, Plus } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useSOPList } from '@/features/sop-management/hooks/useSOPList';
-import { SOP_STATUSES, TRASH_TABS, VIEW_MODES } from '@/features/sop-management/constants/sopConstants';
-import CheckboxList from '@/features/sop-management/components/CheckboxList';
+import { SOP_STATUSES, VIEW_MODES } from '@/features/sop-management/constants/sopConstants';
 import SOPCreateForm from '@/features/sop-management/components/SOPCreateForm';
 import SOPEditForm from '@/features/sop-management/components/SOPEditForm';
 import TrashPanel from '@/features/sop-management/components/TrashPanel';
+
+function StatusBadge({ status }) {
+  const styles = {
+    [SOP_STATUSES.DRAFT]: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-700 dark:text-neutral-300',
+    [SOP_STATUSES.FOR_REVIEW]: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-200',
+    [SOP_STATUSES.APPROVED]: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200',
+    [SOP_STATUSES.PUBLISHED]: 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-200',
+    [SOP_STATUSES.ARCHIVED]: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400',
+  };
+
+  return (
+    <span className={`inline-flex items-center rounded-full border border-transparent px-2.5 py-0.5 text-xs font-medium ${styles[status] || styles[SOP_STATUSES.DRAFT]}`}>
+      {status}
+    </span>
+  );
+}
+
+function SOPCard({ sop, viewMode, editingSopId, editTitle, setEditTitle, editDescription, setEditDescription, editStatus, setEditStatus, cascade, onEditStart, onEditCancel, onEditSave, onDeleteSop }) {
+  if (editingSopId === sop.id) {
+    return (
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm">
+        <SOPEditForm
+          sop={sop}
+          editTitle={editTitle} setEditTitle={setEditTitle}
+          editDescription={editDescription} setEditDescription={setEditDescription}
+          editStatus={editStatus} setEditStatus={setEditStatus}
+          cascade={cascade}
+          onCancel={onEditCancel}
+          onSave={onEditSave}
+        />
+      </div>
+    );
+  }
+
+  if (viewMode === VIEW_MODES.GRID) {
+    return (
+      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col">
+        <div className="flex-1">
+          <Link to={`/sops/${sop.id}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline break-words leading-snug">{sop.title}</Link>
+          {sop.description && <p className="mt-2 text-sm text-[var(--text-muted)] line-clamp-3">{sop.description}</p>}
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-[var(--text-muted)] font-mono">{sop.sop_code}</span>
+            <StatusBadge status={sop.status} />
+          </div>
+        </div>
+        <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
+          <button onClick={() => onEditStart(sop)} className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">Edit</button>
+          <button onClick={() => onDeleteSop(sop.id)} className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">Delete</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 hover:shadow-sm transition-shadow">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <Link to={`/sops/${sop.id}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline truncate">{sop.title}</Link>
+          <span className="text-xs text-[var(--text-muted)] shrink-0">{sop.sop_code}</span>
+          <StatusBadge status={sop.status} />
+        </div>
+        <div className="flex gap-1 shrink-0">
+          <button onClick={() => onEditStart(sop)} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors" title="Edit SOP" aria-label="Edit SOP">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button onClick={() => onDeleteSop(sop.id)} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors" title="Delete SOP" aria-label="Delete SOP">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SOPListPage() {
   const {
@@ -28,8 +100,11 @@ function SOPListPage() {
   useEffect(() => {
     setStatus('');
     setSearch('');
-    fetchSops();
-  }, [activeTab, archivedTab, setStatus, setSearch, fetchSops]);
+    if (activeTab === 'sops') {
+      fetchSops();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, archivedTab]);
 
   useEffect(() => {
     if (activeTab !== 'sops') return;
@@ -37,82 +112,104 @@ function SOPListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, debouncedStatus, activeTab]);
 
-  const handleCreateCancel = () => {
-    resetForm();
-    setShowCreate(false);
-  };
-
-  const SOPCard = ({ sop }) => (
-    <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-4 hover:shadow-sm transition-shadow flex flex-col">
-      {editingSopId === sop.id ? (
-        <SOPEditForm
-          sop={sop}
-          editTitle={editTitle} setEditTitle={setEditTitle}
-          editDescription={editDescription} setEditDescription={setEditDescription}
-          editStatus={editStatus} setEditStatus={setEditStatus}
-          cascade={cascade}
-          onCancel={handleEditCancel}
-          onSave={handleEditSave}
-          loading={loading}
-        />
-      ) : viewMode === VIEW_MODES.GRID ? (
-        <>
-          <div className="flex-1">
-            <Link to={`/sops/${sop.id}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline break-words">{sop.title}</Link>
-            {sop.description && <p className="mt-2 text-sm text-[var(--text-muted)] line-clamp-3">{sop.description}</p>}
-            <div className="mt-3 flex items-center gap-2 flex-wrap">
-              <span className="text-xs text-[var(--text-muted)]">{sop.sop_code}</span>
-              <span className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300">{sop.status}</span>
+  const renderSops = () => {
+    if (loading) {
+      return (
+        <div className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2'}>
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 animate-pulse">
+              <div className="h-4 w-3/4 rounded bg-[var(--bg-hover)]" />
+              <div className="mt-3 h-3 w-1/2 rounded bg-[var(--bg-hover)]" />
+              <div className="mt-4 h-8 w-full rounded bg-[var(--bg-hover)]" />
             </div>
-          </div>
-          <div className="flex gap-2 mt-4 pt-3 border-t border-[var(--border)]">
-            <button onClick={() => handleEditStart(sop)} className="px-3 py-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-sm text-neutral-600 dark:text-neutral-400 transition-colors">Edit</button>
-            <button onClick={() => handleDeleteSop(sop.id)} className="px-3 py-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 hover:bg-red-50 dark:hover:bg-red-950/40 text-sm text-red-600 dark:text-red-400 transition-colors">Delete</button>
-          </div>
-        </>
-      ) : (
-        <div className="flex items-center justify-between">
-          <div>
-            <Link to={`/sops/${sop.id}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline">{sop.title}</Link>
-            <span className="ml-2 text-xs text-[var(--text-muted)]">{sop.sop_code}</span>
-            <span className="ml-2 inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300">{sop.status}</span>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => handleEditStart(sop)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors" title="Edit SOP">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            </button>
-            <button onClick={() => handleDeleteSop(sop.id)} className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors" title="Delete SOP">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            </button>
-          </div>
+          ))}
         </div>
-      )}
-    </div>
-  );
+      );
+    }
+
+    if (sops.length === 0) {
+      return (
+        <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--bg-surface)] p-10 text-center">
+          <p className="text-[var(--text-muted)]">{archivedTab ? 'No archived SOPs.' : 'No SOPs found.'}</p>
+          {!archivedTab && (
+            <p className="text-xs text-[var(--text-muted)] mt-1">Create your first SOP to get started.</p>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2'}>
+        {sops.map((sop) => (
+          <SOPCard
+            key={sop.id}
+            sop={sop}
+            viewMode={viewMode}
+            editingSopId={editingSopId}
+            editTitle={editTitle}
+            setEditTitle={setEditTitle}
+            editDescription={editDescription}
+            setEditDescription={setEditDescription}
+            editStatus={editStatus}
+            setEditStatus={setEditStatus}
+            cascade={cascade}
+            onEditStart={handleEditStart}
+            onEditCancel={handleEditCancel}
+            onEditSave={handleEditSave}
+            onDeleteSop={handleDeleteSop}
+          />
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">SOP Management</h1>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Files</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">Manage your standard operating procedures</p>
         </div>
         {activeTab === 'sops' && !archivedTab && (
-          <button onClick={() => setShowCreate(true)} className="bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors rounded-lg inline-flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2.5 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-500/40"
+          >
+            <Plus size={16} />
             Create SOP
           </button>
         )}
       </div>
 
       <div className="flex gap-1 border-b border-[var(--border)]">
-        <button onClick={() => { setActiveTab('sops'); setArchivedTab(false); }} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'sops' && !archivedTab ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] dark:hover:text-neutral-300'}`}>
+        <button
+          onClick={() => { setActiveTab('sops'); setArchivedTab(false); }}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'sops' && !archivedTab
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] dark:hover:text-neutral-300'
+          }`}
+        >
           SOPs
         </button>
-        <button onClick={() => { setActiveTab('sops'); setArchivedTab(true); }} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'sops' && archivedTab ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] dark:hover:text-neutral-300'}`}>
+        <button
+          onClick={() => { setActiveTab('sops'); setArchivedTab(true); }}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'sops' && archivedTab
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] dark:hover:text-neutral-300'
+          }`}
+        >
           Archived
         </button>
-        <button onClick={() => setActiveTab('trash')} className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeTab === 'trash' ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] dark:hover:text-neutral-300'}`}>
+        <button
+          onClick={() => setActiveTab('trash')}
+          className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === 'trash'
+              ? 'border-blue-600 text-blue-600 dark:text-blue-400'
+              : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)] dark:hover:text-neutral-300'
+          }`}
+        >
           Trash
         </button>
       </div>
@@ -129,12 +226,22 @@ function SOPListPage() {
             onCreate={handleCreate}
           />
 
-          <div className="flex gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
               <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
-              <input type="text" placeholder={archivedTab ? 'Search archived SOPs...' : 'Search SOPs...'} value={search} onChange={(e) => setSearch(e.target.value)} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] py-2 pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500" />
+              <input
+                type="search"
+                placeholder={archivedTab ? 'Search archived SOPs...' : 'Search SOPs...'}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] py-2.5 pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+              />
             </div>
-            <select value={status} onChange={(e) => setStatus(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500">
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2.5 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+            >
               <option value="">All Statuses</option>
               <option value={SOP_STATUSES.DRAFT}>Draft</option>
               <option value={SOP_STATUSES.FOR_REVIEW}>For Review</option>
@@ -143,29 +250,30 @@ function SOPListPage() {
               {!archivedTab && <option value={SOP_STATUSES.ARCHIVED}>Archived</option>}
             </select>
             <div className="flex items-center border border-[var(--border)] rounded-lg overflow-hidden bg-[var(--bg-page)]">
-              <button onClick={() => setViewMode(VIEW_MODES.GRID)} className={`p-2 ${viewMode === VIEW_MODES.GRID ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`} title="Grid View">
+              <button
+                onClick={() => setViewMode(VIEW_MODES.GRID)}
+                className={`p-2.5 transition-colors ${viewMode === VIEW_MODES.GRID ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                title="Grid View"
+                aria-label="Grid view"
+                aria-pressed={viewMode === VIEW_MODES.GRID}
+              >
                 <LayoutGrid size={16} />
               </button>
-              <button onClick={() => setViewMode(VIEW_MODES.LIST)} className={`p-2 ${viewMode === VIEW_MODES.LIST ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`} title="List View">
+              <button
+                onClick={() => setViewMode(VIEW_MODES.LIST)}
+                className={`p-2.5 transition-colors ${viewMode === VIEW_MODES.LIST ? 'bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}
+                title="List View"
+                aria-label="List view"
+                aria-pressed={viewMode === VIEW_MODES.LIST}
+              >
                 <LayoutList size={16} />
               </button>
             </div>
           </div>
 
-          {loading ? (
-            <p className="text-[var(--text-muted)] text-center py-8">Loading...</p>
-          ) : (
-            <div className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2'}>
-              {sops.map((sop) => (
-                <SOPCard key={sop.id} sop={sop} />
-              ))}
-              {sops.length === 0 && !loading && (
-                <div className={viewMode === VIEW_MODES.GRID ? 'col-span-full' : ''}>
-                  <p className="text-[var(--text-muted)] text-center py-8">{archivedTab ? 'No archived SOPs.' : 'No SOPs found.'}</p>
-                </div>
-              )}
-            </div>
-          )}
+          <div>
+            {renderSops()}
+          </div>
         </>
       )}
 

@@ -1,61 +1,15 @@
 import { useState } from 'react';
-import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAssignmentCascade } from '@/features/sop-management/hooks/useAssignmentCascade';
 import { createAssignment } from '@/features/sop-management/services/assignmentService';
-
-function CheckboxList({ items, selectedIds, onToggle, labelKey, valueKey, placeholder }) {
-  const [open, setOpen] = useState(false);
-  const selectedCount = selectedIds.length;
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full text-left px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-800 text-sm text-neutral-800 dark:text-neutral-200 hover:border-indigo-500 transition-colors flex items-center justify-between"
-      >
-        <span className={selectedCount > 0 ? 'text-neutral-900 dark:text-neutral-100' : 'text-neutral-400 dark:text-neutral-500'}>
-          {selectedCount > 0 ? `${selectedCount} selected` : placeholder}
-        </span>
-        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-      </button>
-      {open && (
-        <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-600 rounded-lg shadow-lg">
-          {items.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-neutral-400">No options</p>
-          ) : (
-            items.map((item) => {
-              const id = valueKey ? item[valueKey] : item;
-              const label = labelKey ? item[labelKey] : item;
-              const checked = selectedIds.includes(id);
-              return (
-                <label
-                  key={id}
-                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-700 cursor-pointer text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => onToggle(id)}
-                    className="rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
-                  />
-                  <span className="text-neutral-700 dark:text-neutral-300">{label}</span>
-                  {checked && <Check size={14} className="ml-auto text-green-600" />}
-                </label>
-              );
-            })
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+import CheckboxList from './CheckboxList';
 
 export default function AssignmentForm({ sopId, onCreated }) {
   const cascade = useAssignmentCascade();
+  const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!cascade.selectedDeptIds.length) return;
+    if (!cascade.selectedDeptIds.length || submitting) return;
+    setSubmitting(true);
     try {
       await createAssignment(sopId, {
         department_ids: cascade.selectedDeptIds,
@@ -67,41 +21,71 @@ export default function AssignmentForm({ sopId, onCreated }) {
       cascade.setSelectedDeptIds([]);
       cascade.setSelectedPositions([]);
       cascade.setSelectedUserIds([]);
+      cascade.setUserSearch('');
       onCreated?.();
     } catch (err) {
       console.error('Failed to create assignment', err);
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  const submitDisabled = !cascade.selectedDeptIds.length || submitting;
+
   return (
     <div className="space-y-3">
-      <CheckboxList
-        items={cascade.departments}
-        selectedIds={cascade.selectedDeptIds}
-        onToggle={cascade.toggleDepartment}
-        labelKey="name"
-        valueKey="id"
-        placeholder="Select departments..."
-      />
-      <CheckboxList
-        items={cascade.positions}
-        selectedIds={cascade.selectedPositions}
-        onToggle={cascade.togglePosition}
-        labelKey={(p) => p}
-        valueKey={(p) => p}
-        placeholder="Select positions..."
-      />
+      <div>
+        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Business</label>
+        <CheckboxList
+          items={cascade.businesses}
+          selectedIds={cascade.selectedBusinessIds}
+          onToggle={cascade.toggleBusiness}
+          labelKey="business_name"
+          valueKey="id"
+          placeholder="Select businesses..."
+          loading={cascade.loading.businesses}
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Departments</label>
+        <CheckboxList
+          items={cascade.filteredDepartments}
+          selectedIds={cascade.selectedDeptIds}
+          onToggle={cascade.toggleDepartment}
+          labelKey="name"
+          valueKey="id"
+          placeholder="Select departments..."
+          loading={cascade.loading.departments}
+          emptyText={cascade.selectedBusinessIds.length ? 'No departments for selected businesses' : 'Select a business first'}
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Positions</label>
+        <CheckboxList
+          items={cascade.positions}
+          selectedIds={cascade.selectedPositions}
+          onToggle={cascade.togglePosition}
+          labelKey={(p) => p}
+          valueKey={(p) => p}
+          placeholder="Select positions..."
+          loading={cascade.loading.positions}
+          emptyText={cascade.selectedDeptIds.length ? 'No positions found' : 'Select a department first'}
+        />
+      </div>
+
       <div>
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Users</span>
-          <span className="text-xs text-neutral-400">{cascade.totalUsers} found</span>
+          <span className="text-xs font-medium text-[var(--text-secondary)]">Users</span>
+          <span className="text-xs text-[var(--text-muted)]">{cascade.totalUsers} found</span>
         </div>
         <input
-          type="text"
+          type="search"
           placeholder="Search users..."
           value={cascade.userSearch}
           onChange={(e) => cascade.setUserSearch(e.target.value)}
-          className="w-full rounded border border-neutral-300 dark:border-neutral-600 px-2 py-1 text-xs bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 mb-2 focus:outline-none focus:border-indigo-500"
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] mb-2 outline-none focus:border-blue-500 placeholder:text-[var(--text-muted)]"
         />
         <CheckboxList
           items={cascade.users}
@@ -110,14 +94,17 @@ export default function AssignmentForm({ sopId, onCreated }) {
           labelKey="full_name"
           valueKey="id"
           placeholder="Select users..."
+          loading={cascade.loading.users}
+          emptyText={cascade.selectedDeptIds.length ? 'No users found' : 'Select a department first'}
         />
       </div>
+
       <button
         onClick={handleSubmit}
-        disabled={!cascade.selectedDeptIds.length}
-        className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        disabled={submitDisabled}
+        className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
       >
-        Assign Selected
+        {submitting ? 'Assigning...' : 'Assign Selected'}
       </button>
     </div>
   );

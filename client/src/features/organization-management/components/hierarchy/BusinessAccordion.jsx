@@ -1,15 +1,42 @@
 import { ChevronDown, ChevronRight, Building2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { useHierarchyContext } from './HierarchyContext';
 import HierarchyNode from './HierarchyNode';
 import { summarizeUnitTypes, sumMembers } from './hierarchyStats';
+import { getBusinessLogo } from '@/features/organization-management/api/business.api';
 
 function BusinessLogo({ business }) {
-  const logoSrc = business.logo_url || business.logo || business.avatar_url || null;
+  const [blobUrl, setBlobUrl] = useState(null);
 
-  if (logoSrc) {
+  useEffect(() => {
+    if (!business?.id) return;
+    let cancelled = false;
+    let currentUrl = null;
+
+    const fetchLogo = async () => {
+      try {
+        const response = await getBusinessLogo(business.id);
+        if (!cancelled && response?.data) {
+          currentUrl = URL.createObjectURL(new Blob([response.data], { type: response.headers['content-type'] || 'image/png' }));
+          setBlobUrl(currentUrl);
+        }
+      } catch {
+        // No logo available
+      }
+    };
+
+    fetchLogo();
+
+    return () => {
+      cancelled = true;
+      if (currentUrl) URL.revokeObjectURL(currentUrl);
+    };
+  }, [business?.id]);
+
+  if (blobUrl) {
     return (
       <img
-        src={logoSrc}
+        src={blobUrl}
         alt={`${business.business_name} logo`}
         className="h-9 w-9 rounded-lg object-cover shrink-0 border border-[var(--border)]"
       />

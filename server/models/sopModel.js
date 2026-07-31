@@ -137,6 +137,19 @@ async function findById(id) {
   return normalizeSopRow(rows[0] || null, cols);
 }
 
+async function findByIdIncludingDeleted(id) {
+  const cols = await getSopsColumns();
+  const [rows] = await db.query(`
+    SELECT s.*, d.name AS department_name, c.name AS category_name, u.full_name AS owner_name
+    FROM sops s
+    LEFT JOIN departments d ON s.department_id = d.id
+    LEFT JOIN categories c ON s.category_id = c.id
+    LEFT JOIN users u ON s.${cols.owner} = u.id
+    WHERE s.id = ?
+  `, [id]);
+  return normalizeSopRow(rows[0] || null, cols);
+}
+
 async function findByCode(code) {
   const cols = await getSopsColumns();
   const [rows] = await db.query(
@@ -341,6 +354,7 @@ async function listTrashed(filters = {}) {
 module.exports = {
   findAll,
   findById,
+  findByIdIncludingDeleted,
   findByCode,
   create,
   update,
