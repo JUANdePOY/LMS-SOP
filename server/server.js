@@ -76,7 +76,7 @@ const clientDist = process.env.CLIENT_DIST_PATH
 console.log('Client dist path:', clientDist);
 console.log('Client dist exists:', fs.existsSync(clientDist));
 if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
+  app.use(express.static(clientDist, { index: false }));
   console.log('Static file serving enabled from:', clientDist);
 } else {
   console.warn('WARNING: client/dist not found! Build may have failed.');
@@ -135,18 +135,22 @@ app.use(async (req, res, next) => {
     return next();
   }
 
-  const indexPath = path.join(clientDist, 'index.html');
-  const indexPathExists = fs.existsSync(indexPath);
-
-  if (!indexPathExists) {
-    console.error('SPA index.html missing at', indexPath);
-    return res.status(404).json({ status: 'error', message: 'Not found', code: 'NOT_FOUND' });
+  if (res.headersSent) {
+    return next();
   }
 
+  const indexPath = path.join(clientDist, 'index.html');
+
   try {
-    await res.sendFile(indexPath);
+    const content = await fs.promises.readFile(indexPath, 'utf-8');
+    res.setHeader('Content-Type', 'text/html');
+    return res.send(content);
   } catch (err) {
-    console.error('SPA index.html send error:', err.message, 'code:', err.code);
+    if (err && err.code === 'ENOENT') {
+      console.error('SPA index.html missing at', indexPath);
+      return res.status(404).json({ status: 'error', message: 'Not found', code: 'NOT_FOUND' });
+    }
+    console.error('SPA index.html read/send error:', err.message, 'code:', err.code);
     return res.status(404).json({ status: 'error', message: 'Not found', code: 'NOT_FOUND' });
   }
 });
