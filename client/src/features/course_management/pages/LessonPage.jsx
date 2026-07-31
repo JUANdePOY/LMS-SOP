@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { FileText } from "lucide-react";
 import { useLessonProgress } from "../hooks/useLessonProgress";
 import { useMarkLessonComplete } from "../hooks/useMarkLessonComplete";
 import LessonProgressBar from "../components/LessonProgressBar";
@@ -76,7 +77,7 @@ export default function LessonPage() {
     );
   }
 
-  const isVideoOrText = ['video', 'reading', 'document', 'presentation', 'link', 'downloadable'].includes(currentLesson.type);
+  const isVideoOrText = ['video', 'reading', 'document', 'presentation', 'link', 'downloadable', 'sop'].includes(currentLesson.type);
 
   return (
     <div className="space-y-4">
@@ -97,12 +98,70 @@ export default function LessonPage() {
             {message}
           </div>
         )}
-        <div className="min-h-[200px] rounded-lg border border-dashed border-gray-200 dark:border-neutral-700 flex items-center justify-center">
-          <p className="text-neutral-500 text-sm">
-            {currentLesson.type === 'video' ? 'Video player placeholder' :
-             currentLesson.type === 'quiz' ? 'Quiz view placeholder' :
-             'Reading content placeholder'}
-          </p>
+        <div className="min-h-[200px] rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+          {currentLesson.type === 'video' ? (
+            <div className="p-4">
+              <video controls className="w-full aspect-video" src={currentLesson.url}>
+                Your browser does not support the video tag.
+              </video>
+              {currentLesson.description && (
+                <p className="mt-3 text-sm text-neutral-600 dark:text-neutral-400">{currentLesson.description}</p>
+              )}
+            </div>
+          ) : currentLesson.type === 'reading' ? (
+            <div className="p-6">
+              <h2 className="text-xl font-bold mb-3">{currentLesson.title}</h2>
+              <div
+                className="prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300"
+                dangerouslySetInnerHTML={{ __html: currentLesson.description || currentLesson.content || "No content available." }}
+              />
+            </div>
+          ) : currentLesson.type === 'quiz' ? (
+            <div className="p-4 text-center text-neutral-500">Quiz view placeholder</div>
+          ) : currentLesson.type === 'sop' ? (
+            <div className="p-6">
+              <div className="flex items-start gap-3">
+                <FileText size={24} className="text-blue-600 mt-0.5" />
+                <div>
+                  <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
+                  {currentLesson.description && (
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">{currentLesson.description}</p>
+                  )}
+                  {currentLesson.url && (
+                    <a
+                      href={`/sops/${currentLesson.url}`}
+                      className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 hover:underline"
+                    >
+                      View SOP document
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : currentLesson.type === 'document' ? (
+            <div className="p-6">
+              <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
+              {currentLesson.description && (
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">{currentLesson.description}</p>
+              )}
+              {currentLesson.url && (
+                <a href={currentLesson.url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">
+                  Open external resource
+                </a>
+              )}
+            </div>
+          ) : currentLesson.type === 'link' ? (
+            <div className="p-6">
+              <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
+              {currentLesson.url && (
+                <a href={currentLesson.url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">
+                  {currentLesson.url}
+                </a>
+              )}
+            </div>
+          ) : (
+            <div className="p-4 text-center text-neutral-500">Content placeholder</div>
+          )}
         </div>
         <div className="mt-4 flex justify-end">
           {isVideoOrText && (

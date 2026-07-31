@@ -4,6 +4,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
 import { Loader2 } from "lucide-react";
 import ModuleAccordion from "./ModuleAccordion";
+import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichTextEditor";
 
 export default function CourseFormModal({ open, onClose, onSubmit, loading, initialData }) {
   const [form, setForm] = useState({
@@ -60,7 +61,7 @@ export default function CourseFormModal({ open, onClose, onSubmit, loading, init
         if (m.id !== moduleId) return m;
         return {
           ...m,
-          lessons: [...m.lessons, { title: "", type: "text", content: "", order: m.lessons.length + 1 }],
+          lessons: [...m.lessons, { title: "", type: "reading", content: "", order: m.lessons.length + 1 }],
         };
       }),
     }));
@@ -145,16 +146,10 @@ export default function CourseFormModal({ open, onClose, onSubmit, loading, init
           </div>
           <div>
             <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Description</label>
-            <textarea
-              dir="ltr"
-              lang="en"
+            <RichTextEditor
               value={form.description}
-              onChange={(e) => updateField("description", e.target.value)}
-              onInput={(e) => { e.target.dir = "ltr"; }}
+              onChange={(html) => updateField("description", html)}
               placeholder="What will learners accomplish in this course?"
-              className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 p-2.5 text-sm text-left"
-              style={{ direction: "ltr", textAlign: "left" }}
-              rows={3}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

@@ -3,7 +3,7 @@ import { lazy } from "react";
 const CourseCatalog = lazy(() => import("../pages/CourseCatalog"));
 const CourseCreatePage = lazy(() => import("../pages/CourseCreatePage"));
 const CourseDetailsPage = lazy(() => import("../pages/CourseDetailsPage"));
-const CourseLibraryPage = lazy(() => import("../pages/CourseLibraryPage"));
+const CourseLibraryPage = lazy(() => import("../library/pages/CourseLibraryPage"));
 const CourseLearnerView = lazy(() => import("../pages/CourseLearnerView"));
 const LessonPage = lazy(() => import("../pages/LessonPage"));
 const ModuleManagePage = lazy(() => import("../pages/ModuleManagePage"));

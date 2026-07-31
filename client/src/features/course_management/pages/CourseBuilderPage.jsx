@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/shared/components/ui/Toast";
+import { Button } from "@/shared/components/ui/button";
+import { Card } from "@/shared/components/ui/card";
+import { ChevronLeft, Plus, Shield, Users, Briefcase } from "lucide-react";
 import CourseOutline from "../components/course-builder/CourseOutline";
 import LessonEditor from "../components/course-builder/LessonEditor";
 import ModuleEditor from "../components/course-builder/ModuleEditor";
@@ -177,6 +180,7 @@ export default function CourseBuilderPage() {
       await publishCourse(courseId);
       toast.success("Course published");
       setDirty(false);
+      navigate("/courses/library");
     } catch (err) {
       toast.error(err.message || "Failed to publish");
     } finally {
@@ -231,7 +235,7 @@ export default function CourseBuilderPage() {
         if (m.id !== moduleId) return m;
         return {
           ...m,
-          lessons: [...(m.lessons || []), { id: "new-" + Date.now(), title: "", type: "text", description: "", url: "", order_index: (m.lessons || []).length + 1, isNew: true }],
+          lessons: [...(m.lessons || []), { id: "new-" + Date.now(), title: "", type: "reading", description: "", url: "", order_index: (m.lessons || []).length + 1, isNew: true }],
         };
       });
       modulesRef.current = next;
@@ -312,7 +316,7 @@ export default function CourseBuilderPage() {
       lessons: (m.lessons || []).map((l, lIdx) => ({
         id: l.isNew ? undefined : l.id,
         title: l.title || "",
-        type: l.type || "text",
+        type: l.type || "reading",
         description: l.description || l.content || "",
         url: l.url || l.content || "",
         order: lIdx + 1,
@@ -353,33 +357,44 @@ export default function CourseBuilderPage() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col">
-      <div className="flex items-center justify-between border-b border-[var(--border)] bg-white dark:bg-neutral-900 px-4 py-3">
-        <div className="min-w-0">
-          <h1 className="text-sm font-bold text-neutral-900 dark:text-white truncate">{form.title || "Course Builder"}</h1>
-          <p className="text-[10px] text-neutral-500 truncate">Design modules, lessons, and content</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] text-neutral-500 flex items-center gap-1">
-            {savingStructural || saving ? (
-              <>
-                <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-blue-600" />
-                Saving...
-              </>
-            ) : dirty ? (
-              <>
-                <span className="inline-flex h-2 w-2 rounded-full bg-amber-500" />
-                Unsaved changes
-              </>
-            ) : (
-              <>
-                <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                All changes saved
-              </>
-            )}
-          </span>
-          <button onClick={() => navigate("/courses")} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs hover:border-neutral-300">
-            Back
-          </button>
+      <div className="relative overflow-hidden border-b border-neutral-200/80 dark:border-neutral-700/80 bg-gradient-to-br from-white via-neutral-50/80 to-neutral-100/80 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 px-5 sm:px-6 py-4 sm:py-5 shadow-sm dark:shadow-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.30),rgba(147,51,234,0.08),transparent_75%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.15),rgba(168,85,247,0.12),transparent_45%)]" />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate("/courses")}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{form.title || "Course Builder"}</h1>
+              <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">Design modules, lessons, and content</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <span className="text-[10px] text-neutral-500 flex items-center gap-1">
+              {savingStructural || saving ? (
+                <>
+                  <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-blue-600" />
+                  Saving...
+                </>
+              ) : dirty ? (
+                <>
+                  <span className="inline-flex h-2 w-2 rounded-full bg-amber-500" />
+                  Unsaved changes
+                </>
+              ) : (
+                <>
+                  <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                  All changes saved
+                </>
+              )}
+            </span>
+            <button onClick={() => navigate("/courses")} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs hover:border-neutral-300 dark:hover:border-neutral-600">
+              Back
+            </button>
+          </div>
         </div>
       </div>
 
@@ -424,30 +439,30 @@ export default function CourseBuilderPage() {
               saving={saving}
             />
           ) : (
-            <div className="flex h-full items-center justify-center text-sm text-neutral-500">
-              <div className="text-center space-y-2">
-                <p>Select a module or lesson from the outline to start editing.</p>
-                <button
-                  type="button"
-                  onClick={addModule}
-                  className="rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs hover:border-neutral-300"
-                >
-                  + Add your first module
-                </button>
-              </div>
+          <div className="flex h-full items-center justify-center text-sm text-neutral-500">
+            <div className="text-center space-y-3">
+              <p>Select a module or lesson from the outline to start editing.</p>
+              <button
+                type="button"
+                onClick={addModule}
+                className="rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs hover:border-neutral-300 dark:hover:border-neutral-600 transition-all"
+              >
+                + Add your first module
+              </button>
             </div>
+          </div>
           )}
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] bg-white dark:bg-neutral-900 px-4 py-2">
+      <div className="flex items-center justify-between gap-2 border-t border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2">
         <PublishReadiness course={course} modules={modules} />
         <div className="flex items-center gap-2">
-          <button onClick={handleSaveDraft} disabled={saving || savingStructural} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs hover:border-neutral-300 disabled:opacity-50">
+          <button onClick={handleSaveDraft} disabled={saving || savingStructural} className="rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 text-xs hover:border-neutral-300 dark:hover:border-neutral-600 disabled:opacity-50 transition-all">
             {saving || savingStructural ? "Saving..." : "Save Draft"}
           </button>
-          <button onClick={handlePublish} disabled={saving || savingStructural} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-            {saving || savingStructural ? "Publishing..." : "Publish Course"}
+          <button onClick={handlePublish} disabled={saving || savingStructural} className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-all">
+            {saving || savingStructural ? "Publishing..." : "Publish"}
           </button>
         </div>
       </div>

@@ -8,7 +8,7 @@ import LessonProgressBar from "../components/LessonProgressBar";
 import LessonList from "../components/LessonList";
 
 export default function CourseLearnerView() {
-  const { courseId } = useParams();
+  const { id: courseId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: courses } = useCourseList({ status: "published" });

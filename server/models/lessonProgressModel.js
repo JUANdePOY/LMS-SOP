@@ -4,7 +4,7 @@ const LESSON_STATUSES = ['locked', 'unlocked', 'in_progress', 'completed'];
 
 async function listByCourse(userId, courseId) {
   const [rows] = await db.query(
-    `SELECT lp.*, mc.title AS lesson_title, mc.type AS lesson_type, mc.order_index AS lesson_order, mc.module_id, cm.order_index AS module_order
+    `SELECT lp.*, mc.title AS lesson_title, mc.type AS lesson_type, mc.order_index AS lesson_order, mc.module_id, cm.order_index AS module_order, mc.duration
      FROM lesson_progress lp
      JOIN module_content mc ON lp.lesson_id = mc.id
      JOIN course_modules cm ON mc.module_id = cm.id
@@ -186,13 +186,40 @@ async function getNextModuleId(courseId, currentModuleId) {
   return rows[0]?.id || null;
 }
 
+async function listAllLessonsByCourse(courseId) {
+  const [rows] = await db.query(
+    `SELECT mc.id AS lesson_id, mc.title AS lesson_title, mc.type AS lesson_type,
+     mc.order_index AS lesson_order, mc.module_id, cm.order_index AS module_order,
+     mc.duration, mc.url, mc.description
+     FROM module_content mc
+     JOIN course_modules cm ON mc.module_id = cm.id
+     WHERE cm.course_id = ? AND mc.is_deleted = FALSE AND cm.is_deleted = FALSE
+     ORDER BY cm.order_index ASC, mc.order_index ASC`,
+    [courseId]
+  );
+  return rows;
+}
+
+async function getAllLessonIds(courseId) {
+  const [rows] = await db.query(
+    `SELECT mc.id FROM module_content mc
+     JOIN course_modules cm ON mc.module_id = cm.id
+     WHERE cm.course_id = ? AND mc.is_deleted = FALSE AND cm.is_deleted = FALSE
+     ORDER BY cm.order_index ASC, mc.order_index ASC`,
+    [courseId]
+  );
+  return rows.map(r => r.id);
+}
+
 module.exports = {
   db,
   LESSON_STATUSES,
   listByCourse,
+  listAllLessonsByCourse,
   findByUserAndLesson,
   upsert,
   bulkInitialize,
+  getAllLessonIds,
   getNextLessonId,
   getFirstLessonId,
   countCompleted,

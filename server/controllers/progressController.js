@@ -20,87 +20,92 @@ function sendError(res, err, fallback = 'Request failed') {
   return res.status(code).json(body);
 }
 
-function getCourseProgress(req, res) {
+async function getCourseProgress(req, res) {
   const courseId = parseInt(req.params.courseId, 10);
   const userId = req.user?.id;
 
-  Promise.all([
-    courseModel.findById(courseId),
-    lessonProgressModel.listByCourse(userId, courseId),
-    courseModuleModel.listModules(courseId, { limit: 100 }),
-  ])
-    .then(([course, progress, modules]) => {
-      if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+  try {
+    const [course, progress, modules, allLessons] = await Promise.all([
+      courseModel.findById(courseId),
+      lessonProgressModel.listByCourse(userId, courseId),
+      courseModuleModel.listModules(courseId, { limit: 100 }),
+      lessonProgressModel.listAllLessonsByCourse(courseId),
+    ]);
 
-      const moduleMap = new Map();
-      const contentMap = new Map();
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
 
-      modules.forEach(mod => {
-        moduleMap.set(mod.id, { ...mod, lessons: [] });
-      });
+    const moduleMap = new Map();
 
-      const lessonMap = new Map();
-      progress.forEach(p => {
-        lessonMap.set(p.lesson_id, p);
-      });
+    modules.forEach(mod => {
+      moduleMap.set(mod.id, { ...mod, lessons: [] });
+    });
 
-      const moduleLessonCounts = new Map();
-      progress.forEach(p => {
-        const mid = p.module_id;
-        if (!moduleLessonCounts.has(mid)) moduleLessonCounts.set(mid, { total: 0, completed: 0 });
-        moduleLessonCounts.get(mid).total += 1;
-        if (p.status === 'completed') moduleLessonCounts.get(mid).completed += 1;
-      });
+    const progressMap = new Map();
+    progress.forEach(p => {
+      progressMap.set(p.lesson_id, p);
+    });
 
-      const enriched = lessonsInOrder.map((lp, idx) => {
-        const mod = moduleMap.get(lp.module_id);
-        return {
-          id: lp.lesson_id,
-          title: lp.lesson_title,
-          type: lp.lesson_type,
-          order: lp.lesson_order,
-          moduleId: lp.module_id,
-          moduleOrder: lp.module_order,
-          status: lp.status,
-          completedAt: lp.completed_at,
-          isFirst: idx === 0,
-          isLast: idx === lessonsInOrder.length - 1,
-        };
-      });
+    const enriched = allLessons.map((lp, idx) => {
+      const userProgress = progressMap.get(lp.lesson_id);
+      return {
+        id: lp.lesson_id,
+        title: lp.lesson_title,
+        type: lp.lesson_type,
+        order: lp.lesson_order,
+        moduleId: lp.module_id,
+        moduleOrder: lp.module_order,
+        status: userProgress ? userProgress.status : (idx === 0 ? 'unlocked' : 'locked'),
+        completedAt: userProgress ? userProgress.completed_at : null,
+        duration: lp.duration,
+        url: lp.url,
+        description: lp.description,
+        isFirst: idx === 0,
+        isLast: idx === allLessons.length - 1,
+      };
+    });
 
-      const total = lessonProgressModel.countTotal(courseId);
-      const completed = lessonProgressModel.countCompleted(userId, courseId);
-      const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+    enriched.forEach(lesson => {
+      const mod = moduleMap.get(lesson.moduleId);
+      if (mod) mod.lessons.push(lesson);
+    });
 
-      const moduleSummaries = Array.from(moduleMap.entries()).map(([id, mod]) => {
-        const counts = moduleLessonCounts.get(id) || { total: 0, completed: 0 };
-        return {
-          id: mod.id,
-          title: mod.title,
-          order_index: mod.order_index,
-          totalLessonCount: counts.total,
-          completedLessonCount: counts.completed,
-        };
-      });
+    const [total, completed] = await Promise.all([
+      lessonProgressModel.countTotal(courseId),
+      lessonProgressModel.countCompleted(userId, courseId),
+    ]);
+    const completionPct = total > 0 ? Math.round((completed / total) * 100) : 0;
 
-      res.json({
-        success: true,
-        message: 'OK',
-        data: {
-          courseId,
-          title: course.title,
-          modules: Array.from(moduleMap.values()),
-          lessons: enriched,
-          summary: {
-            total,
-            completed,
-            completionPct,
-          },
-          moduleProgress: moduleSummaries,
+    const moduleSummaries = Array.from(moduleMap.entries()).map(([id, mod]) => {
+      const totalLessons = mod.lessons.length;
+      const completedLessons = mod.lessons.filter(l => l.status === 'completed').length;
+      return {
+        id: mod.id,
+        title: mod.title,
+        order_index: mod.order_index,
+        totalLessonCount: totalLessons,
+        completedLessonCount: completedLessons,
+      };
+    });
+
+    res.json({
+      success: true,
+      message: 'OK',
+      data: {
+        courseId,
+        title: course.title,
+        modules: Array.from(moduleMap.values()),
+        lessons: enriched,
+        summary: {
+          total,
+          completed,
+          completionPct,
         },
-      });
-    })
-    .catch((err) => sendError(res, err, 'Failed to load progress'));
+        moduleProgress: moduleSummaries,
+      },
+    });
+  } catch (err) {
+    sendError(res, err, 'Failed to load progress');
+  }
 }
 
 async function markLessonComplete(req, res) {

@@ -57,7 +57,7 @@ export const menuItems = [
   },
   {
     name: "Course Library",
-    path: "/course-library",
+    path: "/courses/library",
     icon: Library,
     description: "Browse course catalog",
     roles: LMS_ROLES,

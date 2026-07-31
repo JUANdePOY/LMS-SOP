@@ -1,5 +1,6 @@
 const enrollmentModel = require('../models/enrollmentModel');
 const courseModel = require('../models/courseModel');
+const lessonProgressModel = require('../models/lessonProgressModel');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -53,7 +54,7 @@ function getEnrollment(req, res) {
     .catch((err) => sendError(res, err, 'Failed to load enrollment'));
 }
 
-function enrollStudent(req, res) {
+async function enrollStudent(req, res) {
   const userId = req.user?.id;
   const { course_id, user_id, role, status } = req.body;
 
@@ -61,27 +62,32 @@ function enrollStudent(req, res) {
     return res.status(400).json({ success: false, message: 'course_id and user_id are required', code: 'VALIDATION_ERROR' });
   }
 
-  courseModel.findById(course_id)
-    .then((course) => {
-      if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return enrollmentModel.findByCourseAndUser(course_id, user_id);
-    })
-    .then((existing) => {
-      if (existing) {
-        return res.status(409).json({ success: false, message: 'User is already enrolled in this course', code: 'ALREADY_ENROLLED' });
-      }
-      return enrollmentModel.create({
-        course_id,
-        user_id,
-        role: role || 'learner',
-        status: status || 'active',
-      });
-    })
-    .then((id) => {
-      logAudit('enrollment.create', userId, { enrollmentId: id, course_id, user_id });
-      return res.status(201).json({ success: true, message: 'Student enrolled successfully', data: { id } });
-    })
-    .catch((err) => sendError(res, err, 'Failed to enroll student'));
+  try {
+    const course = await courseModel.findById(course_id);
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    const existing = await enrollmentModel.findByCourseAndUser(course_id, user_id);
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'User is already enrolled in this course', code: 'ALREADY_ENROLLED' });
+    }
+
+    const id = await enrollmentModel.create({
+      course_id,
+      user_id,
+      role: role || 'learner',
+      status: status || 'active',
+    });
+
+    const lessonIds = await lessonProgressModel.getAllLessonIds(course_id);
+    if (lessonIds.length > 0) {
+      await lessonProgressModel.bulkInitialize(user_id, course_id, lessonIds);
+    }
+
+    logAudit('enrollment.create', userId, { enrollmentId: id, course_id, user_id });
+    return res.status(201).json({ success: true, message: 'Student enrolled successfully', data: { id } });
+  } catch (err) {
+    sendError(res, err, 'Failed to enroll student');
+  }
 }
 
 function bulkEnroll(req, res) {
