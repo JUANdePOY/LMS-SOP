@@ -3,7 +3,6 @@ const sopService = require('../services/sopService');
 const sopModuleService = require('../services/sopModuleService');
 const sopAttachmentService = require('../services/sopAttachmentService');
 const sopVersionService = require('../services/sopVersionService');
-const sopApprovalService = require('../services/sopApprovalService');
 const sopWorkflowService = require('../services/sopWorkflowService');
 const sopAuditLogService = require('../services/sopAuditLogService');
 const sopShareService = require('../services/sopShareService');
@@ -310,61 +309,6 @@ const versionController = {
   },
 };
 
-const approvalController = {
-  async list(req, res) {
-    try {
-      const result = await sopApprovalService.listApprovals(parseInt(req.params.sopId, 10));
-      res.json({ success: true, data: result });
-    } catch (error) {
-      handleError(res, error);
-    }
-  },
-
-  async create(req, res) {
-    try {
-      const result = await sopApprovalService.createApproval(parseInt(req.params.sopId, 10), req.body, req.user.id);
-      res.status(201).json({ success: true, data: result, message: 'Approval created successfully' });
-    } catch (error) {
-      handleError(res, error);
-    }
-  },
-
-  async update(req, res) {
-    try {
-      const result = await sopApprovalService.updateApproval(parseInt(req.params.approvalId, 10), req.body, req.user.id);
-      res.json({ success: true, data: result, message: 'Approval updated successfully' });
-    } catch (error) {
-      handleError(res, error);
-    }
-  },
-
-  async approve(req, res) {
-    try {
-      const result = await sopApprovalService.approveApproval(
-        parseInt(req.params.approvalId, 10),
-        req.user.id,
-        req.body.comments || null
-      );
-      res.json({ success: true, data: result, message: 'Approval recorded' });
-    } catch (error) {
-      handleError(res, error);
-    }
-  },
-
-  async reject(req, res) {
-    try {
-      const result = await sopApprovalService.rejectApproval(
-        parseInt(req.params.approvalId, 10),
-        req.user.id,
-        req.body.comments
-      );
-      res.json({ success: true, data: result, message: 'Rejection recorded' });
-    } catch (error) {
-      handleError(res, error);
-    }
-  },
-};
-
 const workflowController = {
   async transition(req, res) {
     try {
@@ -511,7 +455,6 @@ module.exports = {
   moduleController,
   attachmentController,
   versionController,
-  approvalController,
   workflowController,
   auditController,
   shareController,

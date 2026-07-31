@@ -966,10 +966,10 @@ INSERT IGNORE INTO approval_workflows (id, name, department_id, description, cre
 VALUES (1, 'Standard SOP Approval', NULL, 'Default 4-step approval chain for all SOPs', 1);
 
 INSERT IGNORE INTO workflow_steps (workflow_id, step_order, step_name, approver_type, approver_role, is_required) VALUES
-    (1, 1, 'Department Review', 'Role', 'Department Head', 1),
-    (1, 2, 'QA Review',         'Role', 'QA Officer',      1),
-    (1, 3, 'Legal Review',      'Role', 'Legal Counsel',   0),
-    (1, 4, 'Final Approval',    'Role', 'CEO',             1);
+    (1, 1, 'Department Review', 'Role', 'department_head', 1),
+    (1, 2, 'QA Review',         'Role', 'admin',           1),
+    (1, 3, 'Legal Review',      'Role', 'admin',           0),
+    (1, 4, 'Final Approval',    'Role', 'super_admin',     1);
 
 -- ============================================================================
 -- END OF DB_SOP.sql (v2.0)

@@ -61,7 +61,7 @@ async function createWorkflowStep(data) {
 async function createWorkflowInstance(data) {
   const { sop_version_id, workflow_id, created_by } = data;
   const [result] = await db.query(
-    'INSERT INTO workflow_instances (sop_version_id, workflow_id, current_step_order, status, started_at, completed_at, created_by, created_at) VALUES (?, ?, 1, \'In Progress\', CURRENT_TIMESTAMP, NULL, ?, CURRENT_TIMESTAMP)',
+    'INSERT INTO workflow_instances (sop_version_id, workflow_id, current_step_order, status, started_at, completed_at, created_by) VALUES (?, ?, 1, \'In Progress\', CURRENT_TIMESTAMP, NULL, ?)',
     [sop_version_id, workflow_id, created_by]
   );
   return result.insertId;
@@ -69,7 +69,7 @@ async function createWorkflowInstance(data) {
 
 async function getWorkflowInstance(sopVersionId) {
   const [rows] = await db.query(
-    'SELECT * FROM workflow_instances WHERE sop_version_id = ? AND status = \'In Progress\' ORDER BY started_at DESC LIMIT 1',
+    'SELECT * FROM workflow_instances WHERE sop_version_id = ? AND status IN (\'In Progress\', \'Approved\') ORDER BY started_at DESC LIMIT 1',
     [sopVersionId]
   );
   return rows[0] || null;
@@ -116,6 +116,14 @@ async function getCurrentStep(instanceId) {
   return rows[0] || null;
 }
 
+async function getWorkflowActions(instanceId) {
+  const [rows] = await db.query(
+    'SELECT * FROM workflow_actions WHERE workflow_instance_id = ? ORDER BY action_at ASC',
+    [instanceId]
+  );
+  return rows;
+}
+
 async function isWorkflowComplete(instanceId) {
   const [rows] = await db.query(`
     SELECT COUNT(*) AS total,
@@ -137,6 +145,7 @@ module.exports = {
   getWorkflows,
   getWorkflowById,
   getWorkflowSteps,
+  getWorkflowActions,
   createWorkflow,
   createWorkflowStep,
   createWorkflowInstance,

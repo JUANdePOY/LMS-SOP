@@ -64,14 +64,14 @@ const approvalWorkflowController = {
 
   async getInstance(req, res) {
     try {
-      const result = await approvalWorkflowService.getWorkflowInstance(
+      const result = await approvalWorkflowService.getWorkflowStatus(
         parseInt(req.params.sopId, 10)
       );
       res.json(successResponse(result));
     } catch (error) {
       handleError(res, error);
     }
-  },
+  }
 };
 
 function handleError(res, error) {

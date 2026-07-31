@@ -95,20 +95,6 @@ CREATE TABLE `approval_workflows` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `arsens`
---
-
-CREATE TABLE `arsens` (
-  `id` int(11) NOT NULL,
-  `name` varchar(255) NOT NULL,
-  `code` varchar(100) NOT NULL,
-  `description` text DEFAULT NULL,
-  `created_at` datetime NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `assignments`
 --
 
@@ -3247,6 +3233,16 @@ ALTER TABLE `workflow_instances`
 --
 ALTER TABLE `workflow_steps`
   ADD CONSTRAINT `fk_workflowstep_workflow` FOREIGN KEY (`workflow_id`) REFERENCES `approval_workflows` (`id`) ON DELETE CASCADE;
+-- Default organization-wide approval workflow (created_by assumes user id 1 exists)
+INSERT IGNORE INTO `approval_workflows` (`id`, `name`, `department_id`, `description`, `created_by`)
+VALUES (1, 'Standard SOP Approval', NULL, 'Default 4-step approval chain for all SOPs', 1);
+
+INSERT IGNORE INTO `workflow_steps` (`workflow_id`, `step_order`, `step_name`, `approver_type`, `approver_role`, `is_required`) VALUES
+    (1, 1, 'Department Review', 'Role', 'department_head', 1),
+    (1, 2, 'QA Review',         'Role', 'admin',           1),
+    (1, 3, 'Legal Review',      'Role', 'admin',           0),
+    (1, 4, 'Final Approval',    'Role', 'super_admin',     1);
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

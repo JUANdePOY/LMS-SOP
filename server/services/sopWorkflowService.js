@@ -1,8 +1,7 @@
 const sopModel = require('../models/sopModel');
 const sopVersionModel = require('../models/sopVersionModel');
-const sopApprovalModel = require('../models/sopApprovalModel');
 const sopAcknowledgementService = require('./sopAcknowledgementService');
-const sopApprovalService = require('./sopApprovalService');
+const approvalWorkflowService = require('./approvalWorkflowService');
 const { canTransitionTo } = require('../utils/sopUtils');
 const { logAudit } = require('../utils/auditLogger');
 const db = require('../config/database');
@@ -23,22 +22,39 @@ async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
   }
 
   if (nextStatus === 'For Review') {
-    await sopApprovalService.createSopApprovals(sopId, actorId);
+    await approvalWorkflowService.startWorkflow(sopId, actorId);
   }
 
   if (nextStatus === 'Approved' || nextStatus === 'Published') {
-    const approvals = await sopApprovalModel.getApprovals(sopId);
-    const pending = approvals.filter((a) => a.status === 'pending');
-    const rejected = approvals.filter((a) => a.status === 'rejected');
-
-    if (rejected.length > 0) {
-      const error = new Error('Cannot transition: SOP has rejected approvals');
+    const workflowInstance = await approvalWorkflowService.getWorkflowInstance(sopId);
+    if (!workflowInstance || workflowInstance.status !== 'Approved') {
+      let pendingSteps = [];
+      if (workflowInstance) {
+        const steps = await approvalWorkflowService.getWorkflowSteps(workflowInstance.workflow_id);
+        const actions = await approvalWorkflowService.getWorkflowActions(workflowInstance.id);
+        pendingSteps = steps
+          .filter((step) => {
+            const stepActions = actions.filter((a) => a.workflow_step_id === step.id);
+            const latestAction = stepActions.length > 0 ? stepActions[stepActions.length - 1] : null;
+            return !latestAction || latestAction.action !== 'Approved';
+          })
+          .map((step) => step.step_name);
+      }
+      const pendingMsg = pendingSteps.length > 0 ? ` Pending steps not approved: ${pendingSteps.join(', ')}.` : '';
+      const error = new Error(`Cannot transition: SOP workflow is not fully approved.${pendingMsg}`);
       error.code = 'APPROVAL_PENDING';
       throw error;
     }
+  }
 
-    if (pending.length > 0) {
-      const error = new Error('Cannot transition: SOP has pending approvals');
+  if (nextStatus === 'Draft') {
+    const workflowInstance = await approvalWorkflowService.getWorkflowInstance(sopId);
+    if (workflowInstance && workflowInstance.status === 'Rejected') {
+      // SOP was rejected — allow transition back to Draft
+    } else if (!workflowInstance) {
+      // No workflow instance exists — allow transition (legacy fallback)
+    } else {
+      const error = new Error('Cannot transition: SOP workflow is not rejected');
       error.code = 'APPROVAL_PENDING';
       throw error;
     }

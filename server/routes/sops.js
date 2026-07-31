@@ -1,6 +1,7 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
-const { sopController, moduleController, attachmentController, versionController, approvalController, workflowController, auditController, shareController, assignmentController, acknowledgementController, approvalWorkflowController } = require('../controllers/sopController');
+const { sopController, moduleController, attachmentController, versionController, workflowController, auditController, shareController, assignmentController, acknowledgementController, approvalWorkflowController } = require('../controllers/sopController');
+const approvalController = require('../controllers/sopApprovalController');
 const assignmentCascadeController = require('../controllers/assignmentCascadeController');
 const { sopAttachmentUploadMiddleware } = require('../middleware/sopUpload');
 

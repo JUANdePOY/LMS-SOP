@@ -1,17 +1,18 @@
 import { useState } from 'react';
 
-function ApprovalPanel({ approvals = [], onApprove, onReject, loading = false }) {
+function ApprovalPanel({ workflow = null, onApprove, onReject, loading = false }) {
   const [actionLoading, setActionLoading] = useState(null);
   const [actionError, setActionError] = useState(null);
 
-  const pending = approvals.filter((a) => a.status === 'pending');
-  const history = approvals.filter((a) => a.status !== 'pending');
+  const steps = workflow?.steps || [];
+  const pending = steps.filter((s) => s.status === 'Pending');
+  const history = steps.filter((s) => s.status !== 'Pending');
 
-  const handleApprove = async (approvalId) => {
-    setActionLoading(approvalId);
+  const handleApprove = async (step) => {
+    setActionLoading(step.id);
     setActionError(null);
     try {
-      await onApprove(approvalId);
+      await onApprove({ instanceId: workflow.id, stepId: step.id, comments: '' });
     } catch (err) {
       const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Approve failed';
       setActionError(message);
@@ -20,11 +21,11 @@ function ApprovalPanel({ approvals = [], onApprove, onReject, loading = false })
     }
   };
 
-  const handleReject = async (approvalId) => {
-    setActionLoading(approvalId);
+  const handleReject = async (step) => {
+    setActionLoading(step.id);
     setActionError(null);
     try {
-      await onReject(approvalId);
+      await onReject({ instanceId: workflow.id, stepId: step.id, comments: '' });
     } catch (err) {
       const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Reject failed';
       setActionError(message);
@@ -43,6 +44,10 @@ function ApprovalPanel({ approvals = [], onApprove, onReject, loading = false })
     );
   }
 
+  if (!workflow) {
+    return <p className="text-sm text-neutral-500 dark:text-neutral-400">No workflow data.</p>;
+  }
+
   return (
     <div className="approval-panel">
       {actionError && (
@@ -53,28 +58,31 @@ function ApprovalPanel({ approvals = [], onApprove, onReject, loading = false })
       {pending.length > 0 ? (
         <div className="space-y-2 mb-4">
           <h4 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">Pending</h4>
-          {pending.map((approval) => (
-            <div key={approval.id} className="flex items-center justify-between border border-neutral-200 dark:border-neutral-700 rounded-lg p-3 bg-white dark:bg-neutral-800">
+          {pending.map((step) => (
+            <div key={step.id} className="flex items-center justify-between border border-neutral-200 dark:border-neutral-700 rounded-lg p-3 bg-white dark:bg-neutral-800">
               <div className="flex items-center gap-2">
                 <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                  <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">{approval.approver_name?.[0]?.toUpperCase() || '?'}</span>
+                  <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">{step.step_name?.[0]?.toUpperCase() || '?'}</span>
                 </div>
-                <span className="text-sm text-neutral-700 dark:text-neutral-300">{approval.approver_name || 'Unknown'}</span>
+                <div>
+                  <span className="text-sm text-neutral-700 dark:text-neutral-300">{step.step_name}</span>
+                  <span className="block text-xs text-neutral-400">{step.approver_role}</span>
+                </div>
               </div>
               <div className="flex gap-1">
                 <button
-                  onClick={() => handleApprove(approval.id)}
-                  disabled={actionLoading === approval.id}
+                  onClick={() => handleApprove(step)}
+                  disabled={actionLoading === step.id}
                   className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {actionLoading === approval.id ? '...' : 'Approve'}
+                  {actionLoading === step.id ? '...' : 'Approve'}
                 </button>
                 <button
-                  onClick={() => handleReject(approval.id)}
-                  disabled={actionLoading === approval.id}
+                  onClick={() => handleReject(step)}
+                  disabled={actionLoading === step.id}
                   className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {actionLoading === approval.id ? '...' : 'Reject'}
+                  {actionLoading === step.id ? '...' : 'Reject'}
                 </button>
               </div>
             </div>
@@ -87,11 +95,11 @@ function ApprovalPanel({ approvals = [], onApprove, onReject, loading = false })
         <div className="pt-4 border-t border-neutral-200 dark:border-neutral-700">
           <h4 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">History</h4>
           <div className="space-y-2">
-            {history.map((approval) => (
-              <div key={approval.id} className="flex items-center justify-between text-xs">
-                <span className="text-neutral-600 dark:text-neutral-400">{approval.approver_name || 'Unknown'}</span>
-                <span className={`font-medium ${approval.status === 'approved' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                  {approval.status}
+            {history.map((step) => (
+              <div key={step.id} className="flex items-center justify-between text-xs">
+                <span className="text-neutral-600 dark:text-neutral-400">{step.step_name}</span>
+                <span className={`font-medium ${step.status === 'Approved' ? 'text-green-600 dark:text-green-400' : step.status === 'Rejected' ? 'text-red-600 dark:text-red-400' : 'text-neutral-400'}`}>
+                  {step.status}
                 </span>
               </div>
             ))}
