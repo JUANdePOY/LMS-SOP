@@ -90,13 +90,13 @@ function EmployeeProtectedWrapper(Component) {
 }
 
 function RoleBasedDashboard() {
-  const { isEmployee, isAdmin, isDepartmentHead, isSuperAdmin } = useAuth();
+  const { isEmployee, isAdmin, isDepartmentHead, isSuperAdmin, isAuthenticated, loading } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) return null;
   if (isEmployee) return <EmployeeDashboard />;
   if (isDepartmentHead || isAdmin || isSuperAdmin) return <Dashboard />;
-  return <Dashboard />;
+  return null;
 }
-
-const RoleBasedDashboardWrapper = wrap(RoleBasedDashboard);
 
 const router = createBrowserRouter([
   {
@@ -106,14 +106,16 @@ const router = createBrowserRouter([
   {
     path: "/",
     element: (
-      <ErrorBoundary>
-        <ToastProvider>
-          <AppLayout />
-        </ToastProvider>
-      </ErrorBoundary>
+      <AuthRoute>
+        <ErrorBoundary>
+          <ToastProvider>
+            <AppLayout />
+          </ToastProvider>
+        </ErrorBoundary>
+      </AuthRoute>
     ),
     children: [
-       { index: true, element: RoleBasedDashboardWrapper, handle: { title: "Dashboard" } },
+        { index: true, element: LMSProtectedWrapper(RoleBasedDashboard), handle: { title: "Dashboard" } },
        { path: "my-learning", element: EmployeeProtectedWrapper(EmployeeDashboard), handle: { title: "My Learning" } },
        { path: "my-learning/catalog", element: EmployeeProtectedWrapper(EmployeeCourseCatalog), handle: { title: "Course Catalog" } },
        { path: "my-learning/course/:id", element: EmployeeProtectedWrapper(EmployeeCourseView), handle: { title: "Course" } },
@@ -147,18 +149,56 @@ const router = createBrowserRouter([
   },
 ]);
 
-export default function App() {
+function AuthRoute({ children }) {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return children;
+}
+
+function AppRoot() {
+  const { loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+      </div>
+    );
+  }
+
   return (
     <SOPProvider>
-          <CourseProvider>
-            <CourseModalProvider>
-              <EnrollmentProvider>
-                <GradingProvider>
-                  <RouterProvider router={router} />
-                </GradingProvider>
-              </EnrollmentProvider>
-            </CourseModalProvider>
-          </CourseProvider>
+      <CourseProvider>
+        <CourseModalProvider>
+          <EnrollmentProvider>
+            <GradingProvider>
+              <RouterProvider router={router} />
+            </GradingProvider>
+          </EnrollmentProvider>
+        </CourseModalProvider>
+      </CourseProvider>
     </SOPProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <ToastProvider>
+        <AppRoot />
+      </ToastProvider>
+    </ErrorBoundary>
   );
 }

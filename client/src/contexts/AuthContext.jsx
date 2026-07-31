@@ -31,13 +31,32 @@ export function AuthProvider({ children }) {
     if (token && storedUser) {
       try {
         const parsedUser = JSON.parse(storedUser);
-        setUser(normalizeUser(parsedUser));
+        api.get('/auth/profile', { skipAuthRedirect: true })
+          .then(response => {
+            if (response.data?.status === 'success' && response.data?.data) {
+              const verifiedUser = normalizeUser(response.data.data);
+              localStorage.setItem('user', JSON.stringify(verifiedUser));
+              setUser(verifiedUser);
+            } else {
+              throw new Error('Invalid response');
+            }
+          })
+          .catch(() => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            setUser(null);
+          })
+          .finally(() => {
+            setLoading(false);
+          });
       } catch {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        setLoading(false);
       }
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const login = useCallback(async (email, password) => {
