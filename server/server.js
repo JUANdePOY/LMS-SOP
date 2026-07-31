@@ -70,7 +70,9 @@ if (loginDebug) {
   });
 }
 
-const clientDist = path.join(__dirname, '..', 'client', 'dist');
+const clientDist = process.env.CLIENT_DIST_PATH
+  ? path.resolve(process.env.CLIENT_DIST_PATH)
+  : path.join(__dirname, '..', 'client', 'dist');
 console.log('Client dist path:', clientDist);
 console.log('Client dist exists:', fs.existsSync(clientDist));
 if (fs.existsSync(clientDist)) {
@@ -128,20 +130,25 @@ app.get('/api/debug', (req, res) => {
   });
 });
 
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   if (req.path.startsWith('/api')) {
     return next();
   }
+
   const indexPath = path.join(clientDist, 'index.html');
-  if (fs.existsSync(indexPath)) {
-    return res.sendFile(indexPath, (err) => {
-      if (err) {
-        console.error('SPA index.html send error:', err.message);
-        return res.status(404).json({ status: 'error', message: 'Not found', code: 'NOT_FOUND' });
-      }
-    });
+  const indexPathExists = fs.existsSync(indexPath);
+
+  if (!indexPathExists) {
+    console.error('SPA index.html missing at', indexPath);
+    return res.status(404).json({ status: 'error', message: 'Not found', code: 'NOT_FOUND' });
   }
-  return res.status(404).json({ status: 'error', message: 'Not found', code: 'NOT_FOUND' });
+
+  try {
+    await res.sendFile(indexPath);
+  } catch (err) {
+    console.error('SPA index.html send error:', err.message, 'code:', err.code);
+    return res.status(404).json({ status: 'error', message: 'Not found', code: 'NOT_FOUND' });
+  }
 });
 
 app.use((err, req, res, next) => {

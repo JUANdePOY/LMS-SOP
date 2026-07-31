@@ -12,7 +12,6 @@ const dbConfig = {
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 10,
-  acquireTimeout: 60000,
   connectTimeout: 30000,
   timezone: '+00:00',
   multipleStatements: true,
