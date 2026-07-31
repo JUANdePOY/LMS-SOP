@@ -13,7 +13,8 @@ function ApprovalPanel({ approvals = [], onApprove, onReject, loading = false })
     try {
       await onApprove(approvalId);
     } catch (err) {
-      setActionError(err?.message || 'Approve failed');
+      const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Approve failed';
+      setActionError(message);
     } finally {
       setActionLoading(null);
     }
@@ -25,7 +26,8 @@ function ApprovalPanel({ approvals = [], onApprove, onReject, loading = false })
     try {
       await onReject(approvalId);
     } catch (err) {
-      setActionError(err?.message || 'Reject failed');
+      const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Reject failed';
+      setActionError(message);
     } finally {
       setActionLoading(null);
     }

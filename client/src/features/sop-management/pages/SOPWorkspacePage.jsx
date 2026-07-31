@@ -6,6 +6,7 @@ import ModuleEditor from '@/features/sop-management/components/SOPEditor/ModuleE
 import AttachmentUploader from '@/features/sop-management/components/SOPEditor/AttachmentUploader';
 import SOPActionBar from '@/features/sop-management/components/SOPActionBar';
 import SOPSidebar from '@/features/sop-management/components/SOPSidebar';
+import { useToast } from '@/shared/components/ui/Toast';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import { useModules } from '@/features/sop-management/hooks/useModules';
 import { useAttachments } from '@/features/sop-management/hooks/useAttachments';
@@ -26,6 +27,7 @@ function SidebarCard({ title, children, className }) {
 function SOPWorkspacePage() {
   const { id } = useParams();
   const sopId = id;
+  const { toast } = useToast();
   const [selectedModule, setSelectedModule] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -89,6 +91,13 @@ function SOPWorkspacePage() {
   const handleSopAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
+      const actionLabels = {
+        submit: 'submitted for review',
+        approve: 'approved',
+        reject: 'rejected',
+        publish: 'published',
+        archive: 'archived',
+      };
       const actionMap = {
         submit: () => submitSop(sopId),
         approve: () => approveSop(sopId),
@@ -100,8 +109,11 @@ function SOPWorkspacePage() {
       await fetchSop();
       await fetchApprovals();
       await fetchAuditLogs();
+      toast.success(`SOP ${actionLabels[action] || 'updated'} successfully`);
     } catch (err) {
+      const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || `${action} failed`;
       console.error(`${action} failed:`, err);
+      toast.error(message);
     } finally {
       setActionLoading((prev) => ({ ...prev, [action]: false }));
     }

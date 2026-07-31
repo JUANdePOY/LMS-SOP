@@ -76,7 +76,17 @@ const approvalWorkflowController = {
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
-  const status = error.status || (code === 'NOT_FOUND' ? 404 : code === 'VALIDATION_ERROR' ? 400 : code === 'INVALID_TRANSITION' ? 400 : code === 'WORKFLOW_NOT_FOUND' ? 404 : 500);
+  const status = error.status || (
+    code === 'NOT_FOUND' ? 404 :
+    code === 'VALIDATION_ERROR' ? 400 :
+    code === 'CODE_EXISTS' ? 409 :
+    code === 'UNAUTHORIZED' ? 403 :
+    code === 'FORBIDDEN' ? 403 :
+    code === 'APPROVAL_PENDING' ? 400 :
+    code === 'INVALID_TRANSITION' ? 400 :
+    code === 'WORKFLOW_NOT_FOUND' ? 404 :
+    500
+  );
   res.status(status).json({ success: false, error: { code, message: error.message } });
 }
 

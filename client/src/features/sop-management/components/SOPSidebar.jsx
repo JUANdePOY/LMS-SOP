@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Share2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
+import { useToast } from '@/shared/components/ui/Toast';
 import ApprovalPanel from '@/features/sop-management/components/ApprovalPanel';
 import VersionTimeline from '@/features/sop-management/components/VersionTimeline';
 import AuditTimeline from '@/features/sop-management/components/AuditTimeline';
@@ -28,6 +29,7 @@ export default function SOPSidebar({ sopId, approvals, setApprovals, auditLogs, 
   const [newVersion, setNewVersion] = useState('');
   const [changeSummary, setChangeSummary] = useState('');
   const [creatingVersion, setCreatingVersion] = useState(false);
+  const { toast } = useToast();
 
   return (
     <>
@@ -36,18 +38,30 @@ export default function SOPSidebar({ sopId, approvals, setApprovals, auditLogs, 
           approvals={approvals}
           loading={approvalsLoading}
           onApprove={async (id) => {
-            await approveApproval(sopId, id);
-            const { data } = await getApprovals(sopId);
-            setApprovals(data?.data || []);
-            if (onAuditRefresh) onAuditRefresh();
-            if (onSopRefresh) onSopRefresh();
+            try {
+              await approveApproval(sopId, id);
+              const { data } = await getApprovals(sopId);
+              setApprovals(data?.data || []);
+              if (onAuditRefresh) onAuditRefresh();
+              if (onSopRefresh) onSopRefresh();
+              toast.success('Approval recorded successfully');
+            } catch (err) {
+              const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Approve failed';
+              toast.error(message);
+            }
           }}
           onReject={async (id) => {
-            await rejectApproval(sopId, id, 'Rejected by reviewer');
-            const { data } = await getApprovals(sopId);
-            setApprovals(data?.data || []);
-            if (onAuditRefresh) onAuditRefresh();
-            if (onSopRefresh) onSopRefresh();
+            try {
+              await rejectApproval(sopId, id, 'Rejected by reviewer');
+              const { data } = await getApprovals(sopId);
+              setApprovals(data?.data || []);
+              if (onAuditRefresh) onAuditRefresh();
+              if (onSopRefresh) onSopRefresh();
+              toast.success('Rejection recorded successfully');
+            } catch (err) {
+              const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Reject failed';
+              toast.error(message);
+            }
           }}
         />
       </SidebarCard>
