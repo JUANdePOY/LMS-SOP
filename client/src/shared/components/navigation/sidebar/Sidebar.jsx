@@ -72,7 +72,7 @@ const MENU_ITEMS = [
         name: "SOP Management",
         path: "/admin/organization",
         icon: Building2,
-        sub: ["hierarchy", "Businesses", "Departments", "Categories", "SOP Management"],
+        sub: ["Dashboard", "Businesses", "Departments", "Categories", "Files"],
       },
        { name: "Course Management", path: "/courses", icon: BookOpen },
        { name: "Course Library", path: "/courses/library", icon: Library },
@@ -142,10 +142,10 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Auto-expand Organization Management when on its child routes
+  // Auto-expand SOP Management when on its child routes
   useEffect(() => {
     if (location.pathname.startsWith("/admin/organization") || location.pathname.startsWith("/sops")) {
-      setExpandedSubMenus(prev => ({ ...prev, "Organization Management": true }));
+      setExpandedSubMenus(prev => ({ ...prev, "SOP Management": true }));
     }
   }, [location.pathname]);
 
@@ -164,8 +164,11 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
 
   const isAnySubActive = (subItems, basePath) => {
     return subItems.some((subItem) => {
-      if (subItem === "SOP Management") {
+      if (subItem === "Files") {
         return location.pathname.startsWith("/sops");
+      }
+      if (subItem === "Dashboard") {
+        return location.pathname.startsWith("/admin/organization");
       }
       const subPath = `${basePath}/${subItem.toLowerCase().replace(/\s+/g, '-')}`;
       return location.pathname.startsWith(subPath);
@@ -203,8 +206,12 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
             collapsed && "justify-center"
           )}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
-            <LayoutDashboard size={18} className="text-white" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg">
+            <img
+              src="/UseThisLogo.png"
+              alt="SOP Training"
+              className="h-6 w-6 object-contain"
+            />
           </div>
           {!collapsed && (
             <div className="flex flex-col leading-tight overflow-hidden">
@@ -289,9 +296,12 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                               <div className="relative ml-[22px] mt-0.5 border-l border-[var(--border-sidebar)] pb-0.5">
                                 <ul className="space-y-0.5 py-0.5" role="list">
                                   {sub.sub.map((subItem) => {
-                                    const isSopMgmt = subItem === "SOP Management";
-                                    const subPath = isSopMgmt ? "/sops" : `${sub.path}/${subItem.toLowerCase().replace(/\s+/g, '-')}`;
-                                    const active = isActive(subPath);
+                                    const isSopMgmt = subItem === "Files";
+                                    const isDashboard = subItem === "Dashboard";
+                                    const subPath = isSopMgmt ? "/sops" : isDashboard ? "/admin/organization" : `${sub.path}/${subItem.toLowerCase().replace(/\s+/g, '-')}`;
+                                    const active = isDashboard
+                                      ? location.pathname === "/admin/organization" || location.pathname === "/admin/organization/hierarchy"
+                                      : isActive(subPath);
                                     return (
                                       <li key={subItem}>
                                         <Link

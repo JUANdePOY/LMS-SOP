@@ -1,4 +1,6 @@
-function VersionTimeline({ versions, onRestore, loading = false, restoring = false }) {
+import { Link } from 'react-router-dom';
+
+function VersionTimeline({ versions, onRestore, sopId, loading = false, restoring = false }) {
   if (loading) {
     return (
       <div className="space-y-3">
@@ -24,7 +26,9 @@ function VersionTimeline({ versions, onRestore, loading = false, restoring = fal
             <div className="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full border-2 border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900"></div>
             <div className="flex justify-between items-start">
               <div>
-                <span className="font-medium text-sm text-neutral-900 dark:text-neutral-100">v{version.version}</span>
+                <Link to={sopId ? `/sops/${sopId}/versions/${version.id}` : '#'} className="font-medium text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
+                  v{version.version}
+                </Link>
                 <span className={`ml-2 px-2 py-0.5 rounded text-xs ${
                   version.status === 'Published' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
                   version.status === 'Draft' ? 'bg-gray-100 text-gray-800 dark:bg-neutral-700 dark:text-neutral-300' :

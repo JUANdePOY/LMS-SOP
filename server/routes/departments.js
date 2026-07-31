@@ -173,6 +173,9 @@ router.delete('/:id', async (req, res) => {
     res.json({ status: 'success', message: 'Department deleted successfully' });
   } catch (err) {
     console.error('Department delete error:', err);
+    if (err.code === 'HAS_DEPENDENCIES') {
+      return res.status(409).json({ status: 'error', message: err.message, code: 'HAS_DEPENDENCIES' });
+    }
     res.status(500).json({ status: 'error', message: 'Failed to delete department', code: 'DB_ERROR' });
   }
 });

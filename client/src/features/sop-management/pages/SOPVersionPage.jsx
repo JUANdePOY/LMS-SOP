@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import VersionTimeline from '@/features/sop-management/components/VersionTimeline';
+import { useParams, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
 
 function SOPVersionPage() {
   const { id, versionId } = useParams();
   const sopId = id;
+  const navigate = useNavigate();
   const [version, setVersion] = useState(null);
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [restoring, setRestoring] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -27,6 +28,18 @@ function SOPVersionPage() {
     }
     fetchData();
   }, [sopId, versionId]);
+
+  const handleRestore = async () => {
+    setRestoring(true);
+    try {
+      await api.post(`/sops/${sopId}/versions/${versionId}/restore`);
+      navigate(`/sops/${sopId}`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRestoring(false);
+    }
+  };
 
   if (loading) return <p>Loading version...</p>;
   if (!version) return <p>Version not found.</p>;
@@ -53,8 +66,12 @@ function SOPVersionPage() {
         ))}
       </div>
       <div className="mt-6">
-        <button className="px-4 py-2 bg-indigo-600 text-white rounded-md">
-          Restore this version
+        <button
+          onClick={handleRestore}
+          disabled={restoring}
+          className="px-4 py-2 bg-indigo-600 text-white rounded-md disabled:opacity-50 transition-colors"
+        >
+          {restoring ? 'Restoring...' : 'Restore this version'}
         </button>
       </div>
     </div>

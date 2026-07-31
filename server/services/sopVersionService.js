@@ -2,6 +2,7 @@ const sopVersionModel = require('../models/sopVersionModel');
 const sopModel = require('../models/sopModel');
 const sopChangeLogModel = require('../models/sopChangeLogModel');
 const { logAudit } = require('../utils/auditLogger');
+const sopAuditLogService = require('./sopAuditLogService');
 
 async function listVersions(sopId) {
   return sopVersionModel.getVersions(sopId);
@@ -41,6 +42,14 @@ async function createVersion(sopId, data, actorId) {
     metadata: { sop_id: sopId },
   });
 
+  sopAuditLogService.logEntry({
+    entity_type: 'sop_version',
+    entity_id: versionId,
+    action: 'sop.version.created',
+    performed_by: actorId,
+    new_values: { version: data.version || '1.0', status: data.status || 'Draft' },
+  });
+
   return { id: versionId };
 }
 
@@ -58,6 +67,13 @@ async function restoreVersion(sopId, versionId, actorId) {
     entity_type: 'sop_version',
     entity_id: versionId,
     metadata: { sop_id: sopId },
+  });
+
+  sopAuditLogService.logEntry({
+    entity_type: 'sop_version',
+    entity_id: versionId,
+    action: 'sop.version.restored',
+    performed_by: actorId,
   });
 
   return result;

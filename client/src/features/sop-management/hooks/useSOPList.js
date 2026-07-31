@@ -3,8 +3,10 @@ import { getSops, createSop, updateSop, deleteSop } from '@/features/sop-managem
 import { createAssignment } from '@/features/sop-management/services/assignmentService';
 import { useAssignmentCascade } from '@/features/sop-management/hooks/useAssignmentCascade';
 import { SOP_STATUSES } from '@/features/sop-management/constants/sopConstants';
+import { useToast } from '@/shared/components/ui/Toast';
 
 export function useSOPList() {
+  const { toast } = useToast();
   const cascade = useAssignmentCascade();
   const [sops, setSops] = useState([]);
   const [search, setSearch] = useState('');
@@ -34,7 +36,7 @@ export function useSOPList() {
         const { data } = await getSops(params);
         setSops(data?.data?.rows || []);
       } catch (err) {
-        console.error(err);
+        toast.error('Failed to fetch SOPs');
       } finally {
         setLoading(false);
       }
@@ -59,7 +61,7 @@ export function useSOPList() {
       const { data: sopData } = await createSop({
         title: newTitle,
         description: newDescription,
-        department_id: null,
+        department_id: cascade.selectedDeptIds.length > 0 ? cascade.selectedDeptIds[0] : null,
         status: SOP_STATUSES.DRAFT,
       });
       const sopId = sopData?.data?.id || sopData?.id;
@@ -75,8 +77,9 @@ export function useSOPList() {
       resetForm();
       setShowCreate(false);
       await fetchSops();
+      toast.success('SOP created successfully');
     } catch (err) {
-      console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to create SOP');
     } finally {
       setLoading(false);
     }
@@ -106,8 +109,9 @@ export function useSOPList() {
       });
       setEditingSopId(null);
       await fetchSops();
+      toast.success('SOP updated successfully');
     } catch (err) {
-      console.error('Failed to update SOP:', err);
+      toast.error(err.response?.data?.message || 'Failed to update SOP');
     }
   };
 
@@ -115,8 +119,9 @@ export function useSOPList() {
     try {
       await deleteSop(sopId);
       await fetchSops();
+      toast.success('SOP deleted successfully');
     } catch (err) {
-      console.error('Failed to delete SOP:', err);
+      toast.error(err.response?.data?.message || 'Failed to delete SOP');
     }
   };
 

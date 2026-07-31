@@ -6,14 +6,18 @@ import { useBusinesses } from '../hooks/useBusinesses';
 import { uploadBusinessLogo } from '../api/business.api';
 import KPICards from '../components/KPICards';
 import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
+import { useToast } from '@/shared/components/ui/Toast';
+import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 
 export default function BusinessPage() {
   const { businesses, loading, error, create, update, remove } = useBusinesses();
+  const { toast } = useToast();
   const [modalOpen, setModalOpen] = useState(false);
   const [editData, setEditData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, business: null });
 
   const safeQuery = sanitizeSearchQuery(query);
 
@@ -56,8 +60,9 @@ export default function BusinessPage() {
       }
       setModalOpen(false);
       setEditData(null);
+      toast.success('Business created successfully');
     } catch (err) {
-      console.error('Failed to create business:', err);
+      toast.error(err.response?.data?.message || 'Failed to create business');
     } finally {
       setSubmitting(false);
     }
@@ -76,8 +81,9 @@ export default function BusinessPage() {
       }
       setModalOpen(false);
       setEditData(null);
+      toast.success('Business updated successfully');
     } catch (err) {
-      console.error('Failed to update business:', err);
+      toast.error(err.response?.data?.message || 'Failed to update business');
     } finally {
       setSubmitting(false);
     }
@@ -88,12 +94,20 @@ export default function BusinessPage() {
     setModalOpen(true);
   };
 
-  const handleDelete = async (business) => {
-    if (!window.confirm(`Are you sure you want to delete "${business.business_name}"? This action cannot be undone.`)) return;
+  const handleDelete = (business) => {
+    setDeleteConfirm({ open: true, business });
+  };
+
+  const confirmDelete = async () => {
+    const business = deleteConfirm.business;
+    if (!business) return;
     try {
       await remove(business.id);
+      toast.success('Business deleted successfully');
     } catch (err) {
-      console.error('Failed to delete business:', err);
+      toast.error(err.response?.data?.message || 'Failed to delete business');
+    } finally {
+      setDeleteConfirm({ open: false, business: null });
     }
   };
 
@@ -101,8 +115,9 @@ export default function BusinessPage() {
     const newStatus = business.status === 'active' ? 'inactive' : 'active';
     try {
       await update(business.id, { status: newStatus });
+      toast.success(`Business ${newStatus === 'active' ? 'activated' : 'deactivated'} successfully`);
     } catch (err) {
-      console.error('Failed to toggle business status:', err);
+      toast.error(err.response?.data?.message || 'Failed to toggle business status');
     }
   };
 
@@ -124,9 +139,9 @@ export default function BusinessPage() {
         </div>
         <button
           onClick={() => { setEditData(null); setModalOpen(true); }}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
         >
-          <Plus className="h-4 w-4" />
+          <Plus size={16} />
           Create Business
         </button>
       </div>
@@ -185,6 +200,17 @@ export default function BusinessPage() {
         onSubmit={editData ? handleUpdate : handleCreate}
         initialData={editData}
         loading={submitting}
+      />
+
+      <ConfirmationDialog
+        isOpen={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ open: false, business: null })}
+        onConfirm={confirmDelete}
+        title="Delete Business"
+        message={`Are you sure you want to delete "${deleteConfirm.business?.business_name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
       />
     </div>
   );

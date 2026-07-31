@@ -50,6 +50,16 @@ async function getModuleById(moduleId) {
   return rows[0] || null;
 }
 
+async function getModuleByIdIncludingDeleted(moduleId) {
+  const cols = await getModulesColumns();
+  const [rows] = await db.query(`
+    SELECT m.*
+    FROM sop_modules m
+    WHERE m.id = ?
+  `, [moduleId]);
+  return rows[0] || null;
+}
+
 async function createModule(data) {
   const { sop_id, title, content, sort_order, created_by } = data;
   const cols = await getModulesColumns();
@@ -136,6 +146,7 @@ async function updateSortOrder(sopId, moduleOrders) {
 module.exports = {
   listModules,
   getModuleById,
+  getModuleByIdIncludingDeleted,
   createModule,
   updateModule,
   deleteModule,

@@ -1,4 +1,4 @@
-function AuditTimeline({ logs, loading = false }) {
+function AuditTimeline({ logs = [], loading = false }) {
   if (loading) {
     return (
       <div className="space-y-3">
@@ -16,6 +16,32 @@ function AuditTimeline({ logs, loading = false }) {
     return <p className="text-neutral-500 dark:text-neutral-400 text-sm">No audit entries.</p>;
   }
 
+  function renderDetails(log) {
+    if (log.old_values && log.new_values) {
+      return (
+        <div className="mt-1 text-xs text-neutral-400 dark:text-neutral-500">
+          <span className="line-through text-neutral-400">{typeof log.old_values === 'object' ? JSON.stringify(log.old_values) : log.old_values}</span>{' '}
+          <span className="text-green-600 dark:text-green-400">{typeof log.new_values === 'object' ? JSON.stringify(log.new_values) : log.new_values}</span>
+        </div>
+      );
+    }
+
+    if (log.metadata) {
+      const meta = typeof log.metadata === 'string' ? (() => { try { return JSON.parse(log.metadata); } catch { return null; } })() : log.metadata;
+      if (meta) {
+        return (
+          <div className="mt-1 text-xs text-neutral-400 dark:text-neutral-500">
+            {Object.entries(meta).map(([key, val]) => (
+              <span key={key} className="mr-2"><span className="font-medium">{key}:</span> {typeof val === 'object' ? JSON.stringify(val) : String(val)}</span>
+            ))}
+          </div>
+        );
+      }
+    }
+
+    return null;
+  }
+
   return (
     <div className="audit-timeline">
       <div className="space-y-3">
@@ -29,12 +55,7 @@ function AuditTimeline({ logs, loading = false }) {
               </span>
             </div>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">by {log.user_name || 'Unknown'}</p>
-            {log.old_values && log.new_values && (
-              <div className="mt-1 text-xs text-neutral-400 dark:text-neutral-500">
-                <span className="line-through text-neutral-400">{typeof log.old_values === 'object' ? JSON.stringify(log.old_values) : log.old_values}</span>{' '}
-                <span className="text-green-600 dark:text-green-400">{typeof log.new_values === 'object' ? JSON.stringify(log.new_values) : log.new_values}</span>
-              </div>
-            )}
+            {renderDetails(log)}
           </div>
         ))}
       </div>

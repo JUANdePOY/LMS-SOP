@@ -4,15 +4,13 @@ import { X, Plus, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose
 import ModuleList from '@/features/sop-management/components/SOPEditor/ModuleList';
 import ModuleEditor from '@/features/sop-management/components/SOPEditor/ModuleEditor';
 import AttachmentUploader from '@/features/sop-management/components/SOPEditor/AttachmentUploader';
-import ApprovalPanel from '@/features/sop-management/components/ApprovalPanel';
 import SOPActionBar from '@/features/sop-management/components/SOPActionBar';
 import SOPSidebar from '@/features/sop-management/components/SOPSidebar';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import { useModules } from '@/features/sop-management/hooks/useModules';
 import { useAttachments } from '@/features/sop-management/hooks/useAttachments';
 import { useVersions } from '@/features/sop-management/hooks/useVersions';
-import { getSop, updateSop } from '@/features/sop-management/services/sopService';
-import api from '@/lib/api';
+import { getSop, getApprovals, getAuditLogs, submitSop, approveSop, rejectSop, publishSop, transitionSop } from '@/features/sop-management/services/sopService';
 
 function SidebarCard({ title, children, className }) {
   return (
@@ -34,6 +32,8 @@ function SOPWorkspacePage() {
   const [restoring, setRestoring] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
   const [approvals, setApprovals] = useState([]);
+  const [approvalsLoading, setApprovalsLoading] = useState(false);
+  const [auditLogsLoading, setAuditLogsLoading] = useState(false);
   const [sop, setSop] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
   const [showLeftSidebar, setShowLeftSidebar] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
@@ -42,7 +42,7 @@ function SOPWorkspacePage() {
 
   const { modules, loading: modulesLoading, error: modulesError, addModule, editModule, removeModule, reorderModules, submitModuleForReview } = useModules(sopId);
   const { attachments, loading: attachmentsLoading, error: attachmentsError, upload, remove: removeAttachment } = useAttachments(selectedModule?.id);
-  const { versions, loading: versionsLoading, error: versionsError, restore } = useVersions(sopId);
+  const { versions, loading: versionsLoading, error: versionsError, restore, refetch: refetchVersions } = useVersions(sopId);
 
   const fetchSop = async () => {
     if (!sopId) return;
@@ -54,16 +54,33 @@ function SOPWorkspacePage() {
 
   const fetchApprovals = async () => {
     if (!sopId) return;
+    setApprovalsLoading(true);
     try {
-      const { data } = await api.get(`/sops/${sopId}/approvals`);
+      const { data } = await getApprovals(sopId);
       setApprovals(data?.data || []);
     } catch { /* ignore */ }
+    finally {
+      setApprovalsLoading(false);
+    }
   };
+
+  const fetchAuditLogs = async () => {
+    if (!sopId) return;
+    setAuditLogsLoading(true);
+    try {
+      const { data } = await getAuditLogs(sopId);
+      setAuditLogs(data?.data || []);
+    } catch { /* ignore */ }
+    finally {
+      setAuditLogsLoading(false);
+    }
+  };
+
 
   useEffect(() => {
     if (!sopId) return;
     Promise.all([
-      api.get(`/sops/${sopId}/audit`).then((r) => setAuditLogs(r.data?.data || [])).catch(() => {}),
+      fetchAuditLogs(),
       fetchApprovals(),
       fetchSop(),
     ]);
@@ -73,15 +90,16 @@ function SOPWorkspacePage() {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
       const actionMap = {
-        submit: () => api.post(`/sops/${sopId}/submit`),
-        approve: () => api.post(`/sops/${sopId}/approve`),
-        reject: () => api.post(`/sops/${sopId}/reject`),
-        publish: () => api.post(`/sops/${sopId}/publish`),
-        archive: () => api.post(`/sops/${sopId}/transition`, { status: 'Archived' }),
+        submit: () => submitSop(sopId),
+        approve: () => approveSop(sopId),
+        reject: () => rejectSop(sopId),
+        publish: () => publishSop(sopId),
+        archive: () => transitionSop(sopId, { status: 'Archived' }),
       };
       await actionMap[action]();
       await fetchSop();
       await fetchApprovals();
+      await fetchAuditLogs();
     } catch (err) {
       console.error(`${action} failed:`, err);
     } finally {
@@ -126,6 +144,9 @@ function SOPWorkspacePage() {
     setRestoring(true);
     try {
       await restore(versionId);
+      await Promise.all([refetchVersions(), fetchSop()]);
+    } catch (err) {
+      console.error('Restore failed:', err);
     } finally {
       setRestoring(false);
     }
@@ -319,12 +340,12 @@ function SOPWorkspacePage() {
                   <h2 className="font-semibold text-neutral-900 dark:text-neutral-100">Details</h2>
                   <button onClick={() => setShowRightSidebar(false)} className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"><X size={20} className="text-neutral-500 dark:text-neutral-400" /></button>
                 </div>
-                <div className="p-4 overflow-y-auto flex-1"><SOPSidebar sopId={sopId} approvals={approvals} setApprovals={setApprovals} auditLogs={auditLogs} versions={versions} versionsLoading={versionsLoading} versionsError={versionsError} onVersionRestore={handleVersionRestore} /></div>
+                 <div className="p-4 overflow-y-auto flex-1"><SOPSidebar sopId={sopId} approvals={approvals} setApprovals={setApprovals} auditLogs={auditLogs} versions={versions} versionsLoading={versionsLoading} versionsError={versionsError} approvalsLoading={approvalsLoading} auditLogsLoading={auditLogsLoading} onVersionRestore={handleVersionRestore} onAuditRefresh={fetchAuditLogs} onSopRefresh={fetchSop} refetchVersions={refetchVersions} /></div>
               </div>
             </div>
           )}
           <div className="hidden lg:flex lg:flex-col gap-4 max-h-[calc(100vh-140px)] overflow-y-auto">
-            <SOPSidebar sopId={sopId} approvals={approvals} setApprovals={setApprovals} auditLogs={auditLogs} versions={versions} versionsLoading={versionsLoading} versionsError={versionsError} onVersionRestore={handleVersionRestore} />
+            <SOPSidebar sopId={sopId} approvals={approvals} setApprovals={setApprovals} auditLogs={auditLogs} versions={versions} versionsLoading={versionsLoading} versionsError={versionsError} approvalsLoading={approvalsLoading} auditLogsLoading={auditLogsLoading} onVersionRestore={handleVersionRestore} onAuditRefresh={fetchAuditLogs} onSopRefresh={fetchSop} refetchVersions={refetchVersions} />
           </div>
         </aside>
       </div>

@@ -1,38 +1,56 @@
 const db = require('../config/database');
 
+// The database table is `audit_logs` (not `sop_audit_logs`).
+// Column layout: id, user_id, action, entity_type, entity_id, metadata, ip_address, user_agent, created_at
+// We join with `users` to get user_name.
+
 async function listBySop(sopId) {
-  const [rows] = await db.query(`
-    SELECT sal.*, u.full_name AS user_name
-    FROM sop_audit_logs sal
-    LEFT JOIN users u ON sal.performed_by = u.id
-    WHERE sal.entity_id IN (
-      SELECT sv.id FROM sop_versions sv WHERE sv.sop_id = ?
-      UNION
-      SELECT s.id FROM sops s WHERE s.id = ?
-    )
-    OR sal.entity_type = 'sop' AND sal.entity_id = ?
-    ORDER BY sal.created_at DESC
-  `, [sopId, sopId, sopId]);
+  const [rows] = await db.query(
+    `
+      SELECT a.*, u.full_name AS user_name
+      FROM audit_logs a
+      LEFT JOIN users u ON a.user_id = u.id
+      WHERE a.entity_type = 'sop' AND a.entity_id = ?
+      OR (
+        a.entity_type IN ('sop_section', 'sop_step', 'sop_document')
+        AND JSON_EXTRACT(a.metadata, '$.sop_id') = ?
+      )
+      OR (
+        a.entity_type = 'sop_version'
+        AND a.entity_id IN (SELECT id FROM sop_versions WHERE sop_id = ?)
+      )
+      ORDER BY a.created_at DESC
+    `,
+    [sopId, sopId, sopId]
+  );
   return rows;
 }
 
 async function listByVersion(versionId) {
-  const [rows] = await db.query(`
-    SELECT sal.*, u.full_name AS user_name
-    FROM sop_audit_logs sal
-    LEFT JOIN users u ON sal.performed_by = u.id
-    WHERE sal.entity_type = 'sop_version' AND sal.entity_id = ?
-    ORDER BY sal.created_at DESC
-  `, [versionId]);
+  const [rows] = await db.query(
+    `
+      SELECT a.*, u.full_name AS user_name
+      FROM audit_logs a
+      LEFT JOIN users u ON a.user_id = u.id
+      WHERE a.entity_type = 'sop_version' AND a.entity_id = ?
+      ORDER BY a.created_at DESC
+    `,
+    [versionId]
+  );
   return rows;
 }
 
 async function createEntry(data) {
-  const { public_id, entity_type, entity_id, action, performed_by, old_values, new_values } = data;
-  const [result] = await db.query(`
-    INSERT INTO sop_audit_logs (public_id, entity_type, entity_id, action, performed_by, old_values, new_values, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-  `, [public_id || null, entity_type, entity_id, action, performed_by || null, old_values || null, new_values || null]);
+  const { entity_type, entity_id, action, performed_by, old_values, new_values } = data;
+  const metadata = {};
+  if (old_values) metadata.old_values = old_values;
+  if (new_values) metadata.new_values = new_values;
+
+  const [result] = await db.query(
+    `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, metadata, created_at)
+     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+    [performed_by || null, action, entity_type, entity_id, JSON.stringify(metadata)]
+  );
   return result.insertId;
 }
 

@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/shared/components/navigation/sidebar/Sidebar";
 import { useTheme } from "@/hooks/useTheme";
+import { Scrollbar } from "@/shared/components/ui/Scrollbar";
 
 const MOBILE_BOTTOM_NAV_ADMIN = [
   { name: "Home", path: "/", icon: Home },
@@ -75,79 +76,81 @@ export default function AppLayout() {
           "ml-0"
         )}
       >
-        <header
-          className={cn(
-            "sticky top-0 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 h-14",
-            "border-b border-[var(--border)]",
-            "bg-[var(--bg-topbar)]",
-            "transition-colors duration-300"
-          )}
-        >
-          <button
-            onClick={() => setCollapsed((v) => !v)}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="hidden lg:flex h-9 w-9 items-center justify-center text-white/70 hover:text-white transition-colors duration-150"
-          >
-            {collapsed ? (
-              <PanelRightClose size={20} />
-            ) : (
-              <PanelLeftClose size={20} />
+        <Scrollbar variant="viewport">
+          <header
+            className={cn(
+              "sticky top-0 z-30 flex items-center gap-2 sm:gap-3 px-3 sm:px-4 lg:px-6 h-14",
+              "border-b border-[var(--border)]",
+              "bg-[var(--bg-topbar)]",
+              "transition-colors duration-300"
             )}
-          </button>
+          >
+            <button
+              onClick={() => setCollapsed((v) => !v)}
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="hidden lg:flex h-9 w-9 items-center justify-center text-white/70 hover:text-white transition-colors duration-150"
+            >
+              {collapsed ? (
+                <PanelRightClose size={20} />
+              ) : (
+                <PanelLeftClose size={20} />
+              )}
+            </button>
 
-          
+            
 
-          <div className="flex-1 max-w-md mx-auto hidden md:block">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-              <input
-                type="text"
-                placeholder="Search users, SOPs, trainings, tasks…"
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-9 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
-              />
+            <div className="flex-1 max-w-md mx-auto hidden md:block">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                <input
+                  type="text"
+                  placeholder="Search users, SOPs, trainings, tasks…"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-9 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
+                />
+              </div>
             </div>
+
+            <div className="flex items-center gap-0.5 sm:gap-1">
+              <button
+                aria-label="Notifications"
+                className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
+              >
+                <Bell size={18} />
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">3</span>
+              </button>
+              <button
+                aria-label="Messages"
+                className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
+              >
+                <Mail size={18} />
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">5</span>
+              </button>
+              <button
+                aria-label="Calendar"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
+              >
+                <Calendar size={18} />
+              </button>
+              <button
+                onClick={toggleTheme}
+                aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
+              >
+                {isDark ? <Sun size={18} /> : <Moon size={18} />}
+              </button>
+            </div>
+          </header>
+
+          <div className="flex-1 w-full px-4 sm:px-6 py-4 sm:py-6">
+            <Outlet />
           </div>
 
-          <div className="flex items-center gap-0.5 sm:gap-1">
-            <button
-              aria-label="Notifications"
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
-            >
-              <Bell size={18} />
-              <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">3</span>
-            </button>
-            <button
-              aria-label="Messages"
-              className="relative flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
-            >
-              <Mail size={18} />
-              <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">5</span>
-            </button>
-            <button
-              aria-label="Calendar"
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
-            >
-              <Calendar size={18} />
-            </button>
-            <button
-              onClick={toggleTheme}
-              aria-label={isDark ? "Switch to light theme" : "Switch to dark theme"}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/15 transition-colors"
-            >
-              {isDark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-          </div>
-        </header>
-
-        <div className="flex-1 w-full px-4 sm:px-6 py-4 sm:py-6">
-          <Outlet />
-        </div>
-
-        <footer className="border-t border-[var(--border)] py-2.5 text-center">
-          <p className="text-[11px] sm:text-xs text-neutral-400">
-            © {new Date().getFullYear()} SOP Training Platform. All rights reserved.
-          </p>
-        </footer>
+          <footer className="border-t border-[var(--border)] py-2.5 text-center">
+            <p className="text-[11px] sm:text-xs text-neutral-400">
+              © {new Date().getFullYear()} SOP Training Platform. All rights reserved.
+            </p>
+          </footer>
+        </Scrollbar>
       </main>
 
       <nav

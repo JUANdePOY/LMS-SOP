@@ -71,6 +71,9 @@ router.route('/:sopId/versions')
   .get(versionController.list)
   .post(versionController.create);
 
+router.route('/:sopId/versions/:versionId')
+  .get(versionController.getById);
+
 router.route('/:sopId/versions/:versionId/restore')
   .post(versionController.restore);
 
@@ -80,7 +83,9 @@ router.route('/:sopId/approvals')
 
 router.route('/:sopId/approvals/:approvalId')
   .put(approvalController.update)
-  .post(approvalController.approve)
+  .post(approvalController.approve);
+
+router.route('/:sopId/approvals/:approvalId/reject')
   .post(approvalController.reject);
 
 router.route('/:sopId/workflow')

@@ -1,8 +1,9 @@
 const sopApprovalModel = require('../models/sopApprovalModel');
 const sopModel = require('../models/sopModel');
 const sopVersionModel = require('../models/sopVersionModel');
-const approvalWorkflowService = require('./approvalWorkflowService');
+const departmentModel = require('../models/departmentModel');
 const { logAudit } = require('../utils/auditLogger');
+const sopAuditLogService = require('./sopAuditLogService');
 
 async function listApprovals(sopId) {
   return sopApprovalModel.getApprovals(sopId);
@@ -44,7 +45,71 @@ async function createApproval(sopId, data, actorId) {
     metadata: { sop_id: sopId },
   });
 
+  sopAuditLogService.logEntry({
+    entity_type: 'sop_approval',
+    entity_id: id,
+    action: 'sop.approval.created',
+    performed_by: actorId,
+    new_values: { sop_id: sopId, status: data.status || 'pending', approver_user_id: data.approver_user_id || actorId },
+  });
+
   return { id };
+}
+
+async function createSopApprovals(sopId, actorId) {
+  const sop = await sopModel.findById(sopId);
+  if (!sop) {
+    const error = new Error('SOP not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+
+  const existing = await sopApprovalModel.getApprovals(sopId);
+
+  const approverUserIds = [];
+
+  if (sop.department_id) {
+    const department = await departmentModel.findById(sop.department_id);
+    if (department && department.head_user_id) {
+      approverUserIds.push(department.head_user_id);
+    }
+  }
+
+  if (approverUserIds.length === 0 && sop.owner_user_id) {
+    approverUserIds.push(sop.owner_user_id);
+  }
+
+  if (approverUserIds.length === 0) {
+    return { created: 0, message: 'No approver found' };
+  }
+
+  const version = await sopVersionModel.getCurrentVersion(sopId);
+
+  if (existing.length > 0) {
+    for (const approval of existing) {
+      if (approval.status !== 'pending') {
+        await sopApprovalModel.updateApproval(approval.id, {
+          status: 'pending',
+          comments: null,
+        });
+      }
+    }
+    return { created: 0, message: 'Existing approvals reset for new review round' };
+  }
+
+  let created = 0;
+  for (const userId of approverUserIds) {
+    await sopApprovalModel.createApproval({
+      sop_id: sopId,
+      sop_version_id: version?.id || null,
+      approver_user_id: userId,
+      status: 'pending',
+      comments: null,
+    });
+    created++;
+  }
+
+  return { created };
 }
 
 async function updateApproval(approvalId, data, actorId) {
@@ -66,6 +131,15 @@ async function updateApproval(approvalId, data, actorId) {
     entity_type: 'sop_approval',
     entity_id: approvalId,
     metadata: { sop_id: existing.sop_id, status: data.status },
+  });
+
+  sopAuditLogService.logEntry({
+    entity_type: 'sop_approval',
+    entity_id: approvalId,
+    action: 'sop.approval.updated',
+    performed_by: actorId,
+    old_values: { status: existing.status, comments: existing.comments },
+    new_values: { status: data.status, comments: data.comments },
   });
 
   return { affectedRows: 1 };
@@ -102,6 +176,15 @@ async function approveApproval(approvalId, actorId, comments) {
     entity_type: 'sop_approval',
     entity_id: approvalId,
     metadata: { sop_id: existing.sop_id, comments },
+  });
+
+  sopAuditLogService.logEntry({
+    entity_type: 'sop_approval',
+    entity_id: approvalId,
+    action: 'sop.approval.approved',
+    performed_by: actorId,
+    old_values: { status: existing.status, comments: existing.comments },
+    new_values: { status: 'approved', comments },
   });
 
   await checkAndTransitionSop(existing.sop_id);
@@ -148,6 +231,15 @@ async function rejectApproval(approvalId, actorId, comments) {
     metadata: { sop_id: existing.sop_id, comments },
   });
 
+  sopAuditLogService.logEntry({
+    entity_type: 'sop_approval',
+    entity_id: approvalId,
+    action: 'sop.approval.rejected',
+    performed_by: actorId,
+    old_values: { status: existing.status, comments: existing.comments },
+    new_values: { status: 'rejected', comments },
+  });
+
   await checkAndTransitionSop(existing.sop_id);
 
   return { id: approvalId, status: 'rejected' };
@@ -183,6 +275,7 @@ module.exports = {
   listApprovals,
   getApprovalById,
   createApproval,
+  createSopApprovals,
   updateApproval,
   approveApproval,
   rejectApproval,

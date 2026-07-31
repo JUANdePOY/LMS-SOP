@@ -42,9 +42,6 @@ const sopController = {
       if (!title || !title.trim()) {
         return res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Title is required" } });
       }
-      if (!department_id) {
-        return res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Department is required" } });
-      }
       const result = await sopService.createSop(req.body, req.user.id);
       res.status(201).json({ success: true, data: result, message: 'SOP created successfully' });
     } catch (error) {
@@ -259,6 +256,20 @@ const attachmentController = {
 };
 
 const versionController = {
+  async getById(req, res) {
+    try {
+      const result = await sopVersionService.getVersionById(parseInt(req.params.versionId, 10));
+      if (!result) {
+        const error = new Error('Version not found');
+        error.code = 'NOT_FOUND';
+        throw error;
+      }
+      res.json({ success: true, data: result });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
   async list(req, res) {
     try {
       const result = await sopVersionService.listVersions(parseInt(req.params.sopId, 10));

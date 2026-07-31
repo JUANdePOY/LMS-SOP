@@ -6,11 +6,13 @@ import { useDepartments } from '../hooks/useDepartments';
 import { useBusinesses } from '../hooks/useBusinesses';
 import { useUsers } from '../hooks/useUsers';
 import { useToast } from '@/shared/components/Toast';
+import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
+import ErrorBoundary from '@/shared/components/ErrorBoundary';
 import KPICards from '../components/KPICards';
 import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
 
 export default function DepartmentPage() {
-  const { departments, loading, error, create, update, remove } = useDepartments();
+  const { departments, loading, error, create, update, remove, refresh } = useDepartments();
   const { businesses } = useBusinesses();
   const { users: allUsers } = useUsers();
   const { success, error: showError } = useToast();
@@ -23,6 +25,8 @@ export default function DepartmentPage() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [businessFilter, setBusinessFilter] = useState('all');
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, department: null });
+  const [deleting, setDeleting] = useState(false);
 
   const safeQuery = sanitizeSearchQuery(query);
 
@@ -94,8 +98,14 @@ export default function DepartmentPage() {
     setModalOpen(true);
   };
 
-  const handleDelete = async (dept) => {
-    if (!window.confirm(`Are you sure you want to delete "${dept.name}"? This action cannot be undone.`)) return;
+  const handleDelete = (dept) => {
+    setDeleteConfirm({ open: true, department: dept });
+  };
+
+  const confirmDelete = async () => {
+    const dept = deleteConfirm.department;
+    if (!dept) return;
+    setDeleting(true);
     try {
       await remove(dept.id);
       success('Department deleted successfully');
@@ -103,6 +113,9 @@ export default function DepartmentPage() {
       const message = err.response?.data?.message || 'Failed to delete department';
       showError(message);
       console.error('Failed to delete department:', err);
+    } finally {
+      setDeleting(false);
+      setDeleteConfirm({ open: false, department: null });
     }
   };
 
@@ -114,7 +127,8 @@ export default function DepartmentPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <ErrorBoundary>
+      <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">Departments</h1>
@@ -124,16 +138,24 @@ export default function DepartmentPage() {
         </div>
         <button
           onClick={() => { setEditData(null); setModalOpen(true); }}
-          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
         >
-          <Plus className="h-4 w-4" />
+          <Plus size={16} />
           Create Department
         </button>
       </div>
 
       {error && (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
-          {error}
+          <div className="flex items-center justify-between gap-4">
+            <span>{error}</span>
+            <button
+              onClick={refresh}
+              className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       )}
 
@@ -198,7 +220,19 @@ export default function DepartmentPage() {
         businesses={businesses}
         users={users}
       />
-    </div>
+
+      <ConfirmationDialog
+        isOpen={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ open: false, department: null })}
+        onConfirm={confirmDelete}
+        title="Delete Department"
+        message={`Are you sure you want to delete "${deleteConfirm.department?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
+      />
+      </div>
+    </ErrorBoundary>
   );
 }
 
