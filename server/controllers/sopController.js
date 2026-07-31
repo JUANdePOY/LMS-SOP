@@ -42,9 +42,6 @@ const sopController = {
       if (!title || !title.trim()) {
         return res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Title is required" } });
       }
-      if (!department_id) {
-        return res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Department is required" } });
-      }
       const result = await sopService.createSop(req.body, req.user.id);
       res.status(201).json({ success: true, data: result, message: 'SOP created successfully' });
     } catch (error) {

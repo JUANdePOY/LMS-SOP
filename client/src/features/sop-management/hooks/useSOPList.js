@@ -61,7 +61,7 @@ export function useSOPList() {
       const { data: sopData } = await createSop({
         title: newTitle,
         description: newDescription,
-        department_id: null,
+        department_id: cascade.selectedDeptIds.length > 0 ? cascade.selectedDeptIds[0] : null,
         status: SOP_STATUSES.DRAFT,
       });
       const sopId = sopData?.data?.id || sopData?.id;

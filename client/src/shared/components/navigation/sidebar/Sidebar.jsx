@@ -172,8 +172,12 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
             collapsed && "justify-center"
           )}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
-            <LayoutDashboard size={18} className="text-white" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg">
+            <img
+              src="/UseThisLogo.png"
+              alt="SOP Training"
+              className="h-6 w-6 object-contain"
+            />
           </div>
           {!collapsed && (
             <div className="flex flex-col leading-tight overflow-hidden">
