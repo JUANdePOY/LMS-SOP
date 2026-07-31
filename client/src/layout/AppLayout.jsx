@@ -24,7 +24,7 @@ const MOBILE_BOTTOM_NAV = [
   { name: "Home", path: "/", icon: Home },
   { name: "Courses", path: "/courses", icon: BookOpen },
   { name: "SOPs", path: "/sops", icon: FileText },
-  { name: "Users", path: "/users", icon: Users },
+  { name: "Users", path: "/settings/users", icon: Users },
   { name: "Reports", path: "/reports", icon: BarChart3 },
 ];
 

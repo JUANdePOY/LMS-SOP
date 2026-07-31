@@ -14,7 +14,6 @@ import { GradingProvider } from "@/features/course_management/context/GradingCon
 const Dashboard     = lazy(() => import("@/pages/Dashboard"));
 const Profile       = lazy(() => import("@/pages/Profile"));
 const Login         = lazy(() => import("@/pages/Login"));
-const Users         = lazy(() => import("@/pages/Users"));
 const Settings      = lazy(() => import("@/pages/Settings"));
 const AuditLogs     = lazy(() => import("@/pages/AuditLogs"));
 const Courses = lazy(() => import("@/pages/courses"));
@@ -31,6 +30,10 @@ const OrgHierarchyPage = lazy(() => import("@/features/organization-management/p
 const OrgBusinessPage = lazy(() => import("@/features/organization-management/pages/BusinessPage"));
 const OrgDepartmentPage = lazy(() => import("@/features/organization-management/pages/DepartmentPage"));
 const OrgCategoryPage = lazy(() => import("@/features/organization-management/pages/CategoryPage"));
+
+// Management sub-pages
+const UsersPanel = lazy(() => import("@/pages/management/userspanel/UsersPanel"));
+const RolesPanel = lazy(() => import("@/pages/management/RolesPanel"));
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
@@ -87,8 +90,10 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: LMSProtectedWrapper(Dashboard), handle: { title: "Dashboard" } },
       { path: "profile", element: LMSProtectedWrapper(Profile), handle: { title: "Profile" } },
-      { path: "users", element: LMSProtectedWrapper(Users), handle: { title: "Administration" } },
+      { path: "users", element: <Navigate to="/settings/users" replace /> },
       { path: "settings", element: SuperAdminProtectedWrapper(Settings), handle: { title: "Settings" } },
+      { path: "settings/users", element: LMSProtectedWrapper(UsersPanel), handle: { title: "User Management" } },
+      { path: "settings/roles", element: LMSProtectedWrapper(RolesPanel), handle: { title: "Roles & Permissions" } },
       { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
       { path: "sops", element: LMSProtectedWrapper(SOPListPage), handle: { title: "SOP Library" } },
       { path: "courses", element: LMSProtectedWrapper(Courses), handle: { title: "Course Catalog" } },

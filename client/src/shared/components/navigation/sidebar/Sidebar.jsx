@@ -45,9 +45,8 @@ const MENU_ITEMS = [
        { name: "Course Library", path: "/course-library", icon: Library },
        { name: "Trash", path: "/trash", icon: Trash2 },
        { name: "Assessments", path: "/assessments", icon: ClipboardCheck, sub: ["Leaderboard", "Report"] },
-      { name: "Certificates", path: "/certificates", icon: Award },
-      { name: "Administration", path: "/users", icon: Users },
-    ],
+       { name: "Certificates", path: "/certificates", icon: Award },
+     ],
   },
   {
     name: "COMMUNICATION",
@@ -77,7 +76,7 @@ const MENU_ITEMS = [
     name: "SYSTEM",
     group: true,
     items: [
-      { name: "Settings", path: "/settings", icon: Settings },
+      { name: "Settings", path: "/settings", icon: Settings, sub: ["Users", "Roles"] },
       { name: "Audit Logs", path: "/audit-logs", icon: Shield },
     ],
   },

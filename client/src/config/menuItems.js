@@ -82,7 +82,7 @@ export const menuItems = [
   },
   {
     name: "Users & Departments",
-    path: "/users",
+    path: "/settings/users",
     icon: Users,
     description: "Manage users and departments",
     roles: LMS_ROLES,

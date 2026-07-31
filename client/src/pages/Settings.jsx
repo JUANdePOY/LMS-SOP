@@ -351,7 +351,7 @@ export default function Settings() {
           {/* Add User Modal */}
           {showAddUser && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-              <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setShowAddUser(false)} />
+              <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setShowAddUser(false)} />
               <div className="relative z-10 w-full max-w-lg rounded-2xl shadow-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
                 <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
                   <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-50">Add New User</h2>
@@ -404,7 +404,7 @@ export default function Settings() {
           {/* Edit User Modal */}
           {editingUser && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-              <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setEditingUser(null)} />
+              <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setEditingUser(null)} />
               <div className="relative z-10 w-full max-w-lg rounded-2xl shadow-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
                 <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
                   <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-50">Edit User</h2>
@@ -444,7 +444,7 @@ export default function Settings() {
           {/* Delete Confirmation */}
           {deletingUserId && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-              <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setDeletingUserId(null)} />
+              <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setDeletingUserId(null)} />
               <div className="relative z-10 w-full max-w-md rounded-2xl shadow-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6">
                 <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 mb-2">Deactivate User</h2>
                 <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">Are you sure you want to deactivate this user? They will no longer be able to log in.</p>
@@ -534,7 +534,7 @@ export default function Settings() {
           {/* Add Setting Modal */}
           {showAddSetting && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-              <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setShowAddSetting(false)} />
+              <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setShowAddSetting(false)} />
               <div className="relative z-10 w-full max-w-lg rounded-2xl shadow-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
                 <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
                   <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-50">Add New Setting</h2>

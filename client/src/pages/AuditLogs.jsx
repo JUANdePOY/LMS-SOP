@@ -301,7 +301,7 @@ export default function AuditLogs() {
 
       {/* Detail Modal */}
       {selectedLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 p-4" onClick={closeDetail}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm p-4" onClick={closeDetail}>
           <div
             className="w-full max-w-3xl rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -375,7 +375,7 @@ export default function AuditLogs() {
       )}
 
       {detailLoading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm">
           <div className="text-sm text-neutral-800 dark:text-neutral-200">Loading details...</div>
         </div>
       )}
