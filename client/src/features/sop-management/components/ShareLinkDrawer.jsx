@@ -107,7 +107,12 @@ function ShareLinkDrawer({ open, onClose, sopId }) {
           <div className="flex items-center gap-2">
             <div className="flex-1 flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 px-3 py-2">
               <Link2 size={16} className="text-neutral-400 shrink-0" />
-              <span className="text-sm text-neutral-700 dark:text-neutral-300 truncate flex-1">{currentLink}</span>
+              <input
+                type="text"
+                readOnly
+                value={currentLink}
+                className="flex-1 bg-transparent text-sm text-neutral-700 dark:text-neutral-300 outline-none min-w-0 truncate"
+              />
             </div>
             <button
               onClick={handleCopy}
