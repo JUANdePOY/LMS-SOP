@@ -10,8 +10,8 @@ const dbConfig = {
   database: process.env.DB_NAME || 'pafr',
   port: parseInt(process.env.DB_PORT, 10) || 3306,
   waitForConnections: true,
-  connectionLimit: 3,
-  queueLimit: 0,
+  connectionLimit: 10,
+  queueLimit: 10,
   connectTimeout: 30000,
   timezone: '+00:00',
   multipleStatements: true,
@@ -101,10 +101,8 @@ function getPool() {
     });
 
     patchPoolMethods(rawPromise, pool.promise());
-    patchPoolMethods(rawPromise, rawPromise);
 
     dbInstance = rawPromise;
-    dbInstance.getConnection = () => pool.promise().getConnection();
     dbInstance.rawPool = pool;
   }
   return dbInstance;

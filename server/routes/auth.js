@@ -15,14 +15,6 @@ const LOGIN_BODY_SAMPLE = (data) => {
   return JSON.stringify(out);
 };
 
-router.use((req, res, next) => {
-  console.log('[auth-request]', req.method, req.path, {
-    contentType: req.get('content-type') || null,
-    body: LOGIN_BODY_SAMPLE(req.body),
-  });
-  next();
-});
-
 const LOGIN_TIMEOUT_MS = 12000;
 
 router.post('/login', [
@@ -36,12 +28,6 @@ router.post('/login', [
     .withMessage('Password is required')
 ], async (req, res) => {
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  console.log(`[login:${requestId}] start`, {
-    method: req.method,
-    path: req.path,
-    contentType: req.get('content-type') || null,
-    body: LOGIN_BODY_SAMPLE(req.body),
-  });
 
   const loginTimer = setTimeout(() => {
     console.error(`[login:${requestId}] timeout after ${LOGIN_TIMEOUT_MS}ms`);
@@ -160,7 +146,6 @@ router.post('/login', [
       new_values: { email: user.email, role: user.role }
     });
 
-    console.log(`[login:${requestId}] success`, { email, userId: user.id, role: user.role });
     clearTimeout(loginTimer);
     return res.status(200).json({
       status: 'success',

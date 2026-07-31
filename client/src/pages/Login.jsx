@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { AlertCircle, Loader, Mail, Lock, Eye, EyeOff, GraduationCap } from 'lucide-react';
+import { AlertCircle, Loader, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
@@ -49,9 +49,11 @@ export default function Login() {
       <div className="login-container">
         <div className="login-card">
           <div className="login-card-header">
-            <div className="login-logo-icon">
-              <GraduationCap size={32} />
-            </div>
+            <img
+              src="/UseThisLogo-v1.png"
+              alt="SOP Training Platform"
+              className="login-logo"
+            />
             <h1 className="login-card-title">SOP TRAINING PLATFORM</h1>
             <p className="login-card-subtitle">
               Learning Management System for Standard Operating Procedures
