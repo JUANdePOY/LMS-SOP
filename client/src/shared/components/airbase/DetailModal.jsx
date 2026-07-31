@@ -51,7 +51,7 @@ export default function DetailModal({
       onClick={(e) => e.target === overlayRef.current && onClose()}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" />
+      <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" />
 
       {/* Panel */}
       <div className={cn(

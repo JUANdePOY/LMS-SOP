@@ -10,6 +10,7 @@ import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { Search, Plus, Edit2, Trash2, Shield, Users, Briefcase, Loader2, Upload, Download, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 import { useToast } from '@/shared/components/ui/Toast';
 import BulkUploadModal from './BulkUploadModal';
+import { cn } from '@/lib/utils';
 
 const ROLE_META = {
   super_admin: { label: 'Super Admin', dot: 'bg-rose-500 dark:bg-rose-400', chip: 'bg-rose-100 text-rose-800 dark:bg-rose-500/25 dark:text-rose-100 border-rose-200 dark:border-rose-500/40', icon: Shield },
@@ -71,6 +72,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [deletingUser, setDeletingUser] = useState(null);
+  const [detailUser, setDetailUser] = useState(null);
   const [formData, setFormData] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -278,8 +280,8 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
 
   return (
     <div className="w-full max-w-none space-y-5 sm:space-y-6">
-      <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-gradient-to-br from-white to-neutral-50/80 dark:from-neutral-900 dark:to-neutral-800/60 p-5 sm:p-6 shadow-sm dark:shadow-none">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.06),transparent_40%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.08),transparent_40%)]" />
+      <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-gradient-to-br from-white via-neutral-50/80 to-neutral-100/80 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 p-5 sm:p-6 shadow-sm dark:shadow-none">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.30),rgba(147,51,234,0.08),transparent_75%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.15),rgba(168,85,247,0.12),transparent_45%)]" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center justify-between">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Users</h1>
@@ -396,8 +398,13 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                   </button>
                 </th>
                 <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
-                  <button onClick={() => handleSort('employee_id')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
-                    Employee ID <SortIcon field="employee_id" />
+                  <button onClick={() => handleSort('email')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                    Email Address <SortIcon field="email" />
+                  </button>
+                </th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+                  <button onClick={() => handleSort('role')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                    Role <SortIcon field="role" />
                   </button>
                 </th>
                 <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
@@ -406,35 +413,17 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                   </button>
                 </th>
                 <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
-                  <button onClick={() => handleSort('position_title')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
-                    Position/Job Title <SortIcon field="position_title" />
-                  </button>
-                </th>
-                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
-                  <button onClick={() => handleSort('email')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
-                    Email Address <SortIcon field="email" />
-                  </button>
-                </th>
-                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">Contact Number</th>
-                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
                   <button onClick={() => handleSort('employment_status')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
-                    Employment Status <SortIcon field="employment_status" />
+                    Status <SortIcon field="employment_status" />
                   </button>
                 </th>
-                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
-                  <button onClick={() => handleSort('date_hired')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
-                    Date Hired <SortIcon field="date_hired" />
-                  </button>
-                </th>
-                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">Birthdate</th>
-                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">Address</th>
                 <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-700/80">
               {paginatedUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="px-4 py-16 text-center">
+                  <td colSpan={5} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <div className="h-14 w-14 rounded-2xl bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center">
                         <Users size={28} className="text-neutral-400 dark:text-neutral-500" />
@@ -450,7 +439,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                 paginatedUsers.map((u, idx) => {
                   const avatarColor = getAvatarColor(u.full_name || u.email);
                   return (
-                    <tr key={u.id} className={`group transition-all duration-150 hover:bg-blue-50/70 dark:hover:bg-neutral-700/60 ${idx % 2 === 0 ? 'bg-white dark:bg-neutral-800' : 'bg-neutral-50/40 dark:bg-neutral-800/60'}`}>
+                    <tr key={u.id} onClick={() => setDetailUser(u)} className={`group cursor-pointer transition-all duration-150 hover:bg-blue-50/70 dark:hover:bg-neutral-700/60 ${idx % 2 === 0 ? 'bg-white dark:bg-neutral-800' : 'bg-neutral-50/40 dark:bg-neutral-800/60'}`}>
                       <td className="px-3 py-3">
                         <div className="flex items-center gap-3">
                           <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${avatarColor} ring-2 ring-white dark:ring-neutral-700 shadow-sm`}>
@@ -461,37 +450,28 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200 font-mono text-xs">
-                        {u.employee_id || <span className="text-neutral-400 dark:text-neutral-500">—</span>}
+                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200 truncate max-w-[220px]">
+                        {u.email || '—'}
+                      </td>
+                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200 whitespace-nowrap">
+                        <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold border", ROLE_META[u.role]?.chip || 'bg-neutral-100 text-neutral-700 border-neutral-200 dark:border-neutral-700')}>
+                          {ROLE_META[u.role]?.label || u.role}
+                        </span>
                       </td>
                       <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200">
                         {u.department_name || <span className="text-neutral-400 dark:text-neutral-500">—</span>}
                       </td>
-                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200">
-                        {u.position_title || <span className="text-neutral-400 dark:text-neutral-500">—</span>}
-                      </td>
-                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200 truncate max-w-[200px]" title={u.email}>
-                        {u.email || '—'}
-                      </td>
-                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200">
-                        {u.contact_number || <span className="text-neutral-400 dark:text-neutral-500">—</span>}
-                      </td>
-                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200">
-                        {u.employment_status || <span className="text-neutral-400 dark:text-neutral-500">—</span>}
-                      </td>
-                      <td className="px-3 py-3 text-sm text-neutral-600 dark:text-neutral-300 whitespace-nowrap">
-                        {formatDate(u.date_hired)}
-                      </td>
-                      <td className="px-3 py-3 text-sm text-neutral-600 dark:text-neutral-300 whitespace-nowrap">
-                        {formatDate(u.birthdate)}
-                      </td>
-                      <td className="px-3 py-3 text-sm text-neutral-600 dark:text-neutral-300 max-w-[180px] truncate" title={u.address || ''}>
-                        {u.address || '—'}
+                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200 whitespace-nowrap">
+                        {u.employment_status ? (
+                          <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium", u.employment_status === 'Regular' ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300")}>
+                            {u.employment_status}
+                          </span>
+                        ) : <span className="text-neutral-400 dark:text-neutral-500">—</span>}
                       </td>
                       <td className="px-3 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => openEdit(u)}
+                            onClick={(e) => { e.stopPropagation(); openEdit(u); }}
                             className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 dark:hover:text-indigo-300 transition-all"
                             title="Edit user"
                           >
@@ -499,7 +479,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                           </button>
                           {u.role !== 'super_admin' && (
                             <button
-                              onClick={() => openDelete(u)}
+                              onClick={(e) => { e.stopPropagation(); openDelete(u); }}
                               className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 dark:hover:text-red-300 transition-all"
                               title="Deactivate user"
                             >
@@ -703,6 +683,74 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
           onConfirm={handleDeleteUser}
           onCancel={() => { setShowDeleteConfirm(false); setDeletingUser(null); }}
         />
+      )}
+
+      {detailUser && (
+        <Modal open={!!detailUser} title="User Details" onClose={() => setDetailUser(null)}>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-4">
+              <div className={`h-14 w-14 rounded-full flex items-center justify-center text-lg font-bold ${getAvatarColor(detailUser.full_name || detailUser.email)} ring-2 ring-white dark:ring-neutral-700 shadow-sm`}>
+                {getInitials(detailUser.full_name || detailUser.email)}
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{detailUser.full_name || '—'}</p>
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">{detailUser.email || '—'}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+              <div>
+                <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Role</span>
+                <p className="mt-0.5">
+                  <span className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold border", ROLE_META[detailUser.role]?.chip || 'bg-neutral-100 text-neutral-700 border-neutral-200 dark:border-neutral-700')}>
+                    {ROLE_META[detailUser.role]?.label || detailUser.role}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Employee ID</span>
+                <p className="mt-0.5 text-neutral-700 dark:text-neutral-200">{detailUser.employee_id || '—'}</p>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Department</span>
+                <p className="mt-0.5 text-neutral-700 dark:text-neutral-200">{detailUser.department_name || '—'}</p>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Position/Job Title</span>
+                <p className="mt-0.5 text-neutral-700 dark:text-neutral-200">{detailUser.position_title || '—'}</p>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Contact Number</span>
+                <p className="mt-0.5 text-neutral-700 dark:text-neutral-200">{detailUser.contact_number || '—'}</p>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Employment Status</span>
+                <p className="mt-0.5">
+                  <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium", detailUser.employment_status === 'Regular' ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400" : "bg-neutral-100 text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300")}>
+                    {detailUser.employment_status || '—'}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Date Hired</span>
+                <p className="mt-0.5 text-neutral-700 dark:text-neutral-200">{formatDate(detailUser.date_hired)}</p>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Birthdate</span>
+                <p className="mt-0.5 text-neutral-700 dark:text-neutral-200">{formatDate(detailUser.birthdate)}</p>
+              </div>
+              <div className="sm:col-span-2">
+                <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Address</span>
+                <p className="mt-0.5 text-neutral-700 dark:text-neutral-200">{detailUser.address || '—'}</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="outline" onClick={() => setDetailUser(null)} className="border-neutral-200 dark:border-neutral-700">Close</Button>
+              <Button onClick={() => { setDetailUser(null); openEdit(detailUser); }} className="shadow-sm">
+                Edit User
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       <BulkUploadModal

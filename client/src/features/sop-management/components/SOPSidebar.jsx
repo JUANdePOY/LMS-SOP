@@ -163,7 +163,7 @@ export default function SOPSidebar({ sopId, approvals, setApprovals, auditLogs, 
 
       {showVersionTimeline && (
         <div className="fixed inset-0 z-40 hidden lg:flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/50 dark:bg-black/60" onClick={() => setShowVersionTimeline(false)} />
+          <div className="fixed inset-0 bg-black/50 dark:bg-black/60 backdrop-blur-sm" onClick={() => setShowVersionTimeline(false)} />
           <div className="relative z-10 w-full max-w-lg bg-white dark:bg-neutral-900 rounded-xl shadow-xl border border-neutral-200 dark:border-neutral-800 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700">
               <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">Version History</h3>
@@ -180,7 +180,7 @@ export default function SOPSidebar({ sopId, approvals, setApprovals, auditLogs, 
 
       {showAuditTrail && (
         <div className="fixed inset-0 z-40 hidden lg:flex items-center justify-center p-4">
-          <div className="fixed inset-0 bg-black/50 dark:bg-black/60" onClick={() => setShowAuditTrail(false)} />
+          <div className="fixed inset-0 bg-black/50 dark:bg-black/60 backdrop-blur-sm" onClick={() => setShowAuditTrail(false)} />
           <div className="relative z-10 w-full max-w-lg bg-white dark:bg-neutral-900 rounded-xl shadow-xl border border-neutral-200 dark:border-neutral-800 max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700">
               <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">Audit Trail</h3>

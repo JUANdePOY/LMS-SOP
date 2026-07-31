@@ -10,11 +10,14 @@ import { CourseProvider } from "@/features/course_management/context/CourseConte
 import { CourseModalProvider } from "@/features/course_management/context/CourseModalContext";
 import { EnrollmentProvider } from "@/features/course_management/context/EnrollmentContext";
 import { GradingProvider } from "@/features/course_management/context/GradingContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Dashboard     = lazy(() => import("@/pages/Dashboard"));
+const EmployeeDashboard = lazy(() => import("@/features/employee/pages/EmployeeDashboard"));
+const EmployeeCourseCatalog = lazy(() => import("@/features/employee/pages/EmployeeCourseCatalog"));
+const EmployeeCourseView = lazy(() => import("@/features/employee/pages/EmployeeCourseView"));
 const Profile       = lazy(() => import("@/pages/Profile"));
 const Login         = lazy(() => import("@/pages/Login"));
-const Users         = lazy(() => import("@/pages/Users"));
 const Settings      = lazy(() => import("@/pages/Settings"));
 const AuditLogs     = lazy(() => import("@/pages/AuditLogs"));
 const Courses = lazy(() => import("@/pages/courses"));
@@ -22,6 +25,8 @@ const CourseDetailsPage = lazy(() => import("@/features/course_management/pages/
 const CourseLearnerView = lazy(() => import("@/features/course_management/pages/CourseLearnerView"));
 const LessonPage = lazy(() => import("@/features/course_management/pages/LessonPage"));
 const CourseBuilderPage = lazy(() => import("@/features/course_management/pages/CourseBuilderPage"));
+const CourseLibraryPage = lazy(() => import("@/features/course_management/library/pages/CourseLibraryPage"));
+const CourseLibraryDetailsPage = lazy(() => import("@/features/course_management/library/pages/CourseLibraryDetailsPage"));
 const SOPListPage    = lazy(() => import("@/features/sop-management/pages/SOPListPage"));
 const SOPWorkspacePage = lazy(() => import("@/features/sop-management/pages/SOPWorkspacePage"));
 const SOPVersionPage = lazy(() => import("@/features/sop-management/pages/SOPVersionPage"));
@@ -31,6 +36,10 @@ const OrgHierarchyPage = lazy(() => import("@/features/organization-management/p
 const OrgBusinessPage = lazy(() => import("@/features/organization-management/pages/BusinessPage"));
 const OrgDepartmentPage = lazy(() => import("@/features/organization-management/pages/DepartmentPage"));
 const OrgCategoryPage = lazy(() => import("@/features/organization-management/pages/CategoryPage"));
+
+// Management sub-pages
+const UsersPanel = lazy(() => import("@/pages/management/userspanel/UsersPanel"));
+const RolesPanel = lazy(() => import("@/pages/management/RolesPanel"));
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
@@ -70,6 +79,25 @@ function SuperAdminProtectedWrapper(Component) {
   );
 }
 
+function EmployeeProtectedWrapper(Component) {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <ProtectedRoute allowedRoles={['employee']}>
+        <Component />
+      </ProtectedRoute>
+    </Suspense>
+  );
+}
+
+function RoleBasedDashboard() {
+  const { isEmployee, isAdmin, isDepartmentHead, isSuperAdmin } = useAuth();
+  if (isEmployee) return <EmployeeDashboard />;
+  if (isDepartmentHead || isAdmin || isSuperAdmin) return <Dashboard />;
+  return <Dashboard />;
+}
+
+const RoleBasedDashboardWrapper = wrap(RoleBasedDashboard);
+
 const router = createBrowserRouter([
   {
     path: "/login",
@@ -85,10 +113,16 @@ const router = createBrowserRouter([
       </ErrorBoundary>
     ),
     children: [
-      { index: true, element: LMSProtectedWrapper(Dashboard), handle: { title: "Dashboard" } },
-      { path: "profile", element: LMSProtectedWrapper(Profile), handle: { title: "Profile" } },
-      { path: "users", element: LMSProtectedWrapper(Users), handle: { title: "Administration" } },
+       { index: true, element: RoleBasedDashboardWrapper, handle: { title: "Dashboard" } },
+       { path: "my-learning", element: EmployeeProtectedWrapper(EmployeeDashboard), handle: { title: "My Learning" } },
+       { path: "my-learning/catalog", element: EmployeeProtectedWrapper(EmployeeCourseCatalog), handle: { title: "Course Catalog" } },
+       { path: "my-learning/course/:id", element: EmployeeProtectedWrapper(EmployeeCourseView), handle: { title: "Course" } },
+       { path: "profile", element: LMSProtectedWrapper(Profile), handle: { title: "Profile" } },
+      { path: "users", element: <Navigate to="/settings/users" replace /> },
+      { path: "course-library", element: <Navigate to="/courses/library" replace /> },
       { path: "settings", element: SuperAdminProtectedWrapper(Settings), handle: { title: "Settings" } },
+      { path: "settings/users", element: LMSProtectedWrapper(UsersPanel), handle: { title: "User Management" } },
+      { path: "settings/roles", element: LMSProtectedWrapper(RolesPanel), handle: { title: "Roles & Permissions" } },
       { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
       { path: "sops", element: LMSProtectedWrapper(SOPListPage), handle: { title: "SOP Library" } },
       { path: "courses", element: LMSProtectedWrapper(Courses), handle: { title: "Course Catalog" } },
@@ -96,6 +130,8 @@ const router = createBrowserRouter([
       { path: "courses/:id/builder", element: LMSProtectedWrapper(CourseBuilderPage), handle: { title: "Course Builder" } },
       { path: "courses/view/:id", element: LMSProtectedWrapper(CourseLearnerView), handle: { title: "My Course" } },
       { path: "courses/view/:id/lesson/:lessonId", element: LMSProtectedWrapper(LessonPage), handle: { title: "Lesson" } },
+      { path: "courses/library", element: LMSProtectedWrapper(CourseLibraryPage), handle: { title: "Course Library" } },
+      { path: "courses/library/:id", element: LMSProtectedWrapper(CourseLibraryDetailsPage), handle: { title: "Course Details" } },
       { path: "sops/:id", element: LMSProtectedWrapper(SOPWorkspacePage), handle: { title: "SOP Workspace" } },
       { path: "sops/:id/versions/:versionId", element: LMSProtectedWrapper(SOPVersionPage), handle: { title: "SOP Version" } },
       { path: "trash", element: LMSProtectedWrapper(SOPListPage), handle: { title: "Trash" } },

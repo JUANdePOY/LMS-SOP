@@ -3,9 +3,11 @@ import LessonContentEditor from "./LessonContentEditor";
 
 const LESSON_TYPES = [
   { value: "video", label: "Video" },
-  { value: "text", label: "Text / Reading" },
+  { value: "reading", label: "Text / Reading" },
   { value: "link", label: "Link" },
   { value: "quiz", label: "Quiz" },
+  { value: "sop", label: "SOP" },
+  { value: "document", label: "Document / File" },
 ];
 
 export default function LessonRow({ lesson, onUpdate, onRemove, onMoveUp, onMoveDown, canMoveUp, canMoveDown }) {
@@ -29,7 +31,7 @@ export default function LessonRow({ lesson, onUpdate, onRemove, onMoveUp, onMove
           className="flex-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm"
         />
         <select
-          value={lesson.type || "text"}
+          value={lesson.type || "reading"}
           onChange={(e) => update({ type: e.target.value })}
           className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1.5 text-sm"
         >

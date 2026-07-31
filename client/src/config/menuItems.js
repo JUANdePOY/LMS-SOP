@@ -57,7 +57,7 @@ export const menuItems = [
   },
   {
     name: "Course Library",
-    path: "/course-library",
+    path: "/courses/library",
     icon: Library,
     description: "Browse course catalog",
     roles: LMS_ROLES,
@@ -82,7 +82,7 @@ export const menuItems = [
   },
   {
     name: "Users & Departments",
-    path: "/users",
+    path: "/settings/users",
     icon: Users,
     description: "Manage users and departments",
     roles: LMS_ROLES,

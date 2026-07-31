@@ -16,25 +16,33 @@ import {
   Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-// import { useAuth } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/shared/components/navigation/sidebar/Sidebar";
 import { useTheme } from "@/hooks/useTheme";
 import { Scrollbar } from "@/shared/components/ui/Scrollbar";
 
-const MOBILE_BOTTOM_NAV = [
+const MOBILE_BOTTOM_NAV_ADMIN = [
   { name: "Home", path: "/", icon: Home },
   { name: "Courses", path: "/courses", icon: BookOpen },
   { name: "SOPs", path: "/sops", icon: FileText },
-  { name: "Users", path: "/users", icon: Users },
+  { name: "Users", path: "/settings/users", icon: Users },
   { name: "Reports", path: "/reports", icon: BarChart3 },
+];
+
+const MOBILE_BOTTOM_NAV_EMPLOYEE = [
+  { name: "Home", path: "/", icon: Home },
+  { name: "Library", path: "/courses/library", icon: BookOpen },
+  { name: "SOPs", path: "/sops", icon: FileText },
+  { name: "Profile", path: "/profile", icon: Users },
 ];
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  // const [userMenuOpen, setUserMenuOpen] = useState(false);
-  // const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { toggleTheme, isDark } = useTheme();
+  const isEmployee = user?.role === 'employee';
+  const mobileNav = isEmployee ? MOBILE_BOTTOM_NAV_EMPLOYEE : MOBILE_BOTTOM_NAV_ADMIN;
 
 
   return (
@@ -155,7 +163,7 @@ export default function AppLayout() {
         )}
         aria-label="Mobile navigation"
       >
-        {MOBILE_BOTTOM_NAV.map((item) => {
+        {mobileNav.map((item) => {
           const Icon = item.icon;
           const active = window.location.pathname === item.path || (item.path !== '/' && window.location.pathname.startsWith(item.path));
           return (

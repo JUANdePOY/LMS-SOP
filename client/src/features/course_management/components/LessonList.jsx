@@ -1,7 +1,28 @@
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { ChevronDown, ChevronRight, PlayCircle, FileText, Video, HelpCircle, ClipboardCheck, ExternalLink, File, Clock } from "lucide-react";
+
+const LESSON_TYPE_META = {
+  reading: { label: "Reading", icon: FileText, color: "text-blue-500" },
+  video: { label: "Video", icon: Video, color: "text-purple-500" },
+  quiz: { label: "Quiz", icon: HelpCircle, color: "text-amber-500" },
+  assignment: { label: "Assignment", icon: ClipboardCheck, color: "text-rose-500" },
+  document: { label: "Document", icon: File, color: "text-emerald-500" },
+  sop: { label: "SOP", icon: FileText, color: "text-indigo-500" },
+  link: { label: "Link", icon: ExternalLink, color: "text-cyan-500" },
+  presentation: { label: "Presentation", icon: FileText, color: "text-violet-500" },
+  downloadable: { label: "Download", icon: File, color: "text-orange-500" },
+  live_session: { label: "Live Session", icon: Video, color: "text-red-500" },
+  interactive: { label: "Interactive", icon: FileText, color: "text-lime-500" },
+};
 
 export default function LessonList({ lessons, modules, onLessonClick, courseId }) {
   const navigate = useNavigate();
+  const [expandedModules, setExpandedModules] = useState(() => {
+    if (!lessons || !lessons.length) return new Set();
+    const firstModuleId = lessons[0]?.moduleId || lessons[0]?.module_id;
+    return firstModuleId ? new Set([firstModuleId]) : new Set();
+  });
 
   if (!lessons || !lessons.length) {
     return <p className="text-sm text-neutral-500">No lessons yet.</p>;
@@ -25,6 +46,29 @@ export default function LessonList({ lessons, modules, onLessonClick, courseId }
     return (mA?.order ?? mA?.order_index ?? 0) - (mB?.order ?? mB?.order_index ?? 0);
   });
 
+  const moduleStats = useMemo(() => {
+    const stats = new Map();
+    for (const [mid, modLessons] of grouped.entries()) {
+      const completed = modLessons.filter((l) => l.status === "completed").length;
+      const totalDuration = modLessons.reduce((sum, l) => sum + (l.duration || 0), 0);
+      stats.set(mid, {
+        completed,
+        total: modLessons.length,
+        duration: totalDuration,
+      });
+    }
+    return stats;
+  }, [grouped]);
+
+  const toggleModule = (moduleId) => {
+    setExpandedModules((prev) => {
+      const next = new Set(prev);
+      if (next.has(moduleId)) next.delete(moduleId);
+      else next.add(moduleId);
+      return next;
+    });
+  };
+
   const handleClick = (lesson) => {
     if (lesson.status === "locked") return;
     if (typeof onLessonClick === "function") {
@@ -35,49 +79,104 @@ export default function LessonList({ lessons, modules, onLessonClick, courseId }
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2">
       {orderedGroupIds.map((mid) => {
         const mod = moduleMap.get(mid);
         const modLessons = grouped.get(mid) || [];
         const moduleHasLocked = modLessons.some((l) => l.status === "locked");
+        const isExpanded = expandedModules.has(mid);
+        const stats = moduleStats.get(mid) || { completed: 0, total: 0, duration: 0 };
+        const modPct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+
         return (
-          <div key={mid} className="rounded-lg border border-[var(--border)] bg-white dark:bg-neutral-900 overflow-hidden">
-            <div className={`flex items-center gap-2 px-3 py-2 text-sm font-semibold ${moduleHasLocked ? "bg-neutral-50 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400" : "bg-neutral-50 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200"}`}>
-              <span>{mod?.title || `Module`}</span>
-              {moduleHasLocked && (
-                <span className="ml-auto text-[10px] font-medium uppercase tracking-wide">Locked</span>
-              )}
+          <div key={mid} className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden">
+            <div
+              className="flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
+              onClick={() => toggleModule(mid)}
+            >
+              <div className="flex items-center gap-2.5">
+                {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                <span className={`text-sm font-semibold ${moduleHasLocked ? "text-neutral-500 dark:text-neutral-400" : "text-neutral-800 dark:text-neutral-200"}`}>
+                  {mod?.title || "Module"}
+                </span>
+                {mod?.description && (
+                  <span className="text-xs text-neutral-500 dark:text-neutral-400 hidden sm:inline">
+                    {mod.description}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2.5">
+                {stats.duration > 0 && (
+                  <span className="text-xs text-neutral-500 dark:text-neutral-400 flex items-center gap-1">
+                    <Clock size={12} />
+                    {stats.duration} min
+                  </span>
+                )}
+                <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                  {stats.completed}/{stats.total}
+                </span>
+                {moduleHasLocked && (
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                    Locked
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="divide-y divide-[var(--border)]">
-              {modLessons.map((lesson) => {
-                const isLocked = lesson.status === "locked";
-                const isCompleted = lesson.status === "completed";
-                return (
-                  <button
-                    key={lesson.id}
-                    disabled={isLocked}
-                    onClick={() => handleClick(lesson)}
-                    className={`w-full text-left rounded-none border-0 px-3 py-2 text-sm flex items-center justify-between transition-colors ${
-                      isLocked
-                        ? "text-gray-400 cursor-not-allowed dark:text-neutral-500"
-                        : "hover:bg-blue-50 dark:hover:bg-neutral-800"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[10px] ${
-                        isCompleted ? "border-green-500 text-green-600 bg-green-50" :
-                        isLocked ? "border-gray-300 text-gray-400" :
-                        "border-blue-500 text-blue-600"
-                      }`}>
-                        {isCompleted ? "✓" : lesson.order}
+
+            {isExpanded && (
+              <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                {modLessons.map((lesson) => {
+                  const isLocked = lesson.status === "locked";
+                  const isCompleted = lesson.status === "completed";
+                  const isInProgress = lesson.status === "in_progress";
+                  const lessonMeta = LESSON_TYPE_META[lesson.type || ""] || LESSON_TYPE_META.reading;
+                  const LessonIcon = lessonMeta.icon;
+
+                  return (
+                    <button
+                      key={lesson.id}
+                      disabled={isLocked}
+                      onClick={() => handleClick(lesson)}
+                      className={`w-full text-left rounded-none border-0 px-3 py-2.5 text-sm flex items-center justify-between transition-colors ${
+                        isLocked
+                          ? "text-neutral-400 cursor-not-allowed"
+                          : "hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <span
+                          className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs ${
+                            isCompleted
+                              ? "border-green-500 text-green-600 bg-green-50 dark:bg-green-500/10"
+                              : isInProgress
+                              ? "border-blue-500 text-blue-600 bg-blue-50 dark:bg-blue-500/10"
+                              : isLocked
+                              ? "border-neutral-300 text-neutral-400"
+                              : "border-neutral-300 text-neutral-500"
+                          }`}
+                        >
+                          {isCompleted ? "✓" : <LessonIcon size={10} className={lessonMeta.color} />}
+                        </span>
+                        <span className={isLocked ? "line-through opacity-60" : ""}>
+                          {lesson.title}
+                        </span>
                       </span>
-                      <span className={isLocked ? "line-through opacity-70" : ""}>{lesson.title}</span>
-                    </span>
-                    <span className="text-xs text-neutral-400">{isLocked ? "Locked" : lesson.type}</span>
-                  </button>
-                );
-              })}
-            </div>
+                      <span className="flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500">
+                        <LessonIcon size={10} className={lessonMeta.color} />
+                        <span>{lessonMeta.label}</span>
+                        {lesson.duration && (
+                          <span className="text-neutral-400">• {lesson.duration} min</span>
+                        )}
+                        {isInProgress && (
+                          <span className="text-xs text-blue-500 font-medium">In Progress</span>
+                        )}
+                        {isLocked && <span className="text-neutral-400">Locked</span>}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}

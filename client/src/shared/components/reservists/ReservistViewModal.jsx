@@ -69,7 +69,7 @@ export default function ReservistViewModal({ reservist, onClose, onEdit }) {
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={(e) => e.target === overlayRef.current && onClose()}
     >
-      <div className="absolute inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" />
+      <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" />
 
       <div className={cn(
         "relative z-10 w-full max-w-3xl rounded-2xl shadow-2xl",

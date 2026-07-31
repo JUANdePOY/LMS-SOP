@@ -52,7 +52,7 @@ const COURSE_MANAGEMENT_MIGRATIONS = [
     id INT AUTO_INCREMENT PRIMARY KEY,
     module_id INT NOT NULL,
     title VARCHAR(255) NOT NULL,
-    type ENUM('video','reading','document','quiz','assignment','link','presentation','downloadable','live_session','interactive') NOT NULL DEFAULT 'reading',
+    type ENUM('video','reading','document','quiz','assignment','link','presentation','downloadable','live_session','interactive','sop') NOT NULL DEFAULT 'reading',
     description TEXT DEFAULT NULL,
     order_index INT NOT NULL DEFAULT 0,
     url VARCHAR(500) DEFAULT NULL,

@@ -34,7 +34,7 @@ export function ConfirmDialog({
     >
       <button
         type="button"
-        className="absolute inset-0 bg-black/55"
+        className="fixed inset-0 bg-black/55 backdrop-blur-sm"
         aria-label="Close dialog"
         disabled={loading}
         onClick={onCancel}

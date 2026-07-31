@@ -20,10 +20,43 @@ import {
   ChevronDown,
   Building2,
   Trash2,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
 import { useAuth } from "@/contexts/AuthContext";
+
+const EMPLOYEE_MENU_ITEMS = [
+  {
+    name: "My Learning",
+    path: "/",
+    icon: LayoutDashboard,
+  },
+  {
+    name: "CORE MODULES",
+    group: true,
+    items: [
+      { name: "Course Library", path: "/courses/library", icon: Library },
+      { name: "SOP Library", path: "/sops", icon: FileText },
+    ],
+  },
+  {
+    name: "COMMUNICATION",
+    group: true,
+    items: [
+      { name: "Messaging", path: "/messaging", icon: MessageSquare },
+      { name: "Announcements", path: "/announcements", icon: Megaphone },
+      { name: "Events", path: "/events", icon: Calendar },
+    ],
+  },
+  {
+    name: "SYSTEM",
+    group: true,
+    items: [
+      { name: "Profile", path: "/profile", icon: User },
+    ],
+  },
+];
 
 const MENU_ITEMS = [
   {
@@ -42,12 +75,11 @@ const MENU_ITEMS = [
         sub: ["Dashboard", "Businesses", "Departments", "Categories", "Files"],
       },
        { name: "Course Management", path: "/courses", icon: BookOpen },
-       { name: "Course Library", path: "/course-library", icon: Library },
+       { name: "Course Library", path: "/courses/library", icon: Library },
        { name: "Trash", path: "/trash", icon: Trash2 },
        { name: "Assessments", path: "/assessments", icon: ClipboardCheck, sub: ["Leaderboard", "Report"] },
-      { name: "Certificates", path: "/certificates", icon: Award },
-      { name: "Administration", path: "/users", icon: Users },
-    ],
+       { name: "Certificates", path: "/certificates", icon: Award },
+     ],
   },
   {
     name: "COMMUNICATION",
@@ -77,7 +109,7 @@ const MENU_ITEMS = [
     name: "SYSTEM",
     group: true,
     items: [
-      { name: "Settings", path: "/settings", icon: Settings },
+      { name: "Settings", path: "/settings", icon: Settings, sub: ["Users", "Roles"] },
       { name: "Audit Logs", path: "/audit-logs", icon: Shield },
     ],
   },
@@ -97,6 +129,8 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const roleLabel = typeof user?.role === 'string' ? user.role.replace('_', ' ') : '';
+  const isEmployee = user?.role === 'employee';
+  const activeMenuItems = isEmployee ? EMPLOYEE_MENU_ITEMS : MENU_ITEMS;
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -196,7 +230,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
         className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-2.5 py-3 scrollbar-none"
         aria-label="Main navigation"
       >
-        {MENU_ITEMS.map((item) => {
+        {activeMenuItems.map((item) => {
           if (item.group) {
             return (
               <div key={item.name} className="mb-3 sm:mb-4">

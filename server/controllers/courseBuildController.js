@@ -207,7 +207,7 @@ async function createCourse(req, res) {
         const lesson = lessonOrder[lIdx];
         if (!lesson || !String(lesson.title || '').trim()) continue;
 
-        const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive'].includes(lesson.type) ? lesson.type : 'reading';
+        const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive', 'sop'].includes(lesson.type) ? lesson.type : 'reading';
         await conn.query(
           `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -347,7 +347,7 @@ async function updateCourse(req, res) {
               if (!lesson) continue;
               const lessonTitle = String(lesson.title || '').trim();
               const effectiveLessonTitle = lessonTitle || `Lesson ${lIdx + 1}`;
-              const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive'].includes(lesson.type) ? lesson.type : 'reading';
+              const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive', 'sop'].includes(lesson.type) ? lesson.type : 'reading';
 
               let lessonId = null;
               if (lesson.id) {
@@ -411,7 +411,7 @@ async function updateCourse(req, res) {
               const lesson = lessonOrder[lIdx];
               if (!lesson || !String(lesson.title || '').trim()) continue;
 
-              const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive'].includes(lesson.type) ? lesson.type : 'reading';
+              const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive', 'sop'].includes(lesson.type) ? lesson.type : 'reading';
               await conn.query(
                 `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

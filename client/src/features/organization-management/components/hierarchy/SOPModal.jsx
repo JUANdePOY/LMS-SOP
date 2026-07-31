@@ -39,7 +39,7 @@ export default function SOPModal() {
   if (!sopModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
       <div className="w-full max-w-2xl rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-xl">
         <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
           <div>
