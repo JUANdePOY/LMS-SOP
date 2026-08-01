@@ -3,7 +3,6 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const db = require('./config/database');
-const loginLimiter = require('./middleware/rateLimiter');
 
 require('dotenv').config();
 
@@ -82,7 +81,7 @@ if (fs.existsSync(clientDist)) {
   console.warn('WARNING: client/dist not found! Build may have failed.');
 }
 
-app.use('/api/auth', loginLimiter, authRoutes);
+app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/departments', departmentsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
