@@ -173,7 +173,7 @@ function SOPListPage() {
         {activeTab === 'sops' && !archivedTab && (
           <button
             onClick={() => setShowCreate(true)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2.5 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-500/40"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
           >
             <Plus size={16} />
             Create SOP

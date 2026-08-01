@@ -98,11 +98,15 @@ function SOPCreateForm({
           <button
             type="button"
             onClick={() => { onCancel(); setShowCreate(false); }}
-            className="px-4 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
           >
             Cancel
           </button>
-          <button onClick={onCreate} disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+          <button
+            onClick={onCreate}
+            disabled={loading}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors disabled:opacity-50"
+          >
             {loading ? 'Creating...' : 'Create'}
           </button>
         </div>
