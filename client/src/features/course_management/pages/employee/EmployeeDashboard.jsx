@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getCourseList } from "@/features/course_management/api/course.api";
 import { getEnrollments } from "@/features/course_management/api/enrollment.api";
-import { useToast } from "@/shared/components/ui/Toast";
-import { Search, BookOpen, Clock, Users, TrendingUp, Award, PlayCircle, CheckCircle2 } from "lucide-react";
+import { Search, BookOpen, Clock, PlayCircle, TrendingUp, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const DIFFICULTY_META = {
@@ -14,12 +13,7 @@ const DIFFICULTY_META = {
   all_levels: { label: "All Levels", color: "bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-100 border-sky-200 dark:border-sky-500/30" },
 };
 
-const STATUS_META = {
-  published: { label: "Published", color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-100 border-emerald-200 dark:border-emerald-500/30" },
-  draft: { label: "Draft", color: "bg-neutral-100 text-neutral-700 dark:bg-neutral-500/20 dark:text-neutral-200 border-neutral-200 dark:border-neutral-500/30" },
-  archived: { label: "Archived", color: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-100 border-amber-200 dark:border-amber-500/30" },
-  under_review: { label: "Under Review", color: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-100 border-blue-200 dark:border-blue-500/30" },
-};
+
 
 function getInitials(name) {
   if (!name) return "?";
@@ -52,9 +46,9 @@ function CourseCard({ course, onClick, showProgress = false, progress = 0 }) {
   return (
     <div
       onClick={onClick}
-      className="group cursor-pointer rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 hover:shadow-lg hover:border-blue-200 dark:hover:border-blue-500/40 transition-all duration-200 overflow-hidden"
+      className="group cursor-pointer rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 hover:shadow-lg transition-all duration-200 overflow-hidden"
     >
-      <div className="aspect-video bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center overflow-hidden">
+      <div className="relative aspect-video bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center overflow-hidden">
         {course.thumbnail_url ? (
           <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
         ) : (
@@ -62,6 +56,11 @@ function CourseCard({ course, onClick, showProgress = false, progress = 0 }) {
             <BookOpen size={48} className="text-blue-400 dark:text-blue-500" />
           </div>
         )}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="rounded-full bg-white dark:bg-neutral-800 p-2.5 shadow-lg">
+            <PlayCircle size={22} className="text-blue-600 dark:text-blue-300" />
+          </div>
+        </div>
       </div>
       <div className="p-4 space-y-3">
         <div>
@@ -140,7 +139,6 @@ function StatCard({ title, value, icon: Icon, color = "blue" }) {
 export default function EmployeeDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [myCourses, setMyCourses] = useState([]);
   const [publishedCourses, setPublishedCourses] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -199,7 +197,7 @@ export default function EmployeeDashboard() {
 
   const completedCount = myCourses.filter((e) => e.progress_percentage >= 100).length;
   const inProgressCount = myCourses.filter((e) => e.progress_percentage > 0 && e.progress_percentage < 100).length;
-  const notStartedCount = myCourses.filter((e) => !e.progress_percentage || e.progress_percentage === 0).length;
+
 
   if (loading) {
     return (
@@ -215,25 +213,15 @@ export default function EmployeeDashboard() {
   }
 
   return (
-    <div className="w-full max-w-none space-y-6 sm:space-y-8">
-      <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-gradient-to-br from-white via-neutral-50/80 to-neutral-100/80 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 px-5 sm:px-6 py-5 sm:py-6 shadow-sm dark:shadow-none">
+    <div className="w-full max-w-none space-y-5 sm:space-y-6">
+      <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-gradient-to-br from-white via-neutral-50/80 to-neutral-100/80 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 px-5 sm:px-6 py-4 sm:py-5 shadow-sm dark:shadow-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.30),rgba(147,51,234,0.08),transparent_75%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.15),rgba(168,85,247,0.12),transparent_45%)]" />
-        <div className="relative">
-          <div className="flex items-center gap-4 mb-4">
-            <div className={`h-14 w-14 rounded-full flex items-center justify-center text-lg font-bold ${getAvatarColor(user?.full_name || user?.email)} ring-2 ring-white dark:ring-neutral-700 shadow-sm`}>
-              {getInitials(user?.full_name || user?.email)}
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
-                Welcome back, {user?.full_name?.split(" ")[0] || "Learner"}!
-              </h1>
-              <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
-                Continue your learning journey
-              </p>
-            </div>
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center justify-between">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">My Learning Dashboard</h1>
+            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">Track your enrolled courses and progress</p>
           </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard title="Enrolled Courses" value={myCourses.length} icon={BookOpen} color="blue" />
             <StatCard title="In Progress" value={inProgressCount} icon={Clock} color="amber" />
             <StatCard title="Completed" value={completedCount} icon={CheckCircle2} color="emerald" />

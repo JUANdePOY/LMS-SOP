@@ -24,6 +24,10 @@ async function getCourseProgress(req, res) {
   const courseId = parseInt(req.params.courseId, 10);
   const userId = req.user?.id;
 
+  if (Number.isNaN(courseId)) {
+    return res.status(400).json({ success: false, message: 'Invalid course ID', code: 'INVALID_COURSE_ID' });
+  }
+
   try {
     const [course, progress, modules, allLessons] = await Promise.all([
       courseModel.findById(courseId),
@@ -122,9 +126,12 @@ async function markLessonComplete(req, res) {
     const courseId = module.course_id;
     const existing = await lessonProgressModel.findByUserAndLesson(userId, lessonId);
     if (!existing) {
-      return res.status(400).json({ success: false, message: 'You do not have access to this lesson yet', code: 'LESSON_LOCKED' });
-    }
-    if (existing.status === 'completed') {
+      const isEnrolled = await enrollmentModel.isEnrolled(userId, courseId);
+      if (!isEnrolled) {
+        return res.status(400).json({ success: false, message: 'You do not have access to this lesson yet', code: 'LESSON_LOCKED' });
+      }
+      await lessonProgressModel.upsert({ userId, lessonId, courseId, status: 'unlocked' });
+    } else if (existing.status === 'completed') {
       return res.json({ success: true, message: 'Lesson already completed' });
     }
 
@@ -196,7 +203,8 @@ async function markLessonComplete(req, res) {
         }
       } else {
         const [[enrollment]] = await conn.query(
-          'SELECT id FROM course_enrollments WHERE course_id = ? AND user_id = ? AND is_deleted = FALSE LIMIT 1'
+          'SELECT id FROM course_enrollments WHERE course_id = ? AND user_id = ? AND is_deleted = FALSE LIMIT 1',
+          [courseId, userId]
         );
         if (enrollment) {
           const pct = Math.round((completed / total) * 100);

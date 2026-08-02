@@ -69,6 +69,11 @@ async function findByCourseAndUser(courseId, userId) {
   return rows[0] || null;
 }
 
+async function isEnrolled(userId, courseId) {
+  const enrollment = await findByCourseAndUser(courseId, userId);
+  return !!enrollment;
+}
+
 async function create(enrollmentData) {
   const { course_id, user_id, role, status } = enrollmentData;
 
@@ -159,6 +164,7 @@ module.exports = {
   listEnrollments,
   findById,
   findByCourseAndUser,
+  isEnrolled,
   create,
   bulkCreate,
   update,

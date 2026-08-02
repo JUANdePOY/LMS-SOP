@@ -16,7 +16,7 @@ export default function EmployeeCourseCard({ course, onClick, showProgress = fal
   return (
     <div
       onClick={onClick}
-      className="group cursor-pointer rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-500/40 transition-all duration-200 overflow-hidden"
+      className="group cursor-pointer rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:shadow-lg transition-all duration-200 overflow-hidden"
     >
       <div className="relative aspect-video bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 flex items-center justify-center overflow-hidden">
         {course.thumbnail_url ? (
@@ -31,13 +31,11 @@ export default function EmployeeCourseCard({ course, onClick, showProgress = fal
             {Math.round(progress)}%
           </div>
         )}
-        {!isEnrolled && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity">
-            <div className="rounded-full bg-white dark:bg-neutral-800 p-2.5 shadow-lg">
-              <PlayCircle size={22} className="text-blue-600 dark:text-blue-300" />
-            </div>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="rounded-full bg-white dark:bg-neutral-800 p-2.5 shadow-lg">
+            <PlayCircle size={22} className="text-blue-600 dark:text-blue-300" />
           </div>
-        )}
+        </div>
       </div>
       <div className="p-4 space-y-2.5">
         <div>

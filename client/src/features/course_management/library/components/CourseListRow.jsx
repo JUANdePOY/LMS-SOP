@@ -1,4 +1,4 @@
-import { BookOpen, Users, Clock, Star, ChevronRight } from "lucide-react";
+import { BookOpen, Users, Clock, Star, PlayCircle, ChevronRight } from "lucide-react";
 
 const STATUS_META = {
   published: {
@@ -47,12 +47,17 @@ export default function CourseListRow({ course, onClick }) {
       className="group cursor-pointer rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
     >
       <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 relative overflow-hidden">
           {course.thumbnail_url ? (
             <img src={course.thumbnail_url} alt={course.title} className="h-full w-full rounded-md object-cover" />
           ) : (
             <BookOpen size={20} className="text-blue-600 dark:text-blue-400" />
           )}
+          <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="rounded-full bg-white dark:bg-neutral-800 p-1.5 shadow-lg">
+              <PlayCircle size={16} className="text-blue-600 dark:text-blue-300" />
+            </div>
+          </div>
         </div>
 
         <div className="flex-1 min-w-0">

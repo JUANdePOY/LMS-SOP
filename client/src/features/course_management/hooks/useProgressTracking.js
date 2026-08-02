@@ -5,36 +5,33 @@ export function useProgressTracking(courseId, userId) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const cancelRef = useRef(false);
-  const courseIdRef = useRef(courseId);
-  const userIdRef = useRef(userId);
-  courseIdRef.current = courseId;
-  userIdRef.current = userId;
 
   const fetchProgress = useCallback(async () => {
-    if (!courseIdRef.current || !userIdRef.current) return;
+    if (!courseId || Number.isNaN(Number(courseId)) || !userId) return;
     setLoading(true);
     setError(null);
     cancelRef.current = false;
     try {
       const { getCourseProgress } = await import("../api/progress.api");
-      const result = await getCourseProgress(courseIdRef.current, userIdRef.current);
+      const result = await getCourseProgress(courseId, userId);
       if (!cancelRef.current) setData(result.data || result);
     } catch (err) {
       if (!cancelRef.current) setError(err.message);
     } finally {
       if (!cancelRef.current) setLoading(false);
     }
-  }, []);
+  }, [courseId, userId]);
 
   const markComplete = useCallback(async (moduleId, contentId) => {
+    if (!courseId) return;
     try {
       const { markContentComplete } = await import("../api/progress.api");
-      return await markContentComplete(courseIdRef.current, moduleId, contentId);
+      return await markContentComplete(courseId, moduleId, contentId);
     } catch (err) {
       setError(err.message);
       throw err;
     }
-  }, []);
+  }, [courseId]);
 
   useEffect(() => {
     fetchProgress();

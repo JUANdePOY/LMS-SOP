@@ -1,4 +1,4 @@
-import { BookOpen, Users, Clock, Star } from "lucide-react";
+import { BookOpen, Users, Clock, Star, PlayCircle } from "lucide-react";
 
 const STATUS_META = {
   published: {
@@ -46,12 +46,17 @@ export default function CourseLibraryCard({ course, onClick }) {
       onClick={onClick}
       className="group cursor-pointer rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
     >
-      <div className="aspect-video bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center overflow-hidden">
+      <div className="aspect-video bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center overflow-hidden relative">
         {course.thumbnail_url ? (
           <img src={course.thumbnail_url} alt={course.title} className="h-full w-full object-cover" />
         ) : (
           <BookOpen size={32} className="text-blue-600 dark:text-blue-400" />
         )}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="rounded-full bg-white dark:bg-neutral-800 p-2.5 shadow-lg">
+            <PlayCircle size={22} className="text-blue-600 dark:text-blue-300" />
+          </div>
+        </div>
       </div>
 
       <div className="p-4 space-y-3">

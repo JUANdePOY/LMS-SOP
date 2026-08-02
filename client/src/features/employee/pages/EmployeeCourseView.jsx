@@ -9,11 +9,10 @@ import { useToast } from "@/shared/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import LessonList from "@/features/course_management/components/LessonList";
 import LessonProgressBar from "@/features/course_management/components/LessonProgressBar";
-import {
+  import {
   getEmployeeCourseDetails,
   getEmployeeCourseProgress,
   getEmployeeEnrollmentStatus,
-  enrollInCourse,
 } from "../api/employee.api";
 
 const DIFFICULTY_META = {
@@ -31,7 +30,6 @@ export default function EmployeeCourseView() {
   const [progressData, setProgressData] = useState(null);
   const [enrollmentStatus, setEnrollmentStatus] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [enrolling, setEnrolling] = useState(false);
   const [progressLoading, setProgressLoading] = useState(false);
   const [progressError, setProgressError] = useState(null);
   const [error, setError] = useState(null);
@@ -100,19 +98,6 @@ export default function EmployeeCourseView() {
     fetchProgress();
   }, [fetchProgress]);
 
-  const handleEnroll = async () => {
-    setEnrolling(true);
-    try {
-      await enrollInCourse(courseId);
-      toast.success("Successfully enrolled in course");
-      await fetchCourseDetails();
-    } catch (err) {
-      toast.error(err.message || "Failed to enroll");
-    } finally {
-      setEnrolling(false);
-    }
-  };
-
   const handleLessonClick = (lesson) => {
     navigate(`/courses/view/${courseId}/lesson/${lesson.id}`);
   };
@@ -128,7 +113,7 @@ export default function EmployeeCourseView() {
   const handleContinueLearning = () => {
     const lessons = progressData?.lessons || [];
     const inProgressLesson = lessons.find((l) => l.status === "in_progress");
-    const nextLesson = lessons.find((l) => l.status === "unlocked" && l.status !== "completed");
+    const nextLesson = lessons.find((l) => l.status !== "completed" && l.status !== "locked");
     const firstIncomplete = inProgressLesson || nextLesson;
     if (firstIncomplete) {
       navigate(`/courses/view/${courseId}/lesson/${firstIncomplete.id}`);
@@ -283,11 +268,10 @@ export default function EmployeeCourseView() {
                 </>
               ) : (
                 <button
-                  onClick={handleEnroll}
-                  disabled={enrolling}
-                  className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  onClick={handleBack}
+                  className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-neutral-700 px-5 py-2.5 text-sm font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
                 >
-                  {enrolling ? "Enrolling..." : "Enroll Now"}
+                  Back to Dashboard
                 </button>
               )}
             </div>
