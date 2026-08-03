@@ -32,12 +32,12 @@ async function findById(id) {
 }
 
 async function create(contentData) {
-  const { module_id, title, type, description, order_index, url, duration, is_required, allow_access_after } = contentData;
+  const { module_id, title, type, description, order_index, url, duration, is_required, allow_access_after, quiz_id } = contentData;
 
   const [result] = await db.query(
     `INSERT INTO module_content (
-      module_id, title, type, description, order_index, url, duration, is_required, allow_access_after
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      module_id, title, type, description, order_index, url, duration, is_required, allow_access_after, quiz_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       module_id,
       title,
@@ -48,13 +48,14 @@ async function create(contentData) {
       duration ?? null,
       is_required ?? true,
       allow_access_after ?? null,
+      quiz_id ? parseInt(quiz_id, 10) : null,
     ]
   );
   return result.insertId;
 }
 
 async function update(id, updates) {
-  const allowed = ['title', 'type', 'description', 'order_index', 'url', 'duration', 'is_required', 'allow_access_after'];
+  const allowed = ['title', 'type', 'description', 'order_index', 'url', 'duration', 'is_required', 'allow_access_after', 'quiz_id'];
   const sets = [];
   const params = [];
 

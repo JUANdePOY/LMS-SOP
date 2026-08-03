@@ -26,10 +26,22 @@ export function useQuizzes(courseId, filters = {}) {
     }
   }, []);
 
+  const createQuiz = useCallback(async (payload) => {
+    try {
+      const { createQuiz: apiCreateQuiz } = await import("../api/quiz.api");
+      const result = await apiCreateQuiz({ ...payload, courseId: courseIdRef.current });
+      setData(prev => [...prev, result.data || result]);
+      return result;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, []);
+
   useEffect(() => {
     fetchQuizzes();
     return () => { cancelRef.current = true; };
   }, [fetchQuizzes]);
 
-  return { data, loading, error, refetch: fetchQuizzes, setData };
+  return { data, loading, error, refetch: fetchQuizzes, createQuiz, setData };
 }

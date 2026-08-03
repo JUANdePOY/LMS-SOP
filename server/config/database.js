@@ -440,6 +440,14 @@ async function runMigrations() {
   } catch (err) {
     console.error('Course management migration error:', err.message);
   }
+
+  try {
+    const { runAssessmentsMigrations } = require('../migrations/assessments');
+    await runAssessmentsMigrations(db);
+    console.log('Assessments migrations applied');
+  } catch (err) {
+    console.error('Assessments migration error:', err.message);
+  }
 }
 
 async function initDatabase() {

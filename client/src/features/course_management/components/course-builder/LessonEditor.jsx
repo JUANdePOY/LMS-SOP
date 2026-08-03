@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { FileText, PlayCircle, HelpCircle, Link2, Trash2, File, FileArchive, Settings, Save } from "lucide-react";
+import { FileText, PlayCircle, HelpCircle, Link2, Trash2, File, FileArchive, Settings, Save, Award } from "lucide-react";
 import { getSops } from "@/features/sop-management/services/sopService";
+import { getMyQuizzes } from "@/features/assessments/api/quiz.api";
 import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichTextEditor";
 
 const TYPE_OPTIONS = [
@@ -9,6 +10,7 @@ const TYPE_OPTIONS = [
   { value: "quiz", label: "Quiz", Icon: HelpCircle },
   { value: "link", label: "Link", Icon: Link2 },
   { value: "sop", label: "SOP", Icon: FileText },
+  { value: "certificate", label: "Certificate", Icon: Award },
   { value: "document", label: "Document / File", Icon: FileArchive },
 ];
 
@@ -24,6 +26,9 @@ export default function LessonEditor({ lesson, moduleId, onSave, onDelete, savin
   const [availableSops, setAvailableSops] = useState([]);
   const [loadingSops, setLoadingSops] = useState(false);
   const [activeTab, setActiveTab] = useState("content");
+  const [quizzes, setQuizzes] = useState([]);
+  const [loadingQuizzes, setLoadingQuizzes] = useState(false);
+  const [selectedQuizId, setSelectedQuizId] = useState(null);
 
   useEffect(() => {
     if (!lesson) return;
@@ -35,6 +40,7 @@ export default function LessonEditor({ lesson, moduleId, onSave, onDelete, savin
     setRequiresQuizPass(!!lesson.requiresQuizPass);
     setPassingScore(lesson.passingScore || "");
     setIsRequired(lesson.is_required ?? true);
+    setSelectedQuizId(lesson.quizId || null);
   }, [lesson?.id]);
 
   useEffect(() => {
@@ -47,6 +53,22 @@ export default function LessonEditor({ lesson, moduleId, onSave, onDelete, savin
         })
         .catch((err) => console.error("Failed to fetch SOPs:", err))
         .finally(() => setLoadingSops(false));
+    }
+  }, [type]);
+
+  useEffect(() => {
+    if (type === "quiz") {
+      setLoadingQuizzes(true);
+      getMyQuizzes()
+        .then((res) => {
+          const items = res.data || [];
+          setQuizzes(items);
+          if (!selectedQuizId && items.length) {
+            setSelectedQuizId(items[0].id);
+          }
+        })
+        .catch((err) => console.error("Failed to fetch quizzes:", err))
+        .finally(() => setLoadingQuizzes(false));
     }
   }, [type]);
 
@@ -69,6 +91,11 @@ export default function LessonEditor({ lesson, moduleId, onSave, onDelete, savin
     emitPatch({ type: newType });
   };
 
+  const handleQuizChange = (quizId) => {
+    setSelectedQuizId(quizId);
+    emitPatch({ quizId });
+  };
+
   const handleSave = () => {
     onSave?.({
       title: title.trim(),
@@ -79,6 +106,7 @@ export default function LessonEditor({ lesson, moduleId, onSave, onDelete, savin
       requiresQuizPass: isQuiz ? requiresQuizPass : false,
       passingScore: isQuiz && requiresQuizPass && passingScore ? parseInt(passingScore, 10) : null,
       is_required: isRequired,
+      quizId: isQuiz ? selectedQuizId : null,
     });
   };
 
@@ -267,6 +295,25 @@ export default function LessonEditor({ lesson, moduleId, onSave, onDelete, savin
               </div>
             ) : (
               <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">Select quiz</label>
+                  {loadingQuizzes ? (
+                    <div className="text-xs text-neutral-500">Loading quizzes...</div>
+                  ) : (
+                    <select
+                      value={selectedQuizId || ""}
+                      onChange={(e) => handleQuizChange(e.target.value ? Number(e.target.value) : null)}
+                      className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm"
+                    >
+                      <option value="">Select a quiz...</option>
+                      {quizzes.map((q) => (
+                        <option key={q.id} value={q.id}>
+                          {q.title}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
                 <div>
                   <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">Quiz instructions</label>
                   <RichTextEditor

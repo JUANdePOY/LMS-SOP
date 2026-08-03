@@ -41,6 +41,15 @@ const OrgCategoryPage = lazy(() => import("@/features/organization-management/pa
 const UsersPanel = lazy(() => import("@/pages/management/userspanel/UsersPanel"));
 const RolesPanel = lazy(() => import("@/pages/management/RolesPanel"));
 
+// Assessments
+const AssessmentsDashboardPage = lazy(() => import("@/features/assessments/pages/AssessmentsDashboardPage"));
+const QuizBuilderPage = lazy(() => import("@/features/assessments/pages/QuizBuilderPage"));
+const TakeQuizPage = lazy(() => import("@/features/assessments/pages/TakeQuizPage"));
+const QuizResultsPage = lazy(() => import("@/features/assessments/pages/QuizResultsPage"));
+const QuizLeaderboardPage = lazy(() => import("@/features/assessments/pages/QuizLeaderboardPage"));
+const ViolationDashboardPage = lazy(() => import("@/features/assessments/pages/ViolationDashboardPage"));
+const QuizzesPanel = lazy(() => import("@/pages/management/QuizzesPanel"));
+
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
 function PageLoader() {
@@ -145,6 +154,14 @@ const router = createBrowserRouter([
       { path: "admin/organization/departments", element: LMSProtectedWrapper(OrgDepartmentPage), handle: { title: "Departments" } },
       { path: "admin/organization/categories", element: LMSProtectedWrapper(OrgCategoryPage), handle: { title: "Categories" } },
       { path: "admin/organization/sop-management", element: <Navigate to="/sops" replace /> },
+      { path: "assessments", element: LMSProtectedWrapper(AssessmentsDashboardPage), handle: { title: "My Quizzes" } },
+      { path: "assessments/manage", element: LMSProtectedWrapper(QuizzesPanel), handle: { title: "Manage Quizzes" } },
+      { path: "assessments/leaderboard", element: LMSProtectedWrapper(QuizLeaderboardPage), handle: { title: "Leaderboard" } },
+      { path: "assessments/integrity", element: LMSProtectedWrapper(ViolationDashboardPage), handle: { title: "Integrity Reports" } },
+      { path: "assessments/quiz/:quizId/results", element: LMSProtectedWrapper(QuizResultsPage), handle: { title: "Quiz Results" } },
+      { path: "assessments/quiz/:quizId/leaderboard", element: LMSProtectedWrapper(QuizLeaderboardPage), handle: { title: "Leaderboard" } },
+      { path: "assessments/quiz/:quizId/take/:attemptId?", element: LMSProtectedWrapper(TakeQuizPage), handle: { title: "Take Quiz" } },
+      { path: "assessments/quiz/:quizId", element: LMSProtectedWrapper(QuizBuilderPage), handle: { title: "Quiz Builder" } },
     ],
   },
 ]);

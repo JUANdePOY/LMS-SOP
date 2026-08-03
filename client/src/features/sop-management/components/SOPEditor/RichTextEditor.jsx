@@ -202,7 +202,9 @@ function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Ente
     content: value || '',
     editable: !disabled,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      let html = editor.getHTML();
+      html = html.replace(/<p>\s*<\/p>/g, '').trim();
+      onChange(html || '');
     },
     editorProps: {
       attributes: {
@@ -215,8 +217,8 @@ function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Ente
   // resetting the form) without fighting the user's own typing (which drives onUpdate).
   useEffect(() => {
     if (!editor) return;
-    const isSame = editor.getHTML() === (value || '');
-    if (!isSame) {
+    const clean = (html) => html.replace(/<p>\s*<\/p>/g, '').trim();
+    if (clean(editor.getHTML()) !== clean(value || '')) {
       editor.commands.setContent(value || '', false);
     }
   }, [value, editor]);

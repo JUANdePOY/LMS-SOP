@@ -15,11 +15,9 @@ export default function CourseBuilderPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [savingStructural, setSavingStructural] = useState(false);
   const [course, setCourse] = useState(null);
   const [modules, setModules] = useState([]);
   const modulesRef = useRef([]);
-  const [dirty, setDirty] = useState(false);
   const [loadingError, setLoadingError] = useState(null);
 
   const [form, setForm] = useState({
@@ -33,12 +31,8 @@ export default function CourseBuilderPage() {
   const [selectedModuleId, setSelectedModuleId] = useState(null);
   const [selectedLessonId, setSelectedLessonId] = useState(null);
 
-  const saveTimer = useRef(null);
-  const leaving = useRef(false);
-
   useEffect(() => {
     if (!courseId) return;
-    leaving.current = false;
     setLoadingError(null);
     let cancelled = false;
     const start = Date.now();
@@ -64,7 +58,6 @@ export default function CourseBuilderPage() {
         const enriched = mods.map((m) => ({ ...m, lessons: m.lessons || [] }));
         modulesRef.current = enriched;
         setModules(enriched);
-        setDirty(false);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -91,38 +84,23 @@ export default function CourseBuilderPage() {
           thumbnail_url: c.thumbnail_url || "",
           status: c.status || "draft",
         });
-        const prevModuleId = selectedModuleId;
-        const prevLessonId = selectedLessonId;
-        const prevModuleIdx = modulesRef.current.findIndex((m) => m.id === prevModuleId);
-        const prevLessonIdx = prevModuleIdx >= 0 ? (modulesRef.current[prevModuleIdx].lessons || []).findIndex((l) => l.id === prevLessonId) : -1;
         const enriched = mods.map((m) => ({ ...m, lessons: m.lessons || [] }));
         modulesRef.current = enriched;
         setModules(enriched);
-        if (prevModuleIdx >= 0 && enriched[prevModuleIdx]) {
-          setSelectedModuleId(enriched[prevModuleIdx].id);
-          if (prevLessonIdx >= 0 && enriched[prevModuleIdx].lessons[prevLessonIdx]) {
-            setSelectedLessonId(enriched[prevModuleIdx].lessons[prevLessonIdx].id);
-          } else {
-            setSelectedLessonId(null);
-          }
-        } else {
-          setSelectedModuleId(null);
-          setSelectedLessonId(null);
-        }
       })
       .catch((err) => {
         toast.error(err.message || "Failed to refresh course");
       });
-  }, [courseId, toast, selectedModuleId, selectedLessonId]);
+  }, [courseId, toast]);
 
-  const autosave = useCallback(
+  const saveNow = useCallback(
     (payload) => {
       if (!courseId) return Promise.resolve();
-      setSavingStructural(true);
+      setSaving(true);
       return builderUpdate(courseId, payload)
         .then((res) => {
           if (res?.success || res?.data?.success) {
-            setDirty(false);
+            toast.success("Saved");
             return refreshCourse();
           } else {
             throw new Error(res?.message || res?.data?.message || "Save failed");
@@ -132,32 +110,20 @@ export default function CourseBuilderPage() {
           toast.error(err.message || "Save failed");
           throw err;
         })
-        .finally(() => setSavingStructural(false));
+        .finally(() => setSaving(false));
     },
     [courseId, toast, refreshCourse]
   );
 
-  const debouncedAutosave = useCallback(
-    (payload) => {
-      setDirty(true);
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-      saveTimer.current = setTimeout(() => autosave(payload), 600);
-    },
-    [autosave]
-  );
-
   const handleSaveDraft = async () => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
     try {
-      await autosave(buildPayload());
-      toast.success("Draft saved");
+      await saveNow(buildPayload());
     } catch (err) {
-      toast.error(err.message || "Failed to save draft");
+      // error already shown in toast
     }
   };
 
   const handlePublish = async () => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
     const payload = buildPayload();
     payload.status = "published";
     payload.title = payload.title.trim();
@@ -174,33 +140,24 @@ export default function CourseBuilderPage() {
       toast.error(`Module "${emptyModule.title || "Untitled"}" has no lessons`);
       return;
     }
-    setSaving(true);
     try {
-      await autosave(payload);
+      await saveNow(payload);
       await publishCourse(courseId);
       toast.success("Course published");
-      setDirty(false);
       navigate("/courses/library");
     } catch (err) {
-      toast.error(err.message || "Failed to publish");
-    } finally {
-      setSaving(false);
+      // error already shown in toast
     }
   };
 
   const updateField = (field, value) => {
-    setForm((prev) => {
-      const next = { ...prev, [field]: value };
-      debouncedAutosave({ ...next, modules: modulesRef.current });
-      return next;
-    });
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   const addModule = () => {
     setModules((prev) => {
       const next = [...prev, { id: "new-" + Date.now(), title: "", type: "chapter", order_index: prev.length + 1, lessons: [], isNew: true }];
       modulesRef.current = next;
-      debouncedAutosave({ ...form, modules: next });
       return next;
     });
     setSelectedModuleId(null);
@@ -208,21 +165,11 @@ export default function CourseBuilderPage() {
   };
 
   const updateModule = (moduleId, patch) => {
-    setModules((prev) => {
-      const next = prev.map((m) => (m.id === moduleId ? { ...m, ...patch } : m));
-      modulesRef.current = next;
-      debouncedAutosave({ ...form, modules: next });
-      return next;
-    });
+    setModules((prev) => prev.map((m) => (m.id === moduleId ? { ...m, ...patch } : m)));
   };
 
   const removeModule = (moduleId) => {
-    setModules((prev) => {
-      const next = prev.filter((m) => m.id !== moduleId).map((m, i) => ({ ...m, order_index: i + 1 }));
-      modulesRef.current = next;
-      debouncedAutosave({ ...form, modules: next });
-      return next;
-    });
+    setModules((prev) => prev.filter((m) => m.id !== moduleId).map((m, i) => ({ ...m, order_index: i + 1 })));
     if (selectedModuleId === moduleId) {
       setSelectedModuleId(null);
       setSelectedLessonId(null);
@@ -238,8 +185,6 @@ export default function CourseBuilderPage() {
           lessons: [...(m.lessons || []), { id: "new-" + Date.now(), title: "", type: "reading", description: "", url: "", order_index: (m.lessons || []).length + 1, isNew: true }],
         };
       });
-      modulesRef.current = next;
-      debouncedAutosave({ ...form, modules: next });
       return next;
     });
   };
@@ -252,8 +197,6 @@ export default function CourseBuilderPage() {
         lessons[lessonIndex] = { ...lessons[lessonIndex], ...patch };
         return { ...m, lessons };
       });
-      modulesRef.current = next;
-      debouncedAutosave({ ...form, modules: next });
       return next;
     });
   };
@@ -267,8 +210,6 @@ export default function CourseBuilderPage() {
           lessons: (m.lessons || []).filter((_, i) => i !== lessonIndex).map((l, i) => ({ ...l, order_index: i + 1 })),
         };
       });
-      modulesRef.current = next;
-      debouncedAutosave({ ...form, modules: next });
       return next;
     });
     setSelectedLessonId(null);
@@ -283,8 +224,6 @@ export default function CourseBuilderPage() {
         [lessons[lessonIndex - 1], lessons[lessonIndex]] = [lessons[lessonIndex], lessons[lessonIndex - 1]];
         return { ...m, lessons: lessons.map((l, i) => ({ ...l, order_index: i + 1 })) };
       });
-      modulesRef.current = next;
-      debouncedAutosave({ ...form, modules: next });
       return next;
     });
   };
@@ -298,8 +237,6 @@ export default function CourseBuilderPage() {
         [lessons[lessonIndex + 1], lessons[lessonIndex]] = [lessons[lessonIndex], lessons[lessonIndex + 1]];
         return { ...m, lessons: lessons.map((l, i) => ({ ...l, order_index: i + 1 })) };
       });
-      modulesRef.current = next;
-      debouncedAutosave({ ...form, modules: next });
       return next;
     });
   };
@@ -324,6 +261,7 @@ export default function CourseBuilderPage() {
         is_required: l.is_required ?? true,
         requiresQuizPass: !!l.requiresQuizPass,
         passingScore: l.passingScore || null,
+        quizId: l.quizId || null,
       })),
     })),
   });
@@ -373,24 +311,6 @@ export default function CourseBuilderPage() {
             </div>
           </div>
           <div className="flex items-center justify-end gap-2">
-            <span className="text-[10px] text-neutral-500 flex items-center gap-1">
-              {savingStructural || saving ? (
-                <>
-                  <span className="inline-flex h-2 w-2 animate-pulse rounded-full bg-blue-600" />
-                  Saving...
-                </>
-              ) : dirty ? (
-                <>
-                  <span className="inline-flex h-2 w-2 rounded-full bg-amber-500" />
-                  Unsaved changes
-                </>
-              ) : (
-                <>
-                  <span className="inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                  All changes saved
-                </>
-              )}
-            </span>
             <button onClick={() => navigate("/courses")} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs hover:border-neutral-300 dark:hover:border-neutral-600">
               Back
             </button>
@@ -439,18 +359,18 @@ export default function CourseBuilderPage() {
               saving={saving}
             />
           ) : (
-          <div className="flex h-full items-center justify-center text-sm text-neutral-500">
-            <div className="text-center space-y-3">
-              <p>Select a module or lesson from the outline to start editing.</p>
-              <button
-                type="button"
-                onClick={addModule}
-                className="rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs hover:border-neutral-300 dark:hover:border-neutral-600 transition-all"
-              >
-                + Add your first module
-              </button>
+            <div className="flex h-full items-center justify-center text-sm text-neutral-500">
+              <div className="text-center space-y-3">
+                <p>Select a module or lesson from the outline to start editing.</p>
+                <button
+                  type="button"
+                  onClick={addModule}
+                  className="rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs hover:border-neutral-300 dark:hover:border-neutral-600 transition-all"
+                >
+                  + Add your first module
+                </button>
+              </div>
             </div>
-          </div>
           )}
         </div>
       </div>
@@ -458,11 +378,11 @@ export default function CourseBuilderPage() {
       <div className="flex items-center justify-between gap-2 border-t border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2">
         <PublishReadiness course={course} modules={modules} />
         <div className="flex items-center gap-2">
-          <button onClick={handleSaveDraft} disabled={saving || savingStructural} className="rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 text-xs hover:border-neutral-300 dark:hover:border-neutral-600 disabled:opacity-50 transition-all">
-            {saving || savingStructural ? "Saving..." : "Save Draft"}
+          <button onClick={handleSaveDraft} disabled={saving} className="rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 text-xs hover:border-neutral-300 dark:hover:border-neutral-600 disabled:opacity-50 transition-all">
+            {saving ? "Saving..." : "Save Draft"}
           </button>
-          <button onClick={handlePublish} disabled={saving || savingStructural} className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-all">
-            {saving || savingStructural ? "Publishing..." : "Publish"}
+          <button onClick={handlePublish} disabled={saving} className="rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-all">
+            {saving ? "Publishing..." : "Publish"}
           </button>
         </div>
       </div>

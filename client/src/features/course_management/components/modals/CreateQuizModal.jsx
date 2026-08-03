@@ -1,20 +1,100 @@
+import { useState } from "react";
+import { Button } from "@/shared/components/ui/button";
+import { Plus, Loader2, X } from "lucide-react";
+
 export default function CreateQuizModal({ open, onClose, onSubmit }) {
-  const handleSubmit = (e) => {
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    onSubmit(Object.fromEntries(fd.entries()));
+    const formData = Object.fromEntries(fd.entries());
+
+    if (!formData.title?.trim()) return;
+
+    setLoading(true);
+    try {
+      await onSubmit({
+        title: formData.title.trim(),
+        description: formData.description?.trim(),
+        timeLimit: formData.timeLimit ? Number(formData.timeLimit) : 0,
+      });
+      onClose();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!open) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-[450px] max-h-[90vh] overflow-y-auto rounded-xl bg-white dark:bg-neutral-900 p-6 shadow-2xl">
-        <h2 className="text-lg font-semibold">Create Quiz</h2>
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
-          <input name="title" placeholder="Quiz title" required className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm" />
-          <textarea name="description" placeholder="Description" rows={3} className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm" />
-          <input name="timeLimit" type="number" placeholder="Time limit (min)" className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm" />
-          <button type="submit" className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white">Create Quiz</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="w-full max-w-md rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xl">
+        <div className="flex items-start justify-between border-b border-neutral-200 dark:border-neutral-800 px-6 py-4">
+          <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Create Quiz</h2>
+          <button onClick={onClose} className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 p-6">
+          <div>
+            <label className="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1.5" htmlFor="title">Quiz Title *</label>
+            <input
+              id="title"
+              name="title"
+              placeholder="Enter quiz title"
+              required
+              autoFocus
+              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1.5" htmlFor="description">Description</label>
+            <textarea
+              id="description"
+              name="description"
+              placeholder="Optional description for this quiz"
+              rows={3}
+              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 outline-none resize-y"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1.5" htmlFor="timeLimit">Time Limit (minutes)</label>
+            <input
+              id="timeLimit"
+              name="timeLimit"
+              type="number"
+              placeholder="0 for no limit"
+              min="0"
+              defaultValue="0"
+              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 outline-none"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2 border-t border-neutral-200 dark:border-neutral-800">
+            <Button variant="outline" size="sm" onClick={onClose} type="button">
+              <X className="h-4 w-4 mr-1.5" />
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Create Quiz
+                </>
+              )}
+            </Button>
+          </div>
         </form>
       </div>
     </div>

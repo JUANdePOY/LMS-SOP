@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronRight, FileText, Video, HelpCircle, ClipboardCheck, ExternalLink, File, Clock } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Video, HelpCircle, ClipboardCheck, ExternalLink, File, Clock, Award } from "lucide-react";
 
 const LESSON_TYPE_META = {
   reading: { label: "Reading", icon: FileText, color: "text-blue-500" },
@@ -9,6 +9,7 @@ const LESSON_TYPE_META = {
   assignment: { label: "Assignment", icon: ClipboardCheck, color: "text-rose-500" },
   document: { label: "Document", icon: File, color: "text-emerald-500" },
   sop: { label: "SOP", icon: FileText, color: "text-indigo-500" },
+  certificate: { label: "Certificate", icon: Award, color: "text-emerald-500" },
   link: { label: "Link", icon: ExternalLink, color: "text-cyan-500" },
   presentation: { label: "Presentation", icon: FileText, color: "text-violet-500" },
   downloadable: { label: "Download", icon: File, color: "text-orange-500" },

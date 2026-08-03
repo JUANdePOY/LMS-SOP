@@ -10,6 +10,7 @@ import {
   Plus,
   Edit3,
   Trash2,
+  Award,
 } from "lucide-react";
 
 const TYPE_CONFIG = {
@@ -18,6 +19,7 @@ const TYPE_CONFIG = {
   quiz: { icon: HelpCircle, label: "Quiz", color: "text-purple-500" },
   link: { icon: Link2, label: "Link", color: "text-indigo-500" },
   sop: { icon: FileText, label: "SOP", color: "text-amber-500" },
+  certificate: { icon: Award, label: "Certificate", color: "text-emerald-500" },
   document: { icon: FileArchive, label: "Document / File", color: "text-red-500" },
 };
 

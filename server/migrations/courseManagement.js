@@ -52,7 +52,7 @@ const COURSE_MANAGEMENT_MIGRATIONS = [
     id INT AUTO_INCREMENT PRIMARY KEY,
     module_id INT NOT NULL,
     title VARCHAR(255) NOT NULL,
-    type ENUM('video','reading','document','quiz','assignment','link','presentation','downloadable','live_session','interactive','sop') NOT NULL DEFAULT 'reading',
+    type ENUM('video','reading','document','quiz','assignment','link','presentation','downloadable','live_session','interactive','sop','certificate') NOT NULL DEFAULT 'reading',
     description TEXT DEFAULT NULL,
     order_index INT NOT NULL DEFAULT 0,
     url VARCHAR(500) DEFAULT NULL,
@@ -262,6 +262,7 @@ const COURSE_MANAGEMENT_MIGRATIONS = [
 
   `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS requires_quiz_pass BOOLEAN NOT NULL DEFAULT FALSE`,
   `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS passing_score INT DEFAULT NULL`,
+  `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS quiz_id INT DEFAULT NULL`,
 
   `CREATE TABLE IF NOT EXISTS lesson_progress (
     id INT AUTO_INCREMENT PRIMARY KEY,

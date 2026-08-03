@@ -55,6 +55,8 @@ const { courseRoutes: progressCourseRoutes, lessonRoutes: progressLessonRoutes }
 const gradesRoutes = require('./routes/grades');
 const discussionsRoutes = require('./routes/discussions');
 const courseBuilderRoutes = require('./routes/course-builder');
+const quizzesRoutes = require('./routes/quizzes');
+const quizAttemptsRoutes = require('./routes/attempts');
 
 const loginDebug = process.env.LOGIN_DEBUG === 'true';
 if (loginDebug) {
@@ -98,6 +100,8 @@ app.use('/api/courses', progressCourseRoutes);
 app.use('/api/enrollments', enrollmentsRoutes);
 app.use('/api/lessons', progressLessonRoutes);
 app.use('/api/course-builder', courseBuilderRoutes);
+app.use('/api/quiz', quizzesRoutes);
+app.use('/api/quiz-attempts', quizAttemptsRoutes);
 app.use('/api/grades', gradesRoutes);
 app.use('/api/discussions', discussionsRoutes);
 

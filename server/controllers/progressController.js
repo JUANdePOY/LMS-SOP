@@ -148,15 +148,14 @@ async function markLessonComplete(req, res) {
           await conn.rollback();
           return res.status(400).json({ success: false, message: 'Quiz not configured for this lesson', code: 'QUIZ_NOT_CONFIGURED' });
         }
-        const submissions = await quizModel.getUserSubmissions(userId, latestQuiz.id);
-        const latest = submissions[0];
-        if (!latest || latest.score === null) {
+        const best = await quizModel.getBestAttempt(latestQuiz.id, userId);
+        if (!best) {
           await conn.rollback();
           return res.status(400).json({ success: false, message: 'Quiz attempt required', code: 'QUIZ_REQUIRED' });
         }
-        if (latest.score < latestQuiz.passing_score) {
+        if (!best.passed) {
           await conn.rollback();
-          return res.status(400).json({ success: false, message: `Quiz score ${latest.score} did not pass minimum ${latestQuiz.passing_score}`, code: 'QUIZ_FAILED' });
+          return res.status(400).json({ success: false, message: `Quiz score ${best.percentage}% did not pass minimum ${latestQuiz.passing_score}%`, code: 'QUIZ_FAILED' });
         }
       }
 
