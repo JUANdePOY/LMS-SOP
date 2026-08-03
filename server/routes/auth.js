@@ -5,6 +5,7 @@ const db = require('../config/database');
 const { comparePassword, generateToken, hashPassword } = require('../app/auth');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
+const loginLimiter = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ const LOGIN_BODY_SAMPLE = (data) => {
 
 const LOGIN_TIMEOUT_MS = 12000;
 
-router.post('/login', [
+router.post('/login', loginLimiter, [
   body('email')
     .isEmail()
     .normalizeEmail()

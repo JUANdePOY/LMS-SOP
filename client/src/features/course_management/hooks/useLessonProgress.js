@@ -8,7 +8,7 @@ export function useLessonProgress(courseId) {
   const cancelRef = useRef(false);
 
   const fetchProgress = useCallback(async () => {
-    if (!courseId) return;
+    if (!courseId || Number.isNaN(Number(courseId))) return;
     setLoading(true);
     setError(null);
     cancelRef.current = false;

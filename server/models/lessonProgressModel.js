@@ -150,7 +150,9 @@ async function markCompleted(conn, userId, lessonId, courseId) {
 async function unlock(conn, userId, lessonId, courseId) {
   const now = new Date();
   const [result] = await conn.query(
-    'INSERT INTO lesson_progress (user_id, lesson_id, course_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+    `INSERT INTO lesson_progress (user_id, lesson_id, course_id, status, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE status = VALUES(status), updated_at = VALUES(updated_at)`,
     [userId, lessonId, courseId, 'unlocked', now, now]
   );
   return result.insertId;

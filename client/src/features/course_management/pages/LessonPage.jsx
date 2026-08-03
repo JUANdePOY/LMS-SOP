@@ -7,13 +7,14 @@ import LessonProgressBar from "../components/LessonProgressBar";
 import LessonList from "../components/LessonList";
 
 export default function LessonPage() {
-  const { courseId, lessonId } = useParams();
+  const { id: courseId, lessonId } = useParams();
   const navigate = useNavigate();
   const { data, loading, error, refetch } = useLessonProgress(courseId);
   const { complete, loading: marking } = useMarkLessonComplete();
   const [message, setMessage] = useState(null);
   const [messageType, setMessageType] = useState("error");
 
+  const modules = data?.modules || [];
   const currentLesson = data?.lessons?.find((l) => String(l.id) === String(lessonId));
   const lessons = data?.lessons || [];
 
@@ -32,7 +33,7 @@ export default function LessonPage() {
       setMessageType("success");
       refetch();
     } catch (err) {
-      setMessage(err.message);
+      setMessage(err.message || "Failed to mark lesson as complete");
       setMessageType("error");
     }
   };
@@ -49,6 +50,10 @@ export default function LessonPage() {
         </div>
       </div>
     );
+  }
+
+  if (!data) {
+    return <p className="text-sm text-neutral-500">Loading lesson...</p>;
   }
 
   if (!currentLesson) {
@@ -191,7 +196,7 @@ export default function LessonPage() {
         </div>
         <div>
           <h3 className="text-sm font-semibold mb-2">Course Outline</h3>
-          <LessonList lessons={lessons} courseId={courseId} />
+          <LessonList lessons={lessons} modules={modules} courseId={courseId} />
         </div>
       </div>
     </div>

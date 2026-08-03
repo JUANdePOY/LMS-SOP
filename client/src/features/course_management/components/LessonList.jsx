@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, ChevronRight, PlayCircle, FileText, Video, HelpCircle, ClipboardCheck, ExternalLink, File, Clock } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Video, HelpCircle, ClipboardCheck, ExternalLink, File, Clock } from "lucide-react";
 
 const LESSON_TYPE_META = {
   reading: { label: "Reading", icon: FileText, color: "text-blue-500" },
@@ -24,27 +24,32 @@ export default function LessonList({ lessons, modules, onLessonClick, courseId }
     return firstModuleId ? new Set([firstModuleId]) : new Set();
   });
 
-  if (!lessons || !lessons.length) {
-    return <p className="text-sm text-neutral-500">No lessons yet.</p>;
-  }
+  const moduleMap = useMemo(() => {
+    const map = new Map();
+    if (modules && Array.isArray(modules)) {
+      for (const m of modules) map.set(m.id, m);
+    }
+    return map;
+  }, [modules]);
 
-  const moduleMap = new Map();
-  if (modules && Array.isArray(modules)) {
-    for (const m of modules) moduleMap.set(m.id, m);
-  }
+  const grouped = useMemo(() => {
+    const map = new Map();
+    if (!lessons || !lessons.length) return map;
+    for (const lesson of lessons) {
+      const mid = lesson.moduleId || lesson.module_id;
+      if (!map.has(mid)) map.set(mid, []);
+      map.get(mid).push(lesson);
+    }
+    return map;
+  }, [lessons]);
 
-  const grouped = new Map();
-  for (const lesson of lessons) {
-    const mid = lesson.moduleId || lesson.module_id;
-    if (!grouped.has(mid)) grouped.set(mid, []);
-    grouped.get(mid).push(lesson);
-  }
-
-  const orderedGroupIds = Array.from(grouped.keys()).sort((a, b) => {
-    const mA = moduleMap.get(a);
-    const mB = moduleMap.get(b);
-    return (mA?.order ?? mA?.order_index ?? 0) - (mB?.order ?? mB?.order_index ?? 0);
-  });
+  const orderedGroupIds = useMemo(() => {
+    return Array.from(grouped.keys()).sort((a, b) => {
+      const mA = moduleMap.get(a);
+      const mB = moduleMap.get(b);
+      return (mA?.order ?? mA?.order_index ?? 0) - (mB?.order ?? mB?.order_index ?? 0);
+    });
+  }, [grouped, moduleMap]);
 
   const moduleStats = useMemo(() => {
     const stats = new Map();
@@ -59,6 +64,10 @@ export default function LessonList({ lessons, modules, onLessonClick, courseId }
     }
     return stats;
   }, [grouped]);
+
+  if (!grouped.size) {
+    return <p className="text-sm text-neutral-500">No lessons yet.</p>;
+  }
 
   const toggleModule = (moduleId) => {
     setExpandedModules((prev) => {
@@ -86,7 +95,6 @@ export default function LessonList({ lessons, modules, onLessonClick, courseId }
         const moduleHasLocked = modLessons.some((l) => l.status === "locked");
         const isExpanded = expandedModules.has(mid);
         const stats = moduleStats.get(mid) || { completed: 0, total: 0, duration: 0 };
-        const modPct = stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
 
         return (
           <div key={mid} className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden">
