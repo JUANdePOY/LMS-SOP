@@ -159,7 +159,7 @@ async function approveApproval(approvalId, actorId, comments) {
     throw error;
   }
 
-  if (existing.approver_user_id !== actorId) {
+  if (parseInt(existing.approver_user_id, 10) !== parseInt(actorId, 10)) {
     const error = new Error('Only the assigned approver can approve');
     error.code = 'UNAUTHORIZED';
     throw error;
@@ -206,7 +206,7 @@ async function rejectApproval(approvalId, actorId, comments) {
     throw error;
   }
 
-  if (existing.approver_user_id !== actorId) {
+  if (parseInt(existing.approver_user_id, 10) !== parseInt(actorId, 10)) {
     const error = new Error('Only the assigned approver can reject');
     error.code = 'UNAUTHORIZED';
     throw error;

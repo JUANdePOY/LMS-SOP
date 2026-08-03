@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Share2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
+import { useToast } from '@/shared/components/ui/Toast';
 import ApprovalPanel from '@/features/sop-management/components/ApprovalPanel';
 import VersionTimeline from '@/features/sop-management/components/VersionTimeline';
 import AuditTimeline from '@/features/sop-management/components/AuditTimeline';
 import ShareLinkDrawer from '@/features/sop-management/components/ShareLinkDrawer';
 import { useVersions } from '@/features/sop-management/hooks/useVersions';
 import { createVersion } from '@/features/sop-management/services/versionService';
-import { approveApproval, rejectApproval, getApprovals } from '@/features/sop-management/services/sopService';
+import { advanceWorkflow, getWorkflow } from '@/features/sop-management/services/sopService';
 
 function SidebarCard({ title, children, className }) {
   return (
@@ -20,7 +21,7 @@ function SidebarCard({ title, children, className }) {
   );
 }
 
-export default function SOPSidebar({ sopId, approvals, setApprovals, auditLogs, versions, versionsLoading, versionsError, approvalsLoading = false, auditLogsLoading = false, onVersionRestore, onAuditRefresh, onSopRefresh, refetchVersions }) {
+export default function SOPSidebar({ sopId, workflow, setWorkflow, auditLogs, versions, versionsLoading, versionsError, workflowLoading = false, auditLogsLoading = false, onVersionRestore, onAuditRefresh, onSopRefresh, refetchVersions }) {
   const [showVersionTimeline, setShowVersionTimeline] = useState(false);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [showNewVersionForm, setShowNewVersionForm] = useState(false);
@@ -28,26 +29,39 @@ export default function SOPSidebar({ sopId, approvals, setApprovals, auditLogs, 
   const [newVersion, setNewVersion] = useState('');
   const [changeSummary, setChangeSummary] = useState('');
   const [creatingVersion, setCreatingVersion] = useState(false);
+  const { toast } = useToast();
 
   return (
     <>
       <SidebarCard title="Approvals">
         <ApprovalPanel
-          approvals={approvals}
-          loading={approvalsLoading}
-          onApprove={async (id) => {
-            await approveApproval(sopId, id);
-            const { data } = await getApprovals(sopId);
-            setApprovals(data?.data || []);
-            if (onAuditRefresh) onAuditRefresh();
-            if (onSopRefresh) onSopRefresh();
+          workflow={workflow}
+          loading={workflowLoading}
+          onApprove={async ({ instanceId, stepId, comments }) => {
+            try {
+              await advanceWorkflow(sopId, { instanceId, stepId, action: 'Approved', comments });
+              const { data } = await getWorkflow(sopId);
+              setWorkflow(data?.data || null);
+              if (onAuditRefresh) onAuditRefresh();
+              if (onSopRefresh) onSopRefresh();
+              toast.success('Approval recorded successfully');
+            } catch (err) {
+              const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Approve failed';
+              toast.error(message);
+            }
           }}
-          onReject={async (id) => {
-            await rejectApproval(sopId, id, 'Rejected by reviewer');
-            const { data } = await getApprovals(sopId);
-            setApprovals(data?.data || []);
-            if (onAuditRefresh) onAuditRefresh();
-            if (onSopRefresh) onSopRefresh();
+          onReject={async ({ instanceId, stepId, comments }) => {
+            try {
+              await advanceWorkflow(sopId, { instanceId, stepId, action: 'Rejected', comments });
+              const { data } = await getWorkflow(sopId);
+              setWorkflow(data?.data || null);
+              if (onAuditRefresh) onAuditRefresh();
+              if (onSopRefresh) onSopRefresh();
+              toast.success('Rejection recorded successfully');
+            } catch (err) {
+              const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Reject failed';
+              toast.error(message);
+            }
           }}
         />
       </SidebarCard>

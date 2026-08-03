@@ -18,9 +18,8 @@ import {
   LogOut,
   User,
   ChevronDown,
-  Building2,
-  Trash2,
-  FileText,
+   Building2,
+   FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
@@ -76,7 +75,6 @@ const MENU_ITEMS = [
       },
        { name: "Course Management", path: "/courses", icon: BookOpen },
        { name: "Course Library", path: "/courses/library", icon: Library },
-       { name: "Trash", path: "/trash", icon: Trash2 },
        { name: "Assessments", path: "/assessments", icon: ClipboardCheck, sub: ["Leaderboard", "Report"] },
        { name: "Certificates", path: "/certificates", icon: Award },
      ],

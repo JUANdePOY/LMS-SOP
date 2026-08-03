@@ -3,7 +3,6 @@ const sopVersionModel = require('../models/sopVersionModel');
 const sopAssignmentService = require('./sopAssignmentService');
 const sopAcknowledgementService = require('./sopAcknowledgementService');
 const sopShareService = require('./sopShareService');
-const sopApprovalService = require('./sopApprovalService');
 const { generateSopCode } = require('../utils/sopUtils');
 const { logAudit } = require('../utils/auditLogger');
 const sopAuditLogService = require('./sopAuditLogService');

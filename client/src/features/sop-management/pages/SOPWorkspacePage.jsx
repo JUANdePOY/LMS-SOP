@@ -6,11 +6,12 @@ import ModuleEditor from '@/features/sop-management/components/SOPEditor/ModuleE
 import AttachmentUploader from '@/features/sop-management/components/SOPEditor/AttachmentUploader';
 import SOPActionBar from '@/features/sop-management/components/SOPActionBar';
 import SOPSidebar from '@/features/sop-management/components/SOPSidebar';
+import { useToast } from '@/shared/components/ui/Toast';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import { useModules } from '@/features/sop-management/hooks/useModules';
 import { useAttachments } from '@/features/sop-management/hooks/useAttachments';
 import { useVersions } from '@/features/sop-management/hooks/useVersions';
-import { getSop, getApprovals, getAuditLogs, submitSop, approveSop, rejectSop, publishSop, transitionSop } from '@/features/sop-management/services/sopService';
+import { getSop, getWorkflow, getAuditLogs, submitSop, approveSop, rejectSop, publishSop, transitionSop } from '@/features/sop-management/services/sopService';
 
 function SidebarCard({ title, children, className }) {
   return (
@@ -26,13 +27,14 @@ function SidebarCard({ title, children, className }) {
 function SOPWorkspacePage() {
   const { id } = useParams();
   const sopId = id;
+  const { toast } = useToast();
   const [selectedModule, setSelectedModule] = useState(null);
   const [isAdding, setIsAdding] = useState(false);
   const [saving, setSaving] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
-  const [approvals, setApprovals] = useState([]);
-  const [approvalsLoading, setApprovalsLoading] = useState(false);
+  const [workflow, setWorkflow] = useState(null);
+  const [workflowLoading, setWorkflowLoading] = useState(false);
   const [auditLogsLoading, setAuditLogsLoading] = useState(false);
   const [sop, setSop] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
@@ -52,15 +54,15 @@ function SOPWorkspacePage() {
     } catch { /* ignore */ }
   };
 
-  const fetchApprovals = async () => {
+  const fetchWorkflow = async () => {
     if (!sopId) return;
-    setApprovalsLoading(true);
+    setWorkflowLoading(true);
     try {
-      const { data } = await getApprovals(sopId);
-      setApprovals(data?.data || []);
+      const { data } = await getWorkflow(sopId);
+      setWorkflow(data?.data || null);
     } catch { /* ignore */ }
     finally {
-      setApprovalsLoading(false);
+      setWorkflowLoading(false);
     }
   };
 
@@ -81,7 +83,7 @@ function SOPWorkspacePage() {
     if (!sopId) return;
     Promise.all([
       fetchAuditLogs(),
-      fetchApprovals(),
+      fetchWorkflow(),
       fetchSop(),
     ]);
   }, [sopId]);
@@ -89,6 +91,13 @@ function SOPWorkspacePage() {
   const handleSopAction = async (action) => {
     setActionLoading((prev) => ({ ...prev, [action]: true }));
     try {
+      const actionLabels = {
+        submit: 'submitted for review',
+        approve: 'approved',
+        reject: 'rejected',
+        publish: 'published',
+        archive: 'archived',
+      };
       const actionMap = {
         submit: () => submitSop(sopId),
         approve: () => approveSop(sopId),
@@ -98,10 +107,13 @@ function SOPWorkspacePage() {
       };
       await actionMap[action]();
       await fetchSop();
-      await fetchApprovals();
+      await fetchWorkflow();
       await fetchAuditLogs();
+      toast.success(`SOP ${actionLabels[action] || 'updated'} successfully`);
     } catch (err) {
+      const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || `${action} failed`;
       console.error(`${action} failed:`, err);
+      toast.error(message);
     } finally {
       setActionLoading((prev) => ({ ...prev, [action]: false }));
     }
@@ -340,12 +352,12 @@ function SOPWorkspacePage() {
                   <h2 className="font-semibold text-neutral-900 dark:text-neutral-100">Details</h2>
                   <button onClick={() => setShowRightSidebar(false)} className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"><X size={20} className="text-neutral-500 dark:text-neutral-400" /></button>
                 </div>
-                 <div className="p-4 overflow-y-auto flex-1"><SOPSidebar sopId={sopId} approvals={approvals} setApprovals={setApprovals} auditLogs={auditLogs} versions={versions} versionsLoading={versionsLoading} versionsError={versionsError} approvalsLoading={approvalsLoading} auditLogsLoading={auditLogsLoading} onVersionRestore={handleVersionRestore} onAuditRefresh={fetchAuditLogs} onSopRefresh={fetchSop} refetchVersions={refetchVersions} /></div>
+                  <div className="p-4 overflow-y-auto flex-1"><SOPSidebar sopId={sopId} workflow={workflow} setWorkflow={setWorkflow} auditLogs={auditLogs} versions={versions} versionsLoading={versionsLoading} versionsError={versionsError} workflowLoading={workflowLoading} auditLogsLoading={auditLogsLoading} onVersionRestore={handleVersionRestore} onAuditRefresh={fetchAuditLogs} onSopRefresh={fetchSop} refetchVersions={refetchVersions} /></div>
               </div>
             </div>
           )}
           <div className="hidden lg:flex lg:flex-col gap-4 max-h-[calc(100vh-140px)] overflow-y-auto">
-            <SOPSidebar sopId={sopId} approvals={approvals} setApprovals={setApprovals} auditLogs={auditLogs} versions={versions} versionsLoading={versionsLoading} versionsError={versionsError} approvalsLoading={approvalsLoading} auditLogsLoading={auditLogsLoading} onVersionRestore={handleVersionRestore} onAuditRefresh={fetchAuditLogs} onSopRefresh={fetchSop} refetchVersions={refetchVersions} />
+            <SOPSidebar sopId={sopId} workflow={workflow} setWorkflow={setWorkflow} auditLogs={auditLogs} versions={versions} versionsLoading={versionsLoading} versionsError={versionsError} workflowLoading={workflowLoading} auditLogsLoading={auditLogsLoading} onVersionRestore={handleVersionRestore} onAuditRefresh={fetchAuditLogs} onSopRefresh={fetchSop} refetchVersions={refetchVersions} />
           </div>
         </aside>
       </div>

@@ -1,3 +1,4 @@
+const db = require('../config/database');
 const approvalWorkflowModel = require('../models/approvalWorkflowModel');
 const sopVersionModel = require('../models/sopVersionModel');
 const sopModel = require('../models/sopModel');
@@ -61,8 +62,8 @@ async function startWorkflow(sopId, actorId) {
     throw error;
   }
 
-  if (sop.status !== 'For Review') {
-    const error = new Error('SOP must be in For Review status to start workflow');
+  if (sop.status !== 'For Review' && sop.status !== 'Draft') {
+    const error = new Error('SOP must be in For Review or Draft status to start workflow');
     error.code = 'INVALID_TRANSITION';
     throw error;
   }
@@ -122,6 +123,29 @@ async function advanceStep(instanceId, stepId, actorId, action, comments) {
     throw error;
   }
 
+// Role-based authorization: check if actor has the required role for this step
+const step = await approvalWorkflowModel.getWorkflowSteps(instance.workflow_id);
+const targetStep = step.find((s) => s.id === stepId);
+if (targetStep && targetStep.approver_role) {
+  const [userRows] = await db.query(
+    'SELECT role FROM users WHERE id = ? AND is_active = TRUE',
+    [actorId]
+  );
+  const user = userRows[0];
+  if (!user) {
+    const error = new Error('User not found or inactive');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+  if (user.role !== targetStep.approver_role) {
+    const error = new Error(
+      `You are not authorized to approve this step. Required role: ${targetStep.approver_role}, your role: ${user.role}`
+    );
+    error.code = 'UNAUTHORIZED';
+    throw error;
+  }
+}
+
   await approvalWorkflowModel.advanceWorkflowStep(instanceId, stepId, actorId, action, comments);
 
   let newStatus = 'In Progress';
@@ -159,6 +183,28 @@ async function getWorkflowInstance(sopId) {
   return approvalWorkflowModel.getWorkflowInstance(version.id);
 }
 
+async function getWorkflowStatus(sopId) {
+  const instance = await getWorkflowInstance(sopId);
+  if (!instance) return null;
+
+  const steps = await approvalWorkflowModel.getWorkflowSteps(instance.workflow_id);
+  const actions = await approvalWorkflowModel.getWorkflowActions(instance.id);
+
+  const stepsWithStatus = steps.map((step) => {
+    const stepActions = actions.filter((a) => a.workflow_step_id === step.id);
+    const latestAction = stepActions.length > 0 ? stepActions[stepActions.length - 1] : null;
+    return {
+      ...step,
+      status: latestAction ? latestAction.action : 'Pending',
+      actor_id: latestAction ? latestAction.actor_id : null,
+      comments: latestAction ? latestAction.comments : null,
+      action_at: latestAction ? latestAction.action_at : null,
+    };
+  });
+
+  return { ...instance, steps: stepsWithStatus };
+}
+
 module.exports = {
   listWorkflows,
   getWorkflowById,
@@ -166,4 +212,7 @@ module.exports = {
   startWorkflow,
   advanceStep,
   getWorkflowInstance,
+  getWorkflowStatus,
+  getWorkflowSteps: approvalWorkflowModel.getWorkflowSteps,
+  getWorkflowActions: approvalWorkflowModel.getWorkflowActions,
 };

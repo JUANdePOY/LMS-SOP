@@ -6,46 +6,81 @@ function successResponse(data, message) {
   return response;
 }
 
+function handleError(res, error) {
+  const code = error.code || 'INTERNAL_ERROR';
+  const status = error.status || (
+    code === 'NOT_FOUND' ? 404 :
+    code === 'VALIDATION_ERROR' ? 400 :
+    code === 'CODE_EXISTS' ? 409 :
+    code === 'UNAUTHORIZED' ? 403 :
+    code === 'FORBIDDEN' ? 403 :
+    code === 'APPROVAL_PENDING' ? 400 :
+    code === 'INVALID_TRANSITION' ? 400 :
+    500
+  );
+  res.status(status).json({ success: false, error: { code, message: error.message } });
+}
+
 const approvalController = {
   async list(req, res) {
-    const result = await sopApprovalService.listApprovals(parseInt(req.params.sopId, 10));
-    res.json({ success: true, data: result });
+    try {
+      const result = await sopApprovalService.listApprovals(parseInt(req.params.sopId, 10));
+      res.json(successResponse(result));
+    } catch (error) {
+      handleError(res, error);
+    }
   },
 
   async create(req, res) {
-    const result = await sopApprovalService.createApproval(
-      parseInt(req.params.sopId, 10),
-      req.body,
-      req.user.id
-    );
-    res.status(201).json({ success: true, data: result, message: 'Approval created successfully' });
+    try {
+      const result = await sopApprovalService.createApproval(
+        parseInt(req.params.sopId, 10),
+        req.body,
+        req.user.id
+      );
+      res.status(201).json(successResponse(result, 'Approval created successfully'));
+    } catch (error) {
+      handleError(res, error);
+    }
   },
 
   async update(req, res) {
-    const result = await sopApprovalService.updateApproval(
-      parseInt(req.params.approvalId, 10),
-      req.body,
-      req.user.id
-    );
-    res.json({ success: true, data: result, message: 'Approval updated successfully' });
+    try {
+      const result = await sopApprovalService.updateApproval(
+        parseInt(req.params.approvalId, 10),
+        req.body,
+        req.user.id
+      );
+      res.json(successResponse(result, 'Approval updated successfully'));
+    } catch (error) {
+      handleError(res, error);
+    }
   },
 
   async approve(req, res) {
-    const result = await sopApprovalService.approveApproval(
-      parseInt(req.params.approvalId, 10),
-      req.user.id,
-      req.body.comments || null
-    );
-    res.json({ success: true, data: result, message: 'Approval recorded' });
+    try {
+      const result = await sopApprovalService.approveApproval(
+        parseInt(req.params.approvalId, 10),
+        req.user.id,
+        req.body.comments || null
+      );
+      res.json(successResponse(result, 'Approval recorded'));
+    } catch (error) {
+      handleError(res, error);
+    }
   },
 
   async reject(req, res) {
-    const result = await sopApprovalService.rejectApproval(
-      parseInt(req.params.approvalId, 10),
-      req.user.id,
-      req.body.comments
-    );
-    res.json({ success: true, data: result, message: 'Rejection recorded' });
+    try {
+      const result = await sopApprovalService.rejectApproval(
+        parseInt(req.params.approvalId, 10),
+        req.user.id,
+        req.body.comments
+      );
+      res.json(successResponse(result, 'Rejection recorded'));
+    } catch (error) {
+      handleError(res, error);
+    }
   },
 };
 

@@ -39,7 +39,7 @@ export default function HierarchyOverviewPage() {
           </button>
           <button
             onClick={() => navigate('/admin/organization/businesses')}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
           >
             <Plus className="h-4 w-4" />
             Manage Businesses

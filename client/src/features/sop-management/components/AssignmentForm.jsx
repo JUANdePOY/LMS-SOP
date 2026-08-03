@@ -102,7 +102,7 @@ export default function AssignmentForm({ sopId, onCreated }) {
       <button
         onClick={handleSubmit}
         disabled={submitDisabled}
-        className="w-full py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+        className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors disabled:opacity-50"
       >
         {submitting ? 'Assigning...' : 'Assign Selected'}
       </button>

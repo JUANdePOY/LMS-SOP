@@ -24,15 +24,11 @@ export const getShares = (sopId) => api.get(`/sops/${sopId}/shares`);
 export const createShare = (sopId, data) => api.post(`/sops/${sopId}/shares`, data);
 
 export const getAuditLogs = (sopId) => api.get(`/sops/${sopId}/audit`);
-export const getApprovals = (sopId) => api.get(`/sops/${sopId}/approvals`);
-export const createApproval = (sopId, data) => api.post(`/sops/${sopId}/approvals`, data);
-export const updateApproval = (approvalId, data) => api.put(`/sops/approvals/${approvalId}`, data);
 
-export const approveApproval = (sopId, approvalId, comments) =>
-  api.post(`/sops/${sopId}/approvals/${approvalId}`, { comments });
-
-export const rejectApproval = (sopId, approvalId, comments) =>
-  api.post(`/sops/${sopId}/approvals/${approvalId}/reject`, { comments });
+export const getWorkflow = (sopId) => api.get(`/sops/${sopId}/workflow`);
+export const startWorkflow = (sopId) => api.post(`/sops/${sopId}/workflow/start`);
+export const advanceWorkflow = (sopId, data) =>
+  api.post(`/sops/${sopId}/workflow/advance`, data);
 
 export const submitSop = (sopId) => api.post(`/sops/${sopId}/submit`);
 export const approveSop = (sopId) => api.post(`/sops/${sopId}/approve`);
