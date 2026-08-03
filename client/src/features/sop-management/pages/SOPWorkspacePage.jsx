@@ -43,7 +43,7 @@ function SOPWorkspacePage() {
   const [confirmAction, setConfirmAction] = useState(null);
 
   const { modules, loading: modulesLoading, error: modulesError, addModule, editModule, removeModule, reorderModules, submitModuleForReview } = useModules(sopId);
-  const { attachments, loading: attachmentsLoading, error: attachmentsError, upload, remove: removeAttachment } = useAttachments(selectedModule?.id);
+  const { attachments, loading: attachmentsLoading, error: attachmentsError, upload, addLink, remove: removeAttachment } = useAttachments(selectedModule?.id);
   const { versions, loading: versionsLoading, error: versionsError, restore, refetch: refetchVersions } = useVersions(sopId);
 
   const fetchSop = async () => {
@@ -313,7 +313,12 @@ function SOPWorkspacePage() {
                     <p className="text-sm text-red-600 dark:text-red-400">Failed to load attachments</p>
                   )}
                   {!attachmentsLoading && !attachmentsError && selectedModule && (
-                    <AttachmentUploader attachments={attachments} onUpload={upload} onDelete={handleAttachmentDelete} />
+                    <AttachmentUploader
+                      attachments={attachments}
+                      onUpload={upload}
+                      onAddLink={addLink}
+                      onDelete={handleAttachmentDelete}
+                    />
                   )}
                   {!attachmentsLoading && !attachmentsError && !selectedModule && isAdding && (
                     <p className="text-sm text-neutral-500 dark:text-neutral-400">

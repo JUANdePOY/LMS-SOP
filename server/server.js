@@ -57,6 +57,8 @@ const gradesRoutes = require('./routes/grades');
 const discussionsRoutes = require('./routes/discussions');
 const courseBuilderRoutes = require('./routes/course-builder');
 
+const { templateRouter, signatureRouter, issuanceRouter } = require('./routes/certificates');
+
 const loginDebug = process.env.LOGIN_DEBUG === 'true';
 if (loginDebug) {
   app.use('/api/auth', (req, res, next) => {
@@ -101,6 +103,11 @@ app.use('/api/lessons', progressLessonRoutes);
 app.use('/api/course-builder', courseBuilderRoutes);
 app.use('/api/grades', gradesRoutes);
 app.use('/api/discussions', discussionsRoutes);
+
+// Certificate management routes
+app.use('/api/certificate-templates', templateRouter);
+app.use('/api/certificate-signatures', signatureRouter);
+app.use('/api/certificate-issuances', issuanceRouter);
 
 app.get('/api/health', async (req, res) => {
   const result = { status: 'OK', timestamp: new Date().toISOString(), env: process.env.NODE_ENV };

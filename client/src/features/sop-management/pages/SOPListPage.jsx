@@ -85,7 +85,7 @@ function SOPListPage() {
   const {
     sops, loading, search, setSearch, status, setStatus,
     archivedTab, setArchivedTab, showCreate, setShowCreate,
-    newTitle, setNewTitle, newDescription, setNewDescription,
+    newTitle, setNewTitle, newDescription, setNewDescription, newLink, setNewLink,
     editingSopId, editTitle, setEditTitle, editDescription, setEditDescription,
     editStatus, setEditStatus, handleCreate, fetchSops,
     resetForm, handleEditStart, handleEditCancel, handleEditSave, handleDeleteSop,
@@ -220,6 +220,7 @@ function SOPListPage() {
             showCreate={showCreate} setShowCreate={setShowCreate}
             newTitle={newTitle} setNewTitle={setNewTitle}
             newDescription={newDescription} setNewDescription={setNewDescription}
+            newLink={newLink} setNewLink={setNewLink}
             loading={loading}
             cascade={cascade}
             onCancel={resetForm}
