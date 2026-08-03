@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react';
 import { getSops, createSop, updateSop, deleteSop } from '@/features/sop-management/services/sopService';
 import { createAssignment } from '@/features/sop-management/services/assignmentService';
+import { createModule } from '@/features/sop-management/services/moduleService';
+import { createLink } from '@/features/sop-management/services/attachmentService';
 import { useAssignmentCascade } from '@/features/sop-management/hooks/useAssignmentCascade';
 import { SOP_STATUSES } from '@/features/sop-management/constants/sopConstants';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -15,6 +17,7 @@ export function useSOPList() {
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [newLink, setNewLink] = useState('');
   const [editingSopId, setEditingSopId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -47,6 +50,7 @@ export function useSOPList() {
   const resetForm = useCallback(() => {
     setNewTitle('');
     setNewDescription('');
+    setNewLink('');
     cascade.setSelectedBusinessIds([]);
     cascade.setSelectedDeptIds([]);
     cascade.setSelectedPositions([]);
@@ -65,6 +69,16 @@ export function useSOPList() {
         status: SOP_STATUSES.DRAFT,
       });
       const sopId = sopData?.data?.id || sopData?.id;
+      
+      // Create a default module for the SOP
+      const moduleResponse = await createModule(sopId, {
+        title: 'Main Content',
+        content: '',
+        sort_order: 1,
+      });
+      const moduleId = moduleResponse?.data?.id || moduleResponse?.id;
+      
+      // Handle assignments
       if (sopId && cascade.selectedDeptIds.length > 0) {
         await createAssignment(sopId, {
           department_ids: cascade.selectedDeptIds,
@@ -74,6 +88,15 @@ export function useSOPList() {
           notes: '',
         });
       }
+      
+      // Handle link if provided
+      if (sopId && newLink && newLink.trim() && moduleId) {
+        await createLink(moduleId, {
+          link_url: newLink,
+          link_title: 'Reference Link',
+        });
+      }
+      
       resetForm();
       setShowCreate(false);
       await fetchSops();
@@ -142,6 +165,8 @@ export function useSOPList() {
     setNewTitle,
     newDescription,
     setNewDescription,
+    newLink,
+    setNewLink,
     // Edit form state
     editingSopId,
     editTitle,

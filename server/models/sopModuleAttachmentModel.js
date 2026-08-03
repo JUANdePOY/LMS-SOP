@@ -55,15 +55,45 @@ async function getByIdIncludingDeleted(attachmentId) {
 }
 
 async function createAttachment(data) {
-  const { module_id, file_name, original_name, mime_type, file_size, file_extension, file_data, uploaded_by } = data;
+  const {
+    module_id,
+    file_name,
+    original_name,
+    mime_type,
+    file_size,
+    file_extension,
+    file_data,
+    uploaded_by,
+    link_url,
+  } = data;
   const cols = await getCachedAttachmentColumns();
 
-  const insertCols = ['module_id', 'file_name'];
-  const insertVals = [module_id, file_name];
+  const insertCols = ['module_id'];
+  const insertVals = [module_id];
 
-  if (cols.hasOriginalName) {
-    insertCols.push('original_name');
-    insertVals.push(original_name || null);
+  // Handle link_url: store link marker in file_name, actual URL in link_url
+  if (link_url) {
+    insertCols.push('file_name');
+    insertVals.push(`link:${link_url}`);
+    
+    // Always add link_url column since we added the migration
+    insertCols.push('link_url');
+    insertVals.push(link_url);
+    
+    if (cols.hasOriginalName) {
+      insertCols.push('original_name');
+      insertVals.push(original_name || 'Link');
+    }
+  } else {
+    // Regular file attachment
+    if (file_name) {
+      insertCols.push('file_name');
+      insertVals.push(file_name);
+    }
+    if (cols.hasOriginalName) {
+      insertCols.push('original_name');
+      insertVals.push(original_name || null);
+    }
   }
 
   if (mime_type !== undefined && mime_type !== null) {

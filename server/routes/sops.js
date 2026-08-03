@@ -56,6 +56,9 @@ router.route('/modules/:moduleId/attachments')
   .get(attachmentController.list)
   .post(sopAttachmentUploadMiddleware, attachmentController.upload);
 
+router.route('/modules/:moduleId/links')
+  .post(attachmentController.createLink);
+
 router.route('/attachments/:attachmentId')
   .delete(attachmentController.remove);
 

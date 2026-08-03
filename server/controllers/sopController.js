@@ -229,6 +229,23 @@ const attachmentController = {
     }
   },
 
+  async createLink(req, res) {
+    try {
+      const { link_url, link_title } = req.body;
+      if (!link_url || !link_url.trim()) {
+        return res.status(400).json({ success: false, error: { code: "VALIDATION_ERROR", message: "Link URL is required" } });
+      }
+      const result = await sopAttachmentService.createLink(
+        parseInt(req.params.moduleId, 10),
+        { link_url, link_title },
+        req.user.id
+      );
+      res.status(201).json({ success: true, data: result, message: 'Link added successfully' });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
   async remove(req, res) {
     try {
       const result = await sopAttachmentService.deleteAttachment(parseInt(req.params.attachmentId, 10), req.user.id);

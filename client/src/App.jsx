@@ -30,6 +30,9 @@ const CourseLibraryDetailsPage = lazy(() => import("@/features/course_management
 const SOPListPage    = lazy(() => import("@/features/sop-management/pages/SOPListPage"));
 const SOPWorkspacePage = lazy(() => import("@/features/sop-management/pages/SOPWorkspacePage"));
 const SOPVersionPage = lazy(() => import("@/features/sop-management/pages/SOPVersionPage"));
+const CertificateTemplatesPage = lazy(() => import("@/features/certificate-management/pages/CertificateTemplatesPage"));
+const MyCertificatesPage = lazy(() => import("@/features/certificate-management/pages/MyCertificatesPage"));
+const VerifyCertificatePage = lazy(() => import("@/features/certificate-management/pages/VerifyCertificatePage"));
 
 // Organization Management
 const OrgHierarchyPage = lazy(() => import("@/features/organization-management/pages/HierarchyOverviewPage"));
@@ -146,6 +149,9 @@ const router = createBrowserRouter([
       { path: "sops/:id", element: LMSProtectedWrapper(SOPWorkspacePage), handle: { title: "SOP Workspace" } },
       { path: "sops/:id/versions/:versionId", element: LMSProtectedWrapper(SOPVersionPage), handle: { title: "SOP Version" } },
       { path: "trash", element: LMSProtectedWrapper(SOPListPage), handle: { title: "Trash" } },
+      { path: "certificates", element: LMSProtectedWrapper(CertificateTemplatesPage), handle: { title: "Certificates" } },
+      { path: "certificates/my-certificates/:userId", element: LMSProtectedWrapper(MyCertificatesPage), handle: { title: "My Certificates" } },
+      { path: "certificates/verify/:certificateNumber", element: LMSProtectedWrapper(VerifyCertificatePage), handle: { title: "Verify Certificate" } },
 
       // Organization Management routes
       { path: "admin/organization", element: LMSProtectedWrapper(OrgHierarchyPage), handle: { title: "SOP Management" } },

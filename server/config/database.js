@@ -398,11 +398,14 @@ const MIGRATIONS = [
    // The legacy migration steps for these tables are no longer needed and are
    // skipped on databases that already use the new schema.
    // =========================================================================
-  // --- sop_module_attachments: add missing columns (is_deleted, original_name, updated_at) ---
-  `ALTER TABLE sop_module_attachments
-    ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE AFTER download_count,
-    ADD COLUMN IF NOT EXISTS original_name VARCHAR(255) DEFAULT NULL AFTER file_name,
-    ADD COLUMN IF NOT EXISTS updated_at DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP AFTER created_at`,
+   // --- sop_module_attachments: add link_url column for storing web links alongside file attachments ---
+   `ALTER TABLE sop_module_attachments
+     ADD COLUMN IF NOT EXISTS link_url VARCHAR(500) DEFAULT NULL AFTER file_size`,
+   // --- sop_module_attachments: add missing columns (is_deleted, original_name, updated_at) ---
+   `ALTER TABLE sop_module_attachments
+     ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE AFTER download_count,
+     ADD COLUMN IF NOT EXISTS original_name VARCHAR(255) DEFAULT NULL AFTER file_name,
+     ADD COLUMN IF NOT EXISTS updated_at DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP AFTER created_at`,
    // Create index for is_deleted on sop_module_attachments
    `CREATE INDEX IF NOT EXISTS idx_sop_module_attachments_deleted ON sop_module_attachments(is_deleted)`,
    // --- sop_approvals: add sop_version_id column ---
@@ -447,6 +450,14 @@ async function runMigrations() {
     console.log('Assessments migrations applied');
   } catch (err) {
     console.error('Assessments migration error:', err.message);
+  }
+
+  try {
+    const { runCertificateMigrations } = require('../migrations/certificateManagement');
+    await runCertificateMigrations();
+    console.log('Certificate management migrations applied');
+  } catch (err) {
+    console.error('Certificate management migration error:', err.message);
   }
 }
 

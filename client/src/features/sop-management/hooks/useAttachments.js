@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getAttachments, uploadAttachment, deleteAttachment } from '@/features/sop-management/services/attachmentService';
+import { getAttachments, uploadAttachment, createLink, deleteAttachment } from '@/features/sop-management/services/attachmentService';
 
 export function useAttachments(moduleId) {
   const [attachments, setAttachments] = useState([]);
@@ -32,10 +32,16 @@ export function useAttachments(moduleId) {
     return response.data.data;
   };
 
+  const addLink = async (linkData) => {
+    const response = await createLink(moduleId, linkData);
+    setAttachments((prev) => [...prev, response.data.data]);
+    return response.data.data;
+  };
+
   const remove = async (attachmentId) => {
     await deleteAttachment(attachmentId);
     setAttachments((prev) => prev.filter((a) => a.id !== attachmentId));
   };
 
-  return { attachments, loading, error, upload, remove, refetch: fetchAttachments };
+  return { attachments, loading, error, upload, addLink, remove, refetch: fetchAttachments };
 }

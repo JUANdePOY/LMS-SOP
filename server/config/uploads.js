@@ -54,6 +54,18 @@ function absolutePathFromRelative(relativePath) {
   return resolved;
 }
 
+function certificateRoot() {
+  return getUploadRoot();
+}
+
+function certificateTemplateDir(publicId) {
+  return path.join(getUploadRoot(), 'certificates', 'templates', String(publicId));
+}
+
+function signatureDir() {
+  return path.join(getUploadRoot(), 'certificates', 'signatures');
+}
+
 module.exports = {
   getUploadRoot,
   getMaxUploadBytes,
@@ -64,4 +76,7 @@ module.exports = {
   trainingDir,
   externalTrainingDir,
   absolutePathFromRelative,
+  certificateRoot,
+  certificateTemplateDir,
+  signatureDir,
 };
