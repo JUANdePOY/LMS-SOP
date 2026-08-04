@@ -1,24 +1,33 @@
-RewriteEngine On
+PassengerAppRoot /home/u607968802/domains/navajowhite-wombat-404442.hostingersite.com/hbuilds/current/nodejs
+PassengerAppType node
+PassengerNodejs /opt/alt/alt-nodejs18/root/bin/node
+PassengerStartupFile server/server.js
+PassengerBaseURI /
+PassengerRestartDir /home/u607968802/domains/navajowhite-wombat-404442.hostingersite.com/hbuilds/current/nodejs/tmp
+SetEnv NODE_OPTIONS "--require /home/u607968802/domains/navajowhite-wombat-404442.hostingersite.com/hbuilds/config/preload-timestamp.js"
+SetEnv LSNODE_CONSOLE_LOG console.log
+RewriteRule ^\.builds - [F,L]
 
-# Handle API requests - proxy to Node.js server
-RewriteCond %{HTTP:Upgrade} websocket [NC]
-RewriteCond %{HTTP:Connection} upgrade [NC]
-RewriteRule ^/?(.*)$ http://127.0.0.1:5000/$1 [P,L]
-
-RewriteCond %{REQUEST_URI} ^/api [NC]
-RewriteRule ^/?(.*)$ http://127.0.0.1:5000/$1 [P,L]
-
-# Serve static files from client/dist
-RewriteCond %{REQUEST_URI} !^/api [NC]
-RewriteCond %{REQUEST_URI} !\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|pdf|txt|map|json)$ [NC]
-RewriteCond %{DOCUMENT_ROOT}/client/dist/index.html -f
-RewriteRule ^/?(.*)$ /client/dist/index.html [L]
-
-# Security headers
 Header set X-Content-Type-Options "nosniff"
 Header set X-Frame-Options "SAMEORIGIN"
 Header set X-XSS-Protection "1; mode=block"
 Header set Referrer-Policy "strict-origin-when-cross-origin"
 
-# Disable directory listing
 Options -Indexes
+
+RewriteEngine On
+
+# Proxy API requests to Node.js server
+RewriteCond %{REQUEST_URI} ^/api [NC]
+RewriteRule ^/?(.*)$ http://127.0.0.1:5000/$1 [P,L]
+
+# Proxy uploads to Node.js server (avatars, certificates, documents)
+RewriteCond %{REQUEST_URI} ^/uploads/ [NC]
+RewriteRule ^/?(.*)$ http://127.0.0.1:5000/$1 [P,L]
+
+# Serve static files from client/dist (JS, CSS, images, fonts)
+RewriteCond %{REQUEST_URI} !^/api [NC]
+RewriteCond %{REQUEST_URI} !^/uploads/ [NC]
+RewriteCond %{REQUEST_URI} !\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|pdf|txt|map|json)$ [NC]
+RewriteCond %{DOCUMENT_ROOT}/client/dist/index.html -f
+RewriteRule ^/?(.*)$ /client/dist/index.html [L]

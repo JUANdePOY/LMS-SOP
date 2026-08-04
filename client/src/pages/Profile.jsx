@@ -32,6 +32,15 @@ const SectionCard = ({ title, icon: Icon, children, className }) => (
   </div>
 );
 
+function toDateInputValue(value) {
+  if (!value) return '';
+  try {
+    return new Date(value).toISOString().split('T')[0];
+  } catch {
+    return value || '';
+  }
+}
+
 export default function Profile() {
   const { addToast } = useToast();
   const [profile, setProfile] = useState(null);
@@ -266,6 +275,18 @@ export default function Profile() {
                     )}
                     placeholder={`Enter ${field.label.toLowerCase()}`}
                   />
+                ) : field.type === 'date' ? (
+                  <input
+                    type={field.type}
+                    value={toDateInputValue(profile[field.key])}
+                    onChange={e => handleInputChange(field.key, e.target.value)}
+                    className={cn(
+                      "w-full rounded-md border border-neutral-300 dark:border-neutral-600",
+                      "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
+                      "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    )}
+                    placeholder={`Enter ${field.label.toLowerCase()}`}
+                  />
                 ) : (
                   <input
                     type={field.type}
@@ -316,6 +337,18 @@ export default function Profile() {
                       "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
                       "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500",
                       "resize-none"
+                    )}
+                    placeholder={`Enter ${field.label.toLowerCase()}`}
+                  />
+                ) : field.type === 'date' ? (
+                  <input
+                    type={field.type}
+                    value={toDateInputValue(profile[field.key])}
+                    onChange={e => handleInputChange(field.key, e.target.value)}
+                    className={cn(
+                      "w-full rounded-md border border-neutral-300 dark:border-neutral-600",
+                      "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
+                      "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     )}
                     placeholder={`Enter ${field.label.toLowerCase()}`}
                   />

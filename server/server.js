@@ -63,6 +63,8 @@ const messagesRoutes = require('./routes/messages');
 
 const { templateRouter, signatureRouter, issuanceRouter } = require('./routes/certificates');
 
+const { getUploadRoot } = require('./config/uploads');
+
 const loginDebug = process.env.LOGIN_DEBUG === 'true';
 if (loginDebug) {
   app.use('/api/auth', (req, res, next) => {
@@ -112,6 +114,8 @@ app.use('/api/discussions', discussionsRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/messages', messagesRoutes);
+
+app.use('/uploads', express.static(getUploadRoot()));
 
 // Certificate management routes
 app.use('/api/certificate-templates', templateRouter);

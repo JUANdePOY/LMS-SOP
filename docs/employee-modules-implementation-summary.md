@@ -134,3 +134,37 @@ Fixed pre-existing ESLint errors:
 ## Verification
 
 All modified files pass ESLint with zero errors or warnings.
+
+---
+
+## Deployment Fixes (Live Hostinger Issue)
+
+### 1. Avatar Upload 422 Error
+
+**Problem**: After uploading a profile picture, the image GET request returned `422 (Unprocessable Content)`.
+
+**Root cause**: The `.htaccess` on Hostinger had no rewrite rules for serving `/uploads/` paths. All requests were routed to the Node.js server (via Passenger), but the server had no `express.static` middleware for the uploads directory. Requests for avatar images fell through to the SPA fallback, returning HTML instead of the image binary.
+
+**Fix**:
+- **`server/server.js`**: Added `app.use('/uploads', express.static(getUploadRoot()))` before the SPA fallback middleware, with `const { getUploadRoot } = require('./config/uploads')`.
+- **`.htaccess`**: Added rewrite rules to:
+  - Proxy `/api` requests to the Node.js server (Passenger on port 5000).
+  - Proxy `/uploads/` requests to the Node.js server so `express.static` can serve avatars, certificates, and other uploaded files.
+  - Serve `client/dist/index.html` as the SPA fallback for all other non-static routes.
+
+### 2. Date Input Format Errors
+
+**Problem**: Browser console warnings: `The specified value "2021-02-10T00:00:00.000Z" does not conform to the required format, "yyyy-MM-dd"`.
+
+**Root cause**: HTML `<input type="date">` elements received ISO datetime strings from the API (e.g., `"1992-06-30T00:00:00.000Z"`) but expect `yyyy-MM-dd` format.
+
+**Fix**: Added a `toDateInputValue(value)` helper in `client/src/pages/Profile.jsx` that converts ISO datetime strings to `yyyy-MM-dd` format before passing to date input fields. Applied to both the Personal Information and Employment Details sections for `date_hired` and `birthdate` fields.
+
+### 3. JSX Parsing Error in Profile
+
+**Problem**: `[plugin:vite:react-babel] Profile.jsx: Unexpected token (27:26)` — the build/dev server failed to parse the file.
+
+**Root cause**: During the date input fixes, `strokeWidth={1.8}` was accidentally merged into the `className` string of the `SectionCard` component: `className="text-blue-500 dark:text-blue-400 strokeWidth={1.8}"`. The `{1.8}` inside the string was interpreted as a JSX expression, breaking the parser.
+
+**Fix**: Restored `strokeWidth={1.8}` as a separate JSX prop outside the `className` string.
+
