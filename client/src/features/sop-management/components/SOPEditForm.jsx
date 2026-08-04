@@ -1,4 +1,5 @@
 import CheckboxList from './CheckboxList';
+import GroupedUserCheckboxList from './GroupedUserCheckboxList';
 
 function SOPEditForm({
   sop,
@@ -67,13 +68,11 @@ function SOPEditForm({
             <span className="text-xs text-[var(--text-muted)]">{cascade.totalUsers} found</span>
           </div>
        
-          <CheckboxList
+          <GroupedUserCheckboxList
             items={cascade.users}
             selectedIds={cascade.selectedUserIds}
             onToggle={cascade.toggleUser}
-            labelKey="full_name"
-            valueKey="id"
-            placeholder="Select users..."
+            onToggleBulk={cascade.toggleUsers}
             loading={cascade.loading.users}
             emptyText={cascade.selectedDeptIds.length ? 'No users found' : 'Select a department first'}
           />

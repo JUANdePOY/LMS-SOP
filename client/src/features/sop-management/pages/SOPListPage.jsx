@@ -109,7 +109,7 @@ function SOPListPage() {
     sops, loading, search, setSearch, status, setStatus,
     archivedTab, setArchivedTab, showCreate, setShowCreate,
     newTitle, setNewTitle, newDescription, setNewDescription, newLink, setNewLink,
-    newRestrictionType, setNewRestrictionType,
+    newCategoryId, setNewCategoryId, categories, loadingCategories,
     editingSopId, editTitle, setEditTitle, editDescription, setEditDescription,
     editStatus, setEditStatus, handleCreate, fetchSops,
     resetForm, handleEditStart, handleEditCancel, handleEditSave, handleDeleteSop,
@@ -245,7 +245,8 @@ function SOPListPage() {
             newTitle={newTitle} setNewTitle={setNewTitle}
             newDescription={newDescription} setNewDescription={setNewDescription}
             newLink={newLink} setNewLink={setNewLink}
-            newRestrictionType={newRestrictionType} setNewRestrictionType={setNewRestrictionType}
+            newCategoryId={newCategoryId} setNewCategoryId={setNewCategoryId}
+            categories={categories} loadingCategories={loadingCategories}
             loading={loading}
             cascade={cascade}
             onCancel={resetForm}

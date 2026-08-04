@@ -21,7 +21,12 @@ export const createAcknowledgement = (sopId, data) => api.post(`/sops/${sopId}/a
 export const acknowledgeSop = (sopId) => api.post(`/sops/${sopId}/acknowledgements/acknowledge`);
 
 export const getShares = (sopId) => api.get(`/sops/${sopId}/shares`);
+export const getShareLinks = getShares;
 export const createShare = (sopId, data) => api.post(`/sops/${sopId}/shares`, data);
+export const createShareLink = (sopId, data) => api.post(`/sops/${sopId}/shares/link`, data);
+export const revokeShareLink = (sopId, shareId) => api.delete(`/sops/${sopId}/shares/${shareId}`);
+
+export const getSharedSop = (token) => api.get(`/sops/share/${token}`);
 
 export const getAuditLogs = (sopId) => api.get(`/sops/${sopId}/audit`);
 
@@ -34,3 +39,4 @@ export const rejectSop = (sopId) => api.post(`/sops/${sopId}/reject`);
 export const publishSop = (sopId) => api.post(`/sops/${sopId}/publish`);
 
 export const transitionSop = (sopId, data) => api.post(`/sops/${sopId}/transition`, data);
+export const getSharedSopModules = (token) => api.get(`/sops/share/${token}/modules`);

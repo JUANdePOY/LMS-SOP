@@ -50,6 +50,7 @@ const categoriesRoutes = require('./routes/categories');
 const businessesRoutes = require('./routes/businesses');
 const hierarchyRoutes = require('./routes/hierarchy');
 const sopsRoutes = require('./routes/sops');
+const sopSharePublicRouter = require('./routes/sopSharePublic');
 const coursesRoutes = require('./routes/courses');
 const enrollmentsRoutes = require('./routes/enrollments');
 const { courseRoutes: progressCourseRoutes, lessonRoutes: progressLessonRoutes } = require('./routes/progress');
@@ -103,6 +104,7 @@ app.use('/api/categories', categoriesRoutes);
 app.use('/api/businesses', businessesRoutes);
 app.use('/api/hierarchy', hierarchyRoutes);
 app.use('/api/sops/attachments', sopAttachmentPublicFile);
+app.use('/api/sops/share', sopSharePublicRouter);
 app.use('/api/sops', sopsRoutes);
 
 app.use('/api/courses', coursesRoutes);

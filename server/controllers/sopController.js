@@ -9,6 +9,7 @@ const sopShareService = require('../services/sopShareService');
 const sopAssignmentService = require('../services/sopAssignmentService');
 const sopAcknowledgementService = require('../services/sopAcknowledgementService');
 const approvalWorkflowController = require('../controllers/approvalWorkflowController');
+const { validateShareLinkPayload } = require('../validators/sopShareValidator');
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
@@ -423,8 +424,45 @@ const shareController = {
 
   async create(req, res) {
     try {
-      const result = await sopShareService.createShare(parseInt(req.params.sopId, 10), req.body, req.user.id);
+      const result = await sopShareService.createShare(
+        parseInt(req.params.sopId, 10),
+        req.body,
+        req.user.id
+      );
       res.status(201).json({ success: true, data: result, message: 'Share created successfully' });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  async createLink(req, res) {
+    try {
+      const validation = validateShareLinkPayload(req.body);
+      if (!validation.valid) {
+        const error = new Error(validation.message);
+        error.code = 'VALIDATION_ERROR';
+        error.details = validation.details;
+        throw error;
+      }
+
+      const result = await sopShareService.createShareLink(
+        parseInt(req.params.sopId, 10),
+        validation,
+        req.user
+      );
+      res.status(201).json({ success: true, data: result, message: 'Share link created successfully' });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  async revoke(req, res) {
+    try {
+      const result = await sopShareService.revokeShare(
+        parseInt(req.params.shareId, 10),
+        req.user.id
+      );
+      res.json({ success: true, data: result, message: 'Share link revoked' });
     } catch (error) {
       handleError(res, error);
     }
