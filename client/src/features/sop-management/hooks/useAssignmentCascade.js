@@ -36,6 +36,13 @@ export function useAssignmentCascade() {
     businesses.forEach((b) => map.set(b.id, b));
     return map;
   }, [businesses]);
+  const groupedDepartments = useMemo(() => {
+    return filteredDepartments.map((dept) => ({
+      ...dept,
+      business_name: businessMap.get(dept.business_id)?.business_name || 'Unknown Business',
+    }));
+  }, [filteredDepartments, businessMap]);
+
 
   const loadDepartments = useCallback(async () => {
     setLoading((p) => ({ ...p, departments: true }));
@@ -168,6 +175,7 @@ export function useAssignmentCascade() {
   return {
     businesses,
     filteredDepartments,
+    groupedDepartments,
     departments,
     positions,
     users,

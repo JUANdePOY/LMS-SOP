@@ -1,5 +1,5 @@
 import CheckboxList from './CheckboxList';
-import GroupedUserCheckboxList from './GroupedUserCheckboxList';
+import GroupedCheckboxList from './GroupedCheckboxList';
 
 function SOPEditForm({
   sop,
@@ -12,7 +12,7 @@ function SOPEditForm({
   onSave,
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div>
         <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">SOP Title</label>
         <input
@@ -35,7 +35,7 @@ function SOPEditForm({
       </div>
 
       <h4 className="text-sm font-semibold text-[var(--text-primary)] mt-1">Assignments</h4>
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div>
           <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Business</label>
           <CheckboxList
@@ -50,35 +50,42 @@ function SOPEditForm({
         </div>
         <div>
           <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Departments</label>
-          <CheckboxList
-            items={cascade.filteredDepartments}
+          <GroupedCheckboxList
+            items={cascade.groupedDepartments}
             selectedIds={cascade.selectedDeptIds}
             onToggle={cascade.toggleDepartment}
             labelKey="name"
             valueKey="id"
-            placeholder="Select departments..."
             loading={cascade.loading.departments}
             emptyText={cascade.selectedBusinessIds.length ? 'No departments for selected businesses' : 'Select a business first'}
+            className="max-h-40 overflow-y-auto"
           />
         </div>
-        
+
         <div>
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs font-medium text-[var(--text-secondary)]">Users</span>
             <span className="text-xs text-[var(--text-muted)]">{cascade.totalUsers} found</span>
           </div>
-       
-          <GroupedUserCheckboxList
+
+          <GroupedCheckboxList
             items={cascade.users}
             selectedIds={cascade.selectedUserIds}
             onToggle={cascade.toggleUser}
             onToggleBulk={cascade.toggleUsers}
+            groupKey="business_name"
+            subgroupKey="department_name"
+            labelKey="full_name"
+            subLabelKey="position_title"
+            valueKey="id"
             loading={cascade.loading.users}
             emptyText={cascade.selectedDeptIds.length ? 'No users found' : 'Select a department first'}
+            className="max-h-48 overflow-y-auto"
           />
         </div>
       </div>
-      <div className="flex gap-2 justify-end">
+
+      <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-1">
         <button
           onClick={onCancel}
           className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
