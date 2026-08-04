@@ -3,7 +3,10 @@ const sopAttachmentService = require('../services/sopAttachmentService');
 
 const attachmentController = {
   async list(req, res) {
-    const result = await sopAttachmentService.listAttachments(parseInt(req.params.moduleId, 10));
+    const result = await sopAttachmentService.listAttachments(
+      parseInt(req.params.moduleId, 10),
+      req.query.versionId ? parseInt(req.query.versionId, 10) : null
+    );
     res.json({ success: true, data: result });
   },
 

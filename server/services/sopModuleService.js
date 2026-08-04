@@ -1,9 +1,10 @@
 const sopModuleModel = require('../models/sopModuleModel');
+const sopVersionModel = require('../models/sopVersionModel');
 const { logAudit } = require('../utils/auditLogger');
 const sopAuditLogService = require('./sopAuditLogService');
 
-async function listModules(sopId) {
-  return sopModuleModel.listModules(sopId);
+async function listModules(sopId, versionId = null) {
+  return sopModuleModel.listModules(sopId, versionId);
 }
 
 async function getModuleById(moduleId) {
@@ -17,12 +18,16 @@ async function getModuleById(moduleId) {
 }
 
 async function createModule(sopId, data, actorId) {
+  // Resolve the current version for this SOP
+  const versionId = data.sop_version_id || await sopVersionModel.getCurrentVersionId(sopId);
+
   const id = await sopModuleModel.createModule({
     sop_id: sopId,
     title: data.title,
     content: data.content || null,
     sort_order: data.sort_order || 1,
     created_by: actorId,
+    sop_version_id: versionId,
   });
 
   logAudit({
@@ -30,7 +35,7 @@ async function createModule(sopId, data, actorId) {
     action: 'sop.module.created',
     entity_type: 'sop_module',
     entity_id: id,
-    metadata: { sop_id: sopId },
+    metadata: { sop_id: sopId, sop_version_id: versionId },
   });
 
   sopAuditLogService.logEntry({
@@ -38,10 +43,10 @@ async function createModule(sopId, data, actorId) {
     entity_id: sopId,
     action: 'sop.module.created',
     performed_by: actorId,
-    new_values: { module_id: id, title: data.title },
+    new_values: { module_id: id, title: data.title, sop_version_id: versionId },
   });
 
-  return { id, title: data.title, content: data.content || null, sort_order: data.sort_order || 1 };
+  return { id, title: data.title, content: data.content || null, sort_order: data.sort_order || 1, sop_version_id: versionId };
 }
 
 async function updateModule(moduleId, data, actorId) {

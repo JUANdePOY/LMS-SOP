@@ -127,7 +127,12 @@ const sopController = {
 const moduleController = {
   async list(req, res) {
     try {
-      const result = await sopModuleService.listModules(parseInt(req.params.sopId, 10));
+      const versionIdParam = req.query.versionId;
+      const versionId = versionIdParam ? parseInt(versionIdParam, 10) : null;
+      const result = await sopModuleService.listModules(
+        parseInt(req.params.sopId, 10),
+        versionId
+      );
       res.json({ success: true, data: result });
     } catch (error) {
       handleError(res, error);
@@ -145,7 +150,11 @@ const moduleController = {
 
   async update(req, res) {
     try {
-      const result = await sopModuleService.updateModule(parseInt(req.params.moduleId, 10), req.body, req.user.id);
+      const result = await sopModuleService.updateModule(
+        parseInt(req.params.moduleId, 10),
+        req.body,
+        req.user.id
+      );
       res.json({ success: true, data: result, message: 'Module updated successfully' });
     } catch (error) {
       handleError(res, error);

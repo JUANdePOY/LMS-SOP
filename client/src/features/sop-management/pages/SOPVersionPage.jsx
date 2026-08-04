@@ -14,10 +14,10 @@ function SOPVersionPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [versionRes, modulesRes] = await Promise.all([
-          api.get(`/sops/${sopId}/versions/${versionId}`),
-          api.get(`/sops/${sopId}/modules`),
-        ]);
+      const [versionRes, modulesRes] = await Promise.all([
+        api.get(`/sops/${sopId}/versions/${versionId}`),
+        api.get(`/sops/${sopId}/modules?versionId=${versionId}`),
+      ]);
         setVersion(versionRes.data?.data || null);
         setModules(modulesRes.data?.data || []);
       } catch (err) {

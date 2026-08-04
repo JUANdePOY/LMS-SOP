@@ -44,8 +44,12 @@ function SOPWorkspacePage() {
   const [showRightSidebar, setShowRightSidebar] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
 
-  const { modules, loading: modulesLoading, error: modulesError, addModule, editModule, removeModule, reorderModules, submitModuleForReview } = useModules(sopId);
-  const { attachments, loading: attachmentsLoading, error: attachmentsError, upload, addLink, remove: removeAttachment } = useAttachments(selectedModule?.id);
+  // Derive the current version ID: prefer SOP's own current_version_id,
+  // fall back to workflow's sop_version if SOP's is not yet set
+  const currentVersionId = sop?.current_version_id || workflow?.sop_version_id || null;
+
+  const { modules, loading: modulesLoading, error: modulesError, addModule, editModule, removeModule, reorderModules, submitModuleForReview } = useModules(sopId, currentVersionId);
+  const { attachments, loading: attachmentsLoading, error: attachmentsError, upload, addLink, remove: removeAttachment } = useAttachments(selectedModule?.id, currentVersionId);
   const { versions, loading: versionsLoading, error: versionsError, restore, refetch: refetchVersions } = useVersions(sopId);
 
   const fetchSop = async () => {

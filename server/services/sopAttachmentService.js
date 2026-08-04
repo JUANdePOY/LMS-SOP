@@ -1,11 +1,12 @@
 const crypto = require('crypto');
 const sopModuleAttachmentModel = require('../models/sopModuleAttachmentModel');
 const sopModuleModel = require('../models/sopModuleModel');
+const sopVersionModel = require('../models/sopVersionModel');
 const { logAudit } = require('../utils/auditLogger');
 const sopAuditLogService = require('./sopAuditLogService');
 
-async function listAttachments(moduleId) {
-  return sopModuleAttachmentModel.listByModule(moduleId);
+async function listAttachments(moduleId, versionId = null) {
+  return sopModuleAttachmentModel.listByModule(moduleId, versionId);
 }
 
 async function getAttachmentById(attachmentId) {
@@ -126,6 +127,9 @@ async function uploadAttachment(moduleId, data, actorId, req) {
     throw error;
   }
 
+  // Get the version associated with this module (if any)
+  const moduleVersionId = module.sop_version_id || await sopVersionModel.getCurrentVersionId(module.sop_id);
+
   const id = await sopModuleAttachmentModel.createAttachment({
     module_id: moduleId,
     file_name,
@@ -135,6 +139,7 @@ async function uploadAttachment(moduleId, data, actorId, req) {
     file_extension,
     file_data,
     uploaded_by: actorId,
+    sop_version_id: moduleVersionId,
   });
 
   logAudit({
@@ -142,7 +147,7 @@ async function uploadAttachment(moduleId, data, actorId, req) {
     action: 'sop.module.attachment.uploaded',
     entity_type: 'sop_module_attachment',
     entity_id: id,
-    metadata: { module_id: moduleId, sop_id: module.sop_id },
+    metadata: { module_id: moduleId, sop_id: module.sop_id, sop_version_id: moduleVersionId },
   });
 
   sopAuditLogService.logEntry({
@@ -150,7 +155,7 @@ async function uploadAttachment(moduleId, data, actorId, req) {
     entity_id: module.sop_id,
     action: 'sop.module.attachment.uploaded',
     performed_by: actorId,
-    new_values: { attachment_id: id, file_name, module_id: moduleId },
+    new_values: { attachment_id: id, file_name, module_id: moduleId, sop_version_id: moduleVersionId },
   });
 
   // view_url is what the frontend rich-text editor uses as the <img src>
@@ -168,6 +173,8 @@ async function createLink(moduleId, data, actorId) {
     throw error;
   }
 
+  const moduleVersionId = module.sop_version_id || await sopVersionModel.getCurrentVersionId(module.sop_id);
+
   const validatedUrl = validateLinkUrl(link_url);
 
   const id = await sopModuleAttachmentModel.createAttachment({
@@ -175,6 +182,7 @@ async function createLink(moduleId, data, actorId) {
     link_url: validatedUrl,
     original_name: link_title,
     uploaded_by: actorId,
+    sop_version_id: moduleVersionId,
   });
 
   logAudit({
@@ -182,7 +190,7 @@ async function createLink(moduleId, data, actorId) {
     action: 'sop.module.attachment.link_created',
     entity_type: 'sop_module_attachment',
     entity_id: id,
-    metadata: { module_id: moduleId, sop_id: module.sop_id },
+    metadata: { module_id: moduleId, sop_id: module.sop_id, sop_version_id: moduleVersionId },
   });
 
   sopAuditLogService.logEntry({
@@ -190,10 +198,10 @@ async function createLink(moduleId, data, actorId) {
     entity_id: module.sop_id,
     action: 'sop.module.attachment.link_created',
     performed_by: actorId,
-    new_values: { attachment_id: id, link_url: validatedUrl, module_id: moduleId },
+    new_values: { attachment_id: id, link_url: validatedUrl, module_id: moduleId, sop_version_id: moduleVersionId },
   });
 
-  return { id };
+  return { id, sop_version_id: moduleVersionId };
 }
 
 async function deleteAttachment(attachmentId, actorId) {

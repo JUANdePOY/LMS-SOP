@@ -399,15 +399,24 @@ const MIGRATIONS = [
    // skipped on databases that already use the new schema.
    // =========================================================================
    // --- sop_module_attachments: add link_url column for storing web links alongside file attachments ---
-   `ALTER TABLE sop_module_attachments
-     ADD COLUMN IF NOT EXISTS link_url VARCHAR(500) DEFAULT NULL AFTER file_size`,
-   // --- sop_module_attachments: add missing columns (is_deleted, original_name, updated_at) ---
-   `ALTER TABLE sop_module_attachments
-     ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE AFTER download_count,
-     ADD COLUMN IF NOT EXISTS original_name VARCHAR(255) DEFAULT NULL AFTER file_name,
-     ADD COLUMN IF NOT EXISTS updated_at DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP AFTER created_at`,
-   // Create index for is_deleted on sop_module_attachments
-   `CREATE INDEX IF NOT EXISTS idx_sop_module_attachments_deleted ON sop_module_attachments(is_deleted)`,
+    `ALTER TABLE sop_module_attachments
+      ADD COLUMN IF NOT EXISTS link_url VARCHAR(500) DEFAULT NULL AFTER file_size`,
+    // --- sop_module_attachments: add missing columns (is_deleted, original_name, updated_at) ---
+    `ALTER TABLE sop_module_attachments
+      ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE AFTER download_count,
+      ADD COLUMN IF NOT EXISTS original_name VARCHAR(255) DEFAULT NULL AFTER file_name,
+      ADD COLUMN IF NOT EXISTS updated_at DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP AFTER created_at`,
+    // Create index for is_deleted on sop_module_attachments
+    `CREATE INDEX IF NOT EXISTS idx_sop_module_attachments_deleted ON sop_module_attachments(is_deleted)`,
+    // --- sop_modules: add sop_version_id column for version isolation ---
+    `ALTER TABLE sop_modules
+      ADD COLUMN IF NOT EXISTS sop_version_id INT NULL AFTER sop_id`,
+    `CREATE INDEX IF NOT EXISTS idx_sop_modules_version ON sop_modules(sop_version_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_sop_modules_sop_version ON sop_modules(sop_id, sop_version_id)`,
+    // --- sop_module_attachments: add sop_version_id column for version isolation ---
+    `ALTER TABLE sop_module_attachments
+      ADD COLUMN IF NOT EXISTS sop_version_id INT NULL AFTER module_id`,
+    `CREATE INDEX IF NOT EXISTS idx_sop_module_attachments_version ON sop_module_attachments(sop_version_id)`,
    // --- sop_approvals: add sop_version_id column ---
    `ALTER TABLE sop_approvals ADD COLUMN IF NOT EXISTS sop_version_id INT NULL AFTER sop_id`,
    `CREATE INDEX IF NOT EXISTS idx_sop_approvals_version ON sop_approvals(sop_version_id)`,

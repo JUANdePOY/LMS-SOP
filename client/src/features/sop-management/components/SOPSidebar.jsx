@@ -74,27 +74,34 @@ export default function SOPSidebar({ sopId, sop, workflow, setWorkflow, auditLog
             <Plus size={16} className="text-indigo-600 dark:text-indigo-400" />
           </button>
         </div>
-        {showNewVersionForm && (
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!newVersion.trim()) return;
-              setCreatingVersion(true);
-              try {
-                await createVersion(sopId, { version: newVersion, change_summary: changeSummary || null, status: 'Draft' });
-                setShowNewVersionForm(false);
-                setNewVersion('');
-                setChangeSummary('');
-                if (refetchVersions) await refetchVersions();
-                if (onSopRefresh) onSopRefresh();
-              } catch (err) {
-                console.error('Failed to create version:', err);
-              } finally {
-                setCreatingVersion(false);
-              }
-            }}
-            className="mt-2 space-y-2 p-2 border border-neutral-200 dark:border-neutral-700 rounded-lg"
-          >
+          {showNewVersionForm && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newVersion.trim()) return;
+                setCreatingVersion(true);
+                try {
+                  const result = await createVersion(sopId, {
+                    version: newVersion,
+                    change_summary: changeSummary || null,
+                    status: 'Draft',
+                    copy_content: true, // Copy current content to new version for isolation
+                  });
+                  setShowNewVersionForm(false);
+                  setNewVersion('');
+                  setChangeSummary('');
+                  if (refetchVersions) await refetchVersions();
+                  if (onSopRefresh) onSopRefresh();
+                  toast.success(`New version ${newVersion} created with copied content`);
+                } catch (err) {
+                  const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Failed to create version';
+                  toast.error(message);
+                } finally {
+                  setCreatingVersion(false);
+                }
+              }}
+              className="mt-2 space-y-2 p-2 border border-neutral-200 dark:border-neutral-700 rounded-lg"
+            >
             <input
               type="text"
               value={newVersion}
