@@ -111,7 +111,7 @@ const MIGRATIONS = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS hierarchy_id INT DEFAULT NULL AFTER quiz_id`,
-  `ALTER TABLE quiz_questions ADD CONSTRAINT IF NOT EXISTS fk_question_hierarchy FOREIGN KEY (hierarchy_id) REFERENCES quiz_hierarchy(id) ON DELETE SET NULL`,
+  `ALTER TABLE quiz_questions ADD CONSTRAINT fk_question_hierarchy FOREIGN KEY (hierarchy_id) REFERENCES quiz_hierarchy(id) ON DELETE SET NULL`,
 ];
 
 async function runAssessmentsMigrations(db) {

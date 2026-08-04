@@ -168,3 +168,19 @@ All modified files pass ESLint with zero errors or warnings.
 
 **Fix**: Restored `strokeWidth={1.8}` as a separate JSX prop outside the `className` string.
 
+### 4. MariaDB Migration Syntax Errors
+
+**Problem**: Hostinger runtime log showed:
+```
+Course migration error: You have an error in your SQL syntax ... near 'FOREIGN KEY (category_id) REFERENCES categories(id)...'
+Assessments migration error: You have an error in your SQL syntax ... near 'FOREIGN KEY (hierarchy_id) REFERENCES quiz_hierarchy(id)...'
+```
+
+**Root cause**: MariaDB does not support `IF NOT EXISTS` with `ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY`. The `IF NOT EXISTS` clause is only valid for `CREATE` and `DROP` statements in MariaDB, not for `ALTER TABLE` constraint operations.
+
+**Fix**: Removed `IF NOT EXISTS` from both migration statements:
+- `server/migrations/courseManagement.js:32` — `ALTER TABLE courses ADD CONSTRAINT fk_courses_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL`
+- `server/migrations/assessments.js:114` — `ALTER TABLE quiz_questions ADD CONSTRAINT fk_question_hierarchy FOREIGN KEY (hierarchy_id) REFERENCES quiz_hierarchy(id) ON DELETE SET NULL`
+
+Both migration runners already catch `ER_DUP_KEYNAME` (error 1061) for subsequent runs, so removing `IF NOT EXISTS` is safe — the constraint creates on first run and is gracefully skipped on subsequent runs.
+
