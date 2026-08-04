@@ -420,13 +420,15 @@ async function runMigrations() {
     try {
       await db.query(sql);
     } catch (err) {
+      const isDuplicateKey = /errno: 121|Duplicate key on write or update/.test(err.message);
       const ignoreCodes = [
         'ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME',
         1060, 1050, 1061, 121
       ];
       if (
         ignoreCodes.includes(err.code) ||
-        ignoreCodes.includes(err.errno)
+        ignoreCodes.includes(err.errno) ||
+        isDuplicateKey
       ) {
         console.log('Migration skipped (already exists):', sql.split('\n')[0]);
       } else {

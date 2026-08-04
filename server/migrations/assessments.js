@@ -119,8 +119,9 @@ async function runAssessmentsMigrations(db) {
     try {
       await db.query(sql);
     } catch (err) {
+      const isDuplicateKey = /errno: 121|Duplicate key on write or update/.test(err.message);
       const ignoreCodes = ['ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 'ER_CANT_MODIFY_SQL', 1060, 1050, 1061, 1091, 121];
-      if (ignoreCodes.includes(err.code) || ignoreCodes.includes(err.errno)) {
+      if (ignoreCodes.includes(err.code) || ignoreCodes.includes(err.errno) || isDuplicateKey) {
         console.log('Assessments migration skipped (already exists):', sql.split('\n')[0].trim());
       } else {
         console.error('Assessments migration error:', err.message);
