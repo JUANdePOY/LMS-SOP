@@ -11,13 +11,24 @@ async function listSops(filters = {}) {
   return sopModel.findAll(filters);
 }
 
-async function getSopById(id) {
+async function getSopById(id, user) {
   const sop = await sopModel.findById(id);
   if (!sop) {
     const error = new Error('SOP not found');
     error.code = 'NOT_FOUND';
     throw error;
   }
+
+  if (user) {
+    const cols = await sopModel.getSopsColumns();
+    const restriction = sopModel.restrictionWhere(user, cols, 'sops');
+    if (restriction && !sopModel.canAccessSop(sop, user)) {
+      const error = new Error('You do not have permission to access this SOP');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+  }
+
   return sop;
 }
 

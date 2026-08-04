@@ -67,6 +67,10 @@ function signatureDir() {
   return path.join(getUploadRoot(), 'certificates', 'signatures');
 }
 
+function avatarDir(userId) {
+  return path.join(getUploadRoot(), 'avatars', String(userId));
+}
+
 module.exports = {
   getUploadRoot,
   getMaxUploadBytes,
@@ -80,4 +84,5 @@ module.exports = {
   certificateRoot,
   certificateTemplateDir,
   signatureDir,
+  avatarDir,
 };

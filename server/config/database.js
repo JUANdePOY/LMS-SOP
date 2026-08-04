@@ -429,13 +429,15 @@ async function runMigrations() {
     try {
       await db.query(sql);
     } catch (err) {
+      const isDuplicateKey = /errno: 121|Duplicate key on write or update/.test(err.message);
       const ignoreCodes = [
         'ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME',
-        1060, 1050, 1061
+        1060, 1050, 1061, 121
       ];
       if (
         ignoreCodes.includes(err.code) ||
-        ignoreCodes.includes(err.errno)
+        ignoreCodes.includes(err.errno) ||
+        isDuplicateKey
       ) {
         console.log('Migration skipped (already exists):', sql.split('\n')[0]);
       } else {
@@ -451,6 +453,14 @@ async function runMigrations() {
     console.log('Course management migrations applied');
   } catch (err) {
     console.error('Course management migration error:', err.message);
+  }
+
+  try {
+    const { runAssessmentsMigrations } = require('../migrations/assessments');
+    await runAssessmentsMigrations(db);
+    console.log('Assessments migrations applied');
+  } catch (err) {
+    console.error('Assessments migration error:', err.message);
   }
 
   try {

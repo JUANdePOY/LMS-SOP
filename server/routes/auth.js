@@ -371,7 +371,7 @@ router.put('/profile', authenticateToken, [
     }
 
     const updates = {};
-    const allowed = ['full_name', 'email', 'position_title', 'contact_number', 'employment_status', 'date_hired', 'birthdate', 'address'];
+    const allowed = ['full_name', 'email', 'position_title', 'contact_number', 'employment_status', 'date_hired', 'birthdate', 'address', 'avatar_url'];
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
@@ -487,6 +487,78 @@ router.put('/profile/password', authenticateToken, [
       message: 'Failed to change password',
       code: 'DB_ERROR'
     });
+  }
+});
+
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs/promises');
+const { getUploadRoot, avatarDir, isAllowedMime, safeExtFromOriginal } = require('../config/uploads');
+
+const avatarStorage = multer.memoryStorage();
+const avatarUpload = multer({
+  storage: avatarStorage,
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
+    }
+  },
+  limits: { fileSize: 2 * 1024 * 1024 },
+});
+
+router.post('/profile/avatar', authenticateToken, avatarUpload.single('avatar'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ status: 'error', message: 'No avatar file uploaded', code: 'NO_FILE' });
+    }
+
+    const userId = req.user.id;
+    const ext = safeExtFromOriginal(req.file.originalname) || '.jpg';
+    const dir = avatarDir(userId);
+    await fs.mkdir(dir, { recursive: true });
+
+    const filename = `avatar-${Date.now()}${ext}`;
+    const absPath = path.join(dir, filename);
+    await fs.writeFile(absPath, req.file.buffer);
+
+    const relPath = path.relative(getUploadRoot(), absPath).replace(/\\/g, '/');
+    const avatarUrl = `/uploads/${relPath}`;
+
+    await db.query('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [avatarUrl, userId]);
+
+    logAudit({
+      user_id: userId,
+      action: 'user.avatar_updated',
+      entity_type: 'user',
+      entity_id: userId,
+      new_values: { avatar_url: avatarUrl },
+    });
+
+    res.json({ status: 'success', message: 'Avatar uploaded', data: { avatar_url: avatarUrl } });
+  } catch (error) {
+    console.error('Avatar upload error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to upload avatar', code: 'DB_ERROR' });
+  }
+});
+
+router.delete('/profile/avatar', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const [rows] = await db.query('SELECT avatar_url FROM users WHERE id = ?', [userId]);
+    const user = rows[0];
+    if (user?.avatar_url) {
+      const rel = user.avatar_url.replace(/^\/uploads\//, '');
+      const abs = path.join(getUploadRoot(), rel);
+      fs.unlink(abs).catch(() => {});
+    }
+    await db.query('UPDATE users SET avatar_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+    res.json({ status: 'success', message: 'Avatar removed' });
+  } catch (error) {
+    console.error('Avatar delete error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to remove avatar', code: 'DB_ERROR' });
   }
 });
 

@@ -144,7 +144,7 @@ async function createCourse(req, res) {
   }
 
   const body = req.body || {};
-  const { title, description, category, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, modules } = body;
+  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, modules } = body;
 
   if (!title || !String(title).trim()) {
     return res.status(400).json({ success: false, message: 'Course title is required', code: 'VALIDATION_ERROR' });
@@ -164,14 +164,15 @@ async function createCourse(req, res) {
 
     const [courseResult] = await conn.query(
       `INSERT INTO courses (
-        title, description, category, difficulty, status, instructor_id, thumbnail_url,
+        title, description, category, category_id, difficulty, status, instructor_id, thumbnail_url,
         prerequisites, learning_outcomes, max_enrollments, start_date, end_date,
         grading_scale, allow_self_enrollment, send_completion_certificates, department_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         String(title).trim(),
         description ?? null,
         category ?? null,
+        category_id ? parseInt(category_id, 10) : null,
         difficulty || 'beginner',
         status || 'draft',
         userId,
@@ -209,8 +210,8 @@ async function createCourse(req, res) {
 
         const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive', 'sop'].includes(lesson.type) ? lesson.type : 'reading';
         await conn.query(
-          `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score, quiz_id)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             moduleId,
             String(lesson.title).trim(),
@@ -222,6 +223,7 @@ async function createCourse(req, res) {
             lesson.is_required ?? true,
             lesson.requiresQuizPass ? 1 : 0,
             lesson.passingScore ? parseInt(lesson.passingScore, 10) : null,
+            lesson.quizId ? parseInt(lesson.quizId, 10) : null,
           ]
         );
       }
@@ -252,7 +254,7 @@ async function updateCourse(req, res) {
 
   const courseId = parseInt(req.params.id, 10);
   const body = req.body || {};
-  const { title, description, category, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, modules } = body;
+  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, modules } = body;
 
   try {
     const [courseRows] = await db.query('SELECT * FROM courses WHERE id = ? AND is_deleted = FALSE LIMIT 1', [courseId]);
@@ -273,14 +275,14 @@ async function updateCourse(req, res) {
       await conn.beginTransaction();
 
       const allowed = [
-        'title', 'description', 'category', 'difficulty', 'thumbnail_url',
+        'title', 'description', 'category', 'category_id', 'difficulty', 'thumbnail_url',
         'prerequisites', 'learning_outcomes', 'max_enrollments', 'start_date',
         'end_date', 'grading_scale', 'allow_self_enrollment', 'send_completion_certificates', 'status'
       ];
       const updates = {};
       for (const key of allowed) {
         if (Object.prototype.hasOwnProperty.call(body, key)) {
-          updates[key] = body[key];
+          updates[key] = key === 'category_id' ? (body[key] ? parseInt(body[key], 10) : null) : body[key];
         }
       }
 
@@ -358,7 +360,7 @@ async function updateCourse(req, res) {
               if (lessonId) {
                 incomingLessonIds.add(lessonId);
                 await conn.query(
-                  `UPDATE module_content SET title = ?, type = ?, description = ?, order_index = ?, url = ?, duration = ?, is_required = ?, requires_quiz_pass = ?, passing_score = ? WHERE id = ?`,
+                  `UPDATE module_content SET title = ?, type = ?, description = ?, order_index = ?, url = ?, duration = ?, is_required = ?, requires_quiz_pass = ?, passing_score = ?, quiz_id = ? WHERE id = ?`,
                   [
                     effectiveLessonTitle,
                     lessonType,
@@ -369,13 +371,14 @@ async function updateCourse(req, res) {
                     lesson.is_required ?? true,
                     lesson.requiresQuizPass ? 1 : 0,
                     lesson.passingScore ? parseInt(lesson.passingScore, 10) : null,
+                    lesson.quizId ? parseInt(lesson.quizId, 10) : null,
                     lessonId,
                   ]
                 );
               } else {
                 const [newLesson] = await conn.query(
-                  `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score, quiz_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                   [
                     moduleId,
                     effectiveLessonTitle,
@@ -387,6 +390,7 @@ async function updateCourse(req, res) {
                     lesson.is_required ?? true,
                     lesson.requiresQuizPass ? 1 : 0,
                     lesson.passingScore ? parseInt(lesson.passingScore, 10) : null,
+                    lesson.quizId ? parseInt(lesson.quizId, 10) : null,
                   ]
                 );
                 incomingLessonIds.add(newLesson.insertId);
@@ -413,8 +417,8 @@ async function updateCourse(req, res) {
 
               const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive', 'sop'].includes(lesson.type) ? lesson.type : 'reading';
               await conn.query(
-                `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score, quiz_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                   moduleId,
                   String(lesson.title).trim(),
@@ -426,6 +430,7 @@ async function updateCourse(req, res) {
                   lesson.is_required ?? true,
                   lesson.requiresQuizPass ? 1 : 0,
                   lesson.passingScore ? parseInt(lesson.passingScore, 10) : null,
+                  lesson.quizId ? parseInt(lesson.quizId, 10) : null,
                 ]
               );
             }

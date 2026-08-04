@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/shared/components/navigation/sidebar/Sidebar";
 import { useTheme } from "@/hooks/useTheme";
 import { Scrollbar } from "@/shared/components/ui/Scrollbar";
+import BannerSection from "@/shared/components/ui/BannerSection";
 
 const MOBILE_BOTTOM_NAV_ADMIN = [
   { name: "Home", path: "/", icon: BookOpen },
@@ -59,17 +60,6 @@ const PATH_TITLE_MAP = {
   "/admin/organization/sop-management": "SOP Management",
 };
 
-function matchPath(pathname, pattern) {
-  const patternParts = pattern.split("/");
-  const pathParts = pathname.split("/");
-  if (patternParts.length !== pathParts.length) return false;
-  for (let i = 0; i < patternParts.length; i++) {
-    if (patternParts[i].startsWith(":")) continue;
-    if (patternParts[i] !== pathParts[i]) return false;
-  }
-  return true;
-}
-
 function getBreadcrumbs(pathname) {
   const parts = pathname.split("/").filter(Boolean);
   const crumbs = [];
@@ -108,6 +98,13 @@ export default function AppLayout() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (location.pathname.match(/^\/courses\/[^/]+\/builder$/)) {
+      setCollapsed(true);
+      setMobileOpen(false);
+    }
+  }, [location.pathname]);
 
   return (
     <div
@@ -292,6 +289,10 @@ export default function AppLayout() {
               </div>
             </div>
           </header>
+
+          <div className="px-4 sm:px-6 pt-4">
+            <BannerSection />
+          </div>
 
           <div className="flex-1 w-full px-4 sm:px-6 py-4 sm:py-6">
             <Outlet />

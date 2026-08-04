@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getUsers, createUser, updateUser, deleteUser, getUserStats } from '@/services/api';
 import { getDepartments } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Select } from '@/shared/components/ui/select';
@@ -58,6 +59,7 @@ function formatDate(date) {
 
 export default function UsersPanel({ departments: initialDepartments = [], activeTab = 'users' }) {
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [departments, setDepartments] = useState(initialDepartments);
@@ -80,37 +82,40 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   const [sortDirection, setSortDirection] = useState('asc');
 
   const fetchUsers = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       const params = {};
       if (search) params.search = search;
       if (roleFilter) params.role = roleFilter;
       if (deptFilter) params.department_id = deptFilter;
       const res = await getUsers(params);
-      if (res.data.status === 'success') {
-        setUsers(res.data.data.rows || []);
+      if (res.data?.status === 'success') {
+        setUsers(res.data.data?.rows || []);
       }
     } catch {
       toast.error('Failed to load users');
     }
-  }, [search, roleFilter, deptFilter, toast]);
+  }, [search, roleFilter, deptFilter, toast, isAuthenticated]);
 
   const fetchStats = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       const res = await getUserStats();
-      if (res.data.status === 'success') {
+      if (res.data?.status === 'success') {
         setStats(res.data.data);
       }
     } catch { /* ignore */ }
-  }, []);
+  }, [isAuthenticated]);
 
   const fetchDepartments = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       const res = await getDepartments({ status: 'active', limit: 100 });
-      if (res.data.status === 'success') {
-        setDepartments(res.data.data.rows);
+      if (res.data?.status === 'success') {
+        setDepartments(res.data.data?.rows || []);
       }
     } catch { /* ignore */ }
-  }, []);
+  }, [isAuthenticated]);
 
   const handleAddUser = async () => {
     setSaving(true);
@@ -255,6 +260,10 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   };
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setLoading(false);
+      return;
+    }
     if (activeTab !== 'users') return;
     const load = async () => {
       setLoading(true);
@@ -263,7 +272,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       setLoading(false);
     };
     load();
-  }, [activeTab, fetchUsers, fetchStats, fetchDepartments]);
+  }, [activeTab, fetchUsers, fetchStats, fetchDepartments, isAuthenticated]);
 
   if (loading) {
     return (

@@ -18,6 +18,7 @@ export function useSOPList() {
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newLink, setNewLink] = useState('');
+  const [newRestrictionType, setNewRestrictionType] = useState('department');
   const [editingSopId, setEditingSopId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
@@ -51,6 +52,7 @@ export function useSOPList() {
     setNewTitle('');
     setNewDescription('');
     setNewLink('');
+    setNewRestrictionType('department');
     cascade.setSelectedBusinessIds([]);
     cascade.setSelectedDeptIds([]);
     cascade.setSelectedPositions([]);
@@ -67,6 +69,7 @@ export function useSOPList() {
         description: newDescription,
         department_id: cascade.selectedDeptIds.length > 0 ? cascade.selectedDeptIds[0] : null,
         status: SOP_STATUSES.DRAFT,
+        restriction_type: newRestrictionType,
       });
       const sopId = sopData?.data?.id || sopData?.id;
       
@@ -167,6 +170,8 @@ export function useSOPList() {
     setNewDescription,
     newLink,
     setNewLink,
+    newRestrictionType,
+    setNewRestrictionType,
     // Edit form state
     editingSopId,
     editTitle,

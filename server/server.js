@@ -56,9 +56,16 @@ const { courseRoutes: progressCourseRoutes, lessonRoutes: progressLessonRoutes }
 const gradesRoutes = require('./routes/grades');
 const discussionsRoutes = require('./routes/discussions');
 const courseBuilderRoutes = require('./routes/course-builder');
+const quizzesRoutes = require('./routes/quizzes');
+const quizAttemptsRoutes = require('./routes/attempts');
+const announcementsRoutes = require('./routes/announcements');
+const eventsRoutes = require('./routes/events');
+const messagesRoutes = require('./routes/messages');
 
 const { templateRouter, signatureRouter, issuanceRouter } = require('./routes/certificates');
 const sopAttachmentPublicFile = require('./services/sopAttachmentPublicFile');
+
+const { getUploadRoot } = require('./config/uploads');
 
 const loginDebug = process.env.LOGIN_DEBUG === 'true';
 if (loginDebug) {
@@ -103,8 +110,15 @@ app.use('/api/courses', progressCourseRoutes);
 app.use('/api/enrollments', enrollmentsRoutes);
 app.use('/api/lessons', progressLessonRoutes);
 app.use('/api/course-builder', courseBuilderRoutes);
+app.use('/api/quiz', quizzesRoutes);
+app.use('/api/quiz-attempts', quizAttemptsRoutes);
 app.use('/api/grades', gradesRoutes);
 app.use('/api/discussions', discussionsRoutes);
+app.use('/api/announcements', announcementsRoutes);
+app.use('/api/events', eventsRoutes);
+app.use('/api/messages', messagesRoutes);
+
+app.use('/uploads', express.static(getUploadRoot()));
 
 // Certificate management routes
 app.use('/api/certificate-templates', templateRouter);

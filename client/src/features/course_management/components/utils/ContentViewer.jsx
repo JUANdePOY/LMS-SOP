@@ -1,15 +1,10 @@
 import { FileText } from "lucide-react";
+import VideoPlayer from "./VideoPlayer";
 
 export default function ContentViewer({ content }) {
   if (!content) return <div className="text-sm text-neutral-500">Select content to view.</div>;
   if (content.type === "video") {
-    return (
-      <div className="rounded-xl border border-[var(--border)] bg-black overflow-hidden">
-        <video controls className="w-full aspect-video" src={content.url}>
-          Your browser does not support the video tag.
-        </video>
-      </div>
-    );
+    return <VideoPlayer src={content.url} title={content.title} />;
   }
   if (content.type === "sop") {
     return (

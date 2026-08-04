@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Settings as SettingsIcon, Users, Shield, Plus, Pencil, Save, X, Trash2, ChevronRight, History, Building2, CheckCircle, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/shared/components/Toast";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   getSettings, updateSetting, createSetting,
   getUsers, createUser, updateUser, deleteUser,
@@ -22,6 +23,7 @@ const TABS = [
 
 export default function Settings() {
   const toast = useToast();
+  const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState("users");
   const [users, setUsers] = useState([]);
   const [settings, setSettings] = useState([]);
@@ -42,39 +44,57 @@ export default function Settings() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
+  const fetchingRef = useRef(false);
 
   const fetchUsers = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       const res = await getUsers({ limit: 100 });
-      if (res.data.status === 'success') setUsers(res.data.data.rows);
+      if (res.data?.status === 'success') {
+        const data = res.data.data;
+        setUsers(data?.rows || data || []);
+      }
     } catch { toast.error("Failed to load users"); }
-  }, [toast]);
+  }, [toast, isAuthenticated]);
 
   const fetchSettings = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       const res = await getSettings();
-      if (res.data.status === 'success') setSettings(res.data.data);
+      if (res.data?.status === 'success') setSettings(res.data.data || []);
     } catch { toast.error("Failed to load settings"); }
-  }, [toast]);
+  }, [toast, isAuthenticated]);
 
   const fetchProfile = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       const res = await getProfile();
-      if (res.data.status === 'success') {
+      if (res.data?.status === 'success') {
         setProfile(res.data.data);
         setEmail(res.data.data.email || "");
       }
     } catch { /* ignore */ }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      await Promise.all([fetchUsers(), fetchSettings(), fetchProfile()]);
+    if (!isAuthenticated) {
       setLoading(false);
+      return;
+    }
+    const load = async () => {
+      if (fetchingRef.current) return;
+      fetchingRef.current = true;
+      setLoading(true);
+      try {
+        await Promise.all([fetchUsers(), fetchSettings(), fetchProfile()]);
+      } finally {
+        setLoading(false);
+        fetchingRef.current = false;
+      }
     };
     load();
-  }, [fetchUsers, fetchSettings, fetchProfile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   const handleAddUser = async () => {
     setSaving(true);

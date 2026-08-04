@@ -31,7 +31,7 @@ function handleError(res, error) {
 const sopController = {
   async list(req, res) {
     try {
-      const result = await sopService.listSops(req.query);
+      const result = await sopService.listSops({ ...req.query, user: req.user });
       res.json({ success: true, data: result });
     } catch (error) {
       handleError(res, error);
@@ -40,7 +40,7 @@ const sopController = {
 
   async getById(req, res) {
     try {
-      const result = await sopService.getSopById(parseInt(req.params.id, 10));
+      const result = await sopService.getSopById(parseInt(req.params.id, 10), req.user);
       res.json({ success: true, data: result });
     } catch (error) {
       handleError(res, error);

@@ -27,6 +27,7 @@ async function getSopsColumns() {
       hasDepartment: cols.has('department_id'),
       hasIsPublished: cols.has('is_published'),
       hasIsArchived: cols.has('is_archived'),
+      hasRestrictionType: cols.has('restriction_type'),
     };
   }
   return sopsColumns;
@@ -49,9 +50,90 @@ function notDeletedClause(cols, alias = 's') {
     : `${alias}.deleted_at IS NULL`;
 }
 
+function restrictionWhere(user, cols, alias = 's') {
+  if (!user || !cols.hasRestrictionType) return '';
+
+  const role = user.role || '';
+  if (role === 'admin' || role === 'super_admin') return '';
+
+  const userDepartmentId = user.department_id || null;
+  const userId = user.id || null;
+
+  return `
+    (
+      ${alias}.restriction_type = 'public'
+      OR (
+        ${alias}.restriction_type = 'department'
+        AND ${alias}.department_id = ?
+      )
+      OR (
+        ${alias}.restriction_type = 'assigned'
+        AND EXISTS (
+          SELECT 1
+          FROM sop_assignments sa
+          LEFT JOIN assignment_departments ad ON ad.assignment_id = sa.id
+          LEFT JOIN assignment_users au ON au.assignment_id = sa.id
+          WHERE sa.sop_version_id = (
+            SELECT current_version_id FROM sops WHERE id = ${alias}.id
+          )
+            AND sa.is_deleted = FALSE
+            AND (
+              au.user_id = ?
+              OR ad.department_id = ?
+            )
+        )
+      )
+      OR (
+        ${alias}.restriction_type = 'private'
+        AND ${alias}.${cols.owner} = ?
+      )
+    )
+  `;
+}
+
+async function canAccessSop(sop, user) {
+  if (!sop || !user) return false;
+  const cols = await getSopsColumns();
+  const restriction = sop.restriction_type;
+  if (!restriction || !cols.hasRestrictionType) return true;
+
+  const role = user.role || '';
+  if (role === 'admin' || role === 'super_admin') return true;
+
+  if (restriction === 'public') return true;
+  if (restriction === 'department' && sop.department_id && user.department_id && sop.department_id === user.department_id) return true;
+  if (restriction === 'private' && sop.owner_id && user.id && sop.owner_id === user.id) return true;
+
+  if (restriction === 'assigned') {
+    const versionId = await getCurrentVersionId(sop.id);
+    if (!versionId) return false;
+    const [assignments] = await db.query(`
+      SELECT sa.id FROM sop_assignments sa
+      WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE
+    `, [versionId]);
+    const assignmentIds = assignments.map((a) => a.id);
+    if (!assignmentIds.length) return false;
+
+    const placeholders = assignmentIds.map(() => '?').join(',');
+    const [userLinks] = await db.query(`
+      SELECT 1 FROM assignment_users WHERE assignment_id IN (${placeholders}) AND user_id = ?
+    `, [...assignmentIds, user.id]);
+    if (userLinks.length) return true;
+
+    if (user.department_id) {
+      const [deptLinks] = await db.query(`
+        SELECT 1 FROM assignment_departments WHERE assignment_id IN (${placeholders}) AND department_id = ?
+      `, [...assignmentIds, user.department_id]);
+      if (deptLinks.length) return true;
+    }
+  }
+
+  return false;
+}
+
 async function findAll(filters = {}) {
   const cols = await getSopsColumns();
-  const { search, status, department_id, category_id, exclude_status, page = 1, limit = 20 } = filters;
+  const { search, status, department_id, category_id, exclude_status, page = 1, limit = 20, user } = filters;
   const offset = (page - 1) * limit;
 
   let sql = `
@@ -85,6 +167,12 @@ async function findAll(filters = {}) {
     params.push(category_id);
   }
 
+  const restrictionSql = restrictionWhere(user, cols, 's');
+  if (restrictionSql) {
+    sql += ' AND ' + restrictionSql;
+    params.push(user.department_id, user.id, user.department_id, user.id);
+  }
+
   sql += ' ORDER BY s.created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
@@ -96,6 +184,7 @@ async function findAll(filters = {}) {
     WHERE ${notDeletedClause(cols)}
   `;
   const countParams = [];
+
   if (search) {
     countSql += ' AND (s.title LIKE ? OR s.' + cols.code + ' LIKE ? OR s.description LIKE ?)';
     countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
@@ -111,6 +200,12 @@ async function findAll(filters = {}) {
   if (category_id && cols.hasCategory) {
     countSql += ' AND s.category_id = ?';
     countParams.push(category_id);
+  }
+
+  const countRestrictionSql = restrictionWhere(user, cols, 's');
+  if (countRestrictionSql) {
+    countSql += ' AND ' + countRestrictionSql;
+    countParams.push(user.department_id, user.id, user.department_id, user.id);
   }
 
   const [countRows] = await db.query(countSql, countParams);
@@ -362,4 +457,7 @@ module.exports = {
   restore,
   permanentDelete,
   listTrashed,
+  getSopsColumns,
+  restrictionWhere,
+  canAccessSop,
 };

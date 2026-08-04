@@ -298,3 +298,51 @@ The seed script creates:
 All demo accounts use the same password: **`password123`**
 
 In production, passwords are hashed with bcrypt (12 salt rounds) and should be changed immediately after first login.
+
+---
+
+## Assessments Demo Data
+
+The seed script also creates a `Security Awareness Fundamentals` course (instructor Mike R.) with a learner enrolled (Sarah M., `sarah.m@organization.com`).
+
+### Course
+- **Title:** Security Awareness Fundamentals
+- **Difficulty:** Beginner
+- **Status:** Published
+- **Instructor:** Mike R. (EMP-003, department_head)
+- **Learner:** Sarah M. (EMP-004, employee)
+
+### Quizzes
+
+| Quiz | Type | Questions | Max Score | Attempts | Time Limit | Passing |
+|------|------|-----------|-----------|----------|-----------|---------|
+| SOP Navigation Basics | Practice | 3 (1 MC, 1 True/False, 1 Multiple Select) | 100 | 3 | 10 min | 70% |
+| Security Fundamentals Final | Final | 4 (2 MC, 1 True/False, 1 Multiple Select) | 100 | 1 | 20 min | 75% |
+
+Both quizzes are **Published** and visible in the **Assessments** dashboard (`/assessments`).
+
+### Demo Attempt & Integrity
+
+Sarah M. has one completed attempt on the **SOP Navigation Basics** practice quiz:
+- **Score:** 80 / 100 (80%) — **Passed**
+- **Time taken:** 540 seconds
+- **Violations:** 3 flagged events — `tab_switch`, `copy_attempt`, `screenshot_attempt`
+
+These violations surface in the **Integrity Reports** page (`/assessments/integrity`) and auto-flag the attempt (≥3 violations).
+
+### Demo Override
+
+Mike R. (department_head) granted Sarah M. one extra attempt on the **Security Fundamentals Final** quiz via an attempt override (see Backend > Attempt Overrides).
+
+---
+
+### 11. Assessments & Integrity Monitoring
+1. Login as `employee` (`sarah.m@organization.com`)
+2. Navigate to **Assessments** in the sidebar
+3. Verify the "SOP Navigation Basics" practice quiz is listed
+4. Click **Take** and answer the 3 questions, then submit
+5. On the results page, verify score, percentage, and pass/fail status
+6. As `department_head` (`mike.r@organization.com`), navigate to **Assessments → Integrity**
+7. Verify the Violations table shows Sarah's 3 integrity events
+8. Verify the attempt is marked as **flagged** (≥3 violations)
+9. Verify the active override is visible in the override list

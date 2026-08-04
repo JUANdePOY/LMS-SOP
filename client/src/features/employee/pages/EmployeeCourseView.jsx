@@ -5,7 +5,6 @@ import {
   CheckCircle2, GraduationCap, BarChart3, RefreshCw,
   AlertCircle, Globe,
 } from "lucide-react";
-import { useToast } from "@/shared/components/ui/Toast";
 import { cn } from "@/lib/utils";
 import LessonList from "@/features/course_management/components/LessonList";
 import LessonProgressBar from "@/features/course_management/components/LessonProgressBar";
@@ -25,7 +24,6 @@ const DIFFICULTY_META = {
 export default function EmployeeCourseView() {
   const { id: courseId } = useParams();
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [course, setCourse] = useState(null);
   const [progressData, setProgressData] = useState(null);
   const [enrollmentStatus, setEnrollmentStatus] = useState(null);

@@ -2,13 +2,6 @@ import { getCourseList, getCourseById } from "@/features/course_management/api/c
 import { getEnrollments, enrollStudent } from "@/features/course_management/api/enrollment.api";
 import { getCourseProgress, getEnrollmentStatus } from "@/features/course_management/services/lesson-progress.service";
 
-function authHeaders() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const headers = { "Content-Type": "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
-}
-
 export async function getMyEnrollments(params = {}) {
   const res = await getEnrollments({ ...params, limit: 100 });
   return res;

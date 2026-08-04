@@ -21,7 +21,16 @@ export const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee']
 export function filterMenuByRole(items, userRole) {
   if (!userRole) return items;
   return items
-    .filter((item) => !item.roles || item.roles.includes(userRole))
+    .filter((item) => {
+      if (!item.roles || item.roles.includes(userRole)) {
+        if (item.children) {
+          const visibleChildren = item.children.filter((c) => !c.roles || c.roles.includes(userRole));
+          return visibleChildren.length > 0;
+        }
+        return true;
+      }
+      return false;
+    })
     .map((item) => {
       if (item.children) {
         return {
@@ -31,7 +40,7 @@ export function filterMenuByRole(items, userRole) {
       }
       return item;
     });
-}
+  }
 
 export const menuItems = [
   {

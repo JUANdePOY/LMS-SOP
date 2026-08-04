@@ -69,7 +69,7 @@ export const CERTIFICATE_SECTIONS = [
   {
     key: 'date',
     label: 'Date',
-    xPercent: 16,
+    xPercent: 50,
     yPercent: 85,
     defaultFontSize: 13,
     minFontSize: 10,

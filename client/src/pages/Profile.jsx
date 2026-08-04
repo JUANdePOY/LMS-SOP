@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { User, Calendar, Phone, MapPin, Droplet, Shield, Loader2, Save, Lock, Mail } from 'lucide-react';
-import { getProfile, updateProfile, changePassword } from '@/services/api';
+import { useState, useEffect, useCallback } from 'react';
+import { User, Calendar, Phone, MapPin, Shield, Loader2, Save, Lock, Mail, Camera, Trash2 } from 'lucide-react';
+import { getProfile, updateProfile, changePassword, uploadAvatar, deleteAvatar } from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +32,15 @@ const SectionCard = ({ title, icon: Icon, children, className }) => (
   </div>
 );
 
+function toDateInputValue(value) {
+  if (!value) return '';
+  try {
+    return new Date(value).toISOString().split('T')[0];
+  } catch {
+    return value || '';
+  }
+}
+
 export default function Profile() {
   const { addToast } = useToast();
   const [profile, setProfile] = useState(null);
@@ -40,8 +49,10 @@ export default function Profile() {
   const [changingPassword, setChangingPassword] = useState(false);
   const [passwordData, setPasswordData] = useState({ current_password: '', new_password: '' });
   const [error, setError] = useState(null);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -56,9 +67,9 @@ export default function Profile() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [addToast]);
 
-  useEffect(() => { loadProfile(); }, []);
+  useEffect(() => { loadProfile(); }, [loadProfile]);
 
   const handleInputChange = (key, value) => {
     setProfile(prev => ({ ...prev, [key]: value }));
@@ -115,6 +126,46 @@ export default function Profile() {
     }
   };
 
+  const handleAvatarUpload = async () => {
+    if (!avatarFile) return;
+    setUploadingAvatar(true);
+    const formData = new FormData();
+    formData.append('avatar', avatarFile);
+    try {
+      const res = await uploadAvatar(formData);
+      if (res.data?.status === 'success') {
+        addToast('Avatar updated successfully', 'success');
+        setProfile((prev) => ({ ...prev, avatar_url: res.data.data.avatar_url }));
+        setAvatarFile(null);
+      } else {
+        throw new Error(res.data?.message || 'Failed to upload avatar');
+      }
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Failed to upload avatar';
+      addToast(message, 'error');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleAvatarDelete = async () => {
+    setUploadingAvatar(true);
+    try {
+      const res = await deleteAvatar();
+      if (res.data?.status === 'success') {
+        addToast('Avatar removed', 'success');
+        setProfile((prev) => ({ ...prev, avatar_url: null }));
+      } else {
+        throw new Error(res.data?.message || 'Failed to remove avatar');
+      }
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Failed to remove avatar';
+      addToast(message, 'error');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -147,6 +198,45 @@ export default function Profile() {
           {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
           Save Changes
         </button>
+      </div>
+
+      <div className="flex items-center gap-5">
+        <div className="relative">
+          <div className={cn(
+            "h-20 w-20 rounded-full overflow-hidden border-2 border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-2xl font-bold text-neutral-500 dark:text-neutral-400",
+            profile?.avatar_url && "border-blue-500"
+          )}>
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+            ) : (
+              (profile?.full_name || profile?.email || 'U').charAt(0).toUpperCase()
+            )}
+          </div>
+          <label className="absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
+            <Camera size={14} />
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} />
+          </label>
+        </div>
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{profile?.full_name || 'User'}</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">{profile?.email}</p>
+          {avatarFile && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-neutral-500">{avatarFile.name}</span>
+              <button onClick={handleAvatarUpload} disabled={uploadingAvatar} className="text-xs text-blue-600 hover:text-blue-700 font-medium">
+                {uploadingAvatar ? 'Uploading...' : 'Upload'}
+              </button>
+              <button onClick={() => setAvatarFile(null)} className="text-xs text-neutral-500 hover:text-neutral-700">
+                Cancel
+              </button>
+            </div>
+          )}
+          {profile?.avatar_url && !avatarFile && (
+            <button onClick={handleAvatarDelete} className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700">
+              <Trash2 size={12} /> Remove avatar
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -182,6 +272,18 @@ export default function Profile() {
                       "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
                       "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500",
                       "resize-none"
+                    )}
+                    placeholder={`Enter ${field.label.toLowerCase()}`}
+                  />
+                ) : field.type === 'date' ? (
+                  <input
+                    type={field.type}
+                    value={toDateInputValue(profile[field.key])}
+                    onChange={e => handleInputChange(field.key, e.target.value)}
+                    className={cn(
+                      "w-full rounded-md border border-neutral-300 dark:border-neutral-600",
+                      "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
+                      "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     )}
                     placeholder={`Enter ${field.label.toLowerCase()}`}
                   />
@@ -235,6 +337,18 @@ export default function Profile() {
                       "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
                       "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500",
                       "resize-none"
+                    )}
+                    placeholder={`Enter ${field.label.toLowerCase()}`}
+                  />
+                ) : field.type === 'date' ? (
+                  <input
+                    type={field.type}
+                    value={toDateInputValue(profile[field.key])}
+                    onChange={e => handleInputChange(field.key, e.target.value)}
+                    className={cn(
+                      "w-full rounded-md border border-neutral-300 dark:border-neutral-600",
+                      "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
+                      "focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
                     )}
                     placeholder={`Enter ${field.label.toLowerCase()}`}
                   />

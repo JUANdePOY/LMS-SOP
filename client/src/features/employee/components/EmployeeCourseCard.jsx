@@ -8,10 +8,9 @@ const DIFFICULTY_META = {
   all_levels: { label: "All Levels", color: "bg-sky-50 text-sky-700 border-sky-200" },
 };
 
-export default function EmployeeCourseCard({ course, onClick, showProgress = false, progress = 0, enrollmentStatus = null }) {
+export default function EmployeeCourseCard({ course, onClick, showProgress = false, progress = 0 }) {
   const difficulty = DIFFICULTY_META[course.difficulty] || DIFFICULTY_META.all_levels;
   const isCompleted = progress >= 100;
-  const isEnrolled = enrollmentStatus === "active" || enrollmentStatus === "completed";
 
   return (
     <div

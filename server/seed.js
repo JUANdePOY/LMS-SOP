@@ -117,6 +117,174 @@ async function seed() {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Assessments demo data (Stage 1)
+  // ---------------------------------------------------------------------------
+  const quizModel = require('./models/quizModel');
+  const courseModel = require('./models/courseModel');
+
+  // Demo course — "Security Awareness Fundamentals" (instructor: Mike R., id 3)
+  const existingCourse = (await db.query(
+    'SELECT id FROM courses WHERE title = ? LIMIT 1',
+    ['Security Awareness Fundamentals']
+  ))[0];
+  const demoCourseId = existingCourse
+    ? existingCourse.id
+    : await courseModel.create({
+      title: 'Security Awareness Fundamentals',
+      description: 'Foundational security and SOP navigation training.',
+      difficulty: 'beginner',
+      status: 'published',
+      instructor_id: 3,
+      allow_self_enrollment: true,
+      send_completion_certificates: true,
+    });
+
+  // Enroll Sarah (user 4) as a learner on the demo course
+  await db.query(
+    `INSERT INTO course_enrollments (course_id, user_id, role, status)
+     SELECT ?, 4, 'student', 'active'
+     WHERE NOT EXISTS (SELECT 1 FROM course_enrollments WHERE course_id = ? AND user_id = 4 LIMIT 1)`,
+    [demoCourseId, demoCourseId]
+  );
+
+  // Practice quiz: SOP Navigation Basics
+  const practiceQuiz = (await db.query(
+    'SELECT id FROM quizzes WHERE course_id = ? AND title = ? LIMIT 1',
+    [demoCourseId, 'SOP Navigation Basics']
+  ))[0];
+  const practiceQuizId = practiceQuiz
+    ? practiceQuiz.id
+    : await quizModel.create({
+      course_id: demoCourseId,
+      module_id: null,
+      title: 'SOP Navigation Basics',
+      description: 'Practice quiz covering SOP navigation and structure.',
+      time_limit: 10,
+      max_score: 100,
+      attempts_allowed: 3,
+      passing_score: 70,
+      status: 'published',
+      quiz_type: 'practice',
+      randomize_questions: true,
+      shuffle_options: true,
+      grading_method: 'auto',
+    });
+
+  // Wipe & reseed questions so re-running seed stays idempotent
+  await db.query('DELETE FROM quiz_questions WHERE quiz_id = ?', [practiceQuizId]);
+  const practiceQuestions = [
+    { type: 'multiple_choice', question_text: 'Where do you access the main SOP document viewer?', options: ['My Learning', 'Course Library', 'SOP Library', 'Profile'], correct_answer: 'SOP Library', points: 20, order_index: 1 },
+    { type: 'true_false', question_text: 'Each SOP step has an estimated completion time.', options: ['True', 'False'], correct_answer: 'True', points: 20, order_index: 2 },
+    { type: 'multiple_select', question_text: 'Which statuses can an SOP have? (select two)', options: ['Draft', 'Published', 'Archived', 'Deleted'], correct_answer: ['Published', 'Archived'], points: 20, order_index: 3 },
+    { type: 'multiple_choice', question_text: 'SOPs are organized into sections and steps.', options: ['True', 'False'], correct_answer: 'True', points: 20, order_index: 4 },
+    { type: 'multiple_choice', question_text: 'You can acknowledge an SOP from the SOP Library.', options: ['True', 'False'], correct_answer: 'True', points: 20, order_index: 5 },
+  ];
+  const practiceQuestionIds = [];
+  for (const q of practiceQuestions) {
+    const qid = await quizModel.createQuestion({ ...q, quiz_id: practiceQuizId });
+    practiceQuestionIds.push(qid);
+  }
+
+  // Final quiz: Security Fundamentals Final
+  const finalQuiz = (await db.query(
+    'SELECT id FROM quizzes WHERE course_id = ? AND title = ? LIMIT 1',
+    [demoCourseId, 'Security Fundamentals Final']
+  ))[0];
+  const finalQuizId = finalQuiz
+    ? finalQuiz.id
+    : await quizModel.create({
+      course_id: demoCourseId,
+      module_id: null,
+      title: 'Security Fundamentals Final',
+      description: 'Final assessment for the Security Awareness course.',
+      time_limit: 20,
+      max_score: 100,
+      attempts_allowed: 1,
+      passing_score: 75,
+      status: 'published',
+      quiz_type: 'final',
+      randomize_questions: false,
+      shuffle_options: false,
+      grading_method: 'highest',
+    });
+
+  await db.query('DELETE FROM quiz_questions WHERE quiz_id = ?', [finalQuizId]);
+  const finalQuestions = [
+    { type: 'multiple_choice', question_text: 'What is the first step when handling a security incident?', options: ['Report it', 'Fix it quietly', 'Ignore it', 'Escalate to IT'], correct_answer: ['Report it'], points: 25, order_index: 1 },
+    { type: 'true_false', question_text: 'Screenshots are permitted during a secured quiz attempt.', options: ['True', 'False'], correct_answer: 'False', points: 25, order_index: 2 },
+    { type: 'multiple_choice', question_text: 'A passing score on final quizzes is?', options: ['60%', '70%', '75%', '80%'], correct_answer: ['75%'], points: 25, order_index: 3 },
+    { type: 'multiple_select', question_text: 'Which actions are flagged by the integrity monitor? (select all that apply)', options: ['Tab switch', 'Copy/paste', 'Right-click', 'Fullscreen exit', 'Devtools open'], correct_answer: ['Tab switch', 'Copy/paste', 'Fullscreen exit', 'Devtools open'], points: 25, order_index: 4 },
+  ];
+  for (const q of finalQuestions) await quizModel.createQuestion({ ...q, quiz_id: finalQuizId });
+
+   // Demo attempt for Sarah (user 4) on the practice quiz: 80/100, passed, 3 violations
+   const existingAttempt = (await db.query(
+    'SELECT id FROM quiz_attempts WHERE quiz_id = ? AND user_id = 4 AND attempt_number = 1 LIMIT 1',
+    [practiceQuizId]
+  ))[0];
+  let attemptId = existingAttempt ? existingAttempt.id : null;
+  if (!attemptId && practiceQuestionIds.length) {
+    const answers = {};
+    answers[practiceQuestionIds[0]] = 'SOP Library';        // correct
+    answers[practiceQuestionIds[1]] = 'True';                // correct
+    answers[practiceQuestionIds[2]] = ['Published'];         // incorrect (missing 'Archived')
+    answers[practiceQuestionIds[3]] = 'True';                // correct
+    answers[practiceQuestionIds[4]] = 'True';                // correct
+    attemptId = await quizModel.createAttempt({
+      quiz_id: practiceQuizId,
+      user_id: 4,
+      attempt_number: 1,
+      answers,
+      time_limit_sec: 600,
+    });
+    await quizModel.updateAttempt(attemptId, {
+      status: 'completed',
+      score: 80,
+      max_score: 100,
+      percentage: 80.0,
+      passed: true,
+      submitted_at: new Date(),
+      time_taken_sec: 540,
+      violation_count: 3,
+    });
+    await quizModel.createResult({
+      attempt_id: attemptId,
+      quiz_id: practiceQuizId,
+      user_id: 4,
+      score: 80,
+      max_score: 100,
+      percentage: 80.0,
+      passed: true,
+      feedback: [
+        { questionId: practiceQuestionIds[0], isCorrect: true, points: 20, selected: 'SOP Library' },
+        { questionId: practiceQuestionIds[1], isCorrect: true, points: 20, selected: 'True' },
+        { questionId: practiceQuestionIds[2], isCorrect: false, points: 20, selected: ['Published'] },
+        { questionId: practiceQuestionIds[3], isCorrect: true, points: 20, selected: 'True' },
+        { questionId: practiceQuestionIds[4], isCorrect: true, points: 20, selected: 'True' },
+      ],
+      is_manual_review: false,
+    });
+    await quizModel.logViolation({ attempt_id: attemptId, user_id: 4, quiz_id: practiceQuizId, type: 'tab_switch', metadata: { reason: 'window focus lost' } });
+    await quizModel.logViolation({ attempt_id: attemptId, user_id: 4, quiz_id: practiceQuizId, type: 'copy_attempt', metadata: { reason: 'copy key event intercepted' } });
+    await quizModel.logViolation({ attempt_id: attemptId, user_id: 4, quiz_id: practiceQuizId, type: 'screenshot_attempt', metadata: { reason: 'Print Screen detected' } });
+  }
+
+  // Override: Mike (id 3) grants Sarah (id 4) one extra attempt on the final quiz
+  await db.query(
+    `INSERT IGNORE INTO quiz_attempt_overrides (quiz_id, user_id, granted_by, attempts_granted, reason)
+     SELECT ?, 4, 3, 1, ? WHERE NOT EXISTS (
+       SELECT 1 FROM quiz_attempt_overrides WHERE quiz_id = ? AND user_id = 4 AND granted_by = 3 LIMIT 1
+     )`,
+    [finalQuizId, 'Extra attempt granted for demo (Sarah had a timeout on a prior attempt).', finalQuizId]
+  );
+
+  console.log('Assessments demo data created successfully!');
+  console.log('  Demo course: Security Awareness Fundamentals');
+  console.log(`    - Practice quiz: SOP Navigation Basics (id ${practiceQuizId})`);
+  console.log(`    - Final quiz: Security Fundamentals Final (id ${finalQuizId})`);
+  console.log('  Demo learner: sarah.m@organization.com — 1 scored attempt (80/100), 3 violations, 1 active override');
+
   console.log('Seed data created successfully!');
   console.log('Demo accounts:');
   users.forEach(u => {

@@ -12,6 +12,8 @@ function SOPCreateForm({
   cascade,
   onCancel,
   onCreate,
+  newRestrictionType,
+  setNewRestrictionType,
 }) {
   if (!showCreate) return null;
 
@@ -50,6 +52,25 @@ function SOPCreateForm({
               className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 placeholder:text-[var(--text-muted)]"
               rows={3}
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Access Restriction</label>
+            <select
+              value={newRestrictionType}
+              onChange={(e) => setNewRestrictionType(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+            >
+              <option value="department">Department - Same department users</option>
+              <option value="public">Public - All authenticated users</option>
+              <option value="assigned">Assigned - Explicitly assigned users only</option>
+              <option value="private">Private - Owner and admins only</option>
+            </select>
+            <p className="text-[10px] text-[var(--text-muted)] mt-1">
+              {newRestrictionType === 'public' && 'All logged-in users can view this SOP.'}
+              {newRestrictionType === 'department' && 'Only users in the same department can view this SOP.'}
+              {newRestrictionType === 'assigned' && 'Only users explicitly assigned to this SOP can view it.'}
+              {newRestrictionType === 'private' && 'Only the SOP owner and admins can view this SOP.'}
+            </p>
           </div>
 
           <div className="space-y-3">

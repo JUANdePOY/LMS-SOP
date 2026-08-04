@@ -1,12 +1,15 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
 import {
-  Search, BookOpen, PlayCircle, RefreshCw, Clock,
+  BookOpen, PlayCircle, RefreshCw, Clock,
+  Megaphone, MessageSquare, ArrowRight,
 } from "lucide-react";
 import EmployeeCourseCard from "../components/EmployeeCourseCard";
 import { useEmployeeDashboard } from "../hooks/useEmployeeDashboard";
+import { useAnnouncements } from "@/features/announcements/hooks/useAnnouncements";
+import { useConversations } from "@/features/messaging/hooks/useMessages";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -27,9 +30,10 @@ export default function EmployeeDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [search, setSearch] = useState("");
 
-  const { enrollments, publishedCourses, loading, error, refetch } = useEmployeeDashboard();
+  const { enrollments, loading, error, refetch } = useEmployeeDashboard();
+  const { items: announcements } = useAnnouncements({ status: "active", limit: 5 });
+  const { conversations } = useConversations();
 
   const myCourses = enrollments.filter((e) => e.course).map((e) => ({ enrollment: e, course: e.course }));
 
@@ -56,16 +60,6 @@ export default function EmployeeDashboard() {
 
   const nextToContinue = inProgressCourses[0];
 
-  const filteredLibrary = publishedCourses.filter((c) => {
-    const term = (search || "").toLowerCase();
-    if (!term) return true;
-    return (
-      (c.title || "").toLowerCase().includes(term) ||
-      (c.description || "").toLowerCase().includes(term) ||
-      (c.category || "").toLowerCase().includes(term)
-    );
-  });
-
   useEffect(() => {
     if (error) {
       toast.error(error);
@@ -84,6 +78,20 @@ export default function EmployeeDashboard() {
       </div>
     );
   }
+
+  const SectionHeader = ({ icon: Icon, title, onViewAll }) => (
+    <div className="flex items-center justify-between">
+      <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+        {Icon && <Icon size={16} className="text-neutral-400 dark:text-neutral-500" />}
+        {title}
+      </h2>
+      {onViewAll && (
+        <button onClick={onViewAll} className="text-xs font-medium text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-200 transition-colors">
+          View all <ArrowRight size={12} className="inline ml-0.5" />
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="w-full max-w-none mx-auto max-w-6xl space-y-6">
@@ -159,6 +167,73 @@ export default function EmployeeDashboard() {
         </div>
       )}
 
+      {announcements.length > 0 && (
+        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-5 sm:p-6 shadow-sm space-y-4">
+          <SectionHeader icon={Megaphone} title="Announcements" onViewAll={() => navigate("/announcements")} />
+          <div className="space-y-2">
+            {announcements.slice(0, 3).map((item) => (
+              <div key={item.id} onClick={() => navigate("/announcements")} className="group cursor-pointer rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-300">
+                    <Megaphone size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{item.title}</h3>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                        item.priority === 'critical' ? 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-100 border-red-200 dark:border-red-500/30' :
+                        item.priority === 'high' ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-100 border-amber-200 dark:border-amber-500/30' :
+                        item.priority === 'medium' ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-100 border-blue-200 dark:border-blue-500/30' :
+                        'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-100 border-slate-200 dark:border-slate-500/30'
+                      }`}>
+                        {item.priority}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2">{item.body}</p>
+                    <p className="text-[10px] text-neutral-400 mt-1">
+                      {item.author} &middot; {new Date(item.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {conversations.length > 0 && (
+        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-5 sm:p-6 shadow-sm space-y-4">
+          <SectionHeader icon={MessageSquare} title="Recent Messages" onViewAll={() => navigate("/messaging")} />
+          <div className="space-y-2">
+            {conversations.slice(0, 3).map((conv) => (
+              <div key={conv.id} onClick={() => navigate("/messaging")} className="group cursor-pointer rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm hover:shadow-md transition-all">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
+                    <MessageSquare size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{conv.subject || "Conversation"}</h3>
+                      {conv.unread_count > 0 && (
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-100 border border-blue-200 dark:border-blue-500/30">
+                          {conv.unread_count} unread
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2">
+                      {conv.last_message_body || "No messages yet"}
+                    </p>
+                    <p className="text-[10px] text-neutral-400 mt-1">
+                      {conv.last_message_at ? new Date(conv.last_message_at).toLocaleString() : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {myCourses.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -188,53 +263,6 @@ export default function EmployeeDashboard() {
           </div>
         </div>
       )}
-
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-            <BookOpen size={16} className="text-neutral-400 dark:text-neutral-500" />
-            Explore Courses
-          </h2>
-          <button
-            onClick={handleLibraryClick}
-            className="text-xs font-medium text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-200 transition-colors"
-          >
-            View all →
-          </button>
-        </div>
-
-        <div className="relative mb-4">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search for courses..."
-            className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-          />
-        </div>
-
-        {filteredLibrary.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-neutral-100 dark:bg-neutral-800 mb-4">
-              <BookOpen size={24} className="text-neutral-400" />
-            </div>
-            <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">No courses found</p>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-              {search ? "Try adjusting your search" : "Check back later for new courses"}
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredLibrary.slice(0, 8).map((course) => (
-              <EmployeeCourseCard
-                key={course.id}
-                course={course}
-                onClick={() => handleCourseClick(course.id)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

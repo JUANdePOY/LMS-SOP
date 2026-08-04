@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import api from '@/services/api';
 import { CERTIFICATE_SECTIONS } from '@/features/certificate-management/constants/certificateSections';
 import useSectionResize from '@/features/certificate-management/hooks/useSectionResize';
+import useSectionPositions from '@/features/certificate-management/hooks/useSectionPositions';
 
 // const PRESENTED_TO_LABEL = 'This certificate is proudly presented to';
 
@@ -52,6 +53,9 @@ export default function CertificatePreviewCanvas({
   const outerRef = useRef(null);
   const containerRef = useRef(null);
   const { resizingKey, startResize } = useSectionResize(containerRef, (key, patch) => {
+    onSectionPatch?.(key, patch);
+  });
+  const { draggingKey, startDrag } = useSectionPositions((key, patch) => {
     onSectionPatch?.(key, patch);
   });
 

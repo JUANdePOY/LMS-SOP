@@ -1,0 +1,118 @@
+const messageModel = require('../models/messageModel');
+const { authenticateToken } = require('../middleware/auth');
+const { logAudit } = require('../utils/auditLogger');
+
+function sendError(res, err, fallback = 'Request failed') {
+  const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
+  const message = err.statusCode ? err.message : fallback;
+  const body = { success: false, message };
+  if (process.env.NODE_ENV !== 'production' && code === 500 && err && typeof err === 'object') {
+    if (err.message && err.message !== message) body.details = err.message;
+    if (err.sqlMessage) body.sqlMessage = err.sqlMessage;
+    if (err.code) body.code = err.code;
+  }
+  if (code === 500) console.error('[Messaging Controller Error]', err);
+  return res.status(code).json(body);
+}
+
+function listConversations(req, res) {
+  const userId = req.user?.id;
+  messageModel.listConversations(userId)
+    .then((conversations) => {
+      res.json({ success: true, message: 'OK', data: conversations });
+    })
+    .catch((err) => sendError(res, err, 'Failed to list conversations'));
+}
+
+function getConversation(req, res) {
+  const { id } = req.params;
+  const userId = req.user?.id;
+  messageModel.getConversation(id)
+    .then((conversation) => {
+      if (!conversation) return res.status(404).json({ success: false, message: 'Conversation not found', code: 'NOT_FOUND' });
+      return messageModel.listMessages(id).then((messages) => {
+        res.json({ success: true, message: 'OK', data: { ...conversation, messages } });
+      });
+    })
+    .catch((err) => sendError(res, err, 'Failed to load conversation'));
+}
+
+function createConversation(req, res) {
+  const userId = req.user?.id;
+  const { subject, body, participantIds } = req.body;
+
+  if (!body || !body.trim()) {
+    return res.status(400).json({ success: false, message: 'Message body is required', code: 'VALIDATION_ERROR' });
+  }
+
+  messageModel.createConversation({
+    subject: subject || null,
+    createdBy: userId,
+    participantIds: participantIds || [],
+  })
+    .then((conversation) => {
+      return messageModel.addMessage({
+        conversationId: conversation.id,
+        senderId: userId,
+        body: body.trim(),
+      }).then((message) => {
+        logAudit && logAudit('message.conversation.create', userId, { conversationId: conversation.id });
+        res.status(201).json({ success: true, message: 'Conversation created', data: { ...conversation, messages: [message] } });
+      });
+    })
+    .catch((err) => sendError(res, err, 'Failed to create conversation'));
+}
+
+function sendMessage(req, res) {
+  const { conversationId } = req.params;
+  const userId = req.user?.id;
+  const { body } = req.body;
+
+  if (!body || !body.trim()) {
+    return res.status(400).json({ success: false, message: 'Message body is required', code: 'VALIDATION_ERROR' });
+  }
+
+  messageModel.getConversation(conversationId)
+    .then((conversation) => {
+      if (!conversation) return res.status(404).json({ success: false, message: 'Conversation not found', code: 'NOT_FOUND' });
+      return messageModel.addMessage({ conversationId, senderId: userId, body: body.trim() });
+    })
+    .then((message) => {
+      logAudit && logAudit('message.send', userId, { conversationId, messageId: message.id });
+      res.status(201).json({ success: true, message: 'Message sent', data: message });
+    })
+    .catch((err) => sendError(res, err, 'Failed to send message'));
+}
+
+function listMessages(req, res) {
+  const { conversationId } = req.params;
+  const userId = req.user?.id;
+  messageModel.getConversation(conversationId)
+    .then((conversation) => {
+      if (!conversation) return res.status(404).json({ success: false, message: 'Conversation not found', code: 'NOT_FOUND' });
+      return messageModel.listMessages(conversationId);
+    })
+    .then((messages) => {
+      res.json({ success: true, message: 'OK', data: messages });
+    })
+    .catch((err) => sendError(res, err, 'Failed to load messages'));
+}
+
+function markAsRead(req, res) {
+  const { messageId } = req.params;
+  const userId = req.user?.id;
+  messageModel.markAsRead(messageId, userId)
+    .then((message) => {
+      res.json({ success: true, message: 'Message marked as read', data: message });
+    })
+    .catch((err) => sendError(res, err, 'Failed to mark message as read'));
+}
+
+module.exports = {
+  listConversations,
+  getConversation,
+  createConversation,
+  sendMessage,
+  listMessages,
+  markAsRead,
+};

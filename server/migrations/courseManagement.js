@@ -28,6 +28,10 @@ const COURSE_MANAGEMENT_MIGRATIONS = [
     INDEX idx_courses_deleted (is_deleted)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `ALTER TABLE courses ADD COLUMN IF NOT EXISTS category_id INT DEFAULT NULL AFTER category`,
+  `ALTER TABLE courses ADD CONSTRAINT fk_courses_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_courses_category_id ON courses(category_id)`,
+
   `CREATE TABLE IF NOT EXISTS course_modules (
     id INT AUTO_INCREMENT PRIMARY KEY,
     course_id INT NOT NULL,
@@ -52,7 +56,7 @@ const COURSE_MANAGEMENT_MIGRATIONS = [
     id INT AUTO_INCREMENT PRIMARY KEY,
     module_id INT NOT NULL,
     title VARCHAR(255) NOT NULL,
-    type ENUM('video','reading','document','quiz','assignment','link','presentation','downloadable','live_session','interactive','sop') NOT NULL DEFAULT 'reading',
+    type ENUM('video','reading','document','quiz','assignment','link','presentation','downloadable','live_session','interactive','sop','certificate') NOT NULL DEFAULT 'reading',
     description TEXT DEFAULT NULL,
     order_index INT NOT NULL DEFAULT 0,
     url VARCHAR(500) DEFAULT NULL,
@@ -262,6 +266,7 @@ const COURSE_MANAGEMENT_MIGRATIONS = [
 
   `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS requires_quiz_pass BOOLEAN NOT NULL DEFAULT FALSE`,
   `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS passing_score INT DEFAULT NULL`,
+  `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS quiz_id INT DEFAULT NULL`,
 
   `CREATE TABLE IF NOT EXISTS lesson_progress (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -293,8 +298,9 @@ async function runCourseMigrations() {
     try {
       await dbPool.query(sql);
     } catch (err) {
-      const ignoreCodes = ['ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 1060, 1050, 1061];
-      if (ignoreCodes.includes(err.code) || ignoreCodes.includes(err.errno)) {
+      const isDuplicateKey = /errno: 121|Duplicate key on write or update/.test(err.message);
+      const ignoreCodes = ['ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 1060, 1050, 1061, 121];
+      if (ignoreCodes.includes(err.code) || ignoreCodes.includes(err.errno) || isDuplicateKey) {
         console.log('Course migration skipped:', sql.split('\n')[0]);
       } else {
         console.error('Course migration error:', err.message);

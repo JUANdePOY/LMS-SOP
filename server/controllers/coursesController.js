@@ -59,7 +59,7 @@ function createCourse(req, res) {
     return res.status(401).json({ success: false, message: 'Authentication required' });
   }
 
-  const { title, description, category, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status } = req.body;
+  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status } = req.body;
 
   if (!title || !title.trim()) {
     return res.status(400).json({ success: false, message: 'Course title is required', code: 'VALIDATION_ERROR' });
@@ -69,6 +69,7 @@ function createCourse(req, res) {
     title: title.trim(),
     description,
     category,
+    category_id: category_id ? parseInt(category_id, 10) : null,
     difficulty,
     instructor_id: userId,
     thumbnail_url,
@@ -98,14 +99,14 @@ function updateCourse(req, res) {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
 
       const allowed = [
-        'title', 'description', 'category', 'difficulty', 'thumbnail_url',
+        'title', 'description', 'category', 'category_id', 'difficulty', 'thumbnail_url',
         'prerequisites', 'learning_outcomes', 'max_enrollments', 'start_date',
         'end_date', 'grading_scale', 'allow_self_enrollment', 'send_completion_certificates', 'status', 'instructor_id'
       ];
       const updates = {};
       for (const key of allowed) {
         if (Object.prototype.hasOwnProperty.call(req.body, key)) {
-          updates[key] = req.body[key];
+          updates[key] = key === 'category_id' ? (req.body[key] ? parseInt(req.body[key], 10) : null) : req.body[key];
         }
       }
 
@@ -330,6 +331,90 @@ function publishCourse(req, res) {
     .catch((err) => sendError(res, err, 'Failed to publish course'));
 }
 
+function exportCourseCSV(req, res) {
+  const courseId = parseInt(req.params.id, 10);
+  courseModel.findById(courseId)
+    .then((course) => {
+      if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+      return courseModel.getCourseEnrollments(courseId)
+        .then((enrollments) => {
+          const rows = [
+            ['Employee ID', 'Name', 'Email', 'Status', 'Progress (%)', 'Enrolled At', 'Completed At'],
+            ...(enrollments || []).map((e) => [
+              e.user_id || '',
+              e.user_name || '',
+              e.user_email || '',
+              e.status || '',
+              e.progress_percentage ?? 0,
+              e.enrolled_at || e.created_at || '',
+              e.completed_at || '',
+            ]),
+          ];
+          const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+          res.setHeader('Content-Type', 'text/csv');
+          res.setHeader('Content-Disposition', `attachment; filename="course-${courseId}-enrollments.csv"`);
+          res.send(csv);
+        });
+    })
+    .catch((err) => sendError(res, err, 'Failed to export CSV'));
+}
+
+function exportCourseExcel(req, res) {
+  const courseId = parseInt(req.params.id, 10);
+  courseModel.findById(courseId)
+    .then((course) => {
+      if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+      return courseModel.getCourseEnrollments(courseId)
+        .then((enrollments) => {
+          const rows = [
+            ['Employee ID', 'Name', 'Email', 'Status', 'Progress (%)', 'Enrolled At', 'Completed At'],
+            ...(enrollments || []).map((e) => [
+              e.user_id || '',
+              e.user_name || '',
+              e.user_email || '',
+              e.status || '',
+              e.progress_percentage ?? 0,
+              e.enrolled_at || e.created_at || '',
+              e.completed_at || '',
+            ]),
+          ];
+          const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+          res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+          res.setHeader('Content-Disposition', `attachment; filename="course-${courseId}-enrollments.xlsx"`);
+          res.send(csv);
+        });
+    })
+    .catch((err) => sendError(res, err, 'Failed to export Excel'));
+}
+
+function exportCoursePDF(req, res) {
+  const courseId = parseInt(req.params.id, 10);
+  courseModel.findById(courseId)
+    .then((course) => {
+      if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+      return courseModel.getCourseEnrollments(courseId)
+        .then((enrollments) => {
+          const rows = [
+            ['Employee ID', 'Name', 'Email', 'Status', 'Progress (%)', 'Enrolled At', 'Completed At'],
+            ...(enrollments || []).map((e) => [
+              e.user_id || '',
+              e.user_name || '',
+              e.user_email || '',
+              e.status || '',
+              e.progress_percentage ?? 0,
+              e.enrolled_at || e.created_at || '',
+              e.completed_at || '',
+            ]),
+          ];
+          const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', `attachment; filename="course-${courseId}-enrollments.pdf"`);
+          res.send(csv);
+        });
+    })
+    .catch((err) => sendError(res, err, 'Failed to export PDF'));
+}
+
 module.exports = {
   listCourses,
   getCourse,
@@ -346,4 +431,7 @@ module.exports = {
   deleteContent,
   archiveCourse,
   publishCourse,
+  exportCourseCSV,
+  exportCourseExcel,
+  exportCoursePDF,
 };
