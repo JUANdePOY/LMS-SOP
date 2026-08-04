@@ -125,7 +125,7 @@ async function runCertificateMigrations() {
     try {
       await dbPool.query(sql);
     } catch (err) {
-      const ignoreCodes = ['ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 1060, 1050, 1061];
+      const ignoreCodes = ['ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 1060, 1050, 1061, 121];
       if (ignoreCodes.includes(err.code) || ignoreCodes.includes(err.errno)) {
         console.log('Certificate migration skipped:', sql.split('\n')[0]);
       } else {

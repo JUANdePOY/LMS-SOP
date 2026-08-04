@@ -119,7 +119,7 @@ async function runAssessmentsMigrations(db) {
     try {
       await db.query(sql);
     } catch (err) {
-      const ignoreCodes = ['ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 'ER_CANT_MODIFY_SQL', 1060, 1050, 1061, 1091];
+      const ignoreCodes = ['ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 'ER_CANT_MODIFY_SQL', 1060, 1050, 1061, 1091, 121];
       if (ignoreCodes.includes(err.code) || ignoreCodes.includes(err.errno)) {
         console.log('Assessments migration skipped (already exists):', sql.split('\n')[0].trim());
       } else {

@@ -422,7 +422,7 @@ async function runMigrations() {
     } catch (err) {
       const ignoreCodes = [
         'ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME',
-        1060, 1050, 1061
+        1060, 1050, 1061, 121
       ];
       if (
         ignoreCodes.includes(err.code) ||
