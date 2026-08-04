@@ -16,6 +16,16 @@ const STEPS = [
   { key: 'sections', label: 'Content Sections' },
 ];
 
+// True A4 dimensions at 96dpi (CSS px). Used as the default canvas size so
+// the Live Preview and the final PDF are both actual A4 sheets unless the
+// user deliberately overrides width/height.
+const A4_LANDSCAPE = { width_px: 1123, height_px: 794 };
+const A4_PORTRAIT = { width_px: 794, height_px: 1123 };
+
+const isKnownA4Preset = (w, h) =>
+  (w === A4_LANDSCAPE.width_px && h === A4_LANDSCAPE.height_px) ||
+  (w === A4_PORTRAIT.width_px && h === A4_PORTRAIT.height_px);
+
 const parseSections = (rawSections) => {
   if (typeof rawSections === 'string') {
     try {
@@ -36,8 +46,8 @@ export default function CertificateTemplateForm({
 }) {
   const [sections, setSections] = useState(() => normalizeSections(parseSections(initialSections?.sections || initialSections || {})));
   const [orientation, setOrientation] = useState(initialSections?.orientation || 'landscape');
-  const [widthPx, setWidthPx] = useState(initialSections?.width_px || 1200);
-  const [heightPx, setHeightPx] = useState(initialSections?.height_px || 800);
+  const [widthPx, setWidthPx] = useState(initialSections?.width_px || A4_LANDSCAPE.width_px);
+  const [heightPx, setHeightPx] = useState(initialSections?.height_px || A4_LANDSCAPE.height_px);
   const [framePreview, setFramePreview] = useState(null);
   const [frameFile, setFrameFile] = useState(null);
   const [templateName, setTemplateName] = useState(initialSections?.name || '');
@@ -72,8 +82,8 @@ export default function CertificateTemplateForm({
     if (initialSections) {
       setSections(normalizeSections(parseSections(initialSections.sections || initialSections)));
       setOrientation(initialSections.orientation || 'landscape');
-      setWidthPx(initialSections.width_px || 1200);
-      setHeightPx(initialSections.height_px || 800);
+      setWidthPx(initialSections.width_px || A4_LANDSCAPE.width_px);
+      setHeightPx(initialSections.height_px || A4_LANDSCAPE.height_px);
       setTemplateName(initialSections.name || '');
       setFramePreview(null);
 
@@ -91,6 +101,20 @@ export default function CertificateTemplateForm({
       }
     };
   }, [initialSections]);
+
+  // Switching orientation only auto-swaps width/height when the current
+  // dimensions are still one of the known A4 presets — i.e. the user
+  // hasn't typed in a custom size. This keeps "New Template" defaults
+  // correctly matching A4 in either orientation, without silently
+  // clobbering a size someone deliberately customized.
+  const handleOrientationChange = (nextOrientation) => {
+    setOrientation(nextOrientation);
+    if (isKnownA4Preset(widthPx, heightPx)) {
+      const preset = nextOrientation === 'portrait' ? A4_PORTRAIT : A4_LANDSCAPE;
+      setWidthPx(preset.width_px);
+      setHeightPx(preset.height_px);
+    }
+  };
 
   // Patch one or more fields on a section at once (font controls, nudge
   // controls, and the canvas width-resize handle all use this).
@@ -191,7 +215,7 @@ export default function CertificateTemplateForm({
                   <select
                     id="orientation"
                     value={orientation}
-                    onChange={(e) => setOrientation(e.target.value)}
+                    onChange={(e) => handleOrientationChange(e.target.value)}
                     className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
                   >
                     <option value="landscape">Landscape</option>
@@ -219,6 +243,9 @@ export default function CertificateTemplateForm({
                   />
                 </div>
               </div>
+              <p className="text-xs text-gray-400">
+                Defaults to A4 ({A4_LANDSCAPE.width_px}×{A4_LANDSCAPE.height_px} landscape / {A4_PORTRAIT.width_px}×{A4_PORTRAIT.height_px} portrait, 96dpi). The Live Preview and downloaded PDF are both sized exactly to these dimensions.
+              </p>
             </div>
           )}
 
@@ -306,6 +333,8 @@ export default function CertificateTemplateForm({
             sections={sections}
             framePreview={framePreview}
             orientation={orientation}
+            widthPx={widthPx}
+            heightPx={heightPx}
             onSectionPatch={handleSectionPatch}
           />
         </div>

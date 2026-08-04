@@ -1,9 +1,11 @@
+const db = require('../config/database');
 const sopApprovalModel = require('../models/sopApprovalModel');
 const sopModel = require('../models/sopModel');
 const sopVersionModel = require('../models/sopVersionModel');
-const departmentModel = require('../models/departmentModel');
 const { logAudit } = require('../utils/auditLogger');
 const sopAuditLogService = require('./sopAuditLogService');
+
+const APPROVER_ROLES = ['admin', 'super_admin'];
 
 async function listApprovals(sopId) {
   return sopApprovalModel.getApprovals(sopId);
@@ -66,21 +68,15 @@ async function createSopApprovals(sopId, actorId) {
 
   const existing = await sopApprovalModel.getApprovals(sopId);
 
-  const approverUserIds = [];
-
-  if (sop.department_id) {
-    const department = await departmentModel.findById(sop.department_id);
-    if (department && department.head_user_id) {
-      approverUserIds.push(department.head_user_id);
-    }
-  }
-
-  if (approverUserIds.length === 0 && sop.owner_user_id) {
-    approverUserIds.push(sop.owner_user_id);
-  }
+  // Find all admin/super_admin users who can approve
+  const [adminUsers] = await db.query(
+    'SELECT id FROM users WHERE role IN (?, ?) AND is_active = TRUE',
+    APPROVER_ROLES
+  );
+  const approverUserIds = adminUsers.map((u) => u.id);
 
   if (approverUserIds.length === 0) {
-    return { created: 0, message: 'No approver found' };
+    return { created: 0, message: 'No admin/super_admin approver found' };
   }
 
   const version = await sopVersionModel.getCurrentVersion(sopId);
@@ -159,8 +155,14 @@ async function approveApproval(approvalId, actorId, comments) {
     throw error;
   }
 
-  if (parseInt(existing.approver_user_id, 10) !== parseInt(actorId, 10)) {
-    const error = new Error('Only the assigned approver can approve');
+  // Any admin/super_admin can approve, not just the assigned user
+  const [userRows] = await db.query(
+    'SELECT role FROM users WHERE id = ? AND is_active = TRUE',
+    [actorId]
+  );
+  const user = userRows[0];
+  if (!user || !APPROVER_ROLES.includes(user.role)) {
+    const error = new Error('Only admin or super_admin can approve');
     error.code = 'UNAUTHORIZED';
     throw error;
   }
@@ -206,8 +208,14 @@ async function rejectApproval(approvalId, actorId, comments) {
     throw error;
   }
 
-  if (parseInt(existing.approver_user_id, 10) !== parseInt(actorId, 10)) {
-    const error = new Error('Only the assigned approver can reject');
+  // Any admin/super_admin can reject, not just the assigned user
+  const [userRows] = await db.query(
+    'SELECT role FROM users WHERE id = ? AND is_active = TRUE',
+    [actorId]
+  );
+  const user = userRows[0];
+  if (!user || !APPROVER_ROLES.includes(user.role)) {
+    const error = new Error('Only admin or super_admin can reject');
     error.code = 'UNAUTHORIZED';
     throw error;
   }
@@ -247,7 +255,6 @@ async function rejectApproval(approvalId, actorId, comments) {
 
 async function checkAndTransitionSop(sopId) {
   const approvals = await sopApprovalModel.getApprovals(sopId);
-  const pending = approvals.filter((a) => a.status === 'pending');
   const rejected = approvals.filter((a) => a.status === 'rejected');
 
   if (rejected.length > 0) {
@@ -259,14 +266,26 @@ async function checkAndTransitionSop(sopId) {
     return;
   }
 
-  if (pending.length === 0 && approvals.length > 0) {
-    const allApproved = approvals.every((a) => a.status === 'approved');
-    if (allApproved) {
-      const sop = await sopModel.findById(sopId);
-      if (sop && sop.status === 'For Review') {
-        const { transitionSop } = require('./sopWorkflowService');
-        await transitionSop(sopId, 'Approved', null, { reason: 'All approvals resolved' });
-      }
+  // At least one admin/super_admin approval is sufficient
+  // Look up roles for all approvers
+  const approverUserIds = approvals.map((a) => a.approver_user_id);
+  if (approverUserIds.length === 0) return;
+
+  const [adminUsers] = await db.query(
+    'SELECT id FROM users WHERE role IN (?, ?) AND is_active = TRUE',
+    APPROVER_ROLES
+  );
+  const adminUserIds = adminUsers.map((u) => u.id);
+
+  const hasAdminApproval = approvals.some(
+    (a) => a.status === 'approved' && adminUserIds.includes(a.approver_user_id)
+  );
+
+  if (hasAdminApproval) {
+    const sop = await sopModel.findById(sopId);
+    if (sop && sop.status === 'For Review') {
+      const { transitionSop } = require('./sopWorkflowService');
+      await transitionSop(sopId, 'Approved', null, { reason: 'Admin approval received' });
     }
   }
 }

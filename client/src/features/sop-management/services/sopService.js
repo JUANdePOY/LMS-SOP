@@ -27,8 +27,6 @@ export const getAuditLogs = (sopId) => api.get(`/sops/${sopId}/audit`);
 
 export const getWorkflow = (sopId) => api.get(`/sops/${sopId}/workflow`);
 export const startWorkflow = (sopId) => api.post(`/sops/${sopId}/workflow/start`);
-export const advanceWorkflow = (sopId, data) =>
-  api.post(`/sops/${sopId}/workflow/advance`, data);
 
 export const submitSop = (sopId) => api.post(`/sops/${sopId}/submit`);
 export const approveSop = (sopId) => api.post(`/sops/${sopId}/approve`);

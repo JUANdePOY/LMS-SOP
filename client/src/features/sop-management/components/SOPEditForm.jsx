@@ -1,4 +1,3 @@
-import { SOP_STATUSES_LIST } from '@/features/sop-management/constants/sopConstants';
 import CheckboxList from './CheckboxList';
 
 function SOPEditForm({
@@ -7,8 +6,6 @@ function SOPEditForm({
   setEditTitle,
   editDescription,
   setEditDescription,
-  editStatus,
-  setEditStatus,
   cascade,
   onCancel,
   onSave,
@@ -34,18 +31,6 @@ function SOPEditForm({
           className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 placeholder:text-[var(--text-muted)]"
           rows={2}
         />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Status</label>
-        <select
-          value={editStatus}
-          onChange={(e) => setEditStatus(e.target.value)}
-          className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
-        >
-          {SOP_STATUSES_LIST.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
       </div>
 
       <h4 className="text-sm font-semibold text-[var(--text-primary)] mt-1">Assignments</h4>

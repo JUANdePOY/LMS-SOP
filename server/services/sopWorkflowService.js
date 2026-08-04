@@ -23,28 +23,15 @@ async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
 
   if (nextStatus === 'For Review') {
     await approvalWorkflowService.startWorkflow(sopId, actorId);
+    const { createSopApprovals } = require('./sopApprovalService');
+    await createSopApprovals(sopId, actorId);
   }
 
   if (nextStatus === 'Approved' || nextStatus === 'Published') {
-    const workflowInstance = await approvalWorkflowService.getWorkflowInstance(sopId);
-    if (!workflowInstance || workflowInstance.status !== 'Approved') {
-      let pendingSteps = [];
-      if (workflowInstance) {
-        const steps = await approvalWorkflowService.getWorkflowSteps(workflowInstance.workflow_id);
-        const actions = await approvalWorkflowService.getWorkflowActions(workflowInstance.id);
-        pendingSteps = steps
-          .filter((step) => {
-            const stepActions = actions.filter((a) => a.workflow_step_id === step.id);
-            const latestAction = stepActions.length > 0 ? stepActions[stepActions.length - 1] : null;
-            return !latestAction || latestAction.action !== 'Approved';
-          })
-          .map((step) => step.step_name);
-      }
-      const pendingMsg = pendingSteps.length > 0 ? ` Pending steps not approved: ${pendingSteps.join(', ')}.` : '';
-      const error = new Error(`Cannot transition: SOP workflow is not fully approved.${pendingMsg}`);
-      error.code = 'APPROVAL_PENDING';
-      throw error;
-    }
+    // Approval is handled by sopApprovalService.checkAndTransitionSop()
+    // when admin/super_admin users approve via the sop_approvals table.
+    // The workflow instance status is no longer a gate for transitioning
+    // to Approved — any admin/super_admin can approve directly.
   }
 
   if (nextStatus === 'Draft') {

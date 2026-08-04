@@ -8,7 +8,7 @@ import AuditTimeline from '@/features/sop-management/components/AuditTimeline';
 import ShareLinkDrawer from '@/features/sop-management/components/ShareLinkDrawer';
 import { useVersions } from '@/features/sop-management/hooks/useVersions';
 import { createVersion } from '@/features/sop-management/services/versionService';
-import { advanceWorkflow, getWorkflow } from '@/features/sop-management/services/sopService';
+import { getWorkflow, getAuditLogs, approveSop, rejectSop } from '@/features/sop-management/services/sopService';
 
 function SidebarCard({ title, children, className }) {
   return (
@@ -21,7 +21,7 @@ function SidebarCard({ title, children, className }) {
   );
 }
 
-export default function SOPSidebar({ sopId, workflow, setWorkflow, auditLogs, versions, versionsLoading, versionsError, workflowLoading = false, auditLogsLoading = false, onVersionRestore, onAuditRefresh, onSopRefresh, refetchVersions }) {
+export default function SOPSidebar({ sopId, sop, workflow, setWorkflow, auditLogs, versions, versionsLoading, versionsError, workflowLoading = false, auditLogsLoading = false, onVersionRestore, onAuditRefresh, onSopRefresh, refetchVersions }) {
   const [showVersionTimeline, setShowVersionTimeline] = useState(false);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [showNewVersionForm, setShowNewVersionForm] = useState(false);
@@ -35,29 +35,29 @@ export default function SOPSidebar({ sopId, workflow, setWorkflow, auditLogs, ve
     <>
       <SidebarCard title="Approvals">
         <ApprovalPanel
-          workflow={workflow}
+          sop={sop}
           loading={workflowLoading}
-          onApprove={async ({ instanceId, stepId, comments }) => {
+          onApprove={async ({ sopId, comments }) => {
             try {
-              await advanceWorkflow(sopId, { instanceId, stepId, action: 'Approved', comments });
+              await approveSop(sopId);
               const { data } = await getWorkflow(sopId);
               setWorkflow(data?.data || null);
               if (onAuditRefresh) onAuditRefresh();
               if (onSopRefresh) onSopRefresh();
-              toast.success('Approval recorded successfully');
+              toast.success('SOP approved successfully');
             } catch (err) {
               const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Approve failed';
               toast.error(message);
             }
           }}
-          onReject={async ({ instanceId, stepId, comments }) => {
+          onReject={async ({ sopId, comments }) => {
             try {
-              await advanceWorkflow(sopId, { instanceId, stepId, action: 'Rejected', comments });
+              await rejectSop(sopId);
               const { data } = await getWorkflow(sopId);
               setWorkflow(data?.data || null);
               if (onAuditRefresh) onAuditRefresh();
               if (onSopRefresh) onSopRefresh();
-              toast.success('Rejection recorded successfully');
+              toast.success('SOP rejected successfully');
             } catch (err) {
               const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Reject failed';
               toast.error(message);

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Button } from '@/shared/components/ui/button';
+import api from '@/services/api';
 import {
   CERTIFICATE_SECTIONS,
   FONT_FAMILY_OPTIONS,
@@ -32,6 +33,47 @@ export default function CertificateSectionsAccordion({
   const [uploadSignerName, setUploadSignerName] = useState('');
   const [uploadPositionTitle, setUploadPositionTitle] = useState('');
   const [uploadFile, setUploadFile] = useState(null);
+
+  const [signatureImageUrls, setSignatureImageUrls] = useState({});
+  const signatureImageUrlsRef = useRef({});
+
+  useEffect(() => {
+    const items = sections.signatures_seal?.items || [];
+    const activeIds = items.map((item) => item.signature_id).filter(Boolean);
+
+    const removedIds = Object.keys(signatureImageUrlsRef.current)
+      .map(Number)
+      .filter((id) => !activeIds.includes(id));
+
+    if (removedIds.length) {
+      const next = { ...signatureImageUrlsRef.current };
+      removedIds.forEach((id) => {
+        URL.revokeObjectURL(next[id]);
+        delete next[id];
+      });
+      signatureImageUrlsRef.current = next;
+      setSignatureImageUrls(next);
+    }
+
+    activeIds.forEach((id) => {
+      if (signatureImageUrlsRef.current[id]) return;
+      api.get(`/certificate-signatures/${id}/image`, { responseType: 'blob' })
+        .then((response) => {
+          const url = URL.createObjectURL(response.data);
+          signatureImageUrlsRef.current = { ...signatureImageUrlsRef.current, [id]: url };
+          setSignatureImageUrls({ ...signatureImageUrlsRef.current });
+        })
+        .catch((error) => {
+          console.error('Failed to load signature image in accordion', error);
+        });
+    });
+  }, [JSON.stringify(sections.signatures_seal?.items)]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(signatureImageUrlsRef.current).forEach(URL.revokeObjectURL);
+    };
+  }, []);
 
   const filledSectionCount = CERTIFICATE_SECTIONS.filter((s) => sections[s.key]?.text || (s.key === 'signatures_seal' && sections[s.key]?.items?.length)).length;
 
@@ -218,6 +260,20 @@ export default function CertificateSectionsAccordion({
                           <p className="text-sm font-medium">{item.label || 'Signature'}</p>
                           <span className="text-xs text-gray-500">{item.type === 'seal' ? 'Seal' : 'Signature'}</span>
                         </div>
+                        {item.signature_id && (
+                          <div className="mt-3">
+                            {signatureImageUrls[item.signature_id] ? (
+                              <img
+                                src={signatureImageUrls[item.signature_id]}
+                                alt={item.label || item.signer_name || 'Signature'}
+                                className="mx-auto h-12 w-auto object-contain"
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <div className="h-12 mx-auto w-full max-w-[120px] rounded bg-gray-100" />
+                            )}
+                          </div>
+                        )}
                         <div className="mt-3">
                           <Label className="text-xs">Signer Name</Label>
                           <Input

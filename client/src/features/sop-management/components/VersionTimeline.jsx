@@ -36,6 +36,11 @@ function VersionTimeline({ versions, onRestore, sopId, loading = false, restorin
                 }`}>
                   {version.status}
                 </span>
+                {version.is_current && (
+                  <span className="ml-2 px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                    Current
+                  </span>
+                )}
               </div>
               <span className="text-xs text-neutral-400 dark:text-neutral-500">
                 {new Date(version.created_at).toLocaleDateString()}

@@ -221,7 +221,8 @@ const attachmentController = {
           file_extension: path.extname(file.originalname).toLowerCase(),
           file_data: file.buffer,
         },
-        req.user.id
+        req.user.id,
+        req
       );
       res.status(201).json({ success: true, data: result, message: 'Attachment uploaded successfully' });
     } catch (error) {
@@ -350,6 +351,12 @@ const workflowController = {
   async approve(req, res) {
     try {
       const body = req.body || {};
+      // Only admin or super_admin can approve
+      if (!['admin', 'super_admin'].includes(req.user?.role)) {
+        const error = new Error('Only admin or super_admin can approve SOPs');
+        error.code = 'UNAUTHORIZED';
+        throw error;
+      }
       const result = await sopWorkflowService.transitionSop(parseInt(req.params.sopId, 10), 'Approved', req.user.id, { comment: body.comment || null });
       res.json({ success: true, data: result, message: 'SOP approved' });
     } catch (error) {
@@ -360,6 +367,12 @@ const workflowController = {
   async reject(req, res) {
     try {
       const body = req.body || {};
+      // Only admin or super_admin can reject
+      if (!['admin', 'super_admin'].includes(req.user?.role)) {
+        const error = new Error('Only admin or super_admin can reject SOPs');
+        error.code = 'UNAUTHORIZED';
+        throw error;
+      }
       const result = await sopWorkflowService.transitionSop(parseInt(req.params.sopId, 10), 'Draft', req.user.id, { comment: body.comment || null });
       res.json({ success: true, data: result, message: 'SOP rejected and returned to draft' });
     } catch (error) {

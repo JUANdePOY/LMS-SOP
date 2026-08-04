@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const sopModuleAttachmentModel = require('../models/sopModuleAttachmentModel');
 const sopModuleModel = require('../models/sopModuleModel');
 const { logAudit } = require('../utils/auditLogger');
@@ -46,7 +47,76 @@ function validateLinkUrl(linkUrl) {
   return trimmedUrl;
 }
 
-async function uploadAttachment(moduleId, data, actorId) {
+// ---------------------------------------------------------------------------
+// Signed view tokens
+//
+// Inline <img> tags can't send an Authorization header, and this route needs
+// to stay reachable indefinitely (a pasted screenshot from months ago still
+// needs to render). So instead of gating it with the normal JWT middleware,
+// each attachment gets an HMAC signature scoped ONLY to "may view attachment
+// <id>" — it grants no other access, can't be forged without the server
+// secret, and doesn't expire. Requires ATTACHMENT_VIEW_SECRET (falls back to
+// JWT_SECRET if you already have one) set in the environment.
+// ---------------------------------------------------------------------------
+
+function getViewSecret() {
+  const secret = process.env.ATTACHMENT_VIEW_SECRET || process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('ATTACHMENT_VIEW_SECRET (or JWT_SECRET) must be set to serve inline attachment images');
+  }
+  return secret;
+}
+
+function signAttachmentToken(attachmentId) {
+  return crypto.createHmac('sha256', getViewSecret()).update(String(attachmentId)).digest('hex');
+}
+
+function verifyAttachmentToken(attachmentId, token) {
+  if (!token) return false;
+  const expected = signAttachmentToken(attachmentId);
+  const a = Buffer.from(expected);
+  const b = Buffer.from(String(token));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+/** Relative URL an <img>/<a> can use directly — no auth header required. */
+function buildViewUrl(attachmentId, req) {
+  const path = `/api/sops/attachments/${attachmentId}/file?token=${signAttachmentToken(attachmentId)}`;
+  if (!req) return path;
+  const protocol = req.get('x-forwarded-proto')?.split(',')[0].trim() || req.protocol;
+  const host = req.get('host');
+  return `${protocol}://${host}${path}`;
+}
+
+/**
+ * Used by the unauthenticated file-serving route (see sopAttachmentPublicFile.js).
+ * Throws NOT_FOUND for missing/deleted attachments or a bad token, so the
+ * route can respond 404 either way without leaking which case it was.
+ */
+async function getAttachmentFileForView(attachmentId, token) {
+  if (!verifyAttachmentToken(attachmentId, token)) {
+    const error = new Error('Attachment not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+  const attachment = await sopModuleAttachmentModel.getById(attachmentId);
+  if (!attachment || attachment.is_deleted) {
+    const error = new Error('Attachment not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+  // NOTE: if listByModule/getById in sopModuleAttachmentModel excludes the
+  // file_data BLOB column for list-view performance, add a dedicated
+  // getFileDataById(attachmentId) there and call it here instead.
+  if (!attachment.file_data) {
+    const error = new Error('Attachment has no stored file data (is it a link attachment?)');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+  return attachment;
+}
+
+async function uploadAttachment(moduleId, data, actorId, req) {
   const { file_name, original_name, mime_type, file_size, file_extension, file_data } = data;
 
   const module = await sopModuleModel.getModuleById(moduleId);
@@ -83,7 +153,9 @@ async function uploadAttachment(moduleId, data, actorId) {
     new_values: { attachment_id: id, file_name, module_id: moduleId },
   });
 
-  return { id };
+  // view_url is what the frontend rich-text editor uses as the <img src>
+  // for pasted/dropped/uploaded images — see imageUploadHelpers.js.
+  return { id, view_url: buildViewUrl(id, req) };
 }
 
 async function createLink(moduleId, data, actorId) {
@@ -231,4 +303,7 @@ module.exports = {
   permanentDeleteAttachment,
   listTrashedAttachments,
   incrementDownload,
+  // new — used by the public file-view route
+  buildViewUrl,
+  getAttachmentFileForView,
 };

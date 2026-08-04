@@ -83,7 +83,13 @@ export default function CertificateTemplateViewModal({ open, onClose, templateId
             <div>
               <div className="mb-2 text-sm text-gray-500">Live Preview</div>
               <div className="rounded border border-gray-200 overflow-hidden">
-                <CertificatePreviewCanvas sections={template.sections || {}} framePreview={framePreview} orientation={template.orientation} />
+                <CertificatePreviewCanvas
+                  sections={template.sections || {}}
+                  framePreview={framePreview}
+                  orientation={template.orientation}
+                  widthPx={template.width_px}
+                  heightPx={template.height_px}
+                />
               </div>
             </div>
           </div>

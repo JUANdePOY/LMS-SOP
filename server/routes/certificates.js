@@ -35,6 +35,9 @@ templateRouter.route('/:id')
 templateRouter.route('/:id/frame')
   .get(certificateTemplateController.getFrame);
 
+templateRouter.route('/:id/download')
+  .get(certificateTemplateController.download);
+
 /* ─────────────────── Signature Router ─────────────────── */
 // Mounted at /api/certificate-signatures
 const signatureRouter = express.Router();

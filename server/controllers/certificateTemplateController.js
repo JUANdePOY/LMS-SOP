@@ -102,6 +102,17 @@ const certificateTemplateController = {
       handleError(res, error);
     }
   },
+
+  async download(req, res) {
+    try {
+      const result = await certificateTemplateService.renderTemplatePdf(req.params.id);
+      res.set('Content-Type', 'application/pdf');
+      res.set('Content-Disposition', `attachment; filename="certificate-${req.params.id}.pdf"`);
+      res.send(result.pdf_bytes);
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
 };
 
 module.exports = { certificateTemplateController, handleError };

@@ -1,16 +1,66 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Check, Loader2, AlertCircle } from 'lucide-react';
 import RichTextEditor from './RichTextEditor';
 
-function ModuleEditor({ module, onSave, onCancel, saving = false }) {
+const AUTOSAVE_DELAY_MS = 2500;
+
+/**
+ * @param {object} props
+ * @param {object} [props.module]
+ * @param {(data: {title: string, content: string}) => void} props.onSave - manual "Save" button
+ * @param {() => void} props.onCancel
+ * @param {boolean} [props.saving]
+ * @param {(data: {title: string, content: string}) => Promise<void>} [props.onAutoSave] -
+ *   fired ~2.5s after the user stops typing, while an *existing* module is open.
+ *   Not called for a not-yet-created module (there's nothing to PATCH yet) —
+ *   same rule your attachments already follow ("save the module first").
+ * @param {(file: File) => Promise<string>} [props.onImageUpload]
+ */
+function ModuleEditor({ module, onSave, onCancel, saving = false, onAutoSave, onImageUpload }) {
   const [title, setTitle] = useState(module?.title || '');
   const [content, setContent] = useState(module?.content || '');
   const [error, setError] = useState('');
+  const [autoSaveStatus, setAutoSaveStatus] = useState('idle'); // idle | pending | saving | saved | error
+
+  const autoSaveTimer = useRef(null);
+  const lastSavedRef = useRef({ title: module?.title || '', content: module?.content || '' });
+  const isExistingModule = !!module?.id;
 
   useEffect(() => {
     setTitle(module?.title || '');
     setContent(module?.content || '');
     setError('');
+    setAutoSaveStatus('idle');
+    lastSavedRef.current = { title: module?.title || '', content: module?.content || '' };
   }, [module]);
+
+  // --- Auto-save: debounce ~2.5s after the last edit, skip if nothing changed
+  // or there's no module id yet to save against. ---
+  useEffect(() => {
+    if (!isExistingModule || !onAutoSave) return;
+    if (title === lastSavedRef.current.title && content === lastSavedRef.current.content) return;
+    if (!title.trim()) return; // don't autosave an invalid (empty-title) state
+
+    setAutoSaveStatus('pending');
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+
+    autoSaveTimer.current = setTimeout(async () => {
+      setAutoSaveStatus('saving');
+      try {
+        await onAutoSave({ title, content });
+        lastSavedRef.current = { title, content };
+        setAutoSaveStatus('saved');
+      } catch (err) {
+        console.error('Auto-save failed:', err);
+        setAutoSaveStatus('error');
+      }
+    }, AUTOSAVE_DELAY_MS);
+
+    return () => clearTimeout(autoSaveTimer.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, content, isExistingModule]);
+
+  useEffect(() => () => clearTimeout(autoSaveTimer.current), []);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -18,15 +68,25 @@ function ModuleEditor({ module, onSave, onCancel, saving = false }) {
       setError('Title is required');
       return;
     }
+    clearTimeout(autoSaveTimer.current);
+    lastSavedRef.current = { title, content };
+    setAutoSaveStatus('idle');
     onSave({ title, content });
   };
+
+  const handleContentChange = useCallback((html) => setContent(html), []);
 
   return (
     <form onSubmit={handleSubmit} className="module-editor space-y-4">
       <div>
-        <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-          Title <span className="text-red-500">*</span>
-        </label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">
+            Title <span className="text-red-500">*</span>
+          </label>
+          {isExistingModule && onAutoSave && (
+            <AutoSaveIndicator status={autoSaveStatus} />
+          )}
+        </div>
         <input
           type="text"
           value={title}
@@ -41,9 +101,10 @@ function ModuleEditor({ module, onSave, onCancel, saving = false }) {
         <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">Content</label>
         <RichTextEditor
           value={content}
-          onChange={setContent}
+          onChange={handleContentChange}
           disabled={saving}
           placeholder="Module content"
+          onImageUpload={isExistingModule ? onImageUpload : undefined}
         />
       </div>
       <div className="flex gap-2">
@@ -55,6 +116,24 @@ function ModuleEditor({ module, onSave, onCancel, saving = false }) {
         </button>
       </div>
     </form>
+  );
+}
+
+function AutoSaveIndicator({ status }) {
+  if (status === 'idle') return null;
+  const map = {
+    pending: { icon: null, label: 'Unsaved changes', className: 'text-neutral-400 dark:text-neutral-500' },
+    saving: { icon: <Loader2 className="w-3 h-3 animate-spin" />, label: 'Saving…', className: 'text-neutral-500 dark:text-neutral-400' },
+    saved: { icon: <Check className="w-3 h-3" />, label: 'Saved', className: 'text-green-600 dark:text-green-400' },
+    error: { icon: <AlertCircle className="w-3 h-3" />, label: 'Auto-save failed', className: 'text-red-600 dark:text-red-400' },
+  };
+  const cfg = map[status];
+  if (!cfg) return null;
+  return (
+    <span className={`flex items-center gap-1 text-xs ${cfg.className}`}>
+      {cfg.icon}
+      {cfg.label}
+    </span>
   );
 }
 

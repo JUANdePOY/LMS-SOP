@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
 const certificateTemplateModel = require('../models/certificateTemplateModel');
+const certificateSignatureModel = require('../models/certificateSignatureModel');
 const { normalizeSections } = require('../shared/certificateSections');
 const { logAudit } = require('../utils/auditLogger');
 const { validateTemplatePayload, validateSectionsPayload } = require('../validators/certificateTemplateValidator');
@@ -10,6 +11,7 @@ const {
   certificateTemplateDir,
   absolutePathFromRelative,
 } = require('../config/uploads');
+const { renderCertificate } = require('./renderCertificate');
 
 async function ensureUploadRoot() {
   await fs.mkdir(certificateRoot(), { recursive: true });
@@ -171,6 +173,13 @@ async function updateTemplate(identifier, body, file, actorId) {
     throw error;
   }
 
+  // Parse + normalize once here, and reuse the result below — do NOT call
+  // normalizeSections(body.sections) again afterward, since body.sections
+  // is still the raw JSON *string* at that point, not an object. Doing so
+  // silently produces an all-defaults sections object (every field falls
+  // back to '' / default), which is what was causing saved templates to
+  // "revert to default" and PDFs to render with only the frame image.
+  let normalizedSections;
   if (body.sections !== undefined) {
     const sectionsValidation = validateSectionsPayload(body.sections);
     if (!sectionsValidation.valid) {
@@ -179,6 +188,7 @@ async function updateTemplate(identifier, body, file, actorId) {
       error.details = sectionsValidation.errors;
       throw error;
     }
+    normalizedSections = sectionsValidation.value;
   }
 
   let frameFilename = existing.frame_filename;
@@ -190,14 +200,11 @@ async function updateTemplate(identifier, body, file, actorId) {
     const { filename, storage_path } = await saveFrameFile(file, existing.public_id, ext);
     frameFilename = filename;
     frameStoragePath = storage_path;
-    // store binary data and metadata in DB alongside filesystem copy
-    // updates object below will include these fields
-    
   }
 
   const updates = { ...fieldValidation.value };
-  if (body.sections !== undefined) {
-    updates.sections = normalizeSections(body.sections);
+  if (normalizedSections !== undefined) {
+    updates.sections = normalizedSections;
   }
   if (frameFilename !== existing.frame_filename) {
     updates.frame_filename = frameFilename;
@@ -246,6 +253,32 @@ async function getTemplateStats() {
   return certificateTemplateModel.getStats();
 }
 
+async function renderTemplatePdf(identifier) {
+  const template = await getTemplate(identifier);
+  if (!template) {
+    const error = new Error('Certificate template not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+
+  const sections = typeof template.sections === 'string'
+    ? JSON.parse(template.sections)
+    : template.sections;
+
+  const signatureIds = sections.signatures_seal?.items?.map(item => item.signature_id).filter(Boolean) || [];
+  const allSignatures = await certificateSignatureModel.findAll({});
+  const matchedSignatures = allSignatures.filter(s => signatureIds.includes(s.id));
+
+  const renderResult = await renderCertificate({
+    template,
+    resolvedSections: sections,
+    signatures: matchedSignatures,
+    isPreview: true, // ← added: this is an unresolved template, not an issued certificate
+  });
+
+  return renderResult;
+}
+
 module.exports = {
   ensureUploadRoot,
   saveFrameFile,
@@ -257,4 +290,5 @@ module.exports = {
   updateTemplate,
   deleteTemplate,
   getTemplateStats,
+  renderTemplatePdf,
 };

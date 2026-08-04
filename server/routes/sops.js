@@ -98,9 +98,6 @@ router.route('/:sopId/workflow')
 router.route('/:sopId/workflow/start')
   .post(approvalWorkflowController.start);
 
-router.route('/:sopId/workflow/advance')
-  .post(approvalWorkflowController.advance);
-
 router.route('/:sopId/transition')
   .post(workflowController.transition);
 

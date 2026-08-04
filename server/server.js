@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('./config/database');
 
+
 require('dotenv').config();
 
 console.log('LMS-SOP Server starting...');
@@ -57,6 +58,7 @@ const discussionsRoutes = require('./routes/discussions');
 const courseBuilderRoutes = require('./routes/course-builder');
 
 const { templateRouter, signatureRouter, issuanceRouter } = require('./routes/certificates');
+const sopAttachmentPublicFile = require('./services/sopAttachmentPublicFile');
 
 const loginDebug = process.env.LOGIN_DEBUG === 'true';
 if (loginDebug) {
@@ -93,6 +95,7 @@ app.use('/api/roles', rolesRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/businesses', businessesRoutes);
 app.use('/api/hierarchy', hierarchyRoutes);
+app.use('/api/sops/attachments', sopAttachmentPublicFile);
 app.use('/api/sops', sopsRoutes);
 
 app.use('/api/courses', coursesRoutes);

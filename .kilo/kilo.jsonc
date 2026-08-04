@@ -14,14 +14,5 @@
     ".kilo/rules/security-rules.md",
     ".kilo/rules/git-rules.md",
     ".kilo/rules/ai-workflow.md"
-  ],
-
-  "compaction": {
-    "auto": true, // Enable or disable automatic compaction
-    "threshold_percent": 80, // Optional trigger at 80% of the model window
-    "prune": true, // Enable pruning of old tool outputs beyond the recency window
-    "tail_turns": 2, // Recent user turns to keep verbatim during compaction
-    "preserve_recent_tokens": 8000, // Maximum token budget for the recent tail
-    "reserved": 20000 // Token buffer kept free; smaller = later trigger, larger = earlier trigger
-  }
+  ]
 }

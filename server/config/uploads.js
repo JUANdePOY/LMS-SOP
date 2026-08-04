@@ -16,6 +16,7 @@ const ALLOWED_MIME = new Set([
   'application/pdf',
   'image/jpeg',
   'image/png',
+  'image/webp',
   // Word documents
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
   'application/msword', // .doc
@@ -24,7 +25,7 @@ const ALLOWED_MIME = new Set([
   'application/vnd.ms-excel', // .xls
 ]);
 
-const ALLOWED_EXT = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.docx', '.doc', '.xlsx', '.xls']);
+const ALLOWED_EXT = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.webp', '.docx', '.doc', '.xlsx', '.xls']);
 
 
 function isAllowedMime(mime) {
