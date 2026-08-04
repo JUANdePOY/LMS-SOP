@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FileText } from "lucide-react";
+import { FileText, Download, ExternalLink } from "lucide-react";
 import { useLessonProgress } from "../hooks/useLessonProgress";
 import { useMarkLessonComplete } from "../hooks/useMarkLessonComplete";
 import LessonProgressBar from "../components/LessonProgressBar";
 import LessonList from "../components/LessonList";
 import VideoPlayer from "../components/utils/VideoPlayer";
 import { getQuizzes } from "@/features/assessments/api/quiz.api";
+import { getIssuancesByUser } from "@/features/certificate-management/services/certificateService";
 
 export default function LessonPage() {
   const { id: courseId, lessonId } = useParams();
@@ -17,6 +18,8 @@ export default function LessonPage() {
   const [messageType, setMessageType] = useState("error");
   const [moduleQuiz, setModuleQuiz] = useState(null);
   const [quizLoading, setQuizLoading] = useState(false);
+  const [certificate, setCertificate] = useState(null);
+  const [certificateLoading, setCertificateLoading] = useState(false);
 
   const modules = data?.modules || [];
   const currentLesson = data?.lessons?.find((l) => String(l.id) === String(lessonId));
@@ -37,7 +40,20 @@ export default function LessonPage() {
         .catch(() => setModuleQuiz(null))
         .finally(() => setQuizLoading(false));
     }
-  }, [currentLesson?.type, currentLesson?.module_id]);
+  }, [currentLesson?.type, currentLesson?.module_id, courseId, moduleQuiz, quizLoading]);
+
+  useEffect(() => {
+    if (currentLesson?.type === "certificate" && currentLesson?.certificateTemplateId) {
+      setCertificateLoading(true);
+      getIssuancesByUser(courseId, { template_id: currentLesson.certificateTemplateId })
+        .then((res) => {
+          const rows = res.data?.data?.rows || res.data?.data || [];
+          setCertificate(rows[0] || null);
+        })
+        .catch(() => setCertificate(null))
+        .finally(() => setCertificateLoading(false));
+    }
+  }, [currentLesson?.type, currentLesson?.certificateTemplateId, courseId]);
 
   const handleMarkComplete = async () => {
     setMessage(null);
@@ -96,7 +112,7 @@ export default function LessonPage() {
     );
   }
 
-  const isVideoOrText = ['video', 'reading', 'document', 'presentation', 'link', 'downloadable', 'sop'].includes(currentLesson.type);
+  const isVideoOrText = ['video', 'reading', 'document', 'presentation', 'link', 'downloadable', 'sop', 'certificate'].includes(currentLesson.type);
 
   return (
     <div className="space-y-4">
@@ -180,10 +196,44 @@ export default function LessonPage() {
               {currentLesson.description && (
                 <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">{currentLesson.description}</p>
               )}
-              {currentLesson.url && (
-                <a href={currentLesson.url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">
-                  Open external resource
+              {currentLesson.url ? (
+                <a href={currentLesson.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 hover:underline">
+                  <ExternalLink size={14} />
+                  Open document
                 </a>
+              ) : (
+                <p className="text-sm text-neutral-500">No document attached.</p>
+              )}
+            </div>
+          ) : currentLesson.type === 'certificate' ? (
+            <div className="p-6">
+              <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
+              {currentLesson.description && (
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">{currentLesson.description}</p>
+              )}
+              {certificateLoading ? (
+                <p className="text-sm text-neutral-500">Loading certificate…</p>
+              ) : certificate ? (
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    Certificate #{certificate.certificate_number} &middot; Issued {certificate.issued_at ? new Date(certificate.issued_at).toLocaleDateString() : ''}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {certificate.pdf_storage_path && (
+                      <a
+                        href={certificate.pdf_storage_path}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                      >
+                        <Download size={14} />
+                        Download PDF
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-amber-600">Certificate will be issued upon course completion.</p>
               )}
             </div>
           ) : currentLesson.type === 'link' ? (

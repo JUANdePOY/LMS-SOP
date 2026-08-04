@@ -36,7 +36,7 @@ export default function CourseLibraryPage() {
 
   const { courses, loading, error, pagination, refetch } = usePublishedCourses(queryParams);
 
-  useEffect(() => {
+   useEffect(() => {
     if (courses.length > 0) {
       const uniqueCats = Array.from(new Set(courses.map((c) => c.category).filter(Boolean)));
       setCategories((prev) => Array.from(new Set([...prev, ...uniqueCats])).sort());
@@ -121,7 +121,7 @@ export default function CourseLibraryPage() {
             onChange={(e) => setDifficulty(e.target.value)}
             className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-sm"
           >
-            <option value="">All Levels</option>
+            <option value="">All Difficulty Levels</option>
             {DIFFICULTIES.map((d) => (
               <option key={d} value={d}>{DIFFICULTY_LABELS[d]}</option>
             ))}
@@ -132,7 +132,7 @@ export default function CourseLibraryPage() {
               onChange={(e) => setCategory(e.target.value)}
               className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-sm"
             >
-              <option value="">All Categories</option>
+              <option value="">All Course Categories</option>
               {categories.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}

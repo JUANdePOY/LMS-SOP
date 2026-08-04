@@ -95,6 +95,23 @@ const MIGRATIONS = [
     FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
     INDEX idx_override_quiz_user (quiz_id, user_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS quiz_hierarchy (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    quiz_id INT NOT NULL,
+    parent_id INT DEFAULT NULL,
+    name VARCHAR(255) NOT NULL,
+    description TEXT DEFAULT NULL,
+    level INT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
+    FOREIGN KEY (parent_id) REFERENCES quiz_hierarchy(id) ON DELETE CASCADE,
+    INDEX idx_hierarchy_quiz (quiz_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS hierarchy_id INT DEFAULT NULL AFTER quiz_id`,
+  `ALTER TABLE quiz_questions ADD CONSTRAINT IF NOT EXISTS fk_question_hierarchy FOREIGN KEY (hierarchy_id) REFERENCES quiz_hierarchy(id) ON DELETE SET NULL`,
 ];
 
 async function runAssessmentsMigrations(db) {

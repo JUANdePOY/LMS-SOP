@@ -78,9 +78,9 @@ export default function EmployeeCourseCatalog() {
         <div className="absolute inset-0 bg-grid-white/10 dark:bg-grid-neutral-800/20 [mask-image:radial-gradient(white,transparent_85%)]" />
 
         <div className="relative px-5 sm:px-6 py-6">
-          <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Course Library</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Assigned Courses</h1>
           <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
-            Browse and enroll in published courses
+            View your assigned courses and track your progress
           </p>
         </div>
       </div>
@@ -93,7 +93,7 @@ export default function EmployeeCourseCatalog() {
               <input
                 value={search}
                 onChange={handleSearchChange}
-                placeholder="Search for courses..."
+                placeholder="Search your courses..."
                 className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
               />
             </div>

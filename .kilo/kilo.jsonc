@@ -1,27 +1,14 @@
 {
-  "project": {
-    "name": "LMS SOP Management System",
-    "language": "javascript",
-    "framework": "react"
-  },
-
-  "rules": [
-    ".kilo/rules/project-overview.md",
-    ".kilo/rules/architecture.md",
-    ".kilo/rules/frontend-rules.md",
-    ".kilo/rules/backend-rules.md",
-    ".kilo/rules/database-rules.md",
-    ".kilo/rules/security-rules.md",
-    ".kilo/rules/git-rules.md",
-    ".kilo/rules/ai-workflow.md"
+  "instructions": [
+    ".kilo/rules/*.md"
   ],
 
   "compaction": {
-    "auto": true, // Enable or disable automatic compaction
-    "threshold_percent": 80, // Optional trigger at 80% of the model window
-    "prune": true, // Enable pruning of old tool outputs beyond the recency window
-    "tail_turns": 2, // Recent user turns to keep verbatim during compaction
-    "preserve_recent_tokens": 8000, // Maximum token budget for the recent tail
-    "reserved": 20000 // Token buffer kept free; smaller = later trigger, larger = earlier trigger
+    "auto": true,
+    "threshold_percent": 80,
+    "prune": true,
+    "tail_turns": 2,
+    "preserve_recent_tokens": 8000,
+    "reserved": 20000
   }
 }

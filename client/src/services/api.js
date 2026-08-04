@@ -4,7 +4,7 @@ const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE,
-  timeout: 10000,
+  timeout: 20000,
 });
 
 api.interceptors.request.use((config) => {
@@ -32,11 +32,22 @@ api.interceptors.response.use(
   }
 );
 
+export const request = (url, options = {}) => {
+  const { method = 'GET', body } = options;
+  const config = { method, ...(body && { data: body, headers: { 'Content-Type': 'application/json' } }) };
+  return api(url, config);
+};
+
 export const login = (credentials) => api.post('/auth/login', credentials, { skipAuthRedirect: true });
 export const logout = () => api.post('/auth/logout');
-export const getProfile = () => api.get('/auth/profile');
+export const getProfile = () => api.get('/auth/profile', { skipAuthRedirect: true });
 export const updateProfile = (data) => api.put('/auth/profile', data, { skipAuthRedirect: true });
 export const changePassword = (data) => api.put('/auth/profile/password', data, { skipAuthRedirect: true });
+export const uploadAvatar = (formData) => api.post('/auth/profile/avatar', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+  skipAuthRedirect: true,
+});
+export const deleteAvatar = () => api.delete('/auth/profile/avatar', { skipAuthRedirect: true });
 
 export const getDashboard = (params = {}) => api.get('/dashboard', { params });
 

@@ -1,5 +1,5 @@
 import api from '../../../lib/api';
-import { validateId, sanitizeSearchQuery, validatePagination } from '../../organization-management/utils/validation';
+import { validateId, sanitizeSearchQuery, validatePagination } from '../utils/validation';
 
 export const getDepartments = (params = {}) => {
   const { sanitized } = validatePagination(params);

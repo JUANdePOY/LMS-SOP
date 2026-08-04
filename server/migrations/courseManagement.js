@@ -28,6 +28,10 @@ const COURSE_MANAGEMENT_MIGRATIONS = [
     INDEX idx_courses_deleted (is_deleted)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  `ALTER TABLE courses ADD COLUMN IF NOT EXISTS category_id INT DEFAULT NULL AFTER category`,
+  `ALTER TABLE courses ADD CONSTRAINT IF NOT EXISTS fk_courses_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_courses_category_id ON courses(category_id)`,
+
   `CREATE TABLE IF NOT EXISTS course_modules (
     id INT AUTO_INCREMENT PRIMARY KEY,
     course_id INT NOT NULL,

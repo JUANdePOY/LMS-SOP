@@ -57,6 +57,9 @@ const discussionsRoutes = require('./routes/discussions');
 const courseBuilderRoutes = require('./routes/course-builder');
 const quizzesRoutes = require('./routes/quizzes');
 const quizAttemptsRoutes = require('./routes/attempts');
+const announcementsRoutes = require('./routes/announcements');
+const eventsRoutes = require('./routes/events');
+const messagesRoutes = require('./routes/messages');
 
 const { templateRouter, signatureRouter, issuanceRouter } = require('./routes/certificates');
 
@@ -106,6 +109,9 @@ app.use('/api/quiz', quizzesRoutes);
 app.use('/api/quiz-attempts', quizAttemptsRoutes);
 app.use('/api/grades', gradesRoutes);
 app.use('/api/discussions', discussionsRoutes);
+app.use('/api/announcements', announcementsRoutes);
+app.use('/api/events', eventsRoutes);
+app.use('/api/messages', messagesRoutes);
 
 // Certificate management routes
 app.use('/api/certificate-templates', templateRouter);

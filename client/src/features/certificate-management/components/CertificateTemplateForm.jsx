@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
@@ -137,7 +137,9 @@ export default function CertificateTemplateForm({
     formData.append('width_px', String(widthPx));
     formData.append('height_px', String(heightPx));
     formData.append('sections', JSON.stringify(sections));
-    formData.append('status', 'active');
+    if (!initialSections?.id) {
+      formData.append('status', 'active');
+    }
 
     if (frameFile) formData.append('frame', frameFile);
 
@@ -158,6 +160,19 @@ export default function CertificateTemplateForm({
     setShowSignatureUpload(false);
     return data;
   };
+
+  const handleCenterAll = useCallback(() => {
+    setSections((prev) => {
+      const next = { ...prev };
+      for (const section of CERTIFICATE_SECTIONS) {
+        next[section.key] = {
+          ...(next[section.key] || {}),
+          text_align: "center",
+        };
+      }
+      return next;
+    });
+  }, []);
 
   return (
     <>
@@ -272,6 +287,7 @@ export default function CertificateTemplateForm({
               onSectionChange={handleSectionChange}
               onSectionPatch={handleSectionPatch}
               onUploadSignature={handleSignatureUpload}
+              onCenterAll={handleCenterAll}
             />
           )}
 
@@ -285,11 +301,11 @@ export default function CertificateTemplateForm({
               </Button>
             )}
             {currentStep < STEPS.length - 1 ? (
-              <Button type="button" onClick={handleSubmit}>
+              <Button type="submit">
                 Next
               </Button>
             ) : (
-              <Button type="button" onClick={handleSubmit} disabled={saving}>
+              <Button type="submit" disabled={saving}>
                 {saving ? 'Saving...' : submitLabel}
               </Button>
             )}

@@ -23,6 +23,7 @@ import {
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
 import { useAuth } from "@/contexts/AuthContext";
+import { filterMenuByRole, LMS_ROLES } from "@/config/menuItems";
 
 const EMPLOYEE_MENU_ITEMS = [
   {
@@ -61,6 +62,7 @@ const MENU_ITEMS = [
     name: "Dashboard",
     path: "/",
     icon: LayoutDashboard,
+    roles: LMS_ROLES.filter(r => r !== 'employee'),
   },
   {
     name: "CORE MODULES",
@@ -71,43 +73,44 @@ const MENU_ITEMS = [
         path: "/admin/organization",
         icon: Building2,
         sub: ["Dashboard", "Businesses", "Departments", "Categories", "Files"],
+        roles: ['super_admin', 'admin'],
       },
-       { name: "Course Management", path: "/courses", icon: BookOpen },
-       { name: "Course Library", path: "/courses/library", icon: Library },
-         { name: "Quizzes", path: "/assessments", icon: ClipboardCheck, sub: ["Manage", "Leaderboard", "Integrity"] },
-       { name: "Certificates", path: "/certificates", icon: Award },
-     ],
+       { name: "Course Management", path: "/courses", icon: BookOpen, roles: ['super_admin', 'admin', 'department_head'] },
+       { name: "Course Library", path: "/courses/library", icon: Library, roles: LMS_ROLES },
+         { name: "Quizzes", path: "/assessments", icon: ClipboardCheck, sub: ["Manage", "Leaderboard", "Integrity"], roles: ['super_admin', 'admin', 'department_head'] },
+        { name: "Certificates", path: "/certificates", icon: Award, roles: ['super_admin', 'admin'] },
+      ],
   },
   {
     name: "COMMUNICATION",
     group: true,
     items: [
-      { name: "Messaging", path: "/messaging", icon: MessageSquare },
-      { name: "Announcements", path: "/announcements", icon: Megaphone },
-      { name: "Events", path: "/events", icon: Calendar },
+      { name: "Messaging", path: "/messaging", icon: MessageSquare, roles: LMS_ROLES },
+      { name: "Announcements", path: "/announcements", icon: Megaphone, roles: LMS_ROLES },
+      { name: "Events", path: "/events", icon: Calendar, roles: LMS_ROLES },
     ],
   },
   {
     name: "INTERNAL OPERATIONS",
     group: true,
     items: [
-      { name: "Tasks & Projects", path: "/tasks", icon: CheckSquare },
+      { name: "Tasks & Projects", path: "/tasks", icon: CheckSquare, roles: ['super_admin', 'admin'] },
     ],
   },
   {
     name: "REPORTS & ANALYTICS",
     group: true,
     items: [
-      { name: "Reports", path: "/reports", icon: BarChart3 },
-      { name: "Analytics", path: "/analytics", icon: PieChart },
+      { name: "Reports", path: "/reports", icon: BarChart3, roles: ['super_admin', 'admin'] },
+      { name: "Analytics", path: "/analytics", icon: PieChart, roles: ['super_admin', 'admin'] },
     ],
   },
   {
     name: "SYSTEM",
     group: true,
     items: [
-      { name: "Settings", path: "/settings", icon: Settings, sub: ["Users", "Roles"] },
-      { name: "Audit Logs", path: "/audit-logs", icon: Shield },
+      { name: "Settings", path: "/settings", icon: Settings, sub: ["Users", "Roles"], roles: ['super_admin'] },
+      { name: "Audit Logs", path: "/audit-logs", icon: Shield, roles: ['super_admin'] },
     ],
   },
 ];
@@ -127,7 +130,8 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   const navigate = useNavigate();
   const roleLabel = typeof user?.role === 'string' ? user.role.replace('_', ' ') : '';
   const isEmployee = user?.role === 'employee';
-  const activeMenuItems = isEmployee ? EMPLOYEE_MENU_ITEMS : MENU_ITEMS;
+  const baseMenuItems = isEmployee ? EMPLOYEE_MENU_ITEMS : MENU_ITEMS;
+  const activeMenuItems = filterMenuByRole(baseMenuItems, user?.role);
 
   useEffect(() => {
     const handleClickOutside = (event) => {

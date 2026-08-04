@@ -14,7 +14,6 @@ function serializeParams(params) {
 
 export function useEmployeeDashboard(params = {}) {
   const [enrollments, setEnrollments] = useState([]);
-  const [publishedCourses, setPublishedCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const cancelRef = useRef(false);
@@ -26,20 +25,11 @@ export function useEmployeeDashboard(params = {}) {
     setError(null);
     cancelRef.current = false;
     try {
-      const { getEmployeeEnrollmentsWithCourses, getPublishedCoursesForEmployee } = await import("../api/employee.api");
-      const [enrollmentsRes, coursesRes] = await Promise.allSettled([
-        getEmployeeEnrollmentsWithCourses(paramsRef.current),
-        getPublishedCoursesForEmployee({ limit: 12, page: 1 }),
-      ]);
+      const { getEmployeeEnrollmentsWithCourses } = await import("../api/employee.api");
+      const enrollmentsRes = await getEmployeeEnrollmentsWithCourses(paramsRef.current);
 
       if (!cancelRef.current) {
-        if (enrollmentsRes.status === "fulfilled") {
-          setEnrollments(enrollmentsRes.value?.data || []);
-        }
-        if (coursesRes.status === "fulfilled") {
-          const data = coursesRes.value?.data?.rows || coursesRes.value?.data || [];
-          setPublishedCourses(Array.isArray(data) ? data : []);
-        }
+        setEnrollments(enrollmentsRes?.data || []);
       }
     } catch (err) {
       if (!cancelRef.current) setError(err.message);
@@ -54,7 +44,7 @@ export function useEmployeeDashboard(params = {}) {
     return () => { cancelRef.current = true; };
   }, [fetchDashboard, paramsKey]);
 
-  return { enrollments, publishedCourses, loading, error, refetch: fetchDashboard };
+  return { enrollments, loading, error, refetch: fetchDashboard };
 }
 
 export function useEmployeeCourseCatalog(params = {}) {

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { QUESTION_TYPES, QUESTION_TYPE_LABELS } from "../constants/questionTypes";
 import { Button } from "@/shared/components/ui/button";
 import { Trash2, Plus, Save, X } from "lucide-react";
+import { getHierarchy } from "../api/quiz.api";
 
 const TYPE_OPTIONS = Object.entries(QUESTION_TYPES).map(([, value]) => ({ value, label: QUESTION_TYPE_LABELS[value] }));
 
@@ -22,7 +23,7 @@ function toOptions(raw) {
   });
 }
 
-export default function QuestionEditor({ question, onSave, onCancel }) {
+export default function QuestionEditor({ question, onSave, onCancel, quizId }) {
   const isEdit = Boolean(question);
   const [text, setText] = useState(question?.question_text || question?.text || "");
   const [type, setType] = useState(question?.type || QUESTION_TYPES.MULTIPLE_CHOICE);
@@ -32,6 +33,18 @@ export default function QuestionEditor({ question, onSave, onCancel }) {
   const [answerText, setAnswerText] = useState("");
   const [points, setPoints] = useState(question?.points || 1);
   const [explanation, setExplanation] = useState(question?.explanation || "");
+  const [hierarchyId, setHierarchyId] = useState(question?.hierarchy_id || "");
+  const [hierarchy, setHierarchy] = useState([]);
+  const [loadingHierarchy, setLoadingHierarchy] = useState(false);
+
+  useEffect(() => {
+    if (!quizId) return;
+    setLoadingHierarchy(true);
+    getHierarchy(quizId)
+      .then((res) => setHierarchy(res.data || []))
+      .catch(() => setHierarchy([]))
+      .finally(() => setLoadingHierarchy(false));
+  }, [quizId]);
 
   useEffect(() => {
     if (!isEdit || !question) return;
@@ -47,6 +60,7 @@ export default function QuestionEditor({ question, onSave, onCancel }) {
       setCorrectIdxs([]);
     }
     setAnswerText(typeof ca === "string" ? ca : "");
+    setHierarchyId(question?.hierarchy_id || "");
   }, [question, isEdit]);
 
   const handleTypeChange = (value) => {
@@ -83,6 +97,7 @@ export default function QuestionEditor({ question, onSave, onCancel }) {
       question_text: text,
       points: Number(points) || 1,
       explanation: explanation || undefined,
+      hierarchy_id: hierarchyId || null,
       options:
         type === QUESTION_TYPES.SHORT_ANSWER
           ? []
@@ -99,6 +114,7 @@ export default function QuestionEditor({ question, onSave, onCancel }) {
 
   const isShortAnswer = type === QUESTION_TYPES.SHORT_ANSWER;
   const isMulti = type === QUESTION_TYPES.MULTI_SELECT;
+  const showHierarchy = type === QUESTION_TYPES.MULTIPLE_CHOICE || type === QUESTION_TYPES.TRUE_FALSE;
 
   return (
     <div className="rounded-xl border border-blue-200/80 dark:border-blue-500/40 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-md">
@@ -115,6 +131,22 @@ export default function QuestionEditor({ question, onSave, onCancel }) {
             ))}
           </select>
         </div>
+        {showHierarchy && (
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1">Hierarchy</label>
+            <select
+              value={hierarchyId}
+              onChange={(e) => setHierarchyId(e.target.value)}
+              disabled={loadingHierarchy}
+              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 outline-none"
+            >
+              <option value="">— None —</option>
+              {hierarchy.map((h) => (
+                <option key={h.id} value={h.id}>{h.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="w-20">
           <label className="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1">Points</label>
           <input

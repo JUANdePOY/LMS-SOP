@@ -41,10 +41,13 @@ export function AuthProvider({ children }) {
               throw new Error('Invalid response');
             }
           })
-          .catch(() => {
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            setUser(null);
+          .catch((error) => {
+            const status = error.response?.status;
+            if (status === 401) {
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
+              setUser(null);
+            }
           })
           .finally(() => {
             setLoading(false);

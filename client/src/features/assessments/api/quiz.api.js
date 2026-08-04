@@ -82,6 +82,10 @@ export async function createQuestion(quizId, payload) {
   return request(`${API_BASE}/${quizId}/questions`, { method: "POST", body: JSON.stringify(payload) });
 }
 
+export async function importQuestions(quizId, questions) {
+  return request(`${API_BASE}/${quizId}/import`, { method: "POST", body: JSON.stringify({ questions }) });
+}
+
 export async function updateQuestion(quizId, questionId, payload) {
   return request(`${API_BASE}/${quizId}/questions/${questionId}`, { method: "PUT", body: JSON.stringify(payload) });
 }
@@ -104,4 +108,20 @@ export async function createQuestionBank(courseId, payload) {
 
 export async function deleteQuestionBank(id) {
   return request(`${API_BASE}/banks/${id}`, { method: "DELETE" });
+}
+
+export async function getHierarchy(quizId) {
+  return request(`${API_BASE}/${quizId}/hierarchy`);
+}
+
+export async function createHierarchy(quizId, payload) {
+  return request(`${API_BASE}/${quizId}/hierarchy`, { method: "POST", body: JSON.stringify(payload) });
+}
+
+export async function updateHierarchy(quizId, hierarchyId, payload) {
+  return request(`${API_BASE}/${quizId}/hierarchy/${hierarchyId}`, { method: "PUT", body: JSON.stringify(payload) });
+}
+
+export async function deleteHierarchy(quizId, hierarchyId) {
+  return request(`${API_BASE}/${quizId}/hierarchy/${hierarchyId}`, { method: "DELETE" });
 }

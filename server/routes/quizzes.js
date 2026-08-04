@@ -16,6 +16,7 @@ router.post('/', quizController.requireAdminRole, quizController.createQuiz);
 
 router.get('/:id/questions', quizController.listQuestions);
 router.post('/:id/questions', quizController.requireAdminRole, quizController.createQuestion);
+router.post('/:id/import', quizController.requireAdminRole, quizController.importQuestions);
 router.get('/:id/questions/:qid', quizController.getQuestionById);
 router.put('/:id/questions/:qid', quizController.requireAdminRole, quizController.updateQuestion);
 router.delete('/:id/questions/:qid', quizController.requireAdminRole, quizController.deleteQuestion);
@@ -33,5 +34,10 @@ router.get('/:id/results', quizController.getQuizResults);
 
 router.get('/banks/:id', quizController.getQuestionBank);
 router.delete('/banks/:id', quizController.requireAdminRole, quizController.deleteQuestionBank);
+
+router.get('/:id/hierarchy', quizController.listHierarchy);
+router.post('/:id/hierarchy', quizController.requireAdminRole, quizController.createHierarchy);
+router.put('/:id/hierarchy/:hid', quizController.requireAdminRole, quizController.updateHierarchy);
+router.delete('/:id/hierarchy/:hid', quizController.requireAdminRole, quizController.deleteHierarchy);
 
 module.exports = router;

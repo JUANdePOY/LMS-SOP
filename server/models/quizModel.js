@@ -151,11 +151,11 @@ async function getQuestionById(id) {
 }
 
 async function createQuestion(questionData) {
-  const { quiz_id, type, question_text, options, correct_answer, points, order_index, question_bank_id } = questionData;
+  const { quiz_id, type, question_text, options, correct_answer, points, order_index, question_bank_id, hierarchy_id } = questionData;
 
   const [result] = await db.query(
-    `INSERT INTO quiz_questions (quiz_id, type, question_text, options, correct_answer, points, order_index, question_bank_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO quiz_questions (quiz_id, type, question_text, options, correct_answer, points, order_index, question_bank_id, hierarchy_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       quiz_id,
       type || 'multiple_choice',
@@ -165,6 +165,7 @@ async function createQuestion(questionData) {
       points || 1,
       order_index ?? 0,
       question_bank_id ?? null,
+      hierarchy_id ?? null,
     ]
   );
   return result.insertId;
@@ -175,7 +176,7 @@ async function createQuestion(questionData) {
 // ---------------------------------------------------------------------------
 
 async function updateQuestion(id, updates) {
-  const allowed = ['quiz_id', 'type', 'question_text', 'options', 'correct_answer', 'points', 'order_index', 'question_bank_id'];
+  const allowed = ['quiz_id', 'type', 'question_text', 'options', 'correct_answer', 'points', 'order_index', 'question_bank_id', 'hierarchy_id'];
   const sets = [];
   const params = [];
 

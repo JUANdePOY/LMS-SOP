@@ -11,16 +11,19 @@ import {
   Edit3,
   Trash2,
   Award,
+  BookOpen,
+  GripVertical,
+  Search,
 } from "lucide-react";
 
 const TYPE_CONFIG = {
-  video: { icon: PlayCircle, label: "Video", color: "text-blue-500" },
-  reading: { icon: FileText, label: "Text / Reading", color: "text-green-500" },
-  quiz: { icon: HelpCircle, label: "Quiz", color: "text-purple-500" },
-  link: { icon: Link2, label: "Link", color: "text-indigo-500" },
-  sop: { icon: FileText, label: "SOP", color: "text-amber-500" },
-  certificate: { icon: Award, label: "Certificate", color: "text-emerald-500" },
-  document: { icon: FileArchive, label: "Document / File", color: "text-red-500" },
+  video: { icon: PlayCircle, label: "Video", color: "text-blue-500 bg-blue-50 dark:bg-blue-900/20" },
+  reading: { icon: FileText, label: "Text", color: "text-green-500 bg-green-50 dark:bg-green-900/20" },
+  quiz: { icon: HelpCircle, label: "Quiz", color: "text-purple-500 bg-purple-50 dark:bg-purple-900/20" },
+  link: { icon: Link2, label: "Link", color: "text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20" },
+  sop: { icon: FileText, label: "SOP", color: "text-amber-500 bg-amber-50 dark:bg-amber-900/20" },
+  certificate: { icon: Award, label: "Cert", color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20" },
+  document: { icon: FileArchive, label: "File", color: "text-red-500 bg-red-50 dark:bg-red-900/20" },
 };
 
 export default function CourseOutline({
@@ -38,24 +41,56 @@ export default function CourseOutline({
   onMoveLessonUp,
   onMoveLessonDown,
 }) {
+  const [expandedModules, setExpandedModules] = useState(() => modules.map((m) => m.id));
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const toggleModule = (moduleId) => {
+    setExpandedModules((prev) =>
+      prev.includes(moduleId) ? prev.filter((id) => id !== moduleId) : [...prev, moduleId]
+    );
+  };
+
+  const filteredModules = modules.filter((m) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (m.title || "").toLowerCase().includes(q) ||
+      (m.lessons || []).some((l) => (l.title || "").toLowerCase().includes(q))
+    );
+  });
+
   return (
-    <div className="flex h-full flex-col border-r border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-neutral-200 dark:border-neutral-700">
-        <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Course Structure</span>
-        <button
-          type="button"
-          onClick={onAddModule}
-          className="inline-flex items-center gap-1 rounded-md border border-neutral-200 dark:border-neutral-700 px-2 py-1 text-xs hover:border-neutral-300 dark:hover:border-neutral-600 transition-all"
-        >
-          <Plus size={14} /> Module
-        </button>
+    <div className="flex h-full flex-col">
+      <div className="px-3 py-3 border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50/50 dark:bg-neutral-800/50">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Course Structure</span>
+          <button
+            type="button"
+            onClick={onAddModule}
+            className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+          >
+            <Plus size={14} /> Add
+          </button>
+        </div>
+        <div className="relative">
+          <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search..."
+            className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-2 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400"
+          />
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
-        {modules.map((mod, idx) => (
+        {filteredModules.map((mod, idx) => (
           <ModuleOutlineItem
             key={mod.id || idx}
             module={mod}
             index={idx}
+            expanded={expandedModules.includes(mod.id)}
+            onToggle={() => toggleModule(mod.id)}
             selected={selectedModuleId === mod.id}
             selectedLessonId={selectedLessonId}
             onSelectModule={() => onSelectModule?.(mod.id)}
@@ -69,10 +104,23 @@ export default function CourseOutline({
             onMoveLessonDown={onMoveLessonDown}
           />
         ))}
-        {modules.length === 0 && (
-          <div className="text-center py-6 text-neutral-400">
-            <FileText size={24} className="mx-auto mb-2 opacity-30" />
-            <p className="text-xs">No modules yet. Add your first module to get started.</p>
+        {filteredModules.length === 0 && (
+          <div className="text-center py-8">
+            <div className="w-12 h-12 bg-neutral-100 dark:bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-3">
+              <BookOpen size={20} className="text-neutral-400" />
+            </div>
+            <p className="text-sm text-neutral-500 mb-3">
+              {searchQuery ? "No matches found" : "No modules yet"}
+            </p>
+            {!searchQuery && (
+              <button
+                type="button"
+                onClick={onAddModule}
+                className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+              >
+                <Plus size={14} /> Add your first module
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -83,6 +131,8 @@ export default function CourseOutline({
 function ModuleOutlineItem({
   module,
   index,
+  expanded,
+  onToggle,
   selected,
   selectedLessonId,
   onSelectModule,
@@ -95,7 +145,6 @@ function ModuleOutlineItem({
   onMoveLessonUp,
   onMoveLessonDown,
 }) {
-  const [open, setOpen] = useState(true);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState("");
   const titleInputRef = useRef(null);
@@ -136,19 +185,19 @@ function ModuleOutlineItem({
 
   return (
     <div
-      className={`rounded-md border transition-all ${
+      className={`rounded-lg border transition-all ${
         selected
           ? "border-blue-300 dark:border-blue-700 bg-blue-50/40 dark:bg-blue-900/10 shadow-sm"
-          : "border-transparent hover:border-neutral-200 dark:border-transparent dark:hover:border-neutral-700"
+          : "border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
       }`}
     >
-      <div className="flex items-center gap-1 px-2 py-1.5">
+      <div className="flex items-center gap-1 px-2 py-2.5">
         <button
           type="button"
-          onClick={() => setOpen((o) => !o)}
+          onClick={onToggle}
           className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors"
         >
-          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </button>
         <div className="flex-1 min-w-0">
           {isEditingTitle ? (
@@ -159,13 +208,13 @@ function ModuleOutlineItem({
               onChange={(e) => setTitleInput(e.target.value)}
               onKeyDown={handleTitleKeyDown}
               onBlur={handleTitleSave}
-              className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-1.5 py-0.5 text-xs text-neutral-900 dark:text-neutral-100"
+              className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-sm text-neutral-900 dark:text-neutral-100"
             />
           ) : (
             <button
               type="button"
               onClick={onSelectModule}
-              className={`w-full truncate text-left text-xs font-medium ${
+              className={`w-full truncate text-left text-sm font-medium ${
                 selected
                   ? "text-blue-700 dark:text-blue-300"
                   : "text-neutral-800 dark:text-neutral-200"
@@ -178,38 +227,37 @@ function ModuleOutlineItem({
         </div>
         <div className="flex items-center gap-1">
           <span
-            className={`text-[10px] ${
+            className={`text-xs ${
               hasLessons ? "text-neutral-500 dark:text-neutral-500" : "text-amber-600 dark:text-amber-400 font-medium"
             }`}
           >
-            {hasLessons ? `${lessons.length} lesson${lessons.length === 1 ? "" : "s"}` : "No lessons"}
+            {hasLessons ? `${lessons.length}` : "0"}
           </span>
           {selected && (
             <button
               type="button"
               onClick={handleEditTitle}
-              className="rounded p-0.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
+              className="rounded p-1 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
               title="Rename module"
             >
-              <Edit3 size={12} />
+              <Edit3 size={14} />
             </button>
           )}
           <button
             type="button"
             onClick={onRemove}
-            className="rounded p-0.5 text-neutral-400 hover:text-red-600"
+            className="rounded p-1 text-neutral-400 hover:text-red-600"
             title="Delete module"
           >
-            <Trash2 size={12} />
+            <Trash2 size={14} />
           </button>
         </div>
       </div>
 
-      {open && (
-        <div className="border-t border-neutral-100 dark:border-neutral-800 px-1.5 py-1 space-y-0.5">
+      {expanded && (
+        <div className="border-t border-neutral-100 dark:border-neutral-800 px-2 py-1.5 space-y-0.5">
           {lessons.map((lesson, lIdx) => {
             const cfg = TYPE_CONFIG[lesson.type] || TYPE_CONFIG.reading;
-            const Icon = cfg.icon;
             const isSelected = selectedLessonId === lesson.id;
             return (
               <LessonOutlineItem
@@ -217,7 +265,6 @@ function ModuleOutlineItem({
                 lesson={lesson}
                 index={lIdx}
                 typeConfig={cfg}
-                Icon={Icon}
                 isSelected={isSelected}
                 onSelect={() => onSelectLesson?.(lesson.id)}
                 onMoveUp={() => onMoveLessonUp?.(module.id, lIdx)}
@@ -232,9 +279,9 @@ function ModuleOutlineItem({
           <button
             type="button"
             onClick={onAddLesson}
-            className="w-full rounded border border-dashed border-neutral-300 dark:border-neutral-600 py-1.5 text-[10px] text-neutral-600 dark:text-neutral-300 hover:border-neutral-400 dark:hover:border-neutral-500 transition-all"
+            className="w-full rounded border border-dashed border-neutral-300 dark:border-neutral-600 py-2 text-xs text-neutral-600 dark:text-neutral-300 hover:border-neutral-400 dark:hover:border-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-all"
           >
-            <Plus size={12} className="inline mr-1" />
+            <Plus size={14} className="inline mr-1" />
             Add Lesson
           </button>
         </div>
@@ -247,7 +294,6 @@ function LessonOutlineItem({
   lesson,
   index,
   typeConfig,
-  Icon,
   isSelected,
   onSelect,
   onMoveUp,
@@ -290,7 +336,7 @@ function LessonOutlineItem({
 
   return (
     <div
-      className={`group flex items-center gap-1 rounded px-1.5 py-1 transition-colors ${
+      className={`group flex items-center gap-1 rounded px-2 py-1.5 transition-colors ${
         isSelected
           ? "bg-blue-100 dark:bg-blue-900/30"
           : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
@@ -301,19 +347,19 @@ function LessonOutlineItem({
           type="button"
           onClick={onMoveUp}
           disabled={isFirst}
-          className="text-neutral-400 dark:text-neutral-500 disabled:opacity-30 hover:text-neutral-700 dark:hover:text-neutral-200"
+          className="text-neutral-400 dark:text-neutral-500 disabled:opacity-20 hover:text-neutral-700 dark:hover:text-neutral-200"
           title="Move up"
         >
-          ↑
+          <GripVertical size={14} />
         </button>
         <button
           type="button"
           onClick={onMoveDown}
           disabled={isLast}
-          className="text-neutral-400 dark:text-neutral-500 disabled:opacity-30 hover:text-neutral-700 dark:hover:text-neutral-200"
+          className="text-neutral-400 dark:text-neutral-500 disabled:opacity-20 hover:text-neutral-700 dark:hover:text-neutral-200"
           title="Move down"
         >
-          ↓
+          <GripVertical size={14} className="rotate-180" />
         </button>
       </div>
 
@@ -327,35 +373,26 @@ function LessonOutlineItem({
             onKeyDown={handleTitleKeyDown}
             onBlur={handleTitleSave}
             onClick={(e) => e.stopPropagation()}
-            className="w-full rounded border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-1 py-0.5 text-xs text-neutral-900 dark:text-neutral-100"
+            className="w-full rounded border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-sm text-neutral-900 dark:text-neutral-100"
           />
         ) : (
           <button
             type="button"
             onClick={onSelect}
-            className={`flex w-full items-center gap-1.5 truncate text-left text-xs ${
+            className={`flex w-full items-center gap-1.5 truncate text-left text-sm ${
               isSelected
                 ? "text-blue-800 dark:text-blue-200 font-medium"
                 : "text-neutral-700 dark:text-neutral-300"
             }`}
             title={`${typeConfig.label}: ${lesson.title || `Lesson ${index + 1}`}`}
           >
-            <Icon size={12} className={`shrink-0 ${typeConfig.color}`} />
+            <span className={`inline-flex items-center justify-center rounded px-1.5 py-1 text-[10px] font-medium ${typeConfig.color}`}>
+              {typeConfig.label}
+            </span>
             <span className="truncate">{lesson.title || `Lesson ${index + 1}`}</span>
           </button>
         )}
       </div>
-
-      <span
-        className={`shrink-0 text-[10px] px-1.5 py-0.25 rounded-full ${
-          isSelected
-            ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-            : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"
-        }`}
-        title={typeConfig.label}
-      >
-        {typeConfig.label.split(" ")[0]}
-      </span>
 
       <button
         type="button"
@@ -364,19 +401,19 @@ function LessonOutlineItem({
           setTitleInput(lesson.title || "");
           setIsEditingTitle(true);
         }}
-        className="opacity-0 group-hover:opacity-100 text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 p-0.5 rounded transition-opacity"
+        className="opacity-0 group-hover:opacity-100 text-neutral-400 dark:text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 p-1 rounded transition-opacity"
         title="Rename lesson"
       >
-        <Edit3 size={10} />
+        <Edit3 size={14} />
       </button>
 
       <button
         type="button"
         onClick={onRemove}
-        className="opacity-0 group-hover:opacity-100 text-neutral-400 dark:text-neutral-500 hover:text-red-600 p-0.5 rounded transition-opacity"
+        className="opacity-0 group-hover:opacity-100 text-neutral-400 dark:text-neutral-500 hover:text-red-600 p-1 rounded transition-opacity"
         title="Delete lesson"
       >
-        <Trash2 size={10} />
+        <Trash2 size={14} />
       </button>
     </div>
   );

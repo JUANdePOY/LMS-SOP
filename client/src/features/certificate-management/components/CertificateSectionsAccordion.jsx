@@ -26,6 +26,7 @@ export default function CertificateSectionsAccordion({
   onSectionChange,
   onSectionPatch,
   onUploadSignature,
+  onCenterAll,
 }) {
   const [uploadLabel, setUploadLabel] = useState('');
   const [uploadType, setUploadType] = useState('signature');
@@ -64,9 +65,22 @@ export default function CertificateSectionsAccordion({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <Label>Content Sections</Label>
-        <span className="text-xs text-gray-400">
-          {filledSectionCount}/{CERTIFICATE_SECTIONS.length} filled
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">
+            {filledSectionCount}/{CERTIFICATE_SECTIONS.length} filled
+          </span>
+          {onCenterAll && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={onCenterAll}
+              className="h-7 text-xs"
+            >
+              Center All
+            </Button>
+          )}
+        </div>
       </div>
 
       {CERTIFICATE_SECTIONS.map((section) => {
@@ -312,7 +326,7 @@ export default function CertificateSectionsAccordion({
                               setUploadSignerName('');
                               setUploadPositionTitle('');
                               setUploadFile(null);
-                            } catch (err) {
+                            } catch {
                               // parent will handle toast/errors
                             }
                           }}

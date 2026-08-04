@@ -144,7 +144,7 @@ async function createCourse(req, res) {
   }
 
   const body = req.body || {};
-  const { title, description, category, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, modules } = body;
+  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, modules } = body;
 
   if (!title || !String(title).trim()) {
     return res.status(400).json({ success: false, message: 'Course title is required', code: 'VALIDATION_ERROR' });
@@ -164,14 +164,15 @@ async function createCourse(req, res) {
 
     const [courseResult] = await conn.query(
       `INSERT INTO courses (
-        title, description, category, difficulty, status, instructor_id, thumbnail_url,
+        title, description, category, category_id, difficulty, status, instructor_id, thumbnail_url,
         prerequisites, learning_outcomes, max_enrollments, start_date, end_date,
         grading_scale, allow_self_enrollment, send_completion_certificates, department_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         String(title).trim(),
         description ?? null,
         category ?? null,
+        category_id ? parseInt(category_id, 10) : null,
         difficulty || 'beginner',
         status || 'draft',
         userId,
@@ -253,7 +254,7 @@ async function updateCourse(req, res) {
 
   const courseId = parseInt(req.params.id, 10);
   const body = req.body || {};
-  const { title, description, category, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, modules } = body;
+  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, modules } = body;
 
   try {
     const [courseRows] = await db.query('SELECT * FROM courses WHERE id = ? AND is_deleted = FALSE LIMIT 1', [courseId]);
@@ -274,14 +275,14 @@ async function updateCourse(req, res) {
       await conn.beginTransaction();
 
       const allowed = [
-        'title', 'description', 'category', 'difficulty', 'thumbnail_url',
+        'title', 'description', 'category', 'category_id', 'difficulty', 'thumbnail_url',
         'prerequisites', 'learning_outcomes', 'max_enrollments', 'start_date',
         'end_date', 'grading_scale', 'allow_self_enrollment', 'send_completion_certificates', 'status'
       ];
       const updates = {};
       for (const key of allowed) {
         if (Object.prototype.hasOwnProperty.call(body, key)) {
-          updates[key] = body[key];
+          updates[key] = key === 'category_id' ? (body[key] ? parseInt(body[key], 10) : null) : body[key];
         }
       }
 

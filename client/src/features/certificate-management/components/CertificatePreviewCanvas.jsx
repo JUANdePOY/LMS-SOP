@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import api from '@/services/api';
 import { CERTIFICATE_SECTIONS } from '@/features/certificate-management/constants/certificateSections';
 import useSectionResize from '@/features/certificate-management/hooks/useSectionResize';
+import useSectionPositions from '@/features/certificate-management/hooks/useSectionPositions';
 
 // const PRESENTED_TO_LABEL = 'This certificate is proudly presented to';
 
@@ -25,6 +26,9 @@ export default function CertificatePreviewCanvas({
   const aspectRatio = orientation === 'portrait' ? 'h-[60vh] w-auto' : 'h-auto w-full max-h-[60vh]';
   const containerRef = useRef(null);
   const { resizingKey, startResize } = useSectionResize(containerRef, (key, patch) => {
+    onSectionPatch?.(key, patch);
+  });
+  const { draggingKey, startDrag } = useSectionPositions((key, patch) => {
     onSectionPatch?.(key, patch);
   });
 
@@ -76,9 +80,13 @@ export default function CertificatePreviewCanvas({
   if (!framePreview) {
     return (
       <div
-        className={`flex items-center justify-center ${aspectRatio} rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800`}
+        ref={containerRef}
+        className={`relative overflow-hidden rounded-lg border border-dashed border-gray-300 bg-gray-50 dark:border-gray-600 dark:bg-gray-900 ${aspectRatio}`}
       >
-        <p className="text-sm text-gray-400">Upload a frame image to see preview</p>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <p className="text-sm text-gray-400">Upload a frame image to see preview</p>
+        </div>
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px)', backgroundSize: '10% 10%' }} />
       </div>
     );
   }
@@ -197,7 +205,7 @@ export default function CertificatePreviewCanvas({
           return (
             <div
               key={section.key}
-              className={`group absolute z-10 rounded px-1 ${isResizing ? 'outline outline-1 outline-dashed outline-indigo-400' : ''}`}
+              className={`group absolute z-10 rounded px-1 cursor-move ${isResizing ? 'outline outline-1 outline-dashed outline-indigo-400' : ''} ${draggingKey === section.key ? 'outline outline-2 outline-blue-400' : ''}`}
               style={{
                 left: `${xPercent}%`,
                 top: `${yPercent}%`,
@@ -207,6 +215,7 @@ export default function CertificatePreviewCanvas({
                 WebkitUserSelect: 'none',
                 MozUserSelect: 'none',
               }}
+              onPointerDown={startDrag(section.key)}
             >
               {section.key === 'title' ? (
                 <div>

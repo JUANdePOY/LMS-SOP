@@ -52,8 +52,15 @@ const QuizResultsPage = lazy(() => import("@/features/assessments/pages/QuizResu
 const QuizLeaderboardPage = lazy(() => import("@/features/assessments/pages/QuizLeaderboardPage"));
 const ViolationDashboardPage = lazy(() => import("@/features/assessments/pages/ViolationDashboardPage"));
 const QuizzesPanel = lazy(() => import("@/pages/management/QuizzesPanel"));
+const AnnouncementsPage = lazy(() => import("@/features/announcements/pages/AnnouncementsPage"));
+const EventsPage = lazy(() => import("@/features/events/pages/EventsPage"));
+const MessagingPage = lazy(() => import("@/features/messaging/pages/MessagingPage"));
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
+
+function RedirectToSOP() {
+  return <Navigate to="/sops" replace />;
+}
 
 function PageLoader() {
   return (
@@ -73,31 +80,31 @@ function wrap(Component) {
 
 function LMSProtectedWrapper(Component) {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <ProtectedRoute allowedRoles={LMS_ROLES}>
+    <ProtectedRoute allowedRoles={LMS_ROLES}>
+      <Suspense fallback={<PageLoader />}>
         <Component />
-      </ProtectedRoute>
-    </Suspense>
+      </Suspense>
+    </ProtectedRoute>
   );
 }
 
-function SuperAdminProtectedWrapper(Component) {
+function AdminProtectedWrapper(Component) {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <ProtectedRoute allowedRoles={['super_admin']}>
+    <ProtectedRoute allowedRoles={['super_admin', 'admin']}>
+      <Suspense fallback={<PageLoader />}>
         <Component />
-      </ProtectedRoute>
-    </Suspense>
+      </Suspense>
+    </ProtectedRoute>
   );
 }
 
 function EmployeeProtectedWrapper(Component) {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <ProtectedRoute allowedRoles={['employee']}>
+    <ProtectedRoute allowedRoles={['employee']}>
+      <Suspense fallback={<PageLoader />}>
         <Component />
-      </ProtectedRoute>
-    </Suspense>
+      </Suspense>
+    </ProtectedRoute>
   );
 }
 
@@ -134,11 +141,11 @@ const router = createBrowserRouter([
        { path: "profile", element: LMSProtectedWrapper(Profile), handle: { title: "Profile" } },
       { path: "users", element: <Navigate to="/settings/users" replace /> },
       { path: "course-library", element: <Navigate to="/courses/library" replace /> },
-      { path: "settings", element: SuperAdminProtectedWrapper(Settings), handle: { title: "Settings" } },
-      { path: "settings/users", element: LMSProtectedWrapper(UsersPanel), handle: { title: "User Management" } },
-      { path: "settings/roles", element: LMSProtectedWrapper(RolesPanel), handle: { title: "Roles & Permissions" } },
-      { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
-      { path: "sops", element: LMSProtectedWrapper(SOPListPage), handle: { title: "SOP Library" } },
+      { path: "settings", element: AdminProtectedWrapper(Settings), handle: { title: "Settings" } },
+      { path: "settings/users", element: AdminProtectedWrapper(UsersPanel), handle: { title: "User Management" } },
+      { path: "settings/roles", element: AdminProtectedWrapper(RolesPanel), handle: { title: "Roles & Permissions" } },
+      { path: "audit-logs", element: AdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
+      { path: "sops", element: AdminProtectedWrapper(SOPListPage), handle: { title: "SOP Library" } },
       { path: "courses", element: LMSProtectedWrapper(Courses), handle: { title: "Course Catalog" } },
       { path: "courses/:id", element: LMSProtectedWrapper(CourseDetailsPage), handle: { title: "Course Details" } },
       { path: "courses/:id/builder", element: LMSProtectedWrapper(CourseBuilderPage), handle: { title: "Course Builder" } },
@@ -146,20 +153,20 @@ const router = createBrowserRouter([
       { path: "courses/view/:id/lesson/:lessonId", element: LMSProtectedWrapper(LessonPage), handle: { title: "Lesson" } },
       { path: "courses/library", element: LMSProtectedWrapper(CourseLibraryPage), handle: { title: "Course Library" } },
       { path: "courses/library/:id", element: LMSProtectedWrapper(CourseLibraryDetailsPage), handle: { title: "Course Details" } },
-      { path: "sops/:id", element: LMSProtectedWrapper(SOPWorkspacePage), handle: { title: "SOP Workspace" } },
-      { path: "sops/:id/versions/:versionId", element: LMSProtectedWrapper(SOPVersionPage), handle: { title: "SOP Version" } },
-      { path: "trash", element: LMSProtectedWrapper(SOPListPage), handle: { title: "Trash" } },
+      { path: "sops/:id", element: AdminProtectedWrapper(SOPWorkspacePage), handle: { title: "SOP Workspace" } },
+      { path: "sops/:id/versions/:versionId", element: AdminProtectedWrapper(SOPVersionPage), handle: { title: "SOP Version" } },
+      { path: "trash", element: AdminProtectedWrapper(SOPListPage), handle: { title: "Trash" } },
       { path: "certificates", element: LMSProtectedWrapper(CertificateTemplatesPage), handle: { title: "Certificates" } },
       { path: "certificates/my-certificates/:userId", element: LMSProtectedWrapper(MyCertificatesPage), handle: { title: "My Certificates" } },
       { path: "certificates/verify/:certificateNumber", element: LMSProtectedWrapper(VerifyCertificatePage), handle: { title: "Verify Certificate" } },
 
       // Organization Management routes
-      { path: "admin/organization", element: LMSProtectedWrapper(OrgHierarchyPage), handle: { title: "SOP Management" } },
-      { path: "admin/organization/hierarchy", element: LMSProtectedWrapper(OrgHierarchyPage), handle: { title: "Hierarchy Overview" } },
-      { path: "admin/organization/businesses", element: LMSProtectedWrapper(OrgBusinessPage), handle: { title: "Businesses" } },
-      { path: "admin/organization/departments", element: LMSProtectedWrapper(OrgDepartmentPage), handle: { title: "Departments" } },
-      { path: "admin/organization/categories", element: LMSProtectedWrapper(OrgCategoryPage), handle: { title: "Categories" } },
-      { path: "admin/organization/sop-management", element: <Navigate to="/sops" replace /> },
+      { path: "admin/organization", element: AdminProtectedWrapper(OrgHierarchyPage), handle: { title: "SOP Management" } },
+      { path: "admin/organization/hierarchy", element: AdminProtectedWrapper(OrgHierarchyPage), handle: { title: "Hierarchy Overview" } },
+      { path: "admin/organization/businesses", element: AdminProtectedWrapper(OrgBusinessPage), handle: { title: "Businesses" } },
+      { path: "admin/organization/departments", element: AdminProtectedWrapper(OrgDepartmentPage), handle: { title: "Departments" } },
+      { path: "admin/organization/categories", element: AdminProtectedWrapper(OrgCategoryPage), handle: { title: "Categories" } },
+      { path: "admin/organization/sop-management", element: AdminProtectedWrapper(RedirectToSOP), handle: { title: "SOP Management" } },
       { path: "assessments", element: LMSProtectedWrapper(AssessmentsDashboardPage), handle: { title: "My Quizzes" } },
       { path: "assessments/manage", element: LMSProtectedWrapper(QuizzesPanel), handle: { title: "Manage Quizzes" } },
       { path: "assessments/leaderboard", element: LMSProtectedWrapper(QuizLeaderboardPage), handle: { title: "Leaderboard" } },
@@ -168,6 +175,9 @@ const router = createBrowserRouter([
       { path: "assessments/quiz/:quizId/leaderboard", element: LMSProtectedWrapper(QuizLeaderboardPage), handle: { title: "Leaderboard" } },
       { path: "assessments/quiz/:quizId/take/:attemptId?", element: LMSProtectedWrapper(TakeQuizPage), handle: { title: "Take Quiz" } },
       { path: "assessments/quiz/:quizId", element: LMSProtectedWrapper(QuizBuilderPage), handle: { title: "Quiz Builder" } },
+      { path: "announcements", element: LMSProtectedWrapper(AnnouncementsPage), handle: { title: "Announcements" } },
+      { path: "events", element: LMSProtectedWrapper(EventsPage), handle: { title: "Events" } },
+      { path: "messaging", element: LMSProtectedWrapper(MessagingPage), handle: { title: "Messaging" } },
     ],
   },
 ]);

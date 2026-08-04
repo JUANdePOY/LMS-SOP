@@ -1,5 +1,6 @@
 const quizModel = require('../models/quizModel');
 const courseModel = require('../models/courseModel');
+const quizHierarchyModel = require('../models/quizHierarchyModel');
 const { logAudit } = require('../utils/auditLogger');
 
 const ADMIN_ROLES = ['super_admin', 'admin', 'department_head'];
@@ -251,7 +252,7 @@ async function listQuestions(req, res) {
 }
 
 async function createQuestion(req, res) {
-  const { type, question_text, options, correct_answer, points, order_index, question_bank_id } = req.body;
+  const { type, question_text, options, correct_answer, points, order_index, question_bank_id, hierarchy_id } = req.body;
   try {
     const quiz = await quizModel.findById(req.params.id);
     if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found', code: 'NOT_FOUND' });
@@ -266,6 +267,7 @@ async function createQuestion(req, res) {
       points,
       order_index,
       question_bank_id,
+      hierarchy_id,
     });
     logAudit && logAudit('quiz.question.create', req.user.id, { quizId: quiz.id, questionId: id });
     res.status(201).json({ success: true, data: { id }, message: 'Question created' });
@@ -274,8 +276,49 @@ async function createQuestion(req, res) {
   }
 }
 
+async function importQuestions(req, res) {
+  const { questions } = req.body;
+  try {
+    const quiz = await quizModel.findById(req.params.id);
+    if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found', code: 'NOT_FOUND' });
+    await assertCanManageCourse(req, quiz.course_id);
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ success: false, message: 'questions array is required and must not be empty', code: 'VALIDATION_ERROR' });
+    }
+
+    const existing = await quizModel.listQuestions(quiz.id);
+    const startIndex = existing.length;
+
+    const created = [];
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      if (!q.type || !q.question_text) {
+        continue;
+      }
+      const id = await quizModel.createQuestion({
+        quiz_id: quiz.id,
+        type: q.type,
+        question_text: q.question_text,
+        options: q.options || null,
+        correct_answer: q.correct_answer || null,
+        points: Number(q.points) || 1,
+        order_index: startIndex + i,
+        question_bank_id: q.question_bank_id || null,
+        hierarchy_id: q.hierarchy_id || null,
+      });
+      created.push({ id, ...q });
+    }
+
+    logAudit && logAudit('quiz.questions.import', req.user.id, { quizId: quiz.id, count: created.length });
+    res.status(201).json({ success: true, data: { imported: created.length, questions: created }, message: `${created.length} questions imported` });
+  } catch (err) {
+    sendError(res, err, 'Failed to import questions');
+  }
+}
+
 async function updateQuestion(req, res) {
-  const { type, question_text, options, correct_answer, points, order_index, question_bank_id } = req.body;
+  const { type, question_text, options, correct_answer, points, order_index, question_bank_id, hierarchy_id } = req.body;
   try {
     const question = await quizModel.getQuestionById(req.params.qid);
     if (!question) return res.status(404).json({ success: false, message: 'Question not found', code: 'NOT_FOUND' });
@@ -283,7 +326,7 @@ async function updateQuestion(req, res) {
     if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found', code: 'NOT_FOUND' });
     await assertCanManageCourse(req, quiz.course_id);
 
-    await quizModel.updateQuestion(req.params.qid, { type, question_text, options, correct_answer, points, order_index, question_bank_id });
+    await quizModel.updateQuestion(req.params.qid, { type, question_text, options, correct_answer, points, order_index, question_bank_id, hierarchy_id });
     res.json({ success: true, message: 'Question updated' });
   } catch (err) {
     sendError(res, err, 'Failed to update question');
@@ -431,6 +474,83 @@ async function getCourseLeaderboard(req, res) {
   }
 }
 
+async function listHierarchy(req, res) {
+  const quizId = req.params.id;
+  try {
+    const quiz = await quizModel.findById(quizId);
+    if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found', code: 'NOT_FOUND' });
+    const items = await quizHierarchyModel.listHierarchy(quizId);
+    res.json({ success: true, data: items });
+  } catch (err) {
+    sendError(res, err, 'Failed to fetch hierarchy');
+  }
+}
+
+async function createHierarchy(req, res) {
+  const quizId = req.params.id;
+  const { name, description, level, parent_id } = req.body;
+  try {
+    const quiz = await quizModel.findById(quizId);
+    if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found', code: 'NOT_FOUND' });
+    await assertCanManageCourse(req, quiz.course_id);
+
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'Name is required', code: 'VALIDATION_ERROR' });
+    }
+
+    const id = await quizHierarchyModel.create({
+      quiz_id: quizId,
+      parent_id: parent_id || null,
+      name,
+      description,
+      level: Number(level) || 1,
+    });
+    logAudit && logAudit('quiz.hierarchy.create', req.user.id, { quizId, hierarchyId: id });
+    res.status(201).json({ success: true, data: { id }, message: 'Hierarchy item created' });
+  } catch (err) {
+    sendError(res, err, 'Failed to create hierarchy item');
+  }
+}
+
+async function updateHierarchy(req, res) {
+  const quizId = req.params.id;
+  const hid = req.params.hid;
+  const { name, description, level, parent_id } = req.body;
+  try {
+    const quiz = await quizModel.findById(quizId);
+    if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found', code: 'NOT_FOUND' });
+    const item = await quizHierarchyModel.findById(hid);
+    if (!item || item.quiz_id !== Number(quizId)) {
+      return res.status(404).json({ success: false, message: 'Hierarchy item not found', code: 'NOT_FOUND' });
+    }
+    await assertCanManageCourse(req, quiz.course_id);
+
+    await quizHierarchyModel.update(hid, { name, description, level, parent_id });
+    res.json({ success: true, message: 'Hierarchy item updated' });
+  } catch (err) {
+    sendError(res, err, 'Failed to update hierarchy item');
+  }
+}
+
+async function deleteHierarchy(req, res) {
+  const quizId = req.params.id;
+  const hid = req.params.hid;
+  try {
+    const quiz = await quizModel.findById(quizId);
+    if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found', code: 'NOT_FOUND' });
+    const item = await quizHierarchyModel.findById(hid);
+    if (!item || item.quiz_id !== Number(quizId)) {
+      return res.status(404).json({ success: false, message: 'Hierarchy item not found', code: 'NOT_FOUND' });
+    }
+    await assertCanManageCourse(req, quiz.course_id);
+
+    await quizHierarchyModel.remove(hid);
+    res.json({ success: true, message: 'Hierarchy item deleted' });
+  } catch (err) {
+    sendError(res, err, 'Failed to delete hierarchy item');
+  }
+}
+
 module.exports = {
   listQuizzes,
   listAllQuizzes,
@@ -455,5 +575,10 @@ module.exports = {
   getLeaderboard,
   getQuizResults,
   getCourseLeaderboard,
+  listHierarchy,
+  createHierarchy,
+  updateHierarchy,
+  deleteHierarchy,
+  importQuestions,
   requireAdminRole,
 };

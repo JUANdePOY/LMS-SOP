@@ -24,6 +24,27 @@ function StatusBadge({ status }) {
   );
 }
 
+function RestrictionBadge({ restrictionType }) {
+  const styles = {
+    public: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200',
+    department: 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-200',
+    assigned: 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-200',
+    private: 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-200',
+  };
+  const labels = {
+    public: 'Public',
+    department: 'Department',
+    assigned: 'Assigned',
+    private: 'Private',
+  };
+
+  return (
+    <span className={`inline-flex items-center rounded-full border border-transparent px-2 py-0.5 text-[10px] font-medium ${styles[restrictionType] || styles.department}`}>
+      {labels[restrictionType] || restrictionType}
+    </span>
+  );
+}
+
 function SOPCard({ sop, viewMode, editingSopId, editTitle, setEditTitle, editDescription, setEditDescription, editStatus, setEditStatus, cascade, onEditStart, onEditCancel, onEditSave, onDeleteSop }) {
   if (editingSopId === sop.id) {
     return (
@@ -50,6 +71,7 @@ function SOPCard({ sop, viewMode, editingSopId, editTitle, setEditTitle, editDes
           <div className="mt-3 flex items-center gap-2 flex-wrap">
             <span className="text-xs text-[var(--text-muted)] font-mono">{sop.sop_code}</span>
             <StatusBadge status={sop.status} />
+            {sop.restriction_type && <RestrictionBadge restrictionType={sop.restriction_type} />}
           </div>
         </div>
         <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
@@ -67,6 +89,7 @@ function SOPCard({ sop, viewMode, editingSopId, editTitle, setEditTitle, editDes
           <Link to={`/sops/${sop.id}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline truncate">{sop.title}</Link>
           <span className="text-xs text-[var(--text-muted)] shrink-0">{sop.sop_code}</span>
           <StatusBadge status={sop.status} />
+          {sop.restriction_type && <RestrictionBadge restrictionType={sop.restriction_type} />}
         </div>
         <div className="flex gap-1 shrink-0">
           <button onClick={() => onEditStart(sop)} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors" title="Edit SOP" aria-label="Edit SOP">
@@ -86,6 +109,7 @@ function SOPListPage() {
     sops, loading, search, setSearch, status, setStatus,
     archivedTab, setArchivedTab, showCreate, setShowCreate,
     newTitle, setNewTitle, newDescription, setNewDescription, newLink, setNewLink,
+    newRestrictionType, setNewRestrictionType,
     editingSopId, editTitle, setEditTitle, editDescription, setEditDescription,
     editStatus, setEditStatus, handleCreate, fetchSops,
     resetForm, handleEditStart, handleEditCancel, handleEditSave, handleDeleteSop,
@@ -221,6 +245,7 @@ function SOPListPage() {
             newTitle={newTitle} setNewTitle={setNewTitle}
             newDescription={newDescription} setNewDescription={setNewDescription}
             newLink={newLink} setNewLink={setNewLink}
+            newRestrictionType={newRestrictionType} setNewRestrictionType={setNewRestrictionType}
             loading={loading}
             cascade={cascade}
             onCancel={resetForm}
