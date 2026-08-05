@@ -57,12 +57,19 @@ const ImageResizable = Image.extend({
   },
 
   renderHTML({ HTMLAttributes }) {
-    // Persisted markup: a <figure> wrapping the <img> and an optional
-    // <figcaption>, so captions survive reload / other viewers of the SOP.
-    const { caption, ...imgAttrs } = HTMLAttributes;
-    const children = [['img', imgAttrs]];
+    const { caption, 'data-align': dataAlign, 'data-width': dataWidth, style: inheritedStyle, ...imgAttrs } = HTMLAttributes;
+    const children = [['img', {
+      ...imgAttrs,
+      style: `width: 100%; height: auto; display: block; ${inheritedStyle || ''}`.trim(),
+    }]];
     if (caption) children.push(['figcaption', {}, caption]);
-    return ['figure', { class: 'sop-image-figure', 'data-align': imgAttrs['data-align'] || 'center' }, ...children];
+
+    const figureAttrs = { class: 'sop-image-figure', 'data-align': dataAlign || 'center' };
+    if (dataWidth) {
+      figureAttrs.style = `width: ${dataWidth}; max-width: 100%;`;
+      figureAttrs['data-width'] = dataWidth;
+    }
+    return ['figure', figureAttrs, ...children];
   },
 
   addNodeView() {

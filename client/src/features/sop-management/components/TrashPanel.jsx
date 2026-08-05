@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, TrashIcon, Undo2, Trash2 } from 'lucide-react';
+import { TrashIcon, Undo2 } from 'lucide-react';
 import { useTrashSops } from '@/features/sop-management/hooks/useTrashSops';
 import { TRASH_TABS } from '@/features/sop-management/constants/sopConstants';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
@@ -95,7 +95,7 @@ function TrashPanel() {
             <Undo2 size={14} className="inline mr-1" /> Restore
           </button>
           <button onClick={() => handlePermanentDelete(sop.id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-medium hover:bg-red-700 transition-colors">
-            <TrashIcon size={14} className="inline mr-1" /> Delete Forever
+            <TrashIcon size={14} className="inline mr-1" /> Delete Permanently
           </button>
         </div>
       </div>

@@ -106,6 +106,14 @@ export default function AppLayout() {
     }
   }, [location.pathname]);
 
+
+  useEffect(() => {
+    if (location.pathname.match(/^\/sops\/[^/]+$/)) {
+      setCollapsed(true);
+      setMobileOpen(false);
+    }
+  }, [location.pathname]);
+
   return (
     <div
       className={cn(

@@ -10,7 +10,7 @@ export const getSopStats = () => api.get('/sops/stats');
 export const getTrashedSops = (params = {}) => api.get('/sops/trashed', { params });
 export const restoreSop = (id) => api.post(`/sops/${id}/restore`);
 export const permanentDeleteSop = (id) => api.delete(`/sops/${id}/permanent`);
-export const emptyTrash = () => api.delete('/sops/trashed');
+export const emptyTrash = () => api.delete('/sops/trashed/empty');
 
 export const getAssignments = (sopId) => api.get(`/sops/${sopId}/assignments`);
 export const createAssignment = (sopId, data) => api.post(`/sops/${sopId}/assignments`, data);
@@ -37,6 +37,9 @@ export const submitSop = (sopId) => api.post(`/sops/${sopId}/submit`);
 export const approveSop = (sopId) => api.post(`/sops/${sopId}/approve`);
 export const rejectSop = (sopId) => api.post(`/sops/${sopId}/reject`);
 export const publishSop = (sopId) => api.post(`/sops/${sopId}/publish`);
+
+export const archiveSop = (sopId) => api.put(`/sops/${sopId}`, { status: 'Archived' });
+export const unarchiveSop = (sopId) => api.put(`/sops/${sopId}`, { status: 'Draft' });
 
 export const transitionSop = (sopId, data) => api.post(`/sops/${sopId}/transition`, data);
 export const getSharedSopModules = (token, versionId = null) =>

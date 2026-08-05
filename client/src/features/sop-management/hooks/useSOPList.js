@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { getSops, createSop, updateSop, deleteSop } from '@/features/sop-management/services/sopService';
+import { getSops, createSop, updateSop, deleteSop, archiveSop, unarchiveSop } from '@/features/sop-management/services/sopService';
 import { createAssignment } from '@/features/sop-management/services/assignmentService';
 import { createModule } from '@/features/sop-management/services/moduleService';
 import { createLink } from '@/features/sop-management/services/attachmentService';
@@ -151,6 +151,21 @@ export function useSOPList() {
     }
   };
 
+  const handleArchiveSop = async (sop) => {
+    try {
+      if (sop.status === SOP_STATUSES.ARCHIVED) {
+        await unarchiveSop(sop.id);
+        toast.success('SOP unarchived successfully');
+      } else {
+        await archiveSop(sop.id);
+        toast.success('SOP archived successfully');
+      }
+      await fetchSops();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update SOP archive status');
+    }
+  };
+
   return {
     // SOP list state
     sops,
@@ -188,6 +203,7 @@ export function useSOPList() {
     handleEditCancel,
     handleEditSave,
     handleDeleteSop,
+    handleArchiveSop,
     // Cascade
     cascade,
   };
