@@ -1,7 +1,9 @@
 const path = require('path');
+const PDFDocument = require('pdfkit');
 const sopService = require('../services/sopService');
 const sopModuleService = require('../services/sopModuleService');
 const sopAttachmentService = require('../services/sopAttachmentService');
+const sopModuleAttachmentModel = require('../models/sopModuleAttachmentModel');
 const sopVersionService = require('../services/sopVersionService');
 const sopWorkflowService = require('../services/sopWorkflowService');
 const sopAuditLogService = require('../services/sopAuditLogService');
@@ -527,6 +529,185 @@ const acknowledgementController = {
   },
 };
 
+/**
+ * Render SOP module HTML content into a PDF document, embedding images
+ * from the imageCache (Map of attachmentId -> { data, mime }).
+ * Returns true if any content was rendered, false otherwise.
+ */
+function renderModuleContentForPdf(html, imageCache, doc) {
+  // Split HTML into text segments and <img> tags
+  const imgTagRegex = /(<img[^>]+>)/g;
+  const parts = html.split(imgTagRegex);
+  let hasContent = false;
+
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+
+    // Check if this part is an <img> tag
+    const imgMatch = trimmed.match(/<img[^>]+src="([^"]+)"[^>]*>/);
+    if (imgMatch) {
+      const src = imgMatch[1];
+      const idMatch = src.match(/\/api\/sops\/attachments\/(\d+)\/file/);
+      if (idMatch) {
+        const attId = parseInt(idMatch[1], 10);
+        const image = imageCache.get(attId);
+        if (image) {
+          try {
+            // Calculate max width to fit within page margins
+            const maxWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+            doc.image(image.data, {
+              fit: [maxWidth, 300],
+              align: 'center',
+            });
+            hasContent = true;
+          } catch {
+            // Skip images that can't be embedded
+          }
+        }
+      }
+      continue;
+    }
+
+    // Plain text segment — strip remaining HTML tags
+    const text = trimmed
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .trim();
+
+    if (text) {
+      doc.fontSize(9).font('Helvetica').text(text, { align: 'justify', lineGap: 3 });
+      hasContent = true;
+    }
+  }
+
+  return hasContent;
+}
+
+const exportController = {
+  async exportPdf(req, res) {
+    try {
+      const sopId = parseInt(req.params.id, 10);
+      const sop = await sopService.getSopById(sopId, req.user);
+      if (!sop) {
+        const error = new Error('SOP not found');
+        error.code = 'NOT_FOUND';
+        throw error;
+      }
+
+      const versionId = req.query.versionId
+        ? parseInt(req.query.versionId, 10)
+        : (sop.current_version_id || null);
+      const modules = await sopModuleService.listModules(sopId, versionId);
+
+      const doc = new PDFDocument({ margin: 50 });
+      const filename = `SOP-${sop.code || sop.id}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      doc.pipe(res);
+
+      // Header
+      doc.fontSize(28).text(sop.title || 'SOP', { align: 'center' });
+      if (sop.code) {
+        doc.fontSize(10).text(sop.code, { align: 'center', color: '#666' });
+      }
+      doc.moveDown();
+
+      // Metadata table
+      const metaFields = [];
+      if (sop.status) metaFields.push(['Status', sop.status]);
+      if (sop.department_name) metaFields.push(['Department', sop.department_name]);
+      if (sop.category_name) metaFields.push(['Category', sop.category_name]);
+      if (sop.owner_name) metaFields.push(['Owner', sop.owner_name]);
+      if (sop.created_at) metaFields.push(['Created', new Date(sop.created_at).toLocaleDateString()]);
+      if (sop.updated_at) metaFields.push(['Updated', new Date(sop.updated_at).toLocaleDateString()]);
+
+      if (metaFields.length > 0) {
+        metaFields.forEach(([label, value]) => {
+          doc.fontSize(10).font('Helvetica-Bold').text(label + ':', { continued: true, width: 100 });
+          doc.font('Helvetica').text(String(value));
+        });
+        doc.moveDown();
+      }
+
+      // Description
+      if (sop.description) {
+        doc.fontSize(12).font('Helvetica-Bold').text('Description');
+        doc.fontSize(10).font('Helvetica').text(sop.description, { align: 'justify' });
+        doc.moveDown();
+      }
+
+      // Pre-fetch all images referenced in module content
+      const imageCache = new Map();
+      const imgSrcRegex = /<img[^>]+src="([^"]+)"/g;
+      const attachmentIdRegex = /\/api\/sops\/attachments\/(\d+)\/file/;
+
+      if (modules && modules.length > 0) {
+        const attachmentIds = new Set();
+        modules.forEach((module) => {
+          if (!module.content) return;
+          let match;
+          while ((match = imgSrcRegex.exec(module.content)) !== null) {
+            const src = match[1];
+            const idMatch = src.match(attachmentIdRegex);
+            if (idMatch) {
+              attachmentIds.add(parseInt(idMatch[1], 10));
+            }
+          }
+        });
+
+        for (const attId of attachmentIds) {
+          try {
+            const attachment = await sopModuleAttachmentModel.getById(attId);
+            if (attachment && attachment.file_data && attachment.mime_type) {
+              imageCache.set(attId, {
+                data: attachment.file_data,
+                mime: attachment.mime_type,
+              });
+            }
+          } catch {
+            // Skip attachments that can't be loaded
+          }
+        }
+      }
+
+      // Modules
+      doc.fontSize(12).font('Helvetica-Bold').text('Modules');
+      doc.moveDown(5);
+
+      if (modules && modules.length > 0) {
+        modules.forEach((module, index) => {
+          // Module title
+          doc.fontSize(11).font('Helvetica-Bold').text(`Module ${index + 1}: ${module.title || 'Untitled'}`);
+          doc.moveDown(2);
+
+          // Module content - render text and embedded images
+          if (module.content) {
+            const rendered = renderModuleContentForPdf(module.content, imageCache, doc);
+            if (!rendered) {
+              doc.fontSize(9).font('Helvetica').text('(No text content)', { align: 'center', color: '#999' });
+            }
+          }
+
+          doc.moveDown(8);
+        });
+      } else {
+        doc.fontSize(9).font('Helvetica').text('No modules in this SOP.', { align: 'center', color: '#999' });
+      }
+
+      doc.end();
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+};
+
 module.exports = {
   sopController,
   moduleController,
@@ -538,4 +719,5 @@ module.exports = {
   assignmentController,
   acknowledgementController,
   approvalWorkflowController,
+  exportController,
 };

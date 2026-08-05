@@ -44,3 +44,30 @@ export const unarchiveSop = (sopId) => api.put(`/sops/${sopId}`, { status: 'Draf
 export const transitionSop = (sopId, data) => api.post(`/sops/${sopId}/transition`, data);
 export const getSharedSopModules = (token, versionId = null) =>
   api.get(`/sops/share/${token}/modules${versionId ? `?versionId=${versionId}` : ''}`);
+
+export const downloadSop = async (sopId) => {
+  try {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const response = await fetch(`/api/sops/${sopId}/export`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error?.message || `Download failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `SOP-${sopId}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("SOP download failed:", err);
+    throw err;
+  }
+};

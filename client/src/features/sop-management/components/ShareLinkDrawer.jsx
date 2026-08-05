@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { X, Copy, Check, Globe, Lock, Link2, Download, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/shared/components/ui/Toast";
-import { createShareLink, getShareLinks, revokeShareLink } from "@/features/sop-management/services/sopService";
+import { createShareLink, getShareLinks, revokeShareLink, downloadSop } from "@/features/sop-management/services/sopService";
 
 function Drawer({ open, onClose, title, children, footer }) {
   useEffect(() => {
@@ -113,10 +113,14 @@ function ShareLinkDrawer({ open, onClose, sopId }) {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!sopId) return;
-    const url = `${baseUrl}/sops/${sopId}/export`;
-    window.open(url, "_blank");
+    try {
+      await downloadSop(sopId);
+      toast.success("SOP downloaded");
+    } catch {
+      toast.error("Failed to download SOP");
+    }
   };
 
   const handleRevoke = async () => {
