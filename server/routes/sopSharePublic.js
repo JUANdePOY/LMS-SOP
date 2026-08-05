@@ -3,6 +3,7 @@ const { optionalAuthenticateToken } = require('../middleware/auth');
 const sopShareService = require('../services/sopShareService');
 const sopModel = require('../models/sopModel');
 const sopModuleService = require('../services/sopModuleService');
+const sopVersionModel = require('../models/sopVersionModel');
 
 const router = express.Router();
 
@@ -14,7 +15,17 @@ router.get('/:token/modules', async (req, res) => {
   try {
     const share = await sopShareService.getSharedSop(req.params.token, req.user || null);
 
-    const result = await sopModuleService.listModules(share.sop_id);
+    // The SOP's modules are version-scoped (sop_modules.sop_version_id).
+    // When no version is supplied, listModules() falls back to
+    // sop_version_id IS NULL, which returns nothing for versioned modules.
+    // Resolve the SOP's current version so the correct module set is served.
+    // An explicit ?versionId= is honored for parity with the authenticated
+    // editor; otherwise we resolve the current version from the shared SOP.
+    const versionId = req.query.versionId
+      ? parseInt(req.query.versionId, 10)
+      : await sopVersionModel.getCurrentVersionId(share.sop_id);
+
+    const result = await sopModuleService.listModules(share.sop_id, versionId);
     res.json({ success: true, data: result });
   } catch (error) {
     const code = error.code || 'INTERNAL_ERROR';

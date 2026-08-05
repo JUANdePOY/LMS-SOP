@@ -39,4 +39,5 @@ export const rejectSop = (sopId) => api.post(`/sops/${sopId}/reject`);
 export const publishSop = (sopId) => api.post(`/sops/${sopId}/publish`);
 
 export const transitionSop = (sopId, data) => api.post(`/sops/${sopId}/transition`, data);
-export const getSharedSopModules = (token) => api.get(`/sops/share/${token}/modules`);
+export const getSharedSopModules = (token, versionId = null) =>
+  api.get(`/sops/share/${token}/modules${versionId ? `?versionId=${versionId}` : ''}`);

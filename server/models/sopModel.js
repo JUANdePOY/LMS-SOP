@@ -265,6 +265,7 @@ async function create(data) {
     owner_user_id,
     status = 'Draft',
     version,
+    restriction_type,
   } = data;
 
   const insertCols = ['title', cols.code, 'description', 'department_id', 'category_id', cols.owner, 'status'];

@@ -208,20 +208,14 @@ export default function CertificatesPage() {
         </div>
       )}
 
-      {showForm && (
-        <Card className="p-6">
-          <h3 className="mb-4 text-lg font-semibold">
-            {editingTemplate ? 'Edit Template' : 'New Template'}
-          </h3>
-          <CertificateTemplateForm
-            initialSections={editingTemplate || defaultSections}
-            onSubmit={editingTemplate ? (data) => handleUpdateSubmit(editingTemplate.id, data) : handleCreateSubmit}
-            onCancel={handleFormClose}
-            saving={saving}
-            submitLabel={editingTemplate ? 'Update Template' : 'Create Template'}
-          />
-        </Card>
-      )}
+      <CertificateTemplateForm
+        open={showForm}
+        onClose={handleFormClose}
+        initialSections={editingTemplate || defaultSections}
+        onSubmit={editingTemplate ? (data) => handleUpdateSubmit(editingTemplate.id, data) : handleCreateSubmit}
+        saving={saving}
+        submitLabel={editingTemplate ? 'Update Template' : 'Create Template'}
+      />
 
       <CertificateTemplateViewModal
         open={showViewModal}

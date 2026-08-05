@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { getSharedSop, getSharedSopModules } from "@/features/sop-management/services/sopService";
+import SOP_CONTENT_STYLES from "@/features/sop-management/utils/sopContentStyles";
 
 function ModuleCard({ module }) {
   const statusColors = {
@@ -25,9 +26,14 @@ function ModuleCard({ module }) {
               </span>
             )}
           </div>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 line-clamp-3">
-            {module.content?.replace(/<[^>]*>/g, "") || "No content"}
-          </p>
+          {module.content && module.content.replace(/<[^>]*>/g, "").trim() ? (
+            <div
+              className={`mt-2 break-words [&_img]:max-w-full [&_img]:h-auto ${SOP_CONTENT_STYLES}`}
+              dangerouslySetInnerHTML={{ __html: module.content }}
+            />
+          ) : (
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">No content</p>
+          )}
           <div className="flex items-center gap-2 mt-2 text-xs text-neutral-400 dark:text-neutral-500">
             <span className="px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded text-neutral-600 dark:text-neutral-400">
               Sort: {module.sort_order}
@@ -71,22 +77,22 @@ export default function PublicSOPPage() {
 
   useEffect(() => {
     const fetchModules = async () => {
-      if (!token) return;
+      if (!token || loading || !sop) return;
       try {
         setModulesLoading(true);
-        const { data: modResponse } = await getSharedSopModules(token);
+        setModulesError(null);
+        const { data: modResponse } = await getSharedSopModules(token, sop?.current_version_id);
         setModules(modResponse?.data || []);
-      } catch {
-        setModulesError("Failed to load modules");
+      } catch (err) {
+        const message = err?.response?.data?.error?.message || "Failed to load modules";
+        setModulesError(message);
       } finally {
         setModulesLoading(false);
       }
     };
 
-    if (token) {
-      fetchModules();
-    }
-  }, [token]);
+    fetchModules();
+  }, [token, sop, loading]);
 
   if (loading) {
     return (
