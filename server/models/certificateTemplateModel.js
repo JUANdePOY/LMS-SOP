@@ -74,7 +74,7 @@ async function findAll(filters = {}) {
 async function findByIdentifier(identifier) {
   const isNumeric = /^\d+$/.test(String(identifier));
     const sql = isNumeric
-      ? `SELECT t.id, t.public_id, t.name, t.department_id, t.frame_filename, t.frame_storage_path, t.frame_mime_type, t.frame_size, t.frame_original_name,
+       ? `SELECT t.id, t.public_id, t.name, t.department_id, t.frame_filename, t.frame_storage_path, t.frame_data, t.frame_mime_type, t.frame_size, t.frame_original_name,
       t.orientation, t.width_px, t.height_px, t.sections, t.status, t.created_by, t.updated_by, t.created_at, t.updated_at, t.deleted_at, t.is_deleted,
       d.name AS department_name,
       creator.full_name AS created_by_name,
@@ -84,7 +84,7 @@ async function findByIdentifier(identifier) {
     LEFT JOIN users creator ON t.created_by = creator.id
     LEFT JOIN users updater ON t.updated_by = updater.id
     WHERE t.id = ? AND t.is_deleted = 0`
-      : `SELECT t.id, t.public_id, t.name, t.department_id, t.frame_filename, t.frame_storage_path, t.frame_mime_type, t.frame_size, t.frame_original_name,
+      : `SELECT t.id, t.public_id, t.name, t.department_id, t.frame_filename, t.frame_storage_path, t.frame_data, t.frame_mime_type, t.frame_size, t.frame_original_name,
       t.orientation, t.width_px, t.height_px, t.sections, t.status, t.created_by, t.updated_by, t.created_at, t.updated_at, t.deleted_at, t.is_deleted,
       d.name AS department_name,
       creator.full_name AS created_by_name,
@@ -105,7 +105,7 @@ async function findByIdentifier(identifier) {
 
 async function findById(id) {
   const [rows] = await db.query(
-    `SELECT t.id, t.public_id, t.name, t.department_id, t.frame_filename, t.frame_storage_path, t.frame_mime_type, t.frame_size, t.frame_original_name,
+    `SELECT t.id, t.public_id, t.name, t.department_id, t.frame_filename, t.frame_storage_path, t.frame_data, t.frame_mime_type, t.frame_size, t.frame_original_name,
             t.orientation, t.width_px, t.height_px, t.sections, t.status, t.created_by, t.updated_by, t.created_at, t.updated_at, t.deleted_at, t.is_deleted,
      d.name AS department_name,
      creator.full_name AS created_by_name,

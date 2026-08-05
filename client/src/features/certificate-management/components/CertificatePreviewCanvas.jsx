@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import api from '@/services/api';
+import { useToast } from '@/shared/components/ui/Toast';
 import { CERTIFICATE_SECTIONS } from '@/features/certificate-management/constants/certificateSections';
 import useSectionResize from '@/features/certificate-management/hooks/useSectionResize';
 import useSectionPositions from '@/features/certificate-management/hooks/useSectionPositions';
@@ -36,10 +37,12 @@ export default function CertificatePreviewCanvas({
   sections,
   framePreview,
   orientation,
-  widthPx,
+   widthPx,
   heightPx,
   onSectionPatch,
 }) {
+  const { toast } = useToast();
+
   // font_size values are authored against the template's native
   // width_px/height_px. Since the page element below is always rendered
   // at true 1:1 pixel size (zoom is applied via CSS transform on top of
@@ -129,6 +132,10 @@ export default function CertificatePreviewCanvas({
         })
         .catch((error) => {
           console.error('Failed to load certificate signature image', error);
+          toast.error(
+            error.response?.data?.message ||
+            `Failed to load signature image (id: ${id})`
+          );
         });
     });
   }, [signatureItems.join(',')]);
@@ -282,7 +289,7 @@ export default function CertificatePreviewCanvas({
                 const yPercent = data?.y_percent ?? section.yPercent ?? 50;
                 const widthPercent = data?.width_percent ?? section.defaultWidthPercent ?? 80;
                 const fontSize = data?.font_size || section.defaultFontSize;
-                const textAlign = data?.text_align || section.defaultAlign || 'center';
+                const textAlign = section.defaultAlign || 'center';
                 const fontFamily = data?.font_family || section.defaultFontFamily || 'inherit';
                 const lineHeight = data?.line_height || section.defaultLineHeight || 1.4;
                 const isBold = data?.font_weight === 'bold' || section.defaultWeight === 'bold';
@@ -322,19 +329,27 @@ export default function CertificatePreviewCanvas({
                                 <img
                                   src={signatureImageUrls[item.signature_id]}
                                   alt={item.label || item.signer_name || 'Signature image'}
-                                  className="mx-auto mb-2 h-16 w-auto object-contain"
+                                  className="mx-auto mb-1 h-12 w-auto object-contain"
                                   onError={(e) => { e.target.style.display = 'none'; }}
                                 />
                               ) : (
-                                <div className="h-16 mx-auto mb-2 w-full rounded bg-gray-100" />
+                                <div className="h-12 mx-auto mb-1 w-full rounded bg-gray-100" />
                               )
                             ) : (
-                              <div className="h-16" />
+                              <div className="h-12" />
                             )}
                             <div style={{ borderBottom: '1px solid rgba(0,0,0,0.35)', paddingBottom: 6 }}>
                               <span style={{ fontSize: `${fontSize * fontScale}px`, fontFamily, fontWeight: 600 }}>{item.signer_name || item.label || ''}</span>
                             </div>
-                            <div className="mt-1 text-xs text-gray-600">{item.position_title || ''}</div>
+                            <div
+                              className="mt-1 text-gray-600"
+                              style={{
+                                fontSize: `${Math.max(Math.round(fontSize * fontScale * 0.75), 10)}px`,
+                                fontFamily,
+                              }}
+                            >
+                              {item.position_title || ''}
+                            </div>
                           </div>
                         ))}
                       </div>

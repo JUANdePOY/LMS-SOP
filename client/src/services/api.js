@@ -44,7 +44,6 @@ export const getProfile = () => api.get('/auth/profile', { skipAuthRedirect: tru
 export const updateProfile = (data) => api.put('/auth/profile', data, { skipAuthRedirect: true });
 export const changePassword = (data) => api.put('/auth/profile/password', data, { skipAuthRedirect: true });
 export const uploadAvatar = (formData) => api.post('/auth/profile/avatar', formData, {
-  headers: { 'Content-Type': 'multipart/form-data' },
   skipAuthRedirect: true,
 });
 export const deleteAvatar = () => api.delete('/auth/profile/avatar', { skipAuthRedirect: true });

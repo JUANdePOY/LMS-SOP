@@ -180,9 +180,9 @@ export default function CertificateTemplateForm({
   const goBack = () => setCurrentStep((s) => Math.max(s - 1, 0));
 
   const handleSignatureUpload = async (formData) => {
-    const data = await uploadSignature(formData);
+    const response = await uploadSignature(formData);
     setShowSignatureUpload(false);
-    return data;
+    return response.data;
   };
 
   const handleCenterAll = useCallback(() => {

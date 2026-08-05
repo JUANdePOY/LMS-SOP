@@ -60,10 +60,18 @@ async function renderCertificate({ template, resolvedSections, signatures, isPre
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([template.width_px, template.height_px]);
 
-  const frameAbsPath = absolutePathFromRelative(template.frame_storage_path)
-    || path.resolve(certificateRoot(), template.frame_storage_path);
-  const frameBytes = await fs.readFile(frameAbsPath);
-  const frameImage = template.frame_storage_path.toLowerCase().endsWith('.png')
+  let frameBytes;
+  if (template.frame_data) {
+    frameBytes = template.frame_data;
+  } else {
+    const frameAbsPath = absolutePathFromRelative(template.frame_storage_path)
+      || path.resolve(certificateRoot(), template.frame_storage_path);
+    frameBytes = await fs.readFile(frameAbsPath);
+  }
+  const isPng = (template.frame_mime_type === 'image/png') ||
+    (template.frame_filename || '').toLowerCase().endsWith('.png') ||
+    (template.frame_storage_path || '').toLowerCase().endsWith('.png');
+  const frameImage = isPng
     ? await pdfDoc.embedPng(frameBytes)
     : await pdfDoc.embedJpg(frameBytes);
   page.drawImage(frameImage, { x: 0, y: 0, width: template.width_px, height: template.height_px });
@@ -91,7 +99,7 @@ async function renderCertificate({ template, resolvedSections, signatures, isPre
     const xPercent = data?.x_percent ?? section.xPercent ?? 50;
     const yPercent = data?.y_percent ?? section.yPercent ?? 50;
     const widthPercent = data?.width_percent ?? section.defaultWidthPercent ?? 80;
-    const align = data?.text_align || section.defaultAlign || 'center';
+    const align = section.defaultAlign || 'center';
     const boxWidthPx = (widthPercent / 100) * template.width_px;
 
     let yPos = template.height_px - (yPercent / 100) * template.height_px;
@@ -178,8 +186,9 @@ async function renderCertificate({ template, resolvedSections, signatures, isPre
     const imgWidth = Math.min(100, slotWidth - 10);
     const imgHeight = imgWidth * 0.4;
     const labelFont = fonts.regular;
-    const labelSize = 11;
-    const subLabelSize = 9;
+    const sigFontSize = sigData?.font_size ?? sigSection.defaultFontSize ?? 13;
+    const labelSize = sigFontSize;
+    const subLabelSize = Math.max(Math.round(sigFontSize * 0.75), 10);
 
     // Coerce to string on both sides — DB driver / JSON round-trip can
     // leave one side as a number and the other as a string, which would
@@ -191,18 +200,29 @@ async function renderCertificate({ template, resolvedSections, signatures, isPre
       const slotCenterX = bandStartX + slotWidth * i + slotWidth / 2;
       const sigRecord = item.signature_id ? signaturesById.get(String(item.signature_id)) : null;
 
-      if (sigRecord?.storage_path) {
+      if (sigRecord) {
         try {
-          const sigAbsPath = absolutePathFromRelative(sigRecord.storage_path)
-            || path.resolve(certificateRoot(), sigRecord.storage_path);
-          const sigBytes = await fs.readFile(sigAbsPath);
-          const sigImage = await pdfDoc.embedPng(sigBytes);
-          page.drawImage(sigImage, {
-            x: slotCenterX - imgWidth / 2,
-            y: bandY,
-            width: imgWidth,
-            height: imgHeight,
-          });
+          // Prefer BLOB data stored in the DB; fall back to the file on disk
+          // so signatures whose file was lost (or never persisted to disk)
+          // still render in the PDF.
+          let sigBytes;
+          if (sigRecord.signature_data) {
+            sigBytes = sigRecord.signature_data;
+          } else if (sigRecord.storage_path) {
+            const sigAbsPath = absolutePathFromRelative(sigRecord.storage_path)
+              || path.resolve(certificateRoot(), sigRecord.storage_path);
+            sigBytes = await fs.readFile(sigAbsPath);
+          }
+
+          if (sigBytes) {
+            const sigImage = await pdfDoc.embedPng(sigBytes);
+            page.drawImage(sigImage, {
+              x: slotCenterX - imgWidth / 2,
+              y: bandY,
+              width: imgWidth,
+              height: imgHeight,
+            });
+          }
         } catch (err) {
           // A missing/corrupt signature image shouldn't take down the
           // whole PDF — skip just the image, still render the name/title

@@ -139,7 +139,7 @@ export function normalizeSections(raw = {}) {
       x_percent: incoming.x_percent ?? section.xPercent ?? 50,
       y_percent: incoming.y_percent ?? section.yPercent ?? 50,
       width_percent: incoming.width_percent ?? section.defaultWidthPercent ?? 80,
-      text_align: incoming.text_align || section.defaultAlign || 'center',
+      text_align: section.defaultAlign || 'center',
       font_size: incoming.font_size || section.defaultFontSize,
       font_weight: incoming.font_weight || section.defaultWeight || 'normal',
       font_style: incoming.font_style || section.defaultStyle || 'normal',
