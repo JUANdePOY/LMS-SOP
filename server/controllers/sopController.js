@@ -9,6 +9,7 @@ const sopShareService = require('../services/sopShareService');
 const sopAssignmentService = require('../services/sopAssignmentService');
 const sopAcknowledgementService = require('../services/sopAcknowledgementService');
 const approvalWorkflowController = require('../controllers/approvalWorkflowController');
+const { validateShareLinkPayload } = require('../validators/sopShareValidator');
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
@@ -127,7 +128,12 @@ const sopController = {
 const moduleController = {
   async list(req, res) {
     try {
-      const result = await sopModuleService.listModules(parseInt(req.params.sopId, 10));
+      const versionIdParam = req.query.versionId;
+      const versionId = versionIdParam ? parseInt(versionIdParam, 10) : null;
+      const result = await sopModuleService.listModules(
+        parseInt(req.params.sopId, 10),
+        versionId
+      );
       res.json({ success: true, data: result });
     } catch (error) {
       handleError(res, error);
@@ -145,7 +151,11 @@ const moduleController = {
 
   async update(req, res) {
     try {
-      const result = await sopModuleService.updateModule(parseInt(req.params.moduleId, 10), req.body, req.user.id);
+      const result = await sopModuleService.updateModule(
+        parseInt(req.params.moduleId, 10),
+        req.body,
+        req.user.id
+      );
       res.json({ success: true, data: result, message: 'Module updated successfully' });
     } catch (error) {
       handleError(res, error);
@@ -221,7 +231,8 @@ const attachmentController = {
           file_extension: path.extname(file.originalname).toLowerCase(),
           file_data: file.buffer,
         },
-        req.user.id
+        req.user.id,
+        req
       );
       res.status(201).json({ success: true, data: result, message: 'Attachment uploaded successfully' });
     } catch (error) {
@@ -350,6 +361,12 @@ const workflowController = {
   async approve(req, res) {
     try {
       const body = req.body || {};
+      // Only admin or super_admin can approve
+      if (!['admin', 'super_admin'].includes(req.user?.role)) {
+        const error = new Error('Only admin or super_admin can approve SOPs');
+        error.code = 'UNAUTHORIZED';
+        throw error;
+      }
       const result = await sopWorkflowService.transitionSop(parseInt(req.params.sopId, 10), 'Approved', req.user.id, { comment: body.comment || null });
       res.json({ success: true, data: result, message: 'SOP approved' });
     } catch (error) {
@@ -360,6 +377,12 @@ const workflowController = {
   async reject(req, res) {
     try {
       const body = req.body || {};
+      // Only admin or super_admin can reject
+      if (!['admin', 'super_admin'].includes(req.user?.role)) {
+        const error = new Error('Only admin or super_admin can reject SOPs');
+        error.code = 'UNAUTHORIZED';
+        throw error;
+      }
       const result = await sopWorkflowService.transitionSop(parseInt(req.params.sopId, 10), 'Draft', req.user.id, { comment: body.comment || null });
       res.json({ success: true, data: result, message: 'SOP rejected and returned to draft' });
     } catch (error) {
@@ -401,8 +424,45 @@ const shareController = {
 
   async create(req, res) {
     try {
-      const result = await sopShareService.createShare(parseInt(req.params.sopId, 10), req.body, req.user.id);
+      const result = await sopShareService.createShare(
+        parseInt(req.params.sopId, 10),
+        req.body,
+        req.user.id
+      );
       res.status(201).json({ success: true, data: result, message: 'Share created successfully' });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  async createLink(req, res) {
+    try {
+      const validation = validateShareLinkPayload(req.body);
+      if (!validation.valid) {
+        const error = new Error(validation.message);
+        error.code = 'VALIDATION_ERROR';
+        error.details = validation.details;
+        throw error;
+      }
+
+      const result = await sopShareService.createShareLink(
+        parseInt(req.params.sopId, 10),
+        validation,
+        req.user
+      );
+      res.status(201).json({ success: true, data: result, message: 'Share link created successfully' });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  async revoke(req, res) {
+    try {
+      const result = await sopShareService.revokeShare(
+        parseInt(req.params.shareId, 10),
+        req.user.id
+      );
+      res.json({ success: true, data: result, message: 'Share link revoked' });
     } catch (error) {
       handleError(res, error);
     }

@@ -265,10 +265,12 @@ async function create(data) {
     owner_user_id,
     status = 'Draft',
     version,
+    restriction_type,
   } = data;
 
   const insertCols = ['title', cols.code, 'description', 'department_id', 'category_id', cols.owner, 'status'];
   const insertVals = [title, code || null, description || null, department_id || null, category_id || null, owner_user_id || null, status || 'Draft'];
+  if (cols.hasRestrictionType) { insertCols.push('restriction_type'); insertVals.push(restriction_type || 'public'); }
 
   // The real table has BOTH owner_user_id (nullable) and owner_id
   // (NOT NULL, no default). getSopsColumns() only detects/writes whichever
@@ -314,6 +316,7 @@ async function update(id, data) {
   const params = [];
 
   const allowedFields = ['title', cols.code, 'description', 'department_id', 'category_id', 'status'];
+  if (cols.hasRestrictionType) { allowedFields.push('restriction_type'); }
   for (const field of allowedFields) {
     if (data[field] !== undefined) {
       sets.push(`${field} = ?`);

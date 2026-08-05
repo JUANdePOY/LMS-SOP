@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAssignmentCascade } from '@/features/sop-management/hooks/useAssignmentCascade';
 import { createAssignment } from '@/features/sop-management/services/assignmentService';
 import CheckboxList from './CheckboxList';
+import GroupedCheckboxList from './GroupedCheckboxList';
 
 export default function AssignmentForm({ sopId, onCreated }) {
   const cascade = useAssignmentCascade();
@@ -49,13 +50,12 @@ export default function AssignmentForm({ sopId, onCreated }) {
 
       <div>
         <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Departments</label>
-        <CheckboxList
-          items={cascade.filteredDepartments}
+        <GroupedCheckboxList
+          items={cascade.groupedDepartments}
           selectedIds={cascade.selectedDeptIds}
           onToggle={cascade.toggleDepartment}
           labelKey="name"
           valueKey="id"
-          placeholder="Select departments..."
           loading={cascade.loading.departments}
           emptyText={cascade.selectedBusinessIds.length ? 'No departments for selected businesses' : 'Select a business first'}
         />
@@ -87,13 +87,16 @@ export default function AssignmentForm({ sopId, onCreated }) {
           onChange={(e) => cascade.setUserSearch(e.target.value)}
           className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] mb-2 outline-none focus:border-blue-500 placeholder:text-[var(--text-muted)]"
         />
-        <CheckboxList
+        <GroupedCheckboxList
           items={cascade.users}
           selectedIds={cascade.selectedUserIds}
           onToggle={cascade.toggleUser}
+          onToggleBulk={cascade.toggleUsers}
+          groupKey="business_name"
+          subgroupKey="department_name"
           labelKey="full_name"
+          subLabelKey="position_title"
           valueKey="id"
-          placeholder="Select users..."
           loading={cascade.loading.users}
           emptyText={cascade.selectedDeptIds.length ? 'No users found' : 'Select a department first'}
         />

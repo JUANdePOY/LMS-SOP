@@ -9,6 +9,14 @@ const {
   absolutePathFromRelative,
 } = require('../config/uploads');
 
+// Minimal 120x48 gray PNG placeholder used when a signature is
+// soft-deleted or hard-deleted but still referenced by a template
+// signatures_seal items, so the preview and PDF rendering dont break.
+const PLACEHOLDER_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAIAAAAAYCAYAAAAVjKmxAAABp0lEQVR4nO3BMQEAAADCoPVP7WsIoAAAAAAAA',
+  'base64'
+);
+
 async function saveSignatureFile(file) {
   if (!file || !file.buffer) {
     const error = new Error('Signature image buffer is required');
@@ -42,11 +50,25 @@ async function removeSignatureFile(storagePath) {
 }
 
 async function getSignatureImage(id) {
-  const signature = await getSignature(id);
+  let signature;
+  try {
+    signature = await getSignature(id);
+  } catch (err) {
+    if (err.code === 'NOT_FOUND') {
+      return {
+        buffer: PLACEHOLDER_PNG,
+        mime: 'image/png',
+        filename: 'placeholder.png',
+      };
+    }
+    throw err;
+  }
   if (!signature) {
-    const error = new Error('Signature image not found');
-    error.code = 'NOT_FOUND';
-    throw error;
+    return {
+      buffer: PLACEHOLDER_PNG,
+      mime: 'image/png',
+      filename: 'placeholder.png',
+    };
   }
 
   if (signature.signature_data) {

@@ -67,7 +67,7 @@ export function useSOPList() {
       const { data: sopData } = await createSop({
         title: newTitle,
         description: newDescription,
-        department_id: cascade.selectedDeptIds.length > 0 ? cascade.selectedDeptIds[0] : null,
+        department_id: cascade.selectedDeptIds.length > 0 ? cascade.selectedDeptIds[0] : (cascade.filteredDepartments[0]?.id || null),
         status: SOP_STATUSES.DRAFT,
         restriction_type: newRestrictionType,
       });

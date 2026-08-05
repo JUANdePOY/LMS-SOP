@@ -8,7 +8,7 @@ import AuditTimeline from '@/features/sop-management/components/AuditTimeline';
 import ShareLinkDrawer from '@/features/sop-management/components/ShareLinkDrawer';
 import { useVersions } from '@/features/sop-management/hooks/useVersions';
 import { createVersion } from '@/features/sop-management/services/versionService';
-import { advanceWorkflow, getWorkflow } from '@/features/sop-management/services/sopService';
+import { getWorkflow, getAuditLogs, approveSop, rejectSop } from '@/features/sop-management/services/sopService';
 
 function SidebarCard({ title, children, className }) {
   return (
@@ -21,7 +21,7 @@ function SidebarCard({ title, children, className }) {
   );
 }
 
-export default function SOPSidebar({ sopId, workflow, setWorkflow, auditLogs, versions, versionsLoading, versionsError, workflowLoading = false, auditLogsLoading = false, onVersionRestore, onAuditRefresh, onSopRefresh, refetchVersions }) {
+export default function SOPSidebar({ sopId, sop, workflow, setWorkflow, auditLogs, versions, versionsLoading, versionsError, workflowLoading = false, auditLogsLoading = false, onVersionRestore, onAuditRefresh, onSopRefresh, refetchVersions }) {
   const [showVersionTimeline, setShowVersionTimeline] = useState(false);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [showNewVersionForm, setShowNewVersionForm] = useState(false);
@@ -35,29 +35,29 @@ export default function SOPSidebar({ sopId, workflow, setWorkflow, auditLogs, ve
     <>
       <SidebarCard title="Approvals">
         <ApprovalPanel
-          workflow={workflow}
+          sop={sop}
           loading={workflowLoading}
-          onApprove={async ({ instanceId, stepId, comments }) => {
+          onApprove={async ({ sopId, comments }) => {
             try {
-              await advanceWorkflow(sopId, { instanceId, stepId, action: 'Approved', comments });
+              await approveSop(sopId);
               const { data } = await getWorkflow(sopId);
               setWorkflow(data?.data || null);
               if (onAuditRefresh) onAuditRefresh();
               if (onSopRefresh) onSopRefresh();
-              toast.success('Approval recorded successfully');
+              toast.success('SOP approved successfully');
             } catch (err) {
               const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Approve failed';
               toast.error(message);
             }
           }}
-          onReject={async ({ instanceId, stepId, comments }) => {
+          onReject={async ({ sopId, comments }) => {
             try {
-              await advanceWorkflow(sopId, { instanceId, stepId, action: 'Rejected', comments });
+              await rejectSop(sopId);
               const { data } = await getWorkflow(sopId);
               setWorkflow(data?.data || null);
               if (onAuditRefresh) onAuditRefresh();
               if (onSopRefresh) onSopRefresh();
-              toast.success('Rejection recorded successfully');
+              toast.success('SOP rejected successfully');
             } catch (err) {
               const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Reject failed';
               toast.error(message);
@@ -74,27 +74,34 @@ export default function SOPSidebar({ sopId, workflow, setWorkflow, auditLogs, ve
             <Plus size={16} className="text-indigo-600 dark:text-indigo-400" />
           </button>
         </div>
-        {showNewVersionForm && (
-          <form
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (!newVersion.trim()) return;
-              setCreatingVersion(true);
-              try {
-                await createVersion(sopId, { version: newVersion, change_summary: changeSummary || null, status: 'Draft' });
-                setShowNewVersionForm(false);
-                setNewVersion('');
-                setChangeSummary('');
-                if (refetchVersions) await refetchVersions();
-                if (onSopRefresh) onSopRefresh();
-              } catch (err) {
-                console.error('Failed to create version:', err);
-              } finally {
-                setCreatingVersion(false);
-              }
-            }}
-            className="mt-2 space-y-2 p-2 border border-neutral-200 dark:border-neutral-700 rounded-lg"
-          >
+          {showNewVersionForm && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newVersion.trim()) return;
+                setCreatingVersion(true);
+                try {
+                  const result = await createVersion(sopId, {
+                    version: newVersion,
+                    change_summary: changeSummary || null,
+                    status: 'Draft',
+                    copy_content: true, // Copy current content to new version for isolation
+                  });
+                  setShowNewVersionForm(false);
+                  setNewVersion('');
+                  setChangeSummary('');
+                  if (refetchVersions) await refetchVersions();
+                  if (onSopRefresh) onSopRefresh();
+                  toast.success(`New version ${newVersion} created with copied content`);
+                } catch (err) {
+                  const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Failed to create version';
+                  toast.error(message);
+                } finally {
+                  setCreatingVersion(false);
+                }
+              }}
+              className="mt-2 space-y-2 p-2 border border-neutral-200 dark:border-neutral-700 rounded-lg"
+            >
             <input
               type="text"
               value={newVersion}

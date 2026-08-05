@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getModules, createModule, updateModule, deleteModule, updateSortOrder, submitForReview } from '@/features/sop-management/services/moduleService';
 
-export function useModules(sopId) {
+export function useModules(sopId, versionId = null) {
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,21 +13,25 @@ export function useModules(sopId) {
     }
     try {
       setLoading(true);
-      const response = await getModules(sopId);
+      const response = await getModules(sopId, versionId);
       setModules(response.data.data || []);
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, [sopId]);
+  }, [sopId, versionId]);
 
   useEffect(() => {
     fetchModules();
   }, [fetchModules]);
 
   const addModule = async (data) => {
-    const response = await createModule(sopId, data);
+    const moduleData = { ...data };
+    if (versionId !== null && versionId !== undefined) {
+      moduleData.sop_version_id = versionId;
+    }
+    const response = await createModule(sopId, moduleData);
     setModules((prev) => [...prev, response.data.data]);
     return response.data.data;
   };

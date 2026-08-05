@@ -7,17 +7,20 @@ export const getCertificateTemplate = (id) =>
   api.get(`/certificate-templates/${id}`);
 
 export const createCertificateTemplate = (formData) =>
-  api.post('/certificate-templates', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  api.post('/certificate-templates', formData);
 
 export const updateCertificateTemplate = (id, formData) =>
-  api.put(`/certificate-templates/${id}`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  api.put(`/certificate-templates/${id}`, formData);
 
 export const deleteCertificateTemplate = (id) =>
   api.delete(`/certificate-templates/${id}`);
+
+export const downloadTemplatePdf = async (id) => {
+  const response = await api.get(`/certificate-templates/${id}/download`, {
+    responseType: 'blob',
+  });
+  return response.data;
+};
 
 export const getCertificateTemplateStats = () =>
   api.get('/certificate-templates/stats');
@@ -29,9 +32,7 @@ export const getSignature = (id) =>
   api.get(`/certificate-signatures/${id}`);
 
 export const createSignature = (formData) =>
-  api.post('/certificate-signatures', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  api.post('/certificate-signatures', formData);
 
 export const updateSignature = (id, data) =>
   api.put(`/certificate-signatures/${id}`, data);

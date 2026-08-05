@@ -18,6 +18,7 @@ async function getModulesColumns() {
       softDelete: cols.has('is_deleted') ? 'is_deleted' : 'deleted_at',
       hasUpdatedBy: cols.has('updated_by'),
       hasSortOrder: cols.has('sort_order'),
+      hasVersionId: cols.has('sop_version_id'),
     };
   }
   return modulesColumns;
@@ -29,14 +30,45 @@ function notDeletedClause(cols, alias = 'm') {
     : `${alias}.deleted_at IS NULL`;
 }
 
-async function listModules(sopId) {
+/**
+ * Build the version filter clause. When the current version has content
+ * (version_id IS NOT NULL and there are module rows for it), we use a
+ * version-scoped query; otherwise we fall back to the legacy flat query
+ * keyed only on sop_id.
+ */
+function versionFilterClause(cols, alias = 'm', versionId = null) {
+  // If the table has the column AND a versionId is provided, filter by it
+  if (cols.hasVersionId && versionId !== null && versionId !== undefined) {
+    return `${alias}.sop_version_id = ?`;
+  }
+  // Fallback: only show modules with no version (legacy content) if no version provided
+  // OR modules whose version matches, with NULL-safe fallback for migration
+  return `(${alias}.sop_version_id IS NULL OR ${alias}.sop_version_id = ?)`;
+}
+
+async function listModules(sopId, versionId = null) {
   const cols = await getModulesColumns();
+  const params = [sopId];
+
+  let versionClause = '';
+  if (cols.hasVersionId) {
+    if (versionId !== null && versionId !== undefined) {
+      // Version-scoped query: only show modules for this version
+      versionClause = ' AND m.sop_version_id = ?';
+      params.push(versionId);
+    } else {
+      // No version specified: show legacy modules (NULL version) — these are modules
+      // created before version scoping was introduced
+      versionClause = ' AND m.sop_version_id IS NULL';
+    }
+  }
+
   const [rows] = await db.query(`
     SELECT m.*
     FROM sop_modules m
-    WHERE m.sop_id = ? AND ${notDeletedClause(cols)}
+    WHERE m.sop_id = ? AND ${notDeletedClause(cols)}${versionClause}
     ORDER BY m.sort_order ASC, m.id ASC
-  `, [sopId]);
+  `, params);
   return rows;
 }
 
@@ -61,11 +93,17 @@ async function getModuleByIdIncludingDeleted(moduleId) {
 }
 
 async function createModule(data) {
-  const { sop_id, title, content, sort_order, created_by } = data;
+  const { sop_id, title, content, sort_order, created_by, sop_version_id } = data;
   const cols = await getModulesColumns();
 
   const insertCols = ['sop_id', 'title', 'content', 'sort_order', 'created_by'];
   const insertVals = [sop_id, title || null, content || null, sort_order || 1, created_by || null];
+
+  // Add version_id if the column exists
+  if (cols.hasVersionId && sop_version_id !== undefined) {
+    insertCols.push('sop_version_id');
+    insertVals.push(sop_version_id || null);
+  }
 
   if (cols.hasUpdatedBy) {
     insertCols.push('updated_by');
@@ -123,15 +161,28 @@ async function permanentDeleteModule(moduleId) {
   return result.affectedRows;
 }
 
-async function listTrashedModules(sopId) {
+async function listTrashedModules(sopId, versionId = null) {
   const cols = await getModulesColumns();
+  const params = [sopId];
+  let versionClause = '';
+
   const deletedClause = cols.softDelete === 'is_deleted' ? 'm.is_deleted = TRUE' : 'm.deleted_at IS NOT NULL';
+
+  if (cols.hasVersionId) {
+    if (versionId !== null && versionId !== undefined) {
+      versionClause = ' AND m.sop_version_id = ?';
+      params.push(versionId);
+    } else {
+      versionClause = ' AND m.sop_version_id IS NULL';
+    }
+  }
+
   const [rows] = await db.query(`
     SELECT m.*
     FROM sop_modules m
-    WHERE m.sop_id = ? AND ${deletedClause}
+    WHERE m.sop_id = ? AND ${deletedClause}${versionClause}
     ORDER BY m.sort_order ASC, m.id ASC
-  `, [sopId]);
+  `, params);
   return rows;
 }
 

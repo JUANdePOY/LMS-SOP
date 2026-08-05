@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { fetchBusinesses, fetchDepartments, fetchPositions, fetchUsers } from '@/features/sop-management/services/assignmentService';
 
 export function useAssignmentCascade() {
@@ -25,6 +25,25 @@ export function useAssignmentCascade() {
     ? departments.filter((d) => selectedBusinessIds.includes(d.business_id))
     : departments;
 
+  const deptMap = useMemo(() => {
+    const map = new Map();
+    departments.forEach((d) => map.set(d.id, d));
+    return map;
+  }, [departments]);
+
+  const businessMap = useMemo(() => {
+    const map = new Map();
+    businesses.forEach((b) => map.set(b.id, b));
+    return map;
+  }, [businesses]);
+  const groupedDepartments = useMemo(() => {
+    return filteredDepartments.map((dept) => ({
+      ...dept,
+      business_name: businessMap.get(dept.business_id)?.business_name || 'Unknown Business',
+    }));
+  }, [filteredDepartments, businessMap]);
+
+
   const loadDepartments = useCallback(async () => {
     setLoading((p) => ({ ...p, departments: true }));
     try {
@@ -41,8 +60,6 @@ export function useAssignmentCascade() {
       if (!deptIds.length) {
         setPositions([]);
         setSelectedPositions([]);
-        setUsers([]);
-        setSelectedUserIds([]);
         return;
       }
       setLoading((p) => ({ ...p, positions: true }));
@@ -56,8 +73,6 @@ export function useAssignmentCascade() {
       }
       setPositions(Array.from(allPositions).sort());
       setSelectedPositions([]);
-      setUsers([]);
-      setSelectedUserIds([]);
       setLoading((p) => ({ ...p, positions: false }));
     },
     []
@@ -66,32 +81,60 @@ export function useAssignmentCascade() {
   useEffect(() => { loadPositions(selectedDeptIds); }, [selectedDeptIds, loadPositions]);
 
   const loadUsers = useCallback(
-    async (deptId, posName) => {
-      if (!deptId) { setUsers([]); setTotalUsers(0); return; }
+    async (deptIds) => {
+      if (!deptIds.length) {
+        setUsers([]);
+        setTotalUsers(0);
+        setSelectedUserIds([]);
+        return;
+      }
       setLoading((p) => ({ ...p, users: true }));
       try {
-        const r = await fetchUsers(deptId, {
-          positionName: posName || undefined,
-          search: userSearch || undefined,
-          limit: 100,
-        });
-        setUsers(Array.isArray(r?.data?.data) ? r.data.data : (r.data?.data?.rows || []));
-      } catch { setUsers([]); }
+        const allUsers = [];
+        const seenIds = new Set();
+        for (const deptId of deptIds) {
+          try {
+            const r = await fetchUsers(deptId, {
+              search: userSearch || undefined,
+              limit: 100,
+            });
+            const usersList = Array.isArray(r?.data?.data) ? r.data.data : (r.data?.data?.rows || []);
+            const dept = deptMap.get(deptId);
+            const business = dept ? businessMap.get(dept.business_id) : null;
+            usersList.forEach((user) => {
+              if (!seenIds.has(user.id)) {
+                seenIds.add(user.id);
+                allUsers.push({
+                  ...user,
+                  department_id: deptId,
+                  department_name: dept?.name || '',
+                  business_id: dept?.business_id,
+                  business_name: business?.business_name || '',
+                });
+              }
+            });
+          } catch { /* ignore individual department failures */ }
+        }
+        setUsers(allUsers);
+        setTotalUsers(allUsers.length);
+      } catch {
+        setUsers([]);
+        setTotalUsers(0);
+      }
       setLoading((p) => ({ ...p, users: false }));
     },
-    [userSearch]
+    [userSearch, deptMap, businessMap]
   );
 
   useEffect(() => {
-    const deptId = selectedDeptIds[0];
-    const posName = selectedPositions[0];
-    if (deptId) {
-      loadUsers(deptId, posName);
+    if (selectedDeptIds.length > 0) {
+      loadUsers(selectedDeptIds);
     } else {
       setUsers([]);
       setTotalUsers(0);
+      setSelectedUserIds([]);
     }
-  }, [selectedDeptIds, selectedPositions, loadUsers]);
+  }, [selectedDeptIds, loadUsers]);
 
   const toggleBusiness = (id) =>
     setSelectedBusinessIds((prev) => {
@@ -118,9 +161,21 @@ export function useAssignmentCascade() {
       prev.includes(id) ? prev.filter((u) => u !== id) : [...prev, id]
     );
 
+  const toggleUsers = useCallback((ids) => {
+    setSelectedUserIds((prev) => {
+      const allSelected = ids.every((id) => prev.includes(id));
+      if (allSelected) {
+        const idSet = new Set(ids);
+        return prev.filter((u) => !idSet.has(u));
+      }
+      return Array.from(new Set([...prev, ...ids]));
+    });
+  }, []);
+
   return {
     businesses,
     filteredDepartments,
+    groupedDepartments,
     departments,
     positions,
     users,
@@ -137,6 +192,7 @@ export function useAssignmentCascade() {
     toggleDepartment,
     togglePosition,
     toggleUser,
+    toggleUsers,
     loading,
     userSearch,
     setUserSearch,

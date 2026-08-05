@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('./config/database');
 
+
 require('dotenv').config();
 
 console.log('LMS-SOP Server starting...');
@@ -49,6 +50,7 @@ const categoriesRoutes = require('./routes/categories');
 const businessesRoutes = require('./routes/businesses');
 const hierarchyRoutes = require('./routes/hierarchy');
 const sopsRoutes = require('./routes/sops');
+const sopSharePublicRouter = require('./routes/sopSharePublic');
 const coursesRoutes = require('./routes/courses');
 const enrollmentsRoutes = require('./routes/enrollments');
 const { courseRoutes: progressCourseRoutes, lessonRoutes: progressLessonRoutes } = require('./routes/progress');
@@ -62,6 +64,7 @@ const eventsRoutes = require('./routes/events');
 const messagesRoutes = require('./routes/messages');
 
 const { templateRouter, signatureRouter, issuanceRouter } = require('./routes/certificates');
+const sopAttachmentPublicFile = require('./services/sopAttachmentPublicFile');
 
 const { getUploadRoot } = require('./config/uploads');
 
@@ -100,6 +103,8 @@ app.use('/api/roles', rolesRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/businesses', businessesRoutes);
 app.use('/api/hierarchy', hierarchyRoutes);
+app.use('/api/sops/attachments', sopAttachmentPublicFile);
+app.use('/api/sops/share', sopSharePublicRouter);
 app.use('/api/sops', sopsRoutes);
 
 app.use('/api/courses', coursesRoutes);

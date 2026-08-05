@@ -30,6 +30,7 @@ const CourseLibraryDetailsPage = lazy(() => import("@/features/course_management
 const SOPListPage    = lazy(() => import("@/features/sop-management/pages/SOPListPage"));
 const SOPWorkspacePage = lazy(() => import("@/features/sop-management/pages/SOPWorkspacePage"));
 const SOPVersionPage = lazy(() => import("@/features/sop-management/pages/SOPVersionPage"));
+const PublicSOPPage = lazy(() => import("@/features/sop-management/pages/PublicSOPPage"));
 const CertificateTemplatesPage = lazy(() => import("@/features/certificate-management/pages/CertificateTemplatesPage"));
 const MyCertificatesPage = lazy(() => import("@/features/certificate-management/pages/MyCertificatesPage"));
 const VerifyCertificatePage = lazy(() => import("@/features/certificate-management/pages/VerifyCertificatePage"));
@@ -121,6 +122,11 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: wrap(Login),
+  },
+  {
+    path: "s/:token",
+    element: wrap(PublicSOPPage),
+    handle: { title: "SOP Link" },
   },
   {
     path: "/",

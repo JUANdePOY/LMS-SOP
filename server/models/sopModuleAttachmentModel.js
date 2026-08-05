@@ -10,6 +10,7 @@ async function getAttachmentColumns() {
     softDelete: cols.has('is_deleted') ? 'is_deleted' : 'deleted_at',
     hasOriginalName: cols.has('original_name'),
     hasUpdatedAt: cols.has('updated_at'),
+    hasVersionId: cols.has('sop_version_id'),
   };
 }
 
@@ -27,11 +28,26 @@ function notDeletedClause(cols, alias = 'a') {
     : `${alias}.deleted_at IS NULL`;
 }
 
-async function listByModule(moduleId) {
+/**
+ * Build version filter clause for attachments. Returns [params, clause].
+ * - If versionId is provided and column exists: filter by exact version
+ * - If column exists but no versionId: show null-version (legacy) + current version
+ */
+function buildVersionFilter(cols, versionId = null) {
+  if (!cols.hasVersionId) return [[], ''];
+  if (versionId !== null && versionId !== undefined) {
+    return [[versionId], 'AND a.sop_version_id = ?'];
+  }
+  // Default: show legacy attachments (no version) plus all versions for backward compat
+  return [[], ''];
+}
+
+async function listByModule(moduleId, versionId = null) {
   const cols = await getCachedAttachmentColumns();
+  const [params, versionClause] = buildVersionFilter(cols, versionId);
   const [rows] = await db.query(
-    `SELECT * FROM sop_module_attachments a WHERE a.module_id = ? AND ${notDeletedClause(cols)} ORDER BY a.created_at DESC`,
-    [moduleId]
+    `SELECT * FROM sop_module_attachments a WHERE a.module_id = ? AND ${notDeletedClause(cols)} ${versionClause} ORDER BY a.created_at DESC`,
+    [moduleId, ...params]
   );
   return rows;
 }
@@ -65,6 +81,7 @@ async function createAttachment(data) {
     file_data,
     uploaded_by,
     link_url,
+    sop_version_id,
   } = data;
   const cols = await getCachedAttachmentColumns();
 
@@ -94,6 +111,11 @@ async function createAttachment(data) {
       insertCols.push('original_name');
       insertVals.push(original_name || null);
     }
+  }
+
+  if (sop_version_id !== undefined && cols.hasVersionId) {
+    insertCols.push('sop_version_id');
+    insertVals.push(sop_version_id || null);
   }
 
   if (mime_type !== undefined && mime_type !== null) {
@@ -171,12 +193,13 @@ async function permanentDeleteAttachment(attachmentId) {
   return result.affectedRows;
 }
 
-async function listTrashedAttachments(moduleId) {
+async function listTrashedAttachments(moduleId, versionId = null) {
   const cols = await getCachedAttachmentColumns();
   const deletedClause = cols.softDelete === 'is_deleted' ? 'a.is_deleted = TRUE' : 'a.deleted_at IS NOT NULL';
+  const [params, versionClause] = buildVersionFilter(cols, versionId);
   const [rows] = await db.query(
-    `SELECT * FROM sop_module_attachments a WHERE a.module_id = ? AND ${deletedClause} ORDER BY a.created_at DESC`,
-    [moduleId]
+    `SELECT * FROM sop_module_attachments a WHERE a.module_id = ? AND ${deletedClause} ${versionClause} ORDER BY a.created_at DESC`,
+    [moduleId, ...params]
   );
   return rows;
 }

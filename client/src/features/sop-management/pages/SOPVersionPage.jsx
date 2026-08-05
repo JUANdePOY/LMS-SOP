@@ -14,10 +14,10 @@ function SOPVersionPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [versionRes, modulesRes] = await Promise.all([
-          api.get(`/sops/${sopId}/versions/${versionId}`),
-          api.get(`/sops/${sopId}/modules`),
-        ]);
+      const [versionRes, modulesRes] = await Promise.all([
+        api.get(`/sops/${sopId}/versions/${versionId}`),
+        api.get(`/sops/${sopId}/modules?versionId=${versionId}`),
+      ]);
         setVersion(versionRes.data?.data || null);
         setModules(modulesRes.data?.data || []);
       } catch (err) {
@@ -49,6 +49,11 @@ function SOPVersionPage() {
       <h1 className="text-xl font-bold mb-4">Version {version.version}</h1>
       <div className="mb-4">
         <span className="px-2 py-1 rounded text-sm bg-gray-100">{version.status}</span>
+        {version.is_current && (
+          <span className="ml-2 px-2 py-1 rounded text-sm bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+            Current
+          </span>
+        )}
         {version.change_summary && (
           <p className="text-sm text-gray-600 mt-2">{version.change_summary}</p>
         )}

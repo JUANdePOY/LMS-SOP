@@ -98,9 +98,6 @@ router.route('/:sopId/workflow')
 router.route('/:sopId/workflow/start')
   .post(approvalWorkflowController.start);
 
-router.route('/:sopId/workflow/advance')
-  .post(approvalWorkflowController.advance);
-
 router.route('/:sopId/transition')
   .post(workflowController.transition);
 
@@ -122,6 +119,12 @@ router.route('/:sopId/audit')
 router.route('/:sopId/shares')
   .get(shareController.list)
   .post(shareController.create);
+
+router.route('/:sopId/shares/link')
+  .post(shareController.createLink);
+
+router.route('/:sopId/shares/:shareId')
+  .delete(shareController.revoke);
 
 router.route('/assignment/departments').get(assignmentCascadeController.listDepartments);
 

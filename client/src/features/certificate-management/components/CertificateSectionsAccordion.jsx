@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card } from '@/shared/components/ui/card';
 import { Input } from '@/shared/components/ui/input';
 import { Label } from '@/shared/components/ui/label';
 import { Button } from '@/shared/components/ui/button';
+import api from '@/services/api';
+import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
+import { deleteSignature } from '@/features/certificate-management/services/certificateService';
+import { useToast } from '@/shared/components/ui/Toast';
 import {
   CERTIFICATE_SECTIONS,
   FONT_FAMILY_OPTIONS,
@@ -34,6 +38,56 @@ export default function CertificateSectionsAccordion({
   const [uploadPositionTitle, setUploadPositionTitle] = useState('');
   const [uploadFile, setUploadFile] = useState(null);
 
+  const [editSlotIdx, setEditSlotIdx] = useState(null);
+  const [editFile, setEditFile] = useState(null);
+  const [removeSlotIdx, setRemoveSlotIdx] = useState(null);
+
+  const { toast } = useToast();
+  const [signatureImageUrls, setSignatureImageUrls] = useState({});
+  const signatureImageUrlsRef = useRef({});
+
+  useEffect(() => {
+    const items = sections.signatures_seal?.items || [];
+    const activeIds = items.map((item) => item.signature_id).filter(Boolean);
+
+    const removedIds = Object.keys(signatureImageUrlsRef.current)
+      .map(Number)
+      .filter((id) => !activeIds.includes(id));
+
+    if (removedIds.length) {
+      const next = { ...signatureImageUrlsRef.current };
+      removedIds.forEach((id) => {
+        URL.revokeObjectURL(next[id]);
+        delete next[id];
+      });
+      signatureImageUrlsRef.current = next;
+      setSignatureImageUrls(next);
+    }
+
+    activeIds.forEach((id) => {
+      if (signatureImageUrlsRef.current[id]) return;
+      api.get(`/certificate-signatures/${id}/image`, { responseType: 'blob' })
+        .then((response) => {
+          const url = URL.createObjectURL(response.data);
+          signatureImageUrlsRef.current = { ...signatureImageUrlsRef.current, [id]: url };
+          setSignatureImageUrls({ ...signatureImageUrlsRef.current });
+        })
+        .catch((error) => {
+          console.error('Failed to load signature image in accordion', error);
+          toast.error(
+            error.response?.data?.message ||
+            `Failed to load signature image (id: ${id})`
+          );
+        });
+    });
+  }, [JSON.stringify(sections.signatures_seal?.items)]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(signatureImageUrlsRef.current).forEach(URL.revokeObjectURL);
+    };
+  }, []);
+
   const filledSectionCount = CERTIFICATE_SECTIONS.filter((s) => sections[s.key]?.text || (s.key === 'signatures_seal' && sections[s.key]?.items?.length)).length;
 
   const getSectionTextLines = (sectionKey) => {
@@ -61,7 +115,53 @@ export default function CertificateSectionsAccordion({
     });
   };
 
+  const handleRemoveSlot = (idx, item) => {
+    setRemoveSlotIdx(idx);
+  };
+
+  const confirmRemoveSlot = async (item) => {
+    const idx = removeSlotIdx;
+    try {
+      if (item.signature_id) {
+        await deleteSignature(item.signature_id);
+      }
+      const next = [...(sections.signatures_seal?.items || [])];
+      next.splice(idx, 1);
+      onSectionChange('signatures_seal', 'items', next);
+      toast.success('Signature slot removed');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to remove signature');
+    } finally {
+      setRemoveSlotIdx(null);
+    }
+  };
+
+  const handleReupload = async (idx, item) => {
+    if (!editFile) return;
+    const formData = new FormData();
+    formData.append('signature', editFile);
+    formData.append('label', item.label || 'Signature');
+    formData.append('type', item.type || 'signature');
+    formData.append('is_default', 'false');
+    try {
+      const created = await onUploadSignature?.(formData);
+      const items = [...(sections.signatures_seal?.items || [])];
+      items[idx] = { ...items[idx], signature_id: created.id, filename: created.filename, storage_path: created.storage_path };
+      onSectionChange('signatures_seal', 'items', items);
+
+      if (item.signature_id) {
+        try { await deleteSignature(item.signature_id); } catch { /* old image cleanup is best-effort */ }
+      }
+      setEditSlotIdx(null);
+      setEditFile(null);
+      toast.success('Signature image replaced');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to replace signature image');
+    }
+  };
+
   return (
+    <>
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <Label>Content Sections</Label>
@@ -140,19 +240,14 @@ export default function CertificateSectionsAccordion({
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
                     <Label className="text-xs">
-                      Size ({section.minFontSize || 8}–{section.maxFontSize || 120}px)
+                      Size (px)
                     </Label>
                     <Input
                       type="number"
                       value={sections[section.key]?.font_size || section.defaultFontSize}
                       onChange={(e) => {
-                        const min = section.minFontSize || 8;
-                        const max = section.maxFontSize || 120;
-                        const next = Math.min(max, Math.max(min, Number(e.target.value)));
-                        onSectionChange(section.key, 'font_size', next);
+                        onSectionChange(section.key, 'font_size', Number(e.target.value));
                       }}
-                      min={section.minFontSize || 8}
-                      max={section.maxFontSize || 120}
                       className="h-8 text-xs"
                     />
                   </div>
@@ -230,8 +325,77 @@ export default function CertificateSectionsAccordion({
                       <div key={idx} className="rounded-md border border-gray-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium">{item.label || 'Signature'}</p>
-                          <span className="text-xs text-gray-500">{item.type === 'seal' ? 'Seal' : 'Signature'}</span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500">{item.type === 'seal' ? 'Seal' : 'Signature'}</span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-1.5 text-xs"
+                              onClick={() => { setEditSlotIdx(idx); setEditFile(null); }}
+                              title="Reupload signature image"
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-1.5 text-xs text-red-600 hover:text-red-700"
+                              onClick={() => handleRemoveSlot(idx, item)}
+                              title="Remove this signature slot"
+                            >
+                              Remove
+                            </Button>
+                          </div>
                         </div>
+
+                        {editSlotIdx === idx && (
+                          <div className="mt-3 space-y-2 rounded-md border border-gray-200 bg-gray-50 p-2 dark:border-gray-600 dark:bg-gray-800/50">
+                            <div>
+                              <Label className="text-xs">New Image File</Label>
+                              <input
+                                type="file"
+                                accept="image/png,image/jpeg,image/jpg"
+                                onChange={(e) => setEditFile(e.target.files?.[0] || null)}
+                                className="text-sm"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={!editFile}
+                                onClick={() => handleReupload(idx, item)}
+                              >
+                                Save
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() => { setEditSlotIdx(null); setEditFile(null); }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {item.signature_id && (
+                          <div className="mt-3">
+                            {signatureImageUrls[item.signature_id] ? (
+                              <img
+                                src={signatureImageUrls[item.signature_id]}
+                                alt={item.label || item.signer_name || 'Signature'}
+                                className="mx-auto h-12 w-auto object-contain"
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <div className="h-12 mx-auto w-full max-w-[120px] rounded bg-gray-100" />
+                            )}
+                          </div>
+                        )}
                         <div className="mt-3">
                           <Label className="text-xs">Signer Name</Label>
                           <Input
@@ -326,9 +490,9 @@ export default function CertificateSectionsAccordion({
                               setUploadSignerName('');
                               setUploadPositionTitle('');
                               setUploadFile(null);
-                            } catch {
-                              // parent will handle toast/errors
-                            }
+                             } catch (err) {
+                               console.error('Signature upload failed:', err);
+                             }
                           }}
                         >
                           Upload
@@ -447,5 +611,21 @@ export default function CertificateSectionsAccordion({
         );
       })}
     </div>
+
+    {removeSlotIdx !== null && (
+      <ConfirmationDialog
+        isOpen={removeSlotIdx !== null}
+        onClose={() => setRemoveSlotIdx(null)}
+        onConfirm={() => {
+          const item = (sections.signatures_seal?.items || [])[removeSlotIdx];
+          confirmRemoveSlot(item);
+        }}
+        title="Remove Signature Slot"
+        message="This will permanently delete the signature image and remove the signer name, position title, and slot from the template. Are you sure?"
+        confirmText="Remove"
+        variant="destructive"
+      />
+    )}
+    </>
   );
 }

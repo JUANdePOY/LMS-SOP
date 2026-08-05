@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAttachments, uploadAttachment, createLink, deleteAttachment } from '@/features/sop-management/services/attachmentService';
 
-export function useAttachments(moduleId) {
+export function useAttachments(moduleId, versionId = null) {
   const [attachments, setAttachments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -13,14 +13,14 @@ export function useAttachments(moduleId) {
     }
     try {
       setLoading(true);
-      const response = await getAttachments(moduleId);
+      const response = await getAttachments(moduleId, versionId);
       setAttachments(response.data.data || []);
     } catch (err) {
       setError(err);
     } finally {
       setLoading(false);
     }
-  }, [moduleId]);
+  }, [moduleId, versionId]);
 
   useEffect(() => {
     fetchAttachments();

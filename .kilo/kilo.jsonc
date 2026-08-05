@@ -1,15 +1,18 @@
 {
-  "$schema": "https://app.kilo.ai/config.json",
-  "instructions": [
-    ".kilo/rules/*.md"
-  ],
+  "project": {
+    "name": "LMS SOP Management System",
+    "language": "javascript",
+    "framework": "react"
+  },
 
-  "compaction": {
-    "auto": true,
-    "threshold_percent": 80,
-    "prune": true,
-    "tail_turns": 2,
-    "preserve_recent_tokens": 8000,
-    "reserved": 20000
-  }
+  "rules": [
+    ".kilo/rules/project-overview.md",
+    ".kilo/rules/architecture.md",
+    ".kilo/rules/frontend-rules.md",
+    ".kilo/rules/backend-rules.md",
+    ".kilo/rules/database-rules.md",
+    ".kilo/rules/security-rules.md",
+    ".kilo/rules/git-rules.md",
+    ".kilo/rules/ai-workflow.md"
+  ]
 }

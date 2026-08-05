@@ -962,14 +962,12 @@ INSERT IGNORE INTO categories (department_id, name, description) VALUES
     (NULL, 'Quality Assurance', 'QA and ISO/QMS related procedures');
 
 -- Default organization-wide approval workflow (created_by assumes user id 1 exists)
+-- Simplified single-step admin approval: any admin or super_admin can approve
 INSERT IGNORE INTO approval_workflows (id, name, department_id, description, created_by)
-VALUES (1, 'Standard SOP Approval', NULL, 'Default 4-step approval chain for all SOPs', 1);
+VALUES (1, 'Admin Approval', NULL, 'Single-step admin approval workflow', 1);
 
 INSERT IGNORE INTO workflow_steps (workflow_id, step_order, step_name, approver_type, approver_role, is_required) VALUES
-    (1, 1, 'Department Review', 'Role', 'department_head', 1),
-    (1, 2, 'QA Review',         'Role', 'admin',           1),
-    (1, 3, 'Legal Review',      'Role', 'admin',           0),
-    (1, 4, 'Final Approval',    'Role', 'super_admin',     1);
+    (1, 1, 'Admin Approval', 'Role', 'admin', 1);
 
 -- ============================================================================
 -- END OF DB_SOP.sql (v2.0)

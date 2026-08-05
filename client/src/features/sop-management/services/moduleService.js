@@ -1,6 +1,6 @@
 import api from '@/lib/api';
 
-export const getModules = (sopId) => api.get(`/sops/${sopId}/modules`);
+export const getModules = (sopId, versionId = null) => api.get(`/sops/${sopId}/modules${versionId ? `?versionId=${versionId}` : ''}`);
 export const createModule = (sopId, data) => api.post(`/sops/${sopId}/modules`, data);
 export const updateModule = (moduleId, data) => api.put(`/sops/modules/${moduleId}`, data);
 export const deleteModule = (moduleId) => api.delete(`/sops/modules/${moduleId}`);

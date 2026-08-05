@@ -1,18 +1,18 @@
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
-function ApprovalPanel({ workflow = null, onApprove, onReject, loading = false }) {
+function ApprovalPanel({ sop, onApprove, onReject, loading = false }) {
   const [actionLoading, setActionLoading] = useState(null);
   const [actionError, setActionError] = useState(null);
+  const { user } = useAuth();
 
-  const steps = workflow?.steps || [];
-  const pending = steps.filter((s) => s.status === 'Pending');
-  const history = steps.filter((s) => s.status !== 'Pending');
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
-  const handleApprove = async (step) => {
-    setActionLoading(step.id);
+  const handleApprove = async () => {
+    setActionLoading('approve');
     setActionError(null);
     try {
-      await onApprove({ instanceId: workflow.id, stepId: step.id, comments: '' });
+      await onApprove({ sopId: sop.id, comments: '' });
     } catch (err) {
       const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Approve failed';
       setActionError(message);
@@ -21,11 +21,11 @@ function ApprovalPanel({ workflow = null, onApprove, onReject, loading = false }
     }
   };
 
-  const handleReject = async (step) => {
-    setActionLoading(step.id);
+  const handleReject = async () => {
+    setActionLoading('reject');
     setActionError(null);
     try {
-      await onReject({ instanceId: workflow.id, stepId: step.id, comments: '' });
+      await onReject({ sopId: sop.id, comments: 'Rejected by admin' });
     } catch (err) {
       const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Reject failed';
       setActionError(message);
@@ -44,8 +44,16 @@ function ApprovalPanel({ workflow = null, onApprove, onReject, loading = false }
     );
   }
 
-  if (!workflow) {
-    return <p className="text-sm text-neutral-500 dark:text-neutral-400">No workflow data.</p>;
+  if (!sop) {
+    return <p className="text-sm text-neutral-500 dark:text-neutral-400">No SOP data.</p>;
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="text-sm text-neutral-500 dark:text-neutral-400">
+        Only admins and super admins can approve or reject this SOP.
+      </div>
+    );
   }
 
   return (
@@ -55,57 +63,22 @@ function ApprovalPanel({ workflow = null, onApprove, onReject, loading = false }
           {actionError}
         </div>
       )}
-      {pending.length > 0 ? (
-        <div className="space-y-2 mb-4">
-          <h4 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">Pending</h4>
-          {pending.map((step) => (
-            <div key={step.id} className="flex items-center justify-between border border-neutral-200 dark:border-neutral-700 rounded-lg p-3 bg-white dark:bg-neutral-800">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                  <span className="text-xs font-medium text-indigo-700 dark:text-indigo-300">{step.step_name?.[0]?.toUpperCase() || '?'}</span>
-                </div>
-                <div>
-                  <span className="text-sm text-neutral-700 dark:text-neutral-300">{step.step_name}</span>
-                  <span className="block text-xs text-neutral-400">{step.approver_role}</span>
-                </div>
-              </div>
-              <div className="flex gap-1">
-                <button
-                  onClick={() => handleApprove(step)}
-                  disabled={actionLoading === step.id}
-                  className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {actionLoading === step.id ? '...' : 'Approve'}
-                </button>
-                <button
-                  onClick={() => handleReject(step)}
-                  disabled={actionLoading === step.id}
-                  className="px-2 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {actionLoading === step.id ? '...' : 'Reject'}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">No pending approvals.</p>
-      )}
-      {history.length > 0 && (
-        <div className="pt-4 border-t border-neutral-200 dark:border-neutral-700">
-          <h4 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider mb-2">History</h4>
-          <div className="space-y-2">
-            {history.map((step) => (
-              <div key={step.id} className="flex items-center justify-between text-xs">
-                <span className="text-neutral-600 dark:text-neutral-400">{step.step_name}</span>
-                <span className={`font-medium ${step.status === 'Approved' ? 'text-green-600 dark:text-green-400' : step.status === 'Rejected' ? 'text-red-600 dark:text-red-400' : 'text-neutral-400'}`}>
-                  {step.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="space-y-2">
+        <button
+          onClick={handleApprove}
+          disabled={actionLoading === 'approve'}
+          className="w-full px-3 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {actionLoading === 'approve' ? 'Approving...' : 'Approve SOP'}
+        </button>
+        <button
+          onClick={handleReject}
+          disabled={actionLoading === 'reject'}
+          className="w-full px-3 py-2 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          {actionLoading === 'reject' ? 'Rejecting...' : 'Reject SOP'}
+        </button>
+      </div>
     </div>
   );
 }
