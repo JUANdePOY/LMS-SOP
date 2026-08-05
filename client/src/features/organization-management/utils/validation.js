@@ -56,8 +56,8 @@ export function validatePagination(params = {}) {
   const page = parseInt(params.page, 10);
   const limit = parseInt(params.limit, 10);
   const errors = {};
-  if (isNaN(page) || page < 1) errors.page = 'Page must be a positive integer';
-  if (isNaN(limit) || limit < 1 || limit > 100) errors.limit = 'Limit must be between 1 and 100';
+  if (params.page !== undefined && (isNaN(page) || page < 1)) errors.page = 'Page must be a positive integer';
+  if (params.limit !== undefined && (isNaN(limit) || limit < 1 || limit > 100)) errors.limit = 'Limit must be between 1 and 100';
   return { valid: Object.keys(errors).length === 0, errors, sanitized: { page: page || 1, limit: limit || 50 } };
 }
 

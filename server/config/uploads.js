@@ -70,6 +70,10 @@ function avatarDir(userId) {
   return path.join(getUploadRoot(), 'avatars', String(userId));
 }
 
+function courseThumbnailDir() {
+  return path.join(getUploadRoot(), 'course-thumbnails');
+}
+
 module.exports = {
   getUploadRoot,
   getMaxUploadBytes,
@@ -84,4 +88,5 @@ module.exports = {
   certificateTemplateDir,
   signatureDir,
   avatarDir,
+  courseThumbnailDir,
 };

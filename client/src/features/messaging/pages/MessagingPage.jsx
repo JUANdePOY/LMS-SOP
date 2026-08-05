@@ -5,8 +5,7 @@ import { useToast } from "@/shared/components/ui/Toast";
 import { useConversations, useMessages } from "../hooks/useMessages";
 import ConversationList from "../components/ConversationList";
 import MessageThread from "../components/MessageThread";
-import { Modal } from "@/shared/components/ui/modal";
-import { getUsers } from "@/features/organization-management/api/users.api";
+import NewConversationModal from "../components/NewConversationModal";
 
 export default function MessagingPage() {
   const { toast } = useToast();
@@ -14,11 +13,6 @@ export default function MessagingPage() {
   const { conversations, loading: convLoading, error, refresh: refreshConversations, create: createConversation } = useConversations();
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [showNewConversation, setShowNewConversation] = useState(false);
-  const [newSubject, setNewSubject] = useState("");
-  const [newBody, setNewBody] = useState("");
-  const [selectedUserIds, setSelectedUserIds] = useState([]);
-  const [users, setUsers] = useState([]);
-  const [userSearch, setUserSearch] = useState("");
 
   const { messages, loading: msgLoading, send, markAllAsRead } = useMessages(selectedConversation?.id);
 
@@ -32,22 +26,7 @@ export default function MessagingPage() {
     }
   }, [selectedConversation, messages, user?.id, markAllAsRead, refreshConversations]);
 
-  useEffect(() => {
-    if (showNewConversation) {
-      getUsers({ limit: 50 })
-        .then((res) => {
-          const list = res.data?.data || res.data || [];
-          setUsers(Array.isArray(list) ? list : []);
-        })
-        .catch(() => setUsers([]));
-    }
-  }, [showNewConversation]);
-
-  const filteredUsers = userSearch
-    ? users.filter((u) => (u.full_name || "").toLowerCase().includes(userSearch.toLowerCase()))
-    : users;
-
-  const handleSelectConversation = async (conv) => {
+  const handleSelectConversation = (conv) => {
     setSelectedConversation(conv);
   };
 
@@ -59,26 +38,19 @@ export default function MessagingPage() {
     }
   };
 
-  const handleCreateConversation = async () => {
-    if (!newBody.trim()) return;
+  const handleCreateConversation = async (payload) => {
     try {
-      await createConversation({
-        subject: newSubject.trim() || null,
-        body: newBody.trim(),
-        participantIds: selectedUserIds,
-      });
+      const created = await createConversation(payload);
       toast.success("Conversation created");
       setShowNewConversation(false);
-      setNewSubject("");
-      setNewBody("");
-      setSelectedUserIds([]);
+      setSelectedConversation(created);
       refreshConversations();
     } catch (err) {
       toast.error(err.message || "Failed to create conversation");
     }
   };
 
-   if (error) {
+  if (error) {
     return <div className="text-sm text-red-600">{error}</div>;
   }
 
@@ -119,70 +91,12 @@ export default function MessagingPage() {
         </div>
       </div>
 
-      <Modal
+      <NewConversationModal
         open={showNewConversation}
         onClose={() => setShowNewConversation(false)}
-        title="New Conversation"
-        footer={
-          <div className="flex justify-end gap-2">
-            <button onClick={() => setShowNewConversation(false)} className="rounded-lg px-3 py-1.5 text-xs border border-neutral-300 dark:border-neutral-600">
-              Cancel
-            </button>
-            <button onClick={handleCreateConversation} className="rounded-lg px-3 py-1.5 text-xs bg-blue-600 text-white">
-              Create
-            </button>
-          </div>
-        }
-      >
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 mb-1">Subject</label>
-            <input
-              type="text"
-              value={newSubject}
-              onChange={(e) => setNewSubject(e.target.value)}
-              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
-              placeholder="Conversation subject"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 mb-1">Message</label>
-            <textarea
-              value={newBody}
-              onChange={(e) => setNewBody(e.target.value)}
-              rows={3}
-              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
-              placeholder="Type your message..."
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-neutral-700 mb-1">Recipients</label>
-            <input
-              type="text"
-              value={userSearch}
-              onChange={(e) => setUserSearch(e.target.value)}
-              placeholder="Search users..."
-              className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm mb-2"
-            />
-            <div className="max-h-40 overflow-y-auto border border-neutral-200 dark:border-neutral-700 rounded-md">
-              {filteredUsers.map((u) => (
-                <label key={u.id} className="flex items-center gap-2 p-2 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800">
-                  <input
-                    type="checkbox"
-                    checked={selectedUserIds.includes(u.id)}
-                    onChange={() => {
-                      setSelectedUserIds((prev) =>
-                        prev.includes(u.id) ? prev.filter((id) => id !== u.id) : [...prev, u.id]
-                      );
-                    }}
-                  />
-                  <span className="text-xs text-neutral-700 dark:text-neutral-300">{u.full_name || u.email}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </div>
-      </Modal>
+        currentUserId={user?.id}
+        onCreateSuccess={handleCreateConversation}
+      />
     </div>
   );
 }

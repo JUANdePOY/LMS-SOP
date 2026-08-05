@@ -115,3 +115,19 @@ export async function builderDelete(id) {
   const res = await fetch(`${BUILDER_BASE}/${id}`, { method: "DELETE", headers: authHeaders() });
   return handle(res);
 }
+
+export async function uploadCourseThumbnail(file) {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const headers = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const fd = new FormData();
+  fd.append("thumbnail", file);
+
+  const res = await fetch(`${BUILDER_BASE}/thumbnail`, {
+    method: "POST",
+    headers,
+    body: fd,
+  });
+  return handle(res);
+}
