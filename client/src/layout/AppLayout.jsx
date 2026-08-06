@@ -4,7 +4,6 @@ import {
   PanelLeftClose,
   PanelRightClose,
   Search,
-  Bell,
   BookOpen,
   FileText,
   Users,
@@ -13,6 +12,9 @@ import {
   ChevronRight,
   X,
   Menu,
+  MessageSquare,
+  Megaphone,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -20,6 +22,9 @@ import Sidebar from "@/shared/components/navigation/sidebar/Sidebar";
 import { useTheme } from "@/hooks/useTheme";
 import { Scrollbar } from "@/shared/components/ui/Scrollbar";
 import BannerSection from "@/shared/components/ui/BannerSection";
+import GlobalSearch from "@/components/GlobalSearch";
+import NotificationDropdown from "@/shared/components/ui/NotificationDropdown";
+import { useNotificationStore } from "@/shared/stores/notificationStore.js";
 
 const MOBILE_BOTTOM_NAV_ADMIN = [
   { name: "Home", path: "/", icon: BookOpen },
@@ -35,8 +40,17 @@ const MOBILE_BOTTOM_NAV_EMPLOYEE = [
   { name: "Profile", path: "/profile", icon: Users },
 ];
 
+const HEADER_QUICK_ACCESS = [
+  { name: "Messaging", path: "/messaging", icon: MessageSquare },
+  { name: "Announcements", path: "/announcements", icon: Megaphone },
+  { name: "Events", path: "/events", icon: Calendar },
+];
+
 const PATH_TITLE_MAP = {
   "/": "My Learning",
+  "/messaging": "Messaging",
+  "/announcements": "Announcements",
+  "/events": "Events",
   "/courses/library": "Course Library",
   "/sops": "SOP Library",
   "/profile": "Profile",
@@ -80,10 +94,9 @@ function getBreadcrumbs(pathname) {
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
   const [showSearchMobile, setShowSearchMobile] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { toggleTheme, isDark } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -92,6 +105,7 @@ export default function AppLayout() {
   const mobileNav = isEmployee ? MOBILE_BOTTOM_NAV_EMPLOYEE : MOBILE_BOTTOM_NAV_ADMIN;
   const breadcrumbs = getBreadcrumbs(location.pathname);
   const themeToggleLabel = isDark ? "Switch to light theme" : "Switch to dark theme";
+  useNotificationStore();
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -153,22 +167,24 @@ export default function AppLayout() {
           <header
             className={cn(
               "sticky top-0 z-30 flex items-center gap-2 sm:gap-3 lg:px-6 h-14",
-              "border-b border-[var(--border)]",
-              "bg-[var(--bg-topbar)]"
+              "border-b border-[var(--header-border)]",
+              "bg-[var(--bg-topbar)] backdrop-blur supports-[backdrop-filter]:bg-[var(--bg-topbar)]/85"
             )}
           >
             <div className="flex items-center gap-2 px-3 sm:px-4 h-full">
               <button
                 onClick={() => setMobileOpen(true)}
                 aria-label="Open menu"
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors lg:hidden"
+                className={cn(
+                  "flex h-9 w-9 items-center justify-center rounded-xl text-white hover:text-white hover:bg-white/15 dark:hover:bg-white/10 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-white/30 lg:hidden"
+                )}
               >
                 <Menu size={20} />
               </button>
               <button
                 onClick={() => setCollapsed((v) => !v)}
                 aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                className="hidden lg:flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                className=                "hidden lg:flex h-9 w-9 items-center justify-center rounded-xl text-white hover:text-white hover:bg-white/15 dark:hover:bg-white/10 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-white/30"
               >
                 {collapsed ? (
                   <PanelRightClose size={20} />
@@ -177,19 +193,28 @@ export default function AppLayout() {
                 )}
               </button>
 
-              <div className="hidden sm:flex items-center gap-2 min-w-0">
+              <nav
+                aria-label={breadcrumbs.length > 0 ? "Breadcrumb" : "Page title"}
+                className={cn(
+                  "hidden sm:flex items-center gap-2 min-w-0",
+                  "px-2 py-1",
+                  "rounded-lg bg-white/10 border border-[var(--header-border)]",
+                  "transition-colors"
+                )}
+              >
+                <BookOpen size={14} className="text-white shrink-0" />
                 {breadcrumbs.length > 0 ? (
                   <div className="flex items-center gap-1.5 text-sm min-w-0">
                     <span className={cn(
                       "font-semibold truncate",
-                      isEmployee ? "text-blue-600 dark:text-blue-400" : "text-neutral-900 dark:text-neutral-100"
+                      isEmployee ? "text-blue-200" : "text-white"
                     )}>
                       {breadcrumbs[0].title}
                     </span>
                     {breadcrumbs.length > 1 && (
                       <>
-                        <ChevronRight size={14} className="text-neutral-400 shrink-0" />
-                        <span className="text-neutral-600 dark:text-neutral-300 truncate">
+                        <ChevronRight size={14} className="text-neutral-300 shrink-0" />
+                        <span className="text-neutral-200 truncate">
                           {breadcrumbs[breadcrumbs.length - 1].title}
                         </span>
                       </>
@@ -198,48 +223,53 @@ export default function AppLayout() {
                 ) : (
                   <span className={cn(
                     "text-sm font-semibold truncate",
-                    isEmployee ? "text-blue-600 dark:text-blue-400" : "text-neutral-900 dark:text-neutral-100"
+                    isEmployee ? "text-blue-200" : "text-white"
                   )}>
                     Learning
                   </span>
                 )}
-              </div>
+              </nav>
             </div>
 
-            <div className="flex-1 max-w-md mx-auto hidden md:block px-2">
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-                <input
-                  type="text"
-                  placeholder={isEmployee ? "Search courses, SOPs, materials…" : "Search…"}
-                  className={cn(
-                    "w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-9 py-1.5 text-sm text-[var(--text-primary)] placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all",
-                    searchFocused && "ring-2 ring-blue-500/20 border-blue-500"
-                  )}
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
-                />
-              </div>
+            <div className="flex-1 max-w-xl mx-auto hidden md:block px-2">
+              <GlobalSearch />
             </div>
 
             <div className="flex items-center gap-0.5 sm:gap-1 px-3 sm:px-4">
               <button
                 onClick={() => setShowSearchMobile((v) => !v)}
                 aria-label="Search"
-                className="md:hidden flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                className={cn(
+                  "md:hidden flex h-9 w-9 items-center justify-center rounded-xl text-white",
+                  "hover:text-white hover:bg-white/15 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-white/30"
+                )}
               >
                 <Search size={18} />
               </button>
 
-              <button
-                aria-label="Notifications"
-                className="relative flex h-9 w-9 items-center justify-center rounded-lg text-neutral-500 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-              >
-                <Bell size={18} />
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
-                  3
-                </span>
-              </button>
+              <NotificationDropdown showBadge={true} />
+
+              <div className="hidden sm:flex items-center gap-0.5">
+                {HEADER_QUICK_ACCESS.map((item) => {
+                  const Icon = item.icon;
+                  const active = location.pathname === item.path || location.pathname.startsWith(item.path);
+                  return (
+                    <button
+                      key={item.path}
+                      onClick={() => navigate(item.path)}
+                      aria-label={item.name}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex h-9 w-9 items-center justify-center rounded-xl text-white",
+                        "hover:text-white hover:bg-white/15 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-white/30",
+                        active && "text-white bg-white/20"
+                      )}
+                    >
+                      <Icon size={18} strokeWidth={active ? 2.5 : 2} />
+                    </button>
+                  );
+                })}
+              </div>
 
               <div className="relative" ref={profileRef}>
                 <button
@@ -290,7 +320,7 @@ export default function AppLayout() {
                       </button>
                       <div className="border-t border-neutral-100 dark:border-neutral-800 my-1" />
                       <button
-                        onClick={() => { setProfileOpen(false); navigate('/login'); }}
+                        onClick={() => { setProfileOpen(false); logout(); navigate('/login'); }}
                         className="flex w-full items-center gap-3 px-3 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                       >
                         Logout

@@ -1,5 +1,7 @@
+import * as session from '@/services/session';
+
 function authHeaders() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = session.getCurrentToken();
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
@@ -41,8 +43,8 @@ export async function markLessonComplete(lessonId) {
 }
 
 export async function enrollInCourse(courseId) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  const userId = JSON.parse(typeof window !== "undefined" ? localStorage.getItem("user") || "{}" : "{}")?.id;
+  const user = session.getCurrentUser();
+  const userId = user?.id;
   if (!userId) throw new Error("User not authenticated");
   const res = await fetch(`/api/courses/${courseId}/enroll`, {
     method: "POST",

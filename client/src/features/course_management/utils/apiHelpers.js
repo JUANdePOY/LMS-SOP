@@ -1,5 +1,7 @@
+import * as session from '@/services/session';
+
 export async function fetchWithAuth(url, options = {}) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = session.getCurrentToken();
   const headers = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -7,10 +9,8 @@ export async function fetchWithAuth(url, options = {}) {
   };
   const res = await fetch(url, { ...options, headers });
   if (res.status === 401) {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("token");
-      window.location.href = "/login";
-    }
+    session.clearCurrentSession();
+    window.location.href = "/login";
   }
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));

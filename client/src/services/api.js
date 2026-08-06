@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as session from '@/services/session';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -8,7 +9,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
+  const token = session.getCurrentToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -21,8 +22,7 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const code = error.response?.data?.code;
     if ((status === 401 || status === 403) && code && ['NO_TOKEN', 'TOKEN_EXPIRED', 'INVALID_TOKEN', 'ACCOUNT_DEACTIVATED', 'USER_NOT_FOUND'].includes(code) && !error.config?.skipAuthRedirect) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      session.clearCurrentSession();
       window.location.href = '/login';
     }
     if (error.code === 'ECONNABORTED') {
@@ -67,6 +67,8 @@ export const updateDepartment = (id, data) => api.put(`/departments/${id}`, data
 export const deleteDepartment = (id) => api.delete(`/departments/${id}`);
 export const getDepartmentUsers = (id) => api.get(`/departments/${id}/users`);
 
+export const getBusinesses = (params = {}) => api.get('/businesses', { params });
+
 export const getCategories = (params = {}) => api.get('/categories', { params });
 export const getCategory = (id) => api.get(`/categories/${id}`);
 
@@ -81,6 +83,12 @@ export const updateRolePermissions = (roleName, permission_names) => api.put(`/r
 export const getSettings = () => api.get('/settings');
 export const createSetting = (data) => api.post('/settings', data);
 export const updateSetting = (key, data) => api.put(`/settings/${key}`, data);
+
+export const globalSearch = (params = {}) => api.get('/search', { params });
+
+export const getNotifications = (params = {}) => api.get('/notifications', { params });
+export const markNotificationsRead = (ids) => api.patch('/notifications/read', { ids });
+export const markAllNotificationsRead = () => api.patch('/notifications/read-all');
 
 export const getCourses = (params = {}) => api.get('/courses', { params });
 export const getCourse = (id) => api.get(`/courses/${id}`);

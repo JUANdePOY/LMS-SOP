@@ -66,6 +66,7 @@ const tasksRoutes = require('./routes/tasks');
 const taskAttachmentPublicFile = require('./services/taskAttachmentPublicFile');
 const sopCourseLinkRoutes = require('./routes/sopCourseLinks');
 const employeeRoutes = require('./routes/employee');
+const notificationsRoutes = require('./routes/notifications');
 
 const { templateRouter, signatureRouter, issuanceRouter } = require('./routes/certificates');
 const sopAttachmentPublicFile = require('./services/sopAttachmentPublicFile');
@@ -128,6 +129,10 @@ app.use('/api/events', eventsRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/tasks/attachments', taskAttachmentPublicFile.router);
 app.use('/api/tasks', tasksRoutes);
+app.use('/api/notifications', notificationsRoutes);
+
+const searchRoutes = require('./routes/search');
+app.use('/api/search', searchRoutes);
 
 app.use('/uploads', express.static(getUploadRoot()));
 

@@ -61,7 +61,7 @@ export default function ReadinessScoreChart({ data }) {
     setLoading(true);
     (async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = (await import('@/services/session')).getCurrentToken();
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const res = await fetch('/api/readiness/arsens', { headers });
         const json = await res.json();

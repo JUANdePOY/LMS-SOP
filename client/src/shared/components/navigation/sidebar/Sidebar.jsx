@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
 import { useAuth } from "@/contexts/AuthContext";
 import { filterMenuByRole, LMS_ROLES } from "@/config/menuItems";
+import { useNotificationStore } from "@/shared/stores/notificationStore.js";
 import { useMyTaskCount } from "@/features/task-management/hooks/useMyTaskCount";
 
 const EMPLOYEE_MENU_ITEMS = [
@@ -140,6 +141,16 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   const isEmployee = user?.role === 'employee';
   const baseMenuItems = isEmployee ? EMPLOYEE_MENU_ITEMS : MENU_ITEMS;
   const activeMenuItems = filterMenuByRole(baseMenuItems, user?.role);
+  const notificationStore = useNotificationStore();
+
+  const PATH_BANNER_MAP = { "/announcements": ["1"], "/events": ["2"], "/messaging": [] };
+  const getBadgeCount = (path) => {
+    const bannerIds = PATH_BANNER_MAP[path] || [];
+    const unreadBannerIds = bannerIds.filter(
+      (id) => !notificationStore.dismissed.includes(id)
+    );
+    return unreadBannerIds.length;
+  };
 
   const { count: myTaskCount, refresh: refreshTaskCount } = useMyTaskCount();
 
@@ -370,7 +381,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                           isCollapsed={collapsed}
                           onNavClick={handleNavClick}
                           isActive={isActive(sub.path)}
-                          count={sidebarCounts[sub.path]}
+                          badgeCount={getBadgeCount(sub.path)}
                         />
                       )}
                     </li>
@@ -387,7 +398,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                 isCollapsed={collapsed}
                 onNavClick={handleNavClick}
                 isActive={isActive(item.path)}
-                count={sidebarCounts[item.path]}
+                badgeCount={getBadgeCount(item.path)}
               />
             </li>
           );

@@ -716,7 +716,7 @@ export default function CourseBuilderPage() {
                   onClick={addModule}
                   className="rounded-md border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-base hover:border-neutral-300 dark:hover:border-neutral-600 transition-all"
                 >
-                  + Add your first module
+                  + Add your module
                 </button>
               </div>
             </div>

@@ -13,6 +13,85 @@ function sendError(res, err, fallback = 'Request failed') {
   return res.status(status).json({ success: false, message: err.message || fallback, code });
 }
 
+function parseCsvContent(content) {
+  const lines = content.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return [];
+  const headers = parseCsvLine(lines[0]);
+  const colMap = {};
+  headers.forEach((h, i) => { colMap[h.toLowerCase()] = i; });
+
+  const questions = [];
+  for (let i = 1; i < lines.length; i += 1) {
+    const cols = parseCsvLine(lines[i]);
+    const getText = (name) => {
+      const idx = colMap[name];
+      return idx != null ? cols[idx] : '';
+    };
+
+    const question_text = getText('question_text') || getText('question');
+    const type = getText('type') || 'multiple_choice';
+    const optionsRaw = getText('options');
+    const correctRaw = getText('correct_answer') || getText('correctAnswer');
+    const points = getText('points');
+    const explanation = getText('explanation');
+
+    let options = [];
+    if (optionsRaw) {
+      try {
+        const parsed = JSON.parse(optionsRaw);
+        options = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        options = optionsRaw.split('|').map((s) => s.trim()).filter(Boolean);
+      }
+    }
+
+    let correct_answer = correctRaw;
+    if (correctRaw) {
+      try {
+        correct_answer = JSON.parse(correctRaw);
+      } catch {
+        correct_answer = correctRaw;
+      }
+    }
+
+    if (!question_text && !type) continue;
+
+    questions.push({
+      question_text,
+      type,
+      options: options.length ? options : null,
+      correct_answer,
+      points: points ? Number(points) : 1,
+      explanation,
+    });
+  }
+  return questions;
+}
+
+function parseCsvLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current.trim());
+  return result;
+}
+
 async function assertCanManageCourse(req, courseId) {
   const course = await courseModel.findById(courseId);
   if (!course) {
@@ -288,32 +367,161 @@ async function importQuestions(req, res) {
     }
 
     const existing = await quizModel.listQuestions(quiz.id);
-    const startIndex = existing.length;
+    const { validateBulkImport } = require('../utils/bulkImportValidation');
+    const { valid: validQuestions, invalid, errors, summary } = validateBulkImport(questions, existing);
 
-    const created = [];
-    for (let i = 0; i < questions.length; i++) {
-      const q = questions[i];
-      if (!q.type || !q.question_text) {
-        continue;
-      }
-      const id = await quizModel.createQuestion({
-        quiz_id: quiz.id,
-        type: q.type,
-        question_text: q.question_text,
-        options: q.options || null,
-        correct_answer: q.correct_answer || null,
-        points: Number(q.points) || 1,
-        order_index: startIndex + i,
-        question_bank_id: q.question_bank_id || null,
-        hierarchy_id: q.hierarchy_id || null,
+    if (validQuestions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid questions found after validation',
+        code: 'VALIDATION_ERROR',
+        data: { errors, summary, invalid },
       });
-      created.push({ id, ...q });
     }
 
-    logAudit && logAudit('quiz.questions.import', req.user.id, { quizId: quiz.id, count: created.length });
-    res.status(201).json({ success: true, data: { imported: created.length, questions: created }, message: `${created.length} questions imported` });
+    const startIndex = existing.length;
+    const created = [];
+
+    for (let i = 0; i < validQuestions.length; i += 1) {
+      const q = validQuestions[i];
+      try {
+        const id = await quizModel.createQuestion({
+          quiz_id: quiz.id,
+          type: q.type,
+          question_text: q.question_text,
+          options: q.options || null,
+          correct_answer: q.correct_answer != null ? q.correct_answer : null,
+          points: Number(q.points) || 1,
+          order_index: startIndex + i,
+        });
+        created.push({ id, ...q });
+      } catch (err) {
+        errors.push({ row: q.row, message: `Failed to create question: ${err.message}` });
+      }
+    }
+
+    logAudit && logAudit('quiz.questions.import', req.user.id, {
+      quizId: quiz.id,
+      requested: questions.length,
+      imported: created.length,
+      failed: invalid.length,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        imported: created.length,
+        questions: created,
+        errors,
+        summary: {
+          ...summary,
+          failed: invalid.length,
+        },
+      },
+      message: `${created.length} of ${questions.length} questions imported successfully`,
+    });
   } catch (err) {
     sendError(res, err, 'Failed to import questions');
+  }
+}
+
+async function importFromFile(req, res) {
+  const quizId = req.params.id;
+  const format = req.body.format || 'csv';
+  const fileBuffer = req.file ? req.file.buffer : null;
+  const rawContent = req.body.content || null;
+
+  try {
+    const quiz = await quizModel.findById(quizId);
+    if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found', code: 'NOT_FOUND' });
+    await assertCanManageCourse(req, quiz.course_id);
+
+    let fileContent;
+    if (fileBuffer) {
+      fileContent = fileBuffer.toString('utf8');
+    } else if (rawContent) {
+      fileContent = rawContent;
+    } else {
+      return res.status(400).json({ success: false, message: 'No file or content provided', code: 'VALIDATION_ERROR' });
+    }
+
+    let questions;
+
+    if (format === 'json') {
+      try {
+        questions = JSON.parse(fileContent);
+      } catch (parseErr) {
+        return res.status(400).json({ success: false, message: 'Invalid JSON format', code: 'VALIDATION_ERROR', data: { parseError: parseErr.message } });
+      }
+    } else {
+      try {
+        questions = parseCsvContent(fileContent);
+      } catch (parseErr) {
+        return res.status(400).json({ success: false, message: 'Failed to parse CSV file', code: 'VALIDATION_ERROR', data: { parseError: parseErr.message } });
+      }
+    }
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({ success: false, message: 'No questions found in the file', code: 'VALIDATION_ERROR' });
+    }
+
+    const existing = await quizModel.listQuestions(quiz.id);
+    const { validateBulkImport } = require('../utils/bulkImportValidation');
+    const { valid: validQuestions, invalid, errors, summary } = validateBulkImport(questions, existing);
+
+    if (validQuestions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No valid questions found after validation',
+        code: 'VALIDATION_ERROR',
+        data: { errors, summary, invalid },
+      });
+    }
+
+    const startIndex = existing.length;
+    const created = [];
+
+    for (let i = 0; i < validQuestions.length; i += 1) {
+      const q = validQuestions[i];
+      try {
+        const id = await quizModel.createQuestion({
+          quiz_id: quiz.id,
+          type: q.type,
+          question_text: q.question_text,
+          options: q.options || null,
+          correct_answer: q.correct_answer != null ? q.correct_answer : null,
+          points: Number(q.points) || 1,
+          order_index: startIndex + i,
+        });
+        created.push({ id, ...q });
+      } catch (err) {
+        errors.push({ row: q.row, message: `Failed to create question: ${err.message}` });
+      }
+    }
+
+    logAudit && logAudit('quiz.questions.import_file', req.user.id, {
+      quizId: quiz.id,
+      format,
+      requested: questions.length,
+      imported: created.length,
+      failed: invalid.length,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: {
+        imported: created.length,
+        questions: created,
+        errors,
+        summary: {
+          ...summary,
+          failed: invalid.length,
+        },
+      },
+      message: `${created.length} of ${questions.length} questions imported successfully`,
+    });
+  } catch (err) {
+    sendError(res, err, 'Failed to import questions from file');
   }
 }
 
@@ -580,5 +788,6 @@ module.exports = {
   updateHierarchy,
   deleteHierarchy,
   importQuestions,
+  importFromFile,
   requireAdminRole,
 };

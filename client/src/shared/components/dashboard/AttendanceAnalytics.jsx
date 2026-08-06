@@ -25,7 +25,7 @@ export default function AttendanceAnalytics() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const token = localStorage.getItem("token");
+        const token = (await import("@/services/session")).getCurrentToken();
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const [sqRes, topRes] = await Promise.all([
           fetch(`${API_BASE}/readiness/squadrons`, { headers }),

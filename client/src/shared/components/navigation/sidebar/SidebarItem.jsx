@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarTooltip from "@/shared/components/ui/Tooltip";
+import NotificationBadge from "@/shared/components/ui/NotificationBadge";
 
 function SidebarSubItem({ item, onNavClick }) {
   const Icon = item.icon;
@@ -44,7 +45,7 @@ function SidebarSubItem({ item, onNavClick }) {
   );
 }
 
-export default function SidebarItem({ item, isCollapsed, onNavClick, count }) {
+export default function SidebarItem({ item, isCollapsed, onNavClick, badgeCount = 0 }) {
   const Icon = item.icon;
   const location = useLocation();
   const navigate = useNavigate();
@@ -104,9 +105,9 @@ isParentActive
             {!isCollapsed && (
               <>
                 <span className="flex-1 truncate text-left">{item.name}</span>
-                {typeof count === 'number' && count > 0 && (
+                {typeof badgeCount === 'number' && badgeCount > 0 && (
                   <span className="shrink-0 rounded-full bg-[color-mix(in_srgb,var(--accent-amber)_85%,transparent)] px-2 py-0.5 text-[10px] font-bold text-white dark:text-neutral-900 min-w-[20px] text-center">
-                    {count > 99 ? '99+' : count}
+                    {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
                 )}
                 <span
@@ -172,7 +173,7 @@ isParentActive
               "text-[var(--text-on-sidebar)] bg-[var(--bg-active)]",
               "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
               "before:h-[18px] before:w-0.5 before:rounded-full",
-              "before:bg[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]",
+              "before:bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]",
             ],
             isCollapsed && "justify-center px-0"
           )
@@ -186,15 +187,11 @@ isParentActive
               )}>
               <Icon size={17} strokeWidth={isActive ? 2.2 : 1.8} />
             </span>
-            {!isCollapsed && <span className="truncate">{item.name}</span>}
-            {!isCollapsed && typeof count === 'number' && count > 0 && (
-              <span className="shrink-0 rounded-full bg-[color-mix(in_srgb,var(--accent-amber)_85%,transparent)] px-2 py-0.5 text-[10px] font-bold text-white dark:text-neutral-900 min-w-[20px] text-center">
-                {count > 99 ? '99+' : count}
-              </span>
-            )}
-            {isCollapsed && isActive && (
-              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]" />
-            )}
+             {!isCollapsed && <span className="truncate">{item.name}</span>}
+              <NotificationBadge count={badgeCount} />
+              {isCollapsed && isActive && (
+                <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]" />
+              )}
           </>
         )}
       </NavLink>

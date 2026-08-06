@@ -25,17 +25,17 @@ async function findByEmployeeId(employeeId) {
 }
 
 async function create(userData) {
-  const { full_name, email, password_hash, role, department_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address } = userData;
+  const { full_name, email, password_hash, role, department_id, business_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address } = userData;
   const [result] = await db.query(
-    `INSERT INTO users (full_name, email, password_hash, role, department_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
-    [full_name, email, password_hash, role, department_id ?? null, position_title ?? null, employee_id ?? null, contact_number ?? null, employment_status ?? 'Regular', date_hired ?? null, birthdate ?? null, address ?? null]
+    `INSERT INTO users (full_name, email, password_hash, role, department_id, business_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
+    [full_name, email, password_hash, role, department_id ?? null, business_id ?? null, position_title ?? null, employee_id ?? null, contact_number ?? null, employment_status ?? 'Regular', date_hired ?? null, birthdate ?? null, address ?? null]
   );
   return result.insertId;
 }
 
 async function update(id, updates) {
-  const allowed = ['full_name', 'email', 'role', 'department_id', 'position_title', 'employee_id', 'contact_number', 'employment_status', 'date_hired', 'birthdate', 'address', 'is_active', 'avatar_url'];
+  const allowed = ['full_name', 'email', 'role', 'department_id', 'business_id', 'position_title', 'employee_id', 'contact_number', 'employment_status', 'date_hired', 'birthdate', 'address', 'is_active', 'avatar_url'];
   const sets = [];
   const params = [];
   for (const key of allowed) {
@@ -69,14 +69,15 @@ async function updateLastLogin(id) {
 }
 
 async function listUsers(filters = {}) {
-  const { search, role, department_id, employment_status, page = 1, limit = 50 } = filters;
+  const { search, role, department_id, business_id, employment_status, page = 1, limit = 50 } = filters;
   const offset = (page - 1) * limit;
 
   let sql = `
-    SELECT u.*, d.name AS department_name,
+    SELECT u.*, d.name AS department_name, b.business_name,
            u.full_name AS display_name
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
+    LEFT JOIN businesses b ON u.business_id = b.id
     WHERE 1 = 1
   `;
   const params = [];
@@ -92,6 +93,10 @@ async function listUsers(filters = {}) {
   if (department_id) {
     sql += ' AND u.department_id = ?';
     params.push(department_id);
+  }
+  if (business_id) {
+    sql += ' AND u.business_id = ?';
+    params.push(business_id);
   }
   if (employment_status) {
     sql += ' AND u.employment_status = ?';
@@ -116,6 +121,10 @@ async function listUsers(filters = {}) {
   if (department_id) {
     countSql += ' AND u.department_id = ?';
     countParams.push(department_id);
+  }
+  if (business_id) {
+    countSql += ' AND u.business_id = ?';
+    countParams.push(business_id);
   }
   if (employment_status) {
     countSql += ' AND u.employment_status = ?';

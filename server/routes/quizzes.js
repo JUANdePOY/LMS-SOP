@@ -1,7 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
 const quizController = require('../controllers/quizController');
 const { authenticateToken } = require('../middleware/auth');
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 router.use(authenticateToken);
 
@@ -17,6 +20,7 @@ router.post('/', quizController.requireAdminRole, quizController.createQuiz);
 router.get('/:id/questions', quizController.listQuestions);
 router.post('/:id/questions', quizController.requireAdminRole, quizController.createQuestion);
 router.post('/:id/import', quizController.requireAdminRole, quizController.importQuestions);
+router.post('/:id/import-file', quizController.requireAdminRole, upload.single('file'), quizController.importFromFile);
 router.get('/:id/questions/:qid', quizController.getQuestionById);
 router.put('/:id/questions/:qid', quizController.requireAdminRole, quizController.updateQuestion);
 router.delete('/:id/questions/:qid', quizController.requireAdminRole, quizController.deleteQuestion);

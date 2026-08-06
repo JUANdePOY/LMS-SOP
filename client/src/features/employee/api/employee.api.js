@@ -1,6 +1,7 @@
 import { getCourseList, getCourseById } from "@/features/course_management/api/course.api";
 import { getEnrollments, enrollStudent } from "@/features/course_management/api/enrollment.api";
 import { getCourseProgress, getEnrollmentStatus } from "@/features/course_management/services/lesson-progress.service";
+import * as session from '@/services/session';
 
 export async function getMyEnrollments(params = {}) {
   const res = await getEnrollments({ ...params, limit: 100 });
@@ -60,7 +61,7 @@ export async function getEmployeeEnrollmentsWithCourses(params = {}) {
 }
 
 export async function enrollInCourse(courseId) {
-  const storedUser = typeof window !== "undefined" ? localStorage.getItem("user") : null;
-  const userId = storedUser ? JSON.parse(storedUser)?.id : null;
+  const storedUser = session.getCurrentUser();
+  const userId = storedUser ? storedUser.id : null;
   return await enrollStudent({ course_id: courseId, user_id: userId });
 }
