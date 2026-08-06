@@ -62,7 +62,8 @@ export default function Courses({ departments = [] }) {
   const [sort, setSort] = useState({ field: "created_at", direction: "desc" });
   const [page, setPage] = useState({ current: 1, size: 10 });
 
-  const [modals, setModals] = useState({ add: false });
+  const [modals, setModals] = useState({ add: false, edit: false });
+  const [editingCourse, setEditingCourse] = useState(null);
   const [deletingCourse, setDeletingCourse] = useState(null);
 
   const apiParams = useCallback(() => {
@@ -134,6 +135,11 @@ export default function Courses({ departments = [] }) {
   };
 
   const openEdit = (course) => {
+    setEditingCourse(course);
+    setModals((m) => ({ ...m, edit: true }));
+  };
+
+  const openBuilder = (course) => {
     navigate(`/courses/${course.id}/builder`);
   };
 
@@ -143,8 +149,13 @@ export default function Courses({ departments = [] }) {
   };
 
   const closeModals = () => {
-    setModals({ add: false });
+    setModals({ add: false, edit: false });
+    setEditingCourse(null);
     setDeletingCourse(null);
+  };
+
+  const handleEditSuccess = () => {
+    fetchCourses();
   };
 
   const handleDelete = async () => {
@@ -309,6 +320,7 @@ export default function Courses({ departments = [] }) {
             <thead>
               <tr className="border-b-2 border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-700/80">
                 <th className="px-3 py-3 w-10"></th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 hidden sm:table-cell">Thumbnail</th>
                 <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
                   <button onClick={() => handleSort("title")} className="flex items-center gap-1">
                     Course Title {sort.field === "title" && <span>{sort.direction === "asc" ? "↑" : "↓"}</span>}
@@ -324,7 +336,7 @@ export default function Courses({ departments = [] }) {
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-700/80">
               {pagedCourses.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-20 text-center">
+                  <td colSpan={8} className="px-4 py-20 text-center">
                     <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">No courses found</p>
                     <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                       {filters.search || filters.status || filters.difficulty || filters.category
@@ -346,9 +358,18 @@ export default function Courses({ departments = [] }) {
                   return (
                     <tr key={c.id} className={`${idx % 2 === 0 ? "bg-white dark:bg-neutral-800" : "bg-neutral-50/30 dark:bg-neutral-800/50"}`}>
                       <td className="px-3 py-3.5 w-10"></td>
+                      <td className="px-3 py-3.5 hidden sm:table-cell">
+                        {c.thumbnail_url ? (
+                          <img src={c.thumbnail_url} alt={c.title} className="h-10 w-10 rounded-lg object-cover border border-neutral-200 dark:border-neutral-700" />
+                        ) : (
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-sm ring-1 ring-blue-400/30 shrink-0">
+                            <span className="text-sm font-bold">📚</span>
+                          </div>
+                        )}
+                      </td>
                       <td className="px-3 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-sm ring-1 ring-blue-400/30 shrink-0">
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-sm ring-1 ring-blue-400/30 shrink-0 sm:hidden">
                             <span className="text-sm font-bold">📚</span>
                           </div>
                           <div className="min-w-0">
@@ -385,14 +406,17 @@ export default function Courses({ departments = [] }) {
                               🌐
                             </button>
                           )}
-                          {c.status === "published" && (
-                            <button onClick={() => handleQuickAction(c, "archive")} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-amber-600 hover:bg-amber-50 transition-all" title="Archive">
-                              📦
-                            </button>
-                          )}
-                          <button onClick={() => openEdit(c)} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all" title="Open Builder">
-                            🛠️
-                          </button>
+                           {c.status === "published" && (
+                             <button onClick={() => handleQuickAction(c, "archive")} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-amber-600 hover:bg-amber-50 transition-all" title="Archive">
+                               📦
+                             </button>
+                           )}
+                           <button onClick={() => openEdit(c)} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Edit">
+                             ✏️
+                           </button>
+                           <button onClick={() => openBuilder(c)} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all" title="Open Builder">
+                             🛠️
+                           </button>
                           <button onClick={() => openDelete(c)} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-red-600 hover:bg-red-50 transition-all" title="Delete">
                             🗑️
                           </button>
@@ -436,6 +460,14 @@ export default function Courses({ departments = [] }) {
         open={modals.add}
         onClose={closeModals}
         loading={saving}
+      />
+
+      <CreateCourseModal
+        open={modals.edit}
+        onClose={closeModals}
+        loading={saving}
+        course={editingCourse}
+        onSuccess={handleEditSuccess}
       />
 
       {modals.delete && deletingCourse && (

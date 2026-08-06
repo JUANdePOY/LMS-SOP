@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const courseBuildController = require('../controllers/courseBuildController');
 const { authenticateToken } = require('../middleware/auth');
+const { upload } = require('../middleware/courseThumbnailUpload');
 
 router.use(authenticateToken);
 
@@ -15,6 +16,7 @@ router.use((req, res, next) => {
   next();
 });
 
+router.post('/thumbnail', upload.single('thumbnail'), courseBuildController.uploadThumbnail);
 router.post('/', courseBuildController.createCourse);
 router.put('/:id', courseBuildController.updateCourse);
 router.delete('/:id', courseBuildController.deleteCourse);

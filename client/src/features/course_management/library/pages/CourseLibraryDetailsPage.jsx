@@ -8,6 +8,7 @@ import { assignEmployees } from "../services/library.api";
 import { exportGradesCSV, exportEnrollmentsExcel, exportCoursePDF } from "@/features/course_management/services/export.service";
 import { useToast } from "@/shared/components/ui/Toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 import CourseOverviewHero from "../components/CourseOverviewHero";
 import OverviewSection from "../components/OverviewSection";
 import BookOpeningTransition from "../components/BookOpeningTransition";
