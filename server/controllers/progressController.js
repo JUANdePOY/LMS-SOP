@@ -6,6 +6,7 @@ const lessonProgressModel = require('../models/lessonProgressModel');
 const quizModel = require('../models/quizModel');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
+const { autoIssueOnCompletion } = require('../services/certificateAutoIssuanceService');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -188,35 +189,47 @@ async function markLessonComplete(req, res) {
         }
       }
 
+      let enrollment = null;
+
       if (total > 0 && completed >= total) {
-        const [[enrollment]] = await conn.query(
+        const [[enrollmentRow]] = await conn.query(
           'SELECT id FROM course_enrollments WHERE course_id = ? AND user_id = ? AND status != ? AND is_deleted = FALSE LIMIT 1',
           [courseId, userId, 'completed']
         );
-        if (enrollment) {
+        if (enrollmentRow) {
           await conn.query(
             'UPDATE course_enrollments SET status = ?, completed_at = ?, progress_percentage = ? WHERE id = ?',
-            ['completed', new Date(), 100, enrollment.id]
+            ['completed', new Date(), 100, enrollmentRow.id]
           );
-          logAudit('course.complete', userId, { courseId, enrollmentId: enrollment.id });
+          logAudit('course.complete', userId, { courseId, enrollmentId: enrollmentRow.id });
+          enrollment = enrollmentRow;
         }
       } else {
-        const [[enrollment]] = await conn.query(
+        const [[enrollmentRow]] = await conn.query(
           'SELECT id FROM course_enrollments WHERE course_id = ? AND user_id = ? AND is_deleted = FALSE LIMIT 1',
           [courseId, userId]
         );
-        if (enrollment) {
+        if (enrollmentRow) {
           const pct = Math.round((completed / total) * 100);
           await conn.query(
             'UPDATE course_enrollments SET progress_percentage = ? WHERE id = ?',
-            [pct, enrollment.id]
+            [pct, enrollmentRow.id]
           );
+          enrollment = enrollmentRow;
         }
       }
 
       logAudit('lesson.complete', userId, { lessonId, courseId });
 
       await conn.commit();
+
+      if (enrollment && total > 0 && completed >= total) {
+        try {
+          await autoIssueOnCompletion(courseId, userId, enrollment.id, userId);
+        } catch (autoIssueErr) {
+          console.error('Auto certificate issuance failed:', autoIssueErr.message);
+        }
+      }
 
       const progress = await lessonProgressModel.listByCourse(userId, courseId);
       const totalLessons = await lessonProgressModel.countTotal(courseId);

@@ -96,7 +96,7 @@ async function isLinkedToActiveEnrollment(sopId, userId) {
     SELECT 1 FROM sop_course_links scl
     JOIN course_enrollments ce ON ce.course_id = scl.course_id 
       AND ce.user_id = ? 
-      AND ce.status = 'active' 
+      AND ce.status IN ('active', 'completed') 
       AND ce.is_deleted = FALSE
     WHERE scl.sop_id = ? AND scl.deleted_at IS NULL
     LIMIT 1

@@ -549,6 +549,14 @@ async function runMigrations() {
   }
 
   try {
+    const { runCertificateCourseLinkMigrations } = require('../migrations/certificateCourseLinks');
+    await runCertificateCourseLinkMigrations();
+    console.log('Certificate course link migrations applied');
+  } catch (err) {
+    console.error('Certificate course link migration error:', err.message);
+  }
+
+  try {
     const { runSopCourseLinkMigrations } = require('../migrations/sopCourseLinks');
     await runSopCourseLinkMigrations();
     console.log('SOP course link migrations applied');

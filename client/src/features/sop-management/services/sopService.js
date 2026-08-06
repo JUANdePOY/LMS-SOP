@@ -1,4 +1,5 @@
 import api from '@/lib/api';
+import * as session from '@/services/session';
 
 export const getSops = (params = {}) => api.get('/sops', { params });
 export const getSop = (id) => api.get(`/sops/${id}`);
@@ -47,7 +48,7 @@ export const getSharedSopModules = (token, versionId = null) =>
 
 export const downloadSop = async (sopId) => {
   try {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const token = session.getCurrentToken();
     const response = await fetch(`/api/sops/${sopId}/export`, {
       headers: {
         Authorization: `Bearer ${token}`,

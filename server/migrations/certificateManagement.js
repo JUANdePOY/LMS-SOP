@@ -78,6 +78,14 @@ const CERTIFICATE_MANAGEMENT_MIGRATIONS = [
     FOREIGN KEY (issued_by) REFERENCES users(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
+  // certificate_issuances: add verification_code, course_id, enrollment_id
+  `ALTER TABLE certificate_issuances ADD COLUMN verification_code VARCHAR(255) DEFAULT NULL AFTER certificate_number`,
+  `ALTER TABLE certificate_issuances ADD COLUMN course_id INT DEFAULT NULL AFTER user_id`,
+  `ALTER TABLE certificate_issuances ADD COLUMN enrollment_id INT DEFAULT NULL AFTER course_id`,
+  `CREATE INDEX idx_certificate_issuances_course ON certificate_issuances(course_id)`,
+  `CREATE INDEX idx_certificate_issuances_enrollment ON certificate_issuances(enrollment_id)`,
+  `CREATE UNIQUE INDEX uk_certificate_issuances_verification ON certificate_issuances(verification_code)`,
+
   // --------------------------------------------------------
   // Schema compatibility fixes for existing tables
   // --------------------------------------------------------

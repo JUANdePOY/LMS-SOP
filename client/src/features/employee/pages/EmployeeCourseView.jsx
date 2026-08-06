@@ -3,12 +3,14 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   ChevronLeft, BookOpen, Clock, Users, PlayCircle,
   CheckCircle2, GraduationCap, BarChart3, RefreshCw,
-  AlertCircle, Globe,
+  AlertCircle, Globe, Award,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import LessonList from "@/features/course_management/components/LessonList";
 import LessonProgressBar from "@/features/course_management/components/LessonProgressBar";
 import CourseSOPsSection from "@/features/employee/components/CourseSOPsSection";
+import * as session from "@/services/session";
+import { useCourseCompletionCertificates } from "@/features/certificate-management/hooks/useCourseCompletionCertificates";
   import {
   getEmployeeCourseDetails,
   getEmployeeCourseProgress,
@@ -32,6 +34,9 @@ export default function EmployeeCourseView() {
   const [progressLoading, setProgressLoading] = useState(false);
   const [progressError, setProgressError] = useState(null);
   const [error, setError] = useState(null);
+  const { fetchByUser, getCertificateForCourse, issuances } = useCourseCompletionCertificates();
+  const currentUser = session.getCurrentUser();
+  const userId = currentUser?.id;
 
   const parseJSONField = (field) => {
     if (!field) return [];
@@ -128,6 +133,12 @@ export default function EmployeeCourseView() {
   const isEnrolled = enrollmentStatus?.isEnrolled ?? !!progressData;
   const isCompleted = summary.completionPct >= 100;
   const difficulty = DIFFICULTY_META[course?.difficulty] || DIFFICULTY_META.all_levels;
+
+  useEffect(() => {
+    if (isCompleted && userId && courseId) {
+      fetchByUser(userId, 'active');
+    }
+  }, [isCompleted, userId, courseId, fetchByUser]);
 
   if (loading) {
     return (
@@ -326,12 +337,20 @@ export default function EmployeeCourseView() {
               <div className="px-5 sm:px-6 py-4 border-b border-neutral-200 dark:border-neutral-700">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Course Content</h2>
-                  {isCompleted && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
-                      <CheckCircle2 size={14} />
-                      Completed
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {isCompleted && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
+                        <CheckCircle2 size={14} />
+                        Completed
+                      </span>
+                    )}
+                    {isCompleted && userId && courseId && getCertificateForCourse(userId, courseId) && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 px-3 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
+                        <Award size={14} />
+                        Certificate Issued
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="p-5 sm:p-6">

@@ -69,6 +69,7 @@ const employeeRoutes = require('./routes/employee');
 const notificationsRoutes = require('./routes/notifications');
 
 const { templateRouter, signatureRouter, issuanceRouter } = require('./routes/certificates');
+const { certificateCourseLinkRouter } = require('./routes/certificate-course-links');
 const sopAttachmentPublicFile = require('./services/sopAttachmentPublicFile');
 
 const { getUploadRoot } = require('./config/uploads');
@@ -140,6 +141,7 @@ app.use('/uploads', express.static(getUploadRoot()));
 app.use('/api/certificate-templates', templateRouter);
 app.use('/api/certificate-signatures', signatureRouter);
 app.use('/api/certificate-issuances', issuanceRouter);
+app.use('/api/certificate-courses', certificateCourseLinkRouter);
 
 app.get('/api/health', async (req, res) => {
   const result = { status: 'OK', timestamp: new Date().toISOString(), env: process.env.NODE_ENV };
