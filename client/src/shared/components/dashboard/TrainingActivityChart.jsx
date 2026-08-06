@@ -40,7 +40,7 @@ export default function TrainingActivityChart({ data }) {
     }
     const fetchStats = async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = (await import('@/services/session')).getCurrentToken();
         const headers = token ? { Authorization: `Bearer ${token}` } : {};
         const res = await fetch('/api/trainings/stats', { headers });
         const json = await res.json();

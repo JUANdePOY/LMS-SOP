@@ -20,6 +20,7 @@ Stores user accounts with LMS-SOP roles and department assignments.
 | `password_hash` | VARCHAR(255) | YES | NULL | bcrypt-hashed password |
 | `role` | VARCHAR(100) | YES | NULL | LMS-SOP role: `super_admin`, `admin`, `department_head`, `employee` |
 | `department_id` | INT | YES | NULL | Foreign key to `departments.id` |
+| `business_id` | INT | YES | NULL | Foreign key to `businesses.id` |
 | `position_title` | VARCHAR(255) | YES | NULL | Job title |
 | `employee_id` | VARCHAR(100) | YES | NULL | Employee identifier |
 | `contact_number` | VARCHAR(50) | YES | NULL | Phone number |
@@ -38,6 +39,7 @@ Stores user accounts with LMS-SOP roles and department assignments.
 - `UNIQUE KEY uk_users_email (email)`
 - `INDEX idx_users_role (role)`
 - `INDEX idx_users_department (department_id)`
+- `INDEX idx_users_business (business_id)`
 - `INDEX idx_users_active (is_active)`
 
 ---

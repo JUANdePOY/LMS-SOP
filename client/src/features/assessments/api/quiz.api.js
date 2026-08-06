@@ -1,4 +1,5 @@
 import { request } from "./client";
+import * as session from '@/services/session';
 
 const API_BASE = "/api/quiz";
 
@@ -84,6 +85,28 @@ export async function createQuestion(quizId, payload) {
 
 export async function importQuestions(quizId, questions) {
   return request(`${API_BASE}/${quizId}/import`, { method: "POST", body: JSON.stringify({ questions }) });
+}
+
+export async function importFromFile(quizId, file, format = "csv") {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("format", format);
+  const token = session.getCurrentToken();
+  const headers = { Authorization: token ? `Bearer ${token}` : "" };
+  const res = await fetch(`${API_BASE}/${quizId}/import-file`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const err = new Error((data && data.message) || `Request failed with status ${res.status}`);
+    err.status = res.status;
+    err.code = data?.code;
+    err.data = data?.data;
+    throw err;
+  }
+  return data;
 }
 
 export async function updateQuestion(quizId, questionId, payload) {

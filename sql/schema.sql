@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) DEFAULT NULL,
   password_hash VARCHAR(255) DEFAULT NULL,
   role VARCHAR(100) DEFAULT NULL,
+  business_id INT DEFAULT NULL,
   department_id INT DEFAULT NULL,
   position_title VARCHAR(255) DEFAULT NULL,
   employee_id VARCHAR(100) DEFAULT NULL,
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY uk_users_email (email),
   INDEX idx_users_role (role),
   INDEX idx_users_department (department_id),
+  INDEX idx_users_business (business_id),
   INDEX idx_users_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

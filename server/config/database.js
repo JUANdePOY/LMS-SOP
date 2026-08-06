@@ -262,7 +262,9 @@ const MIGRATIONS = [
     INDEX idx_businesses_status (status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `ALTER TABLE departments ADD COLUMN business_id INT DEFAULT NULL`,
-  `CREATE INDEX idx_departments_business ON departments(business_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_departments_business ON departments(business_id)`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS business_id INT DEFAULT NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_users_business ON users(business_id)`,
   `CREATE TABLE IF NOT EXISTS categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,

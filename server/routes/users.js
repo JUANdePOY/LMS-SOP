@@ -13,11 +13,12 @@ router.use(authenticateToken);
 
 router.get('/', async (req, res) => {
   try {
-    const { search, role, department_id, employment_status, page = 1, limit = 50 } = req.query;
+    const { search, role, department_id, business_id, employment_status, page = 1, limit = 50 } = req.query;
     const result = await authModel.listUsers({
       search: search || undefined,
       role: role || undefined,
       department_id: department_id ? parseInt(department_id) : undefined,
+      business_id: business_id ? parseInt(business_id) : undefined,
       employment_status: employment_status || undefined,
       page: parseInt(page),
       limit: parseInt(limit),
@@ -60,6 +61,7 @@ router.post('/', [
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
   body('role').isIn(['super_admin', 'admin', 'department_head', 'employee']).withMessage('Invalid role'),
   body('department_id').optional().isInt(),
+  body('business_id').optional().isInt(),
   body('position_title').optional().trim(),
   body('employee_id').optional().trim(),
   body('contact_number').optional().trim(),
@@ -78,7 +80,7 @@ router.post('/', [
       return res.status(403).json({ status: 'error', message: 'Only super admins can create users', code: 'ADMIN_ONLY' });
     }
 
-    const { full_name, email, password, role, department_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address } = req.body;
+    const { full_name, email, password, role, department_id, business_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address } = req.body;
 
     const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length > 0) {
@@ -90,6 +92,7 @@ router.post('/', [
     const userId = await authModel.create({
       full_name, email, password_hash: passwordHash, role,
       department_id: department_id ? parseInt(department_id) : null,
+      business_id: business_id ? parseInt(business_id) : null,
       position_title, employee_id, contact_number, employment_status,
       date_hired: date_hired || null, birthdate: birthdate || null, address: address || null,
     });
@@ -114,6 +117,7 @@ router.put('/:id', [
   body('email').optional().isEmail().normalizeEmail(),
   body('role').optional().isIn(['super_admin', 'admin', 'department_head', 'employee']),
   body('department_id').optional().isInt(),
+  body('business_id').optional().isInt(),
   body('position_title').optional().trim(),
   body('employee_id').optional().trim(),
   body('contact_number').optional().trim(),
@@ -147,7 +151,7 @@ router.put('/:id', [
     }
 
     const updates = {};
-    const allowed = ['full_name', 'email', 'role', 'department_id', 'position_title', 'employee_id', 'contact_number', 'employment_status', 'date_hired', 'birthdate', 'address', 'is_active'];
+    const allowed = ['full_name', 'email', 'role', 'department_id', 'business_id', 'position_title', 'employee_id', 'contact_number', 'employment_status', 'date_hired', 'birthdate', 'address', 'is_active'];
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
@@ -289,6 +293,13 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
     const deptMap = {};
     depts.forEach(d => { deptMap[String(d.name).toLowerCase()] = d.id; });
 
+    const [businesses] = await db.query('SELECT id, business_name, business_code FROM businesses');
+    const businessMap = {};
+    businesses.forEach(b => {
+      businessMap[String(b.business_name).toLowerCase()] = b.id;
+      businessMap[String(b.business_code).toLowerCase()] = b.id;
+    });
+
     const passwordHash = await require('../app/auth').hashPassword(defaultPassword);
 
     const workbook = new Excel.Workbook();
@@ -371,6 +382,8 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
         const employeeId = get('Employee ID') || null;
         const deptName = get('Department');
         const departmentId = deptName ? (deptMap[deptName.toLowerCase()] || null) : null;
+        const businessName = get('Business') || get('Business Name') || get('business_name');
+        const businessId = businessName ? (businessMap[businessName.toLowerCase()] || null) : null;
         const positionTitle = get('Position/Job Title') || get('Position Title') || get('Position') || null;
         const contactNumber = get('Contact Number') || get('Contact') || null;
         const employmentStatus = get('Employment Status') || 'Regular';
@@ -384,6 +397,7 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
           password_hash: passwordHash,
           role: cleanRole,
           department_id: departmentId,
+          business_id: businessId,
           position_title: positionTitle,
           employee_id: employeeId,
           contact_number: contactNumber,

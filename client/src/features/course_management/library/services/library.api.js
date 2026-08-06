@@ -1,8 +1,10 @@
 import { getCourseList, getCourseById } from "@/features/course_management/api/course.api";
 import { getEnrollments, enrollStudent, bulkEnrollStudents } from "@/features/course_management/api/enrollment.api";
 
+import * as session from '@/services/session';
+
 function authHeaders() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = session.getCurrentToken();
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;

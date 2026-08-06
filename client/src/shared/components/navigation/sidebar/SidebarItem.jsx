@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarTooltip from "@/shared/components/ui/Tooltip";
+import NotificationBadge from "@/shared/components/ui/NotificationBadge";
 
 function SidebarSubItem({ item, onNavClick }) {
   const Icon = item.icon;
@@ -44,7 +45,7 @@ function SidebarSubItem({ item, onNavClick }) {
   );
 }
 
-export default function SidebarItem({ item, isCollapsed, onNavClick }) {
+export default function SidebarItem({ item, isCollapsed, onNavClick, badgeCount = 0 }) {
   const Icon = item.icon;
   const location = useLocation();
   const navigate = useNavigate();
@@ -181,10 +182,11 @@ isParentActive
              )}>
               <Icon size={17} strokeWidth={isActive ? 2.2 : 1.8} />
             </span>
-            {!isCollapsed && <span className="truncate">{item.name}</span>}
-            {isCollapsed && isActive && (
-              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]" />
-            )}
+             {!isCollapsed && <span className="truncate">{item.name}</span>}
+              <NotificationBadge count={badgeCount} />
+              {isCollapsed && isActive && (
+                <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]" />
+              )}
           </>
         )}
       </NavLink>

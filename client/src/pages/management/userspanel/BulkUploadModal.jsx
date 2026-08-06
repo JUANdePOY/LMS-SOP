@@ -5,7 +5,7 @@ import * as XLSX from "xlsx";
 import { bulkUploadUsers } from "@/services/api";
 
 const USER_COLUMNS = [
-  'Full Name', 'Employee ID', 'Department', 'Position/Job Title',
+  'Full Name', 'Employee ID', 'Department', 'Business', 'Position/Job Title',
   'Email Address', 'Contact Number', 'Employment Status',
   'Date Hired', 'Birthdate', 'Address'
 ];
@@ -100,6 +100,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
             const email = getVal(row, 'Email Address', 'Email');
             const employeeId = getVal(row, 'Employee ID', 'EmployeeID');
             const department = getVal(row, 'Department');
+            const business = getVal(row, 'Business', 'Business Name', 'business_name');
             const positionTitle = getVal(row, 'Position/Job Title', 'Position Title', 'Position');
             const contactNumber = getVal(row, 'Contact Number', 'Contact');
             const employmentStatus = getVal(row, 'Employment Status', 'Status');
@@ -110,10 +111,11 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
             return {
               rowIndex: idx + headerRowIndex + 2,
               fullName,
-              email,
-              employeeId,
-              department,
-              positionTitle,
+               email,
+               employeeId,
+               department,
+               business,
+               positionTitle,
               contactNumber,
               employmentStatus,
               dateHired,
@@ -379,6 +381,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                       <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Email</th>
                       <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Employee ID</th>
                       <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Department</th>
+                      <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Business</th>
                       <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Role</th>
                       <th className="px-3 py-2 text-center font-semibold text-neutral-600 dark:text-neutral-400">Status</th>
                     </tr>
@@ -390,6 +393,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                         <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.email}</td>
                         <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.employeeId || '—'}</td>
                         <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.department || '—'}</td>
+                        <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.business || '—'}</td>
                         <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{defaultRole}</td>
                         <td className="px-3 py-2 text-center">
                           {item.valid ? (

@@ -8,30 +8,24 @@ import {
   reorderQuestions,
   publishQuiz,
   updateQuiz,
-  importQuestions,
 } from "../api/quiz.api";
 import { useToast } from "@/shared/components/ui/Toast";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/components/ui/card";
 import { Input } from "@/shared/components/ui/input";
 import QuestionEditor from "../components/QuestionEditor";
-import { Plus, Save, Send, GripVertical, Edit, Trash2, CalendarClock, ChevronUp, ChevronDown, Upload, Search, CheckSquare, Square } from "lucide-react";
-import { QUESTION_TYPE_LABELS } from "../constants/questionTypes";
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  arrayMove,
-  useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import BulkImportModal from "../components/BulkImportModal";
+import { Plus, Save, Send, CalendarClock, Upload, Search, HelpCircle } from "lucide-react";
+import { QUESTION_TYPE_LABELS, QUESTION_TYPE_CONFIG } from "../constants/questionTypes";
+import QuestionTypeTabs from "../components/QuestionTypeTabs";
+
+const TYPE_COLORS = {
+  multiple_choice: { bg: "bg-blue-50 dark:bg-blue-900/20", border: "border-blue-200 dark:border-blue-800", text: "text-blue-700 dark:text-blue-300", icon: "text-blue-600" },
+  multi_select: { bg: "bg-purple-50 dark:bg-purple-900/20", border: "border-purple-200 dark:border-purple-800", text: "text-purple-700 dark:text-purple-300", icon: "text-purple-600" },
+  true_false: { bg: "bg-emerald-50 dark:bg-emerald-900/20", border: "border-emerald-200 dark:border-emerald-800", text: "text-emerald-700 dark:text-emerald-300", icon: "text-emerald-600" },
+  short_answer: { bg: "bg-amber-50 dark:bg-amber-900/20", border: "border-amber-200 dark:border-amber-800", text: "text-amber-700 dark:text-amber-300", icon: "text-amber-600" },
+  essay: { bg: "bg-rose-50 dark:bg-rose-900/20", border: "border-rose-200 dark:border-rose-800", text: "text-rose-700 dark:text-rose-300", icon: "text-rose-600" },
+};
 
 export default function QuizBuilderPage() {
   const { quizId } = useParams();
@@ -42,10 +36,6 @@ export default function QuizBuilderPage() {
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState(null);
   const [settingsDirty, setSettingsDirty] = useState(false);
-  const [showBulkImport, setShowBulkImport] = useState(false);
-  const [bulkInput, setBulkInput] = useState("");
-  const [bulkFormat, setBulkFormat] = useState("json");
-  const [bulkLoading, setBulkLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const autoSaveTimerRef = useRef(null);
@@ -86,21 +76,6 @@ export default function QuizBuilderPage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [settingsDirty]);
 
-  useEffect(() => {
-    if (settingsDirty && !autoSaveTimerRef.current) {
-      autoSaveTimerRef.current = setTimeout(() => {
-        saveSettings();
-        autoSaveTimerRef.current = null;
-      }, 2000);
-    }
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-        autoSaveTimerRef.current = null;
-      }
-    };
-  }, [settingsDirty, saveSettings]);
-
   const handleSetting = (field, value) => {
     setSettings((s) => ({ ...s, [field]: value }));
     setSettingsDirty(true);
@@ -133,6 +108,21 @@ export default function QuizBuilderPage() {
     }
   }, [settings, quizId, refetch, toast]);
 
+  useEffect(() => {
+    if (settingsDirty && !autoSaveTimerRef.current) {
+      autoSaveTimerRef.current = setTimeout(() => {
+        saveSettings();
+        autoSaveTimerRef.current = null;
+      }, 2000);
+    }
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+    };
+  }, [settingsDirty, saveSettings]);
+
   const handleSaveQuestion = async (payload) => {
     try {
       if (editing && editing.id) {
@@ -160,12 +150,36 @@ export default function QuizBuilderPage() {
     }
   };
 
-  const moveQuestion = async (fromIndex, toIndex) => {
-    const order = [...questions];
-    const [moved] = order.splice(fromIndex, 1);
-    order.splice(toIndex, 0, moved);
-    await reorderQuestions(quizId, order.map((q) => q.id));
-    refetch();
+  const handleReorder = async (type, orderedIdsInType) => {
+    const typeQuestions = questions.filter((q) => (q.type || "multiple_choice") === type);
+    const otherQuestions = questions.filter((q) => (q.type || "multiple_choice") !== type);
+
+    const orderedByType = orderedIdsInType.map((id) => typeQuestions.find((q) => q.id === id)).filter(Boolean);
+    const reordered = [];
+
+    let typeIdx = 0;
+    let otherIdx = 0;
+    for (const q of questions) {
+      const qt = q.type || "multiple_choice";
+      if (qt === type) {
+        if (typeIdx < orderedByType.length) {
+          reordered.push(orderedByType[typeIdx]);
+          typeIdx += 1;
+        }
+      } else {
+        if (otherIdx < otherQuestions.length) {
+          reordered.push(otherQuestions[otherIdx]);
+          otherIdx += 1;
+        }
+      }
+    }
+
+    try {
+      await reorderQuestions(quizId, reordered.map((q) => q.id));
+      refetch();
+    } catch (err) {
+      toast.error(err.message || "Failed to reorder questions");
+    }
   };
 
   const handlePublish = async () => {
@@ -176,29 +190,6 @@ export default function QuizBuilderPage() {
       refetch();
     } catch (err) {
       toast.error(err.message || "Failed to publish");
-    }
-  };
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: undefined })
-  );
-
-  const handleDragEnd = async (event) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    const oldIndex = questions.findIndex((q) => q.id === active.id);
-    const newIndex = questions.findIndex((q) => q.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-
-    const reordered = arrayMove(questions, oldIndex, newIndex);
-    try {
-      await reorderQuestions(quizId, reordered.map((q) => q.id));
-      toast.success("Questions reordered");
-      refetch();
-    } catch (err) {
-      toast.error(err.message || "Failed to reorder questions");
     }
   };
 
@@ -242,137 +233,7 @@ export default function QuizBuilderPage() {
     });
   }, [questions, searchQuery]);
 
-  function SortableQuestionItem({ q, idx, isSelected, onToggleSelect, onEdit, onDelete, onMoveUp, onMoveDown }) {
-    const {
-      attributes,
-      listeners,
-      setNodeRef,
-      transform,
-      transition,
-      isDragging,
-    } = useSortable({ id: q.id });
-
-    const style = {
-      transform: CSS.Transform.toString(transform),
-      transition,
-      opacity: isDragging ? 0.5 : 1,
-    };
-
-    return (
-      <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-        <div className="group relative flex items-center gap-3 rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 p-3 shadow-sm hover:shadow-md hover:border-blue-300/80 dark:hover:border-blue-500/40 transition-all duration-200">
-          <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-blue-500 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <GripVertical className="h-4 w-4 text-neutral-400 cursor-grab flex-shrink-0" />
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onToggleSelect(q.id); }}
-              className="flex-shrink-0"
-            >
-              {isSelected ? <CheckSquare className="h-4 w-4 text-blue-600" /> : <Square className="h-4 w-4 text-neutral-400" />}
-            </button>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 whitespace-nowrap">
-              {QUESTION_TYPE_LABELS[q.type] || q.type}
-            </span>
-          </div>
-          <span className="flex-1 font-medium text-neutral-900 dark:text-neutral-100 truncate min-w-0">{q.question_text || q.text || ""}</span>
-          <span className="text-xs text-neutral-500 dark:text-neutral-400 flex-shrink-0">{q.points || 1}pt</span>
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex-shrink-0">
-            <Button size="sm" variant="ghost" onClick={() => onEdit(q)} className="h-8 w-8 p-0">
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => onMoveUp(idx)} title="Move up" className="h-8 w-8 p-0" disabled={idx === 0}>
-              <ChevronUp className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => onMoveDown(idx)} title="Move down" className="h-8 w-8 p-0" disabled={idx === filteredQuestions.length - 1}>
-              <ChevronDown className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => onDelete(q)} title="Delete" className="h-8 w-8 p-0 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20">
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const parseCsv = (text) => {
-    const lines = text.split(/\r?\n/).filter((l) => l.trim());
-    if (lines.length < 2) return [];
-    const headers = lines[0].split(",").map((h) => h.trim().toLowerCase());
-    const typeIdx = headers.indexOf("type");
-    const textIdx = headers.indexOf("question_text");
-    const optionsIdx = headers.indexOf("options");
-    const correctIdx = headers.indexOf("correct_answer");
-    const pointsIdx = headers.indexOf("points");
-    const questions = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = lines[i].split(",");
-      const type = cols[typeIdx]?.trim();
-      const question_text = cols[textIdx]?.trim().replace(/^"|"$/g, "").replace(/""/g, '"');
-      if (!type || !question_text) continue;
-      let options = [];
-      let correct_answer = null;
-      const optionsRaw = cols[optionsIdx]?.trim().replace(/^"|"$/g, "").replace(/""/g, '"');
-      const correctRaw = cols[correctIdx]?.trim().replace(/^"|"$/g, "").replace(/""/g, '"');
-      if (optionsRaw) {
-        try {
-          options = JSON.parse(optionsRaw);
-        } catch {
-          options = optionsRaw.split("|").map((s) => s.trim()).filter(Boolean);
-        }
-      }
-      if (correctRaw) {
-        try {
-          correct_answer = JSON.parse(correctRaw);
-        } catch {
-          correct_answer = correctRaw;
-        }
-      }
-      questions.push({
-        type,
-        question_text,
-        options: options.length ? options : null,
-        correct_answer,
-        points: pointsIdx >= 0 ? Number(cols[pointsIdx]) || 1 : 1,
-      });
-    }
-    return questions;
-  };
-
-  const handleBulkImport = async () => {
-    if (!bulkInput.trim()) return;
-    setBulkLoading(true);
-    try {
-      let questions = [];
-      if (bulkFormat === "json") {
-        try {
-          questions = JSON.parse(bulkInput);
-        } catch {
-          toast.error("Invalid JSON format");
-          setBulkLoading(false);
-          return;
-        }
-      } else {
-        questions = parseCsv(bulkInput);
-      }
-      if (!Array.isArray(questions) || questions.length === 0) {
-        toast.error("No valid questions found");
-        setBulkLoading(false);
-        return;
-      }
-      const res = await importQuestions(quizId, questions);
-      toast.success(`Imported ${res.data?.imported || questions.length} questions`);
-      setShowBulkImport(false);
-      setBulkInput("");
-      refetch();
-    } catch (err) {
-      toast.error(err.message || "Failed to import questions");
-    } finally {
-      setBulkLoading(false);
-    }
-  };
-
+  const [showBulkImport, setShowBulkImport] = useState(false);
   if (loading) return <div className="p-6">Loading quiz...</div>;
   if (!quiz) return <div className="p-6 text-neutral-500">Quiz not found.</div>;
 
@@ -566,32 +427,42 @@ export default function QuizBuilderPage() {
         />
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={filteredQuestions.map((q) => q.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2">
-            {filteredQuestions.map((q, idx) => (
-              <SortableQuestionItem
-                key={q.id}
-                q={q}
-                idx={idx}
-                isSelected={selectedIds.has(q.id)}
-                onToggleSelect={toggleSelect}
-                onEdit={(question) => setEditing(question)}
-                onDelete={handleDeleteQuestion}
-                onMoveUp={(i) => { if (i > 0) moveQuestion(i, i - 1); }}
-                onMoveDown={(i) => { if (i < filteredQuestions.length - 1) moveQuestion(i, i + 1); }}
-              />
-            ))}
-            {filteredQuestions.length === 0 && (
-              <Card className="border border-dashed border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900">
-                <CardContent className="py-8 text-center text-neutral-500">
-                  {searchQuery ? "No questions match your search." : "No questions yet. Add one to get started."}
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </SortableContext>
-      </DndContext>
+      <QuestionTypeTabs
+        questions={filteredQuestions}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelect}
+        onEdit={(question) => setEditing(question)}
+        onDelete={handleDeleteQuestion}
+        onReorder={handleReorder}
+        searchQuery={searchQuery}
+      />
+
+      {filteredQuestions.length > 0 && !searchQuery && (
+        <Card className="border border-dashed border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900">
+          <CardContent className="py-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+              {Object.entries(
+                filteredQuestions.reduce((acc, q) => {
+                  const t = q.type || "multiple_choice";
+                  acc[t] = (acc[t] || 0) + 1;
+                  return acc;
+                }, {})
+              ).map(([type, count]) => {
+                const config = QUESTION_TYPE_CONFIG[type] || { label: type, icon: HelpCircle };
+                const colors = TYPE_COLORS[type] || TYPE_COLORS.multiple_choice;
+                const Icon = config.icon;
+                return (
+                  <div key={type} className="flex items-center gap-2 justify-center">
+                    <Icon className={`h-4 w-4 ${colors.icon}`} />
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400">{config.label || QUESTION_TYPE_LABELS[type] || type}:</span>
+                    <span className="font-medium text-neutral-900 dark:text-neutral-100">{count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => navigate(`/assessments/quiz/${quizId}/take`)}>
@@ -599,66 +470,13 @@ export default function QuizBuilderPage() {
         </Button>
       </div>
 
-      {showBulkImport && (
-        <Card className="p-6">
-          <h3 className="mb-4 text-lg font-semibold">Bulk Import Questions</h3>
-          <div className="space-y-4">
-            <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="bulkFormat"
-                  value="json"
-                  checked={bulkFormat === "json"}
-                  onChange={() => setBulkFormat("json")}
-                />
-                JSON
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name="bulkFormat"
-                  value="csv"
-                  checked={bulkFormat === "csv"}
-                  onChange={() => setBulkFormat("csv")}
-                />
-                CSV
-              </label>
-            </div>
-            {bulkFormat === "json" ? (
-              <textarea
-                className="w-full h-64 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm font-mono"
-                placeholder={`[
-  {
-    "type": "multiple_choice",
-    "question_text": "What is 2+2?",
-    "options": ["3", "4", "5", "6"],
-    "correct_answer": "4",
-    "points": 1
-  }
-]`}
-                value={bulkInput}
-                onChange={(e) => setBulkInput(e.target.value)}
-              />
-            ) : (
-              <textarea
-                className="w-full h-64 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm font-mono"
-                placeholder={`type,question_text,options,correct_answer,points
-multiple_choice,"What is 2+2?","[\\"3\\",\\"4\\",\\"5\\",\\"6\\"]","4",1
-true_false,"The sky is blue","[]","true",1`}
-                value={bulkInput}
-                onChange={(e) => setBulkInput(e.target.value)}
-              />
-            )}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowBulkImport(false)}>Cancel</Button>
-              <Button onClick={handleBulkImport} disabled={bulkLoading}>
-                {bulkLoading ? "Importing..." : "Import Questions"}
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
+      <BulkImportModal
+        open={showBulkImport}
+        onClose={() => setShowBulkImport(false)}
+        quizId={quizId}
+        toast={toast}
+        refetch={refetch}
+      />
     </div>
   );
 }

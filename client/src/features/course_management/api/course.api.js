@@ -1,7 +1,9 @@
+import * as session from '@/services/session';
+
 const API_BASE = "/api/courses";
 
 function authHeaders() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = session.getCurrentToken();
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
@@ -117,7 +119,7 @@ export async function builderDelete(id) {
 }
 
 export async function uploadCourseThumbnail(file) {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = session.getCurrentToken();
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
 

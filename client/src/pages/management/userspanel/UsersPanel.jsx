@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getUsers, createUser, updateUser, deleteUser, getUserStats } from '@/services/api';
+import { getUsers, createUser, updateUser, deleteUser, getUserStats, getBusinesses } from '@/services/api';
 import { getDepartments } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/shared/components/ui/button';
@@ -68,6 +68,8 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
+  const [businesses, setBusinesses] = useState([]);
+  const [businessFilter, setBusinessFilter] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -88,6 +90,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       if (search) params.search = search;
       if (roleFilter) params.role = roleFilter;
       if (deptFilter) params.department_id = deptFilter;
+      if (businessFilter) params.business_id = businessFilter;
       const res = await getUsers(params);
       if (res.data?.status === 'success') {
         setUsers(res.data.data?.rows || []);
@@ -95,7 +98,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
     } catch {
       toast.error('Failed to load users');
     }
-  }, [search, roleFilter, deptFilter, toast, isAuthenticated]);
+  }, [search, roleFilter, deptFilter, businessFilter, toast, isAuthenticated]);
 
   const fetchStats = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -113,6 +116,16 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       const res = await getDepartments({ status: 'active', limit: 100 });
       if (res.data?.status === 'success') {
         setDepartments(res.data.data?.rows || []);
+      }
+    } catch { /* ignore */ }
+  }, [isAuthenticated]);
+
+  const fetchBusinesses = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const res = await getBusinesses({ status: 'active', limit: 100 });
+      if (res.data?.status === 'success') {
+        setBusinesses(res.data.data?.rows || []);
       }
     } catch { /* ignore */ }
   }, [isAuthenticated]);
@@ -183,6 +196,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       email: u.email || '',
       role: u.role || '',
       department_id: u.department_id || '',
+      business_id: u.business_id || '',
       position_title: u.position_title || '',
       employee_id: u.employee_id || '',
       contact_number: u.contact_number || '',
@@ -203,6 +217,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
     if (search && !u.full_name?.toLowerCase().includes(search.toLowerCase()) && !u.email?.toLowerCase().includes(search.toLowerCase())) return false;
     if (roleFilter && u.role !== roleFilter) return false;
     if (deptFilter && u.department_id !== parseInt(deptFilter)) return false;
+    if (businessFilter && u.business_id !== parseInt(businessFilter)) return false;
     return true;
   });
 
@@ -230,12 +245,13 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   const endIdx = Math.min(safePage * pageSize, sortedUsers.length);
 
   const handleExport = () => {
-    const headers = ['Full Name', 'Email', 'Role', 'Department', 'Position', 'Employee ID', 'Contact', 'Status', 'Date Hired'];
+    const headers = ['Full Name', 'Email', 'Role', 'Department', 'Business', 'Position', 'Employee ID', 'Contact', 'Status', 'Date Hired'];
     const rows = filteredUsers.map(u => [
       u.full_name || '',
       u.email || '',
       u.role || '',
       u.department_name || '',
+      u.business_name || '',
       u.position_title || '',
       u.employee_id || '',
       u.contact_number || '',
@@ -268,11 +284,11 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
     const load = async () => {
       setLoading(true);
       setCurrentPage(1);
-      await Promise.all([fetchUsers(), fetchStats(), fetchDepartments()]);
+      await Promise.all([fetchUsers(), fetchStats(), fetchDepartments(), fetchBusinesses()]);
       setLoading(false);
     };
     load();
-  }, [activeTab, fetchUsers, fetchStats, fetchDepartments, isAuthenticated]);
+  }, [activeTab, fetchUsers, fetchStats, fetchDepartments, fetchBusinesses, isAuthenticated]);
 
   if (loading) {
     return (
@@ -389,6 +405,12 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </Select>
+          <Select value={businessFilter} onChange={(e) => setBusinessFilter(e.target.value)} className="w-full sm:w-auto border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400">
+            <option value="">All Businesses</option>
+            {businesses.map((b) => (
+              <option key={b.id} value={b.id}>{b.business_name}</option>
+            ))}
+          </Select>
           <Button variant="outline" onClick={handleExport} disabled={filteredUsers.length === 0} className="border-neutral-200 dark:border-neutral-700 hover:border-blue-300 dark:hover:border-blue-500/60 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all">
             <Download size={16} className="mr-2" />
             Export
@@ -422,6 +444,11 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                   </button>
                 </th>
                 <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
+                  <button onClick={() => handleSort('business_name')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
+                    Business <SortIcon field="business_name" />
+                  </button>
+                </th>
+                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
                   <button onClick={() => handleSort('employment_status')} className="flex items-center gap-1.5 hover:text-blue-700 dark:hover:text-blue-300 transition-colors">
                     Status <SortIcon field="employment_status" />
                   </button>
@@ -432,7 +459,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-700/80">
               {paginatedUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-16 text-center">
+                  <td colSpan={6} className="px-4 py-16 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <div className="h-14 w-14 rounded-2xl bg-neutral-100 dark:bg-neutral-700 flex items-center justify-center">
                         <Users size={28} className="text-neutral-400 dark:text-neutral-500" />
@@ -469,6 +496,9 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                       </td>
                       <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200">
                         {u.department_name || <span className="text-neutral-400 dark:text-neutral-500">—</span>}
+                      </td>
+                      <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200">
+                        {u.business_name || <span className="text-neutral-400 dark:text-neutral-500">—</span>}
                       </td>
                       <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200 whitespace-nowrap">
                         {u.employment_status ? (
@@ -569,6 +599,15 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                   ))}
                 </Select>
               </div>
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
+                <Select value={formData.business_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                  <option value="">Select business…</option>
+                  {businesses.map((b) => (
+                    <option key={b.id} value={b.id}>{b.business_name}</option>
+                  ))}
+                </Select>
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div>
@@ -639,6 +678,15 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                   <option value="">Select department…</option>
                   {departments.map((d) => (
                     <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
+                <Select value={formData.business_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                  <option value="">Select business…</option>
+                  {businesses.map((b) => (
+                    <option key={b.id} value={b.id}>{b.business_name}</option>
                   ))}
                 </Select>
               </div>
@@ -722,6 +770,10 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
               <div>
                 <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Department</span>
                 <p className="mt-0.5 text-neutral-700 dark:text-neutral-200">{detailUser.department_name || '—'}</p>
+              </div>
+              <div>
+                <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Business</span>
+                <p className="mt-0.5 text-neutral-700 dark:text-neutral-200">{detailUser.business_name || '—'}</p>
               </div>
               <div>
                 <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">Position/Job Title</span>

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import api from '@/services/api';
+import * as session from '@/services/session';
 
 const AuthContext = createContext(null);
 
@@ -25,27 +26,24 @@ export function AuthProvider({ children }) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    const currentSession = session.getCurrentSession();
 
-    if (token && storedUser) {
+    if (currentSession?.token && currentSession?.user) {
       try {
-        const parsedUser = JSON.parse(storedUser);
         api.get('/auth/profile', { skipAuthRedirect: true })
           .then(response => {
             if (response.data?.status === 'success' && response.data?.data) {
               const verifiedUser = normalizeUser(response.data.data);
-              localStorage.setItem('user', JSON.stringify(verifiedUser));
+              session.saveCurrentSession(currentSession.token, verifiedUser);
               setUser(verifiedUser);
             } else {
               throw new Error('Invalid response');
             }
           })
-          .catch((error) => {
-            const status = error.response?.status;
+          .catch((authError) => {
+            const status = authError.response?.status;
             if (status === 401) {
-              localStorage.removeItem('token');
-              localStorage.removeItem('user');
+              session.clearCurrentSession();
               setUser(null);
             }
           })
@@ -53,8 +51,7 @@ export function AuthProvider({ children }) {
             setLoading(false);
           });
       } catch {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        session.clearCurrentSession();
         setLoading(false);
       }
     } else {
@@ -73,8 +70,7 @@ export function AuthProvider({ children }) {
         const { token, user: userData } = response.data.data;
         const normalizedUser = normalizeUser(userData);
 
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(normalizedUser));
+        session.saveCurrentSession(token, normalizedUser);
 
         setUser(normalizedUser);
         return { success: true, user: normalizedUser };
@@ -91,11 +87,21 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    session.clearCurrentSession();
     setUser(null);
     setError(null);
   }, []);
+
+  const switchSession = useCallback((tabId) => {
+    if (session.switchSession(tabId)) {
+      const current = session.getCurrentSession();
+      if (current?.user) {
+        setUser(normalizeUser(current.user));
+      }
+    }
+  }, []);
+
+  const listSessions = useCallback(() => session.listSessions(), []);
 
   const isAuthenticated = !!user;
   const isSuperAdmin = user?.role === 'super_admin';
@@ -111,6 +117,8 @@ export function AuthProvider({ children }) {
       error,
       login,
       logout,
+      switchSession,
+      listSessions,
       isAuthenticated,
       isSuperAdmin,
       isAdmin,
