@@ -10,6 +10,20 @@ function safeParse(value) {
   }
 }
 
+// Normalize known type aliases to the canonical value used across the UI
+// (TYPE_ORDER, TYPE_COLORS, etc.). Historically the codebase stored the
+// multi-select type as both "multi_select" and "multiple_select"; the
+// organizer only recognizes "multiple_select", so the other spelling would
+// be counted in stats but never displayed.
+const TYPE_ALIASES = {
+  multi_select: "multiple_select",
+};
+
+function normalizeType(type) {
+  if (!type) return "multiple_choice";
+  return TYPE_ALIASES[type] || type;
+}
+
 export function useQuiz(quizId) {
   const [quiz, setQuiz] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -27,6 +41,7 @@ export function useQuiz(quizId) {
       setQuestions(
         list.map((q) => ({
           ...q,
+          type: normalizeType(q.type),
           options: safeParse(q.options),
           correct_answer: safeParse(q.correct_answer),
         }))

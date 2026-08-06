@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sha
 import { Input } from "@/shared/components/ui/input";
 import QuestionEditor from "../components/QuestionEditor";
 import BulkImportModal from "../components/BulkImportModal";
-import { Plus, Save, Send, CalendarClock, Upload, Search, HelpCircle } from "lucide-react";
+import { Plus, Save, Send, CalendarClock, Upload, Search, HelpCircle, Trash2 } from "lucide-react";
 import { QUESTION_TYPE_LABELS, QUESTION_TYPE_CONFIG } from "../constants/questionTypes";
 import QuestionTypeTabs from "../components/QuestionTypeTabs";
 
@@ -436,33 +436,6 @@ export default function QuizBuilderPage() {
         onReorder={handleReorder}
         searchQuery={searchQuery}
       />
-
-      {filteredQuestions.length > 0 && !searchQuery && (
-        <Card className="border border-dashed border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-900">
-          <CardContent className="py-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-              {Object.entries(
-                filteredQuestions.reduce((acc, q) => {
-                  const t = q.type || "multiple_choice";
-                  acc[t] = (acc[t] || 0) + 1;
-                  return acc;
-                }, {})
-              ).map(([type, count]) => {
-                const config = QUESTION_TYPE_CONFIG[type] || { label: type, icon: HelpCircle };
-                const colors = TYPE_COLORS[type] || TYPE_COLORS.multiple_choice;
-                const Icon = config.icon;
-                return (
-                  <div key={type} className="flex items-center gap-2 justify-center">
-                    <Icon className={`h-4 w-4 ${colors.icon}`} />
-                    <span className="text-xs text-neutral-500 dark:text-neutral-400">{config.label || QUESTION_TYPE_LABELS[type] || type}:</span>
-                    <span className="font-medium text-neutral-900 dark:text-neutral-100">{count}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => navigate(`/assessments/quiz/${quizId}/take`)}>

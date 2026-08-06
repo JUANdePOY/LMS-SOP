@@ -16,7 +16,7 @@ function normalizeOptions(question) {
 
 function QuestionOption({ option, type, selected, onChange }) {
   const isChecked =
-    type === "multi_select"
+    type === "multiple_select"
       ? Array.isArray(selected) && selected.includes(option.value)
       : selected === option.value;
 
@@ -38,7 +38,7 @@ function QuestionOption({ option, type, selected, onChange }) {
     );
   }
 
-  if (type === "multi_select") {
+  if (type === "multiple_select") {
     return (
       <label className={`${base} ${isChecked ? selectedCls : "border-neutral-200 hover:bg-neutral-50"}`}>
         <input
@@ -91,7 +91,7 @@ export default function QuizPlayer({
 
   const handleSelect = (value) => {
     if (!question) return;
-    if (question.type === "multi_select") {
+    if (question.type === "multiple_select") {
       const arr = Array.isArray(selected) ? selected : [];
       const next = arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
       setAnswer(question.id, next);
