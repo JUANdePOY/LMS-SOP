@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const coursesController = require('../controllers/coursesController');
 const { authenticateToken } = require('../middleware/auth');
+const { upload: courseImageUpload } = require('../middleware/courseImageUpload');
 
 // Public read routes for course catalog and details
 router.get('/', coursesController.listCourses);
@@ -25,5 +26,6 @@ router.delete('/:courseId/modules/:moduleId', coursesController.deleteModule);
 router.post('/:courseId/modules/:moduleId/content', coursesController.createContent);
 router.put('/:courseId/modules/:moduleId/content/:contentId', coursesController.updateContent);
 router.delete('/:courseId/modules/:moduleId/content/:contentId', coursesController.deleteContent);
+router.post('/:courseId/modules/:moduleId/images', courseImageUpload.single('file'), coursesController.uploadImage);
 
 module.exports = router;

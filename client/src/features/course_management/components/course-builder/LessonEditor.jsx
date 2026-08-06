@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   FileText,
   PlayCircle,
   HelpCircle,
   Link2,
+  Plus,
   Trash2,
   FileArchive,
   Settings,
@@ -12,28 +13,71 @@ import {
   Loader2,
   AlertCircle,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUp,
+  ArrowDown,
+  BookOpen,
+  ListVideo,
+  Image as ImageIcon,
 } from "lucide-react";
 import { getSops } from "@/features/sop-management/services/sopService";
-import { getMyQuizzes } from "@/features/assessments/api/quiz.api";
+import { getQuizzes } from "@/features/assessments/api/quiz.api";
 import { getCertificateTemplates } from "@/features/certificate-management/services/certificateService";
+import { uploadContent } from "@/features/course_management/api/content.api";
 import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichTextEditor";
+import LessonContentBlocks, { extractOutline, parseBlocks } from "./LessonContentBlocks";
+import OutlineRail from "./OutlineRail";
+import VideoPreview from "./VideoPreview";
+import ChapterEditor from "./ChapterEditor";
+import ThumbnailSelector from "./ThumbnailSelector";
+import Accordion from "./Accordion";
+import CreateLessonQuizModal from "./CreateLessonQuizModal";
+import { parseVideoUrl, PROVIDER_LABEL } from "@/features/course_management/utils/videoUrl";
 
 const TYPE_OPTIONS = [
-  { value: "video", label: "Video", Icon: PlayCircle },
-  { value: "reading", label: "Reading", Icon: FileText },
-  { value: "quiz", label: "Quiz", Icon: HelpCircle },
-  { value: "link", label: "Link", Icon: Link2 },
-  { value: "sop", label: "SOP", Icon: FileText },
-  { value: "certificate", label: "Certificate", Icon: Award },
-  { value: "document", label: "Document", Icon: FileArchive },
+  { value: "video", label: "Video", Icon: PlayCircle, hint: "Embed a YouTube or Vimeo link" },
+  { value: "reading", label: "Reading", Icon: FileText, hint: "Write rich text content" },
+  { value: "quiz", label: "Quiz", Icon: HelpCircle, hint: "Attach an assessment" },
+  { value: "link", label: "Link", Icon: Link2, hint: "Point to an external resource" },
+  { value: "sop", label: "SOP", Icon: FileText, hint: "Embed a standard operating procedure" },
+  { value: "certificate", label: "Certificate", Icon: Award, hint: "Award a certificate on completion" },
+  { value: "document", label: "Document", Icon: FileArchive, hint: "Upload a PDF, DOCX or PPTX" },
 ];
+
+const TYPE_CONFIG = {
+  video: { icon: PlayCircle, label: "Video", color: "text-blue-500 bg-blue-50 dark:bg-blue-900/20" },
+  reading: { icon: FileText, label: "Text", color: "text-green-500 bg-green-50 dark:bg-green-900/20" },
+  quiz: { icon: HelpCircle, label: "Quiz", color: "text-purple-500 bg-purple-50 dark:bg-purple-900/20" },
+  link: { icon: Link2, label: "Link", color: "text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20" },
+  sop: { icon: FileText, label: "SOP", color: "text-amber-500 bg-amber-50 dark:bg-amber-900/20" },
+  certificate: { icon: Award, label: "Cert", color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20" },
+  document: { icon: FileArchive, label: "File", color: "text-red-500 bg-red-50 dark:bg-red-900/20" },
+};
 
 const TABS = [
   { id: "content", label: "Content", icon: FileText },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
+const TYPE_HELPER = Object.fromEntries(TYPE_OPTIONS.map((o) => [o.value, o.hint]));
+
+export default function LessonEditor({
+  lesson,
+  onSave,
+  onDelete,
+  saving,
+  courseId,
+  moduleId,
+  onNavigatePrev,
+  onNavigateNext,
+  canNavigatePrev,
+  canNavigateNext,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
+}) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState("reading");
   const [url, setUrl] = useState("");
@@ -47,16 +91,33 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
   const [activeTab, setActiveTab] = useState("content");
   const [quizzes, setQuizzes] = useState([]);
   const [loadingQuizzes, setLoadingQuizzes] = useState(false);
+  const [showCreateQuiz, setShowCreateQuiz] = useState(false);
   const [selectedQuizId, setSelectedQuizId] = useState(null);
   const [certificateTemplates, setCertificateTemplates] = useState([]);
   const [loadingCertificates, setLoadingCertificates] = useState(false);
   const [selectedCertificateId, setSelectedCertificateId] = useState(null);
   const [documentFile, setDocumentFile] = useState(null);
+  const [chapters, setChapters] = useState([]);
+  const [thumbnailUrl, setThumbnailUrl] = useState(null);
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
+  const titleRef = useRef(null);
   const isQuiz = type === "quiz";
+  const isNewLesson = !!lesson?.isNew;
+  const typeConfig = TYPE_CONFIG[type] || TYPE_CONFIG.reading;
+
+  const handleImageUpload = useCallback(
+    async (file) => {
+      if (!courseId || !moduleId) {
+        throw new Error("Save the module first to add images");
+      }
+      const result = await uploadContent(courseId, moduleId, file);
+      return result?.data?.view_url || result?.view_url;
+    },
+    [courseId, moduleId]
+  );
 
   useEffect(() => {
     if (!lesson) return;
@@ -71,9 +132,19 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
     setSelectedQuizId(lesson.quizId || null);
     setSelectedCertificateId(lesson.certificateTemplateId || null);
     setDocumentFile(lesson.documentFile || null);
+    setChapters(Array.isArray(lesson.chapters) ? lesson.chapters : []);
+    setThumbnailUrl(lesson.thumbnail_url || lesson.thumbnailUrl || null);
     setHasChanges(false);
     setSaveError(null);
   }, [lesson?.id]);
+
+  // Move focus to the title when a brand-new lesson is opened.
+  useEffect(() => {
+    if (isNewLesson && titleRef.current) {
+      const t = setTimeout(() => titleRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [isNewLesson, lesson?.id]);
 
   useEffect(() => {
     if (type === "sop") {
@@ -91,18 +162,19 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
   useEffect(() => {
     if (type === "quiz") {
       setLoadingQuizzes(true);
-      getMyQuizzes()
+      getQuizzes(courseId)
         .then((res) => {
           const items = res.data || [];
           setQuizzes(items);
-          if (!items.find((q) => q.id === selectedQuizId) && items.length) {
+          if (!selectedQuizId && items.length) {
             setSelectedQuizId(items[0].id);
           }
         })
         .catch((err) => console.error("Failed to fetch quizzes:", err))
         .finally(() => setLoadingQuizzes(false));
     }
-  }, [type, selectedQuizId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, courseId]);
 
   useEffect(() => {
     if (type === "certificate") {
@@ -116,6 +188,18 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
         .finally(() => setLoadingCertificates(false));
     }
   }, [type]);
+
+  // Keyboard shortcuts: Ctrl/Cmd+S saves.
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSaveRef.current?.();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   if (!lesson) {
     return (
@@ -138,11 +222,14 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
   }, [lesson, onSave]);
 
   const handleTypeChange = (newType) => {
+    if (newType === type) return;
     setType(newType);
     emitPatch({ type: newType });
   };
 
   const handleQuizChange = (quizId) => {
+    // Guard: only allow quizzes that belong to the current course's scoped list.
+    if (quizId && !quizzes.some((q) => q.id === quizId)) return;
     setSelectedQuizId(quizId);
     emitPatch({ quizId });
   };
@@ -160,145 +247,193 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
       quizId: isQuiz ? selectedQuizId : null,
       certificateTemplateId: type === "certificate" ? selectedCertificateId : null,
       documentFile: type === "document" ? documentFile : null,
+      chapters: type === "video" ? chapters : [],
+      thumbnail_url: thumbnailUrl || null,
     });
     setHasChanges(false);
     setLastSavedAt(new Date());
     setSaveError(null);
   };
 
+  // Keep a stable ref so the global keydown handler can call the latest save.
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+
   const handleDelete = () => {
     onDelete?.();
   };
 
+  const saveStatus = saving ? (
+    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-blue-600">
+      <Loader2 size={12} className="animate-spin" />
+      Saving
+    </span>
+  ) : lastSavedAt && !hasChanges ? (
+    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-neutral-400">
+      <CheckCircle2 size={12} />
+      Saved {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+    </span>
+  ) : hasChanges ? (
+    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-amber-600">
+      <AlertCircle size={12} />
+      Unsaved
+    </span>
+  ) : null;
+
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto px-4 py-5">
-        <div className="max-w-4xl mx-auto space-y-4">
-          <div className="bg-white border border-neutral-200 rounded-lg shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-neutral-100">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <input
-                    value={title}
-                    onChange={(e) => {
-                      setTitle(e.target.value);
-                      emitPatch({ title: e.target.value });
-                    }}
-                    placeholder="Lesson title"
-                    className="w-full text-base font-medium text-neutral-900 placeholder:text-neutral-400 bg-transparent border-0 border-b border-transparent hover:border-neutral-300 focus:border-neutral-900 focus:ring-0 p-0 pb-1 transition-colors"
-                  />
-                  <p className="text-xs text-neutral-500 mt-1">
-                    {isQuiz ? "Quiz lesson" : TYPE_OPTIONS.find((o) => o.value === type)?.label + " lesson"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {lastSavedAt && !hasChanges && (
-                    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-neutral-400">
-                      <CheckCircle2 size={12} />
-                      Saved {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="inline-flex items-center gap-2 px-3.5 py-2 bg-neutral-900 text-white text-sm font-medium rounded-lg hover:bg-neutral-800 active:bg-neutral-950 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    {saving ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Save size={14} />
-                    )}
-                    <span className="hidden sm:inline">{saving ? "Saving" : "Save"}</span>
-                  </button>
-                </div>
+    <div className="flex h-full flex-col p-4">
+      <div className="flex flex-1 min-h-0 flex-col rounded-2xl border border-neutral-200 bg-white overflow-hidden">
+        {/* Header (inside the unified card) */}
+        <div className="bg-white border-b border-neutral-200 px-4 py-3">
+          <div className="max-w-4xl mx-auto">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`inline-flex items-center justify-center rounded px-1.5 py-1 text-[10px] font-medium ${typeConfig.color}`}>
+                  {typeConfig.label}
+                </span>
+                <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">
+                  Lesson
+                </span>
               </div>
-
-              <nav className="mt-3 flex items-center gap-1" aria-label="Lesson type">
-                {TYPE_OPTIONS.map((opt) => {
-                  const Icon = opt.Icon;
-                  const active = type === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => handleTypeChange(opt.value)}
-                      className={`
-                        inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors
-                        ${active
-                          ? "bg-neutral-100 text-neutral-900"
-                          : "text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50"}
-                      `}
-                    >
-                      <Icon size={14} />
-                      <span className="hidden sm:inline">{opt.label}</span>
-                    </button>
-                  );
-                })}
-              </nav>
+              <input
+                ref={titleRef}
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  emitPatch({ title: e.target.value });
+                }}
+                placeholder="Lesson title"
+                aria-label="Lesson title"
+                className="w-full text-lg font-semibold text-neutral-900 placeholder:text-neutral-400 bg-transparent border-0 border-b border-transparent hover:border-neutral-300 focus:border-blue-600 focus:ring-0 p-0 pb-1 transition-colors"
+              />
             </div>
-
-            <div className="px-4 pt-4 pb-1">
-              <nav className="-mb-px flex gap-6" aria-label="Editor sections">
-                {TABS.map((tab) => {
-                  const Icon = tab.icon;
-                  const active = activeTab === tab.id;
-                  return (
-                    <button
-                      key={tab.id}
-                      type="button"
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`
-                        inline-flex items-center gap-2 px-1 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors
-                        ${active
-                          ? "border-neutral-900 text-neutral-900"
-                          : "border-transparent text-neutral-500 hover:text-neutral-700"}
-                      `}
-                      aria-current={active ? "page" : undefined}
-                    >
-                      <Icon size={16} />
-                      {tab.label}
-                    </button>
-                  );
-                })}
-              </nav>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {saveStatus}
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                {saving ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Save size={14} />
+                )}
+                <span className="hidden sm:inline">{saving ? "Saving" : "Save"}</span>
+              </button>
             </div>
+          </div>
 
-            <div className="px-4 py-5">
+          {/* Type selector — segmented control */}
+          <nav className="mt-3 flex flex-wrap items-center gap-1" aria-label="Lesson type">
+            {TYPE_OPTIONS.map((opt) => {
+              const Icon = opt.Icon;
+              const active = type === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleTypeChange(opt.value)}
+                  aria-pressed={active}
+                  title={opt.hint}
+                  className={`
+                    inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors
+                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600
+                    ${active
+                      ? "bg-blue-600 text-white"
+                      : "text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100"}
+                  `}
+                >
+                  <Icon size={14} />
+                  <span className="hidden sm:inline">{opt.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Helpful one-liner for the active type */}
+          <p className="mt-2 text-xs text-neutral-500">{TYPE_HELPER[type]}</p>
+
+          {/* Tabs (semantic) */}
+          <div className="mt-3">
+            <nav role="tablist" aria-label="Editor sections" className="-mb-px flex gap-6">
+              {TABS.map((tab) => {
+                const Icon = tab.icon;
+                const active = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    id={`lesson-tab-${tab.id}`}
+                    aria-selected={active}
+                    aria-controls={`lesson-panel-${tab.id}`}
+                    tabIndex={active ? 0 : -1}
+                    onClick={() => setActiveTab(tab.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+                        e.preventDefault();
+                        const dir = e.key === "ArrowRight" ? 1 : -1;
+                        const idx = TABS.findIndex((t) => t.id === activeTab);
+                        const next = TABS[(idx + dir + TABS.length) % TABS.length];
+                        setActiveTab(next.id);
+                      }
+                    }}
+                    className={`
+                      inline-flex items-center gap-2 px-1 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors
+                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 rounded-t
+                      ${active
+                        ? "border-blue-600 text-blue-700"
+                        : "border-transparent text-neutral-500 hover:text-neutral-700"}
+                    `}
+                  >
+                    <Icon size={16} />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto px-4 py-5">
+        <div className="max-w-4xl mx-auto">
+          <div
+            key={type}
+            className="animate-[fadeIn_0.18s_ease-out]"
+          >
+            <div className="px-4 py-5" role="tabpanel" id="lesson-panel-content" aria-labelledby="lesson-tab-content" hidden={activeTab !== "content"}>
               {activeTab === "content" && (
                 <div className="space-y-5">
                   {!isQuiz ? (
                     <div className="space-y-5">
-                      <div>
-                        <label htmlFor="lesson-title-input" className="block text-sm font-medium text-neutral-700 mb-2">
-                          Title <span className="text-neutral-400" aria-label="required">*</span>
-                        </label>
-                        <input
-                          id="lesson-title-input"
-                          value={title}
-                          onChange={(e) => {
-                            setTitle(e.target.value);
-                            emitPatch({ title: e.target.value });
-                          }}
-                          placeholder="Enter lesson title"
-                          className="w-full border border-neutral-300 bg-white rounded-lg px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition-colors"
-                        />
-                      </div>
-
                       {type === "reading" ? (
-                        <div>
-                          <label className="block text-sm font-medium text-neutral-700 mb-2">
-                            Content
-                          </label>
-                          <div className="rounded-lg border border-neutral-200 overflow-hidden">
-                            <RichTextEditor
+                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_220px]">
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                              Content
+                            </label>
+                            <LessonContentBlocks
+                              key={lesson?.id}
                               value={description}
                               onChange={(html) => {
                                 setDescription(html);
                                 emitPatch({ description: html, content: html });
                               }}
-                              placeholder="Start writing..."
+                              onImageUpload={handleImageUpload}
                             />
+                          </div>
+                          <div className="hidden lg:block">
+                            <div className="sticky top-4">
+                              <OutlineRail
+                                items={extractOutline(parseBlocks(description))}
+                                onJump={() => {}}
+                              />
+                            </div>
                           </div>
                         </div>
                       ) : type === "sop" ? (
@@ -308,7 +443,7 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                               Select SOP
                             </label>
                             {loadingSops ? (
-                              <div className="flex items-center gap-2 border border-neutral-200 bg-white rounded-lg px-3 py-2">
+                              <div className="flex items-center gap-2 border border-neutral-200 bg-white rounded-md px-3 py-2">
                                 <Loader2 size={16} className="animate-spin text-neutral-500" />
                                 <span className="text-sm text-neutral-500">Loading...</span>
                               </div>
@@ -325,7 +460,7 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                                     description: selectedSop?.title || "",
                                   });
                                 }}
-                                className="w-full border border-neutral-300 bg-white rounded-lg px-3 py-2 text-sm text-neutral-900 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition-colors"
+                                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
                               >
                                 <option value="">Select an SOP...</option>
                                 {availableSops.map((sop) => (
@@ -341,13 +476,14 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                               <label className="block text-sm font-medium text-neutral-700 mb-2">
                                 Notes
                               </label>
-                              <div className="rounded-lg border border-neutral-200 overflow-hidden">
+                              <div className="rounded-md border border-neutral-200 overflow-hidden">
                                 <RichTextEditor
                                   value={description}
                                   onChange={(html) => {
                                     setDescription(html);
                                     emitPatch({ description: html });
                                   }}
+                                  onImageUpload={handleImageUpload}
                                   placeholder="Optional notes..."
                                 />
                               </div>
@@ -361,7 +497,7 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                               Certificate Template
                             </label>
                             {loadingCertificates ? (
-                              <div className="flex items-center gap-2 border border-neutral-200 bg-white rounded-lg px-3 py-2">
+                              <div className="flex items-center gap-2 border border-neutral-200 bg-white rounded-md px-3 py-2">
                                 <Loader2 size={16} className="animate-spin text-neutral-500" />
                                 <span className="text-sm text-neutral-500">Loading...</span>
                               </div>
@@ -374,7 +510,7 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                                   setSelectedCertificateId(id);
                                   emitPatch({ certificateTemplateId: id, url: id ? String(id) : "" });
                                 }}
-                                className="w-full border border-neutral-300 bg-white rounded-lg px-3 py-2 text-sm text-neutral-900 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition-colors"
+                                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
                               >
                                 <option value="">Select a certificate template...</option>
                                 {certificateTemplates.map((tpl) => (
@@ -392,7 +528,7 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                             <label htmlFor="doc-upload" className="block text-sm font-medium text-neutral-700 mb-2">
                               Document
                             </label>
-                            <div className="relative border border-neutral-300 rounded-lg hover:border-neutral-400 transition-colors">
+                            <div className="relative border border-neutral-200 rounded-md hover:border-neutral-300 transition-colors">
                               <input
                                 id="doc-upload"
                                 type="file"
@@ -426,6 +562,71 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                             </div>
                           </div>
                         </div>
+                      ) : type === "video" ? (
+                        <div className="space-y-5">
+                          <VideoPreview url={url} />
+
+                          <div>
+                            <label htmlFor="lesson-url" className="block text-sm font-medium text-neutral-700 mb-2">
+                              Video URL
+                            </label>
+                            <input
+                              id="lesson-url"
+                              value={url}
+                              onChange={(e) => {
+                                setUrl(e.target.value);
+                                emitPatch({ url: e.target.value, content: e.target.value });
+                              }}
+                              placeholder="https://youtube.com/watch?v=..."
+                              aria-invalid={!!url && !parseVideoUrl(url)}
+                              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
+                            />
+                            {url && parseVideoUrl(url) && (
+                              <p className="mt-1.5 text-xs text-neutral-500">
+                                Source: {PROVIDER_LABEL[parseVideoUrl(url).provider]}
+                              </p>
+                            )}
+                          </div>
+
+                          <Accordion title="Chapters & Timestamps" icon={ListVideo} defaultOpen={chapters.length > 0}>
+                            <ChapterEditor
+                              chapters={chapters}
+                              onChange={(next) => {
+                                setChapters(next);
+                                emitPatch({ chapters: next });
+                              }}
+                            />
+                          </Accordion>
+
+                          <Accordion title="Thumbnail" icon={ImageIcon} defaultOpen={!!thumbnailUrl}>
+                            <ThumbnailSelector
+                              courseId={courseId}
+                              moduleId={moduleId}
+                              value={thumbnailUrl}
+                              onChange={(next) => {
+                                setThumbnailUrl(next);
+                                emitPatch({ thumbnail_url: next });
+                              }}
+                            />
+                          </Accordion>
+
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                              Description
+                            </label>
+                            <div className="rounded-md border border-neutral-200 overflow-hidden">
+                              <RichTextEditor
+                                value={description}
+                                onChange={(html) => {
+                                  setDescription(html);
+                                  emitPatch({ description: html });
+                                }}
+                                onImageUpload={handleImageUpload}
+                                placeholder="Optional description..."
+                              />
+                            </div>
+                          </div>
+                        </div>
                       ) : (
                         <div>
                           <label htmlFor="lesson-url" className="block text-sm font-medium text-neutral-700 mb-2">
@@ -443,20 +644,21 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                                 ? "https://example.com"
                                 : "https://youtube.com/watch?v=..."
                             }
-                            className="w-full border border-neutral-300 bg-white rounded-lg px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition-colors"
+                            className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
                           />
                           {type === "video" && (
                             <div className="mt-5">
                               <label className="block text-sm font-medium text-neutral-700 mb-2">
                                 Description
                               </label>
-                              <div className="rounded-lg border border-neutral-200 overflow-hidden">
+                              <div className="rounded-md border border-neutral-200 overflow-hidden">
                                 <RichTextEditor
                                   value={description}
                                   onChange={(html) => {
                                     setDescription(html);
                                     emitPatch({ description: html });
                                   }}
+                                  onImageUpload={handleImageUpload}
                                   placeholder="Optional description..."
                                 />
                               </div>
@@ -468,20 +670,33 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                   ) : (
                     <div className="space-y-5">
                       <div>
-                        <label htmlFor="quiz-select" className="block text-sm font-medium text-neutral-700 mb-2">
-                          Quiz
-                        </label>
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                          <label htmlFor="quiz-select" className="block text-sm font-medium text-neutral-700">
+                            Quiz
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setShowCreateQuiz(true)}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                          >
+                            <Plus size={14} /> Create new
+                          </button>
+                        </div>
                         {loadingQuizzes ? (
-                          <div className="flex items-center gap-2 border border-neutral-200 bg-white rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-2 border border-neutral-200 bg-white rounded-md px-3 py-2">
                             <Loader2 size={16} className="animate-spin text-neutral-500" />
                             <span className="text-sm text-neutral-500">Loading...</span>
+                          </div>
+                        ) : quizzes.length === 0 ? (
+                          <div className="rounded-md border border-dashed border-neutral-300 bg-neutral-50 px-3 py-3 text-sm text-neutral-500">
+                            No quizzes in this course yet. Create one below, then attach it.
                           </div>
                         ) : (
                           <select
                             id="quiz-select"
                             value={selectedQuizId || ""}
                             onChange={(e) => handleQuizChange(e.target.value ? Number(e.target.value) : null)}
-                            className="w-full border border-neutral-300 bg-white rounded-lg px-3 py-2 text-sm text-neutral-900 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition-colors"
+                            className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
                           >
                             <option value="">Select a quiz...</option>
                             {quizzes.map((q) => (
@@ -497,13 +712,14 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                         <label className="block text-sm font-medium text-neutral-700 mb-2">
                           Instructions
                         </label>
-                        <div className="rounded-lg border border-neutral-200 overflow-hidden">
+                        <div className="rounded-md border border-neutral-200 overflow-hidden">
                           <RichTextEditor
                             value={description}
                             onChange={(html) => {
                               setDescription(html);
                               emitPatch({ description: html });
                             }}
+                            onImageUpload={handleImageUpload}
                             placeholder="Instructions or context..."
                           />
                         </div>
@@ -518,7 +734,7 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                               setRequiresQuizPass(e.target.checked);
                               emitPatch({ requiresQuizPass: e.target.checked });
                             }}
-                            className="mt-0.5 w-4 h-4 border-neutral-300 text-neutral-900 focus:ring-neutral-900 rounded"
+                            className="mt-0.5 w-4 h-4 border-neutral-300 text-blue-600 focus:ring-blue-600 rounded"
                           />
                           <div>
                             <span className="text-sm font-medium text-neutral-700">
@@ -545,7 +761,7 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                                 placeholder="e.g. 70"
                                 min="0"
                                 max="100"
-                                className="w-full border border-neutral-300 bg-white rounded-lg pl-3 pr-8 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition-colors"
+                                className="w-full rounded-md border border-neutral-200 bg-white pl-3 pr-8 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
                               />
                               <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-neutral-500">%</span>
                             </div>
@@ -556,7 +772,15 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                   )}
                 </div>
               )}
+            </div>
 
+            <div
+              className="px-4 py-5"
+              role="tabpanel"
+              id="lesson-panel-settings"
+              aria-labelledby="lesson-tab-settings"
+              hidden={activeTab !== "settings"}
+            >
               {activeTab === "settings" && (
                 <div className="space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
@@ -575,7 +799,7 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                           }}
                           placeholder="e.g. 10"
                           min="0"
-                          className="w-full border border-neutral-300 bg-white rounded-lg pl-3 pr-10 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition-colors"
+                          className="w-full rounded-md border border-neutral-200 bg-white pl-3 pr-10 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
                         />
                         <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-neutral-500">min</span>
                       </div>
@@ -593,7 +817,7 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                             setIsRequired(e.target.checked);
                             emitPatch({ is_required: e.target.checked });
                           }}
-                          className="w-4 h-4 border-neutral-300 text-neutral-900 focus:ring-neutral-900 rounded"
+                          className="w-4 h-4 border-neutral-300 text-blue-600 focus:ring-blue-600 rounded"
                         />
                         <div>
                           <span className="text-sm text-neutral-700">Required lesson</span>
@@ -609,26 +833,78 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
         </div>
       </div>
 
+      {/* Footer with navigation + delete */}
       <footer className="border-t border-neutral-200 bg-white px-5 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <button
             type="button"
             onClick={handleDelete}
             disabled={saving}
-            className="inline-flex items-center gap-2 px-3 py-2 text-sm text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50 rounded-lg disabled:opacity-40 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-neutral-500 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Trash2 size={16} />
-            Delete
+            <span className="hidden sm:inline">Delete</span>
           </button>
-          <div className="flex items-center gap-3">
-            {hasChanges && (
-              <span className="text-xs text-neutral-400">
-                Unsaved changes
-              </span>
-            )}
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={onNavigatePrev}
+              disabled={!canNavigatePrev}
+              title="Previous lesson"
+              aria-label="Previous lesson"
+              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} />
+              <span className="hidden sm:inline">Prev</span>
+            </button>
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={!canMoveUp}
+              title="Move lesson up"
+              aria-label="Move lesson up"
+              className="inline-flex items-center justify-center rounded-md px-2 py-1.5 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ArrowUp size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={!canMoveDown}
+              title="Move lesson down"
+              aria-label="Move lesson down"
+              className="inline-flex items-center justify-center rounded-md px-2 py-1.5 text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ArrowDown size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={onNavigateNext}
+              disabled={!canNavigateNext}
+              title="Next lesson"
+              aria-label="Next lesson"
+              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <span className="hidden sm:inline">Next</span>
+              <ChevronRight size={16} />
+            </button>
           </div>
         </div>
       </footer>
+
+      <CreateLessonQuizModal
+        open={showCreateQuiz}
+        onClose={() => setShowCreateQuiz(false)}
+        courseId={courseId}
+        onCreated={(quiz) => {
+          if (!quiz?.id) return;
+          setQuizzes((prev) => [quiz, ...prev]);
+          setSelectedQuizId(quiz.id);
+          emitPatch({ quizId: quiz.id });
+        }}
+      />
+      </div>
     </div>
   );
 }

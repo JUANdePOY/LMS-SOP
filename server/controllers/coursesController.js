@@ -268,7 +268,7 @@ function updateContent(req, res) {
   courseContentModel.findById(contentId)
     .then((content) => {
       if (!content) return res.status(404).json({ success: false, message: 'Content not found' });
-      const allowed = ['title', 'type', 'description', 'order_index', 'url', 'duration', 'is_required', 'allow_access_after'];
+      const allowed = ['title', 'type', 'description', 'order_index', 'url', 'duration', 'is_required', 'allow_access_after', 'chapters', 'thumbnail_url'];
       const updates = {};
       for (const key of allowed) {
         if (Object.prototype.hasOwnProperty.call(req.body, key)) {
@@ -415,6 +415,22 @@ function exportCoursePDF(req, res) {
     .catch((err) => sendError(res, err, 'Failed to export PDF'));
 }
 
+function uploadImage(req, res) {
+  const courseId = parseInt(req.params.courseId, 10);
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'No image file uploaded', code: 'NO_FILE' });
+  }
+  try {
+    const { saveCourseImage } = require('../middleware/courseImageUpload');
+    const url = saveCourseImage(courseId, req.file);
+    logAudit('course.image.uploaded', req.user.id, { course_id: courseId, url });
+    res.status(201).json({ success: true, data: { view_url: url }, message: 'Image uploaded successfully' });
+  } catch (err) {
+    console.error('[Course Image Upload Error]', err);
+    res.status(500).json({ success: false, message: 'Failed to upload image', code: 'UPLOAD_ERROR' });
+  }
+}
+
 module.exports = {
   listCourses,
   getCourse,
@@ -434,4 +450,5 @@ module.exports = {
   exportCourseCSV,
   exportCourseExcel,
   exportCoursePDF,
+  uploadImage,
 };

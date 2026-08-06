@@ -163,7 +163,8 @@ async function listAllQuizzes(req, res) {
 
 async function listMyQuizzes(req, res) {
   try {
-    const quizzes = await quizModel.getMyQuizzes(req.user.id, req.user.role);
+    const courseId = req.query.courseId ? parseInt(req.query.courseId, 10) : null;
+    const quizzes = await quizModel.getMyQuizzes(req.user.id, req.user.role, courseId);
     res.json({ success: true, data: quizzes });
   } catch (err) {
     sendError(res, err, 'Failed to list quizzes');

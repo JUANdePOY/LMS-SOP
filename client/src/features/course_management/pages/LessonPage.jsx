@@ -6,6 +6,7 @@ import { useMarkLessonComplete } from "../hooks/useMarkLessonComplete";
 import LessonProgressBar from "../components/LessonProgressBar";
 import LessonList from "../components/LessonList";
 import VideoPlayer from "../components/utils/VideoPlayer";
+import LB_PROSE from "../utils/lbProse";
 import { getQuizzes } from "@/features/assessments/api/quiz.api";
 import { getIssuancesByUser } from "@/features/certificate-management/services/certificateService";
 
@@ -145,7 +146,7 @@ export default function LessonPage() {
             <div className="p-6">
               <h2 className="text-xl font-bold mb-3">{currentLesson.title}</h2>
               <div
-                className="prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300"
+                className={`prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300 ${LB_PROSE}`}
                 dangerouslySetInnerHTML={{ __html: currentLesson.description || currentLesson.content || "No content available." }}
               />
             </div>

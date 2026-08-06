@@ -629,16 +629,19 @@ async function getUserSubmissions(userId, quizId) {
   return rows;
 }
 
-async function getMyQuizzes(userId, role) {
+async function getMyQuizzes(userId, role, courseId) {
   const adminRoles = ['super_admin', 'admin', 'department_head'];
+  const courseFilter = courseId ? ' AND q.course_id = ?' : '';
+  const courseParam = courseId ? [courseId] : [];
+
   if (adminRoles.includes(role)) {
     const [rows] = await db.query(
       `SELECT q.*, c.title AS course_title, c.id AS course_id
        FROM quizzes q
        JOIN courses c ON q.course_id = c.id
-       WHERE q.is_deleted = FALSE AND q.status = 'published'
+       WHERE q.is_deleted = FALSE AND q.status = 'published'${courseFilter}
        ORDER BY q.created_at DESC`,
-      []
+      courseParam
     );
     return rows;
   }
@@ -648,10 +651,10 @@ async function getMyQuizzes(userId, role) {
      FROM quizzes q
      JOIN courses c ON q.course_id = c.id
      LEFT JOIN course_enrollments ce ON ce.course_id = c.id AND ce.user_id = ? AND ce.status = 'active' AND ce.is_deleted = FALSE
-     WHERE q.is_deleted = FALSE AND q.status = 'published'
+     WHERE q.is_deleted = FALSE AND q.status = 'published'${courseFilter}
        AND (ce.user_id IS NOT NULL OR c.instructor_id = ?)
      ORDER BY q.created_at DESC`,
-    [userId, userId]
+    [userId, userId, ...courseParam]
   );
   return rows;
 }
