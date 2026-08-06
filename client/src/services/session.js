@@ -71,15 +71,18 @@ export function listSessions() {
   return Object.values(readRegistry());
 }
 
-export function getActiveSessionId() {
-  return localStorage.getItem(ACTIVE_KEY);
+// The active-session pointer is per-tab (sessionStorage) so each tab keeps
+// its own isolated login. The shared localStorage registry only tracks
+// sessions across tabs for awareness/switching.
+function getActiveSessionId() {
+  return sessionStorage.getItem(ACTIVE_KEY);
 }
 
-export function setActiveSessionId(tabId) {
+function setActiveSessionId(tabId) {
   if (tabId) {
-    localStorage.setItem(ACTIVE_KEY, tabId);
+    sessionStorage.setItem(ACTIVE_KEY, tabId);
   } else {
-    localStorage.removeItem(ACTIVE_KEY);
+    sessionStorage.removeItem(ACTIVE_KEY);
   }
 }
 
@@ -97,19 +100,20 @@ export function saveCurrentSession(token, user) {
   return tabId;
 }
 
-// Read the session currently active in this tab. Falls back to the
-// session owned by this tab, then to any available session.
+// Read the session owned by THIS tab. Each tab is fully isolated, so a new
+// tab always starts unauthenticated (showing the login page) even if another
+// tab is already logged in — letting you log in a different account there.
 export function getCurrentSession() {
-  const activeId = getActiveSessionId();
-  if (activeId) {
-    const session = readSession(activeId);
-    if (session) return session;
-  }
   const tabId = getTabId();
   const ownSession = readSession(tabId);
   if (ownSession) {
     setActiveSessionId(tabId);
     return ownSession;
+  }
+  const activeId = getActiveSessionId();
+  if (activeId) {
+    const session = readSession(activeId);
+    if (session) return session;
   }
   return null;
 }
@@ -130,12 +134,13 @@ export function switchSession(tabId) {
 }
 
 // Remove the session for the current tab (or a specific tab id).
+// This logs the current tab out without promoting another tab's session
+// as active — each tab keeps its own isolated session.
 export function clearCurrentSession(tabId) {
   const id = tabId || getTabId();
   removeSession(id);
   if (getActiveSessionId() === id) {
-    const remaining = Object.keys(readRegistry());
-    setActiveSessionId(remaining.length ? remaining[0] : null);
+    setActiveSessionId(null);
   }
 }
 
@@ -144,5 +149,5 @@ export function clearAllSessions() {
   const registry = readRegistry();
   Object.keys(registry).forEach((id) => localStorage.removeItem(sessionKey(id)));
   localStorage.removeItem(REGISTRY_KEY);
-  localStorage.removeItem(ACTIVE_KEY);
+  sessionStorage.removeItem(ACTIVE_KEY);
 }
