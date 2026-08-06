@@ -256,7 +256,7 @@ export default function CertificateTemplateViewModal({ open, onClose, templateId
           label: section.label,
           filled: items.length > 0,
           text: items.length
-            ? items.map((i) => i.signer_name || i.label || '').filter(Boolean).join(', ')
+            ? items.map((i) => [i.signer_name, i.position_title, i.label].filter(Boolean).join(' - ')).filter(Boolean).join(', ')
             : '',
         };
       }

@@ -21,7 +21,6 @@ const TYPE_CONFIG = {
   reading: { icon: FileText, label: "Text", color: "text-green-500 bg-green-50 dark:bg-green-900/20" },
   quiz: { icon: HelpCircle, label: "Quiz", color: "text-purple-500 bg-purple-50 dark:bg-purple-900/20" },
   link: { icon: Link2, label: "Link", color: "text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20" },
-  sop: { icon: FileText, label: "SOP", color: "text-amber-500 bg-amber-50 dark:bg-amber-900/20" },
   certificate: { icon: Award, label: "Cert", color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20" },
   document: { icon: FileArchive, label: "File", color: "text-red-500 bg-red-50 dark:bg-red-900/20" },
 };

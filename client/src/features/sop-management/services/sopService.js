@@ -10,7 +10,7 @@ export const getSopStats = () => api.get('/sops/stats');
 export const getTrashedSops = (params = {}) => api.get('/sops/trashed', { params });
 export const restoreSop = (id) => api.post(`/sops/${id}/restore`);
 export const permanentDeleteSop = (id) => api.delete(`/sops/${id}/permanent`);
-export const emptyTrash = () => api.delete('/sops/trashed');
+export const emptyTrash = () => api.delete('/sops/trashed/empty');
 
 export const getAssignments = (sopId) => api.get(`/sops/${sopId}/assignments`);
 export const createAssignment = (sopId, data) => api.post(`/sops/${sopId}/assignments`, data);
@@ -38,6 +38,36 @@ export const approveSop = (sopId) => api.post(`/sops/${sopId}/approve`);
 export const rejectSop = (sopId) => api.post(`/sops/${sopId}/reject`);
 export const publishSop = (sopId) => api.post(`/sops/${sopId}/publish`);
 
+export const archiveSop = (sopId) => api.put(`/sops/${sopId}`, { status: 'Archived' });
+export const unarchiveSop = (sopId) => api.put(`/sops/${sopId}`, { status: 'Draft' });
+
 export const transitionSop = (sopId, data) => api.post(`/sops/${sopId}/transition`, data);
 export const getSharedSopModules = (token, versionId = null) =>
   api.get(`/sops/share/${token}/modules${versionId ? `?versionId=${versionId}` : ''}`);
+
+export const downloadSop = async (sopId) => {
+  try {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const response = await fetch(`/api/sops/${sopId}/export`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error?.message || `Download failed (${response.status})`);
+    }
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `SOP-${sopId}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error("SOP download failed:", err);
+    throw err;
+  }
+};

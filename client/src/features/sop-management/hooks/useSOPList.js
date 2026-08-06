@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
-import { getSops, createSop, updateSop, deleteSop } from '@/features/sop-management/services/sopService';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { getSops, createSop, updateSop, deleteSop, archiveSop, unarchiveSop } from '@/features/sop-management/services/sopService';
 import { createAssignment } from '@/features/sop-management/services/assignmentService';
 import { createModule } from '@/features/sop-management/services/moduleService';
 import { createLink } from '@/features/sop-management/services/attachmentService';
 import { useAssignmentCascade } from '@/features/sop-management/hooks/useAssignmentCascade';
+import { getCategories } from '@/features/organization-management/api/category.api';
 import { SOP_STATUSES } from '@/features/sop-management/constants/sopConstants';
 import { useToast } from '@/shared/components/ui/Toast';
 
@@ -19,11 +20,46 @@ export function useSOPList() {
   const [newDescription, setNewDescription] = useState('');
   const [newLink, setNewLink] = useState('');
   const [newRestrictionType, setNewRestrictionType] = useState('department');
+  const [newCategoryId, setNewCategoryId] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const [editingSopId, setEditingSopId] = useState(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editStatus, setEditStatus] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState('');
   const [archivedTab, setArchivedTab] = useState(false);
+
+  const filteredCategories = useMemo(() => {
+    if (!categories.length) return [];
+    if (!cascade.selectedDeptIds.length) return [];
+    return categories.filter((cat) => cat.department_id && cascade.selectedDeptIds.includes(cat.department_id));
+  }, [categories, cascade.selectedDeptIds]);
+
+  useEffect(() => {
+    if (!cascade.selectedDeptIds.length) {
+      setNewCategoryId('');
+      setEditCategoryId('');
+    }
+  }, [cascade.selectedDeptIds]);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoadingCategories(true);
+    getCategories({ limit: 100 })
+      .then((r) => {
+        if (mounted) setCategories(r.data?.data?.rows || []);
+      })
+      .catch(() => {
+        if (mounted) setCategories([]);
+      })
+      .finally(() => {
+        if (mounted) setLoadingCategories(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const fetchSops = useCallback(
     async (searchValue = search, statusValue = status) => {
@@ -53,6 +89,7 @@ export function useSOPList() {
     setNewDescription('');
     setNewLink('');
     setNewRestrictionType('department');
+    setNewCategoryId('');
     cascade.setSelectedBusinessIds([]);
     cascade.setSelectedDeptIds([]);
     cascade.setSelectedPositions([]);
@@ -68,6 +105,7 @@ export function useSOPList() {
         title: newTitle,
         description: newDescription,
         department_id: cascade.selectedDeptIds.length > 0 ? cascade.selectedDeptIds[0] : (cascade.filteredDepartments[0]?.id || null),
+        category_id: newCategoryId || null,
         status: SOP_STATUSES.DRAFT,
         restriction_type: newRestrictionType,
       });
@@ -116,6 +154,7 @@ export function useSOPList() {
     setEditTitle(sop.title);
     setEditDescription(sop.description || '');
     setEditStatus(sop.status);
+    setEditCategoryId(sop.category_id || '');
   };
 
   const handleEditCancel = () => {
@@ -123,6 +162,7 @@ export function useSOPList() {
     setEditTitle('');
     setEditDescription('');
     setEditStatus('');
+    setEditCategoryId('');
   };
 
   const handleEditSave = async (sopId) => {
@@ -132,6 +172,7 @@ export function useSOPList() {
         title: editTitle,
         description: editDescription,
         status: editStatus,
+        category_id: editCategoryId || null,
       });
       setEditingSopId(null);
       await fetchSops();
@@ -148,6 +189,21 @@ export function useSOPList() {
       toast.success('SOP deleted successfully');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete SOP');
+    }
+  };
+
+  const handleArchiveSop = async (sop) => {
+    try {
+      if (sop.status === SOP_STATUSES.ARCHIVED) {
+        await unarchiveSop(sop.id);
+        toast.success('SOP unarchived successfully');
+      } else {
+        await archiveSop(sop.id);
+        toast.success('SOP archived successfully');
+      }
+      await fetchSops();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update SOP archive status');
     }
   };
 
@@ -172,6 +228,11 @@ export function useSOPList() {
     setNewLink,
     newRestrictionType,
     setNewRestrictionType,
+    newCategoryId,
+    setNewCategoryId,
+    categories,
+    loadingCategories,
+    filteredCategories,
     // Edit form state
     editingSopId,
     editTitle,
@@ -180,6 +241,8 @@ export function useSOPList() {
     setEditDescription,
     editStatus,
     setEditStatus,
+    editCategoryId,
+    setEditCategoryId,
     // Handlers
     fetchSops,
     resetForm,
@@ -188,6 +251,7 @@ export function useSOPList() {
     handleEditCancel,
     handleEditSave,
     handleDeleteSop,
+    handleArchiveSop,
     // Cascade
     cascade,
   };

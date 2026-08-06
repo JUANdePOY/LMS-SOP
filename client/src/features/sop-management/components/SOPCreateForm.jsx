@@ -9,6 +9,10 @@ function SOPCreateForm({
   setNewTitle,
   newDescription,
   setNewDescription,
+  newCategoryId,
+  setNewCategoryId,
+  filteredCategories,
+  loadingCategories,
   loading,
   cascade,
   onCancel,
@@ -95,26 +99,24 @@ function SOPCreateForm({
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-medium text-[var(--text-secondary)]">Users</label>
-                {typeof cascade.totalUsers === 'number' && (
-                  <span className="text-xs text-[var(--text-muted)]">{cascade.totalUsers} found</span>
-                )}
-              </div>
-              <GroupedCheckboxList
-                items={cascade.users}
-                selectedIds={cascade.selectedUserIds}
-                onToggle={cascade.toggleUser}
-                onToggleBulk={cascade.toggleUsers}
-                groupKey="business_name"
-                subgroupKey="department_name"
-                labelKey="full_name"
-                subLabelKey="position_title"
-                valueKey="id"
-                loading={cascade.loading.users}
-                emptyText={cascade.selectedDeptIds.length ? 'No users found' : 'Select a department first'}
-                className="max-h-48 overflow-y-auto"
-              />
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Category</label>
+              <select
+                value={newCategoryId}
+                onChange={(e) => setNewCategoryId(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+                disabled={loadingCategories || !cascade.selectedDeptIds.length}
+              >
+                <option value="">{
+                  cascade.selectedDeptIds.length
+                    ? 'Select category...'
+                    : 'Select a department first'
+                }</option>
+                {filteredCategories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>

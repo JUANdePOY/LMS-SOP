@@ -1,0 +1,210 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Search, Plus, Filter, X, RefreshCw, AlertTriangle, ClipboardList, Clock, XCircle, CheckCircle } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/shared/components/ui/Toast';
+import { cn } from '@/lib/utils';
+import { useTasks } from '../hooks/useTasks';
+import { getTask } from '../services/taskService';
+import TaskCard from '../components/TaskCard';
+import TaskCardSkeleton from '../components/TaskCardSkeleton';
+import TaskForm from '../components/TaskForm';
+import { TASK_PRIORITIES, TASK_STATUSES } from '../constants/taskConstants';
+
+export default function TasksPage() {
+  const { isAnyAdmin } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { tasks, loading, error, stats, refresh, create, update, remove } = useTasks();
+  const [showForm, setShowForm] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+
+  useEffect(() => {
+    if (!isAnyAdmin) {
+      navigate('/tasks/my', { replace: true });
+    }
+  }, [isAnyAdmin, navigate]);
+
+  if (!isAnyAdmin) {
+    return null;
+  }
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  const statItems = useMemo(() => {
+    if (!stats) return [];
+    return [
+      { label: 'Total', value: stats.total, icon: ClipboardList, color: 'text-neutral-600 dark:text-neutral-300', bg: 'bg-neutral-50 dark:bg-neutral-500/10' },
+      { label: 'Pending', value: stats.pending, icon: Clock, color: 'text-slate-600 dark:text-slate-300', bg: 'bg-slate-50 dark:bg-slate-500/10' },
+      { label: 'In Progress', value: stats.in_progress, icon: RefreshCw, color: 'text-blue-600 dark:text-blue-300', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+      { label: 'Completed', value: stats.completed, icon: CheckCircle, color: 'text-emerald-600 dark:text-emerald-300', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+      { label: 'Overdue', value: stats.overdue, icon: AlertTriangle, color: 'text-red-600 dark:text-red-300', bg: 'bg-red-50 dark:bg-red-500/10' },
+      { label: 'Cancelled', value: stats.cancelled, icon: XCircle, color: 'text-neutral-500 dark:text-neutral-400', bg: 'bg-neutral-50 dark:bg-neutral-500/10' },
+    ];
+  }, [stats]);
+
+  const hasActiveFilters = search || statusFilter || priorityFilter;
+
+  const clearFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setPriorityFilter('');
+  };
+
+  useEffect(() => {
+    const timeout = setTimeout(() => refresh(), 300);
+    return () => clearTimeout(timeout);
+  }, [search, statusFilter, priorityFilter]);
+
+  const handleSubmit = async (payload) => {
+    setSaving(true);
+    try {
+      if (editingTask) {
+        await update(editingTask.id, payload);
+      } else {
+        await create(payload);
+      }
+      setShowForm(false);
+      setEditingTask(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleView = (task) => {
+    navigate(`/tasks/${task.id}`);
+  };
+
+  const handleEdit = async (task) => {
+    try {
+      const data = await getTask(task.id);
+      setEditingTask(data);
+    } catch (err) {
+      toast.error(err.message || 'Failed to load task details');
+    }
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this task?')) return;
+    try {
+      await remove(id);
+    } catch (err) {
+      // error handled in hook
+    }
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+            <Filter size={20} className="text-neutral-400" />
+            Tasks & Projects
+          </h1>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Create, assign, and monitor tasks</p>
+        </div>
+        <button
+          onClick={() => { setEditingTask(null); setShowForm(true); }}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-3 py-1.5 text-xs font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 transition-colors"
+        >
+          <Plus size={14} />
+          New Task
+        </button>
+      </div>
+
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          {statItems.map((stat) => (
+            <div key={stat.label} className={cn("rounded-lg border border-[var(--border)] px-3 py-2.5", stat.bg)}>
+              <div className="flex items-center gap-2">
+                <stat.icon size={14} className={stat.color} />
+                <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{stat.label}</p>
+              </div>
+              <p className="text-lg font-bold text-neutral-900 dark:text-neutral-100 mt-1">{stat.value}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-3 mb-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="relative flex-1 w-full sm:w-auto">
+            <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search tasks..."
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] pl-8 pr-3 py-1.5 text-sm outline-none focus:border-blue-500 placeholder:text-[var(--text-muted)]"
+              aria-label="Search tasks"
+            />
+          </div>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-2 py-1.5 text-sm outline-none focus:border-blue-500 flex-1 sm:flex-none" aria-label="Filter by status">
+              <option value="">All Status</option>
+              {TASK_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} className="rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-2 py-1.5 text-sm outline-none focus:border-blue-500 flex-1 sm:flex-none" aria-label="Filter by priority">
+              <option value="">All Priority</option>
+              {TASK_PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-2 py-1.5 text-xs text-neutral-600 dark:text-neutral-300 hover:bg-[var(--bg-hover)] transition-colors shrink-0"
+                aria-label="Clear all filters"
+              >
+                <X size={12} />
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 dark:bg-red-950/30 p-4 mb-4 flex items-start gap-3">
+          <AlertTriangle size={16} className="text-red-500 mt-0.5 shrink-0" />
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        </div>
+      )}
+
+      {/* Task List */}
+      <div className="space-y-3">
+        {loading && tasks.length === 0 ? (
+          <TaskCardSkeleton count={4} />
+        ) : tasks.length === 0 ? (
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-12 text-center">
+            <ClipboardList size={32} className="text-[var(--text-muted)] mx-auto mb-3" />
+            <p className="text-sm text-[var(--text-muted)] mb-1">No tasks found</p>
+            {hasActiveFilters && (
+              <p className="text-xs text-[var(--text-muted)]">Try adjusting your search or filters</p>
+            )}
+          </div>
+        ) : (
+          tasks.map((task) => (
+            <TaskCard key={task.id} task={task} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} canManage />
+          ))
+        )}
+      </div>
+
+      <TaskForm
+        show={showForm}
+        onClose={() => { setShowForm(false); setEditingTask(null); }}
+        onSubmit={handleSubmit}
+        saving={saving}
+        initialData={editingTask}
+      />
+    </div>
+  );
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, LayoutGrid, LayoutList, Plus } from 'lucide-react';
+import { Search, LayoutGrid, LayoutList, Plus, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useSOPList } from '@/features/sop-management/hooks/useSOPList';
@@ -45,22 +45,7 @@ function RestrictionBadge({ restrictionType }) {
   );
 }
 
-function SOPCard({ sop, viewMode, editingSopId, editTitle, setEditTitle, editDescription, setEditDescription, editStatus, setEditStatus, cascade, onEditStart, onEditCancel, onEditSave, onDeleteSop }) {
-  if (editingSopId === sop.id) {
-    return (
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm">
-        <SOPEditForm
-          sop={sop}
-          editTitle={editTitle} setEditTitle={setEditTitle}
-          editDescription={editDescription} setEditDescription={setEditDescription}
-          editStatus={editStatus} setEditStatus={setEditStatus}
-          cascade={cascade}
-          onCancel={onEditCancel}
-          onSave={onEditSave}
-        />
-      </div>
-    );
-  }
+function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop }) {
 
   if (viewMode === VIEW_MODES.GRID) {
     return (
@@ -76,6 +61,7 @@ function SOPCard({ sop, viewMode, editingSopId, editTitle, setEditTitle, editDes
         </div>
         <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
           <button onClick={() => onEditStart(sop)} className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">Edit</button>
+          <button onClick={() => onArchiveSop(sop)} className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">{sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}</button>
           <button onClick={() => onDeleteSop(sop.id)} className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">Delete</button>
         </div>
       </div>
@@ -95,6 +81,13 @@ function SOPCard({ sop, viewMode, editingSopId, editTitle, setEditTitle, editDes
           <button onClick={() => onEditStart(sop)} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors" title="Edit SOP" aria-label="Edit SOP">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
           </button>
+          <button onClick={() => onArchiveSop(sop)} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors" title={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive SOP' : 'Archive SOP'} aria-label={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive SOP' : 'Archive SOP'}>
+            {sop.status === SOP_STATUSES.ARCHIVED ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+            )}
+          </button>
           <button onClick={() => onDeleteSop(sop.id)} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors" title="Delete SOP" aria-label="Delete SOP">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
           </button>
@@ -109,10 +102,11 @@ function SOPListPage() {
     sops, loading, search, setSearch, status, setStatus,
     archivedTab, setArchivedTab, showCreate, setShowCreate,
     newTitle, setNewTitle, newDescription, setNewDescription, newLink, setNewLink,
-    newCategoryId, setNewCategoryId, categories, loadingCategories,
+    newCategoryId, setNewCategoryId, categories, loadingCategories, filteredCategories,
     editingSopId, editTitle, setEditTitle, editDescription, setEditDescription,
-    editStatus, setEditStatus, handleCreate, fetchSops,
-    resetForm, handleEditStart, handleEditCancel, handleEditSave, handleDeleteSop,
+    editStatus, setEditStatus, editCategoryId, setEditCategoryId, handleCreate, fetchSops,
+    resetForm,
+    handleEditStart, handleEditCancel, handleEditSave, handleDeleteSop, handleArchiveSop,
     cascade,
   } = useSOPList();
 
@@ -135,6 +129,17 @@ function SOPListPage() {
     fetchSops(debouncedSearch, debouncedStatus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch, debouncedStatus, activeTab]);
+
+
+  useEffect(() => {
+    if (!editingSopId) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') handleEditCancel();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [editingSopId, handleEditCancel]);
+  const editingSop = sops.find(s => s.id === editingSopId);
 
   const renderSops = () => {
     if (loading) {
@@ -165,23 +170,7 @@ function SOPListPage() {
     return (
       <div className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2'}>
         {sops.map((sop) => (
-          <SOPCard
-            key={sop.id}
-            sop={sop}
-            viewMode={viewMode}
-            editingSopId={editingSopId}
-            editTitle={editTitle}
-            setEditTitle={setEditTitle}
-            editDescription={editDescription}
-            setEditDescription={setEditDescription}
-            editStatus={editStatus}
-            setEditStatus={setEditStatus}
-            cascade={cascade}
-            onEditStart={handleEditStart}
-            onEditCancel={handleEditCancel}
-            onEditSave={handleEditSave}
-            onDeleteSop={handleDeleteSop}
-          />
+          <SOPCard key={sop.id} sop={sop} viewMode={viewMode} onEditStart={handleEditStart} onDeleteSop={handleDeleteSop} onArchiveSop={handleArchiveSop} />
         ))}
       </div>
     );
@@ -246,7 +235,7 @@ function SOPListPage() {
             newDescription={newDescription} setNewDescription={setNewDescription}
             newLink={newLink} setNewLink={setNewLink}
             newCategoryId={newCategoryId} setNewCategoryId={setNewCategoryId}
-            categories={categories} loadingCategories={loadingCategories}
+            filteredCategories={filteredCategories} loadingCategories={loadingCategories}
             loading={loading}
             cascade={cascade}
             onCancel={resetForm}
@@ -305,6 +294,31 @@ function SOPListPage() {
       )}
 
       {activeTab === 'trash' && <TrashPanel />}
+
+      {editingSopId && editingSop && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={handleEditCancel} />
+          <div className="relative z-10 w-full max-w-lg rounded-xl bg-white dark:bg-neutral-900 p-6 shadow-xl border border-neutral-200 dark:border-neutral-800 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">Edit SOP</h3>
+              <button onClick={handleEditCancel} className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
+                <X size={20} className="text-neutral-500 dark:text-neutral-400" />
+              </button>
+            </div>
+            <SOPEditForm
+              sop={editingSop}
+              editTitle={editTitle} setEditTitle={setEditTitle}
+              editDescription={editDescription} setEditDescription={setEditDescription}
+              editStatus={editStatus} setEditStatus={setEditStatus}
+              editCategoryId={editCategoryId} setEditCategoryId={setEditCategoryId}
+              filteredCategories={filteredCategories} loadingCategories={loadingCategories}
+              cascade={cascade}
+              onCancel={handleEditCancel}
+              onSave={handleEditSave}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

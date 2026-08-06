@@ -65,6 +65,7 @@ const PATH_TITLE_MAP = {
   "/courses/view/:id/lesson/:lessonId": "Lesson",
   "/sops/:id": "SOP Workspace",
   "/sops/:id/versions/:versionId": "SOP Version",
+  "/my-learning/sops/:id": "SOP",
   "/trash": "Trash",
   "/admin/organization": "Organization",
   "/admin/organization/hierarchy": "Hierarchy Overview",
@@ -72,6 +73,9 @@ const PATH_TITLE_MAP = {
   "/admin/organization/departments": "Departments",
   "/admin/organization/categories": "Categories",
   "/admin/organization/sop-management": "SOP Management",
+  "/tasks": "Tasks & Projects",
+  "/tasks/:id": "Task Details",
+  "/tasks/my": "My Tasks",
 };
 
 function getBreadcrumbs(pathname) {
@@ -115,6 +119,14 @@ export default function AppLayout() {
 
   useEffect(() => {
     if (location.pathname.match(/^\/courses\/[^/]+\/builder$/)) {
+      setCollapsed(true);
+      setMobileOpen(false);
+    }
+  }, [location.pathname]);
+
+
+  useEffect(() => {
+    if (location.pathname.match(/^\/sops\/[^/]+$/)) {
       setCollapsed(true);
       setMobileOpen(false);
     }

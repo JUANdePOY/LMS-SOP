@@ -55,8 +55,11 @@ function pickFont(fonts, weight, style) {
  *   underline, matching what CertificatePreviewCanvas.jsx shows in the
  *   editor. Never pass true for an actual issued certificate — a real
  *   PDF handed to a recipient should never show a placeholder bracket.
+ * @param {string} [params.certificateNumber] - UUID assigned at issuance.
+ *   When provided and isPreview is false, rendered as a fixed element
+ *   at the bottom-right of the certificate.
  */
-async function renderCertificate({ template, resolvedSections, signatures, isPreview = false }) {
+async function renderCertificate({ template, resolvedSections, signatures, isPreview = false, certificateNumber = null }) {
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([template.width_px, template.height_px]);
 
@@ -263,10 +266,34 @@ async function renderCertificate({ template, resolvedSections, signatures, isPre
     }
   }
 
+  // ── Certificate Number (fixed bottom-right) ──────────────
+  // Rendered only when a certificateNumber is provided and this
+  // is an issued certificate (not a preview). The number is
+  // generated at issuance time and serves as the verification ID.
+  if (certificateNumber && !isPreview) {
+    const certNumFontSize = 8;
+    const certNumFont = fonts.regular;
+    const certNumColor = rgb(0.45, 0.45, 0.45);
+    const certNumYPercent = 92;
+
+    const certNumText = `No. ${certificateNumber}`;
+    const certNumWidth = certNumFont.widthOfTextAtSize(certNumText, certNumFontSize);
+    const certNumX = template.width_px - certNumWidth - 12;
+    const certNumY = template.height_px - (certNumYPercent / 100) * template.height_px;
+
+    page.drawText(certNumText, {
+      x: certNumX,
+      y: certNumY,
+      size: certNumFontSize,
+      font: certNumFont,
+      color: certNumColor,
+    });
+  }
+
   const pdfBytes = await pdfDoc.save();
 
   const pdfFilename = `certificate-${crypto.randomUUID()}.pdf`;
-  const pdfDir = path.join(certificateRoot(), 'issuances');
+  const pdfDir = path.join(certificateRoot(), 'certificates', 'issuances');
   await fs.mkdir(pdfDir, { recursive: true });
   const pdfAbsPath = path.join(pdfDir, pdfFilename);
   const pdfRelativePath = path.posix.join('certificates', 'issuances', pdfFilename);

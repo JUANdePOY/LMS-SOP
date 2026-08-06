@@ -308,8 +308,8 @@ export default function LessonEditor({
     onSave?.({
       title: title.trim(),
       type,
-      url: type === "reading" ? description : type === "sop" ? url : url,
-      description: type === "reading" || type === "sop" ? description : description,
+      url: type === "reading" ? description : url,
+      description: type === "reading" ? description : description,
       duration: duration ? parseInt(duration, 10) : null,
       requiresQuizPass: isQuiz ? requiresQuizPass : false,
       passingScore: isQuiz && requiresQuizPass && passingScore ? parseInt(passingScore, 10) : null,

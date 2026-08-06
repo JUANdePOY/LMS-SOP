@@ -3,6 +3,7 @@ const complianceModel = require('../models/sopComplianceModel');
 const sopModel = require('../models/sopModel');
 const assignmentCascadeService = require('../services/assignmentCascadeService');
 const sopComplianceModel = require('../models/sopComplianceModel');
+const { getCurrentVersionId } = require('../models/sopVersionModel');
 const {
   normalizeAssignmentType,
   validateAssignmentPayload,
@@ -28,11 +29,19 @@ async function listAssignments(sopId) {
   return complianceModel.listAssignments(sopId);
 }
 
+const ALLOWED_ASSIGNMENT_STATUSES = ['Published'];
+
 async function createAssignment(sopId, payload, assignedBy) {
   const sop = await sopModel.findById(sopId);
   if (!sop) {
     const error = new Error('SOP not found');
     error.code = 'NOT_FOUND';
+    throw error;
+  }
+
+  if (!ALLOWED_ASSIGNMENT_STATUSES.includes(sop.status)) {
+    const error = new Error(`Cannot assign SOP with status: ${sop.status}. Only Approved and Published SOPs can be assigned.`);
+    error.code = 'INVALID_SOP_STATUS';
     throw error;
   }
 
@@ -123,13 +132,28 @@ async function resolveAssignedUserIds(sopId) {
   return Array.from(userIds);
 }
 
+async function isAssignedToUser(sopId, userId) {
+  const versionId = await getCurrentVersionId(sopId);
+  if (!versionId) return false;
+
+  const [rows] = await db.query(`
+    SELECT sa.id FROM sop_assignments sa
+    INNER JOIN assignment_users au ON au.assignment_id = sa.id
+    WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE AND au.user_id = ?
+    LIMIT 1
+  `, [versionId, userId]);
+
+  return rows.length > 0;
+}
+
 module.exports = {
   listAssignments,
   createAssignment,
   deleteAssignment,
   resolveAssignedUserIds,
+  isAssignedToUser,
   getAssignmentDropdowns: assignmentCascadeService.getDepartments,
   getPositionsFromDepartment: assignmentCascadeService.getPositionsForDepartment,
-  getUsersFromDepartment: assignmentCascadeService.getUsersForDepartment,
+  getUsersFromDepartment: assignmentCascadeService.getUsersFromDepartment,
   getAssignedAssignments: assignmentCascadeService.getAssignedAssignments,
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -25,6 +25,7 @@ import SidebarItem from "./SidebarItem";
 import { useAuth } from "@/contexts/AuthContext";
 import { filterMenuByRole, LMS_ROLES } from "@/config/menuItems";
 import { useNotificationStore } from "@/shared/stores/notificationStore.js";
+import { useMyTaskCount } from "@/features/task-management/hooks/useMyTaskCount";
 
 const EMPLOYEE_MENU_ITEMS = [
   {
@@ -47,6 +48,13 @@ const EMPLOYEE_MENU_ITEMS = [
       { name: "Messaging", path: "/messaging", icon: MessageSquare },
       { name: "Announcements", path: "/announcements", icon: Megaphone },
       { name: "Events", path: "/events", icon: Calendar },
+    ],
+  },
+  {
+    name: "WORKFLOW",
+    group: true,
+    items: [
+      { name: "My Tasks", path: "/tasks/my", icon: CheckSquare },
     ],
   },
   {
@@ -144,6 +152,25 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
     return unreadBannerIds.length;
   };
 
+  const { count: myTaskCount, refresh: refreshTaskCount } = useMyTaskCount();
+
+  useEffect(() => {
+    refreshTaskCount();
+  }, [refreshTaskCount]);
+
+  // Build a map of path -> count for sidebar badges
+  const sidebarCounts = useMemo(() => {
+    const counts = {};
+    if (myTaskCount > 0) {
+      if (isEmployee) {
+        counts['/tasks/my'] = myTaskCount;
+      } else {
+        counts['/tasks'] = myTaskCount;
+      }
+    }
+    return counts;
+  }, [myTaskCount, isEmployee]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -160,6 +187,11 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
       setExpandedSubMenus(prev => ({ ...prev, "SOP Management": true }));
     }
   }, [location.pathname]);
+
+  // Refresh task count when route changes
+  useEffect(() => {
+    refreshTaskCount();
+  }, [location.pathname, refreshTaskCount]);
 
   const toggleSubMenu = (name) => {
     setExpandedSubMenus((prev) => ({ ...prev, [name]: !prev[name] }));

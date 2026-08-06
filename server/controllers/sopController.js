@@ -1,7 +1,9 @@
 const path = require('path');
+const PDFDocument = require('pdfkit');
 const sopService = require('../services/sopService');
 const sopModuleService = require('../services/sopModuleService');
 const sopAttachmentService = require('../services/sopAttachmentService');
+const sopModuleAttachmentModel = require('../models/sopModuleAttachmentModel');
 const sopVersionService = require('../services/sopVersionService');
 const sopWorkflowService = require('../services/sopWorkflowService');
 const sopAuditLogService = require('../services/sopAuditLogService');
@@ -527,6 +529,424 @@ const acknowledgementController = {
   },
 };
 
+/**
+ * ---- PDF export styling constants ----
+ */
+const PDF_COLORS = {
+  accent: '#1F4E8C',
+  accentDark: '#173D6E',
+  text: '#1A1A1A',
+  muted: '#6B7280',
+  border: '#E2E8F0',
+  lightBg: '#F1F5F9',
+  white: '#FFFFFF',
+};
+
+const STATUS_COLORS = {
+  Draft: '#9CA3AF',
+  'In Review': '#D97706',
+  Active: '#16A34A',
+  Approved: '#16A34A',
+  Archived: '#6B7280',
+  Deprecated: '#DC2626',
+};
+
+function getStatusColor(status) {
+  return STATUS_COLORS[status] || PDF_COLORS.muted;
+}
+
+function contentWidthOf(doc) {
+  return doc.page.width - doc.page.margins.left - doc.page.margins.right;
+}
+
+/** Keeps a block of content from being orphaned at the bottom of a page. */
+function ensureSpace(doc, minHeight) {
+  const bottom = doc.page.height - doc.page.margins.bottom;
+  if (doc.y + minHeight > bottom) {
+    doc.addPage();
+  }
+}
+
+/**
+ * Draws the full-width cover header (title, code, status pill) used at the
+ * top of the first page.
+ */
+function drawCoverHeader(doc, sop) {
+  const bandHeight = 96;
+  const pageWidth = doc.page.width;
+
+  doc.rect(0, 0, pageWidth, bandHeight).fill(PDF_COLORS.accent);
+
+  doc.fillColor(PDF_COLORS.white)
+    .font('Helvetica-Bold')
+    .fontSize(22)
+    .text(sop.title || 'SOP', doc.page.margins.left, 26, {
+      width: pageWidth - doc.page.margins.left - doc.page.margins.right - 110,
+    });
+
+  if (sop.code) {
+    doc.font('Helvetica')
+      .fontSize(10)
+      .fillColor('#D6E4F5')
+      .text(sop.code, doc.page.margins.left, 58);
+  }
+
+  if (sop.status) {
+    const label = String(sop.status);
+    doc.font('Helvetica-Bold').fontSize(9);
+    const pillPaddingX = 10;
+    const pillWidth = doc.widthOfString(label) + pillPaddingX * 2;
+    const pillHeight = 20;
+    const pillX = pageWidth - doc.page.margins.right - pillWidth;
+    const pillY = 28;
+    doc.roundedRect(pillX, pillY, pillWidth, pillHeight, 10).fill(getStatusColor(sop.status));
+    doc.fillColor(PDF_COLORS.white).text(label, pillX, pillY + 5, {
+      width: pillWidth,
+      align: 'center',
+    });
+  }
+
+  doc.fillColor(PDF_COLORS.text);
+  doc.y = bandHeight + 24;
+  doc.x = doc.page.margins.left;
+}
+
+/** Slim continuation header drawn on every page after the first. */
+function drawContinuationHeader(doc, sop) {
+  const pageWidth = doc.page.width;
+  doc.rect(0, 0, pageWidth, 6).fill(PDF_COLORS.accent);
+
+  doc.font('Helvetica').fontSize(8).fillColor(PDF_COLORS.muted)
+    .text(sop.code || '', doc.page.margins.left, 18, { continued: false });
+
+  doc.font('Helvetica').fontSize(8).fillColor(PDF_COLORS.muted)
+    .text(sop.title || 'SOP', doc.page.margins.left, 18, {
+      width: pageWidth - doc.page.margins.left - doc.page.margins.right,
+      align: 'right',
+    });
+
+  doc.fillColor(PDF_COLORS.text);
+  doc.y = 40;
+  doc.x = doc.page.margins.left;
+}
+
+/** Renders SOP metadata as a bordered two-column info box. */
+function drawMetadataBox(doc, metaFields) {
+  if (!metaFields.length) return;
+
+  const startX = doc.page.margins.left;
+  const width = contentWidthOf(doc);
+  const colWidth = width / 2;
+  const rowHeight = 32;
+  const padding = 14;
+  const rows = Math.ceil(metaFields.length / 2);
+  const boxHeight = rows * rowHeight + padding * 2;
+
+  ensureSpace(doc, boxHeight + 20);
+  const startY = doc.y;
+
+  doc.roundedRect(startX, startY, width, boxHeight, 4).fill(PDF_COLORS.lightBg);
+  doc.roundedRect(startX, startY, width, boxHeight, 4).lineWidth(1).stroke(PDF_COLORS.border);
+
+  metaFields.forEach(([label, value], i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const x = startX + padding + col * colWidth;
+    const y = startY + padding + row * rowHeight;
+    const colInnerWidth = colWidth - padding * 2;
+
+    doc.fillColor(PDF_COLORS.muted).font('Helvetica-Bold').fontSize(8)
+      .text(label.toUpperCase(), x, y, { width: colInnerWidth });
+    doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(10)
+      .text(String(value), x, y + 12, { width: colInnerWidth });
+  });
+
+  doc.fillColor(PDF_COLORS.text);
+  doc.x = startX;
+  doc.y = startY + boxHeight + 20;
+}
+
+/** Section heading with a small accent underline. */
+function drawSectionHeading(doc, label) {
+  ensureSpace(doc, 40);
+  const startX = doc.page.margins.left;
+  doc.fillColor(PDF_COLORS.text).font('Helvetica-Bold').fontSize(13).text(label, startX, doc.y);
+  const lineY = doc.y + 4;
+  doc.moveTo(startX, lineY).lineTo(startX + 36, lineY).lineWidth(2).stroke(PDF_COLORS.accent);
+  doc.moveDown(1.2);
+  doc.x = startX;
+  doc.fillColor(PDF_COLORS.text);
+}
+
+/**
+ * Render SOP module HTML content into a PDF document, embedding images
+ * from the imageCache (Map of attachmentId -> { data, mime }).
+ * Returns true if any content was rendered, false otherwise.
+ */
+function renderModuleContentForPdf(html, imageCache, doc) {
+  // Split HTML into text segments and <img> tags
+  const imgTagRegex = /(<img[^>]+>)/g;
+  const parts = html.split(imgTagRegex);
+  let hasContent = false;
+  const startX = doc.page.margins.left;
+
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+
+    // Check if this part is an <img> tag
+    const imgMatch = trimmed.match(/<img[^>]+src="([^"]+)"[^>]*>/);
+    if (imgMatch) {
+      const src = imgMatch[1];
+      const idMatch = src.match(/\/api\/sops\/attachments\/(\d+)\/file/);
+      if (idMatch) {
+        const attId = parseInt(idMatch[1], 10);
+        const image = imageCache.get(attId);
+        if (image) {
+          try {
+            const maxWidth = contentWidthOf(doc);
+            const maxHeight = 300;
+
+            // doc.image()/{fit:...} does NOT auto-paginate — it just draws
+            // at the current y, so a tall image can run straight through
+            // the bottom margin and overlap the footer/next content. Work
+            // out the actual scaled height up front so ensureSpace can
+            // trigger a real page break when it won't fit.
+            let renderHeight = maxHeight;
+            try {
+              const dims = doc.openImage(image.data);
+              if (dims && dims.width && dims.height) {
+                const scale = Math.min(maxWidth / dims.width, maxHeight / dims.height, 1);
+                renderHeight = dims.height * scale;
+              }
+            } catch {
+              // Unknown dims — fall back to the worst-case (max) height.
+            }
+
+            ensureSpace(doc, renderHeight + 16);
+            doc.image(image.data, {
+              fit: [maxWidth, maxHeight],
+              align: 'center',
+            });
+            doc.x = startX;
+            doc.moveDown(0.5);
+            hasContent = true;
+          } catch {
+            // Skip images that can't be embedded
+          }
+        }
+      }
+      continue;
+    }
+
+    // Plain text segment — strip remaining HTML tags
+    const text = trimmed
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .trim();
+
+    if (text) {
+      doc.fillColor(PDF_COLORS.text).fontSize(10).font('Helvetica')
+        .text(text, startX, doc.y, { width: contentWidthOf(doc), align: 'justify', lineGap: 4 });
+      doc.x = startX;
+      hasContent = true;
+    }
+  }
+
+  return hasContent;
+}
+
+/** Draws the "Page X of Y" / generated-on footer on the given (already active) page. */
+function drawFooter(doc, sop, pageNumber, totalPages) {
+  const pageWidth = doc.page.width;
+  const bottomY = doc.page.height - doc.page.margins.bottom + 14;
+  const startX = doc.page.margins.left;
+  const width = contentWidthOf(doc);
+
+  doc.moveTo(startX, bottomY - 8).lineTo(startX + width, bottomY - 8)
+    .lineWidth(0.5).stroke(PDF_COLORS.border);
+
+  // Text placed in the footer sits below the normal content margin, which
+  // would otherwise make pdfkit think the text overflows the page and
+  // silently insert a new blank page. Widen the bottom margin for the
+  // duration of these two calls, then restore it.
+  const originalBottomMargin = doc.page.margins.bottom;
+  doc.page.margins.bottom = 0;
+
+  doc.font('Helvetica').fontSize(8).fillColor(PDF_COLORS.muted)
+    .text(`Generated ${new Date().toLocaleDateString()}`, startX, bottomY, {
+      width: width / 2,
+      lineBreak: false,
+    });
+
+  doc.font('Helvetica').fontSize(8).fillColor(PDF_COLORS.muted)
+    .text(`Page ${pageNumber} of ${totalPages}`, startX, bottomY, {
+      width,
+      align: 'right',
+      lineBreak: false,
+    });
+
+  doc.page.margins.bottom = originalBottomMargin;
+  doc.fillColor(PDF_COLORS.text);
+}
+
+const exportController = {
+  async exportPdf(req, res) {
+    try {
+      const sopId = parseInt(req.params.id, 10);
+      const sop = await sopService.getSopById(sopId, req.user);
+      if (!sop) {
+        const error = new Error('SOP not found');
+        error.code = 'NOT_FOUND';
+        throw error;
+      }
+
+      const versionId = req.query.versionId
+        ? parseInt(req.query.versionId, 10)
+        : (sop.current_version_id || null);
+      const modules = await sopModuleService.listModules(sopId, versionId);
+
+      const doc = new PDFDocument({ margin: 50, bufferPages: true });
+      const filename = `SOP-${sop.code || sop.id}.pdf`;
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+      doc.pipe(res);
+
+      // The constructor already created page 1 before this listener is
+      // attached, so every 'pageAdded' event from here on is page 2+ —
+      // each of those gets the slim continuation header.
+      doc.on('pageAdded', () => {
+        drawContinuationHeader(doc, sop);
+      });
+
+      drawCoverHeader(doc, sop);
+
+      // Metadata box
+      const metaFields = [];
+      if (sop.status) metaFields.push(['Status', sop.status]);
+      if (sop.department_name) metaFields.push(['Department', sop.department_name]);
+      if (sop.category_name) metaFields.push(['Category', sop.category_name]);
+      if (sop.owner_name) metaFields.push(['Owner', sop.owner_name]);
+      if (sop.created_at) metaFields.push(['Created', new Date(sop.created_at).toLocaleDateString()]);
+      if (sop.updated_at) metaFields.push(['Updated', new Date(sop.updated_at).toLocaleDateString()]);
+      drawMetadataBox(doc, metaFields);
+
+      // Description
+      if (sop.description) {
+        drawSectionHeading(doc, 'Description');
+        doc.fillColor(PDF_COLORS.text).fontSize(10).font('Helvetica')
+          .text(sop.description, doc.page.margins.left, doc.y, {
+            width: contentWidthOf(doc),
+            align: 'justify',
+          });
+        doc.x = doc.page.margins.left;
+        doc.moveDown(1.5);
+      }
+
+      // Pre-fetch all images referenced in module content
+      const imageCache = new Map();
+      const imgSrcRegex = /<img[^>]+src="([^"]+)"/g;
+      const attachmentIdRegex = /\/api\/sops\/attachments\/(\d+)\/file/;
+
+      if (modules && modules.length > 0) {
+        const attachmentIds = new Set();
+        modules.forEach((module) => {
+          if (!module.content) return;
+          let match;
+          while ((match = imgSrcRegex.exec(module.content)) !== null) {
+            const src = match[1];
+            const idMatch = src.match(attachmentIdRegex);
+            if (idMatch) {
+              attachmentIds.add(parseInt(idMatch[1], 10));
+            }
+          }
+        });
+
+        for (const attId of attachmentIds) {
+          try {
+            const attachment = await sopModuleAttachmentModel.getById(attId);
+            if (attachment && attachment.file_data && attachment.mime_type) {
+              imageCache.set(attId, {
+                data: attachment.file_data,
+                mime: attachment.mime_type,
+              });
+            }
+          } catch {
+            // Skip attachments that can't be loaded
+          }
+        }
+      }
+
+      // Modules
+      drawSectionHeading(doc, 'Modules');
+
+      if (modules && modules.length > 0) {
+        modules.forEach((module, index) => {
+          ensureSpace(doc, 70);
+
+          const startX = doc.page.margins.left;
+          const width = contentWidthOf(doc);
+          const badgeSize = 22;
+          const titleY = doc.y;
+
+          doc.fillColor(PDF_COLORS.accent)
+            .circle(startX + badgeSize / 2, titleY + badgeSize / 2, badgeSize / 2)
+            .fill();
+          doc.fillColor(PDF_COLORS.white).font('Helvetica-Bold').fontSize(10)
+            .text(String(index + 1), startX, titleY + 6, { width: badgeSize, align: 'center' });
+
+          doc.fillColor(PDF_COLORS.text).font('Helvetica-Bold').fontSize(11.5)
+            .text(module.title || 'Untitled', startX + badgeSize + 10, titleY + 4, {
+              width: width - badgeSize - 10,
+            });
+
+          doc.x = startX;
+          doc.y = Math.max(doc.y, titleY + badgeSize) + 10;
+
+          if (module.content) {
+            const rendered = renderModuleContentForPdf(module.content, imageCache, doc);
+            if (!rendered) {
+              doc.fillColor(PDF_COLORS.muted).fontSize(9).font('Helvetica')
+                .text('(No text content)', startX, doc.y, { width, align: 'center' });
+              doc.x = startX;
+            }
+          }
+
+          if (index < modules.length - 1) {
+            doc.moveDown(1);
+            ensureSpace(doc, 20);
+            doc.moveTo(startX, doc.y).lineTo(startX + width, doc.y)
+              .lineWidth(0.5).stroke(PDF_COLORS.border);
+            doc.moveDown(1.5);
+          }
+          doc.fillColor(PDF_COLORS.text);
+        });
+      } else {
+        doc.fillColor(PDF_COLORS.muted).fontSize(9).font('Helvetica')
+          .text('No modules in this SOP.', { align: 'center' });
+        doc.fillColor(PDF_COLORS.text);
+      }
+
+      // Stamp page numbers / footer on every page now that content is final.
+      const range = doc.bufferedPageRange();
+      for (let i = 0; i < range.count; i++) {
+        doc.switchToPage(range.start + i);
+        drawFooter(doc, sop, i + 1, range.count);
+      }
+
+      doc.end();
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+};
+
 module.exports = {
   sopController,
   moduleController,
@@ -538,4 +958,5 @@ module.exports = {
   assignmentController,
   acknowledgementController,
   approvalWorkflowController,
+  exportController,
 };

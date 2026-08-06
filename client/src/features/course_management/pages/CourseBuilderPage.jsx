@@ -8,6 +8,56 @@ import ModuleEditor from "../components/course-builder/ModuleEditor";
 import PublishReadiness from "../components/course-builder/PublishReadiness";
 import { builderGet, builderUpdate, publishCourse } from "../api/course.api";
 
+function authHeaders() {
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
+
+async function handleSopLink(res) {
+  const text = await res.text();
+  try {
+    const json = JSON.parse(text);
+    if (!res.ok) {
+      const error = new Error(json?.message || json?.error || `Request failed with status ${res.status}`);
+      error.status = res.status;
+      error.code = json?.code;
+      throw error;
+    }
+    return json;
+  } catch {
+    if (!res.ok) {
+      const error = new Error(text || res.statusText);
+      error.status = res.status;
+      throw error;
+    }
+    return { message: text || res.statusText };
+  }
+}
+
+async function fetchCourseSops(courseId) {
+  const res = await fetch(`/api/courses/${courseId}/sops`, { headers: authHeaders() });
+  return handleSopLink(res);
+}
+
+async function linkSopToCourse(courseId, sopId, meta = {}) {
+  const res = await fetch(`/api/courses/${courseId}/sops`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ sop_id: sopId, ...meta }),
+  });
+  return handleSopLink(res);
+}
+
+async function unlinkSopFromCourse(courseId, sopId) {
+  const res = await fetch(`/api/courses/${courseId}/sops/${sopId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  return handleSopLink(res);
+}
+
 const STATUS_CONFIG = {
   draft: { label: "Draft", color: "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300", icon: Clock },
   published: { label: "Published", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300", icon: CheckCircle2 },
@@ -170,6 +220,8 @@ export default function CourseBuilderPage() {
   const [selectedLessonId, setSelectedLessonId] = useState(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const handleSaveDraftRef = useRef(null);
+  const [courseSops, setCourseSops] = useState([]);
+  const courseSopsRef = useRef([]);
 
   const statusConfig = STATUS_CONFIG[course?.status] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
@@ -239,6 +291,20 @@ export default function CourseBuilderPage() {
     };
   }, [courseId, navigate, toast]);
 
+  useEffect(() => {
+    if (!courseId) return;
+    fetchCourseSops(courseId)
+      .then((res) => {
+        const data = res?.data || res || [];
+        setCourseSops(Array.isArray(data) ? data : []);
+        courseSopsRef.current = Array.isArray(data) ? data : [];
+      })
+      .catch(() => {
+        setCourseSops([]);
+        courseSopsRef.current = [];
+      });
+  }, [courseId]);
+
   const refreshCourse = useCallback(() => {
     if (!courseId) return Promise.resolve();
     return builderGet(courseId)
@@ -256,6 +322,12 @@ export default function CourseBuilderPage() {
         const enriched = mods.map((m) => ({ ...m, lessons: m.lessons || [] }));
         modulesRef.current = enriched;
         setModules(enriched);
+      })
+      .then(() => fetchCourseSops(courseId))
+      .then((res) => {
+        const data = res?.data || res || [];
+        setCourseSops(Array.isArray(data) ? data : []);
+        courseSopsRef.current = Array.isArray(data) ? data : [];
       })
       .catch((err) => {
         toast.error(err.message || "Failed to refresh course");
@@ -287,17 +359,86 @@ export default function CourseBuilderPage() {
     })),
   }), [form, modules]);
 
+  const getModuleSops = (moduleId) => {
+    if (!moduleId) return [];
+    return courseSops.filter((s) => s.module_id === moduleId);
+  };
+
+  const handleLinkSop = (moduleId, sopId) => {
+    setCourseSops((prev) => {
+      const exists = prev.find((s) => s.sop_id === sopId && s.module_id === moduleId);
+      if (exists) return prev;
+      const next = [...prev, {
+        id: `temp-${Date.now()}-${sopId}`,
+        sop_id: sopId,
+        course_id: parseInt(courseId, 10),
+        module_id: moduleId,
+        display_order: prev.filter((s) => s.module_id === moduleId).length,
+        is_required: false,
+        link_type: "Reference",
+      }];
+      setHasUnsavedChanges(true);
+      return next;
+    });
+  };
+
+  const handleUnlinkSop = (moduleId, sopId) => {
+    setCourseSops((prev) => {
+      const next = prev.filter((s) => !(s.sop_id === sopId && s.module_id === moduleId));
+      setHasUnsavedChanges(true);
+      return next;
+    });
+  };
+
+  const syncCourseSops = async () => {
+    if (!courseId) return;
+    const previous = courseSopsRef.current || [];
+    const current = courseSops;
+
+    const previousIds = new Set(previous.map((s) => `${s.sop_id}-${s.module_id}`));
+    const currentIds = new Set(current.map((s) => `${s.sop_id}-${s.module_id}`));
+
+    const toAdd = current.filter((s) => !previousIds.has(`${s.sop_id}-${s.module_id}`));
+    const toRemove = previous.filter((s) => !currentIds.has(`${s.sop_id}-${s.module_id}`));
+
+    for (const sop of toAdd) {
+      try {
+        await linkSopToCourse(courseId, sop.sop_id, {
+          module_id: sop.module_id,
+          display_order: sop.display_order,
+          is_required: sop.is_required,
+          link_type: sop.link_type,
+        });
+      } catch (err) {
+        if (err?.code !== 'DUPLICATE_LINK') {
+          toast.error(err?.message || 'Failed to link SOP');
+        }
+      }
+    }
+
+    for (const sop of toRemove) {
+      try {
+        await unlinkSopFromCourse(courseId, sop.sop_id);
+      } catch (err) {
+        toast.error(err?.message || 'Failed to unlink SOP');
+      }
+    }
+
+    courseSopsRef.current = current;
+  };
+
   const saveNow = useCallback(
     (payload) => {
       if (!courseId) return Promise.resolve();
       setSaving(true);
       setIsSavingDraft(true);
       return builderUpdate(courseId, payload)
-        .then((res) => {
+        .then(async (res) => {
           if (res?.success || res?.data?.success) {
             toast.success("Saved");
             setHasUnsavedChanges(false);
             setLastSaved(new Date());
+            await syncCourseSops();
             return refreshCourse();
           } else {
             throw new Error(res?.message || res?.data?.message || "Save failed");
@@ -312,7 +453,7 @@ export default function CourseBuilderPage() {
           setIsSavingDraft(false);
         });
     },
-    [courseId, toast, refreshCourse]
+    [courseId, toast, refreshCourse, syncCourseSops]
   );
 
   const handleSaveDraft = useCallback(async () => {
@@ -730,6 +871,10 @@ export default function CourseBuilderPage() {
               onSave={updateModule}
               onDelete={() => removeModule(selectedModuleId)}
               saving={saving}
+              courseId={courseId}
+              moduleSops={getModuleSops(selectedModuleId)}
+              onLinkSop={handleLinkSop}
+              onUnlinkSop={handleUnlinkSop}
             />
           ) : (
             <BuilderEmptyState

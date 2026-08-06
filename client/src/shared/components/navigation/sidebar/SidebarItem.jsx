@@ -76,25 +76,25 @@ export default function SidebarItem({ item, isCollapsed, onNavClick, badgeCount 
               setOpen(true);
             }}
             aria-expanded={open}
-className={cn(
+            className={cn(
                "relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5",
                "text-sm font-medium leading-none tracking-[-0.01em]",
                "transition-all duration-200 ease-out",
                "outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-amber)_60%,transparent)]",
 isParentActive
-                ? [
-                    "text-[var(--text-on-sidebar)] bg-[var(--bg-active)]",
-                    "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
-                    "before:h-[18px] before:w-0.5 before:rounded-full",
-                    "before:bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]",
-                  ]
-                 : [
-                     "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:text-[var(--text-on-sidebar)] hover:bg-[var(--bg-hover)]",
-                     "hover:scale-[1.015]",
-                   ],
+                 ? [
+                     "text-[var(--text-on-sidebar)] bg-[var(--bg-active)]",
+                     "before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2",
+                     "before:h-[18px] before:w-0.5 before:rounded-full",
+                     "before:bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]",
+                   ]
+                : [
+                    "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:text-[var(--text-on-sidebar)] hover:bg-[var(--bg-hover)]",
+                    "hover:scale-[1.015]",
+                  ],
                isCollapsed && "justify-center px-0"
-             )}
-           >
+            )}
+          >
 <span className={cn(
                 "flex h-[18px] w-[18px] shrink-0 items-center justify-center transition-colors duration-200",
                 isParentActive ? "text-[var(--text-on-sidebar)]" : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)]"
@@ -105,6 +105,11 @@ isParentActive
             {!isCollapsed && (
               <>
                 <span className="flex-1 truncate text-left">{item.name}</span>
+                {typeof badgeCount === 'number' && badgeCount > 0 && (
+                  <span className="shrink-0 rounded-full bg-[color-mix(in_srgb,var(--accent-amber)_85%,transparent)] px-2 py-0.5 text-[10px] font-bold text-white dark:text-neutral-900 min-w-[20px] text-center">
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </span>
+                )}
                 <span
                   onClick={handleChevronClick}
                   className="shrink-0 p-0.5 rounded hover:bg-[var(--bg-hover)] cursor-pointer"
@@ -177,9 +182,9 @@ isParentActive
         {({ isActive }) => (
           <>
 <span className={cn(
-               "flex h-[18px] w-[18px] shrink-0 items-center justify-center transition-colors duration-200",
-               isActive ? "text-[var(--text-on-sidebar)]" : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)]"
-             )}>
+                "flex h-[18px] w-[18px] shrink-0 items-center justify-center transition-colors duration-200",
+                isActive ? "text-[var(--text-on-sidebar)]" : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)]"
+              )}>
               <Icon size={17} strokeWidth={isActive ? 2.2 : 1.8} />
             </span>
              {!isCollapsed && <span className="truncate">{item.name}</span>}

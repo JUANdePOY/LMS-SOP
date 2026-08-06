@@ -6,7 +6,6 @@ const LESSON_TYPES = [
   { value: "reading", label: "Text / Reading" },
   { value: "link", label: "Link" },
   { value: "quiz", label: "Quiz" },
-  { value: "sop", label: "SOP" },
   { value: "certificate", label: "Certificate" },
   { value: "document", label: "Document / File" },
 ];

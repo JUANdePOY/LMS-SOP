@@ -1,26 +1,15 @@
 import { useState, useEffect } from "react";
 import { Trash2, Settings, Save, Loader2, CheckCircle2, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
 import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichTextEditor";
+import ModuleSOPsTab from "./ModuleSOPsTab";
 
 const TABS = [
   { id: "content", label: "Content", icon: null },
+  { id: "sops", label: "SOPs", icon: null },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-export default function ModuleEditor({
-  module,
-  onSave,
-  onDelete,
-  saving,
-  onNavigatePrev,
-  onNavigateNext,
-  canNavigatePrev,
-  canNavigateNext,
-  onMoveUp,
-  onMoveDown,
-  canMoveUp,
-  canMoveDown,
-}) {
+export default function ModuleEditor({ module, onSave, onDelete, saving, courseId, moduleSops = [], onLinkSop, onUnlinkSop }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [orderIndex, setOrderIndex] = useState("");
@@ -157,75 +146,75 @@ export default function ModuleEditor({
           </div>
         </div>
 
-        {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-4 py-5">
-          <div className="max-w-4xl mx-auto">
-            <div className="px-4 py-5" role="tabpanel" id="module-panel-content" aria-labelledby="module-tab-content" hidden={activeTab !== "content"}>
-              {activeTab === "content" && (
-                <div>
-                  <label className="block text-sm font-medium text-neutral-700 mb-2">
-                    Description
-                  </label>
-                  <RichTextEditor
-                    value={description}
-                    onChange={(html) => {
-                      setDescription(html);
-                      emitPatch({ description: html });
-                    }}
-                    placeholder="What will learners learn in this module?"
-                  />
-                </div>
-              )}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-2xl mx-auto px-5 py-6">
+          {activeTab === "content" && (
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
+                Description
+              </label>
+              <RichTextEditor
+                value={description}
+                onChange={(html) => {
+                  setDescription(html);
+                  emitPatch({ description: html });
+                }}
+                placeholder="What will learners learn in this module?"
+              />
             </div>
+          )}
 
-            <div
-              className="px-4 py-5"
-              role="tabpanel"
-              id="module-panel-settings"
-              aria-labelledby="module-tab-settings"
-              hidden={activeTab !== "settings"}
-            >
-              {activeTab === "settings" && (
-                <div className="space-y-5">
+          {activeTab === "settings" && (
+            <div className="space-y-5">
+              <div>
+                <label htmlFor="module-order" className="block text-sm font-medium text-neutral-700 mb-2">
+                  Order
+                </label>
+                <input
+                  id="module-order"
+                  type="number"
+                  value={orderIndex}
+                  onChange={(e) => {
+                    setOrderIndex(e.target.value);
+                    emitPatch({ order_index: e.target.value ? parseInt(e.target.value, 10) : undefined });
+                  }}
+                  placeholder="1"
+                  className="w-full border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition-colors"
+                />
+                <p className="text-xs text-neutral-500 mt-1.5">Position in course sequence</p>
+              </div>
+              <div>
+                <label className="flex items-center gap-3 p-3 border border-neutral-200 hover:border-neutral-300 transition-colors cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isVisible}
+                    onChange={(e) => {
+                      setIsVisible(e.target.checked);
+                      emitPatch({ is_visible: e.target.checked });
+                    }}
+                    className="w-4 h-4 border-neutral-300 text-neutral-900 focus:ring-neutral-900"
+                  />
                   <div>
-                    <label htmlFor="module-order" className="block text-sm font-medium text-neutral-700 mb-2">
-                      Order
-                    </label>
-                    <input
-                      id="module-order"
-                      type="number"
-                      value={orderIndex}
-                      onChange={(e) => {
-                        setOrderIndex(e.target.value);
-                        emitPatch({ order_index: e.target.value ? parseInt(e.target.value, 10) : undefined });
-                      }}
-                      placeholder="1"
-                      className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
-                    />
-                    <p className="text-xs text-neutral-500 mt-1.5">Position in course sequence</p>
+                    <span className="text-sm text-neutral-700">Visible to learners</span>
+                    <p className="text-xs text-neutral-500">Module will be accessible</p>
                   </div>
-                  <div>
-                    <label className="flex items-center gap-3 p-3 border border-neutral-200 rounded-lg hover:border-neutral-300 transition-colors cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isVisible}
-                        onChange={(e) => {
-                          setIsVisible(e.target.checked);
-                          emitPatch({ is_visible: e.target.checked });
-                        }}
-                        className="w-4 h-4 border-neutral-300 text-blue-600 focus:ring-blue-600 rounded"
-                      />
-                      <div>
-                        <span className="text-sm text-neutral-700">Visible to learners</span>
-                        <p className="text-xs text-neutral-500">Module will be accessible</p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              )}
+                </label>
+              </div>
             </div>
-          </div>
+          )}
+
+          {activeTab === "sops" && (
+            <ModuleSOPsTab
+              moduleId={module.id}
+              courseId={courseId}
+              sops={moduleSops}
+              onLinkSop={onLinkSop}
+              onUnlinkSop={onUnlinkSop}
+              saving={saving}
+            />
+          )}
         </div>
+      </div>
 
         {/* Footer with navigation + delete */}
         <footer className="border-t border-neutral-200 bg-white px-5 py-3">

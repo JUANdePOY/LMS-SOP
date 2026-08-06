@@ -62,6 +62,10 @@ const quizAttemptsRoutes = require('./routes/attempts');
 const announcementsRoutes = require('./routes/announcements');
 const eventsRoutes = require('./routes/events');
 const messagesRoutes = require('./routes/messages');
+const tasksRoutes = require('./routes/tasks');
+const taskAttachmentPublicFile = require('./services/taskAttachmentPublicFile');
+const sopCourseLinkRoutes = require('./routes/sopCourseLinks');
+const employeeRoutes = require('./routes/employee');
 const notificationsRoutes = require('./routes/notifications');
 
 const { templateRouter, signatureRouter, issuanceRouter } = require('./routes/certificates');
@@ -104,15 +108,18 @@ app.use('/api/roles', rolesRoutes);
 app.use('/api/categories', categoriesRoutes);
 app.use('/api/businesses', businessesRoutes);
 app.use('/api/hierarchy', hierarchyRoutes);
+
 app.use('/api/sops/attachments', sopAttachmentPublicFile);
 app.use('/api/sops/share', sopSharePublicRouter);
 app.use('/api/sops', sopsRoutes);
 
+app.use('/api/courses', sopCourseLinkRoutes);
 app.use('/api/courses', coursesRoutes);
 app.use('/api/courses', progressCourseRoutes);
 app.use('/api/enrollments', enrollmentsRoutes);
 app.use('/api/lessons', progressLessonRoutes);
 app.use('/api/course-builder', courseBuilderRoutes);
+app.use('/api/employee', employeeRoutes);
 app.use('/api/quiz', quizzesRoutes);
 app.use('/api/quiz-attempts', quizAttemptsRoutes);
 app.use('/api/grades', gradesRoutes);
@@ -120,6 +127,8 @@ app.use('/api/discussions', discussionsRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/messages', messagesRoutes);
+app.use('/api/tasks/attachments', taskAttachmentPublicFile.router);
+app.use('/api/tasks', tasksRoutes);
 app.use('/api/notifications', notificationsRoutes);
 
 const searchRoutes = require('./routes/search');
