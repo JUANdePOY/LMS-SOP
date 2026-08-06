@@ -30,16 +30,7 @@ import {
   Settings2,
   ListChecks,
 } from "lucide-react";
-import { QUESTION_TYPE_LABELS, QUESTION_TYPE_CONFIG } from "../constants/questionTypes";
 import QuestionTypeTabs from "../components/QuestionTypeTabs";
-
-const TYPE_COLORS = {
-  multiple_choice: { bg: "bg-blue-50 dark:bg-blue-900/20", border: "border-blue-200 dark:border-blue-800", text: "text-blue-700 dark:text-blue-300", icon: "text-blue-600" },
-  multi_select: { bg: "bg-purple-50 dark:bg-purple-900/20", border: "border-purple-200 dark:border-purple-800", text: "text-purple-700 dark:text-purple-300", icon: "text-purple-600" },
-  true_false: { bg: "bg-emerald-50 dark:bg-emerald-900/20", border: "border-emerald-200 dark:border-emerald-800", text: "text-emerald-700 dark:text-emerald-300", icon: "text-emerald-600" },
-  short_answer: { bg: "bg-amber-50 dark:bg-amber-900/20", border: "border-amber-200 dark:border-amber-800", text: "text-amber-700 dark:text-amber-300", icon: "text-amber-600" },
-  essay: { bg: "bg-rose-50 dark:bg-rose-900/20", border: "border-rose-200 dark:border-rose-800", text: "text-rose-700 dark:text-rose-300", icon: "text-rose-600" },
-};
 
 const fieldClass =
   "w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 outline-none";
@@ -56,7 +47,7 @@ function Field({ label, children, className = "" }) {
 function SaveStatusPill({ settingsDirty, saving }) {
   if (saving) {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300">
         <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
       </span>
     );
@@ -356,7 +347,7 @@ export default function QuizBuilderPage() {
                 onClick={() => setActiveTab(tab.value)}
                 className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                   isActive
-                    ? "border-blue-500 text-blue-700 dark:text-blue-300"
+                    ? "border-indigo-500 text-indigo-700 dark:text-indigo-300"
                     : "border-transparent text-neutral-500 dark:text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200"
                 }`}
               >
@@ -364,9 +355,9 @@ export default function QuizBuilderPage() {
                 {tab.label}
                 {tab.badge != null && (
                   <span
-                    className={`ml-0.5 min-w-[1.25rem] px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                      isActive ? "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300" : "bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300"
-                    }`}
+                      className={`ml-0.5 min-w-[1.25rem] px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                        isActive ? "bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300" : "bg-neutral-200 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300"
+                      }`}
                   >
                     {tab.badge}
                   </span>

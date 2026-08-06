@@ -2,10 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { Link, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useQuizzesCatalog } from "../hooks/useQuizzesCatalog";
-import { createQuiz, publishQuiz, archiveQuiz, deleteQuiz } from "../api/quiz.api";
+import { publishQuiz, archiveQuiz, deleteQuiz } from "../api/quiz.api";
 import { getCourseList } from "@/features/course_management/api/course.api";
 import { useToast } from "@/shared/components/ui/Toast";
-import { Modal } from "@/shared/components/ui/modal";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/card";
 import CreateQuizModal from "../components/modals/CreateQuizModal";
@@ -167,7 +166,6 @@ export default function QuizListPage() {
   const [filters, setFilters] = useState({ search: "", status: "", quizType: "", page: 1 });
   const [courses, setCourses] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [busy, setBusy] = useState(null);
 
   const { quizzes, pagination, loading, error, refetch } = useQuizzesCatalog({ ...filters, limit: 20 });
@@ -200,20 +198,15 @@ export default function QuizListPage() {
     refetch({ ...f, limit: 20 });
   }, [filters, refetch]);
 
-  const handleCreate = async (payload) => {
-    setCreating(true);
-    try {
-      const res = await createQuiz(payload.courseId, payload);
-      const quizId = res?.data?.id;
-      toast.success("Quiz created. Add questions in the builder.");
-      setShowCreate(false);
-      refetch({ ...filters, limit: 20 });
-      if (quizId) navigate(`/assessments/quiz/${quizId}`);
-    } catch (err) {
-      toast.error(err.message || "Failed to create quiz");
-    } finally {
-      setCreating(false);
-    }
+  const handleCreateComplete = ({ quizId, questionCount, openBuilder }) => {
+    setShowCreate(false);
+    refetch({ ...filters, limit: 20 });
+    toast.success(
+      questionCount > 0
+        ? `Quiz created with ${questionCount} question${questionCount === 1 ? "" : "s"}.`
+        : "Quiz created. Add questions in the builder."
+    );
+    if (openBuilder && quizId) navigate(`/assessments/quiz/${quizId}`);
   };
 
   const handleTogglePublish = async (q) => {
@@ -292,19 +285,13 @@ export default function QuizListPage() {
       )}
 
       {showCreate && (
-        <Modal
+        <CreateQuizModal
           open={showCreate}
-          onClose={() => setShowCreate(false)}
-          title="Create Quiz"
-        >
-          <CreateQuizModal
-            courses={courses}
-            loadingCourses={loadingCourses}
-            saving={creating}
-            onSave={handleCreate}
-            onCancel={() => setShowCreate(false)}
-          />
-        </Modal>
+          courses={courses}
+          loadingCourses={loadingCourses}
+          onCancel={() => setShowCreate(false)}
+          onComplete={handleCreateComplete}
+        />
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-end gap-3">

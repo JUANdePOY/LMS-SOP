@@ -153,8 +153,6 @@ const TYPE_LABEL = {
   multiple_select: "Multiple Select",
   true_false: "True / False",
   short_answer: "Short Answer",
-  fill_blank: "Fill in the Blank",
-  essay: "Essay",
 };
 
 function AttemptDetail({ attempt, result, qMap }) {

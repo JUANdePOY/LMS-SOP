@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import { Modal } from "@/shared/components/ui/modal";
 import { Button } from "@/shared/components/ui/button";
-import { QUESTION_TYPE_LABELS } from "../constants/questionTypes";
+import { QUESTION_TYPE_LABELS, TYPE_BADGE } from "../constants/questionTypes";
 import { validateBulkImport, parseCsv } from "../utils/bulkImportValidation";
-import { Upload, X, CheckCircle2, AlertCircle, Download, FileText, Table2, Braces, ClipboardPaste } from "lucide-react";
+import { Upload, X, CheckCircle2, AlertCircle, Download, FileText, Table2, Braces } from "lucide-react";
 
 const CSV_TEMPLATE = `question_text,type,options,correct_answer,points,explanation
 "What is the capital of France?","multiple_choice","Paris|London|Berlin|Madrid","Paris",2,"Paris is the capital."
@@ -32,19 +32,9 @@ const SUPPORTED_FORMATS = [
   { value: "xlsx", label: "Excel (.xlsx)", icon: FileText, desc: "Excel workbook (coming soon)", disabled: true },
 ];
 
-const TYPE_CHIP = {
-  multiple_choice: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300",
-  multiple_select: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
-  multi_select: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300",
-  true_false: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300",
-  short_answer: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
-  essay: "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300",
-  fill_blank: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300",
-};
-
 function TypeBadge({ type }) {
   return (
-    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${TYPE_CHIP[type] || "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300"}`}>
+    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold whitespace-nowrap ${TYPE_BADGE}`}>
       {QUESTION_TYPE_LABELS[type] || type}
     </span>
   );

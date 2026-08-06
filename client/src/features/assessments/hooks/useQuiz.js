@@ -11,7 +11,7 @@ function safeParse(value) {
 }
 
 // Normalize known type aliases to the canonical value used across the UI
-// (TYPE_ORDER, TYPE_COLORS, etc.). Historically the codebase stored the
+// (TYPE_ORDER, etc.). Historically the codebase stored the
 // multi-select type as both "multi_select" and "multiple_select"; the
 // organizer only recognizes "multiple_select", so the other spelling would
 // be counted in stats but never displayed.

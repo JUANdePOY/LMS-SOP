@@ -20,9 +20,12 @@ import {
   BookOpen,
   ListVideo,
   Image as ImageIcon,
+  X,
+  ExternalLink,
+  Copy,
 } from "lucide-react";
 import { getSops } from "@/features/sop-management/services/sopService";
-import { getQuizzes } from "@/features/assessments/api/quiz.api";
+import { getQuizzes, duplicateQuiz } from "@/features/assessments/api/quiz.api";
 import { getCertificateTemplates } from "@/features/certificate-management/services/certificateService";
 import { uploadContent } from "@/features/course_management/api/content.api";
 import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichTextEditor";
@@ -32,7 +35,7 @@ import VideoPreview from "./VideoPreview";
 import ChapterEditor from "./ChapterEditor";
 import ThumbnailSelector from "./ThumbnailSelector";
 import Accordion from "./Accordion";
-import CreateLessonQuizModal from "./CreateLessonQuizModal";
+import CreateQuizModal from "@/features/assessments/components/modals/CreateQuizModal";
 import { parseVideoUrl, PROVIDER_LABEL } from "@/features/course_management/utils/videoUrl";
 
 const TYPE_OPTIONS = [
@@ -62,12 +65,61 @@ const TABS = [
 
 const TYPE_HELPER = Object.fromEntries(TYPE_OPTIONS.map((o) => [o.value, o.hint]));
 
+function QuizSummaryCard({ quiz, requiresQuizPass, onEdit, onDuplicate, onDetach }) {
+  const questionCount = quiz.question_count ?? 0;
+  const typeLabel = quiz.quiz_type === "final" ? "Final" : "Practice";
+  return (
+    <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-800/50">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <HelpCircle size={16} className="shrink-0 text-neutral-500" />
+            <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{quiz.title || "Untitled quiz"}</p>
+            <span className="shrink-0 rounded-full bg-neutral-200 px-2 py-0.5 text-[10px] font-medium text-neutral-600 dark:bg-neutral-700 dark:text-neutral-300">{typeLabel}</span>
+          </div>
+          <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+            {questionCount} {questionCount === 1 ? "question" : "questions"}
+            {requiresQuizPass ? " · passing score required" : ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={onEdit}
+            title="Edit questions in Quiz Builder"
+            className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+          >
+            <ExternalLink size={13} /> Edit
+          </button>
+          <button
+            type="button"
+            onClick={onDuplicate}
+            title="Duplicate quiz"
+            className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+          >
+            <Copy size={13} /> Duplicate
+          </button>
+          <button
+            type="button"
+            onClick={onDetach}
+            title="Detach quiz"
+            className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-medium text-neutral-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:bg-red-950/30 transition-colors"
+          >
+            <X size={13} /> Detach
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LessonEditor({
   lesson,
   onSave,
   onDelete,
   saving,
   courseId,
+  courseTitle,
   moduleId,
   onNavigatePrev,
   onNavigateNext,
@@ -77,6 +129,7 @@ export default function LessonEditor({
   onMoveDown,
   canMoveUp,
   canMoveDown,
+  onOpenQuizBuilder,
 }) {
   const [title, setTitle] = useState("");
   const [type, setType] = useState("reading");
@@ -107,6 +160,7 @@ export default function LessonEditor({
   const isQuiz = type === "quiz";
   const isNewLesson = !!lesson?.isNew;
   const typeConfig = TYPE_CONFIG[type] || TYPE_CONFIG.reading;
+  const selectedQuiz = isQuiz ? quizzes.find((q) => q.id === selectedQuizId) || null : null;
 
   const handleImageUpload = useCallback(
     async (file) => {
@@ -232,6 +286,22 @@ export default function LessonEditor({
     if (quizId && !quizzes.some((q) => q.id === quizId)) return;
     setSelectedQuizId(quizId);
     emitPatch({ quizId });
+  };
+
+  const handleDuplicateQuiz = async () => {
+    if (!selectedQuizId) return;
+    try {
+      const res = await duplicateQuiz(selectedQuizId);
+      const created = res?.data;
+      if (created?.id) {
+        const refreshed = await getQuizzes(courseId);
+        setQuizzes(refreshed.data || []);
+        setSelectedQuizId(created.id);
+        emitPatch({ quizId: created.id });
+      }
+    } catch (err) {
+      console.error("Failed to duplicate quiz:", err);
+    }
   };
 
   const handleSave = () => {
@@ -708,6 +778,33 @@ export default function LessonEditor({
                         )}
                       </div>
 
+                      {selectedQuiz && (
+                        <QuizSummaryCard
+                          quiz={selectedQuiz}
+                          requiresQuizPass={requiresQuizPass}
+                          onEdit={() => onOpenQuizBuilder?.(selectedQuiz.id)}
+                          onDuplicate={handleDuplicateQuiz}
+                          onDetach={() => {
+                            setSelectedQuizId(null);
+                            emitPatch({ quizId: null });
+                          }}
+                        />
+                      )}
+
+                      {isQuiz && requiresQuizPass && !selectedQuizId && (
+                        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+                          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                          <span>Attach a quiz before requiring a passing score, or this lesson cannot be completed.</span>
+                        </div>
+                      )}
+
+                      {isQuiz && requiresQuizPass && selectedQuiz && (selectedQuiz.question_count ?? 0) === 0 && (
+                        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+                          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                          <span>This quiz has no questions yet. Add questions in the Quiz Builder before publishing.</span>
+                        </div>
+                      )}
+
                       <div>
                         <label className="block text-sm font-medium text-neutral-700 mb-2">
                           Instructions
@@ -893,15 +990,23 @@ export default function LessonEditor({
         </div>
       </footer>
 
-      <CreateLessonQuizModal
+      <CreateQuizModal
         open={showCreateQuiz}
-        onClose={() => setShowCreateQuiz(false)}
-        courseId={courseId}
-        onCreated={(quiz) => {
-          if (!quiz?.id) return;
-          setQuizzes((prev) => [quiz, ...prev]);
-          setSelectedQuizId(quiz.id);
-          emitPatch({ quizId: quiz.id });
+        courses={courseId ? [{ id: courseId, title: courseTitle || "Current course" }] : []}
+        loadingCourses={false}
+        lockCourseId={courseId}
+        onCancel={() => setShowCreateQuiz(false)}
+        onComplete={async ({ quizId }) => {
+          if (!quizId) return;
+          setShowCreateQuiz(false);
+          try {
+            const res = await getQuizzes(courseId);
+            setQuizzes(res.data || []);
+          } catch {
+            /* keep prior list on refresh failure */
+          }
+          setSelectedQuizId(quizId);
+          emitPatch({ quizId });
         }}
       />
       </div>

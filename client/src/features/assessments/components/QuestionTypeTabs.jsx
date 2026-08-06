@@ -10,16 +10,16 @@ import {
   CheckCircle2,
   XCircle,
   HelpCircle,
-  List,
-  Type,
 } from "lucide-react";
 import { Button } from "@/shared/components/ui/button";
 import {
   QUESTION_TYPE_LABELS,
   QUESTION_TYPE_CONFIG,
   QUESTION_TYPE_ICONS,
-  TYPE_THEME,
-  DEFAULT_TYPE_THEME,
+  TYPE_BADGE,
+  TYPE_CHIP,
+  TYPE_ICON,
+  TYPE_DOT,
 } from "../constants/questionTypes";
 import {
   DndContext,
@@ -42,22 +42,15 @@ const TYPE_ORDER = [
   "multiple_select",
   "true_false",
   "short_answer",
-  "essay",
-  "fill_blank",
 ];
-
-function themeFor(type) {
-  return TYPE_THEME[type] || DEFAULT_TYPE_THEME;
-}
 
 function TypeIcon({ type, className = "h-5 w-5" }) {
   const Icon = QUESTION_TYPE_ICONS[type] || GripVertical;
-  const colorClass = themeFor(type).icon || "text-neutral-400";
-  return <Icon className={`${className} ${colorClass}`} />;
+  return <Icon className={`${className} ${TYPE_ICON}`} />;
 }
 
-function TypeDot({ type }) {
-  return <span className={`h-2.5 w-2.5 rounded-full ${themeFor(type).dot}`} />;
+function TypeDot() {
+  return <span className={`h-2.5 w-2.5 rounded-full ${TYPE_DOT}`} />;
 }
 
 function getOptionText(opt) {
@@ -235,7 +228,6 @@ function QuestionTypeSection({
 }) {
   const [collapsed, setCollapsed] = useState(true);
   const isCollapsed = !forceExpanded && collapsed;
-  const theme = themeFor(type);
   const config = QUESTION_TYPE_CONFIG[type] || {
     icon: GripVertical,
     label: type,
@@ -274,13 +266,13 @@ function QuestionTypeSection({
         }}
       >
         <div className="flex items-center gap-3">
-          <span className={`flex items-center justify-center h-7 w-7 rounded-lg ${theme.chip} ${theme.text} ring-1 ring-black/5`}>
+          <span className={`flex items-center justify-center h-7 w-7 rounded-lg ${TYPE_CHIP} ${TYPE_ICON} ring-1 ring-black/5`}>
             <TypeIcon type={type} className="h-4 w-4" />
           </span>
-          <h3 className={`font-semibold ${theme.text} text-[13px] tracking-tight`}>
+          <h3 className={`font-semibold ${TYPE_ICON} text-[13px] tracking-tight`}>
             {config.label || QUESTION_TYPE_LABELS[type] || type}
           </h3>
-          <span className={`text-xs px-2.5 py-0.5 rounded-full ${theme.chip} ${theme.text} font-semibold tabular-nums`}>
+          <span className={`text-xs px-2.5 py-0.5 rounded-full ${TYPE_BADGE} font-semibold tabular-nums`}>
             {items.length}
           </span>
         </div>
@@ -294,9 +286,9 @@ function QuestionTypeSection({
           className="relative p-1.5 hover:bg-neutral-200/70 dark:hover:bg-neutral-700/70 rounded-md transition-colors"
         >
           {isCollapsed ? (
-            <ChevronRight className={`h-4 w-4 ${theme.icon}`} />
+            <ChevronRight className={`h-4 w-4 ${TYPE_ICON}`} />
           ) : (
-            <ChevronDown className={`h-4 w-4 ${theme.icon}`} />
+            <ChevronDown className={`h-4 w-4 ${TYPE_ICON}`} />
           )}
         </button>
       </div>
@@ -326,7 +318,7 @@ function QuestionTypeSection({
             </DndContext>
             {items.length === 0 && (
               <div className="text-center py-8 text-neutral-500 dark:text-neutral-400 text-sm">
-                <span className={`inline-flex items-center justify-center h-10 w-10 rounded-xl ${theme.chip} ${theme.text} mb-2`}>
+                <span className={`inline-flex items-center justify-center h-10 w-10 rounded-xl ${TYPE_CHIP} ${TYPE_ICON} mb-2`}>
                   <TypeIcon type={type} className="h-5 w-5" />
                 </span>
                 <p>No questions of this type yet.</p>
@@ -399,7 +391,6 @@ export default function QuestionTypeTabs({
           >
             {typeTabs.map((tab) => {
               const isActive = activeTab === tab.value;
-              const theme = tab.dot ? themeFor(tab.dot) : null;
               return (
                 <button
                   key={tab.value}
@@ -413,7 +404,7 @@ export default function QuestionTypeTabs({
                       : "text-neutral-600 dark:text-neutral-400 bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800"
                   }`}
                 >
-                  {tab.dot && <TypeDot type={tab.dot} />}
+                  {tab.dot && <TypeDot />}
                   {tab.label}
                   <span
                     className={`px-1.5 py-0.25 rounded-full text-xs tabular-nums ${

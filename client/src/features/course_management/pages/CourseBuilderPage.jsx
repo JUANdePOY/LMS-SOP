@@ -709,6 +709,8 @@ export default function CourseBuilderPage() {
             <LessonEditor
               lesson={selectedLesson}
               courseId={courseId}
+              courseTitle={course?.title}
+              onOpenQuizBuilder={(quizId) => navigate(`/assessments/quiz/${quizId}`)}
               moduleId={selectedModuleId}
               onSave={(patch) => updateLesson(selectedModuleId, modules.find((m) => m.id === selectedModuleId)?.lessons?.findIndex((l) => l.id === selectedLessonId) ?? 0, patch)}
               onDelete={() => removeLesson(selectedModuleId, modules.find((m) => m.id === selectedModuleId)?.lessons?.findIndex((l) => l.id === selectedLessonId) ?? 0)}

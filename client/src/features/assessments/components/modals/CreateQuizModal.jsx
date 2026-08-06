@@ -1,99 +1,155 @@
 import { useState } from "react";
+import { Modal } from "@/shared/components/ui/modal";
 import { Button } from "@/shared/components/ui/button";
-import { Plus, Loader2, X } from "lucide-react";
+import { useToast } from "@/shared/components/ui/Toast";
+import { useQuizWizard } from "../../hooks/useQuizWizard";
+import StepBasics from "../wizard/StepBasics";
+import StepQuestions from "../wizard/StepQuestions";
+import StepReview from "../wizard/StepReview";
+import { CheckCircle2, ArrowLeft, ArrowRight, Loader2, X } from "lucide-react";
 
-export default function CreateQuizModal({ courses, loadingCourses, saving, onSave, onCancel }) {
-  const [form, setForm] = useState({
-    courseId: "",
-    title: "",
-    quiz_type: "practice",
-    time_limit: "",
-    passing_score: "",
-    description: "",
-  });
+const STEPS = [
+  { id: 1, label: "Basics" },
+  { id: 2, label: "Questions" },
+  { id: 3, label: "Review" },
+];
 
-  const setField = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+function Stepper({ step }) {
+  return (
+    <div className="flex items-center gap-2">
+      {STEPS.map((s, i) => {
+        const done = step > s.id;
+        const active = step === s.id;
+        return (
+          <div key={s.id} className="flex items-center gap-2 flex-1">
+            <div
+              className={`flex items-center gap-2 ${
+                active
+                  ? "text-blue-700 dark:text-blue-300"
+                  : done
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-neutral-400 dark:text-neutral-500"
+              }`}
+            >
+              <span
+                className={`flex items-center justify-center h-7 w-7 rounded-full text-xs font-semibold border shrink-0 ${
+                  active
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/30"
+                    : done
+                    ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20"
+                    : "border-neutral-300 dark:border-neutral-600"
+                }`}
+              >
+                {done ? <CheckCircle2 className="h-4 w-4" /> : s.id}
+              </span>
+              <span className="text-xs font-medium hidden sm:inline">{s.label}</span>
+            </div>
+            {i < STEPS.length - 1 && (
+              <div
+                className={`h-0.5 flex-1 rounded ${
+                  done ? "bg-emerald-500" : "bg-neutral-200 dark:bg-neutral-700"
+                }`}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!form.courseId || !form.title.trim()) return;
-    onSave({
-      courseId: Number(form.courseId),
-      title: form.title.trim(),
-      description: form.description.trim() || undefined,
-      quiz_type: form.quiz_type,
-      time_limit: form.time_limit ? Number(form.time_limit) : null,
-      passing_score: form.passing_score ? Number(form.passing_score) : null,
-    });
-  };
+export default function CreateQuizModal({ open, courses, loadingCourses, lockCourseId, onCancel, onComplete }) {
+  const { toast } = useToast();
+  const wizard = useQuizWizard({ toast, onComplete, onCancel, courseId: lockCourseId });
+  const [openBuilder, setOpenBuilder] = useState(false);
+
+  if (!open) return null;
+
+  const selectedCourse = courses?.find(
+    (c) => String(c.id) === String(wizard.settings.courseId)
+  );
+  const courseTitle = selectedCourse?.title || selectedCourse?.name;
+
+  const footer = (
+    <div className="flex items-center justify-between w-full gap-2">
+      <div>
+        {wizard.step > 1 ? (
+          <Button variant="ghost" size="sm" onClick={() => wizard.setStep(wizard.step - 1)}>
+            <ArrowLeft className="h-4 w-4 mr-1" /> Back
+          </Button>
+        ) : (
+          <Button variant="ghost" size="sm" onClick={wizard.cancel}>
+            <X className="h-4 w-4 mr-1" /> Cancel
+          </Button>
+        )}
+      </div>
+      <div className="flex items-center gap-2">
+        {wizard.step === 1 && (
+          <Button size="sm" onClick={wizard.submitStep1} disabled={wizard.savingStep === 1}>
+            {wizard.savingStep === 1 ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" /> Creating…
+              </>
+            ) : (
+              <>
+                <ArrowRight className="h-4 w-4 mr-1" /> Next: Questions
+              </>
+            )}
+          </Button>
+        )}
+        {wizard.step === 2 && (
+          <Button size="sm" onClick={() => wizard.setStep(3)}>
+            <ArrowRight className="h-4 w-4 mr-1" /> Next: Review
+          </Button>
+        )}
+        {wizard.step === 3 && (
+          <Button
+            size="sm"
+            onClick={() => wizard.finish(openBuilder)}
+            disabled={wizard.savingStep === 3}
+          >
+            <CheckCircle2 className="h-4 w-4 mr-1" /> Finish
+          </Button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between">
-        <h3 className="text-lg font-semibold">Create Quiz</h3>
-        <button onClick={onCancel} className="text-neutral-500 hover:text-neutral-700">
-          <X className="h-5 w-5" />
-        </button>
-      </div>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-xs text-neutral-500 mb-1">Course *</label>
-          <select
-            required
-            value={form.courseId}
-            onChange={(e) => setField("courseId", e.target.value)}
-            className="w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm"
-            disabled={loadingCourses}
-          >
-            <option value="">Select a course</option>
-            {loadingCourses ? (
-              <option disabled>Loading courses…</option>
-            ) : (
-              courses.map((c) => (
-                <option key={c.id} value={c.id}>{c.title || c.name}</option>
-              ))
-            )}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-neutral-500 mb-1">Title *</label>
-          <input
-            required
-            value={form.title}
-            onChange={(e) => setField("title", e.target.value)}
-            className="w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm"
-            placeholder="e.g. Security Fundamentals Final"
+    <Modal open={open} onClose={wizard.cancel} title="Create Quiz" size="3xl" footer={footer}>
+      <Stepper step={wizard.step} />
+      <div className="mt-5">
+        {wizard.step === 1 && (
+          <StepBasics
+            settings={wizard.settings}
+            setField={wizard.setField}
+            errors={wizard.errors}
+            courses={courses}
+            loadingCourses={loadingCourses}
+            disabledCourse={!!lockCourseId}
           />
-        </div>
-        <div>
-          <label className="block text-xs text-neutral-500 mb-1">Quiz Type</label>
-          <select value={form.quiz_type} onChange={(e) => setField("quiz_type", e.target.value)} className="w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm">
-            <option value="practice">Practice</option>
-            <option value="final">Final</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs text-neutral-500 mb-1">Time Limit (minutes)</label>
-          <input type="number" min={0} value={form.time_limit} onChange={(e) => setField("time_limit", e.target.value)} className="w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm" placeholder="Leave blank for none" />
-        </div>
-        <div>
-          <label className="block text-xs text-neutral-500 mb-1">Passing Score (%)</label>
-          <input type="number" min={0} max={100} value={form.passing_score} onChange={(e) => setField("passing_score", e.target.value)} className="w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm" placeholder="e.g. 70" />
-        </div>
-        <div>
-          <label className="block text-xs text-neutral-500 mb-1">Description</label>
-          <textarea value={form.description} onChange={(e) => setField("description", e.target.value)} rows={2} className="w-full rounded-lg border border-neutral-300 px-2.5 py-1.5 text-sm" placeholder="Optional description shown to students" />
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" size="sm" onClick={onCancel}>
-            <X className="h-4 w-4 mr-1" />
-            Cancel
-          </Button>
-          <Button type="submit" disabled={saving || !form.courseId || !form.title.trim()}>
-            {saving ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" />Creating…</> : <><Plus className="h-4 w-4 mr-1" />Create Quiz</>}
-          </Button>
-        </div>
-      </form>
-    </div>
+        )}
+        {wizard.step === 2 && (
+          <StepQuestions
+            quizId={wizard.quizId}
+            questions={wizard.questions}
+            onAddQuestion={wizard.addQuestion}
+            onUpdateQuestion={wizard.updateQuestion}
+            onRemoveQuestion={wizard.removeQuestion}
+            onReorder={wizard.reorderQuestions}
+            onRefresh={wizard.loadQuestions}
+          />
+        )}
+        {wizard.step === 3 && (
+          <StepReview
+            settings={wizard.settings}
+            courseTitle={courseTitle}
+            questions={wizard.questions}
+            openBuilder={openBuilder}
+            setOpenBuilder={setOpenBuilder}
+          />
+        )}
+      </div>
+    </Modal>
   );
 }
