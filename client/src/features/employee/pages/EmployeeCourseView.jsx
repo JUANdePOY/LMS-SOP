@@ -8,6 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import LessonList from "@/features/course_management/components/LessonList";
 import LessonProgressBar from "@/features/course_management/components/LessonProgressBar";
+import CourseSOPsSection from "@/features/employee/components/CourseSOPsSection";
   import {
   getEmployeeCourseDetails,
   getEmployeeCourseProgress,
@@ -342,6 +343,8 @@ export default function EmployeeCourseView() {
                 />
               </div>
             </div>
+
+            <CourseSOPsSection courseId={courseId} />
           </div>
 
           <div className="space-y-6">

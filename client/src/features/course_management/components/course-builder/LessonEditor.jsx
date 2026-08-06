@@ -13,7 +13,6 @@ import {
   AlertCircle,
   CheckCircle2,
 } from "lucide-react";
-import { getSops } from "@/features/sop-management/services/sopService";
 import { getMyQuizzes } from "@/features/assessments/api/quiz.api";
 import { getCertificateTemplates } from "@/features/certificate-management/services/certificateService";
 import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichTextEditor";
@@ -23,7 +22,6 @@ const TYPE_OPTIONS = [
   { value: "reading", label: "Reading", Icon: FileText },
   { value: "quiz", label: "Quiz", Icon: HelpCircle },
   { value: "link", label: "Link", Icon: Link2 },
-  { value: "sop", label: "SOP", Icon: FileText },
   { value: "certificate", label: "Certificate", Icon: Award },
   { value: "document", label: "Document", Icon: FileArchive },
 ];
@@ -74,19 +72,6 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
     setHasChanges(false);
     setSaveError(null);
   }, [lesson?.id]);
-
-  useEffect(() => {
-    if (type === "sop") {
-      setLoadingSops(true);
-      getSops({ exclude_status: "ARCHIVED" })
-        .then((res) => {
-          const sops = res.data?.data?.rows || res.data?.data || [];
-          setAvailableSops(sops);
-        })
-        .catch((err) => console.error("Failed to fetch SOPs:", err))
-        .finally(() => setLoadingSops(false));
-    }
-  }, [type]);
 
   useEffect(() => {
     if (type === "quiz") {
@@ -151,8 +136,8 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
     onSave?.({
       title: title.trim(),
       type,
-      url: type === "reading" ? description : type === "sop" ? url : url,
-      description: type === "reading" || type === "sop" ? description : description,
+      url: type === "reading" ? description : url,
+      description: type === "reading" ? description : description,
       duration: duration ? parseInt(duration, 10) : null,
       requiresQuizPass: isQuiz ? requiresQuizPass : false,
       passingScore: isQuiz && requiresQuizPass && passingScore ? parseInt(passingScore, 10) : null,
@@ -300,59 +285,6 @@ export default function LessonEditor({ lesson, onSave, onDelete, saving }) {
                               placeholder="Start writing..."
                             />
                           </div>
-                        </div>
-                      ) : type === "sop" ? (
-                        <div className="space-y-4">
-                          <div>
-                            <label htmlFor="sop-select" className="block text-sm font-medium text-neutral-700 mb-2">
-                              Select SOP
-                            </label>
-                            {loadingSops ? (
-                              <div className="flex items-center gap-2 border border-neutral-200 bg-white rounded-lg px-3 py-2">
-                                <Loader2 size={16} className="animate-spin text-neutral-500" />
-                                <span className="text-sm text-neutral-500">Loading...</span>
-                              </div>
-                            ) : (
-                              <select
-                                id="sop-select"
-                                value={url}
-                                onChange={(e) => {
-                                  const selectedSop = availableSops.find((s) => String(s.id) === e.target.value);
-                                  setUrl(e.target.value);
-                                  emitPatch({
-                                    url: e.target.value,
-                                    content: e.target.value,
-                                    description: selectedSop?.title || "",
-                                  });
-                                }}
-                                className="w-full border border-neutral-300 bg-white rounded-lg px-3 py-2 text-sm text-neutral-900 focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition-colors"
-                              >
-                                <option value="">Select an SOP...</option>
-                                {availableSops.map((sop) => (
-                                  <option key={sop.id} value={sop.id}>
-                                    {sop.title}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
-                          </div>
-                          {url && (
-                            <div>
-                              <label className="block text-sm font-medium text-neutral-700 mb-2">
-                                Notes
-                              </label>
-                              <div className="rounded-lg border border-neutral-200 overflow-hidden">
-                                <RichTextEditor
-                                  value={description}
-                                  onChange={(html) => {
-                                    setDescription(html);
-                                    emitPatch({ description: html });
-                                  }}
-                                  placeholder="Optional notes..."
-                                />
-                              </div>
-                            </div>
-                          )}
                         </div>
                       ) : type === "certificate" ? (
                         <div className="space-y-4">

@@ -51,6 +51,7 @@ const PATH_TITLE_MAP = {
   "/courses/view/:id/lesson/:lessonId": "Lesson",
   "/sops/:id": "SOP Workspace",
   "/sops/:id/versions/:versionId": "SOP Version",
+  "/my-learning/sops/:id": "SOP",
   "/trash": "Trash",
   "/admin/organization": "Organization",
   "/admin/organization/hierarchy": "Hierarchy Overview",

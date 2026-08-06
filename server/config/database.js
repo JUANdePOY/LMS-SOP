@@ -545,6 +545,14 @@ async function runMigrations() {
   } catch (err) {
     console.error('Certificate management migration error:', err.message);
   }
+
+  try {
+    const { runSopCourseLinkMigrations } = require('../migrations/sopCourseLinks');
+    await runSopCourseLinkMigrations();
+    console.log('SOP course link migrations applied');
+  } catch (err) {
+    console.error('SOP course link migration error:', err.message);
+  }
 }
 
 async function initDatabase() {

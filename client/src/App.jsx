@@ -16,6 +16,7 @@ const Dashboard     = lazy(() => import("@/pages/Dashboard"));
 const EmployeeDashboard = lazy(() => import("@/features/employee/pages/EmployeeDashboard"));
 const EmployeeCourseCatalog = lazy(() => import("@/features/employee/pages/EmployeeCourseCatalog"));
 const EmployeeCourseView = lazy(() => import("@/features/employee/pages/EmployeeCourseView"));
+const EmployeeSOPView = lazy(() => import("@/features/employee/pages/EmployeeSOPView"));
 const Profile       = lazy(() => import("@/pages/Profile"));
 const Login         = lazy(() => import("@/pages/Login"));
 const Settings      = lazy(() => import("@/pages/Settings"));
@@ -147,6 +148,7 @@ const router = createBrowserRouter([
        { path: "my-learning", element: EmployeeProtectedWrapper(EmployeeDashboard), handle: { title: "My Learning" } },
        { path: "my-learning/catalog", element: EmployeeProtectedWrapper(EmployeeCourseCatalog), handle: { title: "Course Catalog" } },
        { path: "my-learning/course/:id", element: EmployeeProtectedWrapper(EmployeeCourseView), handle: { title: "Course" } },
+       { path: "my-learning/sops/:id", element: EmployeeProtectedWrapper(EmployeeSOPView), handle: { title: "SOP" } },
        { path: "profile", element: LMSProtectedWrapper(Profile), handle: { title: "Profile" } },
       { path: "users", element: <Navigate to="/settings/users" replace /> },
       { path: "course-library", element: <Navigate to="/courses/library" replace /> },
