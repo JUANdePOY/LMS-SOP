@@ -1,0 +1,261 @@
+import { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
+import { TASK_PRIORITIES, TASK_STATUSES } from '../constants/taskConstants';
+import AssignmentInput from './AssignmentInput';
+
+function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [priority, setPriority] = useState('Medium');
+  const [status, setStatus] = useState('Pending');
+  const [startDatetime, setStartDatetime] = useState('');
+  const [deadlineDatetime, setDeadlineDatetime] = useState('');
+  const [estimatedHours, setEstimatedHours] = useState('');
+  const [category, setCategory] = useState('');
+  const [assignments, setAssignments] = useState([]);
+  const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    if (initialData) {
+      setTitle(initialData.title || '');
+      setDescription(initialData.description || '');
+      setPriority(initialData.priority || 'Medium');
+      setStatus(initialData.status || 'Pending');
+      setStartDatetime(initialData.start_datetime ? initialData.start_datetime.slice(0, 16) : '');
+      setDeadlineDatetime(initialData.deadline_datetime ? initialData.deadline_datetime.slice(0, 16) : '');
+      setEstimatedHours(initialData.estimated_hours || '');
+      setCategory(initialData.category || '');
+      setAssignments(
+        initialData.assignments?.map((a) => ({
+          assignment_type: a.assignment_type,
+          reference_id: a.reference_id,
+          reference_name: a.reference_name,
+        })) || []
+      );
+    } else {
+      setTitle('');
+      setDescription('');
+      setPriority('Medium');
+      setStatus('Pending');
+      setStartDatetime('');
+      setDeadlineDatetime('');
+      setEstimatedHours('');
+      setCategory('');
+      setAssignments([]);
+    }
+    setErrors({});
+  }, [initialData, show]);
+
+  const addAssignment = () => {
+    setAssignments([...assignments, { assignment_type: 'User', reference_id: '', reference_name: '' }]);
+  };
+
+  const updateAssignment = (index, updated) => {
+    const next = [...assignments];
+    next[index] = { ...next[index], ...updated };
+    setAssignments(next);
+  };
+
+  const removeAssignment = (index) => {
+    setAssignments(assignments.filter((_, i) => i !== index));
+  };
+
+  const validate = () => {
+    const newErrors = {};
+    if (!title.trim()) newErrors.title = 'Title is required';
+    if (!startDatetime) newErrors.startDatetime = 'Start date is required';
+    if (!deadlineDatetime) newErrors.deadlineDatetime = 'Deadline is required';
+    if (startDatetime && deadlineDatetime && new Date(deadlineDatetime) <= new Date(startDatetime)) {
+      newErrors.deadlineDatetime = 'Deadline must be after start date';
+    }
+    if (estimatedHours !== '' && estimatedHours !== null && estimatedHours !== undefined) {
+      const hours = Number(estimatedHours);
+      if (!Number.isFinite(hours) || hours < 0 || !Number.isInteger(hours)) {
+        newErrors.estimatedHours = 'Estimated hours must be a non-negative whole number';
+      }
+    }
+    const validAssignments = assignments.filter((a) => a.reference_id || a.reference_name);
+    if (validAssignments.length === 0) newErrors.assignments = 'At least one assignment is required';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = () => {
+    if (!validate()) return;
+    onSubmit({
+      title,
+      description,
+      priority,
+      status,
+      start_datetime: startDatetime,
+      deadline_datetime: deadlineDatetime,
+      estimated_hours: estimatedHours ? Number(estimatedHours) : null,
+      category: category || null,
+      assignments: assignments.filter((a) => a.reference_id || a.reference_name),
+    });
+  };
+
+  if (!show) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-10 flex w-full sm:max-w-2xl flex-col rounded-t-2xl sm:rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-sm max-h-[92vh] sm:max-h-[85vh]">
+        <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[var(--border)] shrink-0">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">{initialData ? 'Edit Task' : 'New Task'}</h3>
+          <button type="button" onClick={onClose} className="p-2 -mr-2 rounded-lg hover:bg-[var(--bg-hover)] transition-colors" aria-label="Close">
+            <X size={20} className="text-[var(--text-muted)]" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-4 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Title *</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Task title"
+              className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 placeholder:text-[var(--text-muted)] ${errors.title ? 'border-red-500' : 'border-[var(--border)]'}`}
+            />
+            {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title}</p>}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Description</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Detailed instructions"
+              rows={3}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 placeholder:text-[var(--text-muted)]"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Priority</label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+              >
+                {TASK_PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Status</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+              >
+                {TASK_STATUSES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Start Date & Time *</label>
+              <input
+                type="datetime-local"
+                value={startDatetime}
+                onChange={(e) => setStartDatetime(e.target.value)}
+                className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 ${errors.startDatetime ? 'border-red-500' : 'border-[var(--border)]'}`}
+              />
+              {errors.startDatetime && <p className="text-xs text-red-500 mt-1">{errors.startDatetime}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Deadline *</label>
+              <input
+                type="datetime-local"
+                value={deadlineDatetime}
+                onChange={(e) => setDeadlineDatetime(e.target.value)}
+                className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 ${errors.deadlineDatetime ? 'border-red-500' : 'border-[var(--border)]'}`}
+              />
+              {errors.deadlineDatetime && <p className="text-xs text-red-500 mt-1">{errors.deadlineDatetime}</p>}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Estimated Hours</label>
+              <input
+                type="number"
+                value={estimatedHours}
+                onChange={(e) => setEstimatedHours(e.target.value)}
+                placeholder="Optional"
+                min="0"
+                className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 placeholder:text-[var(--text-muted)] ${errors.estimatedHours ? 'border-red-500' : 'border-[var(--border)]'}`}
+              />
+              {errors.estimatedHours && <p className="text-xs text-red-500 mt-1">{errors.estimatedHours}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Category</label>
+              <input
+                type="text"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="Optional"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 placeholder:text-[var(--text-muted)]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-[var(--text-primary)]">Assignments *</label>
+              <button
+                type="button"
+                onClick={addAssignment}
+                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+              >
+                + Add Assignment
+              </button>
+            </div>
+            {errors.assignments && <p className="text-xs text-red-500 mb-2">{errors.assignments}</p>}
+            <div className="space-y-2">
+              {assignments.map((a, idx) => (
+                <AssignmentInput
+                  key={idx}
+                  assignment={a}
+                  onUpdate={(updated) => updateAssignment(idx, updated)}
+                  onRemove={() => removeAssignment(idx)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 px-5 sm:px-6 py-4 border-t border-[var(--border)] shrink-0 bg-[var(--bg-surface)]">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={saving}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Saving...' : initialData ? 'Update' : 'Create'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default TaskForm;

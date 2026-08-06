@@ -67,12 +67,15 @@ async function issueCertificate(payload, actorId) {
   const signatures = await certificateSignatureModel.findAll({});
   const matchedSignatures = signatures.filter(s => signatureIds.includes(s.id));
 
+  const certificateNumber = crypto.randomUUID();
+
   let renderResult;
   try {
     renderResult = await renderCertificate({
       template,
       resolvedSections,
       signatures: matchedSignatures,
+      certificateNumber,
     });
   } catch (err) {
     console.error('Certificate render error:', err);
@@ -80,8 +83,6 @@ async function issueCertificate(payload, actorId) {
     error.code = 'RENDER_ERROR';
     throw error;
   }
-
-  const certificateNumber = crypto.randomUUID();
 
   const issuanceId = await certificateIssuanceModel.create({
     certificate_number: certificateNumber,

@@ -58,7 +58,7 @@ export default function CertificatePreviewCanvas({
   const { resizingKey, startResize } = useSectionResize(containerRef, (key, patch) => {
     onSectionPatch?.(key, patch);
   });
-  const { draggingKey, startDrag } = useSectionPositions((key, patch) => {
+  const { draggingKey, startDrag } = useSectionPositions(containerRef, (key, patch) => {
     onSectionPatch?.(key, patch);
   });
 
@@ -302,45 +302,105 @@ export default function CertificatePreviewCanvas({
 
                 const [titleLine1, titleLine2] = getTitleLines(data?.text);
 
-                // Special rendering for signatures band: render uploaded images and signer labels
+                // Special rendering for signatures band: each uploaded image, and
+                // separately each image's signer-name/position text, is its own
+                // independently-positioned element (own drag key, own patch
+                // target). Moving the image never moves its text, and moving one
+                // signer's image/text never touches another signer's or any
+                // other section.
                 if (section.key === 'signatures_seal') {
                   const items = sections.signatures_seal?.items || [];
                   if (items.length === 0) return null;
 
-                  return (
-                    <div
-                      key={section.key}
-                      className="absolute z-10 rounded px-1"
-                      style={{
-                        left: `${xPercent}%`,
-                        top: `${yPercent}%`,
-                        width: `${widthPercent}%`,
-                        transform,
-                        userSelect: 'none',
-                        WebkitUserSelect: 'none',
-                        MozUserSelect: 'none',
-                      }}
-                    >
-                      <div className="flex items-end justify-between w-full">
-                        {items.map((item, idx) => (
-                          <div key={idx} className="flex-1 text-center px-2">
-                            {item.signature_id ? (
-                              signatureImageUrls[item.signature_id] ? (
-                                <img
-                                  src={signatureImageUrls[item.signature_id]}
-                                  alt={item.label || item.signer_name || 'Signature image'}
-                                  className="mx-auto mb-1 h-12 w-auto object-contain"
-                                  onError={(e) => { e.target.style.display = 'none'; }}
-                                />
-                              ) : (
-                                <div className="h-12 mx-auto mb-1 w-full rounded bg-gray-100" />
-                              )
-                            ) : (
-                              <div className="h-12" />
-                            )}
+                  const defaultItemWidth = 18;
+                  const slotSpacing = defaultItemWidth + 4;
+                  const rowWidth = slotSpacing * items.length - 4;
+                  const rowStartX = xPercent - rowWidth / 2;
+
+                  return items.flatMap((item, idx) => {
+                    const itemId = item.signature_id ?? idx;
+                    const imgKey = `signatures_seal:img:${itemId}`;
+                    const textKey = `signatures_seal:text:${itemId}`;
+                    const defaultItemX = rowStartX + slotSpacing * idx + defaultItemWidth / 2;
+                    const itemXPercent = item.x_percent ?? defaultItemX;
+                    const itemYPercent = item.y_percent ?? yPercent;
+                    const itemWidthPercent = item.width_percent ?? defaultItemWidth;
+                    const isImgDragging = draggingKey === imgKey;
+                    const isImgResizing = resizingKey === imgKey;
+
+                    const hasSignerText = Boolean(item.signer_name || item.position_title || sections.signatures_seal?.signer_name || sections.signatures_seal?.position_title);
+                    const textXPercent = item.text_x_percent ?? itemXPercent;
+                    const textYPercent = item.text_y_percent ?? (itemYPercent + 8);
+                    const textWidthPercent = item.text_width_percent ?? itemWidthPercent;
+                    const isTextDragging = draggingKey === textKey;
+                    const isTextResizing = resizingKey === textKey;
+
+                    const elements = [
+                      <div
+                        key={`${itemId}-img`}
+                        className={`group absolute z-10 rounded px-1 ${isImgResizing ? 'outline outline-1 outline-dashed outline-indigo-400' : ''} ${isImgDragging ? 'cursor-grabbing opacity-80' : 'cursor-grab'}`}
+                        onPointerDown={startDrag(imgKey)}
+                        style={{
+                          left: `${itemXPercent}%`,
+                          top: `${itemYPercent}%`,
+                          width: `${itemWidthPercent}%`,
+                          transform: 'translate(-50%, -50%)',
+                          userSelect: 'none',
+                          WebkitUserSelect: 'none',
+                          MozUserSelect: 'none',
+                        }}
+                      >
+                        {item.signature_id ? (
+                          signatureImageUrls[item.signature_id] ? (
+                            <img
+                              src={signatureImageUrls[item.signature_id]}
+                              alt={item.label || 'Signature image'}
+                              className="mx-auto w-full object-contain pointer-events-none"
+                              style={{ height: `${sections.signatures_seal?.image_size || 48}px` }}
+                              onError={(e) => { e.target.style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="mx-auto w-full rounded bg-gray-100" style={{ height: `${sections.signatures_seal?.image_size || 48}px` }} />
+                          )
+                        ) : (
+                          <div style={{ height: `${sections.signatures_seal?.image_size || 48}px` }} />
+                        )}
+
+                        {onSectionPatch && (
+                          <div
+                            role="slider"
+                            aria-label="Resize signature image"
+                            onPointerDown={startResize(imgKey, itemWidthPercent)}
+                            className={`absolute -bottom-2 -right-2 h-3.5 w-3.5 cursor-ew-resize rounded-sm border border-white bg-indigo-500 opacity-0 shadow transition-opacity group-hover:opacity-100 ${isImgResizing ? 'opacity-100' : ''}`}
+                          />
+                        )}
+                      </div>,
+                    ];
+
+                    if (hasSignerText) {
+                      elements.push(
+                        <div
+                          key={`${itemId}-text`}
+                          className={`group absolute z-10 rounded px-1 text-center ${isTextResizing ? 'outline outline-1 outline-dashed outline-indigo-400' : ''} ${isTextDragging ? 'cursor-grabbing opacity-80' : 'cursor-grab'}`}
+                          onPointerDown={startDrag(textKey)}
+                          style={{
+                            left: `${textXPercent}%`,
+                            top: `${textYPercent}%`,
+                            width: `${textWidthPercent}%`,
+                            transform: 'translate(-50%, -50%)',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                            MozUserSelect: 'none',
+                          }}
+                        >
+                          {(item.signer_name || sections.signatures_seal?.signer_name) && (
                             <div style={{ borderBottom: '1px solid rgba(0,0,0,0.35)', paddingBottom: 6 }}>
-                              <span style={{ fontSize: `${fontSize * fontScale}px`, fontFamily, fontWeight: 600 }}>{item.signer_name || item.label || ''}</span>
+                              <span style={{ fontSize: `${fontSize * fontScale}px`, fontFamily, fontWeight: 600 }}>
+                                {item.signer_name || sections.signatures_seal?.signer_name}
+                              </span>
                             </div>
+                          )}
+                          {(item.position_title || sections.signatures_seal?.position_title) && (
                             <div
                               className="mt-1 text-gray-600"
                               style={{
@@ -348,22 +408,36 @@ export default function CertificatePreviewCanvas({
                                 fontFamily,
                               }}
                             >
-                              {item.position_title || ''}
+                                {item.position_title || sections.signatures_seal?.position_title}
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
+                          )}
+
+                          {onSectionPatch && (
+                            <div
+                              role="slider"
+                              aria-label="Resize signer name and position text"
+                              onPointerDown={startResize(textKey, textWidthPercent)}
+                              className={`absolute -bottom-2 -right-2 h-3.5 w-3.5 cursor-ew-resize rounded-sm border border-white bg-indigo-500 opacity-0 shadow transition-opacity group-hover:opacity-100 ${isTextResizing ? 'opacity-100' : ''}`}
+                            />
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return elements;
+                  });
                 }
                 const secondLineFontSize = data?.title_second_font_size || section.defaultSecondLineFontSize || Math.max(Math.round(fontSize * 0.75), 12);
                 const secondLineFontWeight = data?.title_second_font_weight || section.defaultSecondLineWeight || 'normal';
                 const secondLineFontStyle = data?.title_second_font_style || section.defaultSecondLineStyle || data?.font_style || 'normal';
 
+                const isDragging = draggingKey === section.key;
+
                 return (
                   <div
                     key={section.key}
-                    className={`group absolute z-10 rounded px-1 ${isResizing ? 'outline outline-1 outline-dashed outline-indigo-400' : ''}`}
+                    className={`group absolute z-10 rounded px-1 ${isResizing ? 'outline outline-1 outline-dashed outline-indigo-400' : ''} ${isDragging ? 'cursor-grabbing opacity-80' : 'cursor-grab'}`}
+                    onPointerDown={startDrag(section.key)}
                     style={{
                       left: `${xPercent}%`,
                       top: `${yPercent}%`,

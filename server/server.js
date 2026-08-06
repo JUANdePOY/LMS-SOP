@@ -62,6 +62,8 @@ const quizAttemptsRoutes = require('./routes/attempts');
 const announcementsRoutes = require('./routes/announcements');
 const eventsRoutes = require('./routes/events');
 const messagesRoutes = require('./routes/messages');
+const tasksRoutes = require('./routes/tasks');
+const taskAttachmentPublicFile = require('./services/taskAttachmentPublicFile');
 
 const { templateRouter, signatureRouter, issuanceRouter } = require('./routes/certificates');
 const sopAttachmentPublicFile = require('./services/sopAttachmentPublicFile');
@@ -119,6 +121,8 @@ app.use('/api/discussions', discussionsRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/messages', messagesRoutes);
+app.use('/api/tasks/attachments', taskAttachmentPublicFile.router);
+app.use('/api/tasks', tasksRoutes);
 
 app.use('/uploads', express.static(getUploadRoot()));
 

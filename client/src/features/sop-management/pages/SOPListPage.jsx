@@ -102,9 +102,9 @@ function SOPListPage() {
     sops, loading, search, setSearch, status, setStatus,
     archivedTab, setArchivedTab, showCreate, setShowCreate,
     newTitle, setNewTitle, newDescription, setNewDescription, newLink, setNewLink,
-    newCategoryId, setNewCategoryId, categories, loadingCategories,
+    newCategoryId, setNewCategoryId, categories, loadingCategories, filteredCategories,
     editingSopId, editTitle, setEditTitle, editDescription, setEditDescription,
-    editStatus, setEditStatus, handleCreate, fetchSops,
+    editStatus, setEditStatus, editCategoryId, setEditCategoryId, handleCreate, fetchSops,
     resetForm,
     handleEditStart, handleEditCancel, handleEditSave, handleDeleteSop, handleArchiveSop,
     cascade,
@@ -235,7 +235,7 @@ function SOPListPage() {
             newDescription={newDescription} setNewDescription={setNewDescription}
             newLink={newLink} setNewLink={setNewLink}
             newCategoryId={newCategoryId} setNewCategoryId={setNewCategoryId}
-            categories={categories} loadingCategories={loadingCategories}
+            filteredCategories={filteredCategories} loadingCategories={loadingCategories}
             loading={loading}
             cascade={cascade}
             onCancel={resetForm}
@@ -310,6 +310,8 @@ function SOPListPage() {
               editTitle={editTitle} setEditTitle={setEditTitle}
               editDescription={editDescription} setEditDescription={setEditDescription}
               editStatus={editStatus} setEditStatus={setEditStatus}
+              editCategoryId={editCategoryId} setEditCategoryId={setEditCategoryId}
+              filteredCategories={filteredCategories} loadingCategories={loadingCategories}
               cascade={cascade}
               onCancel={handleEditCancel}
               onSave={handleEditSave}

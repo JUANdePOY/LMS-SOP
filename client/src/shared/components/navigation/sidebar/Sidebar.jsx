@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
 import { useAuth } from "@/contexts/AuthContext";
 import { filterMenuByRole, LMS_ROLES } from "@/config/menuItems";
+import { useMyTaskCount } from "@/features/task-management/hooks/useMyTaskCount";
 
 const EMPLOYEE_MENU_ITEMS = [
   {
@@ -46,6 +47,13 @@ const EMPLOYEE_MENU_ITEMS = [
       { name: "Messaging", path: "/messaging", icon: MessageSquare },
       { name: "Announcements", path: "/announcements", icon: Megaphone },
       { name: "Events", path: "/events", icon: Calendar },
+    ],
+  },
+  {
+    name: "WORKFLOW",
+    group: true,
+    items: [
+      { name: "My Tasks", path: "/tasks/my", icon: CheckSquare },
     ],
   },
   {
@@ -133,6 +141,25 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   const baseMenuItems = isEmployee ? EMPLOYEE_MENU_ITEMS : MENU_ITEMS;
   const activeMenuItems = filterMenuByRole(baseMenuItems, user?.role);
 
+  const { count: myTaskCount, refresh: refreshTaskCount } = useMyTaskCount();
+
+  useEffect(() => {
+    refreshTaskCount();
+  }, [refreshTaskCount]);
+
+  // Build a map of path -> count for sidebar badges
+  const sidebarCounts = useMemo(() => {
+    const counts = {};
+    if (myTaskCount > 0) {
+      if (isEmployee) {
+        counts['/tasks/my'] = myTaskCount;
+      } else {
+        counts['/tasks'] = myTaskCount;
+      }
+    }
+    return counts;
+  }, [myTaskCount, isEmployee]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -149,6 +176,11 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
       setExpandedSubMenus(prev => ({ ...prev, "SOP Management": true }));
     }
   }, [location.pathname]);
+
+  // Refresh task count when route changes
+  useEffect(() => {
+    refreshTaskCount();
+  }, [location.pathname, refreshTaskCount]);
 
   const toggleSubMenu = (name) => {
     setExpandedSubMenus((prev) => ({ ...prev, [name]: !prev[name] }));
@@ -338,6 +370,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                           isCollapsed={collapsed}
                           onNavClick={handleNavClick}
                           isActive={isActive(sub.path)}
+                          count={sidebarCounts[sub.path]}
                         />
                       )}
                     </li>
@@ -354,6 +387,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                 isCollapsed={collapsed}
                 onNavClick={handleNavClick}
                 isActive={isActive(item.path)}
+                count={sidebarCounts[item.path]}
               />
             </li>
           );

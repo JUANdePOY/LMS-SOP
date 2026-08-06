@@ -58,6 +58,9 @@ const PATH_TITLE_MAP = {
   "/admin/organization/departments": "Departments",
   "/admin/organization/categories": "Categories",
   "/admin/organization/sop-management": "SOP Management",
+  "/tasks": "Tasks & Projects",
+  "/tasks/:id": "Task Details",
+  "/tasks/my": "My Tasks",
 };
 
 function getBreadcrumbs(pathname) {

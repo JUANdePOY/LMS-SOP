@@ -88,6 +88,7 @@ export const CERTIFICATE_SECTIONS = [
     defaultFontSize: 13,
     minFontSize: 10,
     maxFontSize: 18,
+    defaultImageSize: 48,
     defaultAlign: 'center',
     defaultFontFamily: "Inter, system-ui, -apple-system, sans-serif",
     defaultLineHeight: 1.3,
@@ -153,6 +154,9 @@ export function normalizeSections(raw = {}) {
     }
     if (section.key === 'signatures_seal') {
       out[section.key].items = Array.isArray(incoming.items) ? incoming.items : [];
+      out[section.key].signer_name = incoming.signer_name || '';
+      out[section.key].position_title = incoming.position_title || '';
+      out[section.key].image_size = incoming.image_size || section.defaultImageSize || 48;
     }
   }
   return out;

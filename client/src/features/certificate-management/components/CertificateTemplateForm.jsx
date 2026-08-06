@@ -53,6 +53,7 @@ export default function CertificateTemplateForm({
   const [framePreview, setFramePreview] = useState(null);
   const [frameFile, setFrameFile] = useState(null);
   const [templateName, setTemplateName] = useState(initialSections?.name || '');
+  const [status, setStatus] = useState(initialSections?.status || 'draft');
   const fileInputRef = useRef(null);
 
   const [showSignatureUpload, setShowSignatureUpload] = useState(false);
@@ -88,6 +89,7 @@ export default function CertificateTemplateForm({
       setWidthPx(initialSections.width_px || A4_LANDSCAPE.width_px);
       setHeightPx(initialSections.height_px || A4_LANDSCAPE.height_px);
       setTemplateName(initialSections.name || '');
+      setStatus(initialSections.status || 'draft');
       setFramePreview(null);
 
       if (initialSections.id) {
@@ -121,7 +123,32 @@ export default function CertificateTemplateForm({
 
   // Patch one or more fields on a section at once (font controls, nudge
   // controls, and the canvas width-resize handle all use this).
+  //
+  // Signature images are a special case: each signature item renders as two
+  // independent pieces on the canvas — its image and its signer-name/position
+  // text — each with its own drag/resize key ("signatures_seal:img:<id>" or
+  // "signatures_seal:text:<id>"). Those patches must land on that one item
+  // inside signatures_seal.items (on x_percent/y_percent/width_percent for
+  // the image, or text_x_percent/text_y_percent/text_width_percent for the
+  // text) — never on the signatures_seal section root — so moving one piece
+  // never moves the other piece, another signer's image/text, or any other
+  // section.
   const handleSectionPatch = (key, patch) => {
+    const signatureItemMatch = /^signatures_seal:(img|text):(.+)$/.exec(key);
+    if (signatureItemMatch) {
+      const [, kind, itemId] = signatureItemMatch;
+      const fieldPatch = kind === 'text'
+        ? Object.fromEntries(Object.entries(patch).map(([field, value]) => [`text_${field}`, value]))
+        : patch;
+      setSections(prev => {
+        const items = prev.signatures_seal?.items || [];
+        const nextItems = items.map((item, i) =>
+          String(item.signature_id ?? i) === itemId ? { ...item, ...fieldPatch } : item
+        );
+        return { ...prev, signatures_seal: { ...prev.signatures_seal, items: nextItems } };
+      });
+      return;
+    }
     setSections(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }));
   };
 
@@ -158,12 +185,10 @@ export default function CertificateTemplateForm({
     formData.append('width_px', String(widthPx));
     formData.append('height_px', String(heightPx));
     formData.append('sections', JSON.stringify(sections));
-    if (!initialSections?.id) {
-      formData.append('status', 'active');
-    }
+    formData.append('status', status);
     if (frameFile) formData.append('frame', frameFile);
     return formData;
-  }, [templateName, orientation, widthPx, heightPx, sections, initialSections?.id, frameFile]);
+  }, [templateName, orientation, widthPx, heightPx, sections, status, frameFile]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -266,6 +291,22 @@ export default function CertificateTemplateForm({
                       placeholder="e.g., Completion Certificate"
                       required
                     />
+                  </div>
+                  <div>
+                    <Label htmlFor="status">Status</Label>
+                    <select
+                      id="status"
+                      value={status}
+                      onChange={(e) => setStatus(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800"
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="active">Active</option>
+                      <option value="archived">Archived</option>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-400">
+                      Draft templates cannot be used for issuance. Active templates are available immediately.
+                    </p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
@@ -7,10 +7,13 @@ const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
  * around a canvas. Keeps drag state + coordinate conversion out of the
  * component tree per architecture.md ("no business logic inside components").
  *
+ * @param {React.RefObject} containerRef - ref to the canvas container
+ *   element, used to convert pointer coordinates into x/y percentages.
+ *   Pass the same ref that's attached to the certificate page element
+ *   (mirrors how useSectionResize receives its containerRef).
  * @param {(key: string, patch: { x_percent: number, y_percent: number }) => void} onChange
  */
-export default function useSectionPositions(onChange) {
-  const containerRef = useRef(null);
+export default function useSectionPositions(containerRef, onChange) {
   const [draggingKey, setDraggingKey] = useState(null);
 
   const applyPosition = useCallback((key, clientX, clientY) => {
@@ -20,7 +23,7 @@ export default function useSectionPositions(onChange) {
     const xPercent = clamp(((clientX - rect.left) / rect.width) * 100, 0, 100);
     const yPercent = clamp(((clientY - rect.top) / rect.height) * 100, 0, 100);
     onChange(key, { x_percent: xPercent, y_percent: yPercent });
-  }, [onChange]);
+  }, [containerRef, onChange]);
 
   useEffect(() => {
     if (!draggingKey) return undefined;
@@ -56,5 +59,5 @@ export default function useSectionPositions(onChange) {
     setDraggingKey(key);
   }, []);
 
-  return { containerRef, draggingKey, startDrag };
+  return { draggingKey, startDrag };
 }
