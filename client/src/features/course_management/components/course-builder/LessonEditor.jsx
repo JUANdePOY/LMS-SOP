@@ -35,6 +35,7 @@ import VideoPreview from "./VideoPreview";
 import ChapterEditor from "./ChapterEditor";
 import ThumbnailSelector from "./ThumbnailSelector";
 import Accordion from "./Accordion";
+import LinkPreview, { isValidUrl } from "./LinkPreview";
 import CreateQuizModal from "@/features/assessments/components/modals/CreateQuizModal";
 import { parseVideoUrl, PROVIDER_LABEL } from "@/features/course_management/utils/videoUrl";
 
@@ -145,11 +146,13 @@ export default function LessonEditor({
   const [quizzes, setQuizzes] = useState([]);
   const [loadingQuizzes, setLoadingQuizzes] = useState(false);
   const [showCreateQuiz, setShowCreateQuiz] = useState(false);
+  const [pendingType, setPendingType] = useState(null);
   const [selectedQuizId, setSelectedQuizId] = useState(null);
   const [certificateTemplates, setCertificateTemplates] = useState([]);
   const [loadingCertificates, setLoadingCertificates] = useState(false);
   const [selectedCertificateId, setSelectedCertificateId] = useState(null);
   const [documentFile, setDocumentFile] = useState(null);
+  const [linkTitle, setLinkTitle] = useState("");
   const [chapters, setChapters] = useState([]);
   const [thumbnailUrl, setThumbnailUrl] = useState(null);
   const [lastSavedAt, setLastSavedAt] = useState(null);
@@ -186,6 +189,7 @@ export default function LessonEditor({
     setSelectedQuizId(lesson.quizId || null);
     setSelectedCertificateId(lesson.certificateTemplateId || null);
     setDocumentFile(lesson.documentFile || null);
+    setLinkTitle(lesson.linkTitle || "");
     setChapters(Array.isArray(lesson.chapters) ? lesson.chapters : []);
     setThumbnailUrl(lesson.thumbnail_url || lesson.thumbnailUrl || null);
     setHasChanges(false);
@@ -275,10 +279,40 @@ export default function LessonEditor({
     onSave?.({ ...lesson, ...patch });
   }, [lesson, onSave]);
 
+  const hasContent = () => {
+    const text = (description || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, "").trim();
+    if (text) return true;
+    if (url && type !== "reading") return true;
+    if (type === "quiz" && selectedQuizId) return true;
+    if (type === "certificate" && selectedCertificateId) return true;
+    if (type === "document" && documentFile) return true;
+    if (type === "video" && (chapters.length || thumbnailUrl)) return true;
+    return false;
+  };
+
+  const applyTypeChange = (newType) => {
+    setPendingType(null);
+    setType(newType);
+    setDescription("");
+    setUrl("");
+    setRequiresQuizPass(false);
+    setPassingScore("");
+    setSelectedQuizId(null);
+    setSelectedCertificateId(null);
+    setDocumentFile(null);
+    setLinkTitle("");
+    setChapters([]);
+    setThumbnailUrl(null);
+    emitPatch({ type: newType });
+  };
+
   const handleTypeChange = (newType) => {
     if (newType === type) return;
-    setType(newType);
-    emitPatch({ type: newType });
+    if (hasContent()) {
+      setPendingType(newType);
+      return;
+    }
+    applyTypeChange(newType);
   };
 
   const handleQuizChange = (quizId) => {
@@ -548,6 +582,7 @@ export default function LessonEditor({
                               </label>
                               <div className="rounded-md border border-neutral-200 overflow-hidden">
                                 <RichTextEditor
+                                  key={lesson?.id}
                                   value={description}
                                   onChange={(html) => {
                                     setDescription(html);
@@ -684,56 +719,101 @@ export default function LessonEditor({
                             <label className="block text-sm font-medium text-neutral-700 mb-2">
                               Description
                             </label>
+                               <div className="rounded-md border border-neutral-200 overflow-hidden">
+                                 <RichTextEditor
+                                   key={lesson?.id}
+                                   value={description}
+                                   onChange={(html) => {
+                                     setDescription(html);
+                                     emitPatch({ description: html });
+                                   }}
+                                   onImageUpload={handleImageUpload}
+                                   placeholder="Optional description..."
+                                 />
+                               </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-5">
+                          <div>
+                            <label htmlFor="lesson-url" className="block text-sm font-medium text-neutral-700 mb-2">
+                              Link URL
+                            </label>
+                            <div className="flex items-stretch gap-2">
+                              <div className="relative flex-1">
+                                <Link2 size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
+                                <input
+                                  id="lesson-url"
+                                  value={url}
+                                  onChange={(e) => {
+                                    setUrl(e.target.value);
+                                    emitPatch({ url: e.target.value, content: e.target.value });
+                                  }}
+                                  placeholder="https://example.com"
+                                  aria-invalid={!!url.trim() && !isValidUrl(url)}
+                                  className={`w-full rounded-md border bg-white pl-9 pr-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-1 transition-colors ${
+                                    url.trim() && !isValidUrl(url)
+                                      ? "border-red-300 focus:border-red-600 focus:ring-red-600"
+                                      : "border-neutral-200 focus:border-blue-600 focus:ring-blue-600"
+                                  }`}
+                                />
+                              </div>
+                              <a
+                                href={isValidUrl(url) ? url : undefined}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                aria-disabled={!isValidUrl(url)}
+                                title="Open link in a new tab"
+                                className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                                  isValidUrl(url)
+                                    ? "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100"
+                                    : "cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-300"
+                                }`}
+                              >
+                                <ExternalLink size={14} /> Open
+                              </a>
+                            </div>
+                            {url.trim() && !isValidUrl(url) && (
+                              <p className="mt-1.5 text-xs text-red-600">Enter a full URL starting with http:// or https://</p>
+                            )}
+                          </div>
+
+                          <div>
+                            <label htmlFor="link-title" className="block text-sm font-medium text-neutral-700 mb-2">
+                              Link title <span className="font-normal text-neutral-400">(optional)</span>
+                            </label>
+                            <input
+                              id="link-title"
+                              value={linkTitle}
+                              onChange={(e) => {
+                                setLinkTitle(e.target.value);
+                                emitPatch({ linkTitle: e.target.value });
+                              }}
+                              placeholder="e.g. Company Handbook"
+                              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
+                            />
+                            <p className="mt-1.5 text-xs text-neutral-500">Shown in the course outline when set; otherwise the link host is used.</p>
+                          </div>
+
+                          <LinkPreview url={url} title={linkTitle} />
+
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                              Description
+                            </label>
                             <div className="rounded-md border border-neutral-200 overflow-hidden">
                               <RichTextEditor
+                                key={lesson?.id}
                                 value={description}
                                 onChange={(html) => {
                                   setDescription(html);
                                   emitPatch({ description: html });
                                 }}
                                 onImageUpload={handleImageUpload}
-                                placeholder="Optional description..."
+                                placeholder="Optional context for learners..."
                               />
                             </div>
                           </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <label htmlFor="lesson-url" className="block text-sm font-medium text-neutral-700 mb-2">
-                            {type === "link" ? "Link" : "Video URL"}
-                          </label>
-                          <input
-                            id="lesson-url"
-                            value={url}
-                            onChange={(e) => {
-                              setUrl(e.target.value);
-                              emitPatch({ url: e.target.value, content: e.target.value });
-                            }}
-                            placeholder={
-                              type === "link"
-                                ? "https://example.com"
-                                : "https://youtube.com/watch?v=..."
-                            }
-                            className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
-                          />
-                          {type === "video" && (
-                            <div className="mt-5">
-                              <label className="block text-sm font-medium text-neutral-700 mb-2">
-                                Description
-                              </label>
-                              <div className="rounded-md border border-neutral-200 overflow-hidden">
-                                <RichTextEditor
-                                  value={description}
-                                  onChange={(html) => {
-                                    setDescription(html);
-                                    emitPatch({ description: html });
-                                  }}
-                                  onImageUpload={handleImageUpload}
-                                  placeholder="Optional description..."
-                                />
-                              </div>
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
@@ -809,17 +889,18 @@ export default function LessonEditor({
                         <label className="block text-sm font-medium text-neutral-700 mb-2">
                           Instructions
                         </label>
-                        <div className="rounded-md border border-neutral-200 overflow-hidden">
-                          <RichTextEditor
-                            value={description}
-                            onChange={(html) => {
-                              setDescription(html);
-                              emitPatch({ description: html });
-                            }}
-                            onImageUpload={handleImageUpload}
-                            placeholder="Instructions or context..."
-                          />
-                        </div>
+                         <div className="rounded-md border border-neutral-200 overflow-hidden">
+                           <RichTextEditor
+                             key={lesson?.id}
+                             value={description}
+                             onChange={(html) => {
+                               setDescription(html);
+                               emitPatch({ description: html });
+                             }}
+                             onImageUpload={handleImageUpload}
+                             placeholder="Instructions or context..."
+                           />
+                         </div>
                       </div>
 
                       <div className="border border-neutral-200 rounded-lg p-4">
@@ -1009,6 +1090,52 @@ export default function LessonEditor({
           emitPatch({ quizId });
         }}
       />
+
+      {pendingType && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="type-change-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setPendingType(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-5 shadow-xl dark:border-neutral-700 dark:bg-neutral-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                <AlertCircle size={18} />
+              </span>
+              <div className="min-w-0">
+                <h3 id="type-change-title" className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                  Switch lesson type?
+                </h3>
+                <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
+                  This lesson already has content for the <span className="font-medium">{TYPE_CONFIG[type]?.label || type}</span> type.
+                  Changing to <span className="font-medium">{TYPE_CONFIG[pendingType]?.label || pendingType}</span> will clear the current content and cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingType(null)}
+                className="rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:bg-neutral-800 transition-colors"
+              >
+                Keep current
+              </button>
+              <button
+                type="button"
+                onClick={() => applyTypeChange(pendingType)}
+                className="rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 transition-colors"
+              >
+                Switch & clear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

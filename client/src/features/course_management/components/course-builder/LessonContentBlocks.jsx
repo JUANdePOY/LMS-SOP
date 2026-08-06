@@ -1,4 +1,4 @@
-import { useState, useCallback, useId, useRef } from "react";
+import { useState, useCallback, useId, useRef, useEffect } from "react";
 import {
   ArrowUp,
   ArrowDown,
@@ -118,6 +118,13 @@ export default function LessonContentBlocks({ value, onChange, onImageUpload }) 
     },
     [onChange]
   );
+
+  useEffect(() => {
+    const clean = (html) => html.replace(/<p>\s*<\/p>/g, '').trim();
+    if (clean(serializeBlocks(blocks)) !== clean(value || '')) {
+      setBlocks(parseBlocks(value));
+    }
+  }, [value]);
 
   const addBlock = (kind, atIndex) => {
     const block = { id: newBlockId(), kind, html: "", src: "", caption: "", variant: "info" };

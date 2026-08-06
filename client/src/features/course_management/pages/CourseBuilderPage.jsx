@@ -349,6 +349,7 @@ export default function CourseBuilderPage() {
         type: l.type || "reading",
         description: l.description || l.content || "",
         url: l.url || l.content || "",
+        linkTitle: l.linkTitle || null,
         order: lIdx + 1,
         duration: l.duration || null,
         is_required: l.is_required ?? true,
@@ -848,6 +849,7 @@ export default function CourseBuilderPage() {
         <main className="flex-1 min-w-0">
           {selectedLesson ? (
             <LessonEditor
+              key={selectedLessonId}
               lesson={selectedLesson}
               courseId={courseId}
               courseTitle={course?.title}

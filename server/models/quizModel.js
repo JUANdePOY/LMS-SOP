@@ -6,19 +6,22 @@ async function listQuizzes(courseId, filters = {}) {
   const limitNum = Number(limit) || 20;
   const offset = (pageNum - 1) * limitNum;
 
-  let sql = 'SELECT * FROM quizzes WHERE course_id = ? AND is_deleted = FALSE';
+  let sql = `SELECT q.*, COUNT(DISTINCT qq.id) AS question_count
+    FROM quizzes q
+    LEFT JOIN quiz_questions qq ON qq.quiz_id = q.id
+    WHERE q.course_id = ? AND q.is_deleted = FALSE`;
   const params = [courseId];
 
   if (module_id) {
-    sql += ' AND module_id = ?';
+    sql += ' AND q.module_id = ?';
     params.push(module_id);
   }
   if (status) {
-    sql += ' AND status = ?';
+    sql += ' AND q.status = ?';
     params.push(status);
   }
 
-  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  sql += ' GROUP BY q.id ORDER BY q.created_at DESC LIMIT ? OFFSET ?';
   params.push(limitNum, offset);
 
   const [rows] = await db.query(sql, params);
