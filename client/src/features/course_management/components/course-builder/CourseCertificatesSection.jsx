@@ -4,6 +4,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
 import { Label } from "@/shared/components/ui/label";
 import { X, Plus, Award } from "lucide-react";
+import { getCertificateTemplates } from "@/features/certificate-management/services/certificateService";
 
 export default function CourseCertificatesSection({
   courseId,
@@ -19,15 +20,23 @@ export default function CourseCertificatesSection({
 
   useEffect(() => {
     if (!courseId) return;
+    let cancelled = false;
     setLoadingTemplates(true);
-    fetch("/api/certificate-templates?status=active&limit=50")
-      .then((res) => res.json())
-      .then((json) => {
-        const rows = json?.data?.rows || json?.data || [];
+    getCertificateTemplates({ status: "active", limit: 50 })
+      .then((res) => {
+        if (cancelled) return;
+        const rows = res?.data?.rows || res?.data || [];
         setTemplates(Array.isArray(rows) ? rows : []);
       })
-      .catch(() => setTemplates([]))
-      .finally(() => setLoadingTemplates(false));
+      .catch(() => {
+        if (!cancelled) setTemplates([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTemplates(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [courseId]);
 
   const handleLink = () => {

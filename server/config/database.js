@@ -20,8 +20,28 @@ const dbConfig = {
   keepAliveInitialDelay: 10000
 };
 
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 5;
 const RETRY_DELAY = 800;
+
+// Errors that should be retried because the underlying condition is expected
+// to clear on its own. The hosting MySQL user has a max_connections_per_hour
+// quota; once it is exceeded new physical connections are rejected until the
+// hourly counter resets. Retrying with backoff lets in-flight requests recover
+// automatically instead of surfacing a hard 500 to the user.
+function isTransientError(err) {
+  const msg = (err && err.message) ? err.message : String(err);
+  const code = err && err.code;
+  return (
+    msg.includes('ECONNRESET') ||
+    msg.includes('PROTOCOL_CONNECTION_LOST') ||
+    msg.includes('ENOTFOUND') ||
+    msg.includes('ETIMEDOUT') ||
+    msg.includes('ECONNREFUSED') ||
+    msg.includes('max_connections_per_hour') ||
+    code === 'ER_USER_LIMIT_REACHED' ||
+    code === 'ER_CON_COUNT_ERROR'
+  );
+}
 
 async function withRetry(fn, label = 'query') {
   let lastErr;
@@ -30,13 +50,16 @@ async function withRetry(fn, label = 'query') {
       return await fn();
     } catch (err) {
       lastErr = err;
-      const msg = (err && err.message) ? err.message : String(err);
-      const transient = msg.includes('ECONNRESET') || msg.includes('PROTOCOL_CONNECTION_LOST') || msg.includes('ENOTFOUND') || msg.includes('ETIMEDOUT') || msg.includes('ECONNREFUSED');
+      const transient = isTransientError(err);
       if (!transient || attempt === MAX_RETRIES) {
         throw err;
       }
-      console.warn(`MySQL ${label} transient error (attempt ${attempt}/${MAX_RETRIES}): ${msg}`);
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY * attempt));
+      // Use a longer backoff for quota/connection-limit errors so we don't
+      // burn through attempts before the hourly counter has a chance to reset.
+      const isQuota = (err && err.code) === 'ER_USER_LIMIT_REACHED' || (err && err.message || '').includes('max_connections_per_hour');
+      const delay = (isQuota ? 5000 : RETRY_DELAY) * attempt;
+      console.warn(`MySQL ${label} transient error (attempt ${attempt}/${MAX_RETRIES}): ${(err && err.message) || err}`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
   throw lastErr;
@@ -265,6 +288,7 @@ const MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS idx_departments_business ON departments(business_id)`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS business_id INT DEFAULT NULL`,
   `CREATE INDEX IF NOT EXISTS idx_users_business ON users(business_id)`,
+  `ALTER TABLE sops MODIFY department_id INT DEFAULT NULL`,
   `CREATE TABLE IF NOT EXISTS categories (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,

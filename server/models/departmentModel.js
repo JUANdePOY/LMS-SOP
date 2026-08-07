@@ -169,12 +169,12 @@ async function removeWithConnection(conn, id, force = false) {
   } else {
     // Force delete: unlink / clean up referencing records, then remove the department.
     //
-    // NOTE on sops: sops.department_id is NOT NULL and fk_sop_department has no
-    // ON DELETE rule (i.e. RESTRICT), so we can neither null it nor rely on the
-    // FK. SOPs support soft delete, so retire them instead of destroying them.
+    // SOPs support soft delete, so retire them instead of destroying them. Their
+    // department_id is detached (now nullable) so the FK to departments no longer
+    // blocks the final DELETE below.
     await conn.query(
       `UPDATE sops
-       SET deleted_at = CURRENT_TIMESTAMP, is_deleted = 1
+       SET deleted_at = CURRENT_TIMESTAMP, is_deleted = 1, department_id = NULL
        WHERE department_id = ? AND deleted_at IS NULL`,
       [id]
     );

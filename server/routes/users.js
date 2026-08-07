@@ -135,7 +135,9 @@ router.put('/:id', [
       return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
     }
 
-    if (req.user.role !== 'super_admin' && req.user.id !== userId) {
+    const isSelf = req.user.id === userId;
+    const canManageOthers = ['super_admin', 'admin', 'department_head'].includes(req.user.role);
+    if (!isSelf && !canManageOthers) {
       return res.status(403).json({ status: 'error', message: 'Can only update your own profile', code: 'FORBIDDEN' });
     }
 
@@ -188,7 +190,9 @@ router.put('/:id/password', [
     const userId = parseInt(req.params.id);
     const { current_password, new_password } = req.body;
 
-    if (req.user.role !== 'super_admin' && req.user.id !== userId) {
+    const isSelfPw = req.user.id === userId;
+    const canManageOthersPw = ['super_admin', 'admin'].includes(req.user.role);
+    if (!isSelfPw && !canManageOthersPw) {
       return res.status(403).json({ status: 'error', message: 'Can only change your own password', code: 'FORBIDDEN' });
     }
 
