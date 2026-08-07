@@ -7,6 +7,7 @@ import { SOP_STATUSES, VIEW_MODES } from '@/features/sop-management/constants/so
 import SOPCreateForm from '@/features/sop-management/components/SOPCreateForm';
 import SOPEditForm from '@/features/sop-management/components/SOPEditForm';
 import TrashPanel from '@/features/sop-management/components/TrashPanel';
+import { StaggerList, MotionItem } from '@/shared/motion';
 
 function StatusBadge({ status }) {
   const styles = {
@@ -168,11 +169,13 @@ function SOPListPage() {
     }
 
     return (
-      <div className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2'}>
+      <StaggerList className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2'}>
         {sops.map((sop) => (
-          <SOPCard key={sop.id} sop={sop} viewMode={viewMode} onEditStart={handleEditStart} onDeleteSop={handleDeleteSop} onArchiveSop={handleArchiveSop} />
+          <MotionItem key={sop.id}>
+            <SOPCard sop={sop} viewMode={viewMode} onEditStart={handleEditStart} onDeleteSop={handleDeleteSop} onArchiveSop={handleArchiveSop} />
+          </MotionItem>
         ))}
-      </div>
+      </StaggerList>
     );
   };
 

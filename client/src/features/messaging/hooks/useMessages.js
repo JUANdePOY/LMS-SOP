@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getConversations, getMessages, createConversation, sendMessage, markAsRead } from "../api/message.api";
+import { getConversations, getMessages, createConversation, sendMessage, markAsRead, deleteConversation } from "../api/message.api";
 
 export function useConversations() {
   const [conversations, setConversations] = useState([]);
@@ -47,7 +47,12 @@ export function useConversations() {
     )));
   };
 
-  return { conversations, loading, error, refresh: load, create, markRead };
+  const remove = async (id) => {
+    await deleteConversation(id);
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  return { conversations, loading, error, refresh: load, create, markRead, remove };
 }
 
 export function useMessages(conversationId) {
@@ -56,10 +61,11 @@ export function useMessages(conversationId) {
   const [error, setError] = useState(null);
   const intervalRef = useRef(null);
   const cancelRef = useRef(false);
+  const isFirstLoad = useRef(true);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (showSpinner = false) => {
     if (!conversationId) return;
-    setLoading(true);
+    if (showSpinner) setLoading(true);
     setError(null);
     cancelRef.current = false;
     try {
@@ -69,15 +75,17 @@ export function useMessages(conversationId) {
         setMessages(data);
       }
     } catch (err) {
-      if (!cancelRef.current) setError(err.message || "Failed to load messages");
+      if (!cancelRef.current && showSpinner) setError(err.message || "Failed to load messages");
     } finally {
-      if (!cancelRef.current) setLoading(false);
+      if (!cancelRef.current && showSpinner) setLoading(false);
+      isFirstLoad.current = false;
     }
   }, [conversationId]);
 
   useEffect(() => {
-    load();
-    intervalRef.current = setInterval(load, 5000);
+    isFirstLoad.current = true;
+    load(true);
+    intervalRef.current = setInterval(() => load(false), 8000);
     return () => {
       clearInterval(intervalRef.current);
       cancelRef.current = true;

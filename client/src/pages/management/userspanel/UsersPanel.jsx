@@ -11,6 +11,7 @@ import { Search, Plus, Edit2, Trash2, Shield, Users, Briefcase, Loader2, Upload,
 import { useToast } from '@/shared/components/ui/Toast';
 import BulkUploadModal from './BulkUploadModal';
 import { cn } from '@/lib/utils';
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 const ROLE_META = {
   super_admin: { label: 'Super Admin', dot: 'bg-rose-500 dark:bg-rose-400', chip: 'bg-rose-100 text-rose-800 dark:bg-rose-500/25 dark:text-rose-100 border-rose-200 dark:border-rose-500/40', icon: Shield },
@@ -366,56 +367,64 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       </div>
 
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="group relative overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-500/40 transition-all duration-200">
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-50/60 to-transparent dark:from-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-            <div className="relative flex items-center gap-2 sm:gap-3">
-              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center ring-1 ring-blue-200/60 dark:ring-blue-500/30">
-                <Users size={18} className="text-blue-600 dark:text-blue-300" />
+        <StaggerList className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <MotionItem>
+            <Card className="group relative overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-blue-200 dark:hover:border-blue-500/40 transition-all duration-200">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/60 to-transparent dark:from-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              <div className="relative flex items-center gap-2 sm:gap-3">
+                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center ring-1 ring-blue-200/60 dark:ring-blue-500/30">
+                  <Users size={18} className="text-blue-600 dark:text-blue-300" />
+                </div>
+                <div>
+                  <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{stats.total}</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-300">Total Users</p>
+                </div>
               </div>
-              <div>
-                <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{stats.total}</p>
-                <p className="text-[10px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-300">Total Users</p>
+            </Card>
+          </MotionItem>
+          <MotionItem>
+            <Card className="group relative overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-500/40 transition-all duration-200">
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/60 to-transparent dark:from-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              <div className="relative flex items-center gap-2 sm:gap-3">
+                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center ring-1 ring-emerald-200/60 dark:ring-emerald-500/30">
+                  <Users size={18} className="text-emerald-600 dark:text-emerald-300" />
+                </div>
+                <div>
+                  <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{stats.active}</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-300">Active Users</p>
+                </div>
               </div>
-            </div>
-          </Card>
-          <Card className="group relative overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-emerald-200 dark:hover:border-emerald-500/40 transition-all duration-200">
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/60 to-transparent dark:from-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-            <div className="relative flex items-center gap-2 sm:gap-3">
-              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center ring-1 ring-emerald-200/60 dark:ring-emerald-500/30">
-                <Users size={18} className="text-emerald-600 dark:text-emerald-300" />
+            </Card>
+          </MotionItem>
+          <MotionItem>
+            <Card className="group relative overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-purple-200 dark:hover:border-purple-500/40 transition-all duration-200">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-50/60 to-transparent dark:from-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              <div className="relative flex items-center gap-2 sm:gap-3">
+                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center ring-1 ring-purple-200/60 dark:ring-purple-500/30">
+                  <Shield size={18} className="text-purple-600 dark:text-purple-300" />
+                </div>
+                <div>
+                  <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{stats.admins}</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-300">Admins</p>
+                </div>
               </div>
-              <div>
-                <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{stats.active}</p>
-                <p className="text-[10px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-300">Active Users</p>
+            </Card>
+          </MotionItem>
+          <MotionItem>
+            <Card className="group relative overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-amber-200 dark:hover:border-amber-500/40 transition-all duration-200">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-50/60 to-transparent dark:from-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              <div className="relative flex items-center gap-2 sm:gap-3">
+                <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center ring-1 ring-amber-200/60 dark:ring-amber-500/30">
+                  <Briefcase size={18} className="text-amber-600 dark:text-amber-300" />
+                </div>
+                <div>
+                  <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{stats.employees}</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-300">Employees</p>
+                </div>
               </div>
-            </div>
-          </Card>
-          <Card className="group relative overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-purple-200 dark:hover:border-purple-500/40 transition-all duration-200">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-50/60 to-transparent dark:from-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-            <div className="relative flex items-center gap-2 sm:gap-3">
-              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center ring-1 ring-purple-200/60 dark:ring-purple-500/30">
-                <Shield size={18} className="text-purple-600 dark:text-purple-300" />
-              </div>
-              <div>
-                <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{stats.admins}</p>
-                <p className="text-[10px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-300">Admins</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="group relative overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-3 sm:p-4 shadow-sm hover:shadow-md hover:border-amber-200 dark:hover:border-amber-500/40 transition-all duration-200">
-            <div className="absolute inset-0 bg-gradient-to-br from-amber-50/60 to-transparent dark:from-amber-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-            <div className="relative flex items-center gap-2 sm:gap-3">
-              <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center ring-1 ring-amber-200/60 dark:ring-amber-500/30">
-                <Briefcase size={18} className="text-amber-600 dark:text-amber-300" />
-              </div>
-              <div>
-                <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{stats.employees}</p>
-                <p className="text-[10px] sm:text-xs font-medium text-neutral-600 dark:text-neutral-300">Employees</p>
-              </div>
-            </div>
-          </Card>
-        </div>
+            </Card>
+          </MotionItem>
+        </StaggerList>
       )}
 
       <div className="flex flex-col lg:flex-row gap-3">

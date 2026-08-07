@@ -9,6 +9,8 @@ import {
 import EmployeeCourseCard from "../components/EmployeeCourseCard";
 import { useEmployeeDashboard } from "../hooks/useEmployeeDashboard";
 import { useConversations } from "@/features/messaging/hooks/useMessages";
+import { usePageUpdates } from "@/shared/hooks/usePageUpdates";
+import UpdateNotificationBanner from "@/shared/components/ui/UpdateNotificationBanner";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -32,6 +34,25 @@ export default function EmployeeDashboard() {
 
   const { enrollments, loading, error, refetch } = useEmployeeDashboard();
   const { conversations } = useConversations();
+
+  const { hasUpdate, loading: refreshingUpdates, refresh: refreshUpdates, dismiss: dismissUpdates } = usePageUpdates({
+    intervalMs: 30000,
+    checkFn: async () => {
+      const { getEmployeeEnrollmentsWithCourses } = await import("../api/employee.api");
+      const res = await getEmployeeEnrollmentsWithCourses();
+      const rows = res?.data || [];
+      return rows.map((e) => ({
+        id: e.id,
+        progress: e.progress_percentage,
+        status: e.status,
+        updated_at: e.course?.updated_at,
+      }));
+    },
+  });
+
+  const handleRefreshUpdates = useCallback(() => {
+    refreshUpdates(refetch).catch(() => {});
+  }, [refreshUpdates, refetch]);
 
   const myCourses = enrollments.filter((e) => e.course).map((e) => ({ enrollment: e, course: e.course }));
 
@@ -93,6 +114,14 @@ export default function EmployeeDashboard() {
 
   return (
     <div className="w-full max-w-none mx-auto max-w-6xl space-y-6">
+      <UpdateNotificationBanner
+        open={hasUpdate}
+        message="New changes are available on your dashboard. Refresh to see the latest updates."
+        loading={refreshingUpdates}
+        onRefresh={handleRefreshUpdates}
+        onDismiss={dismissUpdates}
+      />
+
       <div className="relative overflow-hidden rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-neutral-900 dark:via-blue-900/20 dark:to-indigo-950 shadow-sm">
         <div className="absolute -top-4 -right-4 h-48 w-48 rounded-full bg-gradient-to-br from-blue-300/20 to-purple-300/20 dark:from-blue-500/5 dark:to-purple-500/5 blur-3xl" />
         <div className="absolute -bottom-4 -left-4 h-40 w-40 rounded-full bg-gradient-to-br from-indigo-300/20 to-sky-300/20 dark:from-indigo-500/5 dark:to-sky-500/5 blur-3xl" />
@@ -167,7 +196,7 @@ export default function EmployeeDashboard() {
 
       {conversations.length > 0 && (
         <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-5 sm:p-6 shadow-sm space-y-4">
-          <SectionHeader icon={MessageSquare} title="Recent Messages" onViewAll={() => navigate("/messaging")} />
+          <SectionHeader icon={MessageSquare} title="Recent Message" onViewAll={() => navigate("/messaging")} />
           <div className="space-y-2">
             {conversations.slice(0, 3).map((conv) => (
               <div key={conv.id} onClick={() => navigate("/messaging")} className="group cursor-pointer rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm hover:shadow-md transition-all">

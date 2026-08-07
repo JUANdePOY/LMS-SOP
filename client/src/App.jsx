@@ -5,6 +5,7 @@ import { lazy, Suspense } from "react";
 import { ToastProvider } from "@/shared/components/Toast";
 import ErrorBoundary from "@/shared/components/ErrorBoundary";
 import ProtectedRoute from "@/shared/components/ProtectedRoute";
+import { MotionProvider } from "@/shared/motion";
 import { SOPProvider } from "@/features/sop-management/context/SOPContext";
 import { CourseProvider } from "@/features/course_management/context/CourseContext";
 import { CourseModalProvider } from "@/features/course_management/context/CourseModalContext";
@@ -245,7 +246,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <ToastProvider>
-        <AppRoot />
+        <MotionProvider>
+          <AppRoot />
+        </MotionProvider>
       </ToastProvider>
     </ErrorBoundary>
   );

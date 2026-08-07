@@ -75,16 +75,34 @@ const messageModel = {
     }
   },
 
+  async getParticipants(conversationId) {
+    const [rows] = await db.query(`
+      SELECT cp.user_id as id, u.full_name, u.email, u.role
+      FROM conversation_participants cp
+      LEFT JOIN users u ON u.id = cp.user_id
+      WHERE cp.conversation_id = ?
+      ORDER BY cp.joined_at ASC
+    `, [conversationId]);
+    return rows;
+  },
+
   async getConversation(id) {
     const [rows] = await db.query(`
       SELECT c.*, 
         (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id) as message_count,
         (SELECT MAX(sent_at) FROM messages WHERE conversation_id = c.id) as last_message_at,
         (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND read_at IS NULL AND sender_id != c.created_by) as unread_count,
-        (SELECT m.body FROM messages m WHERE m.conversation_id = c.id ORDER BY m.sent_at DESC LIMIT 1) as last_message_body
+        (SELECT m.body FROM messages m WHERE m.conversation_id = c.id ORDER BY m.sent_at DESC LIMIT 1) as last_message_body,
+        (SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = c.id) as participant_count
       FROM conversations c WHERE c.id = ?
     `, [id]);
-    return rows[0] || null;
+    const conversation = rows[0] || null;
+    if (conversation) {
+      const participants = await this.getParticipants(id);
+      conversation.participants = participants;
+      conversation.type = conversation.participant_count > 2 ? 'group_forum' : 'direct';
+    }
+    return conversation;
   },
 
   async listConversations(userId) {
@@ -93,13 +111,24 @@ const messageModel = {
         (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id) as message_count,
         (SELECT MAX(sent_at) FROM messages WHERE conversation_id = c.id) as last_message_at,
         (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND read_at IS NULL AND sender_id != ?) as unread_count,
-        (SELECT m.body FROM messages m WHERE m.conversation_id = c.id ORDER BY m.sent_at DESC LIMIT 1) as last_message_body
+        (SELECT m.body FROM messages m WHERE m.conversation_id = c.id ORDER BY m.sent_at DESC LIMIT 1) as last_message_body,
+        (SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = c.id) as participant_count
       FROM conversations c
       INNER JOIN conversation_participants cp ON cp.conversation_id = c.id
       WHERE cp.user_id = ?
       ORDER BY c.updated_at DESC
     `, [userId, userId]);
-    return rows;
+
+    const conversations = [];
+    for (const row of rows) {
+      const participants = await this.getParticipants(row.id);
+      conversations.push({
+        ...row,
+        participants,
+        type: row.participant_count > 2 ? 'group_forum' : 'direct',
+      });
+    }
+    return conversations;
   },
 
   async addMessage({ conversationId, senderId, body }) {
@@ -144,6 +173,14 @@ const messageModel = {
   async deleteConversation(id) {
     await db.query('DELETE FROM conversations WHERE id = ?', [id]);
     return { id };
+  },
+
+  async isParticipant(conversationId, userId) {
+    const [rows] = await db.query(
+      'SELECT 1 FROM conversation_participants WHERE conversation_id = ? AND user_id = ? LIMIT 1',
+      [conversationId, userId]
+    );
+    return rows.length > 0;
   },
 };
 

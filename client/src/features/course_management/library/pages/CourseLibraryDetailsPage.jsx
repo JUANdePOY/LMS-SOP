@@ -15,6 +15,7 @@ import OverviewSection from "../components/OverviewSection";
 import BookOpeningTransition from "../components/BookOpeningTransition";
 import CourseContentSection from "../components/CourseContentSection";
 import { ProgressBar } from "../utils/courseVisuals";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 const ENROLLMENT_STATUS_META = {
   active: {
@@ -384,42 +385,56 @@ export default function CourseLibraryDetailsPage() {
 
             {activeTab === "analytics" && (
               <OverviewSection title="Analytics Overview" icon={BarChart3}>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 bg-neutral-50/60 dark:bg-neutral-800/40 p-3">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Completion Rate</p>
-                    <p className="mt-1 text-xl font-bold text-neutral-900 dark:text-neutral-100">{Math.round(enhancedAnalytics.completionRate)}%</p>
-                    <div className="mt-2">
-                      <ProgressBar value={enhancedAnalytics.completionRate} />
+                <StaggerList className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <MotionItem>
+                    <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 bg-neutral-50/60 dark:bg-neutral-800/40 p-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Completion Rate</p>
+                      <p className="mt-1 text-xl font-bold text-neutral-900 dark:text-neutral-100">{Math.round(enhancedAnalytics.completionRate)}%</p>
+                      <div className="mt-2">
+                        <ProgressBar value={enhancedAnalytics.completionRate} />
+                      </div>
                     </div>
-                  </div>
-                  <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 bg-neutral-50/60 dark:bg-neutral-800/40 p-3">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Active Learners</p>
-                    <p className="mt-1 text-xl font-bold text-neutral-900 dark:text-neutral-100">{analytics?.active_learners || enhancedAnalytics.inProgress}</p>
-                  </div>
-                  <div className="col-span-2 rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 bg-neutral-50/60 dark:bg-neutral-800/40 p-3 sm:col-span-1">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Avg. Progress</p>
-                    <p className="mt-1 text-xl font-bold text-neutral-900 dark:text-neutral-100">{Math.round(enhancedAnalytics.avgProgress)}%</p>
-                  </div>
-                </div>
+                  </MotionItem>
+                  <MotionItem>
+                    <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 bg-neutral-50/60 dark:bg-neutral-800/40 p-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Active Learners</p>
+                      <p className="mt-1 text-xl font-bold text-neutral-900 dark:text-neutral-100">{analytics?.active_learners || enhancedAnalytics.inProgress}</p>
+                    </div>
+                  </MotionItem>
+                  <MotionItem>
+                    <div className="col-span-2 rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 bg-neutral-50/60 dark:bg-neutral-800/40 p-3 sm:col-span-1">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Avg. Progress</p>
+                      <p className="mt-1 text-xl font-bold text-neutral-900 dark:text-neutral-100">{Math.round(enhancedAnalytics.avgProgress)}%</p>
+                    </div>
+                  </MotionItem>
+                </StaggerList>
 
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 p-3">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Enrolled</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{enhancedAnalytics.totalEnrollments}</p>
-                  </div>
-                  <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 p-3">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Completed</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{enhancedAnalytics.completed}</p>
-                  </div>
-                  <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 p-3">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Lessons</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{enhancedAnalytics.lessonCount}</p>
-                  </div>
-                  <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 p-3">
-                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Avg. Time</p>
-                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{analytics?.avg_completion_time ? `${analytics.avg_completion_time}d` : "—"}</p>
-                  </div>
-                </div>
+                <StaggerList className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <MotionItem>
+                    <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 p-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Enrolled</p>
+                      <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{enhancedAnalytics.totalEnrollments}</p>
+                    </div>
+                  </MotionItem>
+                  <MotionItem>
+                    <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 p-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Completed</p>
+                      <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{enhancedAnalytics.completed}</p>
+                    </div>
+                  </MotionItem>
+                  <MotionItem>
+                    <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 p-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Lessons</p>
+                      <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{enhancedAnalytics.lessonCount}</p>
+                    </div>
+                  </MotionItem>
+                  <MotionItem>
+                    <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 p-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Avg. Time</p>
+                      <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{analytics?.avg_completion_time ? `${analytics.avg_completion_time}d` : "—"}</p>
+                    </div>
+                  </MotionItem>
+                </StaggerList>
 
                 <div className="mt-4 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-600 p-3">
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Your Session Engagement</p>
@@ -468,14 +483,16 @@ export default function CourseLibraryDetailsPage() {
 
             {learningOutcomes.length > 0 && (
               <OverviewSection title="What you'll learn" icon={GraduationCap}>
-                <ul className="space-y-2.5">
+                <StaggerList className="space-y-2.5">
                   {learningOutcomes.map((outcome, i) => (
-                    <li key={i} className="flex items-start gap-2.5 text-sm text-neutral-600 dark:text-neutral-300">
-                      <CheckCircle size={16} className="mt-0.5 text-blue-600 dark:text-blue-400 shrink-0" />
-                      <span>{outcome}</span>
-                    </li>
+                    <MotionItem key={i}>
+                      <li className="flex items-start gap-2.5 text-sm text-neutral-600 dark:text-neutral-300">
+                        <CheckCircle size={16} className="mt-0.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                        <span>{outcome}</span>
+                      </li>
+                    </MotionItem>
                   ))}
-                </ul>
+                </StaggerList>
               </OverviewSection>
             )}
 
@@ -493,14 +510,16 @@ export default function CourseLibraryDetailsPage() {
             )}
 
             <OverviewSection title="Course Info">
-              <div className="space-y-2.5 text-sm">
+              <StaggerList className="space-y-2.5 text-sm">
                 {courseInfoItems.map((item) => (
-                  <div key={item.label} className="flex items-center justify-between">
-                    <span className="text-neutral-500 dark:text-neutral-400">{item.label}</span>
-                    <span className="text-neutral-900 dark:text-neutral-100 font-medium">{item.value}</span>
-                  </div>
+                  <MotionItem key={item.label}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-neutral-500 dark:text-neutral-400">{item.label}</span>
+                      <span className="text-neutral-900 dark:text-neutral-100 font-medium">{item.value}</span>
+                    </div>
+                  </MotionItem>
                 ))}
-              </div>
+              </StaggerList>
             </OverviewSection>
 
             {course?.instructor_name && (

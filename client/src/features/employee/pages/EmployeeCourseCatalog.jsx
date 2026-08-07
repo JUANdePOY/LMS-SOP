@@ -4,6 +4,7 @@ import { Search, Filter, SortAsc, SortDesc } from "lucide-react";
 import { cn } from "@/lib/utils";
 import EmployeeCourseCard from "../components/EmployeeCourseCard";
 import { useEmployeeCourseCatalog } from "../hooks/useEmployeeDashboard";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 const DIFFICULTIES = ["beginner", "intermediate", "advanced", "all_levels"];
 const DIFFICULTY_LABELS = {
@@ -205,15 +206,16 @@ export default function EmployeeCourseCatalog() {
 
       {!loading && !error && courses.length > 0 && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {courses.map((course) => (
-              <EmployeeCourseCard
-                key={course.id}
-                course={course}
-                onClick={() => handleCourseClick(course.id)}
-              />
+              <MotionItem key={course.id}>
+                <EmployeeCourseCard
+                  course={course}
+                  onClick={() => handleCourseClick(course.id)}
+                />
+              </MotionItem>
             ))}
-          </div>
+          </StaggerList>
 
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between pt-4 border-t border-neutral-200 dark:border-neutral-700">

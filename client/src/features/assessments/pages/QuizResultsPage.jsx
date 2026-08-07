@@ -5,6 +5,7 @@ import { listAttempts, getAttemptResults } from "../api/attempt.api";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/card";
 import { formatDuration } from "../utils/formatDuration";
 import { CheckCircle, XCircle, Clock, Trophy, Target, BarChart3 } from "lucide-react";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 function statusBadge(status) {
   const map = { completed: "text-blue-700 bg-blue-100", graded: "text-purple-700 bg-purple-100", in_progress: "text-amber-700 bg-amber-100" };
@@ -103,13 +104,13 @@ export default function QuizResultsPage() {
       {error && <p className="text-sm text-red-500">{error}</p>}
 
       {attempts.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          <StatCard label="Attempts" value={stats.total} icon={BarChart3} accent="neutral" />
-          <StatCard label="Best" value={stats.best} icon={Trophy} accent="indigo" />
-          <StatCard label="Avg Score" value={stats.avg} icon={Target} accent="amber" />
-          <StatCard label="Passed" value={stats.passed} icon={CheckCircle} accent="emerald" />
-          <StatCard label="Pass Rate" value={stats.passRate} icon={Clock} accent="rose" />
-        </div>
+        <StaggerList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <MotionItem><StatCard label="Attempts" value={stats.total} icon={BarChart3} accent="neutral" /></MotionItem>
+          <MotionItem><StatCard label="Best" value={stats.best} icon={Trophy} accent="indigo" /></MotionItem>
+          <MotionItem><StatCard label="Avg Score" value={stats.avg} icon={Target} accent="amber" /></MotionItem>
+          <MotionItem><StatCard label="Passed" value={stats.passed} icon={CheckCircle} accent="emerald" /></MotionItem>
+          <MotionItem><StatCard label="Pass Rate" value={stats.passRate} icon={Clock} accent="rose" /></MotionItem>
+        </StaggerList>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -128,30 +129,31 @@ export default function QuizResultsPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-2">
+            <StaggerList className="space-y-2">
               {attempts.map((a) => (
-                <button
-                  key={a.id}
-                  onClick={() => open(a)}
-                  className={`w-full text-left rounded-lg border p-3 text-sm transition-all hover:shadow-sm ${
-                    selected?.id === a.id ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20" : "border-neutral-200 hover:border-indigo-200"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">Attempt #{a.attempt_number}</span>
-                    <span className={statusBadge(a.status)}>{a.status}</span>
-                  </div>
-                  <div className="mt-1 text-neutral-600">
-                    Score: {a.score}/{a.max_score} · {a.percentage}%
-                  </div>
-                  {a.time_taken_sec != null && (
-                    <div className="text-neutral-400 flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> {formatDuration(a.time_taken_sec)}
+                <MotionItem key={a.id}>
+                  <button
+                    onClick={() => open(a)}
+                    className={`w-full text-left rounded-lg border p-3 text-sm transition-all hover:shadow-sm ${
+                      selected?.id === a.id ? "border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20" : "border-neutral-200 hover:border-indigo-200"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Attempt #{a.attempt_number}</span>
+                      <span className={statusBadge(a.status)}>{a.status}</span>
                     </div>
-                  )}
-                </button>
+                    <div className="mt-1 text-neutral-600">
+                      Score: {a.score}/{a.max_score} · {a.percentage}%
+                    </div>
+                    {a.time_taken_sec != null && (
+                      <div className="text-neutral-400 flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> {formatDuration(a.time_taken_sec)}
+                      </div>
+                    )}
+                  </button>
+                </MotionItem>
               ))}
-            </div>
+            </StaggerList>
           )}
         </div>
 

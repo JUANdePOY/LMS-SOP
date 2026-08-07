@@ -5,6 +5,7 @@ import {
 } from "@/features/course_management/api/course.api";
 import CreateCourseModal from "@/features/course_management/components/modals/CreateCourseModal";
 import { useToast } from "@/shared/components/ui/Toast";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 const STATUS_META = {
   published: {
@@ -246,24 +247,32 @@ export default function Courses({ departments = [] }) {
       </div>
 
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-          <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-4 shadow-sm">
-            <p className="text-2xl font-bold">{stats.total}</p>
-            <p className="text-xs text-neutral-500">Total Courses</p>
-          </div>
-          <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-4 shadow-sm">
-            <p className="text-2xl font-bold">{stats.published}</p>
-            <p className="text-xs text-neutral-500">Published</p>
-          </div>
-          <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-4 shadow-sm">
-            <p className="text-2xl font-bold">{stats.draft}</p>
-            <p className="text-xs text-neutral-500">Draft</p>
-          </div>
-          <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-4 shadow-sm">
-            <p className="text-2xl font-bold">{stats.enrolled || 0}</p>
-            <p className="text-xs text-neutral-500">Enrollments</p>
-          </div>
-        </div>
+        <StaggerList className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          <MotionItem>
+            <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-4 shadow-sm">
+              <p className="text-2xl font-bold">{stats.total}</p>
+              <p className="text-xs text-neutral-500">Total Courses</p>
+            </div>
+          </MotionItem>
+          <MotionItem>
+            <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-4 shadow-sm">
+              <p className="text-2xl font-bold">{stats.published}</p>
+              <p className="text-xs text-neutral-500">Published</p>
+            </div>
+          </MotionItem>
+          <MotionItem>
+            <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-4 shadow-sm">
+              <p className="text-2xl font-bold">{stats.draft}</p>
+              <p className="text-xs text-neutral-500">Draft</p>
+            </div>
+          </MotionItem>
+          <MotionItem>
+            <div className="rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 p-4 shadow-sm">
+              <p className="text-2xl font-bold">{stats.enrolled || 0}</p>
+              <p className="text-xs text-neutral-500">Enrollments</p>
+            </div>
+          </MotionItem>
+        </StaggerList>
       )}
 
       <div className="flex flex-col gap-3">

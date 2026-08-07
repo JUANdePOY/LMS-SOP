@@ -4,6 +4,7 @@ import { useLeaderboard } from "../hooks/useLeaderboard";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/components/ui/card";
 import { Trophy, Medal, Award, Clock, TrendingUp, Users, BarChart3, Crown, Star } from "lucide-react";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 const RANK_ICONS = { 1: Crown, 2: Medal, 3: Award };
 
@@ -174,11 +175,11 @@ export default function QuizLeaderboardPage() {
       )}
 
       {board.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <StatCard label="Ranked" value={board.length} icon={Users} accent="blue" />
-          <StatCard label="Top Score" value={`${topScore}%`} icon={TrendingUp} accent="emerald" />
-          <StatCard label="Average" value={`${averageScore}%`} icon={BarChart3} accent="purple" />
-        </div>
+        <StaggerList className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <MotionItem><StatCard label="Ranked" value={board.length} icon={Users} accent="blue" /></MotionItem>
+          <MotionItem><StatCard label="Top Score" value={`${topScore}%`} icon={TrendingUp} accent="emerald" /></MotionItem>
+          <MotionItem><StatCard label="Average" value={`${averageScore}%`} icon={BarChart3} accent="purple" /></MotionItem>
+        </StaggerList>
       )}
 
       {boardLoading ? (

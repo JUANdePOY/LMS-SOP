@@ -33,6 +33,10 @@ export async function markAsRead(messageId) {
   return request(`${API_BASE}/messages/${messageId}/read`, { method: "PATCH" });
 }
 
+export async function deleteConversation(id) {
+  return request(`${API_BASE}/conversations/${id}`, { method: "DELETE" });
+}
+
 function authHeaders() {
   const token = session.getCurrentToken();
   const headers = { "Content-Type": "application/json" };

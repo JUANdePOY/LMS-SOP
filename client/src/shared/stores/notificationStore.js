@@ -1,5 +1,8 @@
-import { useSyncExternalStore, useState, useCallback } from "react";
+import { useSyncExternalStore, useState, useCallback, useEffect } from "react";
 import { getNotifications, markNotificationsRead, markAllNotificationsRead } from "@/services/api.js";
+import { getConversations } from "@/features/messaging/api/message.api";
+
+const POLL_INTERVAL_MS = 25000;
 
 const STORAGE_KEY = "lms_dismissed_banners";
 
@@ -35,6 +38,7 @@ const listeners = new Set();
 let dismissed = getDismissedFromStorage();
 let serverNotifications = [];
 let unreadServerCount = 0;
+let unreadMessageCount = 0;
 
 let cachedSnapshot = null;
 
@@ -43,7 +47,8 @@ function computeSnapshot() {
     dismissed,
     serverNotifications,
     unreadServerCount,
-    unreadTotal: unreadServerCount,
+    unreadMessageCount,
+    unreadTotal: unreadServerCount + unreadMessageCount,
     unreadBannerCount: APP_BANNER_IDS.filter((id) => !dismissed.includes(id)).length,
   };
 }
@@ -81,6 +86,8 @@ export const NotificationStore = {
   },
 
   async fetchServerNotifications() {
+    const prevNotifications = serverNotifications;
+    const prevUnread = unreadServerCount;
     try {
       const response = await getNotifications({ unread_only: false, limit: 50 });
       const data = response.data;
@@ -88,16 +95,34 @@ export const NotificationStore = {
       if (Array.isArray(notifications) && Array.isArray(notifications[0])) {
         notifications = notifications[0];
       }
-      serverNotifications = Array.isArray(notifications) ? notifications : [];
+      serverNotifications = Array.isArray(notifications) ? notifications : prevNotifications;
       unreadServerCount = data.unread_count || 0;
       emitChange();
       return serverNotifications;
     } catch {
-      serverNotifications = [];
-      unreadServerCount = 0;
+      // Preserve last-known data on transient errors so the badge doesn't vanish
+      serverNotifications = prevNotifications;
+      unreadServerCount = prevUnread;
       emitChange();
       return [];
     }
+  },
+
+  async fetchMessagesUnread() {
+    const prev = unreadMessageCount;
+    try {
+      const res = await getConversations();
+      const rows = Array.isArray(res?.data?.data) ? res.data.data : [];
+      unreadMessageCount = rows.reduce((sum, c) => sum + (Number(c.unread_count) || 0), 0);
+      emitChange();
+    } catch {
+      unreadMessageCount = prev;
+      emitChange();
+    }
+  },
+
+  async refresh() {
+    await Promise.all([this.fetchServerNotifications(), this.fetchMessagesUnread()]);
   },
 
   async markAllRead() {
@@ -132,6 +157,7 @@ export const NotificationStore = {
     setDismissedToStorage(dismissed);
     serverNotifications = [];
     unreadServerCount = 0;
+    unreadMessageCount = 0;
     emitChange();
   },
 
@@ -158,13 +184,17 @@ export const useNotifications = () => {
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
 
-  const fetch = useCallback(async () => {
-    if (fetched) return;
-    setLoading(true);
+  const load = useCallback(async (showSpinner = false) => {
+    if (showSpinner) setLoading(true);
     await NotificationStore.fetchServerNotifications();
-    setLoading(false);
+    if (showSpinner) setLoading(false);
     setFetched(true);
-  }, [fetched]);
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await NotificationStore.refresh();
+    setFetched(true);
+  }, []);
 
   const markRead = useCallback(async (id) => {
     await NotificationStore.markRead(id);
@@ -178,14 +208,37 @@ export const useNotifications = () => {
     notifications: store.serverNotifications,
     unreadCount: store.unreadTotal,
     unreadServerCount: store.unreadServerCount,
+    unreadMessageCount: store.unreadMessageCount,
     dismissed: store.dismissed,
     loading,
     fetched,
-    fetch,
+    fetch: load,
+    refresh,
     markRead,
     markAllRead: markAllReadAction,
   };
 };
+
+export function useNotificationPoller() {
+  useEffect(() => {
+    NotificationStore.refresh();
+    const interval = setInterval(() => NotificationStore.refresh(), POLL_INTERVAL_MS);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") NotificationStore.refresh();
+    };
+    const onFocus = () => NotificationStore.refresh();
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, []);
+}
 
 export function isBannerDismissed(id) {
   return dismissed.includes(id);

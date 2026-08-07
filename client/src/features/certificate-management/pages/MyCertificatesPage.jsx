@@ -10,6 +10,7 @@ import { ISSUANCE_STATUSES } from '@/features/certificate-management/constants/c
 import * as session from '@/services/session';
 import { Download, Award } from 'lucide-react';
 import CertificatePreviewCanvas from '@/features/certificate-management/components/CertificatePreviewCanvas';
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 export default function MyCertificatesPage() {
   const { userId } = useParams();
@@ -61,45 +62,46 @@ export default function MyCertificatesPage() {
           <p className="text-gray-500">No certificates found for this user.</p>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <StaggerList className="grid gap-4">
           {issuances.map((issuance) => (
-            <Card
-              key={issuance.id}
-              className="p-4 cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => handleCardClick(issuance)}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Award size={18} className="text-indigo-600" />
-                    <h3 className="font-medium">{issuance.template_name}</h3>
-                    <Badge className={ISSUANCE_STATUSES[issuance.status]?.color || ''}>
-                      {ISSUANCE_STATUSES[issuance.status]?.label || issuance.status}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Certificate #: {issuance.certificate_number}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Recipient: {(() => {
-                      const resolved = typeof issuance.resolved_sections === 'string'
-                        ? JSON.parse(issuance.resolved_sections)
-                        : issuance.resolved_sections;
-                      const overrideName = resolved?.recipient_name?.text;
-                      return overrideName || issuance.user_name || '—';
-                    })()}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Issued: {new Date(issuance.issued_at).toLocaleString()}
-                  </p>
-                  <div className="mt-2 text-xs text-indigo-600">
-                    Click to preview
+            <MotionItem key={issuance.id}>
+              <Card
+                className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+                onClick={() => handleCardClick(issuance)}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <Award size={18} className="text-indigo-600" />
+                      <h3 className="font-medium">{issuance.template_name}</h3>
+                      <Badge className={ISSUANCE_STATUSES[issuance.status]?.color || ''}>
+                        {ISSUANCE_STATUSES[issuance.status]?.label || issuance.status}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Certificate #: {issuance.certificate_number}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Recipient: {(() => {
+                        const resolved = typeof issuance.resolved_sections === 'string'
+                          ? JSON.parse(issuance.resolved_sections)
+                          : issuance.resolved_sections;
+                        const overrideName = resolved?.recipient_name?.text;
+                        return overrideName || issuance.user_name || '—';
+                      })()}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Issued: {new Date(issuance.issued_at).toLocaleString()}
+                    </p>
+                    <div className="mt-2 text-xs text-indigo-600">
+                      Click to preview
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            </MotionItem>
           ))}
-        </div>
+        </StaggerList>
       )}
 
       <Modal open={isModalOpen} onClose={handleCloseModal} title="Certificate Preview" size="xl" footer={selectedIssuance && selectedIssuance.pdf_storage_path ? (

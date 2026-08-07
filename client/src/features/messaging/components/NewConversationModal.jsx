@@ -16,7 +16,7 @@ const MODE = {
   GROUP_FORUM: "group_forum",
 };
 
-export default function NewConversationModal({ open, onClose, currentUserId, onCreateSuccess }) {
+export default function NewConversationModal({ open, onClose, currentUserId, onCreateSuccess, canCreateGroup = false }) {
   const [mode, setMode] = useState(MODE.DIRECT);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -71,9 +71,10 @@ export default function NewConversationModal({ open, onClose, currentUserId, onC
 
   useEffect(() => {
     if (open) {
+      if (!canCreateGroup) setMode(MODE.DIRECT);
       loadCourses();
     }
-  }, [open]);
+  }, [open, canCreateGroup]);
 
   const loadCourses = async () => {
     setCoursesLoading(true);
@@ -142,6 +143,7 @@ export default function NewConversationModal({ open, onClose, currentUserId, onC
   };
 
   const handleModeChange = (newMode) => {
+    if (newMode === MODE.GROUP_FORUM && !canCreateGroup) return;
     setMode(newMode);
     setSubject("");
     setBody("");
@@ -208,7 +210,10 @@ export default function NewConversationModal({ open, onClose, currentUserId, onC
           <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
             Type
           </label>
-          <div className="flex gap-1 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 p-1">
+          <div className={cn(
+            "flex gap-1 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 p-1",
+            !canCreateGroup && "hidden"
+          )}>
             <button
               type="button"
               onClick={() => handleModeChange(MODE.DIRECT)}
@@ -236,6 +241,11 @@ export default function NewConversationModal({ open, onClose, currentUserId, onC
               Group Forum
             </button>
           </div>
+          {!canCreateGroup && (
+            <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
+              Only Super Admins and Admins can create group forums.
+            </p>
+          )}
         </div>
 
         <div>

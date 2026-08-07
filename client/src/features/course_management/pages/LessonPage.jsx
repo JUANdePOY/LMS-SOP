@@ -270,20 +270,38 @@ export default function LessonPage() {
                   </div>
 
                   <div className="flex items-center justify-end border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-800/30 px-6 py-4">
-                    {currentLesson.status !== 'completed' && (
-                      <button
-                        onClick={() => {
-                        try {
-                          sessionStorage.setItem('quizReturnContext', JSON.stringify({ courseId, lessonId, nextLessonId: nextLesson?.id }));
-                        } catch { /* ignore */ }
-                        navigate(`/assessments/quiz/${moduleQuiz.id}/take`, { state: { courseId, lessonId, nextLessonId: nextLesson?.id } });
-                      }}
-                        className="group inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition-all hover:bg-blue-700 hover:shadow-md active:bg-blue-800"
-                      >
-                        <PlayCircle size={17} className="transition-transform group-hover:scale-110" />
-                        Start Quiz
-                      </button>
-                    )}
+                    {(() => {
+                      const canRetake = isFinalQuiz
+                        ? attemptsRemaining > 0
+                        : true;
+                      const isRetake = currentLesson.status === 'completed' && canRetake;
+                      if (currentLesson.status !== 'completed' || isRetake) {
+                        return (
+                          <button
+                            onClick={() => {
+                              try {
+                                sessionStorage.setItem('quizReturnContext', JSON.stringify({ courseId, lessonId, nextLessonId: nextLesson?.id }));
+                              } catch { /* ignore */ }
+                              navigate(`/assessments/quiz/${moduleQuiz.id}/take`, { state: { courseId, lessonId, nextLessonId: nextLesson?.id } });
+                            }}
+                            className="group inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition-all hover:bg-blue-700 hover:shadow-md active:bg-blue-800"
+                          >
+                            {isRetake ? (
+                              <>
+                                <RefreshCw size={17} className="transition-transform group-hover:rotate-90" />
+                                Retake Quiz
+                              </>
+                            ) : (
+                              <>
+                                <PlayCircle size={17} className="transition-transform group-hover:scale-110" />
+                                Start Quiz
+                              </>
+                            )}
+                          </button>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 </div>
               ) : (

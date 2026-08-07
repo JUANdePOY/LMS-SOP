@@ -101,6 +101,18 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const updateUser = useCallback((updates) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const updated = { ...prev, ...updates };
+      const currentSession = session.getCurrentSession();
+      if (currentSession?.token) {
+        session.saveCurrentSession(currentSession.token, updated);
+      }
+      return updated;
+    });
+  }, []);
+
   const listSessions = useCallback(() => session.listSessions(), []);
 
   const isAuthenticated = !!user;
@@ -119,6 +131,7 @@ export function AuthProvider({ children }) {
       logout,
       switchSession,
       listSessions,
+      updateUser,
       isAuthenticated,
       isSuperAdmin,
       isAdmin,

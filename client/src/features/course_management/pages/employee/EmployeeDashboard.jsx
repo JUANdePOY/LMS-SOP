@@ -5,6 +5,7 @@ import { getCourseList } from "@/features/course_management/api/course.api";
 import { getEnrollments } from "@/features/course_management/api/enrollment.api";
 import { Search, BookOpen, Clock, PlayCircle, TrendingUp, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 const DIFFICULTY_META = {
   beginner: { label: "Beginner", color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-100 border-emerald-200 dark:border-emerald-500/30" },
@@ -242,21 +243,22 @@ export default function EmployeeDashboard() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {myCourses.slice(0, 8).map((enrollment) => {
               const course = enrollment.course;
               if (!course) return null;
               return (
-                <CourseCard
-                  key={enrollment.id}
-                  course={course}
-                  onClick={() => handleCourseClick(course.id)}
-                  showProgress={true}
-                  progress={enrollment.progress_percentage || 0}
-                />
+                <MotionItem key={enrollment.id}>
+                  <CourseCard
+                    course={course}
+                    onClick={() => handleCourseClick(course.id)}
+                    showProgress={true}
+                    progress={enrollment.progress_percentage || 0}
+                  />
+                </MotionItem>
               );
             })}
-          </div>
+          </StaggerList>
         </div>
       )}
 

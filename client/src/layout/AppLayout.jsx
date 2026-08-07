@@ -19,12 +19,14 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import Sidebar from "@/shared/components/navigation/sidebar/Sidebar";
+import UserAvatar from "@/shared/components/ui/Avatar";
 import { useTheme } from "@/hooks/useTheme";
 import { Scrollbar } from "@/shared/components/ui/Scrollbar";
 import BannerSection from "@/shared/components/ui/BannerSection";
 import GlobalSearch from "@/components/GlobalSearch";
 import NotificationDropdown from "@/shared/components/ui/NotificationDropdown";
-import { useNotificationStore } from "@/shared/stores/notificationStore.js";
+import { useNotificationStore, useNotificationPoller } from "@/shared/stores/notificationStore.js";
+import { PageTransition } from "@/shared/motion";
 
 const MOBILE_BOTTOM_NAV_ADMIN = [
   { name: "Home", path: "/", icon: BookOpen },
@@ -107,6 +109,7 @@ export default function AppLayout() {
   const currentTitle = breadcrumbs.length ? breadcrumbs[breadcrumbs.length - 1].title : "Learning";
   const themeToggleLabel = isDark ? "Switch to light theme" : "Switch to dark theme";
   useNotificationStore();
+  useNotificationPoller();
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -278,14 +281,9 @@ export default function AppLayout() {
                 <button
                   onClick={() => setProfileOpen((v) => !v)}
                   aria-label="User menu"
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors",
-                    isEmployee
-                      ? "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200"
-                      : "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
-                  )}
+                  className="flex items-center justify-center"
                 >
-                  {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
+                  <UserAvatar user={user} size="sm" ring />
                 </button>
 
                 {profileOpen && (
@@ -340,7 +338,9 @@ export default function AppLayout() {
           </div>
 
           <div className="flex-1 w-full px-4 sm:px-6 py-4 sm:py-6">
-            <Outlet />
+            <PageTransition>
+              <Outlet />
+            </PageTransition>
           </div>
 
           <footer className="border-t border-[var(--border)] py-2.5 text-center">

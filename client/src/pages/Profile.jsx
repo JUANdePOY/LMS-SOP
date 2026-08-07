@@ -2,7 +2,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { User, Calendar, Phone, MapPin, Shield, Loader2, Save, Lock, Mail, Camera, Trash2 } from 'lucide-react';
 import { getProfile, updateProfile, changePassword, uploadAvatar, deleteAvatar } from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+
+const DEFAULT_AVATAR_SVG =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='#9ca3af'><path d='M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10zm0 2c-5 0-9 2.5-9 5.5V22h18v-2.5c0-3-4-5.5-9-5.5z'/></svg>"
+  );
 
 const FORM_FIELDS = [
   { key: 'full_name', label: 'Full Name', icon: User, type: 'text' },
@@ -43,6 +50,7 @@ function toDateInputValue(value) {
 
 export default function Profile() {
   const { addToast } = useToast();
+  const { updateUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -136,6 +144,7 @@ export default function Profile() {
       if (res.data?.status === 'success') {
         addToast('Avatar updated successfully', 'success');
         setProfile((prev) => ({ ...prev, avatar_url: res.data.data.avatar_url }));
+        updateUser({ avatar_url: res.data.data.avatar_url });
         setAvatarFile(null);
       } else {
         throw new Error(res.data?.message || 'Failed to upload avatar');
@@ -155,6 +164,7 @@ export default function Profile() {
       if (res.data?.status === 'success') {
         addToast('Avatar removed', 'success');
         setProfile((prev) => ({ ...prev, avatar_url: null }));
+        updateUser({ avatar_url: null });
       } else {
         throw new Error(res.data?.message || 'Failed to remove avatar');
       }
@@ -203,14 +213,14 @@ export default function Profile() {
       <div className="flex items-center gap-5">
         <div className="relative">
           <div className={cn(
-            "h-20 w-20 rounded-full overflow-hidden border-2 border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-2xl font-bold text-neutral-500 dark:text-neutral-400",
+            "h-20 w-20 rounded-full overflow-hidden border-2 border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800",
             profile?.avatar_url && "border-blue-500"
           )}>
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
-            ) : (
-              (profile?.full_name || profile?.email || 'U').charAt(0).toUpperCase()
-            )}
+            <img
+              src={profile?.avatar_url || DEFAULT_AVATAR_SVG}
+              alt="Avatar"
+              className="h-full w-full object-cover"
+            />
           </div>
           <label className="absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 shadow-sm">
             <Camera size={14} />

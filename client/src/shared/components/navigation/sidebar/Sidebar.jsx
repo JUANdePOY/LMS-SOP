@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -17,12 +17,12 @@ import {
   Shield,
   LogOut,
   User,
-  ChevronDown,
+   ChevronDown,
    Building2,
-   FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
+import UserAvatar from "@/shared/components/ui/Avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { filterMenuByRole, LMS_ROLES } from "@/config/menuItems";
 import { useNotificationStore } from "@/shared/stores/notificationStore.js";
@@ -145,8 +145,9 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   const activeMenuItems = filterMenuByRole(baseMenuItems, user?.role);
   const notificationStore = useNotificationStore();
 
-  const PATH_BANNER_MAP = { "/announcements": ["1"], "/events": ["2"], "/messaging": [] };
+  const PATH_BANNER_MAP = { "/announcements": ["1"], "/events": ["2"] };
   const getBadgeCount = (path) => {
+    if (path === "/messaging") return notificationStore.unreadMessageCount || 0;
     const bannerIds = PATH_BANNER_MAP[path] || [];
     const unreadBannerIds = bannerIds.filter(
       (id) => !notificationStore.dismissed.includes(id)
@@ -154,24 +155,11 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
     return unreadBannerIds.length;
   };
 
-  const { count: myTaskCount, refresh: refreshTaskCount } = useMyTaskCount();
+  const { refresh: refreshTaskCount } = useMyTaskCount();
 
   useEffect(() => {
     refreshTaskCount();
   }, [refreshTaskCount]);
-
-  // Build a map of path -> count for sidebar badges
-  const sidebarCounts = useMemo(() => {
-    const counts = {};
-    if (myTaskCount > 0) {
-      if (isEmployee) {
-        counts['/tasks/my'] = myTaskCount;
-      } else {
-        counts['/tasks'] = myTaskCount;
-      }
-    }
-    return counts;
-  }, [myTaskCount, isEmployee]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -418,15 +406,8 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
         onClick={() => setProfileMenuOpen((v) => !v)}
       >
         <div className="relative">
-          <span
-            className={cn(
-              "relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-              "bg-gradient-to-br from-blue-500 to-blue-700 text-xs font-bold text-white shadow-sm"
-            )}
-          >
-            {(user?.full_name || user?.email || 'U').charAt(0).toUpperCase()}
-            <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-[var(--bg-surface)] bg-emerald-400" />
-          </span>
+          <UserAvatar user={user} size="sm" ring />
+          <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-[var(--bg-surface)] bg-emerald-400" />
 
           {profileMenuOpen && (
             <>

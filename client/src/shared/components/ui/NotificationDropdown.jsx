@@ -3,7 +3,7 @@ import { Bell, Info, AlertCircle, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import NotificationBadge from "@/shared/components/ui/NotificationBadge";
-import { useNotifications, markAllBannersAsViewed } from "@/shared/stores/notificationStore.js";
+import { useNotifications } from "@/shared/stores/notificationStore.js";
 
 const TYPE_ICON = {
   info: Info,
@@ -47,18 +47,6 @@ export default function NotificationDropdown({ showBadge = true, onFetch }) {
       onFetch?.();
     }
   }, [open, loading, fetched, fetch, onFetch]);
-
-  useEffect(() => {
-    if (open && fetched && notifications.length > 0) {
-      markAllRead();
-    }
-  }, [open, fetched, notifications.length, markAllRead]);
-
-  useEffect(() => {
-    if (open) {
-      markAllBannersAsViewed();
-    }
-  }, [open]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {

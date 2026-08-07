@@ -12,6 +12,7 @@ import { Card } from '@/shared/components/ui/card';
 import { Badge } from '@/shared/components/ui/badge';
 import { Button } from '@/shared/components/ui/button';
 import { cn } from '@/lib/utils';
+import { StaggerList, MotionItem } from '@/shared/motion';
 
 const STAT_CARDS = [
   { label: 'Total Users', value: '128', delta: '+12%', icon: Users, color: 'blue' },
@@ -113,36 +114,38 @@ export default function Dashboard() {
       </div>
 
       {/* Stat Cards - fluid grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
+      <StaggerList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
         {STAT_CARDS.map((card) => {
           const Icon = card.icon;
           return (
-            <Card key={card.label} className="p-3 sm:p-4">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                  <div className={cn(
-                    "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                    card.color === 'blue' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' :
-                    card.color === 'emerald' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' :
-                    card.color === 'amber' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400' :
-                    'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
-                  )}>
-                    <Icon size={18} />
+            <MotionItem key={card.label}>
+              <Card className="p-3 sm:p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                    <div className={cn(
+                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+                      card.color === 'blue' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' :
+                      card.color === 'emerald' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' :
+                      card.color === 'amber' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400' :
+                      'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+                    )}>
+                      <Icon size={18} />
+                    </div>
+                    <div className="min-w-0">
+                       <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate">{card.label}</p>
+                      <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 leading-tight">{card.value}</p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                     <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate">{card.label}</p>
-                    <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 leading-tight">{card.value}</p>
-                  </div>
+                   <span className="flex items-center gap-0.5 text-[10px] sm:text-xs font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
+                    <TrendingUp size={12} />
+                    {card.delta}
+                  </span>
                 </div>
-                 <span className="flex items-center gap-0.5 text-[10px] sm:text-xs font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
-                  <TrendingUp size={12} />
-                  {card.delta}
-                </span>
-              </div>
-            </Card>
+              </Card>
+            </MotionItem>
           );
         })}
-      </div>
+      </StaggerList>
 
       {/* Training Completion Overview */}
       <Card className="p-3 sm:p-4 lg:p-6">

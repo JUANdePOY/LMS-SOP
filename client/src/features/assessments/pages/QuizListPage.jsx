@@ -8,6 +8,7 @@ import { useToast } from "@/shared/components/ui/Toast";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/card";
 import CreateQuizModal from "../components/modals/CreateQuizModal";
+import { StaggerList, MotionItem } from "@/shared/motion";
 import {
   Grid as GridIcon,
   List,
@@ -351,11 +352,13 @@ export default function QuizListPage() {
           <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4 mr-1" /> Create Quiz</Button>
         </div>
       ) : view === "grid" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {quizzes.map((q) => (
-            <QuizCard key={q.id} q={q} onTogglePublish={handleTogglePublish} onDelete={handleDelete} busy={busy} />
+            <MotionItem key={q.id}>
+              <QuizCard q={q} onTogglePublish={handleTogglePublish} onDelete={handleDelete} busy={busy} />
+            </MotionItem>
           ))}
-        </div>
+        </StaggerList>
       ) : (
         <QuizTable quizzes={quizzes} onTogglePublish={handleTogglePublish} onDelete={handleDelete} busy={busy} />
       )}

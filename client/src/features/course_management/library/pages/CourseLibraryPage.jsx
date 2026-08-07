@@ -9,6 +9,7 @@ import CourseListRow from "../components/CourseListRow";
 import FilterSidebar from "../components/FilterSidebar";
 import QuickAssignModal from "../components/QuickAssignModal";
 import { useToast } from "@/shared/components/ui/Toast";
+import { StaggerList, MotionItem } from "@/shared/motion";
 import * as session from "@/services/session";
 
 const ADMIN_ROLES = ["super_admin", "admin", "department_head"];
@@ -404,9 +405,13 @@ export default function CourseLibraryPage() {
           {!loading && continueLearning.length > 0 && (
             <section>
               <h2 className="mb-3 text-sm font-semibold text-neutral-700 dark:text-neutral-200">Continue Learning</h2>
-              <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
-                {continueLearning.map(renderCard)}
-              </div>
+              <StaggerList className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+                {continueLearning.map((course) => (
+                  <MotionItem key={course.id}>
+                    {renderCard(course)}
+                  </MotionItem>
+                ))}
+              </StaggerList>
             </section>
           )}
 
@@ -472,13 +477,21 @@ export default function CourseLibraryPage() {
               </p>
               <section>
                 {viewMode === "grid" ? (
-                  <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
-                    {mainCourses.map(renderCard)}
-                  </div>
+                  <StaggerList className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+                    {mainCourses.map((course) => (
+                      <MotionItem key={course.id}>
+                        {renderCard(course)}
+                      </MotionItem>
+                    ))}
+                  </StaggerList>
                 ) : (
-                  <div className="space-y-2">
-                    {mainCourses.map(renderRow)}
-                  </div>
+                  <StaggerList className="space-y-2">
+                    {mainCourses.map((course) => (
+                      <MotionItem key={course.id}>
+                        {renderRow(course)}
+                      </MotionItem>
+                    ))}
+                  </StaggerList>
                 )}
               </section>
 

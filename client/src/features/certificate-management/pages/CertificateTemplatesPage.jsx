@@ -10,6 +10,7 @@ import CertificateTemplateForm from '@/features/certificate-management/component
 import CertificateTemplateViewModal from '@/features/certificate-management/components/CertificateTemplateViewModal';
 import SignatureUploadModal from '@/features/certificate-management/components/SignatureUploadModal';
 import IssueCertificateModal from '@/features/certificate-management/components/IssueCertificateModal';
+import { StaggerList, MotionItem } from "@/shared/motion";
 import { CERTIFICATE_STATUSES, ISSUANCE_STATUSES } from '@/features/certificate-management/constants/certificateSections';
 import { useCertificates } from '@/features/certificate-management/hooks/useCertificates';
 import { useSignatures } from '@/features/certificate-management/hooks/useSignatures';
@@ -144,14 +145,16 @@ export default function CertificatesPage() {
       </div>
 
       {stats.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
+        <StaggerList className="grid grid-cols-3 gap-4">
           {stats.map((stat) => (
-            <Card key={stat.status} className="p-4">
-              <p className="text-sm text-gray-500">{CERTIFICATE_STATUSES[stat.status]?.label || stat.status}</p>
-              <p className="text-2xl font-bold">{stat.count}</p>
-            </Card>
+            <MotionItem key={stat.status}>
+              <Card className="p-4">
+                <p className="text-sm text-gray-500">{CERTIFICATE_STATUSES[stat.status]?.label || stat.status}</p>
+                <p className="text-2xl font-bold">{stat.count}</p>
+              </Card>
+            </MotionItem>
           ))}
-        </div>
+        </StaggerList>
       )}
 
       {loading ? (
@@ -163,24 +166,25 @@ export default function CertificatesPage() {
           <p className="text-gray-500">No templates found. Create your first template to get started.</p>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <StaggerList className="grid gap-4">
           {templates.map((template) => (
-            <Card key={template.id} className="p-4 cursor-pointer" onClick={() => handleView(template)}>
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium">{template.name}</h3>
-                    <Badge className={CERTIFICATE_STATUSES[template.status]?.color || ''}>
-                      {CERTIFICATE_STATUSES[template.status]?.label || template.status}
-                    </Badge>
+            <MotionItem key={template.id}>
+              <Card className="p-4 cursor-pointer" onClick={() => handleView(template)}>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium">{template.name}</h3>
+                      <Badge className={CERTIFICATE_STATUSES[template.status]?.color || ''}>
+                        {CERTIFICATE_STATUSES[template.status]?.label || template.status}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {template.width_px}x{template.height_px} • {template.orientation}
+                    </p>
+                    {template.department_name && (
+                      <p className="text-sm text-gray-500">Dept: {template.department_name}</p>
+                    )}
                   </div>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {template.width_px}x{template.height_px} • {template.orientation}
-                  </p>
-                  {template.department_name && (
-                    <p className="text-sm text-gray-500">Dept: {template.department_name}</p>
-                  )}
-                </div>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); handleEdit(template); }}>
                     Edit
@@ -204,8 +208,9 @@ export default function CertificatesPage() {
                 </div>
               </div>
             </Card>
+            </MotionItem>
           ))}
-        </div>
+        </StaggerList>
       )}
 
       <CertificateTemplateForm
