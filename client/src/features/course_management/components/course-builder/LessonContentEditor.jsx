@@ -33,7 +33,7 @@ export default function LessonContentEditor({ lesson, onChange, onClose }) {
   return (
     <div className="space-y-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Lesson Content</span>
+        <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Lesson Contentsss</span>
         {typeof onClose === "function" && (
           <button type="button" onClick={onClose} className="text-xs text-neutral-500 hover:text-neutral-700">Close</button>
         )}

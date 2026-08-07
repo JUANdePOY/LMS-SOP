@@ -138,9 +138,6 @@ export default function LessonPage() {
           {currentLesson.type === 'video' ? (
             <div className="p-4">
               <VideoPlayer src={currentLesson.url} title={currentLesson.title} />
-              {currentLesson.description && (
-                <p className="mt-3 text-sm text-neutral-600 dark:text-neutral-400">{currentLesson.description}</p>
-              )}
             </div>
           ) : currentLesson.type === 'reading' ? (
             <div className="p-6">
