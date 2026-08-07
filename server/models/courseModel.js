@@ -4,19 +4,36 @@ const COURSE_STATUSES = ['draft', 'published', 'archived', 'under_review'];
 const COURSE_DIFFICULTIES = ['beginner', 'intermediate', 'advanced', 'all_levels'];
 
 async function listCourses(filters = {}) {
-  const { search, status, category, difficulty, instructor_id, page = 1, limit = 20 } = filters;
+  const { search, status, category, difficulty, instructor_id, page = 1, limit = 20, sort, order } = filters;
   const offset = (page - 1) * limit;
+
+  const allowedSort = {
+    created_at: 'c.created_at',
+    title: 'c.title',
+    enrollment_count: 'enrollment_count',
+  };
+  const sortColumn = allowedSort[sort] || 'c.created_at';
+  const sortDir = String(order || 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+  const categories = Array.isArray(category)
+    ? category.filter(Boolean)
+    : category ? String(category).split(',').map((s) => s.trim()).filter(Boolean) : [];
+  const difficulties = Array.isArray(difficulty)
+    ? difficulty.filter(Boolean)
+    : difficulty ? String(difficulty).split(',').map((s) => s.trim()).filter(Boolean) : [];
 
   let sql = `
     SELECT 
-      c.id, c.title, c.description, c.category, c.difficulty, c.status,
+      c.id, c.title, c.description, c.category, c.difficulty, c.status, c.department_id,
       c.instructor_id, c.thumbnail_url, c.max_enrollments, c.start_date, c.end_date,
       c.grading_scale, c.allow_self_enrollment, c.send_completion_certificates,
       c.created_at, c.updated_at,
+      d.name AS department_name,
       u.full_name AS instructor_name,
       COUNT(DISTINCT e.id) AS enrollment_count,
       COUNT(DISTINCT m.id) AS module_count
     FROM courses c
+    LEFT JOIN departments d ON c.department_id = d.id
     LEFT JOIN users u ON c.instructor_id = u.id
     LEFT JOIN course_enrollments e ON c.id = e.course_id AND e.status = 'active' AND e.is_deleted = FALSE
     LEFT JOIN course_modules m ON c.id = m.course_id AND m.is_deleted = FALSE
@@ -28,13 +45,13 @@ async function listCourses(filters = {}) {
     sql += ' AND c.status = ?';
     params.push(status);
   }
-  if (category) {
-    sql += ' AND c.category = ?';
-    params.push(category);
+  if (categories.length > 0) {
+    sql += ` AND c.category IN (${categories.map(() => '?').join(',')})`;
+    params.push(...categories);
   }
-  if (difficulty) {
-    sql += ' AND c.difficulty = ?';
-    params.push(difficulty);
+  if (difficulties.length > 0) {
+    sql += ` AND c.difficulty IN (${difficulties.map(() => '?').join(',')})`;
+    params.push(...difficulties);
   }
   if (instructor_id) {
     sql += ' AND c.instructor_id = ?';
@@ -45,7 +62,7 @@ async function listCourses(filters = {}) {
     params.push(`%${search}%`, `%${search}%`);
   }
 
-  sql += ' GROUP BY c.id ORDER BY c.created_at DESC LIMIT ? OFFSET ?';
+  sql += ` GROUP BY c.id ORDER BY ${sortColumn} ${sortDir} LIMIT ? OFFSET ?`;
   params.push(limit, offset);
 
   const [rows] = await db.query(sql, params);
@@ -55,6 +72,13 @@ async function listCourses(filters = {}) {
 async function countCourses(filters = {}) {
   const { search, status, category, difficulty, instructor_id } = filters;
 
+  const categories = Array.isArray(category)
+    ? category.filter(Boolean)
+    : category ? String(category).split(',').map((s) => s.trim()).filter(Boolean) : [];
+  const difficulties = Array.isArray(difficulty)
+    ? difficulty.filter(Boolean)
+    : difficulty ? String(difficulty).split(',').map((s) => s.trim()).filter(Boolean) : [];
+
   let sql = 'SELECT COUNT(*) AS total FROM courses c WHERE c.is_deleted = FALSE';
   const params = [];
 
@@ -62,13 +86,13 @@ async function countCourses(filters = {}) {
     sql += ' AND c.status = ?';
     params.push(status);
   }
-  if (category) {
-    sql += ' AND c.category = ?';
-    params.push(category);
+  if (categories.length > 0) {
+    sql += ` AND c.category IN (${categories.map(() => '?').join(',')})`;
+    params.push(...categories);
   }
-  if (difficulty) {
-    sql += ' AND c.difficulty = ?';
-    params.push(difficulty);
+  if (difficulties.length > 0) {
+    sql += ` AND c.difficulty IN (${difficulties.map(() => '?').join(',')})`;
+    params.push(...difficulties);
   }
   if (instructor_id) {
     sql += ' AND c.instructor_id = ?';
@@ -167,6 +191,28 @@ async function update(id, updates) {
   return result.affectedRows;
 }
 
+async function listCategories(filters = {}) {
+  const { status } = filters;
+  let sql = `
+    SELECT DISTINCT c.category
+    FROM courses c
+    WHERE c.is_deleted = FALSE
+      AND c.category IS NOT NULL
+      AND c.category != ''
+  `;
+  const params = [];
+
+  if (status) {
+    sql += ' AND c.status = ?';
+    params.push(status);
+  }
+
+  sql += ' ORDER BY c.category ASC';
+
+  const [rows] = await db.query(sql, params);
+  return rows.map((r) => r.category);
+}
+
 async function softDelete(id) {
   const [result] = await db.query(
     'UPDATE courses SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
@@ -201,6 +247,7 @@ module.exports = {
   db,
   listCourses,
   countCourses,
+  listCategories,
   findById,
   create,
   update,
@@ -210,3 +257,4 @@ module.exports = {
   COURSE_STATUSES,
   COURSE_DIFFICULTIES,
 };
+

@@ -9,17 +9,29 @@ const DIFFICULTY_META = {
   all_levels: { label: "All Levels", color: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30" },
 };
 
+function MetaStat({ icon: Icon, value, label }) {
+  return (
+    <div className="flex items-center gap-1.5" title={label}>
+      <Icon size={13} className="text-neutral-400 dark:text-neutral-500" />
+      <span>{value}</span>
+    </div>
+  );
+}
+
 export default function CourseOverviewHero({
   course,
   onBack,
   primaryAction,
   secondaryAction,
   breadcrumb,
+  progress,
 }) {
   const difficulty = useMemo(() => {
     if (!course?.difficulty) return DIFFICULTY_META.all_levels;
     return DIFFICULTY_META[course.difficulty] || DIFFICULTY_META.all_levels;
   }, [course?.difficulty]);
+
+  const hasProgress = typeof progress === "number" && progress >= 0;
 
   return (
     <div className="w-full max-w-none">
@@ -30,9 +42,9 @@ export default function CourseOverviewHero({
             <div className="flex items-center justify-between gap-3">
               <button
                 onClick={onBack}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+                className="group inline-flex items-center gap-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
               >
-                <ChevronLeft size={14} />
+                <ChevronLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
                 {breadcrumb || "Back to Library"}
               </button>
               {secondaryAction && (
@@ -42,8 +54,9 @@ export default function CourseOverviewHero({
               )}
             </div>
 
-            <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-              <div className="relative h-40 sm:h-44 md:h-48 w-full md:w-64 shrink-0 rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-6">
+              <div className="relative h-40 w-full sm:h-44 sm:w-40 md:h-48 md:w-64 shrink-0 rounded-xl overflow-hidden border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-800 shadow-sm ring-1 ring-inset ring-white/40 dark:ring-white/5">
+                <div className="pointer-events-none absolute inset-y-0 left-0 w-2 bg-gradient-to-r from-black/5 to-transparent dark:from-white/10" />
                 {course?.thumbnail_url ? (
                   <img
                     src={course.thumbnail_url}
@@ -57,7 +70,7 @@ export default function CourseOverviewHero({
                 )}
               </div>
 
-              <div className="flex-1 min-w-0 space-y-2">
+              <div className="flex-1 min-w-0 space-y-2.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold border", difficulty.color)}>
                     {difficulty.label}
@@ -77,32 +90,36 @@ export default function CourseOverviewHero({
                   <p className="text-xs text-neutral-500 dark:text-neutral-400">by {course.instructor_name}</p>
                 )}
 
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-neutral-500 dark:text-neutral-400">
-                  <div className="flex items-center gap-1.5">
-                    <Clock size={13} className="text-neutral-400 dark:text-neutral-500" />
-                    <span>{course?.duration_hours || 0}h</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <BookOpen size={13} className="text-neutral-400 dark:text-neutral-500" />
-                    <span>{course?.lesson_count || 0} lessons</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Users size={13} className="text-neutral-400 dark:text-neutral-500" />
-                    <span>{course?.enrollment_count || 0} students</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Globe size={13} className="text-neutral-400 dark:text-neutral-500" />
-                    <span>English</span>
-                  </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                  <MetaStat icon={Clock} value={`${course?.duration_hours || 0}h`} label="Duration" />
+                  <span className="hidden sm:block h-3 w-px bg-neutral-200 dark:bg-neutral-700" />
+                  <MetaStat icon={BookOpen} value={`${course?.lesson_count || 0} lessons`} label="Lessons" />
+                  <span className="hidden sm:block h-3 w-px bg-neutral-200 dark:bg-neutral-700" />
+                  <MetaStat icon={Users} value={`${course?.enrollment_count || 0} students`} label="Students" />
+                  <span className="hidden sm:block h-3 w-px bg-neutral-200 dark:bg-neutral-700" />
+                  <MetaStat icon={Globe} value="English" label="Language" />
                 </div>
 
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
-                  {primaryAction && (
-                    <div className="flex items-center gap-2">
-                      {primaryAction}
+                {hasProgress && (
+                  <div className="pt-1">
+                    <div className="mb-1 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
+                      <span className="font-medium text-neutral-600 dark:text-neutral-300">Your progress</span>
+                      <span>{progress}%</span>
                     </div>
-                  )}
-                </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
+                      <div
+                        className="h-full rounded-full bg-blue-600 dark:bg-blue-400 transition-all"
+                        style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {primaryAction && (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-1">
+                    <div className="flex items-center gap-2">{primaryAction}</div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

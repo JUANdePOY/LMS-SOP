@@ -1,14 +1,20 @@
 import { cn } from "@/lib/utils";
 
-export default function OverviewSection({ title, icon: Icon, children, className }) {
+export default function OverviewSection({ title, icon: Icon, children, className, divider = false }) {
   return (
-    <section className={cn("rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-5 sm:p-6", className)}>
+    <section
+      className={cn(
+        "rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 p-5 sm:p-6 shadow-sm dark:shadow-none",
+        className
+      )}
+    >
       {title && (
-        <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3 flex items-center gap-2">
-          {Icon && <Icon size={16} className="text-blue-600 dark:text-blue-400" />}
+        <h2 className="mb-3.5 flex items-center gap-2 text-[13px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">
+          {Icon && <Icon size={15} className="text-blue-600 dark:text-blue-400" />}
           {title}
         </h2>
       )}
+      {divider && <div className="mb-4 h-px bg-neutral-100 dark:bg-neutral-800" />}
       {children}
     </section>
   );

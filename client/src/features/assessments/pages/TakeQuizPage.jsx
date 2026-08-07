@@ -1,8 +1,10 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useRef, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { useTakeQuiz } from "../hooks/useTakeQuiz";
+import { useQuiz } from "../hooks/useQuiz";
 import { useIntegrityMonitor } from "../hooks/useIntegrityMonitor";
 import QuizPlayer from "../components/QuizPlayer";
+import QuizIntro from "../components/QuizIntro";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/components/ui/card";
 import { formatDuration } from "../utils/formatDuration";
@@ -103,6 +105,7 @@ export default function TakeQuizPage() {
   const containerRef = useRef(null);
   const engine = useTakeQuiz();
   const { quiz, status, result, attempt, violationCount, limitReached, start, reportViolation } = engine;
+  const { quiz: quizDetails, loading: loadingDetails, error: detailsError } = useQuiz(quizId);
 
   const handleViolation = useCallback(
     (type, metadata) => reportViolation(type, metadata),
@@ -111,25 +114,19 @@ export default function TakeQuizPage() {
 
   useIntegrityMonitor({ active: status === "playing", containerRef, onEvent: handleViolation });
 
-  useEffect(() => {
+  const handleStart = useCallback(() => {
     if (quizId && status === "idle") start(quizId);
   }, [quizId, status, start]);
 
-  useEffect(() => {
-    if (status === "playing" && containerRef.current && document.fullscreenElement === null) {
-      containerRef.current.requestFullscreen().catch(() => {});
-    }
-  }, [status]);
-
-  if (status === "loading" || status === "idle") {
-    return <div className="p-8 text-center text-neutral-600">Preparing your quiz…</div>;
-  }
+  const handleCancel = useCallback(() => {
+    if (quizId) window.history.back();
+  }, [quizId]);
 
   if (status === "limit_reached") {
-    return <LimitReachedView limitReached={limitReached} quiz={quiz} />;
+    return <LimitReachedView limitReached={limitReached} quiz={quizDetails} />;
   }
 
-  if (status === "error" || !quiz) {
+  if (status === "error" || detailsError) {
     return (
       <div className="p-8 text-center text-neutral-600">
         Unable to load the quiz. <Link to="/assessments" className="text-indigo-600 underline">Back to assessments</Link>
@@ -137,8 +134,29 @@ export default function TakeQuizPage() {
     );
   }
 
+  if (status === "loading" || loadingDetails) {
+    return <div className="p-8 text-center text-neutral-600">Preparing your quiz…</div>;
+  }
+
   if (status === "submitted") {
     return <ResultView result={result} quiz={quiz} attempt={attempt} />;
+  }
+
+  if (status === "idle") {
+    const isFinal = quizDetails?.quiz_type === "final";
+    const attemptsRemaining = isFinal
+      ? quizDetails?.attempts_allowed ?? 3
+      : "∞";
+    return (
+      <div className="min-h-screen bg-neutral-50 py-6">
+        <QuizIntro
+          quiz={quizDetails}
+          attemptsRemaining={attemptsRemaining}
+          onStart={handleStart}
+          onCancel={handleCancel}
+        />
+      </div>
+    );
   }
 
   return (

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/shared/components/ui/Toast";
-import { ChevronLeft, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, X, Save, Rocket, Clock, CheckCircle2, AlertCircle, Search } from "lucide-react";
+import { ChevronLeft, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, X, Save, Rocket, Clock, CheckCircle2, AlertCircle, Search, Plus, Layers, FileText, HelpCircle, BookOpen, ListChecks } from "lucide-react";
 import CourseOutline from "../components/course-builder/CourseOutline";
 import LessonEditor from "../components/course-builder/LessonEditor";
 import ModuleEditor from "../components/course-builder/ModuleEditor";
@@ -87,6 +87,131 @@ const STATUS_CONFIG = {
   published: { label: "Published", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300", icon: CheckCircle2 },
   archived: { label: "Archived", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300", icon: AlertCircle },
 };
+
+function BuilderEmptyState({ modules, onAddModule, onSelectModule }) {
+  const moduleCount = modules.length;
+  const lessonCount = modules.reduce((sum, m) => sum + (m.lessons?.length || 0), 0);
+  const emptyModules = modules.filter((m) => !(m.lessons?.length)).length;
+
+  const stats = [
+    { Icon: Layers, label: "Modules", value: moduleCount },
+    { Icon: FileText, label: "Lessons", value: lessonCount },
+    { Icon: HelpCircle, label: "Empty modules", value: emptyModules },
+  ];
+
+  const hero = moduleCount === 0
+    ? {
+        title: "Start Building Your Course",
+        desc: "Organize your content into modules and lessons. Create your first module to get going, then add lessons inside it.",
+        cta: "Add your first module",
+      }
+    : lessonCount === 0
+      ? {
+          title: "Add Lessons to Your Modules",
+          desc: "You've created modules — now fill them with lessons. Pick a module below to start adding video, reading, quiz, or other content.",
+          cta: "Open a module",
+        }
+      : {
+          title: "Your Course Is Taking Shape",
+          desc: "You have modules and lessons in place. Keep refining the content, or open any module from the list below to continue editing.",
+          cta: "Continue editing",
+        };
+
+  return (
+    <div className="h-full overflow-y-auto p-6">
+      <div className="mx-auto w-full max-w-3xl space-y-5">
+        <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-sm">
+          <div className="relative overflow-hidden bg-gradient-to-br from-white via-neutral-50/80 to-neutral-100/80 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 px-8 pt-10 pb-8 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-600/20">
+              <Rocket size={28} className="text-white" />
+            </div>
+            <h3 className="mt-5 text-2xl font-semibold text-neutral-900 dark:text-neutral-100">{hero.title}</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm text-neutral-500 dark:text-neutral-400">{hero.desc}</p>
+            <button
+              type="button"
+              onClick={moduleCount === 0 ? onAddModule : () => onSelectModule(modules[0]?.id)}
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 active:bg-blue-800"
+            >
+              <Plus size={16} />
+              {hero.cta}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 divide-y divide-[var(--border)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            <div className="flex items-center justify-center gap-3 px-6 py-5">
+              <Layers size={18} className="text-[var(--text-secondary)]" />
+              <div>
+                <p className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{moduleCount}</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">Modules</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-center gap-3 px-6 py-5">
+              <FileText size={18} className="text-[var(--text-secondary)]" />
+              <div>
+                <p className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{lessonCount}</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">Lessons</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-center gap-3 px-6 py-5">
+              <HelpCircle size={18} className="text-[var(--text-secondary)]" />
+              <div>
+                <p className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{emptyModules}</p>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">Empty modules</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {moduleCount > 0 && (
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-sm p-5">
+            <div className="mb-4 flex items-center justify-between">
+              <h4 className="flex items-center gap-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                <BookOpen size={16} className="text-[var(--text-secondary)]" />
+                Course outline
+              </h4>
+              <button
+                type="button"
+                onClick={onAddModule}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                <Plus size={14} />
+                Add module
+              </button>
+            </div>
+            <ul className="space-y-2">
+              {modules.map((m) => {
+                const lessons = m.lessons || [];
+                return (
+                  <li key={m.id}>
+                    <button
+                      type="button"
+                      onClick={() => onSelectModule(m.id)}
+                      className="group flex w-full items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 text-left transition-colors hover:bg-[var(--bg-hover)]"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-subtle)] text-[var(--text-secondary)]">
+                          <Layers size={18} />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{m.title || "Untitled module"}</p>
+                          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-neutral-500 dark:text-neutral-400">
+                            <ListChecks size={12} />
+                            {lessons.length} {lessons.length === 1 ? "lesson" : "lessons"}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="shrink-0 text-xs text-neutral-400 group-hover:text-neutral-600 dark:group-hover:text-neutral-200">Open</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function CourseBuilderPage() {
   const { id: courseId } = useParams();
@@ -264,6 +389,7 @@ export default function CourseBuilderPage() {
         type: l.type || "reading",
         description: l.description || l.content || "",
         url: l.url || l.content || "",
+        linkTitle: l.linkTitle || null,
         order: lIdx + 1,
         duration: l.duration || null,
         is_required: l.is_required ?? true,
@@ -470,6 +596,20 @@ export default function CourseBuilderPage() {
     });
   };
 
+  const moveModule = (moduleId, dir) => {
+    const idx = modules.findIndex((m) => m.id === moduleId);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= modules.length) return;
+    setModules((prev) => {
+      const next = [...prev];
+      [next[idx], next[target]] = [next[target], next[idx]];
+      const reordered = next.map((m, i) => ({ ...m, order_index: i + 1 }));
+      modulesRef.current = reordered;
+      setHasUnsavedChanges(true);
+      return reordered;
+    });
+  };
+
   const removeModule = (moduleId) => {
     setModules((prev) => {
       const next = prev.filter((m) => m.id !== moduleId).map((m, i) => ({ ...m, order_index: i + 1 }));
@@ -484,18 +624,23 @@ export default function CourseBuilderPage() {
   };
 
   const addLesson = (moduleId) => {
+    const newLessonId = "new-" + Date.now();
     setModules((prev) => {
       const next = prev.map((m) => {
         if (m.id !== moduleId) return m;
         return {
           ...m,
-          lessons: [...(m.lessons || []), { id: "new-" + Date.now(), title: "", type: "reading", description: "", url: "", order_index: (m.lessons || []).length + 1, isNew: true }],
+          lessons: [...(m.lessons || []), { id: newLessonId, title: "", type: "reading", description: "", url: "", order_index: (m.lessons || []).length + 1, isNew: true }],
         };
       });
       modulesRef.current = next;
       setHasUnsavedChanges(true);
       return next;
     });
+    setSelectedModuleId(moduleId);
+    setSelectedLessonId(newLessonId);
+    setShowLeftSidebar(false);
+    setShowRightSidebar(true);
   };
 
   const updateLesson = (moduleId, lessonIndex, patch) => {
@@ -561,6 +706,26 @@ export default function CourseBuilderPage() {
   const selectedModule = modules.find((m) => m.id === selectedModuleId) || null;
   const selectedLesson = selectedModule?.lessons?.find((l) => l.id === selectedLessonId) || null;
 
+  const flatLessons = modules.flatMap((m) =>
+    (m.lessons || []).map((l) => ({ lesson: l, moduleId: m.id }))
+  );
+  const lessonNavIndex = flatLessons.findIndex((item) => item.lesson.id === selectedLessonId);
+
+  const selectLessonById = (lessonId) => {
+    const hit = flatLessons.find((item) => item.lesson.id === lessonId);
+    if (!hit) return;
+    setSelectedModuleId(hit.moduleId);
+    setSelectedLessonId(lessonId);
+    setShowLeftSidebar(false);
+    setShowRightSidebar(true);
+  };
+  const navLessonPrev = () => {
+    if (lessonNavIndex > 0) selectLessonById(flatLessons[lessonNavIndex - 1].lesson.id);
+  };
+  const navLessonNext = () => {
+    if (lessonNavIndex < flatLessons.length - 1) selectLessonById(flatLessons[lessonNavIndex + 1].lesson.id);
+  };
+
   if (!course && !loadingError) {
     return (
       <div className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center gap-3">
@@ -620,7 +785,7 @@ export default function CourseBuilderPage() {
               Saving...
             </span>
           )}
-          <div className="flex items-center gap-1 p-1 bg-neutral-100/80 dark:bg-neutral-800/80 rounded-lg border border-neutral-200/60 dark:border-neutral-700/60">
+          <div className="hidden md:flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 p-1 ml-2">
             <button
               onClick={() => {
                 const next = !showLeftSidebar;
@@ -628,20 +793,19 @@ export default function CourseBuilderPage() {
                 if (next) setShowRightSidebar(false);
               }}
               aria-label={showLeftSidebar ? "Close course outline sidebar" : "Open course outline sidebar"}
-              aria-expanded={showLeftSidebar}
-              aria-controls="outline-panel"
+              aria-pressed={showLeftSidebar}
               className={`
-                inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium
-                transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]
-                ${showLeftSidebar 
-                  ? 'bg-white dark:bg-neutral-700 text-blue-600 dark:text-blue-400 shadow-sm' 
-                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-white/60 dark:hover:bg-neutral-700/60'}
+                inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2
+                ${showLeftSidebar
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-neutral-700 dark:text-neutral-200 hover:bg-white dark:hover:bg-neutral-700'}
               `}
             >
               {showLeftSidebar ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-              <span className="hidden sm:inline">{showLeftSidebar ? 'Outline' : 'Outline'}</span>
+              <span>Outline</span>
             </button>
-            <div className="w-px h-5 bg-neutral-300 dark:bg-neutral-600 mx-0.5" />
+            <div className="w-px h-4 bg-neutral-300 dark:bg-neutral-600 mx-0.5" />
             <button
               onClick={() => {
                 const next = !showRightSidebar;
@@ -649,18 +813,17 @@ export default function CourseBuilderPage() {
                 if (next) setShowLeftSidebar(false);
               }}
               aria-label={showRightSidebar ? "Close details sidebar" : "Open details sidebar"}
-              aria-expanded={showRightSidebar}
-              aria-controls="details-panel"
+              aria-pressed={showRightSidebar}
               className={`
-                inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium
-                transition-all duration-200 ease-[cubic-bezier(0.4,0,0.2,1)]
-                ${showRightSidebar 
-                  ? 'bg-white dark:bg-neutral-700 text-blue-600 dark:text-blue-400 shadow-sm' 
-                  : 'text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 hover:bg-white/60 dark:hover:bg-neutral-700/60'}
+                inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2
+                ${showRightSidebar
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-neutral-700 dark:text-neutral-200 hover:bg-white dark:hover:bg-neutral-700'}
               `}
             >
-              <span className="hidden sm:inline">{showRightSidebar ? 'Details' : 'Details'}</span>
               {showRightSidebar ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+              <span>Details</span>
             </button>
           </div>
         </div>
@@ -766,10 +929,22 @@ export default function CourseBuilderPage() {
         <main className="flex-1 min-w-0">
           {selectedLesson ? (
             <LessonEditor
+              key={selectedLessonId}
               lesson={selectedLesson}
+              courseId={courseId}
+              courseTitle={course?.title}
+              onOpenQuizBuilder={(quizId) => navigate(`/assessments/quiz/${quizId}`)}
               moduleId={selectedModuleId}
               onSave={(patch) => updateLesson(selectedModuleId, modules.find((m) => m.id === selectedModuleId)?.lessons?.findIndex((l) => l.id === selectedLessonId) ?? 0, patch)}
               onDelete={() => removeLesson(selectedModuleId, modules.find((m) => m.id === selectedModuleId)?.lessons?.findIndex((l) => l.id === selectedLessonId) ?? 0)}
+              onNavigatePrev={navLessonPrev}
+              onNavigateNext={navLessonNext}
+              canNavigatePrev={lessonNavIndex > 0}
+              canNavigateNext={lessonNavIndex < flatLessons.length - 1}
+              onMoveUp={() => moveLessonUp(selectedModuleId, modules.find((m) => m.id === selectedModuleId)?.lessons?.findIndex((l) => l.id === selectedLessonId) ?? 0)}
+              onMoveDown={() => moveLessonDown(selectedModuleId, modules.find((m) => m.id === selectedModuleId)?.lessons?.findIndex((l) => l.id === selectedLessonId) ?? 0)}
+              canMoveUp={lessonNavIndex > 0}
+              canMoveDown={lessonNavIndex < flatLessons.length - 1}
               saving={saving}
             />
           ) : selectedModule ? (
@@ -782,24 +957,44 @@ export default function CourseBuilderPage() {
               moduleSops={getModuleSops(selectedModuleId)}
               onLinkSop={handleLinkSop}
               onUnlinkSop={handleUnlinkSop}
+              onMoveUp={() => moveModule(selectedModuleId, -1)}
+              onMoveDown={() => moveModule(selectedModuleId, 1)}
+              onNavigatePrev={() => {
+                const idx = modules.findIndex((m) => m.id === selectedModuleId);
+                if (idx > 0) {
+                  setSelectedModuleId(modules[idx - 1].id);
+                  setSelectedLessonId(null);
+                }
+              }}
+              onNavigateNext={() => {
+                const idx = modules.findIndex((m) => m.id === selectedModuleId);
+                if (idx < modules.length - 1) {
+                  setSelectedModuleId(modules[idx + 1].id);
+                  setSelectedLessonId(null);
+                }
+              }}
+              canMoveUp={modules.findIndex((m) => m.id === selectedModuleId) > 0}
+              canMoveDown={(() => {
+                const idx = modules.findIndex((m) => m.id === selectedModuleId);
+                return idx >= 0 && idx < modules.length - 1;
+              })()}
+              canNavigatePrev={modules.findIndex((m) => m.id === selectedModuleId) > 0}
+              canNavigateNext={(() => {
+                const idx = modules.findIndex((m) => m.id === selectedModuleId);
+                return idx >= 0 && idx < modules.length - 1;
+              })()}
             />
           ) : (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center space-y-3 max-w-sm">
-                <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Rocket size={28} className="text-blue-600 dark:text-blue-400" />
-                </div>
-                <h3 className="text-xl font-medium text-neutral-900 dark:text-neutral-100">Start Building Your Course</h3>
-                <p className="text-base text-neutral-500 dark:text-neutral-400">Select a module or lesson from the outline to edit, or create a new one to get started.</p>
-                <button
-                  type="button"
-                  onClick={addModule}
-                  className="rounded-md border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-base hover:border-neutral-300 dark:hover:border-neutral-600 transition-all"
-                >
-                  + Add your module
-                </button>
-              </div>
-            </div>
+            <BuilderEmptyState
+              modules={modules}
+              onAddModule={addModule}
+              onSelectModule={(id) => {
+                setSelectedModuleId(id);
+                setSelectedLessonId(null);
+                setShowLeftSidebar(true);
+                setShowRightSidebar(false);
+              }}
+            />
           )}
         </main>
 

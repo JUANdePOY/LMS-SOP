@@ -49,6 +49,15 @@ export async function getCourseList(params = {}) {
   return handle(res);
 }
 
+export async function getCourseCategories(params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([key, val]) => {
+    if (val !== undefined && val !== null && val !== "") qs.append(key, val);
+  });
+  const res = await fetch(`${API_BASE}/categories?${qs.toString()}`, { headers: authHeaders() });
+  return handle(res);
+}
+
 export async function getCourseById(id) {
   const res = await fetch(`${API_BASE}/${id}`, { headers: authHeaders() });
   return handle(res);

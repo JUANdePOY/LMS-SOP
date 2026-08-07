@@ -98,8 +98,34 @@ async function update(id, data) {
   return result.affectedRows;
 }
 
-async function softDelete(id) {
-  const [result] = await db.query('UPDATE categories SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
+async function softDelete(id, force = false) {
+  // sops.category_id is nullable with ON DELETE SET NULL, but this is a *soft*
+  // delete, so the FK never fires and SOPs would keep pointing at a category
+  // that no longer appears in any listing. Surface that as a blocker instead of
+  // silently leaving dangling references.
+  const [sops] = await db.query(
+    'SELECT COUNT(*) AS count FROM sops WHERE category_id = ? AND deleted_at IS NULL',
+    [id]
+  );
+  const sopCount = sops[0]?.count ?? 0;
+
+  if (sopCount > 0 && !force) {
+    const err = new Error(
+      `Cannot delete category because ${sopCount} SOP(s) still reference it. Please reassign or remove these records first.`
+    );
+    err.code = 'HAS_DEPENDENCIES';
+    throw err;
+  }
+
+  if (force && sopCount > 0) {
+    // Detach the SOPs so the soft-delete does not leave dangling references.
+    await db.query('UPDATE sops SET category_id = NULL WHERE category_id = ?', [id]);
+  }
+
+  const [result] = await db.query(
+    'UPDATE categories SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND deleted_at IS NULL',
+    [id]
+  );
   return result.affectedRows;
 }
 

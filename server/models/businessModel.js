@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const departmentModel = require('./departmentModel');
 
 const BUSINESS_STATUSES = ['active', 'inactive'];
 
@@ -152,18 +153,48 @@ async function clearLogo(id) {
   return result.affectedRows;
 }
 
-async function remove(id) {
-  const [deptCheck] = await db.query(
-    'SELECT COUNT(*) AS count FROM departments WHERE business_id = ?',
+async function remove(id, force = false) {
+  const [deptRows] = await db.query(
+    'SELECT id FROM departments WHERE business_id = ?',
     [id]
   );
-  if (deptCheck[0]?.count > 0) {
+
+  if (deptRows.length > 0 && !force) {
     const err = new Error('Cannot delete business with existing departments. Remove or reassign departments first.');
     err.statusCode = 409;
     throw err;
   }
-  const [result] = await db.query('DELETE FROM businesses WHERE id = ?', [id]);
-  return result.affectedRows;
+
+  if (!deptRows.length) {
+    const [result] = await db.query('DELETE FROM businesses WHERE id = ?', [id]);
+    return result.affectedRows;
+  }
+
+  // Force delete with departments attached.
+  //
+  // departments.business_id is NOT NULL and fk_department_business declares no
+  // ON DELETE action (so it behaves as RESTRICT). That means we can neither
+  // orphan the departments by nulling business_id nor let the FK clean up for
+  // us -- each department must be force-deleted first. The whole cascade runs
+  // in one transaction so a failure part-way cannot leave the business deleted
+  // with dangling departments (or vice versa).
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    for (const dept of deptRows) {
+      await departmentModel.removeWithConnection(conn, dept.id, true);
+    }
+
+    const [result] = await conn.query('DELETE FROM businesses WHERE id = ?', [id]);
+    await conn.commit();
+    return result.affectedRows;
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
 }
 
 async function getHierarchy() {

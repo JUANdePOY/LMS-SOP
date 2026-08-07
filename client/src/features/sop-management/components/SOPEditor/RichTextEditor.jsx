@@ -285,6 +285,16 @@ function EditorToolbar({ editor, onPickImage, uploadEnabled }) {
 function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Enter module content...', onImageUpload }) {
   const fileInputRef = useRef(null);
 
+  // Keep the latest callbacks in refs. Tiptap's `useEditor` captures the
+  // `onUpdate`/`onDrop`/`onPaste` handlers once at editor creation and (in v3)
+  // never refreshes them, so reading them from a ref guarantees every editor
+  // instance always talks to its OWN current props instead of a stale/shared
+  // closure. This is what prevented edits from leaking across instances.
+  const onChangeRef = useRef(onChange);
+  const onImageUploadRef = useRef(onImageUpload);
+  onChangeRef.current = onChange;
+  onImageUploadRef.current = onImageUpload;
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -310,7 +320,7 @@ function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Ente
     onUpdate: ({ editor }) => {
       let html = editor.getHTML();
       html = html.replace(/<p>\s*<\/p>/g, '').trim();
-      onChange(html || '');
+      onChangeRef.current?.(html || '');
     },
     editorProps: {
       attributes: {
@@ -325,7 +335,7 @@ function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Ente
         event.preventDefault();
         imageItems.forEach((item) => {
           const file = item.getAsFile();
-          if (file) insertImageWithUpload(editor, file, null, onImageUpload);
+          if (file) insertImageWithUpload(editor, file, null, onImageUploadRef.current);
         });
         return true;
       },
@@ -337,19 +347,23 @@ function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Ente
         event.preventDefault();
         const coords = { left: event.clientX, top: event.clientY };
         const pos = view.posAtCoords(coords)?.pos ?? view.state.selection.from;
-        files.forEach((file, i) => insertImageWithUpload(editor, file, pos + i, onImageUpload));
+        files.forEach((file, i) => insertImageWithUpload(editor, file, pos + i, onImageUploadRef.current));
         return true;
       },
     },
   });
 
-  // Keep the editor in sync when `value` changes from outside (e.g. switching modules,
+  // Keep the editor in sync when `value` changes from outside (e.g. switching lessons,
   // resetting the form) without fighting the user's own typing (which drives onUpdate).
   useEffect(() => {
     if (!editor) return;
     const clean = (html) => html.replace(/<p>\s*<\/p>/g, '').trim();
     if (clean(editor.getHTML()) !== clean(value || '')) {
-      editor.commands.setContent(value || '', false);
+      // Don't clobber the editor the user is actively editing — only sync when the
+      // external value diverges and the field isn't focused, otherwise we'd overwrite
+      // the in-progress content/cursor of this instance.
+      if (editor.isFocused) return;
+      editor.commands.setContent(value || '', { emitUpdate: false });
     }
   }, [value, editor]);
 

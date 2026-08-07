@@ -6,19 +6,22 @@ async function listQuizzes(courseId, filters = {}) {
   const limitNum = Number(limit) || 20;
   const offset = (pageNum - 1) * limitNum;
 
-  let sql = 'SELECT * FROM quizzes WHERE course_id = ? AND is_deleted = FALSE';
+  let sql = `SELECT q.*, COUNT(DISTINCT qq.id) AS question_count
+    FROM quizzes q
+    LEFT JOIN quiz_questions qq ON qq.quiz_id = q.id
+    WHERE q.course_id = ? AND q.is_deleted = FALSE`;
   const params = [courseId];
 
   if (module_id) {
-    sql += ' AND module_id = ?';
+    sql += ' AND q.module_id = ?';
     params.push(module_id);
   }
   if (status) {
-    sql += ' AND status = ?';
+    sql += ' AND q.status = ?';
     params.push(status);
   }
 
-  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  sql += ' GROUP BY q.id ORDER BY q.created_at DESC LIMIT ? OFFSET ?';
   params.push(limitNum, offset);
 
   const [rows] = await db.query(sql, params);
@@ -136,7 +139,7 @@ async function softDelete(id) {
 
 async function listQuestions(quizId) {
   const [rows] = await db.query(
-    'SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY order_index ASC, id ASC',
+    'SELECT * FROM quiz_questions WHERE quiz_id = ? AND is_deleted = FALSE ORDER BY order_index ASC, id ASC',
     [quizId]
   );
   return rows;
@@ -255,7 +258,7 @@ async function getQuizWithQuestions(quizId) {
   const quiz = quizzes[0];
   if (!quiz) return null;
 
-  const [questions] = await db.query('SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY order_index ASC, id ASC', [quizId]);
+    const [questions] = await db.query('SELECT * FROM quiz_questions WHERE quiz_id = ? AND is_deleted = FALSE ORDER BY order_index ASC, id ASC', [quizId]);
 
   return { ...quiz, questions: questions || [] };
 }
@@ -629,16 +632,19 @@ async function getUserSubmissions(userId, quizId) {
   return rows;
 }
 
-async function getMyQuizzes(userId, role) {
+async function getMyQuizzes(userId, role, courseId) {
   const adminRoles = ['super_admin', 'admin', 'department_head'];
+  const courseFilter = courseId ? ' AND q.course_id = ?' : '';
+  const courseParam = courseId ? [courseId] : [];
+
   if (adminRoles.includes(role)) {
     const [rows] = await db.query(
       `SELECT q.*, c.title AS course_title, c.id AS course_id
        FROM quizzes q
        JOIN courses c ON q.course_id = c.id
-       WHERE q.is_deleted = FALSE AND q.status = 'published'
+       WHERE q.is_deleted = FALSE AND q.status = 'published'${courseFilter}
        ORDER BY q.created_at DESC`,
-      []
+      courseParam
     );
     return rows;
   }
@@ -648,10 +654,10 @@ async function getMyQuizzes(userId, role) {
      FROM quizzes q
      JOIN courses c ON q.course_id = c.id
      LEFT JOIN course_enrollments ce ON ce.course_id = c.id AND ce.user_id = ? AND ce.status = 'active' AND ce.is_deleted = FALSE
-     WHERE q.is_deleted = FALSE AND q.status = 'published'
+     WHERE q.is_deleted = FALSE AND q.status = 'published'${courseFilter}
        AND (ce.user_id IS NOT NULL OR c.instructor_id = ?)
      ORDER BY q.created_at DESC`,
-    [userId, userId]
+    [userId, userId, ...courseParam]
   );
   return rows;
 }

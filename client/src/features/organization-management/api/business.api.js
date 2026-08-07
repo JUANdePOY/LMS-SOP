@@ -21,10 +21,10 @@ export const updateBusiness = (id, data) => {
   return api.put(`/businesses/${id}`, data);
 };
 
-export const deleteBusiness = (id) => {
+export const deleteBusiness = (id, force = false) => {
   const err = validateId(id, 'Business ID');
   if (err) return Promise.reject(new Error(err));
-  return api.delete(`/businesses/${id}`);
+  return api.delete(`/businesses/${id}`, { params: { force: force ? 'true' : 'false' } });
 };
 
 export const getBusinessHierarchy = () => api.get('/businesses/hierarchy');

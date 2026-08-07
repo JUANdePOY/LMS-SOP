@@ -356,7 +356,20 @@ export default function Courses({ departments = [] }) {
                   const status = STATUS_META[statusKey] || STATUS_META.draft;
                   const difficulty = DIFFICULTY_META[c.difficulty] || DIFFICULTY_META.beginner;
                   return (
-                    <tr key={c.id} className={`${idx % 2 === 0 ? "bg-white dark:bg-neutral-800" : "bg-neutral-50/30 dark:bg-neutral-800/50"}`}>
+                    <tr
+                      key={c.id}
+                      onClick={() => openBuilder(c)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          openBuilder(c);
+                        }
+                      }}
+                      aria-label={`Open course ${c.title || "Untitled Course"}`}
+                      className={`${idx % 2 === 0 ? "bg-white dark:bg-neutral-800" : "bg-neutral-50/30 dark:bg-neutral-800/50"} cursor-pointer transition-colors hover:bg-blue-50/60 dark:hover:bg-blue-900/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
+                    >
                       <td className="px-3 py-3.5 w-10"></td>
                       <td className="px-3 py-3.5 hidden sm:table-cell">
                         {c.thumbnail_url ? (
@@ -400,7 +413,7 @@ export default function Courses({ departments = [] }) {
                         {c.start_date || c.end_date ? <span>{formatDate(c.start_date)} {c.end_date ? `— ${formatDate(c.end_date)}` : ""}</span> : "—"}
                       </td>
                       <td className="px-3 py-3.5">
-                        <div className="flex items-center justify-end gap-0.5">
+                        <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
                           {c.status === "draft" && (
                             <button onClick={() => handleQuickAction(c, "publish")} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-emerald-600 hover:bg-emerald-50 transition-all" title="Publish">
                               🌐

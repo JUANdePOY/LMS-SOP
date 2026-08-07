@@ -21,6 +21,7 @@ export function useTakeQuiz() {
   const [violationAction, setViolationAction] = useState("none");
   const [limitReached, setLimitReached] = useState(null);
   const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
   const timerRef = useRef(null);
   const draftRef = useRef(null);
 
@@ -101,8 +102,11 @@ export function useTakeQuiz() {
         const next = { ...prev, [questionId]: value };
         if (attempt && attempt.id) {
           if (draftRef.current) clearTimeout(draftRef.current);
+          setSaving(true);
           draftRef.current = setTimeout(() => {
-            saveDraftAttempt(attempt.id, { answers: next }).catch(() => {});
+            saveDraftAttempt(attempt.id, { answers: next })
+              .catch(() => {})
+              .finally(() => setSaving(false));
           }, 2000);
         }
         return next;
@@ -200,6 +204,7 @@ export function useTakeQuiz() {
     violationAction,
     limitReached,
     error,
+    saving,
     start,
     reset,
     setAnswer,

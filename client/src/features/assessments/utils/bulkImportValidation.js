@@ -55,7 +55,7 @@ export function validateQuestion(q, existingQuestions = []) {
     errors.push({ row: q.row, field: "type", message: `Invalid type "${q.type}". Must be one of: ${Array.from(VALID_TYPES).join(", ")}` });
   }
 
-  if (q.type === "multiple_choice" || q.type === "multi_select") {
+  if (q.type === "multiple_choice" || q.type === "multiple_select") {
     if (!q.options || !Array.isArray(q.options) || q.options.length < 2) {
       errors.push({ row: q.row, field: "options", message: "At least two options are required for multiple choice/select questions" });
     }
@@ -67,7 +67,7 @@ export function validateQuestion(q, existingQuestions = []) {
         errors.push({ row: q.row, field: "correct_answer", message: `Correct answer "${q.correct_answer}" is not among the options` });
       }
     }
-    if (q.type === "multi_select" && q.options && Array.isArray(q.correct_answer)) {
+    if (q.type === "multiple_select" && q.options && Array.isArray(q.correct_answer)) {
       const opts = q.options.map((o) => String(o).trim());
       q.correct_answer.forEach((ans) => {
         if (!opts.includes(String(ans).trim())) {

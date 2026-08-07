@@ -160,14 +160,15 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Department not found', code: 'NOT_FOUND' });
     }
 
-    await departmentModel.remove(departmentId);
+    const force = req.query.force === 'true' || req.body?.force === true;
+    await departmentModel.remove(departmentId, force);
 
     logAudit({
       user_id: req.user.id,
       action: 'department.deleted',
       entity_type: 'department',
       entity_id: departmentId,
-      old_values: { name: targetDept.name, code: targetDept.code }
+      old_values: { name: targetDept.name, code: targetDept.code, forced: force }
     });
 
     res.json({ status: 'success', message: 'Department deleted successfully' });

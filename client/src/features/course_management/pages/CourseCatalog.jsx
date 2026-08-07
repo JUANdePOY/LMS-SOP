@@ -1,18 +1,21 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useCourseList } from "../hooks/useCourseList";
 import { useCourseFilters } from "../hooks/useCourseFilters";
 import { Button } from "@/shared/components/ui/button";
-import { Card } from "@/shared/components/ui/card";
-import { Search, Plus, Users, BookOpen, GraduationCap, Award } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import CourseTable from "../components/tables/CourseTable";
 import CreateCourseModal from "../components/modals/CreateCourseModal";
 import { useCreateCourse } from "../hooks/useCreateCourse";
 
 export default function CourseCatalog() {
+  const navigate = useNavigate();
   const { data, loading, error, refetch } = useCourseList({ status: "published" });
-  const { filters, updateFilter, resetFilters } = useCourseFilters();
-  const { create, loading: createLoading } = useCreateCourse();
+  const { filters, updateFilter } = useCourseFilters();
+  const { create } = useCreateCourse();
   const [open, setOpen] = useState(false);
+
+  const handleView = (course) => navigate(`/courses/${course.id}`);
 
   const handleCreate = async (values) => {
     await create(values);
@@ -63,7 +66,7 @@ export default function CourseCatalog() {
           <button onClick={refetch} className="mt-2 rounded-lg px-3 py-1.5 text-sm bg-red-600 text-white">Retry</button>
         </div>
       )}
-      {!loading && !error && <CourseTable courses={filtered} />}
+      {!loading && !error && <CourseTable courses={filtered} onView={handleView} />}
       <CreateCourseModal open={open} onClose={() => setOpen(false)} onSubmit={handleCreate} />
     </div>
   );

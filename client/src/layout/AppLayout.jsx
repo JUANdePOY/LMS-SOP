@@ -104,6 +104,7 @@ export default function AppLayout() {
   const isEmployee = user?.role === 'employee';
   const mobileNav = isEmployee ? MOBILE_BOTTOM_NAV_EMPLOYEE : MOBILE_BOTTOM_NAV_ADMIN;
   const breadcrumbs = getBreadcrumbs(location.pathname);
+  const currentTitle = breadcrumbs.length ? breadcrumbs[breadcrumbs.length - 1].title : "Learning";
   const themeToggleLabel = isDark ? "Switch to light theme" : "Switch to dark theme";
   useNotificationStore();
 
@@ -193,6 +194,8 @@ export default function AppLayout() {
                 )}
               </button>
 
+              <span className="sm:hidden min-w-0 truncate text-sm font-semibold text-white">{currentTitle}</span>
+
               <nav
                 aria-label={breadcrumbs.length > 0 ? "Breadcrumb" : "Page title"}
                 className={cn(
@@ -235,7 +238,7 @@ export default function AppLayout() {
               <GlobalSearch />
             </div>
 
-            <div className="flex items-center gap-0.5 sm:gap-1 px-3 sm:px-4">
+            <div className="flex items-center gap-0.5 sm:gap-1 px-3 sm:px-4 shrink-0">
               <button
                 onClick={() => setShowSearchMobile((v) => !v)}
                 aria-label="Search"
@@ -249,7 +252,7 @@ export default function AppLayout() {
 
               <NotificationDropdown showBadge={true} />
 
-              <div className="hidden sm:flex items-center gap-0.5">
+              <div className="flex items-center gap-0.5">
                 {HEADER_QUICK_ACCESS.map((item) => {
                   const Icon = item.icon;
                   const active = location.pathname === item.path || location.pathname.startsWith(item.path);

@@ -53,6 +53,7 @@ const sopsRoutes = require('./routes/sops');
 const sopSharePublicRouter = require('./routes/sopSharePublic');
 const coursesRoutes = require('./routes/courses');
 const enrollmentsRoutes = require('./routes/enrollments');
+const learningPathsRoutes = require('./routes/learningPaths');
 const { courseRoutes: progressCourseRoutes, lessonRoutes: progressLessonRoutes } = require('./routes/progress');
 const gradesRoutes = require('./routes/grades');
 const discussionsRoutes = require('./routes/discussions');
@@ -118,6 +119,7 @@ app.use('/api/courses', sopCourseLinkRoutes);
 app.use('/api/courses', coursesRoutes);
 app.use('/api/courses', progressCourseRoutes);
 app.use('/api/enrollments', enrollmentsRoutes);
+app.use('/api/learning-paths', learningPathsRoutes);
 app.use('/api/lessons', progressLessonRoutes);
 app.use('/api/course-builder', courseBuilderRoutes);
 app.use('/api/employee', employeeRoutes);
@@ -237,3 +239,4 @@ server.on('error', (err) => {
 });
 
 module.exports = app;
+

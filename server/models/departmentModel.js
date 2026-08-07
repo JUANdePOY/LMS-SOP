@@ -113,53 +113,85 @@ async function update(id, data) {
   return result.affectedRows;
 }
 
-async function remove(id) {
-  // Check for dependent SOPs (soft-deleted ones are excluded)
-  const [sops] = await db.query(
-    'SELECT COUNT(*) AS count FROM sops WHERE department_id = ? AND deleted_at IS NULL',
-    [id]
-  );
+async function remove(id, force = false) {
+  return removeWithConnection(db, id, force);
+}
 
-  // Check for active users in this department
-  const [users] = await db.query(
-    'SELECT COUNT(*) AS count FROM users WHERE department_id = ? AND is_active = TRUE',
-    [id]
-  );
-
-  // Check for approval workflows tied to this department
-  const [workflows] = await db.query(
-    'SELECT COUNT(*) AS count FROM approval_workflows WHERE department_id = ?',
-    [id]
-  );
-
-  // Check for categories tied to this department
-  const [categories] = await db.query(
-    'SELECT COUNT(*) AS count FROM categories WHERE department_id = ?',
-    [id]
-  );
-
-  // Check for assignment_departments entries
-  const [assignments] = await db.query(
-    'SELECT COUNT(*) AS count FROM assignment_departments WHERE department_id = ?',
-    [id]
-  );
-
-  const blockers = [];
-  if (sops[0]?.count > 0) blockers.push(`${sops[0].count} SOP(s)`);
-  if (users[0]?.count > 0) blockers.push(`${users[0].count} active user(s)`);
-  if (workflows[0]?.count > 0) blockers.push(`${workflows[0].count} approval workflow(s)`);
-  if (categories[0]?.count > 0) blockers.push(`${categories[0].count} categor(y/ies)`);
-  if (assignments[0]?.count > 0) blockers.push(`${assignments[0].count} assignment(s)`);
-
-  if (blockers.length > 0) {
-    const err = new Error(
-      `Cannot delete department because the following records still reference it: ${blockers.join(', ')}. Please reassign or remove these records first.`
+// Shared implementation so callers that already own a transaction (e.g. a
+// business cascade delete) can reuse the exact same semantics. `conn` may be
+// the pool or a dedicated transaction connection.
+async function removeWithConnection(conn, id, force = false) {
+  if (!force) {
+    // Check for dependent SOPs (soft-deleted ones are excluded)
+    const [sops] = await conn.query(
+      'SELECT COUNT(*) AS count FROM sops WHERE department_id = ? AND deleted_at IS NULL',
+      [id]
     );
-    err.code = 'HAS_DEPENDENCIES';
-    throw err;
+
+    // Check for active users in this department
+    const [users] = await conn.query(
+      'SELECT COUNT(*) AS count FROM users WHERE department_id = ? AND is_active = TRUE',
+      [id]
+    );
+
+    // Check for approval workflows tied to this department
+    const [workflows] = await conn.query(
+      'SELECT COUNT(*) AS count FROM approval_workflows WHERE department_id = ?',
+      [id]
+    );
+
+    // Check for categories tied to this department
+    const [categories] = await conn.query(
+      'SELECT COUNT(*) AS count FROM categories WHERE department_id = ?',
+      [id]
+    );
+
+    // Check for assignment_departments entries
+    const [assignments] = await conn.query(
+      'SELECT COUNT(*) AS count FROM assignment_departments WHERE department_id = ?',
+      [id]
+    );
+
+    const blockers = [];
+    if (sops[0]?.count > 0) blockers.push(`${sops[0].count} SOP(s)`);
+    if (users[0]?.count > 0) blockers.push(`${users[0].count} active user(s)`);
+    if (workflows[0]?.count > 0) blockers.push(`${workflows[0].count} approval workflow(s)`);
+    if (categories[0]?.count > 0) blockers.push(`${categories[0].count} categor(y/ies)`);
+    if (assignments[0]?.count > 0) blockers.push(`${assignments[0].count} assignment(s)`);
+
+    if (blockers.length > 0) {
+      const err = new Error(
+        `Cannot delete department because the following records still reference it: ${blockers.join(', ')}. Please reassign or remove these records first.`
+      );
+      err.code = 'HAS_DEPENDENCIES';
+      throw err;
+    }
+  } else {
+    // Force delete: unlink / clean up referencing records, then remove the department.
+    //
+    // NOTE on sops: sops.department_id is NOT NULL and fk_sop_department has no
+    // ON DELETE rule (i.e. RESTRICT), so we can neither null it nor rely on the
+    // FK. SOPs support soft delete, so retire them instead of destroying them.
+    await conn.query(
+      `UPDATE sops
+       SET deleted_at = CURRENT_TIMESTAMP, is_deleted = 1
+       WHERE department_id = ? AND deleted_at IS NULL`,
+      [id]
+    );
+    // These columns are nullable, so detaching is safe and preserves the rows.
+    await conn.query('UPDATE users SET department_id = NULL WHERE department_id = ?', [id]);
+    await conn.query('UPDATE categories SET department_id = NULL WHERE department_id = ?', [id]);
+    await conn.query('UPDATE courses SET department_id = NULL WHERE department_id = ?', [id]);
+    // Matches fk_workflow_department (ON DELETE SET NULL): a workflow scoped to
+    // this department becomes an organization-wide workflow rather than being
+    // destroyed along with its steps.
+    await conn.query('UPDATE approval_workflows SET department_id = NULL WHERE department_id = ?', [id]);
+    // assignment_departments and department_members are ON DELETE CASCADE, so
+    // the DELETE below cleans them up automatically. Child departments are
+    // detached by departments_ibfk_1 (parent_department_id ON DELETE SET NULL).
   }
 
-  const [result] = await db.query('DELETE FROM departments WHERE id = ?', [id]);
+  const [result] = await conn.query('DELETE FROM departments WHERE id = ?', [id]);
   return result.affectedRows;
 }
 
@@ -218,6 +250,7 @@ module.exports = {
   create,
   update,
   remove,
+  removeWithConnection,
   getHierarchy,
   getChildren,
   getUsers,

@@ -225,13 +225,13 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
       className={cn(
         "fixed inset-y-0 left-0 z-50 flex flex-col",
         "bg-[var(--bg-sidebar)] text-[var(--text-on-sidebar)]",
-        "transition-all duration-200 ease-out",
+        "transition-transform duration-200 ease-out",
         "bg-white/95 dark:bg-neutral-900/95",
         "backdrop-blur-md",
         "border-r border-[var(--border-sidebar)]",
         SIDEBAR_WIDTH.expanded,
-        "max-lg:-translate-x-full",
-        mobileOpen && "translate-x-0",
+        "lg:translate-x-0",
+        !mobileOpen ? "max-lg:-translate-x-full" : "max-lg:translate-x-0",
         collapsed && SIDEBAR_WIDTH.collapsed,
         "shadow-lg lg:shadow-none"
       )}

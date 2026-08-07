@@ -120,18 +120,25 @@ router.delete('/:id', requireAdmin, async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Category not found', code: 'NOT_FOUND' });
     }
 
-    await categoryModel.softDelete(parseInt(req.params.id, 10));
+    const force = req.query.force === 'true' || req.body?.force === true;
+    if (force && req.user.role !== 'super_admin') {
+      return res.status(403).json({ status: 'error', message: 'Only super admins can force delete categories', code: 'ADMIN_ONLY' });
+    }
+    await categoryModel.softDelete(parseInt(req.params.id, 10), force);
 
     logAudit({
       user_id: req.user.id,
       action: 'category.deleted',
       entity_type: 'category',
       entity_id: req.params.id,
-      metadata: { name: category.name },
+      metadata: { name: category.name, forced: force },
     });
 
     res.json({ status: 'success', message: 'Category deleted successfully' });
   } catch (err) {
+    if (err.code === 'HAS_DEPENDENCIES') {
+      return res.status(409).json({ status: 'error', message: err.message, code: 'HAS_DEPENDENCIES' });
+    }
     console.error('Category delete error:', err);
     res.status(500).json({ status: 'error', message: 'Failed to delete category', code: 'DB_ERROR' });
   }

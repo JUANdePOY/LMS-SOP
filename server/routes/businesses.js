@@ -275,14 +275,15 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Business not found', code: 'NOT_FOUND' });
     }
 
-    await businessModel.remove(businessId);
+    const force = req.query.force === 'true' || req.body?.force === true;
+    await businessModel.remove(businessId, force);
 
     logAudit({
       user_id: req.user.id,
       action: 'business.deleted',
       entity_type: 'business',
       entity_id: businessId,
-      metadata: { business_code: target.business_code, business_name: target.business_name },
+      metadata: { business_code: target.business_code, business_name: target.business_name, forced: force },
     });
 
     res.json({ status: 'success', message: 'Business deleted successfully' });
