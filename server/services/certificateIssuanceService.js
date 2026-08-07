@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const certificateIssuanceModel = require('../models/certificateIssuanceModel');
 const certificateTemplateModel = require('../models/certificateTemplateModel');
 const certificateSignatureModel = require('../models/certificateSignatureModel');
+const authModel = require('../models/authModel');
 const { resolveDynamicSections } = require('../shared/certificateSections');
 const { logAudit } = require('../utils/auditLogger');
 const { validateIssuancePayload } = require('../validators/certificateIssuanceValidator');
@@ -66,11 +67,23 @@ async function issueCertificate(payload, actorId) {
     }
   }
 
+  const user = await authModel.findById(user_id);
+  if (!user) {
+    const error = new Error('Recipient user not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+
   const sections = typeof template.sections === 'string'
     ? JSON.parse(template.sections)
     : template.sections;
 
-  const resolvedSections = resolveDynamicSections(sections, overrides || {});
+  const effectiveOverrides = { ...(overrides || {}) };
+  if (!effectiveOverrides.recipient_name) {
+    effectiveOverrides.recipient_name = user.full_name || '';
+  }
+
+  const resolvedSections = resolveDynamicSections(sections, effectiveOverrides);
 
   const signatureIds = sections.signatures_seal?.items?.map(item => item.signature_id).filter(Boolean) || [];
   const signatures = await certificateSignatureModel.findAll({});

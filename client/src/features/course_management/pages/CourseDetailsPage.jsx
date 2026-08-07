@@ -6,6 +6,7 @@ import { useEnrollmentList } from "../hooks/useEnrollmentList";
 import { useGrades } from "../hooks/useGrades";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { useDiscussions } from "../hooks/useDiscussions";
+import { useUpdateCourse } from "../hooks/useUpdateCourse";
 import { Button } from "@/shared/components/ui/button";
 import { Card } from "@/shared/components/ui/card";
 import { useNavigate } from "react-router-dom";
@@ -49,10 +50,17 @@ export default function CourseDetailsPage() {
   const { data: grades } = useGrades({ courseId: id });
   const { data: analytics } = useAnalytics(id);
   const { data: discussions } = useDiscussions(id);
+  const { update: updateCourseSettings, loading: updatingSettings } = useUpdateCourse();
   const [tab, setTab] = useState("overview");
   const [modals, setModals] = useState({});
 
   const toggleModal = (key) => setModals((p) => ({ ...p, [key]: !p[key] }));
+
+  const handleSettingsSave = async (payload) => {
+    if (!id) return;
+    await updateCourseSettings(id, payload);
+    await refetch?.();
+  };
 
   if (loading) return <p className="text-sm text-neutral-500">Loading course...</p>;
   if (error) {
@@ -123,7 +131,7 @@ export default function CourseDetailsPage() {
         {tab === "assignments" && <AssignmentsTab assignments={[]} onAdd={() => toggleModal("assignment")} />}
         {tab === "discussions" && <DiscussionsTab discussions={discussions} />}
         {tab === "analytics" && <AnalyticsTab analytics={analytics} />}
-        {tab === "settings" && <SettingsTab course={course} />}
+        {tab === "settings" && <SettingsTab course={course} onSave={handleSettingsSave} />}
       </div>
       <AddModuleModal open={modals.module} onClose={() => toggleModal("module")} onSubmit={() => refetch?.()} />
       <AddContentModal open={modals.content} onClose={() => toggleModal("content")} onSubmit={() => refetch?.()} />

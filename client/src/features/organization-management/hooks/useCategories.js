@@ -45,21 +45,20 @@ export function useCategories(initialParams = {}) {
   const create = useCallback(async (data) => {
     const response = await createCategory(data);
     const payload = response.data;
-    const created = payload?.data || payload;
     if (payload?.status === 'success') {
-      setCategories((prev) => [created, ...prev]);
+      await refresh();
     }
-    return created;
-  }, []);
+    return payload?.data || payload;
+  }, [refresh]);
 
   const update = useCallback(async (id, data) => {
     const response = await updateCategory(id, data);
     const payload = response.data;
     if (payload?.status === 'success') {
-      setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
+      await refresh();
     }
     return payload;
-  }, []);
+  }, [refresh]);
 
   const remove = useCallback(async (id) => {
     await deleteCategory(id);

@@ -8,9 +8,12 @@ async function findAll(filters = {}) {
     SELECT i.*,
            t.name AS template_name,
            t.public_id AS template_public_id,
+           t.orientation AS template_orientation,
+           t.width_px AS template_width_px,
+           t.height_px AS template_height_px,
            u.full_name AS user_name,
            issuer.full_name AS issued_by_name
-    FROM certificate_issuances i
+     FROM certificate_issuances i
     LEFT JOIN certificate_templates t ON i.template_id = t.id AND t.is_deleted = 0
     LEFT JOIN users u ON i.user_id = u.id
     LEFT JOIN users issuer ON i.issued_by = issuer.id
@@ -66,6 +69,9 @@ async function findById(id) {
     `SELECT i.*,
             t.name AS template_name,
             t.public_id AS template_public_id,
+            t.orientation AS template_orientation,
+            t.width_px AS template_width_px,
+            t.height_px AS template_height_px,
             u.full_name AS user_name,
             issuer.full_name AS issued_by_name
      FROM certificate_issuances i
@@ -87,6 +93,9 @@ async function findByCertificateNumber(certificateNumber) {
     `SELECT i.*,
             t.name AS template_name,
             t.public_id AS template_public_id,
+            t.orientation AS template_orientation,
+            t.width_px AS template_width_px,
+            t.height_px AS template_height_px,
             u.full_name AS user_name,
             issuer.full_name AS issued_by_name
      FROM certificate_issuances i

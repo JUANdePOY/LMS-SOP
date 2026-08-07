@@ -8,14 +8,14 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { useIssuances } from '@/features/certificate-management/hooks/useIssuances';
 import { ISSUANCE_STATUSES } from '@/features/certificate-management/constants/certificateSections';
 import * as session from '@/services/session';
-import { Download, X, Award } from 'lucide-react';
+import { Download, Award } from 'lucide-react';
 import CertificatePreviewCanvas from '@/features/certificate-management/components/CertificatePreviewCanvas';
 
 export default function MyCertificatesPage() {
   const { userId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { issuances, loading, fetchByUser, handleRevoke } = useIssuances();
+  const { issuances, loading, fetchByUser } = useIssuances();
 
   const currentUser = session.getCurrentUser();
   const resolvedUserId = userId ? parseInt(userId, 10) : (currentUser?.id || 1);
@@ -27,24 +27,15 @@ export default function MyCertificatesPage() {
     fetchByUser(resolvedUserId);
   }, [resolvedUserId, fetchByUser]);
 
-  const handleRevokeClick = async (id) => {
-    if (!confirm('Are you sure you want to revoke this certificate?')) return;
-    try {
-      await handleRevoke(id);
-    } catch (err) {
-      // error handled in hook
-    }
+  const handleCardClick = (issuance) => {
+    setSelectedIssuance(issuance);
+    setIsModalOpen(true);
   };
 
   const handleViewPdf = (pdfPath) => {
     if (pdfPath) {
       window.open(`/uploads/${pdfPath}`, '_blank');
     }
-  };
-
-  const handleCardClick = (issuance) => {
-    setSelectedIssuance(issuance);
-    setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
@@ -105,78 +96,26 @@ export default function MyCertificatesPage() {
                     Click to preview
                   </div>
                 </div>
-                {issuance.status === 'active' && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleRevokeClick(issuance.id);
-                    }}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    Revoke
-                  </Button>
-                )}
               </div>
             </Card>
           ))}
         </div>
       )}
 
-      <Modal open={isModalOpen} onClose={handleCloseModal} title="Certificate Preview" size="xl">
+      <Modal open={isModalOpen} onClose={handleCloseModal} title="Certificate Preview" size="xl" footer={selectedIssuance && selectedIssuance.pdf_storage_path ? (
+        <div className="flex w-full justify-end gap-3">
+          <Button
+            size="sm"
+            onClick={() => handleViewPdf(selectedIssuance.pdf_storage_path)}
+            className="flex items-center gap-1"
+          >
+            <Download size={14} />
+            Download PDF
+          </Button>
+        </div>
+      ) : null}>
         {selectedIssuance && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Award size={20} className="text-indigo-600" />
-                <h3 className="text-lg font-semibold">{selectedIssuance.template_name}</h3>
-                <Badge className={ISSUANCE_STATUSES[selectedIssuance.status]?.color || ''}>
-                  {ISSUANCE_STATUSES[selectedIssuance.status]?.label || selectedIssuance.status}
-                </Badge>
-              </div>
-              <Button variant="ghost" size="sm" onClick={handleCloseModal}>
-                <X size={18} />
-              </Button>
-            </div>
-
-            {selectedIssuance.pdf_storage_path && (
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => handleViewPdf(selectedIssuance.pdf_storage_path)}
-                  className="flex items-center gap-1"
-                >
-                  <Download size={14} />
-                  Download PDF
-                </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setIsModalOpen(false);
-                      handleViewPdf(selectedIssuance.pdf_storage_path);
-                    }}
-                    className="flex items-center gap-1"
-                  >
-                    Open PDF
-                  </Button>
-                {selectedIssuance.status === 'active' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      handleCloseModal();
-                      handleRevokeClick(selectedIssuance.id);
-                    }}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    Revoke
-                  </Button>
-                )}
-              </div>
-            )}
-
             <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900">
               {(() => {
                 try {
@@ -188,9 +127,9 @@ export default function MyCertificatesPage() {
                     <CertificatePreviewCanvas
                       sections={sections}
                        framePreview={selectedIssuance.template_public_id ? `/api/certificate-templates/${selectedIssuance.template_public_id}/frame` : null}
-                      orientation={sections.orientation || 'portrait'}
-                      widthPx={sections.width_px}
-                      heightPx={sections.height_px}
+                      orientation={selectedIssuance.template_orientation || 'landscape'}
+                      widthPx={selectedIssuance.template_width_px}
+                      heightPx={selectedIssuance.template_height_px}
                     />
                   );
                 } catch {
