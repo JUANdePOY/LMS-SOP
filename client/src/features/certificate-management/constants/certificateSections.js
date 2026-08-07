@@ -164,10 +164,10 @@ export function normalizeSections(raw = {}) {
 
 export function resolveDynamicSections(templateSections, overrides = {}) {
   const resolved = JSON.parse(JSON.stringify(templateSections));
-  if (overrides.recipient_name) {
+  if (overrides.recipient_name && resolved.recipient_name) {
     resolved.recipient_name.text = overrides.recipient_name;
   }
-  if (overrides.date) {
+  if (overrides.date && resolved.date) {
     resolved.date.text = overrides.date;
   }
   return resolved;

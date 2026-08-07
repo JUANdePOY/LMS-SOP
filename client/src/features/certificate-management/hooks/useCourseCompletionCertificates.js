@@ -23,7 +23,8 @@ export function useCourseCompletionCertificates() {
   }, [toast]);
 
   const getCertificateForCourse = useCallback((userId, courseId) => {
-    return issuances.find(issuance => issuance.course_id === courseId && issuance.status === 'active');
+    const numericCourseId = Number(courseId);
+    return issuances.find(issuance => issuance.course_id === numericCourseId && issuance.status === 'active');
   }, [issuances]);
 
   return {

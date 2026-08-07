@@ -38,6 +38,13 @@ templateRouter.route('/:id/frame')
 templateRouter.route('/:id/download')
   .get(certificateTemplateController.download);
 
+// Public frame route — certificate frame images are decorative and safe
+// to expose publicly so that issued certificates can render previews
+// without requiring admin authentication.
+const templateFramePublicRouter = express.Router();
+templateFramePublicRouter.route('/:publicId/frame')
+  .get(certificateTemplateController.getFrame);
+
 /* ─────────────────── Signature Router ─────────────────── */
 // Mounted at /api/certificate-signatures
 const signatureRouter = express.Router();
@@ -47,13 +54,17 @@ signatureRouter.route('/')
   .get(certificateSignatureController.list)
   .post(signatureUploadMiddleware, certificateSignatureController.create);
 
-signatureRouter.route('/:id/image')
-  .get(certificateSignatureController.getImage);
-
 signatureRouter.route('/:id')
   .get(certificateSignatureController.getById)
   .put(certificateSignatureController.update)
   .delete(certificateSignatureController.remove);
+
+// Public image route — signature images are embedded in certificates
+// and should be viewable by any authenticated user, not just admins.
+const signatureImageRouter = express.Router();
+signatureImageRouter.use(authenticateToken);
+signatureImageRouter.route('/:id/image')
+  .get(certificateSignatureController.getImage);
 
 /* ─────────────────── Issuance Router ─────────────────── */
 // Mounted at /api/certificate-issuances
@@ -94,6 +105,8 @@ issuanceRouter.delete(
 
 module.exports = {
   templateRouter,
+  templateFramePublicRouter,
   signatureRouter,
+  signatureImageRouter,
   issuanceRouter,
 };

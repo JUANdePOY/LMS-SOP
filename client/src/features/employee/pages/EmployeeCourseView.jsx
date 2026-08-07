@@ -345,10 +345,13 @@ export default function EmployeeCourseView() {
                       </span>
                     )}
                     {isCompleted && userId && courseId && getCertificateForCourse(userId, courseId) && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 px-3 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30">
+                      <button
+                        onClick={() => navigate('/certificates/my-certificates')}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 px-3 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 transition-colors"
+                      >
                         <Award size={14} />
                         Certificate Issued
-                      </span>
+                      </button>
                     )}
                   </div>
                 </div>

@@ -68,7 +68,7 @@ const sopCourseLinkRoutes = require('./routes/sopCourseLinks');
 const employeeRoutes = require('./routes/employee');
 const notificationsRoutes = require('./routes/notifications');
 
-const { templateRouter, signatureRouter, issuanceRouter } = require('./routes/certificates');
+const { templateRouter, templateFramePublicRouter, signatureRouter, signatureImageRouter, issuanceRouter } = require('./routes/certificates');
 const { certificateCourseLinkRouter } = require('./routes/certificate-course-links');
 const sopAttachmentPublicFile = require('./services/sopAttachmentPublicFile');
 
@@ -138,7 +138,12 @@ app.use('/api/search', searchRoutes);
 app.use('/uploads', express.static(getUploadRoot()));
 
 // Certificate management routes
+// Public frame route must be mounted BEFORE the admin-protected template
+// router so that unauthenticated users can fetch certificate frame images
+// for issued-certificate previews.
+app.use('/api/certificate-templates', templateFramePublicRouter);
 app.use('/api/certificate-templates', templateRouter);
+app.use('/api/certificate-signatures', signatureImageRouter);
 app.use('/api/certificate-signatures', signatureRouter);
 app.use('/api/certificate-issuances', issuanceRouter);
 app.use('/api/certificate-courses', certificateCourseLinkRouter);

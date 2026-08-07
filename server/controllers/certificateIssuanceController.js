@@ -35,6 +35,7 @@ function mapPublicIssuance(row) {
     verification_code: row.verification_code || null,
     template_id: row.template_id,
     template_name: row.template_name,
+    template_public_id: row.template_public_id || null,
     user_id: row.user_id,
     user_name: row.user_name,
     course_id: row.course_id || null,

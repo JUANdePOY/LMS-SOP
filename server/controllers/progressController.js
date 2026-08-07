@@ -193,8 +193,8 @@ async function markLessonComplete(req, res) {
 
       if (total > 0 && completed >= total) {
         const [[enrollmentRow]] = await conn.query(
-          'SELECT id FROM course_enrollments WHERE course_id = ? AND user_id = ? AND status != ? AND is_deleted = FALSE LIMIT 1',
-          [courseId, userId, 'completed']
+          'SELECT id FROM course_enrollments WHERE course_id = ? AND user_id = ? AND is_deleted = FALSE LIMIT 1',
+          [courseId, userId]
         );
         if (enrollmentRow) {
           await conn.query(
@@ -225,7 +225,11 @@ async function markLessonComplete(req, res) {
 
       if (enrollment && total > 0 && completed >= total) {
         try {
-          await autoIssueOnCompletion(courseId, userId, enrollment.id, userId);
+          const result = await autoIssueOnCompletion(courseId, userId, enrollment.id, userId);
+          if (result.issued) {
+            res.locals.certificateIssued = true;
+            res.locals.certificate = result.issuance;
+          }
         } catch (autoIssueErr) {
           console.error('Auto certificate issuance failed:', autoIssueErr.message);
         }
@@ -251,6 +255,10 @@ async function markLessonComplete(req, res) {
             completed: completedLessons,
             completionPct: completedPct,
           },
+          ...(res.locals.certificateIssued ? {
+            certificateIssued: true,
+            certificate: res.locals.certificate,
+          } : {}),
         },
       });
     } catch (txErr) {
