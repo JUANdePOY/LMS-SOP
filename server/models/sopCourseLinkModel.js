@@ -56,20 +56,47 @@ async function listByCourseAndSop(courseId, sopId) {
   return rows[0] || null;
 }
 
+function toValidIntOrNull(value, fieldName) {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = parseInt(value, 10);
+  if (!Number.isInteger(parsed)) {
+    const error = new Error(`Invalid ${fieldName}: expected a number`);
+    error.code = 'VALIDATION_ERROR';
+    throw error;
+  }
+  return parsed;
+}
+
+function toValidIntOrThrow(value, fieldName) {
+  const parsed = toValidIntOrNull(value, fieldName);
+  if (parsed === null) {
+    const error = new Error(`${fieldName} is required`);
+    error.code = 'VALIDATION_ERROR';
+    throw error;
+  }
+  return parsed;
+}
+
 async function create(linkData) {
   const { course_id, sop_id, module_id, display_order, is_required, link_type, created_by } = linkData;
+
+  const courseIdValue = toValidIntOrThrow(course_id, 'course_id');
+  const sopIdValue = toValidIntOrThrow(sop_id, 'sop_id');
+  const moduleIdValue = toValidIntOrNull(module_id, 'module_id');
+  const createdByValue = toValidIntOrNull(created_by, 'created_by');
+
   const [result] = await db.query(
     `INSERT INTO sop_course_links 
      (course_id, sop_id, module_id, display_order, is_required, link_type, created_by)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
     [
-      parseInt(course_id, 10),
-      parseInt(sop_id, 10),
-      module_id ? parseInt(module_id, 10) : null,
+      courseIdValue,
+      sopIdValue,
+      moduleIdValue,
       display_order ?? 0,
       is_required ? 1 : 0,
       link_type || 'Reference',
-      created_by ? parseInt(created_by, 10) : null,
+      createdByValue,
     ]
   );
   return result.insertId;
