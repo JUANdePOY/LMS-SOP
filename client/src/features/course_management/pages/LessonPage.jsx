@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { FileText, Download, ExternalLink } from "lucide-react";
+import { FileText, Download, ExternalLink, HelpCircle, ListChecks, Award, Clock, CheckCircle2, RefreshCw, PlayCircle, AlertCircle, Loader2, ArrowRight } from "lucide-react";
 import { useLessonProgress } from "../hooks/useLessonProgress";
 import { useMarkLessonComplete } from "../hooks/useMarkLessonComplete";
 import LessonProgressBar from "../components/LessonProgressBar";
 import LessonList from "../components/LessonList";
 import VideoPlayer from "../components/utils/VideoPlayer";
 import LB_PROSE from "../utils/lbProse";
-import { getQuizzes } from "@/features/assessments/api/quiz.api";
+import { getQuizzes, getQuizById } from "@/features/assessments/api/quiz.api";
+import { listAttempts } from "@/features/assessments/api/attempt.api";
 import { getIssuancesByUser } from "@/features/certificate-management/services/certificateService";
 
 export default function LessonPage() {
@@ -19,12 +20,24 @@ export default function LessonPage() {
   const [messageType, setMessageType] = useState("error");
   const [moduleQuiz, setModuleQuiz] = useState(null);
   const [quizLoading, setQuizLoading] = useState(false);
+  const [quizAttempts, setQuizAttempts] = useState([]);
   const [certificate, setCertificate] = useState(null);
   const [certificateLoading, setCertificateLoading] = useState(false);
 
   const modules = data?.modules || [];
   const currentLesson = data?.lessons?.find((l) => String(l.id) === String(lessonId));
   const lessons = data?.lessons || [];
+  const nextLesson = lessons
+    .filter((l) => l.order > (currentLesson?.order ?? 0))
+    .sort((a, b) => a.order - b.order)[0] || null;
+
+  const isFinalQuiz = moduleQuiz?.quiz_type === "final";
+  const attemptsAllowed = isFinalQuiz ? (moduleQuiz?.attempts_allowed ?? 3) : Infinity;
+  const attemptsUsed = quizAttempts.length;
+  const attemptsRemaining = isFinalQuiz ? Math.max(0, attemptsAllowed - attemptsUsed) : Infinity;
+  const latestAttempt = quizAttempts.length
+    ? [...quizAttempts].sort((a, b) => (b.attempt_number || 0) - (a.attempt_number || 0))[0]
+    : null;
 
   useEffect(() => {
     if (message) {
@@ -34,14 +47,33 @@ export default function LessonPage() {
   }, [message]);
 
   useEffect(() => {
-    if (currentLesson?.type === "quiz" && currentLesson?.module_id && !moduleQuiz && !quizLoading) {
+    if (currentLesson?.type === "quiz" && !moduleQuiz && !quizLoading) {
       setQuizLoading(true);
-      getQuizzes(courseId, { module_id: currentLesson.module_id, limit: 1 })
-        .then((res) => setModuleQuiz((res.data || [])[0] || null))
+      const promise = currentLesson.quizId
+        ? getQuizById(currentLesson.quizId)
+        : getQuizzes(courseId, { module_id: currentLesson.module_id, limit: 1 });
+      promise
+        .then((res) => {
+          if (currentLesson.quizId) {
+            setModuleQuiz(res?.data || res || null);
+          } else {
+            const quizzes = res?.data || res || [];
+            setModuleQuiz(Array.isArray(quizzes) ? quizzes[0] : quizzes);
+          }
+        })
         .catch(() => setModuleQuiz(null))
         .finally(() => setQuizLoading(false));
     }
-  }, [currentLesson?.type, currentLesson?.module_id, courseId, moduleQuiz, quizLoading]);
+  }, [currentLesson?.type, currentLesson?.module_id, currentLesson?.quizId, courseId, moduleQuiz, quizLoading]);
+
+  useEffect(() => {
+    if (currentLesson?.type !== "quiz") return;
+    const quizId = currentLesson.quizId || moduleQuiz?.id;
+    if (!quizId) return;
+    listAttempts({ quizId })
+      .then((res) => setQuizAttempts(Array.isArray(res?.data) ? res.data : []))
+      .catch(() => setQuizAttempts([]));
+  }, [currentLesson?.type, currentLesson?.quizId, moduleQuiz?.id]);
 
   useEffect(() => {
     if (currentLesson?.type === "certificate" && currentLesson?.certificateTemplateId) {
@@ -149,23 +181,116 @@ export default function LessonPage() {
             </div>
           ) : currentLesson.type === 'quiz' ? (
             <div className="p-6">
-              <h2 className="text-xl font-bold mb-3">{currentLesson.title}</h2>
+              <div className="mb-5">
+                <h2 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">{currentLesson.title}</h2>
+                {currentLesson.description && (
+                  <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">{currentLesson.description}</p>
+                )}
+              </div>
               {quizLoading ? (
-                <p className="text-sm text-neutral-500">Loading quiz…</p>
+                <div className="flex items-center gap-3 rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-neutral-50/70 dark:bg-neutral-800/40 px-5 py-4">
+                  <Loader2 size={18} className="animate-spin text-blue-600" />
+                  <p className="text-sm text-neutral-500">Loading quiz…</p>
+                </div>
               ) : moduleQuiz ? (
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                    {moduleQuiz.title} &middot; {moduleQuiz.max_score} pts {moduleQuiz.time_limit ? `&middot; ${moduleQuiz.time_limit} min` : ""}
-                  </p>
-                  <button
-                    onClick={() => navigate(`/assessments/quiz/${moduleQuiz.id}/take`)}
-                    className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white"
-                  >
-                    Start Quiz
-                  </button>
+                <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-sm">
+                  <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-sky-50/60 dark:from-blue-500/10 dark:via-neutral-900 dark:to-sky-500/5 px-6 pt-5 pb-5">
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.18),transparent_70%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.12),transparent_55%)]" />
+                    <div className="relative flex items-start justify-between gap-4">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 shadow-sm shadow-blue-600/20">
+                          <HelpCircle size={22} className="text-white" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-neutral-900 dark:text-neutral-50">{moduleQuiz.title}</p>
+                          {moduleQuiz.description && (
+                            <p className="mt-0.5 line-clamp-2 text-xs text-neutral-500 dark:text-neutral-400">{moduleQuiz.description}</p>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`shrink-0 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${moduleQuiz.quiz_type === 'final' ? 'border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-500/40 dark:bg-violet-500/15 dark:text-violet-300' : 'border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-300'}`}>
+                        {moduleQuiz.quiz_type === 'final' ? 'Final' : 'Practice'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-3 lg:grid-cols-6">
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-400">
+                          <ListChecks size={13} /> Questions
+                        </span>
+                        <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">{moduleQuiz.question_count ?? moduleQuiz.questionsCount ?? 0}</span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-400">
+                          <Award size={13} /> Points
+                        </span>
+                        <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">{moduleQuiz.max_score ?? 0}</span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-400">
+                          <Clock size={13} /> Time
+                        </span>
+                        <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">{moduleQuiz.time_limit ? `${moduleQuiz.time_limit} min` : '—'}</span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-400">
+                          <CheckCircle2 size={13} /> Pass Mark
+                        </span>
+                        <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">{moduleQuiz.passing_score != null ? `${moduleQuiz.passing_score}%` : '—'}</span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-400">
+                          <RefreshCw size={13} /> Attempts
+                        </span>
+                        <span className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+                          {isFinalQuiz ? `${attemptsRemaining}/${attemptsAllowed}` : '∞'}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-400">
+                          <CheckCircle2 size={13} /> Latest Grade
+                        </span>
+                        {latestAttempt ? (
+                          <span
+                            className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                              latestAttempt.passed
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                                : 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
+                            }`}
+                          >
+                            {latestAttempt.percentage != null ? `${latestAttempt.percentage}%` : `${latestAttempt.score}/${latestAttempt.max_score}`}
+                          </span>
+                        ) : (
+                          <span className="text-sm font-semibold text-neutral-400 dark:text-neutral-500">—</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end border-t border-neutral-100 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-800/30 px-6 py-4">
+                    {currentLesson.status !== 'completed' && (
+                      <button
+                        onClick={() => {
+                        try {
+                          sessionStorage.setItem('quizReturnContext', JSON.stringify({ courseId, lessonId, nextLessonId: nextLesson?.id }));
+                        } catch { /* ignore */ }
+                        navigate(`/assessments/quiz/${moduleQuiz.id}/take`, { state: { courseId, lessonId, nextLessonId: nextLesson?.id } });
+                      }}
+                        className="group inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition-all hover:bg-blue-700 hover:shadow-md active:bg-blue-800"
+                      >
+                        <PlayCircle size={17} className="transition-transform group-hover:scale-110" />
+                        Start Quiz
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
-                <p className="text-sm text-amber-600">No quiz is configured for this lesson.</p>
+                <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 px-5 py-4">
+                  <AlertCircle size={18} className="mt-0.5 shrink-0 text-amber-600" />
+                  <p className="text-sm text-amber-700 dark:text-amber-300">No quiz is configured for this lesson.</p>
+                </div>
               )}
             </div>
           ) : currentLesson.type === 'sop' ? (
@@ -248,14 +373,25 @@ export default function LessonPage() {
           )}
         </div>
         <div className="mt-4 flex justify-end">
-          {isVideoOrText && (
+          {currentLesson.status === 'completed' ? (
             <button
-              onClick={handleMarkComplete}
-              disabled={marking || currentLesson.status === 'completed'}
-              className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => nextLesson && navigate(`/courses/view/${courseId}/lesson/${nextLesson.id}`)}
+              disabled={!nextLesson}
+              className="group inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition-all hover:bg-blue-700 hover:shadow-md active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {marking ? 'Saving...' : currentLesson.status === 'completed' ? 'Completed' : 'Mark as Complete'}
+              {nextLesson ? 'Proceed to Next Lesson' : 'Course Completed'}
+              {nextLesson && <ArrowRight size={17} className="transition-transform group-hover:translate-x-0.5" />}
             </button>
+          ) : (
+            isVideoOrText && (
+              <button
+                onClick={handleMarkComplete}
+                disabled={marking}
+                className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {marking ? 'Saving...' : 'Mark as Complete'}
+              </button>
+            )
           )}
         </div>
       </div>

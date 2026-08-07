@@ -1,5 +1,5 @@
-import { useRef, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useRef, useCallback, useState } from "react";
+import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { useTakeQuiz } from "../hooks/useTakeQuiz";
 import { useQuiz } from "../hooks/useQuiz";
 import { useIntegrityMonitor } from "../hooks/useIntegrityMonitor";
@@ -8,10 +8,45 @@ import QuizIntro from "../components/QuizIntro";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/components/ui/card";
 import { formatDuration } from "../utils/formatDuration";
-import { Trophy, CheckCircle, XCircle } from "lucide-react";
+import { markLessonComplete } from "../../course_management/services/lesson-progress.service";
+import { Trophy, CheckCircle, XCircle, ArrowRight, ArrowLeft } from "lucide-react";
 
 function ResultView({ result, quiz }) {
   const passed = result?.passed;
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [completing, setCompleting] = useState(false);
+  const from = { ...(location.state || {}) };
+  if (!from.courseId && !from.lessonId) {
+    try {
+      const stored = JSON.parse(sessionStorage.getItem("quizReturnContext") || "{}");
+      from.courseId = from.courseId || stored.courseId;
+      from.lessonId = from.lessonId || stored.lessonId;
+      from.nextLessonId = from.nextLessonId || stored.nextLessonId;
+    } catch { /* ignore */ }
+  }
+  const backToLesson = from.courseId && from.lessonId;
+  const nextLessonId = from.nextLessonId;
+
+  // Marking the quiz lesson complete on the backend unlocks the next lesson.
+  const markCurrentLessonComplete = useCallback(async () => {
+    if (!from.lessonId) return;
+    try {
+      setCompleting(true);
+      await markLessonComplete(from.lessonId);
+    } catch {
+      // Non-fatal: backend enforces completion gating; proceed regardless.
+    } finally {
+      setCompleting(false);
+    }
+  }, [from.lessonId]);
+
+  const goToLesson = async (targetLessonId) => {
+    try { sessionStorage.removeItem("quizReturnContext"); } catch { /* ignore */ }
+    if (passed && from.lessonId) await markCurrentLessonComplete();
+    navigate(`/courses/view/${from.courseId}/lesson/${targetLessonId}`);
+  };
+
   return (
     <div className="max-w-2xl mx-auto mt-8">
       <Card>
@@ -52,10 +87,22 @@ function ResultView({ result, quiz }) {
               You can retake this quiz from the Assessments page if attempts remain.
             </div>
           )}
-          <div className="flex gap-3 pt-2">
-            <Button asChild>
-              <Link to={`/assessments/quiz/${quiz.id}/results`}>Review Results</Link>
-            </Button>
+          <div className="flex flex-wrap gap-3 pt-2">
+            {passed && nextLessonId ? (
+              <Button onClick={() => goToLesson(nextLessonId)} disabled={completing}>
+                {completing ? "Completing…" : "Proceed to Next Lesson"}
+                <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            ) : passed && backToLesson ? (
+              <Button onClick={() => goToLesson(from.lessonId)} disabled={completing}>
+                {completing ? "Completing…" : "Back to Lesson"}
+                <ArrowLeft className="h-4 w-4 ml-1" />
+              </Button>
+            ) : (
+              <Button asChild>
+                <Link to={`/assessments/quiz/${quiz.id}/results`}>Review Results</Link>
+              </Button>
+            )}
             <Button variant="outline" asChild>
               <Link to="/assessments">Back to Assessments</Link>
             </Button>
