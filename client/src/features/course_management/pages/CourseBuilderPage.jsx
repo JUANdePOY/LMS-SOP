@@ -347,6 +347,7 @@ export default function CourseBuilderPage() {
 
   const refreshCourse = useCallback(() => {
     if (!courseId) return Promise.resolve();
+    const prevModules = modulesRef.current;
     return builderGet(courseId)
       .then((res) => {
         const c = res.data || {};
@@ -362,6 +363,30 @@ export default function CourseBuilderPage() {
         const enriched = mods.map((m) => ({ ...m, lessons: m.lessons || [] }));
         modulesRef.current = enriched;
         setModules(enriched);
+
+        // If the currently selected module/lesson had a temp client-side id
+        // (module not yet saved when the user selected it), remap the
+        // selection to the real id the server just assigned, by position,
+        // so the editor doesn't silently lose the selection after a save
+        // and the module doesn't keep looking "unsaved".
+        setSelectedModuleId((currentModuleId) => {
+          if (!currentModuleId) return currentModuleId;
+          if (enriched.some((m) => m.id === currentModuleId)) return currentModuleId;
+          const prevIdx = prevModules.findIndex((m) => m.id === currentModuleId);
+          const mapped = prevIdx >= 0 ? enriched[prevIdx]?.id ?? null : null;
+          if (mapped == null) return currentModuleId;
+
+          const prevModule = prevModules[prevIdx];
+          const newModule = enriched[prevIdx];
+          setSelectedLessonId((currentLessonId) => {
+            if (!currentLessonId) return currentLessonId;
+            if ((newModule.lessons || []).some((l) => l.id === currentLessonId)) return currentLessonId;
+            const lessonIdx = (prevModule.lessons || []).findIndex((l) => l.id === currentLessonId);
+            return lessonIdx >= 0 ? (newModule.lessons || [])[lessonIdx]?.id ?? null : null;
+          });
+
+          return mapped;
+        });
       })
       .then(() => fetchCourseSops(courseId))
       .then((res) => {
@@ -407,6 +432,11 @@ export default function CourseBuilderPage() {
   };
 
   const handleLinkSop = (moduleId, sopId) => {
+    const targetModule = modules.find((m) => m.id === moduleId);
+    if (!targetModule || targetModule.isNew) {
+      toast.error('This module isn\'t saved to the server yet. Click "Save Draft" in the right panel first, then link SOPs.');
+      return;
+    }
     setCourseSops((prev) => {
       const exists = prev.find((s) => s.sop_id === sopId && s.module_id === moduleId);
       if (exists) return prev;
@@ -440,10 +470,21 @@ export default function CourseBuilderPage() {
     const previousIds = new Set(previous.map((s) => `${s.sop_id}-${s.module_id}`));
     const currentIds = new Set(current.map((s) => `${s.sop_id}-${s.module_id}`));
 
+    const isSavedModuleId = (moduleId) => {
+      if (moduleId === null || moduleId === undefined || moduleId === "") return true; // course-level link, no module
+      return Number.isInteger(Number(moduleId)) && !modules.some((m) => m.id === moduleId && m.isNew);
+    };
+
     const toAdd = current.filter((s) => !previousIds.has(`${s.sop_id}-${s.module_id}`));
     const toRemove = previous.filter((s) => !currentIds.has(`${s.sop_id}-${s.module_id}`));
 
-    for (const sop of toAdd) {
+    const addable = toAdd.filter((s) => isSavedModuleId(s.module_id));
+    const skipped = toAdd.length - addable.length;
+    if (skipped > 0) {
+      toast.error(`Skipped linking ${skipped} SOP${skipped === 1 ? "" : "s"} to an unsaved module. Save the module first, then link it.`);
+    }
+
+    for (const sop of addable) {
       try {
         await linkSopToCourse(courseId, sop.sop_id, {
           module_id: sop.module_id,
