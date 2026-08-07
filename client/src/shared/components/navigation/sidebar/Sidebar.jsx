@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
+  Home,
   BookOpen,
   Library,
   ClipboardCheck,
@@ -29,14 +30,15 @@ import { useMyTaskCount } from "@/features/task-management/hooks/useMyTaskCount"
 
 const EMPLOYEE_MENU_ITEMS = [
   {
-    name: "My Learning",
+    name: "Dashboard",
     path: "/",
     icon: LayoutDashboard,
   },
   {
-    name: "CORE MODULES",
+    name: "LEARNING",
     group: true,
     items: [
+      { name: "My Learning", path: "/my-learning", icon: Home },
       { name: "Course Library", path: "/courses/library", icon: Library },
       { name: "SOP Library", path: "/sops", icon: FileText },
     ],

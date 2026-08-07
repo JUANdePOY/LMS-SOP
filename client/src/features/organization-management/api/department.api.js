@@ -21,10 +21,10 @@ export const updateDepartment = (id, data) => {
   return api.put(`/departments/${id}`, data);
 };
 
-export const deleteDepartment = (id) => {
+export const deleteDepartment = (id, { force = false } = {}) => {
   const err = validateId(id, 'Department ID');
   if (err) return Promise.reject(new Error(err));
-  return api.delete(`/departments/${id}`);
+  return api.delete(`/departments/${id}`, { params: force ? { force: 'true' } : {} });
 };
 
 export const getDepartmentTree = () => api.get('/departments/tree');

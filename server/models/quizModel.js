@@ -36,6 +36,16 @@ async function findById(id) {
   return rows[0] || null;
 }
 
+// Like findById but ignores the soft-delete flag. Used by force-delete to locate
+// an already-soft-deleted quiz (e.g. orphaned after its course was removed).
+async function findByIdIgnoringDelete(id) {
+  const [rows] = await db.query(
+    'SELECT * FROM quizzes WHERE id = ? LIMIT 1',
+    [id]
+  );
+  return rows[0] || null;
+}
+
 async function listAllQuizzes(filters = {}) {
   const { search, status, quizType, page = 1, limit = 20 } = filters;
   const pageNum = Number(page) || 1;
@@ -133,6 +143,25 @@ async function softDelete(id) {
   const [result] = await db.query(
     'UPDATE quizzes SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
     [id]
+  );
+  return result.affectedRows;
+}
+
+// Hard delete a quiz, bypassing the soft-delete flag. Used when a parent course
+// has already been removed (which soft-deletes the quiz) and the quiz needs to
+// be fully purged. Dependent rows are removed by their ON DELETE CASCADE FKs.
+async function hardDelete(id) {
+  const [result] = await db.query('DELETE FROM quizzes WHERE id = ?', [id]);
+  return result.affectedRows;
+}
+
+// Soft-delete every quiz belonging to a course. Dependent rows
+// (quiz_questions, quiz_attempts, quiz_results, etc.) are removed by their
+// ON DELETE CASCADE FKs. Returns the count of quizzes affected.
+async function softDeleteByCourse(courseId) {
+  const [result] = await db.query(
+    'UPDATE quizzes SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE course_id = ? AND is_deleted = FALSE',
+    [courseId]
   );
   return result.affectedRows;
 }
@@ -692,10 +721,13 @@ async function getQuizResults(quizId) {
 module.exports = {
   listQuizzes,
   findById,
+  findByIdIgnoringDelete,
   listAllQuizzes,
   create,
   update,
   softDelete,
+  hardDelete,
+  softDeleteByCourse,
   listQuestions,
   getQuestionById,
   createQuestion,

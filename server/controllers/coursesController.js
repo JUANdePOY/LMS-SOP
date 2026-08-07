@@ -1,6 +1,7 @@
 const courseModel = require('../models/courseModel');
 const courseModuleModel = require('../models/courseModuleModel');
 const courseContentModel = require('../models/courseContentModel');
+const quizModel = require('../models/quizModel');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -130,8 +131,10 @@ function deleteCourse(req, res) {
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
       return courseModel.softDelete(courseId).then(() => {
-        logAudit('course.delete', userId, { courseId, title: course.title });
-        return res.json({ success: true, message: 'Course deleted successfully' });
+        return quizModel.softDeleteByCourse(courseId).then(() => {
+          logAudit('course.delete', userId, { courseId, title: course.title });
+          return res.json({ success: true, message: 'Course deleted successfully' });
+        });
       });
     })
     .catch((err) => sendError(res, err, 'Failed to delete course'));

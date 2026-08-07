@@ -1,7 +1,7 @@
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export default function ConfirmationDialog({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirm', cancelText = 'Cancel', variant = 'default' }) {
+export default function ConfirmationDialog({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirm', cancelText = 'Cancel', variant = 'default', children }) {
   if (!isOpen) return null;
 
   const variantConfig = {
@@ -30,6 +30,12 @@ export default function ConfirmationDialog({ isOpen, onClose, onConfirm, title, 
             </p>
           </div>
         </div>
+
+        {children && (
+          <div className="mt-4">
+            {children}
+          </div>
+        )}
 
         <div className="mt-6 flex justify-end gap-3">
           <button

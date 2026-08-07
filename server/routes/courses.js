@@ -4,6 +4,17 @@ const coursesController = require('../controllers/coursesController');
 const { authenticateToken } = require('../middleware/auth');
 const { upload: courseImageUpload } = require('../middleware/courseImageUpload');
 
+function handleImageUpload(req, res, next) {
+  courseImageUpload.single('file')(req, res, (err) => {
+    if (err) {
+      const message = err.message || 'Image upload failed';
+      const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+      return res.status(status).json({ success: false, message, code: 'IMAGE_UPLOAD_ERROR' });
+    }
+    next();
+  });
+}
+
 // Public read routes for course catalog and details
 router.get('/', coursesController.listCourses);
 router.get('/categories', coursesController.listCategories);
@@ -27,6 +38,6 @@ router.delete('/:courseId/modules/:moduleId', coursesController.deleteModule);
 router.post('/:courseId/modules/:moduleId/content', coursesController.createContent);
 router.put('/:courseId/modules/:moduleId/content/:contentId', coursesController.updateContent);
 router.delete('/:courseId/modules/:moduleId/content/:contentId', coursesController.deleteContent);
-router.post('/:courseId/modules/:moduleId/images', courseImageUpload.single('file'), coursesController.uploadImage);
+router.post('/:courseId/modules/:moduleId/images', handleImageUpload, coursesController.uploadImage);
 
 module.exports = router;

@@ -15,7 +15,7 @@ async function listEnrollments(filters = {}) {
       c.title AS course_title
     FROM course_enrollments e
     JOIN users u ON e.user_id = u.id
-    JOIN courses c ON e.course_id = c.id
+    JOIN courses c ON e.course_id = c.id AND c.is_deleted = FALSE
     WHERE e.is_deleted = FALSE
   `;
   const params = [];
@@ -53,7 +53,7 @@ async function findById(id) {
       c.title AS course_title
      FROM course_enrollments e
      JOIN users u ON e.user_id = u.id
-     JOIN courses c ON e.course_id = c.id
+     JOIN courses c ON e.course_id = c.id AND c.is_deleted = FALSE
      WHERE e.id = ? AND e.is_deleted = FALSE
      LIMIT 1`,
     [id]
