@@ -16,6 +16,7 @@ export default function IssueCertificateModal({ open, onClose, onSuccess }) {
   const [userId, setUserId] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [verificationCode, setVerificationCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
 
@@ -48,6 +49,9 @@ export default function IssueCertificateModal({ open, onClose, onSuccess }) {
           date: date,
         },
       };
+      if (verificationCode.trim()) {
+        payload.verification_code = verificationCode.trim();
+      }
       const { data } = await issueCertificate(payload);
       toast.success('Certificate issued successfully');
       onSuccess?.(data);
@@ -65,6 +69,7 @@ export default function IssueCertificateModal({ open, onClose, onSuccess }) {
     setUserId('');
     setRecipientName('');
     setDate(new Date().toISOString().split('T')[0]);
+    setVerificationCode('');
     onClose();
   };
 
@@ -115,6 +120,15 @@ export default function IssueCertificateModal({ open, onClose, onSuccess }) {
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
+          />
+        </div>
+        <div>
+          <Label htmlFor="verificationCode">Verification Code (override)</Label>
+          <Input
+            id="verificationCode"
+            value={verificationCode}
+            onChange={(e) => setVerificationCode(e.target.value)}
+            placeholder="Optional custom code"
           />
         </div>
         <div className="flex justify-end gap-3">

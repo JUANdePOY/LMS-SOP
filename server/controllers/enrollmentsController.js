@@ -138,8 +138,21 @@ function updateEnrollmentStatus(req, res) {
   enrollmentModel.findById(enrollmentId)
     .then((enrollment) => {
       if (!enrollment) return res.status(404).json({ success: false, message: 'Enrollment not found' });
-      return enrollmentModel.update(enrollmentId, { status }).then(() => {
+      return enrollmentModel.update(enrollmentId, { status }).then(async () => {
         logAudit('enrollment.status_update', userId, { enrollmentId, status });
+
+        if (status === 'completed') {
+          try {
+            const { autoIssueOnCompletion } = require('../services/certificateAutoIssuanceService');
+            const result = await autoIssueOnCompletion(enrollment.course_id, enrollment.user_id, enrollmentId, userId);
+            if (result.issued) {
+              return res.json({ success: true, message: 'Enrollment status updated', certificateIssued: true, certificate: result.issuance });
+            }
+          } catch (err) {
+            console.error('Auto certificate issuance failed:', err.message);
+          }
+        }
+
         return res.json({ success: true, message: 'Enrollment status updated' });
       });
     })

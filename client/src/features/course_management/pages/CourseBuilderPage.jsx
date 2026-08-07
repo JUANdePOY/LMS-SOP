@@ -7,9 +7,11 @@ import LessonEditor from "../components/course-builder/LessonEditor";
 import ModuleEditor from "../components/course-builder/ModuleEditor";
 import PublishReadiness from "../components/course-builder/PublishReadiness";
 import { builderGet, builderUpdate, publishCourse } from "../api/course.api";
+import * as session from "@/services/session";
+import CourseCertificatesSection from "../components/course-builder/CourseCertificatesSection";
 
 function authHeaders() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = session.getCurrentToken();
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
@@ -52,6 +54,28 @@ async function linkSopToCourse(courseId, sopId, meta = {}) {
 
 async function unlinkSopFromCourse(courseId, sopId) {
   const res = await fetch(`/api/courses/${courseId}/sops/${sopId}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  return handleSopLink(res);
+}
+
+async function fetchCourseCertificates(courseId) {
+  const res = await fetch("/api/certificate-courses/courses/" + courseId + "/certificates", { headers: authHeaders() });
+  return handleSopLink(res);
+}
+
+async function linkCertificateToCourse(courseId, templateId, meta = {}) {
+  const res = await fetch("/api/certificate-courses/courses/" + courseId + "/certificates", {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ template_id: templateId, ...meta }),
+  });
+  return handleSopLink(res);
+}
+
+async function unlinkCertificateFromCourse(courseId, templateId) {
+  const res = await fetch("/api/certificate-courses/courses/" + courseId + "/certificates/" + templateId, {
     method: "DELETE",
     headers: authHeaders(),
   });
@@ -222,6 +246,8 @@ export default function CourseBuilderPage() {
   const handleSaveDraftRef = useRef(null);
   const [courseSops, setCourseSops] = useState([]);
   const courseSopsRef = useRef([]);
+  const [courseCertificates, setCourseCertificates] = useState([]);
+  const courseCertificatesRef = useRef([]);
 
   const statusConfig = STATUS_CONFIG[course?.status] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
@@ -302,6 +328,20 @@ export default function CourseBuilderPage() {
       .catch(() => {
         setCourseSops([]);
         courseSopsRef.current = [];
+      });
+  }, [courseId]);
+
+  useEffect(() => {
+    if (!courseId) return;
+    fetchCourseCertificates(courseId)
+      .then((res) => {
+        const data = res?.data || res || [];
+        setCourseCertificates(Array.isArray(data) ? data : []);
+        courseCertificatesRef.current = Array.isArray(data) ? data : [];
+      })
+      .catch(() => {
+        setCourseCertificates([]);
+        courseCertificatesRef.current = [];
       });
   }, [courseId]);
 
@@ -428,6 +468,46 @@ export default function CourseBuilderPage() {
     courseSopsRef.current = current;
   };
 
+  const syncCourseCertificates = async () => {
+    if (!courseId) return;
+    const previous = courseCertificatesRef.current || [];
+    const current = courseCertificates;
+
+    const previousIds = new Set(previous.map((c) => c.certificate_template_id));
+    const currentIds = new Set(current.map((c) => c.certificate_template_id));
+
+    const toAdd = current.filter((c) => !previousIds.has(c.certificate_template_id));
+    const toRemove = previous.filter((c) => !currentIds.has(c.certificate_template_id));
+
+    for (const cert of toAdd) {
+      try {
+        await linkCertificateToCourse(courseId, cert.certificate_template_id, {
+          is_default: cert.is_default,
+          display_order: cert.display_order,
+        });
+      } catch (err) {
+        if (err && err.code !== "DUPLICATE_LINK") {
+          toast.error(err.message || "Failed to link certificate");
+        }
+      }
+    }
+
+    for (const cert of toRemove) {
+      try {
+        await unlinkCertificateFromCourse(courseId, cert.certificate_template_id);
+      } catch (err) {
+        toast.error(err.message || "Failed to unlink certificate");
+      }
+    }
+
+    courseCertificatesRef.current = current;
+  };
+
+  const syncCourseData = async () => {
+    await syncCourseSops();
+    await syncCourseCertificates();
+  };
+
   const saveNow = useCallback(
     (payload) => {
       if (!courseId) return Promise.resolve();
@@ -439,7 +519,7 @@ export default function CourseBuilderPage() {
             toast.success("Saved");
             setHasUnsavedChanges(false);
             setLastSaved(new Date());
-            await syncCourseSops();
+            await syncCourseData();
             return refreshCourse();
           } else {
             throw new Error(res?.message || res?.data?.message || "Save failed");
@@ -454,7 +534,7 @@ export default function CourseBuilderPage() {
           setIsSavingDraft(false);
         });
     },
-    [courseId, toast, refreshCourse, syncCourseSops]
+    [courseId, toast, refreshCourse, syncCourseData]
   );
 
   const handleSaveDraft = useCallback(async () => {
@@ -939,6 +1019,19 @@ export default function CourseBuilderPage() {
                 </div>
                 <div className="p-4 overflow-y-auto flex-1 space-y-4">
                   <PublishReadiness course={course} modules={modules} />
+                  <CourseCertificatesSection
+                    courseId={courseId}
+                    certificates={courseCertificates}
+                    saving={saving}
+                    onLink={(templateId, meta) => {
+                      setCourseCertificates((prev) => [...prev, { id: 'temp-' + Date.now() + '-' + templateId, certificate_template_id: templateId, ...meta }]);
+                      setHasUnsavedChanges(true);
+                    }}
+                    onUnlink={(templateId) => {
+                      setCourseCertificates((prev) => prev.filter((c) => c.certificate_template_id !== templateId));
+                      setHasUnsavedChanges(true);
+                    }}
+                  />
                   <div className="flex flex-col gap-2">
                     <button onClick={handleSaveDraft} disabled={saving} className="rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-1.5 text-sm hover:border-neutral-300 dark:hover:border-neutral-600 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
                       <Save size={14} />
@@ -962,6 +1055,19 @@ export default function CourseBuilderPage() {
                 <PublishReadiness course={course} modules={modules} />
               </div>
             </div>
+            <CourseCertificatesSection
+              courseId={courseId}
+              certificates={courseCertificates}
+              saving={saving}
+              onLink={(templateId, meta) => {
+                setCourseCertificates((prev) => [...prev, { id: 'temp-' + Date.now() + '-' + templateId, certificate_template_id: templateId, ...meta }]);
+                setHasUnsavedChanges(true);
+              }}
+              onUnlink={(templateId) => {
+                setCourseCertificates((prev) => prev.filter((c) => c.certificate_template_id !== templateId));
+                setHasUnsavedChanges(true);
+              }}
+            />
             <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-sm p-4 space-y-2">
               <button onClick={handleSaveDraft} disabled={saving} className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-2 text-sm hover:border-neutral-300 dark:hover:border-neutral-600 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
                 <Save size={14} />

@@ -107,13 +107,15 @@ async function create(data) {
   const {
     certificate_number, template_id, user_id, resolved_sections,
     pdf_storage_path, status, issued_by, expires_at, title, data_snapshot,
+    course_id, enrollment_id, verification_code,
   } = data;
 
   const [result] = await db.query(
     `INSERT INTO certificate_issuances
        (certificate_number, template_id, user_id, resolved_sections,
-        pdf_storage_path, status, issued_by, expires_at, title, data_snapshot)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        pdf_storage_path, status, issued_by, expires_at, title, data_snapshot,
+        course_id, enrollment_id, verification_code)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       certificate_number, template_id, user_id,
       JSON.stringify(resolved_sections),
@@ -123,9 +125,32 @@ async function create(data) {
       expires_at || null,
       title || null,
       data_snapshot ? JSON.stringify(data_snapshot) : null,
+      course_id ?? null,
+      enrollment_id ?? null,
+      verification_code || null,
     ]
   );
   return result.insertId;
+}
+
+async function findByEnrollment(enrollmentId) {
+  const [rows] = await db.query(
+    `SELECT * FROM certificate_issuances
+     WHERE enrollment_id = ?
+     LIMIT 1`,
+    [enrollmentId]
+  );
+  return rows[0] || null;
+}
+
+async function findByVerificationCode(code) {
+  const [rows] = await db.query(
+    `SELECT * FROM certificate_issuances
+     WHERE verification_code = ?
+     LIMIT 1`,
+    [code]
+  );
+  return rows[0] || null;
 }
 
 async function updateStatus(id, status, revokedAt = null) {
@@ -142,6 +167,8 @@ module.exports = {
   findAll,
   findById,
   findByCertificateNumber,
+  findByEnrollment,
+  findByVerificationCode,
   create,
   updateStatus,
 };

@@ -36,7 +36,7 @@ async function issueCertificate(payload, actorId) {
     throw error;
   }
 
-  const { template_id, user_id, overrides } = validation.value;
+  const { template_id, user_id, overrides, course_id, enrollment_id, verification_code } = validation.value;
 
   const template = await certificateTemplateModel.findByIdentifier(template_id);
   if (!template) {
@@ -55,6 +55,15 @@ async function issueCertificate(payload, actorId) {
     const error = new Error('Template has been deleted');
     error.code = 'NOT_FOUND';
     throw error;
+  }
+
+  if (verification_code) {
+    const existing = await certificateIssuanceModel.findByVerificationCode(verification_code);
+    if (existing) {
+      const error = new Error('Verification code already in use');
+      error.code = 'VALIDATION_ERROR';
+      throw error;
+    }
   }
 
   const sections = typeof template.sections === 'string'
@@ -94,6 +103,9 @@ async function issueCertificate(payload, actorId) {
     issued_by: actorId,
     title: template.name,
     data_snapshot: resolvedSections,
+    course_id: course_id ?? null,
+    enrollment_id: enrollment_id ?? null,
+    verification_code: verification_code || null,
   });
 
   logAudit({
@@ -103,8 +115,11 @@ async function issueCertificate(payload, actorId) {
     entity_id: issuanceId,
     metadata: {
       certificate_number: certificateNumber,
+      verification_code: verification_code || null,
       template_id: template.id,
       user_id,
+      course_id: course_id ?? null,
+      enrollment_id: enrollment_id ?? null,
     },
   });
 

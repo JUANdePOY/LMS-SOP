@@ -19,6 +19,8 @@ function sendError(res, err, fallback = 'Request failed') {
 
 const ALLOWED_EMPLOYEE_SOP_STATUSES = ['Published'];
 
+
+
 async function getEmployeeSop(req, res) {
   try {
     const userId = req.user.id;

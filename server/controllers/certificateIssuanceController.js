@@ -32,10 +32,14 @@ function mapPublicIssuance(row) {
   return {
     id: row.id,
     certificate_number: row.certificate_number,
+    verification_code: row.verification_code || null,
     template_id: row.template_id,
     template_name: row.template_name,
+    template_public_id: row.template_public_id || null,
     user_id: row.user_id,
     user_name: row.user_name,
+    course_id: row.course_id || null,
+    enrollment_id: row.enrollment_id || null,
     status: row.status,
     issued_at: row.issued_at,
     issued_by_name: row.issued_by_name,
@@ -86,13 +90,15 @@ const certificateIssuanceController = {
 
   async issue(req, res) {
     try {
-      const { template_id, user_id, overrides } = req.body;
-
+      const { template_id, user_id, overrides, course_id, enrollment_id, verification_code } = req.body;
       const result = await certificateIssuanceService.issueCertificate(
         {
           template_id: parseInt(template_id, 10),
           user_id: parseInt(user_id, 10),
           overrides,
+          course_id: course_id ? parseInt(course_id, 10) : undefined,
+          enrollment_id: enrollment_id ? parseInt(enrollment_id, 10) : undefined,
+          verification_code: verification_code || undefined,
         },
         req.user.id
       );
