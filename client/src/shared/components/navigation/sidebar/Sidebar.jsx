@@ -38,7 +38,7 @@ const EMPLOYEE_MENU_ITEMS = [
     group: true,
     items: [
       { name: "Course Library", path: "/courses/library", icon: Library },
-      { name: "SOP Library", path: "/sops", icon: FileText },
+      { name: "My Certificates", path: "/certificates/my-certificates", icon: Award },
     ],
   },
   {
@@ -86,10 +86,9 @@ const MENU_ITEMS = [
       },
        { name: "Course Management", path: "/courses", icon: BookOpen, roles: ['super_admin', 'admin', 'department_head'] },
        { name: "Course Library", path: "/courses/library", icon: Library, roles: LMS_ROLES },
-        { name: "My Certificates", path: "/certificates/my-certificates", icon: Award, roles: LMS_ROLES },
-         { name: "Quizzes", path: "/assessments", icon: ClipboardCheck, sub: ["Manage", "Leaderboard", "Integrity"], roles: ['super_admin', 'admin', 'department_head'] },
-        { name: "Certificates", path: "/certificates", icon: Award, roles: ['super_admin', 'admin'] },
-      ],
+       { name: "Quizzes", path: "/assessments", icon: ClipboardCheck, sub: ["Manage", "Leaderboard", "Integrity"], roles: ['super_admin', 'admin', 'department_head'] },
+       { name: "Certificates", path: "/certificates", icon: Award, roles: ['super_admin', 'admin'] },
+    ],
   },
   {
     name: "COMMUNICATION",

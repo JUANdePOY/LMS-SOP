@@ -80,7 +80,7 @@ function createCourse(req, res) {
     end_date,
     grading_scale,
     allow_self_enrollment,
-    send_completion_certificates,
+    send_completion_certificates: send_completion_certificates === undefined ? true : send_completion_certificates,
     status: status || 'draft',
   })
     .then((id) => {

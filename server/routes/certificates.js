@@ -42,7 +42,7 @@ templateRouter.route('/:id/download')
 // to expose publicly so that issued certificates can render previews
 // without requiring admin authentication.
 const templateFramePublicRouter = express.Router();
-templateFramePublicRouter.route('/:publicId/frame')
+templateFramePublicRouter.route('/:id/frame')
   .get(certificateTemplateController.getFrame);
 
 /* ─────────────────── Signature Router ─────────────────── */

@@ -840,8 +840,8 @@ export default function CourseBuilderPage() {
           `}
         >
           {showLeftSidebar && (
-            <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setShowLeftSidebar(false)}>
-              <div className="fixed inset-0 bg-black/50 dark:bg-black/60 backdrop-blur-sm" />
+            <div className="fixed inset-0 z-50 lg:hidden">
+              <div className="fixed inset-0 bg-black/50 dark:bg-black/60 backdrop-blur-sm" onClick={() => setShowLeftSidebar(false)} />
               <div className="absolute left-0 top-0 h-full w-3/4 max-w-sm bg-white dark:bg-neutral-900 shadow-xl border-r border-neutral-200 dark:border-neutral-700 flex flex-col">
                 <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700">
                   <h2 className="font-semibold text-neutral-900 dark:text-neutral-100 text-base">Course Outline</h2>
@@ -1008,8 +1008,8 @@ export default function CourseBuilderPage() {
           `}
         >
           {showRightSidebar && (
-            <div className="fixed inset-0 z-50 lg:hidden" onClick={() => setShowRightSidebar(false)}>
-              <div className="fixed inset-0 bg-black/50 dark:bg-black/60 backdrop-blur-sm" />
+            <div className="fixed inset-0 z-50 lg:hidden">
+              <div className="fixed inset-0 bg-black/50 dark:bg-black/60 backdrop-blur-sm" onClick={() => setShowRightSidebar(false)} />
               <div className="absolute right-0 top-0 h-full w-3/4 max-w-sm bg-white dark:bg-neutral-900 shadow-xl border-l border-neutral-200 dark:border-neutral-700 flex flex-col">
                 <div className="flex items-center justify-between p-4 border-b border-neutral-200 dark:border-neutral-700">
                   <h2 className="font-semibold text-neutral-900 dark:text-neutral-100 text-base">Details</h2>

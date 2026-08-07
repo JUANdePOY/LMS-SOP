@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Plus, Search } from 'lucide-react';
 import CategoryTable from '../components/category/CategoryTable';
 import CategoryModal from '../components/category/CategoryModal';
+import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import { useCategories } from '../hooks/useCategories';
 import { useDepartments } from '../hooks/useDepartments';
 import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
@@ -14,9 +15,11 @@ export default function CategoryPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editData, setEditData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, category: null });
 
   const safeQuery = sanitizeSearchQuery(query);
 
@@ -75,13 +78,22 @@ export default function CategoryPage() {
     setModalOpen(true);
   };
 
-  const handleDelete = async (category) => {
-    if (!window.confirm(`Are you sure you want to delete "${category.name}"? This action cannot be undone.`)) return;
+  const handleDelete = (category) => {
+    setDeleteConfirm({ open: true, category });
+  };
+
+  const confirmDelete = async () => {
+    const category = deleteConfirm.category;
+    if (!category) return;
+    setDeleting(true);
     try {
       await remove(category.id);
       toast.success('Category deleted successfully');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete category');
+    } finally {
+      setDeleting(false);
+      setDeleteConfirm({ open: false, category: null });
     }
   };
 
@@ -172,6 +184,17 @@ export default function CategoryPage() {
         initialData={editData}
         loading={submitting}
         departments={departments}
+      />
+
+      <ConfirmationDialog
+        isOpen={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ open: false, category: null })}
+        onConfirm={confirmDelete}
+        title="Delete Category"
+        message={`Are you sure you want to delete "${deleteConfirm.category?.name}"? This action cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="destructive"
       />
     </div>
   );

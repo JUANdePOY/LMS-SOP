@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from "react";
+import api from "@/services/api";
 import { Card } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
@@ -16,17 +17,22 @@ export default function CourseCertificatesSection({
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const [templates, setTemplates] = useState([]);
   const [loadingTemplates, setLoadingTemplates] = useState(false);
+  const [templatesError, setTemplatesError] = useState(null);
 
   useEffect(() => {
     if (!courseId) return;
     setLoadingTemplates(true);
-    fetch("/api/certificate-templates?status=active&limit=50")
-      .then((res) => res.json())
-      .then((json) => {
-        const rows = json?.data?.rows || json?.data || [];
+    setTemplatesError(null);
+    api.get('/certificate-templates', { params: { status: 'active', limit: 50 } })
+      .then((res) => {
+        const rows = res.data?.data?.rows || res.data?.data || [];
         setTemplates(Array.isArray(rows) ? rows : []);
       })
-      .catch(() => setTemplates([]))
+      .catch((err) => {
+        console.error('Failed to load certificate templates', err);
+        setTemplatesError(err.response?.data?.message || 'Failed to load templates');
+        setTemplates([]);
+      })
       .finally(() => setLoadingTemplates(false));
   }, [courseId]);
 
@@ -51,6 +57,10 @@ export default function CourseCertificatesSection({
           <span className="text-xs text-neutral-500">{certificates.length} linked</span>
         )}
       </div>
+
+      {templatesError && (
+        <p className="text-xs text-red-600">{templatesError}</p>
+      )}
 
       {certificates.length > 0 && (
         <div className="space-y-2">
@@ -82,7 +92,7 @@ export default function CourseCertificatesSection({
         </div>
       )}
 
-      {availableTemplates.length > 0 && (
+      {availableTemplates.length > 0 && !templatesError && (
         <div className="flex items-end gap-2">
           <div className="flex-1">
             <Label htmlFor="cert-template" className="text-xs text-neutral-600 dark:text-neutral-400">

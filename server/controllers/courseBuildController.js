@@ -241,7 +241,7 @@ async function createCourse(req, res) {
         end_date ?? null,
         grading_scale || 'STANDARD',
         allow_self_enrollment ?? true,
-        send_completion_certificates ?? false,
+        send_completion_certificates ?? true,
         effectiveDepartmentId,
       ]
     );
