@@ -69,7 +69,7 @@ async function updateLastLogin(id) {
 }
 
 async function listUsers(filters = {}) {
-  const { search, role, department_id, business_id, employment_status, page = 1, limit = 50 } = filters;
+  const { search, role, department_id, business_id, employment_status, is_active, include_inactive, page = 1, limit = 50 } = filters;
   const offset = (page - 1) * limit;
 
   let sql = `
@@ -81,6 +81,16 @@ async function listUsers(filters = {}) {
     WHERE 1 = 1
   `;
   const params = [];
+
+  // By default only return active users. Pass include_inactive=true or
+  // is_active explicitly to override (e.g. for an "include deactivated" view).
+  if (is_active === false || is_active === 0 || is_active === 'false') {
+    sql += ' AND u.is_active = FALSE';
+  } else if (is_active === true || is_active === 1 || is_active === 'true') {
+    sql += ' AND u.is_active = TRUE';
+  } else if (!include_inactive) {
+    sql += ' AND u.is_active = TRUE';
+  }
 
   if (search) {
     sql += ' AND (u.full_name LIKE ? OR u.email LIKE ? OR u.employee_id LIKE ?)';
@@ -110,6 +120,13 @@ async function listUsers(filters = {}) {
 
   let countSql = `SELECT COUNT(*) AS total FROM users u WHERE 1 = 1`;
   const countParams = [];
+  if (is_active === false || is_active === 0 || is_active === 'false') {
+    countSql += ' AND u.is_active = FALSE';
+  } else if (is_active === true || is_active === 1 || is_active === 'true') {
+    countSql += ' AND u.is_active = TRUE';
+  } else if (!include_inactive) {
+    countSql += ' AND u.is_active = TRUE';
+  }
   if (search) {
     countSql += ' AND (u.full_name LIKE ? OR u.email LIKE ? OR u.employee_id LIKE ?)';
     countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);

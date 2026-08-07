@@ -163,6 +163,16 @@ function QuestionItem({ q, isSelected, onToggleSelect, onEdit, onDelete }) {
             </div>
           )}
 
+          {!hasOptions && q.type === "short_answer" && (
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-300">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+              <span className="leading-snug">{q.correct_answer || "—"}</span>
+              <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                Expected
+              </span>
+            </div>
+          )}
+
           {q.explanation && (
             <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400 italic line-clamp-1">
               {q.explanation}

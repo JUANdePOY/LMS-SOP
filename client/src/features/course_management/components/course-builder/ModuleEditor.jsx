@@ -9,7 +9,24 @@ const TABS = [
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
-export default function ModuleEditor({ module, onSave, onDelete, saving, courseId, moduleSops = [], onLinkSop, onUnlinkSop }) {
+export default function ModuleEditor({
+  module,
+  onSave,
+  onDelete,
+  saving,
+  courseId,
+  moduleSops = [],
+  onLinkSop,
+  onUnlinkSop,
+  onMoveUp,
+  onMoveDown,
+  onNavigatePrev,
+  onNavigateNext,
+  canMoveUp = false,
+  canMoveDown = false,
+  canNavigatePrev = false,
+  canNavigateNext = false,
+}) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [orderIndex, setOrderIndex] = useState("");

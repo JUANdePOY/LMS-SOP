@@ -82,10 +82,8 @@ function serializeAttempt(attempt) {
 function serializeQuizForPlayer(quiz) {
   const questions = (quiz.questions || []).map((q) => {
     let options = q.options;
-    let correct = q.correct_answer;
     try { options = typeof options === 'string' ? JSON.parse(options) : options; } catch { options = null; }
-    try { correct = typeof correct === 'string' ? JSON.parse(correct) : correct; } catch { correct = null; }
-    return { ...q, options: options || [], correct_answer: correct };
+    return { ...q, options: options || [] };
   });
   return { ...quiz, questions };
 }
@@ -181,13 +179,23 @@ async function submitAttempt(req, res) {
   }
 }
 
+function parseJsonField(value) {
+  if (value == null) return value;
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
 function evaluateAttempt(questions, answers) {
   let score = 0;
   const perQuestion = [];
   for (const q of questions) {
     const weight = Number(q.points) || 1;
     const selected = answers[q.id];
-    const correct = q.correct_answer;
+    const correct = parseJsonField(q.correct_answer);
     const isCorrect = isAnswerCorrect(q.type, selected, correct);
     if (isCorrect) score += weight;
     perQuestion.push({

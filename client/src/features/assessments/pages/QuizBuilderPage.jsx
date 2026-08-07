@@ -397,7 +397,7 @@ export default function QuizBuilderPage() {
                     <option value="final">Final (3 attempts)</option>
                   </select>
                 </Field>
-                <Field label="Time Limit (seconds)">
+                <Field label="Time Limit (minutes)">
                   <input type="number" className={fieldClass} value={settings?.time_limit ?? ""} onChange={(e) => handleSetting("time_limit", e.target.value ? Number(e.target.value) : null)} />
                 </Field>
                 <Field label="Passing Score (%)">

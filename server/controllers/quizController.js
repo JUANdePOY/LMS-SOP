@@ -176,7 +176,7 @@ async function getQuiz(req, res) {
     const quiz = await quizModel.findById(req.params.id);
     if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found', code: 'NOT_FOUND' });
     const questions = await quizModel.listQuestions(quiz.id);
-    res.json({ success: true, data: { ...quiz, questionsCount: questions.length } });
+    res.json({ success: true, data: { ...quiz, question_count: questions.length, questionsCount: questions.length } });
   } catch (err) {
     sendError(res, err, 'Failed to fetch quiz');
   }

@@ -1,7 +1,8 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ChevronLeft, Edit3, Users, BarChart3, Calendar, CheckCircle, Search, Download, BookOpen, GraduationCap, Clock, Globe } from "lucide-react";
+import { Edit3, Users, BarChart3, CheckCircle, Search, Download, BookOpen, GraduationCap, Layers } from "lucide-react";
 import { useCourseLibraryDetails } from "../hooks/useCourseLibraryDetails";
+import { useCourseAnalytics } from "../hooks/useCourseAnalytics";
 import { useUsers } from "@/features/organization-management/hooks/useUsers";
 import { useDepartments } from "@/features/organization-management/hooks/useDepartments";
 import { assignEmployees } from "../services/library.api";
@@ -12,6 +13,8 @@ import { cn } from "@/lib/utils";
 import CourseOverviewHero from "../components/CourseOverviewHero";
 import OverviewSection from "../components/OverviewSection";
 import BookOpeningTransition from "../components/BookOpeningTransition";
+import CourseContentSection from "../components/CourseContentSection";
+import { ProgressBar } from "../utils/courseVisuals";
 
 const ENROLLMENT_STATUS_META = {
   active: {
@@ -68,6 +71,7 @@ export default function CourseLibraryDetailsPage() {
   const { course, enrollments, analytics, loading, error, refetch } = useCourseLibraryDetails(courseId);
   const { users: allUsers } = useUsers({ page: 1, limit: 100 });
   const { departments } = useDepartments({ limit: 100 });
+  const { track, trackTabView, trackContentView, getSessionSummary } = useCourseAnalytics(courseId);
   const [isAssigning, setIsAssigning] = useState(false);
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -79,6 +83,12 @@ export default function CourseLibraryDetailsPage() {
       toast.error(error);
     }
   }, [error, toast]);
+
+  const myProgress = useMemo(() => {
+    const mine = enrollments.find((e) => e.user_id === user?.id);
+    if (!mine) return undefined;
+    return typeof mine.progress_percentage === "number" ? mine.progress_percentage : Number(mine.progress) || 0;
+  }, [enrollments, user?.id]);
 
   const enrolledUserIds = new Set(enrollments.map((e) => e.user_id));
   let availableEmployees = allUsers.filter((u) => !enrolledUserIds.has(u.id));
@@ -99,6 +109,7 @@ export default function CourseLibraryDetailsPage() {
     setIsAssigning(true);
     try {
       await assignEmployees(courseId, selectedEmployees);
+      track("assign", { count: selectedEmployees.length });
       toast.success(`${selectedEmployees.length} employee(s) assigned to course`);
       setShowAssignModal(false);
       setSelectedEmployees([]);
@@ -123,6 +134,7 @@ export default function CourseLibraryDetailsPage() {
       a.download = `course-${courseId}-enrollments.${format === "excel" ? "xlsx" : format}`;
       a.click();
       URL.revokeObjectURL(url);
+      track("export", { format });
       toast.success("Export downloaded");
     } catch (err) {
       toast.error(err.message || "Failed to export data");
@@ -138,14 +150,26 @@ export default function CourseLibraryDetailsPage() {
   const [activeTab, setActiveTab] = useState("overview");
 
   const tabs = useMemo(() => {
-    if (isEmployee) return [{ key: "overview", label: "Overview" }];
-    return [
+    const base = [
       { key: "overview", label: "Overview" },
-      { key: "enrollments", label: "Enrollments" },
-      { key: "analytics", label: "Analytics" },
-      { key: "actions", label: "Actions" },
+      { key: "content", label: "Content", icon: Layers },
+    ];
+    if (isEmployee) return base;
+    return [
+      ...base,
+      { key: "enrollments", label: "Enrollments", icon: Users },
+      { key: "analytics", label: "Analytics", icon: BarChart3 },
+      { key: "actions", label: "Actions", icon: CheckCircle },
     ];
   }, [isEmployee]);
+
+  const handleTabChange = useCallback(
+    (key) => {
+      setActiveTab(key);
+      trackTabView(key);
+    },
+    [trackTabView]
+  );
 
   const courseDescription = course?.description || "No description available.";
   const learningOutcomes = useMemo(() => {
@@ -172,20 +196,63 @@ export default function CourseLibraryDetailsPage() {
     { label: "Language", value: "English" },
   ], [course]);
 
+  const enhancedAnalytics = useMemo(() => {
+    const totalEnrollments = enrollments.length;
+    const completed = enrollments.filter((e) => (e.progress_percentage || 0) >= 100).length;
+    const inProgress = enrollments.filter((e) => {
+      const p = e.progress_percentage || 0;
+      return p > 0 && p < 100;
+    }).length;
+    const avgProgress = totalEnrollments
+      ? enrollments.reduce((sum, e) => sum + (e.progress_percentage || 0), 0) / totalEnrollments
+      : 0;
+    const completionRate = totalEnrollments ? (completed / totalEnrollments) * 100 : 0;
+    return {
+      totalEnrollments,
+      completed,
+      inProgress,
+      avgProgress,
+      completionRate,
+      lessonCount: course?.lesson_count || 0,
+    };
+  }, [enrollments, course?.lesson_count]);
+
+  const sessionSummary = getSessionSummary();
+
   if (loading && !course) {
     return (
-      <div className="flex h-96 items-center justify-center">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+      <div className="w-full max-w-none space-y-5 sm:space-y-6">
+        <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 p-5 sm:p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-5 sm:gap-6 animate-pulse">
+            <div className="h-40 w-full sm:h-44 sm:w-40 md:h-48 md:w-64 shrink-0 rounded-xl bg-neutral-200 dark:bg-neutral-700" />
+            <div className="flex-1 min-w-0 space-y-3">
+              <div className="h-4 w-24 rounded bg-neutral-200 dark:bg-neutral-700" />
+              <div className="h-6 w-2/3 rounded bg-neutral-200 dark:bg-neutral-700" />
+              <div className="h-3 w-1/3 rounded bg-neutral-200 dark:bg-neutral-700" />
+              <div className="h-3 w-1/2 rounded bg-neutral-200 dark:bg-neutral-700" />
+            </div>
+          </div>
+        </div>
+        <div className="max-w-4xl space-y-5">
+          <div className="h-32 rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 animate-pulse" />
+          <div className="h-40 rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 animate-pulse" />
+        </div>
       </div>
     );
   }
 
   if (error && !course) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-xl font-bold">Course Not Found</h1>
-        <p className="text-sm text-neutral-500">{error}</p>
-        <button onClick={() => navigate("/courses/library")} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-sm">
+      <div className="mx-auto max-w-md rounded-2xl border border-red-200 dark:border-red-500/30 bg-red-50/60 dark:bg-red-500/10 p-8 text-center shadow-sm">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-red-100 dark:bg-red-500/20">
+          <BookOpen size={24} className="text-red-500" />
+        </div>
+        <h1 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">Course Not Found</h1>
+        <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">{error}</p>
+        <button
+          onClick={() => navigate("/courses/library")}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-sm font-medium hover:border-neutral-300"
+        >
           Back to Library
         </button>
       </div>
@@ -201,6 +268,7 @@ export default function CourseLibraryDetailsPage() {
             course={course}
             onBack={onBack}
             breadcrumb="Back to Library"
+            progress={myProgress}
             primaryAction={
           !isEmployee ? (
             <button
@@ -215,26 +283,40 @@ export default function CourseLibraryDetailsPage() {
       />
 
       {!isEmployee && (
-        <div className="flex items-center gap-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-1">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                activeTab === tab.key
-                  ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                  : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100"
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 p-1 shadow-sm dark:shadow-none">
+          {tabs.map((tab) => {
+            const active = activeTab === tab.key;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => handleTabChange(tab.key)}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap",
+                  active
+                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                    : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100"
+                )}
+              >
+                {Icon && <Icon size={13} />}
+                {tab.label}
+                {active && (
+                  <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-blue-600 dark:bg-blue-400" />
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 
-      <div className="max-w-4xl space-y-5">
-        {(!isEmployee && activeTab !== "overview") ? (
+      <div className="mx-auto max-w-3xl space-y-5 sm:space-y-6">
+        {activeTab === "content" ? (
+          <CourseContentSection
+            courseId={courseId}
+            onLessonView={(payload) => trackContentView(payload)}
+          />
+        ) : (!isEmployee && activeTab !== "overview") ? (
           <>
             {activeTab === "enrollments" && (
               <OverviewSection title="Enrolled Employees" icon={Users}>
@@ -243,22 +325,22 @@ export default function CourseLibraryDetailsPage() {
                   <button onClick={() => setShowAssignModal(true)} className="rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-blue-300 dark:hover:border-blue-500/60 hover:bg-blue-50 dark:hover:bg-blue-500/10">+ Assign Employees</button>
                 </div>
                 {enrollments.length === 0 ? (
-                  <div className="text-center py-8 text-neutral-400">
+                  <div className="text-center py-10 text-neutral-400">
                     <Users size={32} className="mx-auto mb-2 opacity-30" />
                     <p className="text-sm">No employees enrolled yet</p>
                     <button onClick={() => setShowAssignModal(true)} className="mt-2 rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs hover:border-neutral-300">Assign first employee</button>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto rounded-lg border border-neutral-200/80 dark:border-neutral-700/80">
                     <table className="w-full">
-                      <thead>
+                      <thead className="sticky top-0 z-10 bg-neutral-50/95 dark:bg-neutral-800/95 backdrop-blur">
                         <tr className="border-b border-neutral-200 dark:border-neutral-700">
-                          <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Employee</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Email</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Status</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Progress</th>
-                          <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Enrolled</th>
-                          <th className="px-3 py-2 text-right text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 w-16">Actions</th>
+                          <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Employee</th>
+                          <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Email</th>
+                          <th className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Status</th>
+                          <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Progress</th>
+                          <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400">Enrolled</th>
+                          <th className="px-3 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 w-16">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
@@ -279,15 +361,15 @@ export default function CourseLibraryDetailsPage() {
                                 <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${status.chip}`}><span className={`h-1.5 w-1.5 rounded-full ${status.dot}`}></span>{status.label}</span>
                               </td>
                               <td className="px-3 py-2.5">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-16 h-2 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
+                                <div className="ml-auto flex w-24 items-center gap-2">
+                                  <div className="h-2 flex-1 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
                                     <div className={`h-full rounded-full ${progress >= 80 ? "bg-emerald-500" : progress >= 50 ? "bg-blue-500" : "bg-amber-500"}`} style={{ width: `${progress}%` }} />
                                   </div>
-                                  <span className="text-xs text-neutral-600 dark:text-neutral-400">{progress}%</span>
+                                  <span className="w-9 text-right text-xs tabular-nums text-neutral-600 dark:text-neutral-400">{progress}%</span>
                                 </div>
                               </td>
-                              <td className="px-3 py-2.5 text-xs text-neutral-600 dark:text-neutral-400">{formatDate(enrollment.enrolled_at || enrollment.created_at)}</td>
-                              <td className="px-3 py-2.5">
+                              <td className="px-3 py-2.5 text-right text-xs tabular-nums text-neutral-600 dark:text-neutral-400">{formatDate(enrollment.enrolled_at || enrollment.created_at)}</td>
+                              <td className="px-3 py-2.5 text-right">
                                 <button onClick={() => navigate(`/courses/${courseId}/analytics/user/${enrollment.user_id}`)} className="rounded p-1 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200" title="View user progress"><BarChart3 size={12} /></button>
                               </td>
                             </tr>
@@ -302,23 +384,62 @@ export default function CourseLibraryDetailsPage() {
 
             {activeTab === "analytics" && (
               <OverviewSection title="Analytics Overview" icon={BarChart3}>
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-neutral-500 dark:text-neutral-400">Completion Rate</span>
-                      <span className="text-neutral-900 dark:text-neutral-100 font-medium">{analytics?.completion_rate?.toFixed(0) || 0}%</span>
-                    </div>
-                    <div className="w-full h-2 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
-                      <div className="h-full rounded-full bg-blue-500" style={{ width: `${analytics?.completion_rate || 0}%` }} />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 bg-neutral-50/60 dark:bg-neutral-800/40 p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Completion Rate</p>
+                    <p className="mt-1 text-xl font-bold text-neutral-900 dark:text-neutral-100">{Math.round(enhancedAnalytics.completionRate)}%</p>
+                    <div className="mt-2">
+                      <ProgressBar value={enhancedAnalytics.completionRate} />
                     </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-neutral-500 dark:text-neutral-400">Active Learners</span>
-                    <span className="text-neutral-900 dark:text-neutral-100 font-medium">{analytics?.active_learners || 0}</span>
+                  <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 bg-neutral-50/60 dark:bg-neutral-800/40 p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Active Learners</p>
+                    <p className="mt-1 text-xl font-bold text-neutral-900 dark:text-neutral-100">{analytics?.active_learners || enhancedAnalytics.inProgress}</p>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-neutral-500 dark:text-neutral-400">Avg. Time to Complete</span>
-                    <span className="text-neutral-900 dark:text-neutral-100 font-medium">{analytics?.avg_completion_time ? `${analytics.avg_completion_time} days` : "—"}</span>
+                  <div className="col-span-2 rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 bg-neutral-50/60 dark:bg-neutral-800/40 p-3 sm:col-span-1">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Avg. Progress</p>
+                    <p className="mt-1 text-xl font-bold text-neutral-900 dark:text-neutral-100">{Math.round(enhancedAnalytics.avgProgress)}%</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Enrolled</p>
+                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{enhancedAnalytics.totalEnrollments}</p>
+                  </div>
+                  <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Completed</p>
+                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{enhancedAnalytics.completed}</p>
+                  </div>
+                  <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Lessons</p>
+                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{enhancedAnalytics.lessonCount}</p>
+                  </div>
+                  <div className="rounded-lg border border-neutral-200/80 dark:border-neutral-700/80 p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Avg. Time</p>
+                    <p className="mt-1 text-lg font-bold text-neutral-900 dark:text-neutral-100">{analytics?.avg_completion_time ? `${analytics.avg_completion_time}d` : "—"}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-600 p-3">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">Your Session Engagement</p>
+                  <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+                    <div>
+                      <p className="text-neutral-500 dark:text-neutral-400">Content views</p>
+                      <p className="font-semibold text-neutral-900 dark:text-neutral-100">{sessionSummary.contentViews}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-500 dark:text-neutral-400">Tabs opened</p>
+                      <p className="font-semibold text-neutral-900 dark:text-neutral-100">{Object.keys(sessionSummary.tabViews).length}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-500 dark:text-neutral-400">Exports</p>
+                      <p className="font-semibold text-neutral-900 dark:text-neutral-100">{sessionSummary.downloads}</p>
+                    </div>
+                    <div>
+                      <p className="text-neutral-500 dark:text-neutral-400">Assignments</p>
+                      <p className="font-semibold text-neutral-900 dark:text-neutral-100">{sessionSummary.assignments}</p>
+                    </div>
                   </div>
                 </div>
               </OverviewSection>
@@ -400,11 +521,11 @@ export default function CourseLibraryDetailsPage() {
       </div>
 
       {showAssignModal && !isEmployee && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-xl bg-white dark:bg-neutral-900 shadow-2xl">
-            <div className="border-b border-neutral-200 dark:border-neutral-700 px-5 py-3 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-2xl rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-neutral-700/80 px-5 py-3.5">
               <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Assign Employees to Course</h2>
-              <button onClick={() => { setShowAssignModal(false); setSelectedEmployees([]); setEmployeeSearch(""); }} className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">×</button>
+              <button onClick={() => { setShowAssignModal(false); setSelectedEmployees([]); setEmployeeSearch(""); }} className="rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200" aria-label="Close">×</button>
             </div>
             <div className="p-4 space-y-3">
               <div className="flex items-center gap-2">

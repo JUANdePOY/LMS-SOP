@@ -6,6 +6,7 @@ const { upload: courseImageUpload } = require('../middleware/courseImageUpload')
 
 // Public read routes for course catalog and details
 router.get('/', coursesController.listCourses);
+router.get('/categories', coursesController.listCategories);
 router.get('/:id', coursesController.getCourse);
 router.get('/:courseId/modules', coursesController.listModules);
 router.get('/:courseId/modules/:moduleId/content', coursesController.listContent);

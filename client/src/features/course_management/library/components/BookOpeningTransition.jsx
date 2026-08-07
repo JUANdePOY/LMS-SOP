@@ -35,20 +35,20 @@ export default function BookOpeningTransition({ children, courseId }) {
               cardRect
                 ? {
                     opacity: 0,
-                    scale: 0.95,
+                    scale: 0.96,
                     y: cardRect.top - (cardRect.height * 0.1),
                     x: cardRect.left - (cardRect.width * 0.1),
                     width: cardRect.width,
                     height: cardRect.height,
                   }
-                : { opacity: 0, y: 20 }
+                : { opacity: 0, y: 16 }
             }
             animate={{ opacity: 1, scale: 1, y: 0, x: 0, width: "100%", height: "auto" }}
-            exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
+            exit={{ opacity: 0, y: -16, scale: 0.98, transition: { duration: 0.25, ease: "easeInOut" } }}
             transition={{
-              duration: 0.4,
-              ease: [0.4, 0, 0.2, 1],
-              layout: { duration: 0.4 },
+              duration: 0.45,
+              ease: [0.22, 1, 0.36, 1],
+              layout: { duration: 0.45 },
             }}
             className="overflow-hidden"
           >

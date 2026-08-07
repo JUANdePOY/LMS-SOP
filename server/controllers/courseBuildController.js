@@ -166,10 +166,18 @@ async function getCourse(req, res) {
       : [[]];
     const lessonsRows = Array.isArray(queryResult) && queryResult[0] && Array.isArray(queryResult[0]) ? queryResult[0] : [];
 
+    // Map DB snake_case rows to the camelCase shape the client expects
+    // (e.g. quiz_id -> quizId, certificate_template_id -> certificateTemplateId).
+    const normalizeLesson = (l) => ({
+      ...l,
+      quizId: l.quiz_id ?? null,
+      certificateTemplateId: l.certificate_template_id ?? null,
+    });
+
     const lessonsByModule = new Map();
     for (const l of lessonsRows) {
       if (!lessonsByModule.has(l.module_id)) lessonsByModule.set(l.module_id, []);
-      lessonsByModule.get(l.module_id).push(l);
+      lessonsByModule.get(l.module_id).push(normalizeLesson(l));
     }
 
     const enrichedModules = modules.map(m => ({
@@ -257,11 +265,11 @@ async function createCourse(req, res) {
         const lesson = lessonOrder[lIdx];
         if (!lesson || !String(lesson.title || '').trim()) continue;
 
-        const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive', 'sop'].includes(lesson.type) ? lesson.type : 'reading';
+        const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive', 'sop', 'certificate'].includes(lesson.type) ? lesson.type : 'reading';
         await assertQuizBelongsToCourse(conn, courseId, lesson.quizId);
           await conn.query(
-            `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score, quiz_id, chapters, thumbnail_url)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score, quiz_id, certificate_template_id, chapters, thumbnail_url)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
               moduleId,
               String(lesson.title).trim(),
@@ -274,6 +282,7 @@ async function createCourse(req, res) {
               lesson.requiresQuizPass ? 1 : 0,
               lesson.passingScore ? parseInt(lesson.passingScore, 10) : null,
               lesson.quizId ? parseInt(lesson.quizId, 10) : null,
+              lesson.certificateTemplateId ? parseInt(lesson.certificateTemplateId, 10) : null,
               lesson.chapters ? JSON.stringify(lesson.chapters) : null,
               lesson.thumbnail_url ?? lesson.thumbnailUrl ?? null,
             ]
@@ -401,7 +410,7 @@ async function updateCourse(req, res) {
               if (!lesson) continue;
               const lessonTitle = String(lesson.title || '').trim();
               const effectiveLessonTitle = lessonTitle || `Lesson ${lIdx + 1}`;
-              const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive', 'sop'].includes(lesson.type) ? lesson.type : 'reading';
+              const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive', 'sop', 'certificate'].includes(lesson.type) ? lesson.type : 'reading';
         await assertQuizBelongsToCourse(conn, courseId, lesson.quizId);
 
               let lessonId = null;
@@ -413,7 +422,7 @@ async function updateCourse(req, res) {
               if (lessonId) {
                 incomingLessonIds.add(lessonId);
                 await conn.query(
-                  `UPDATE module_content SET title = ?, type = ?, description = ?, order_index = ?, url = ?, duration = ?, is_required = ?, requires_quiz_pass = ?, passing_score = ?, quiz_id = ?, chapters = ?, thumbnail_url = ? WHERE id = ?`,
+                  `UPDATE module_content SET title = ?, type = ?, description = ?, order_index = ?, url = ?, duration = ?, is_required = ?, requires_quiz_pass = ?, passing_score = ?, quiz_id = ?, certificate_template_id = ?, chapters = ?, thumbnail_url = ? WHERE id = ?`,
                   [
                     effectiveLessonTitle,
                     lessonType,
@@ -425,6 +434,7 @@ async function updateCourse(req, res) {
                     lesson.requiresQuizPass ? 1 : 0,
                     lesson.passingScore ? parseInt(lesson.passingScore, 10) : null,
                     lesson.quizId ? parseInt(lesson.quizId, 10) : null,
+                    lesson.certificateTemplateId ? parseInt(lesson.certificateTemplateId, 10) : null,
                     lesson.chapters ? JSON.stringify(lesson.chapters) : null,
                     lesson.thumbnail_url ?? lesson.thumbnailUrl ?? null,
                     lessonId,
@@ -432,8 +442,8 @@ async function updateCourse(req, res) {
                 );
               } else {
                 const [newLesson] = await conn.query(
-                  `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score, quiz_id, chapters, thumbnail_url)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                  `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score, quiz_id, certificate_template_id, chapters, thumbnail_url)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                   [
                     moduleId,
                     effectiveLessonTitle,
@@ -446,7 +456,8 @@ async function updateCourse(req, res) {
                     lesson.requiresQuizPass ? 1 : 0,
                     lesson.passingScore ? parseInt(lesson.passingScore, 10) : null,
                     lesson.quizId ? parseInt(lesson.quizId, 10) : null,
-                    lesson.chapters ? JSON.stringify(lesson.chapters) : null,
+              lesson.certificateTemplateId ? parseInt(lesson.certificateTemplateId, 10) : null,
+              lesson.chapters ? JSON.stringify(lesson.chapters) : null,
                     lesson.thumbnail_url ?? lesson.thumbnailUrl ?? null,
                   ]
                 );
@@ -472,11 +483,11 @@ async function updateCourse(req, res) {
               const lesson = lessonOrder[lIdx];
               if (!lesson || !String(lesson.title || '').trim()) continue;
 
-              const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive', 'sop'].includes(lesson.type) ? lesson.type : 'reading';
+              const lessonType = ['video', 'reading', 'document', 'quiz', 'assignment', 'link', 'presentation', 'downloadable', 'live_session', 'interactive', 'sop', 'certificate'].includes(lesson.type) ? lesson.type : 'reading';
         await assertQuizBelongsToCourse(conn, courseId, lesson.quizId);
               await conn.query(
-                `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score, quiz_id, chapters, thumbnail_url)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO module_content (module_id, title, type, description, order_index, url, duration, is_required, requires_quiz_pass, passing_score, quiz_id, certificate_template_id, chapters, thumbnail_url)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                   moduleId,
                   String(lesson.title).trim(),
@@ -489,7 +500,8 @@ async function updateCourse(req, res) {
                   lesson.requiresQuizPass ? 1 : 0,
                   lesson.passingScore ? parseInt(lesson.passingScore, 10) : null,
                   lesson.quizId ? parseInt(lesson.quizId, 10) : null,
-                  lesson.chapters ? JSON.stringify(lesson.chapters) : null,
+              lesson.certificateTemplateId ? parseInt(lesson.certificateTemplateId, 10) : null,
+              lesson.chapters ? JSON.stringify(lesson.chapters) : null,
                   lesson.thumbnail_url ?? lesson.thumbnailUrl ?? null,
                 ]
               );

@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getUsers, createUser, updateUser, deleteUser, getUserStats, getBusinesses } from '@/services/api';
-import { getDepartments } from '@/services/api';
+import { getUsers, createUser, updateUser, deleteUser, getUserStats, getBusinesses, getDepartmentHierarchy } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -63,6 +62,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [departments, setDepartments] = useState(initialDepartments);
+  const [departmentTree, setDepartmentTree] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
@@ -118,7 +118,31 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
         setDepartments(res.data.data?.rows || []);
       }
     } catch { /* ignore */ }
+    try {
+      const hRes = await getDepartmentHierarchy();
+      if (hRes.data?.status === 'success') {
+        setDepartmentTree(Array.isArray(hRes.data.data) ? hRes.data.data : []);
+      }
+    } catch { /* ignore */ }
   }, [isAuthenticated]);
+
+  // Flatten the nested department tree into an indented option list so the
+  // parent → child hierarchy is visible when picking a department.
+  const departmentOptions = (() => {
+    const out = [];
+    const walk = (nodes, depth) => {
+      for (const node of nodes || []) {
+        out.push({
+          id: node.id,
+          name: depth > 0 ? `${'  '.repeat(depth)}${node.name}` : node.name,
+          depth,
+        });
+        if (node.children && node.children.length) walk(node.children, depth + 1);
+      }
+    };
+    walk(departmentTree, 0);
+    return out;
+  })();
 
   const fetchBusinesses = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -174,15 +198,17 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
     setSaving(true);
     try {
       const res = await deleteUser(deletingUser.id);
-      if (res.data.status === 'success') {
+      if (res.data?.status === 'success') {
         toast.success('User deactivated successfully');
         setShowDeleteConfirm(false);
         setDeletingUser(null);
         fetchUsers();
         fetchStats();
+      } else {
+        toast.error(res.data?.message || 'Failed to deactivate user');
       }
-    } catch {
-      const message = 'Failed to deactivate user';
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Failed to deactivate user';
       toast.error(message);
     } finally {
       setSaving(false);
@@ -214,6 +240,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   };
 
   const filteredUsers = users.filter((u) => {
+    if (u.is_active === false) return false;
     if (search && !u.full_name?.toLowerCase().includes(search.toLowerCase()) && !u.email?.toLowerCase().includes(search.toLowerCase())) return false;
     if (roleFilter && u.role !== roleFilter) return false;
     if (deptFilter && u.department_id !== parseInt(deptFilter)) return false;
@@ -594,7 +621,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
                 <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
                   <option value="">Select department…</option>
-                  {departments.map((d) => (
+                  {departmentOptions.map((d) => (
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </Select>
@@ -676,7 +703,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
                 <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
                   <option value="">Select department…</option>
-                  {departments.map((d) => (
+                  {departmentOptions.map((d) => (
                     <option key={d.id} value={d.id}>{d.name}</option>
                   ))}
                 </Select>
@@ -733,10 +760,13 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
 
       {showDeleteConfirm && deletingUser && (
         <ConfirmDialog
+          open={showDeleteConfirm}
           title="Deactivate User"
           message={`Are you sure you want to deactivate "${deletingUser.full_name || deletingUser.email}"? They will no longer be able to log in.`}
           confirmLabel="Deactivate"
           variant="danger"
+          destructive
+          loading={saving}
           onConfirm={handleDeleteUser}
           onCancel={() => { setShowDeleteConfirm(false); setDeletingUser(null); }}
         />

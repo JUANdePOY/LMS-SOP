@@ -55,7 +55,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', [
+router.post('/', requireAdmin, [
   body('full_name').trim().isLength({ min: 2 }).withMessage('Full name is required'),
   body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
@@ -74,10 +74,6 @@ router.post('/', [
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
-    }
-
-    if (req.user.role !== 'super_admin') {
-      return res.status(403).json({ status: 'error', message: 'Only super admins can create users', code: 'ADMIN_ONLY' });
     }
 
     const { full_name, email, password, role, department_id, business_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address } = req.body;
@@ -223,13 +219,9 @@ router.put('/:id/password', [
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
-
-    if (req.user.role !== 'super_admin') {
-      return res.status(403).json({ status: 'error', message: 'Only super admins can deactivate users', code: 'ADMIN_ONLY' });
-    }
 
     const targetUser = await authModel.findById(userId);
     if (!targetUser) {

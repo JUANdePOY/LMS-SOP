@@ -877,6 +877,32 @@ export default function CourseBuilderPage() {
               moduleSops={getModuleSops(selectedModuleId)}
               onLinkSop={handleLinkSop}
               onUnlinkSop={handleUnlinkSop}
+              onMoveUp={() => moveModule(selectedModuleId, -1)}
+              onMoveDown={() => moveModule(selectedModuleId, 1)}
+              onNavigatePrev={() => {
+                const idx = modules.findIndex((m) => m.id === selectedModuleId);
+                if (idx > 0) {
+                  setSelectedModuleId(modules[idx - 1].id);
+                  setSelectedLessonId(null);
+                }
+              }}
+              onNavigateNext={() => {
+                const idx = modules.findIndex((m) => m.id === selectedModuleId);
+                if (idx < modules.length - 1) {
+                  setSelectedModuleId(modules[idx + 1].id);
+                  setSelectedLessonId(null);
+                }
+              }}
+              canMoveUp={modules.findIndex((m) => m.id === selectedModuleId) > 0}
+              canMoveDown={(() => {
+                const idx = modules.findIndex((m) => m.id === selectedModuleId);
+                return idx >= 0 && idx < modules.length - 1;
+              })()}
+              canNavigatePrev={modules.findIndex((m) => m.id === selectedModuleId) > 0}
+              canNavigateNext={(() => {
+                const idx = modules.findIndex((m) => m.id === selectedModuleId);
+                return idx >= 0 && idx < modules.length - 1;
+              })()}
             />
           ) : (
             <BuilderEmptyState

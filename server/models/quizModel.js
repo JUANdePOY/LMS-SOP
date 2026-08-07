@@ -139,7 +139,7 @@ async function softDelete(id) {
 
 async function listQuestions(quizId) {
   const [rows] = await db.query(
-    'SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY order_index ASC, id ASC',
+    'SELECT * FROM quiz_questions WHERE quiz_id = ? AND is_deleted = FALSE ORDER BY order_index ASC, id ASC',
     [quizId]
   );
   return rows;
@@ -258,7 +258,7 @@ async function getQuizWithQuestions(quizId) {
   const quiz = quizzes[0];
   if (!quiz) return null;
 
-  const [questions] = await db.query('SELECT * FROM quiz_questions WHERE quiz_id = ? ORDER BY order_index ASC, id ASC', [quizId]);
+    const [questions] = await db.query('SELECT * FROM quiz_questions WHERE quiz_id = ? AND is_deleted = FALSE ORDER BY order_index ASC, id ASC', [quizId]);
 
   return { ...quiz, questions: questions || [] };
 }

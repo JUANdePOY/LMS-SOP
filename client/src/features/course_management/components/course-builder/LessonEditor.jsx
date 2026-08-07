@@ -36,6 +36,11 @@ import ChapterEditor from "./ChapterEditor";
 import ThumbnailSelector from "./ThumbnailSelector";
 import Accordion from "./Accordion";
 import LinkPreview, { isValidUrl } from "./LinkPreview";
+import SopPreview from "./SopPreview";
+import SopPicker from "./SopPicker";
+import CertificatePreview from "./CertificatePreview";
+import CertificatePicker from "./CertificatePicker";
+import DocumentPreview, { DOCUMENT_ACCEPT, DOCUMENT_MAX_BYTES, isAcceptedDocument, formatBytes } from "./DocumentPreview";
 import CreateQuizModal from "@/features/assessments/components/modals/CreateQuizModal";
 import { parseVideoUrl, PROVIDER_LABEL } from "@/features/course_management/utils/videoUrl";
 
@@ -543,7 +548,7 @@ export default function LessonEditor({
                       ) : type === "sop" ? (
                         <div className="space-y-4">
                           <div>
-                            <label htmlFor="sop-select" className="block text-sm font-medium text-neutral-700 mb-2">
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
                               Select SOP
                             </label>
                             {loadingSops ? (
@@ -552,119 +557,201 @@ export default function LessonEditor({
                                 <span className="text-sm text-neutral-500">Loading...</span>
                               </div>
                             ) : (
-                              <select
-                                id="sop-select"
+                              <SopPicker
+                                sops={availableSops}
                                 value={url}
-                                onChange={(e) => {
-                                  const selectedSop = availableSops.find((s) => String(s.id) === e.target.value);
-                                  setUrl(e.target.value);
+                                onChange={(id) => {
+                                  const selectedSop = availableSops.find((s) => String(s.id) === id);
+                                  setUrl(id);
+                                  setTitle(selectedSop?.title || "");
                                   emitPatch({
-                                    url: e.target.value,
-                                    content: e.target.value,
+                                    title: selectedSop?.title || "",
+                                    url: id,
+                                    content: id,
                                     description: selectedSop?.title || "",
                                   });
                                 }}
-                                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
-                              >
-                                <option value="">Select an SOP...</option>
-                                {availableSops.map((sop) => (
-                                  <option key={sop.id} value={sop.id}>
-                                    {sop.title}
-                                  </option>
-                                ))}
-                              </select>
+                                onOpen={() => {
+                                  if (url) window.open(`/sop/${url}`, "_blank", "noopener,noreferrer");
+                                }}
+                              />
                             )}
                           </div>
-                          {url && (
-                            <div>
-                              <label className="block text-sm font-medium text-neutral-700 mb-2">
-                                Notes
-                              </label>
-                              <div className="rounded-md border border-neutral-200 overflow-hidden">
-                                <RichTextEditor
-                                  key={lesson?.id}
-                                  value={description}
-                                  onChange={(html) => {
-                                    setDescription(html);
-                                    emitPatch({ description: html });
-                                  }}
-                                  onImageUpload={handleImageUpload}
-                                  placeholder="Optional notes..."
-                                />
-                              </div>
+
+                          <SopPreview
+                            sop={availableSops.find((s) => String(s.id) === String(url)) || null}
+                            onOpen={() => {
+                              if (url) window.open(`/sop/${url}`, "_blank", "noopener,noreferrer");
+                            }}
+                          />
+
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
+                              Notes <span className="font-normal text-neutral-400">(optional)</span>
+                            </label>
+                            <div className="rounded-md border border-neutral-200 overflow-hidden">
+                              <RichTextEditor
+                                key={lesson?.id}
+                                value={description}
+                                onChange={(html) => {
+                                  setDescription(html);
+                                  emitPatch({ description: html });
+                                }}
+                                onImageUpload={handleImageUpload}
+                                placeholder="Add lesson-specific context; the full SOP is shown to learners above."
+                              />
                             </div>
-                          )}
+                            <p className="mt-1.5 text-xs text-neutral-500">
+                              The full SOP is displayed to learners; use notes for instructions specific to this lesson.
+                            </p>
+                          </div>
                         </div>
                       ) : type === "certificate" ? (
                         <div className="space-y-4">
                           <div>
-                            <label htmlFor="cert-select" className="block text-sm font-medium text-neutral-700 mb-2">
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
                               Certificate Template
                             </label>
                             {loadingCertificates ? (
                               <div className="flex items-center gap-2 border border-neutral-200 bg-white rounded-md px-3 py-2">
                                 <Loader2 size={16} className="animate-spin text-neutral-500" />
-                                <span className="text-sm text-neutral-500">Loading...</span>
+                                <span className="text-sm text-neutral-500">Loading templates...</span>
                               </div>
                             ) : (
-                              <select
-                                id="cert-select"
-                                value={selectedCertificateId || ""}
-                                onChange={(e) => {
-                                  const id = e.target.value ? Number(e.target.value) : null;
-                                  setSelectedCertificateId(id);
-                                  emitPatch({ certificateTemplateId: id, url: id ? String(id) : "" });
+                              <CertificatePicker
+                                templates={certificateTemplates}
+                                value={selectedCertificateId}
+                                onChange={(id) => {
+                                  const nextId = id ? Number(id) : null;
+                                  setSelectedCertificateId(nextId);
+                                  emitPatch({
+                                    certificateTemplateId: nextId,
+                                    url: nextId ? String(nextId) : "",
+                                  });
                                 }}
-                                className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
-                              >
-                                <option value="">Select a certificate template...</option>
-                                {certificateTemplates.map((tpl) => (
-                                  <option key={tpl.id} value={tpl.id}>
-                                    {tpl.name}
-                                  </option>
-                                ))}
-                              </select>
+                                onOpen={() => {
+                                  if (selectedCertificateId) {
+                                    window.open(
+                                      `/certificates`,
+                                      "_blank",
+                                      "noopener,noreferrer"
+                                    );
+                                  }
+                                }}
+                              />
                             )}
+                            <p className="mt-1.5 text-xs text-neutral-500">
+                              Learners receive this certificate once they complete the course.
+                            </p>
                           </div>
+
+                          <CertificatePreview
+                            template={
+                              certificateTemplates.find(
+                                (t) => String(t.id) === String(selectedCertificateId)
+                              ) || null
+                            }
+                            onOpen={() => {
+                              if (selectedCertificateId) {
+                                window.open(
+                                  `/certificates`,
+                                  "_blank",
+                                  "noopener,noreferrer"
+                                );
+                              }
+                            }}
+                          />
                         </div>
                       ) : type === "document" ? (
                         <div className="space-y-4">
                           <div>
-                            <label htmlFor="doc-upload" className="block text-sm font-medium text-neutral-700 mb-2">
+                            <label className="block text-sm font-medium text-neutral-700 mb-2">
                               Document
                             </label>
-                            <div className="relative border border-neutral-200 rounded-md hover:border-neutral-300 transition-colors">
-                              <input
-                                id="doc-upload"
-                                type="file"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  setDocumentFile(file || null);
-                                  if (file) {
-                                    const reader = new FileReader();
-                                    reader.onloadend = () => {
-                                      emitPatch({ documentFile: file, url: reader.result });
-                                    };
-                                    reader.readAsDataURL(file);
-                                  }
-                                }}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              />
-                              <div className="flex flex-col items-center justify-center py-6 px-4 text-center">
-                                <FileArchive size={24} className="text-neutral-400 mb-2" />
-                                {documentFile ? (
-                                  <>
-                                    <p className="text-sm text-neutral-700">{documentFile.name}</p>
-                                    <p className="text-xs text-neutral-500 mt-1">Click to change</p>
-                                  </>
-                                ) : (
-                                  <>
-                                    <p className="text-sm text-neutral-700">Click to upload</p>
-                                    <p className="text-xs text-neutral-500 mt-1">PDF, DOCX, PPTX</p>
-                                  </>
-                                )}
-                              </div>
-                            </div>
+                            <input
+                              id="doc-upload"
+                              type="file"
+                              accept={DOCUMENT_ACCEPT}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0] || null;
+                                setDocumentFile(file);
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    emitPatch({ documentFile: file, url: reader.result });
+                                  };
+                                  reader.readAsDataURL(file);
+                                } else {
+                                  emitPatch({ documentFile: null, url: "" });
+                                }
+                                e.target.value = "";
+                              }}
+                              className="sr-only"
+                            />
+                            <label
+                              htmlFor="doc-upload"
+                              className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-8 text-center transition-colors ${
+                                documentFile
+                                  ? "border-neutral-200 bg-neutral-50 hover:border-neutral-300"
+                                  : "border-neutral-300 bg-white hover:border-blue-400 hover:bg-blue-50/40"
+                              }`}
+                            >
+                              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
+                                <FileArchive size={22} />
+                              </span>
+                              {documentFile ? (
+                                <>
+                                  <p className="text-sm font-medium text-neutral-700">{documentFile.name}</p>
+                                  <p className="text-xs text-neutral-500">Click to replace</p>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-sm font-medium text-neutral-700">Click to upload a document</p>
+                                  <p className="text-xs text-neutral-500">PDF, DOCX, PPTX, XLSX, CSV · up to 25 MB</p>
+                                </>
+                              )}
+                            </label>
+                            {documentFile && !isAcceptedDocument(documentFile.name) && (
+                              <p className="mt-1.5 text-xs text-amber-600">
+                                This file type isn’t supported. Use a PDF, Word, PowerPoint, Excel, or CSV file.
+                              </p>
+                            )}
+                            {documentFile && documentFile.size > DOCUMENT_MAX_BYTES && (
+                              <p className="mt-1.5 text-xs text-amber-600">
+                                File is {formatBytes(documentFile.size)} — the limit is 25 MB and may fail to upload.
+                              </p>
+                            )}
+                          </div>
+
+                          <DocumentPreview
+                            file={documentFile}
+                            url={url}
+                            onRemove={() => {
+                              setDocumentFile(null);
+                              emitPatch({ documentFile: null, url: "" });
+                            }}
+                            onOpen={() => {
+                              if (url) window.open(url, "_blank", "noopener,noreferrer");
+                            }}
+                          />
+
+                          <div>
+                            <label htmlFor="doc-title" className="block text-sm font-medium text-neutral-700 mb-2">
+                              Document title <span className="font-normal text-neutral-400">(optional)</span>
+                            </label>
+                            <input
+                              id="doc-title"
+                              value={linkTitle}
+                              onChange={(e) => {
+                                setLinkTitle(e.target.value);
+                                emitPatch({ linkTitle: e.target.value });
+                              }}
+                              placeholder="e.g. Safety Manual v3"
+                              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
+                            />
+                            <p className="mt-1.5 text-xs text-neutral-500">
+                              Shown in the course outline when set; otherwise the file name is used.
+                            </p>
                           </div>
                         </div>
                       ) : type === "video" ? (

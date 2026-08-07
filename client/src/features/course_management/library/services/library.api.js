@@ -1,4 +1,4 @@
-import { getCourseList, getCourseById } from "@/features/course_management/api/course.api";
+import { getCourseList, getCourseById, getCourseCategories } from "@/features/course_management/api/course.api";
 import { getEnrollments, enrollStudent, bulkEnrollStudents } from "@/features/course_management/api/enrollment.api";
 
 import * as session from '@/services/session';
@@ -12,6 +12,10 @@ function authHeaders() {
 
 export async function getPublishedCourses(params = {}) {
   return await getCourseList({ ...params, status: "published" });
+}
+
+export async function getCourseLibraryCategories(params = {}) {
+  return await getCourseCategories({ ...params, status: "published" });
 }
 
 export async function getCourseLibraryDetails(courseId) {
@@ -57,4 +61,40 @@ export async function getCourseAnalytics(courseId) {
 
 export async function assignEmployees(courseId, userIds) {
   return await bulkEnrollStudents({ course_id: courseId, user_ids: userIds, role: "learner" });
+}
+
+export async function getLearningPaths(params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([key, val]) => {
+    if (val !== undefined && val !== null && val !== "") qs.append(key, val);
+  });
+  const res = await fetch(`/api/learning-paths?${qs.toString()}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error("Failed to fetch learning paths");
+  return res.json();
+}
+
+export async function getLearningPath(id) {
+  const res = await fetch(`/api/learning-paths/${id}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error("Failed to load learning path");
+  return res.json();
+}
+
+export async function createLearningPath(payload) {
+  const res = await fetch("/api/learning-paths", {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Failed to create learning path");
+  return res.json();
+}
+
+export async function assignLearningPath(pathId, payload = {}) {
+  const res = await fetch(`/api/learning-paths/${pathId}/assign`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error("Failed to assign learning path");
+  return res.json();
 }

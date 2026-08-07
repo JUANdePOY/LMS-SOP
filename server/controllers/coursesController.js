@@ -431,8 +431,18 @@ function uploadImage(req, res) {
   }
 }
 
+function listCategories(req, res) {
+  const { status } = req.query;
+  courseModel.listCategories({ status })
+    .then((categories) => {
+      res.json({ success: true, message: 'OK', data: categories });
+    })
+    .catch((err) => sendError(res, err, 'Failed to list categories'));
+}
+
 module.exports = {
   listCourses,
+  listCategories,
   getCourse,
   createCourse,
   updateCourse,

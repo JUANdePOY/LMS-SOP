@@ -267,8 +267,12 @@ const COURSE_MANAGEMENT_MIGRATIONS = [
   `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS requires_quiz_pass BOOLEAN NOT NULL DEFAULT FALSE`,
   `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS passing_score INT DEFAULT NULL`,
   `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS quiz_id INT DEFAULT NULL`,
+  `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS certificate_template_id INT DEFAULT NULL`,
+  `ALTER TABLE module_content ADD CONSTRAINT fk_module_content_certificate_template FOREIGN KEY (certificate_template_id) REFERENCES certificate_templates(id) ON DELETE SET NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_module_content_certificate_template ON module_content(certificate_template_id)`,
   `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS chapters JSON DEFAULT NULL`,
   `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS thumbnail_url VARCHAR(500) DEFAULT NULL`,
+  `ALTER TABLE module_content MODIFY COLUMN type ENUM('video','reading','document','quiz','assignment','link','presentation','downloadable','live_session','interactive','sop','certificate') NOT NULL DEFAULT 'reading'`,
 
   `CREATE TABLE IF NOT EXISTS lesson_progress (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -291,6 +295,32 @@ const COURSE_MANAGEMENT_MIGRATIONS = [
   `ALTER TABLE courses ADD COLUMN IF NOT EXISTS department_id INT DEFAULT NULL,
    ADD CONSTRAINT fk_courses_department FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL,
    ADD INDEX idx_courses_department (department_id)`,
+
+  `ALTER TABLE course_enrollments ADD COLUMN is_deleted TINYINT NOT NULL DEFAULT 0`,
+  `ALTER TABLE course_enrollments ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+
+  `CREATE TABLE IF NOT EXISTS learning_paths (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT DEFAULT NULL,
+    department_id INT DEFAULT NULL,
+    is_active TINYINT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+
+  `CREATE TABLE IF NOT EXISTS learning_path_courses (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    path_id INT NOT NULL,
+    course_id INT NOT NULL,
+    position INT NOT NULL DEFAULT 0,
+    is_required TINYINT NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_path_course (path_id, course_id),
+    FOREIGN KEY (path_id) REFERENCES learning_paths(id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 async function runCourseMigrations() {
@@ -312,3 +342,4 @@ async function runCourseMigrations() {
 }
 
 module.exports = { runCourseMigrations, COURSE_MANAGEMENT_MIGRATIONS };
+
