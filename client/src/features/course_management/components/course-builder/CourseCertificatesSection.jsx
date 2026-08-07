@@ -5,6 +5,7 @@ import { Button } from "@/shared/components/ui/button";
 import { Badge } from "@/shared/components/ui/badge";
 import { Label } from "@/shared/components/ui/label";
 import { X, Plus, Award } from "lucide-react";
+import { getCertificateTemplates } from "@/features/certificate-management/services/certificateService";
 
 export default function CourseCertificatesSection({
   courseId,
@@ -21,6 +22,7 @@ export default function CourseCertificatesSection({
 
   useEffect(() => {
     if (!courseId) return;
+    let cancelled = false;
     setLoadingTemplates(true);
     setTemplatesError(null);
     api.get('/certificate-templates', { params: { status: 'active', limit: 50 } })

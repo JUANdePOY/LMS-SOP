@@ -6,6 +6,7 @@ import { useDepartments } from '../hooks/useDepartments';
 import { useBusinesses } from '../hooks/useBusinesses';
 import { useUsers } from '../hooks/useUsers';
 import { useToast } from '@/shared/components/Toast';
+import { useAuth } from '@/contexts/AuthContext';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import ErrorBoundary from '@/shared/components/ErrorBoundary';
 import KPICards from '../components/KPICards';
@@ -16,6 +17,8 @@ export default function DepartmentPage() {
   const { businesses } = useBusinesses();
   const { users: allUsers } = useUsers();
   const { success, error: showError } = useToast();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
   const users = allUsers.filter(
     (u) => u.role === 'admin' || u.role === 'department_head'
   );
@@ -25,7 +28,7 @@ export default function DepartmentPage() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [businessFilter, setBusinessFilter] = useState('all');
-  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, department: null });
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, department: null, force: false });
   const [deleting, setDeleting] = useState(false);
 
   const safeQuery = sanitizeSearchQuery(query);
@@ -99,7 +102,7 @@ export default function DepartmentPage() {
   };
 
   const handleDelete = (dept) => {
-    setDeleteConfirm({ open: true, department: dept });
+    setDeleteConfirm({ open: true, department: dept, force: false });
   };
 
   const confirmDelete = async () => {
@@ -107,7 +110,7 @@ export default function DepartmentPage() {
     if (!dept) return;
     setDeleting(true);
     try {
-      await remove(dept.id);
+      await remove(dept.id, { force: deleteConfirm.force });
       success('Department deleted successfully');
     } catch (err) {
       const message = err.response?.data?.message || 'Failed to delete department';
@@ -223,14 +226,28 @@ export default function DepartmentPage() {
 
       <ConfirmationDialog
         isOpen={deleteConfirm.open}
-        onClose={() => setDeleteConfirm({ open: false, department: null })}
+        onClose={() => setDeleteConfirm({ open: false, department: null, force: false })}
         onConfirm={confirmDelete}
         title="Delete Department"
         message={`Are you sure you want to delete "${deleteConfirm.department?.name}"? This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="destructive"
-      />
+      >
+        {isSuperAdmin && (
+          <label className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
+            <input
+              type="checkbox"
+              checked={deleteConfirm.force}
+              onChange={(e) => setDeleteConfirm((prev) => ({ ...prev, force: e.target.checked }))}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium">Force delete</span> — removes this department along with its SOPs, categories, and users' department links instead of blocking.
+            </span>
+          </label>
+        )}
+      </ConfirmationDialog>
       </div>
     </ErrorBoundary>
   );

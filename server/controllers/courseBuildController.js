@@ -2,6 +2,7 @@ const db = require('../config/database');
 const courseModel = require('../models/courseModel');
 const courseModuleModel = require('../models/courseModuleModel');
 const courseContentModel = require('../models/courseContentModel');
+const quizModel = require('../models/quizModel');
 const { authenticateToken, authorize } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -557,6 +558,7 @@ async function deleteCourse(req, res) {
     }
 
     await courseModel.softDelete(courseId);
+    await quizModel.softDeleteByCourse(courseId);
     logAudit('course.builder.delete', userId, { courseId, title: course.title });
     res.json({ success: true, message: 'Course deleted successfully' });
   } catch (err) {

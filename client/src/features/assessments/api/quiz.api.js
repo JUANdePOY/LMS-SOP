@@ -63,8 +63,9 @@ export async function updateQuiz(id, payload) {
   return request(`${API_BASE}/${id}`, { method: "PUT", body: JSON.stringify(payload) });
 }
 
-export async function deleteQuiz(id) {
-  return request(`${API_BASE}/${id}`, { method: "DELETE" });
+export async function deleteQuiz(id, { force = false } = {}) {
+  const qs = force ? '?force=true' : '';
+  return request(`${API_BASE}/${id}${qs}`, { method: "DELETE" });
 }
 
 export async function publishQuiz(id) {

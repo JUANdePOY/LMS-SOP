@@ -231,6 +231,19 @@ export default function QuizListPage() {
       toast.success("Quiz deleted.");
       refetch({ ...filters, limit: 20 });
     } catch (err) {
+      // If the quiz was already soft-deleted (e.g. its parent course was
+      // removed), a normal delete 404s. Fall back to a force delete to purge it.
+      if (err?.status === 404) {
+        try {
+          await deleteQuiz(q.id, { force: true });
+          toast.success("Quiz deleted.");
+          refetch({ ...filters, limit: 20 });
+          return;
+        } catch (forceErr) {
+          toast.error(forceErr.message || "Failed to delete quiz");
+          return;
+        }
+      }
       toast.error(err.message || "Failed to delete quiz");
     } finally {
       setBusy(null);

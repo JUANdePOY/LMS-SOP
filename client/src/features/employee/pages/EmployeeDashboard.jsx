@@ -4,11 +4,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
 import {
   BookOpen, PlayCircle, RefreshCw, Clock,
-  Megaphone, MessageSquare, ArrowRight,
+  MessageSquare, ArrowRight,
 } from "lucide-react";
 import EmployeeCourseCard from "../components/EmployeeCourseCard";
 import { useEmployeeDashboard } from "../hooks/useEmployeeDashboard";
-import { useAnnouncements } from "@/features/announcements/hooks/useAnnouncements";
 import { useConversations } from "@/features/messaging/hooks/useMessages";
 
 function getGreeting() {
@@ -32,7 +31,6 @@ export default function EmployeeDashboard() {
   const { toast } = useToast();
 
   const { enrollments, loading, error, refetch } = useEmployeeDashboard();
-  const { items: announcements } = useAnnouncements({ status: "active", limit: 5 });
   const { conversations } = useConversations();
 
   const myCourses = enrollments.filter((e) => e.course).map((e) => ({ enrollment: e, course: e.course }));
@@ -163,40 +161,6 @@ export default function EmployeeDashboard() {
               <PlayCircle size={16} />
               Continue
             </button>
-          </div>
-        </div>
-      )}
-
-      {announcements.length > 0 && (
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-5 sm:p-6 shadow-sm space-y-4">
-          <SectionHeader icon={Megaphone} title="Announcements" onViewAll={() => navigate("/announcements")} />
-          <div className="space-y-2">
-            {announcements.slice(0, 3).map((item) => (
-              <div key={item.id} onClick={() => navigate("/announcements")} className="group cursor-pointer rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-300">
-                    <Megaphone size={18} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{item.title}</h3>
-                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${
-                        item.priority === 'critical' ? 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-100 border-red-200 dark:border-red-500/30' :
-                        item.priority === 'high' ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-100 border-amber-200 dark:border-amber-500/30' :
-                        item.priority === 'medium' ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-100 border-blue-200 dark:border-blue-500/30' :
-                        'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-100 border-slate-200 dark:border-slate-500/30'
-                      }`}>
-                        {item.priority}
-                      </span>
-                    </div>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2">{item.body}</p>
-                    <p className="text-[10px] text-neutral-400 mt-1">
-                      {item.author} &middot; {new Date(item.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       )}

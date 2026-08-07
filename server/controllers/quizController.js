@@ -236,11 +236,22 @@ async function updateQuiz(req, res) {
 
 async function deleteQuiz(req, res) {
   try {
-    const quiz = await quizModel.findById(req.params.id);
+    const force = req.query.force === 'true' || req.body?.force === true;
+    // For a force delete the quiz may already be soft-deleted (e.g. its parent
+    // course was removed, which cascades a soft delete onto the quiz). In that
+    // case findById (which filters is_deleted) returns nothing, so look up the
+    // row ignoring the soft-delete flag.
+    const quiz = await (force
+      ? quizModel.findByIdIgnoringDelete(req.params.id)
+      : quizModel.findById(req.params.id));
     if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found', code: 'NOT_FOUND' });
     await assertCanManageCourse(req, quiz.course_id);
-    await quizModel.softDelete(req.params.id);
-    logAudit && logAudit('quiz.delete', req.user.id, { quizId: quiz.id });
+    if (force) {
+      await quizModel.hardDelete(req.params.id);
+    } else {
+      await quizModel.softDelete(req.params.id);
+    }
+    logAudit && logAudit('quiz.delete', req.user.id, { quizId: quiz.id, forced: force });
     res.json({ success: true, message: 'Quiz deleted' });
   } catch (err) {
     sendError(res, err, 'Failed to delete quiz');

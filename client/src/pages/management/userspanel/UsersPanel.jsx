@@ -157,7 +157,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   const handleAddUser = async () => {
     setSaving(true);
     try {
-      const res = await createUser(formData);
+      const res = await createUser(cleanPayload(formData));
       if (res.data.status === 'success') {
         toast.success('User created successfully');
         setShowAddModal(false);
@@ -173,10 +173,19 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
     }
   };
 
+  const cleanPayload = (data) => {
+    const out = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (v === '' || v === null || v === undefined) continue;
+      out[k] = v;
+    }
+    return out;
+  };
+
   const handleEditUser = async () => {
     setSaving(true);
     try {
-      const res = await updateUser(editingUser.id, formData);
+      const res = await updateUser(editingUser.id, cleanPayload(formData));
       if (res.data.status === 'success') {
         toast.success('User updated successfully');
         setShowEditModal(false);

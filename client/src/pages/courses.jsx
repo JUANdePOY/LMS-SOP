@@ -38,17 +38,6 @@ const DIFFICULTY_META = {
 
 const DIFFICULTIES = ["beginner", "intermediate", "advanced", "all_levels"];
 
-function formatDate(date) {
-  if (!date) return "—";
-  try {
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return "—";
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-  } catch {
-    return "—";
-  }
-}
-
 export default function Courses({ departments = [] }) {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -156,6 +145,12 @@ export default function Courses({ departments = [] }) {
 
   const handleEditSuccess = () => {
     fetchCourses();
+  };
+
+  const handleCreateSuccess = () => {
+    setPage((p) => ({ ...p, current: 1 }));
+    fetchCourses();
+    refreshStats();
   };
 
   const handleDelete = async () => {
@@ -328,15 +323,13 @@ export default function Courses({ departments = [] }) {
                 </th>
                 <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">Status</th>
                 <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 hidden md:table-cell">Category</th>
-                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 hidden lg:table-cell">Enrollments</th>
-                <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 hidden xl:table-cell">Schedule</th>
                 <th className="px-3 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300 w-28">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-700/80">
               {pagedCourses.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-20 text-center">
+                   <td colSpan={6} className="px-4 py-20 text-center">
                     <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">No courses found</p>
                     <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                       {filters.search || filters.status || filters.difficulty || filters.category
@@ -406,12 +399,6 @@ export default function Courses({ departments = [] }) {
                           <span className="text-neutral-400 dark:text-neutral-500">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-3.5 text-sm text-neutral-700 dark:text-neutral-200 hidden lg:table-cell">
-                        {c.enrollment_count != null ? c.enrollment_count : "—"}
-                      </td>
-                      <td className="px-3 py-3.5 text-xs text-neutral-600 dark:text-neutral-300 hidden xl:table-cell whitespace-nowrap">
-                        {c.start_date || c.end_date ? <span>{formatDate(c.start_date)} {c.end_date ? `— ${formatDate(c.end_date)}` : ""}</span> : "—"}
-                      </td>
                       <td className="px-3 py-3.5">
                         <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
                           {c.status === "draft" && (
@@ -473,6 +460,7 @@ export default function Courses({ departments = [] }) {
         open={modals.add}
         onClose={closeModals}
         loading={saving}
+        onSuccess={handleCreateSuccess}
       />
 
       <CreateCourseModal

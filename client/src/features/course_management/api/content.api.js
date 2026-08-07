@@ -1,4 +1,11 @@
+import * as session from "@/services/session";
+
 const API_BASE = "/api/courses";
+
+function authHeaders() {
+  const token = session.getCurrentToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 export async function getContent(courseId, moduleId) {
   const res = await fetch(`${API_BASE}/${courseId}/modules/${moduleId}/content`);
@@ -43,6 +50,7 @@ export async function uploadContent(courseId, moduleId, file) {
   formData.append("file", file);
   const res = await fetch(`${API_BASE}/${courseId}/modules/${moduleId}/images`, {
     method: "POST",
+    headers: authHeaders(),
     body: formData,
   });
   if (!res.ok) throw new Error("Failed to upload image");

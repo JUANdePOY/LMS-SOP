@@ -14,6 +14,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const Dashboard     = lazy(() => import("@/pages/Dashboard"));
 const EmployeeDashboard = lazy(() => import("@/features/employee/pages/EmployeeDashboard"));
+const EmployeeTrainingDashboard = lazy(() => import("@/features/employee/pages/EmployeeTrainingDashboard"));
 const EmployeeCourseCatalog = lazy(() => import("@/features/employee/pages/EmployeeCourseCatalog"));
 const EmployeeCourseView = lazy(() => import("@/features/employee/pages/EmployeeCourseView"));
 const EmployeeSOPView = lazy(() => import("@/features/employee/pages/EmployeeSOPView"));
@@ -117,7 +118,7 @@ function RoleBasedDashboard() {
   const { isEmployee, isAdmin, isDepartmentHead, isSuperAdmin, isAuthenticated, loading } = useAuth();
   if (loading) return null;
   if (!isAuthenticated) return null;
-  if (isEmployee) return <EmployeeDashboard />;
+  if (isEmployee) return <EmployeeTrainingDashboard />;
   if (isDepartmentHead || isAdmin || isSuperAdmin) return <Dashboard />;
   return null;
 }

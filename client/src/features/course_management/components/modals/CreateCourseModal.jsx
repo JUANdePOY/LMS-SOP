@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Modal } from "@/shared/components/ui/modal";
 import { Button } from "@/shared/components/ui/button";
 import { Input } from "@/shared/components/ui/input";
@@ -10,7 +9,6 @@ import { getDepartments } from "@/services/api";
 import { getCategories } from "@/features/organization-management/api/category.api";
 
 export default function CreateCourseModal({ open, onClose, loading, course = null, onSuccess }) {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const isEdit = Boolean(course);
   const [title, setTitle] = useState("");
@@ -210,13 +208,9 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
         const { builderCreate } = await import("@/features/course_management/api/course.api");
         const res = await builderCreate(payload);
         if (res?.success || res?.data?.success || res === 201) {
-          const newId = res.data?.data?.id;
-          if (newId) {
-            navigate(`/courses/${newId}/builder`);
-          } else {
-            onSuccess?.();
-            onClose?.();
-          }
+          toast.success("Course created successfully");
+          onSuccess?.();
+          onClose?.();
         } else {
           throw new Error(res.data?.message || "Failed to create course");
         }

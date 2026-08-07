@@ -61,10 +61,10 @@ export function useDepartments(initialParams = {}) {
     return payload;
   }, [refresh]);
 
-  const remove = useCallback(async (id) => {
+  const remove = useCallback(async (id, { force = false } = {}) => {
     setError(null);
     try {
-      await deleteDepartment(id);
+      await deleteDepartment(id, { force });
       await refresh();
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to delete department'));

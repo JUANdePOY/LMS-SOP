@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from "react";
+import * as session from "@/services/session";
 
 /**
  * Upload a file with progress reporting, cancel, and retry support.
@@ -21,6 +22,11 @@ export function useVideoUpload() {
       setProgress(0);
 
       xhr.open("POST", endpoint, true);
+
+      const token = session.getCurrentToken();
+      if (token) {
+        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      }
 
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
