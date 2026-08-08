@@ -493,7 +493,7 @@ router.put('/profile/password', authenticateToken, [
 
 const multer = require('multer');
 const path = require('path');
-const { safeExtFromOriginal } = require('../config/uploads');
+const { safeExtFromOriginal, getUploadRoot } = require('../config/uploads');
 const storage = require('../config/storage');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../middleware/auth');
