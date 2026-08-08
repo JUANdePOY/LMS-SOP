@@ -1,11 +1,12 @@
 import { PlayCircle } from "lucide-react";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 export default function CourseCard({ course, onAction, actionLabel }) {
   return (
     <div className="group cursor-pointer rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-4 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
       <div className="relative aspect-video bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center overflow-hidden">
         {course.thumbnail_url ? (
-          <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+          <img src={resolveFileUrl(course.thumbnail_url)} alt={course.title} className="w-full h-full object-cover" />
         ) : (
           <div className="flex items-center justify-center">
             <PlayCircle size={36} className="text-blue-400 dark:text-blue-500" />

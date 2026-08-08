@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import * as session from "@/services/session";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/api\/?$/, "");
 
@@ -9,6 +11,10 @@ function resolveAvatarUrl(url) {
   if (url.startsWith("/")) return `${API_BASE}${url}`;
   return url;
 }
+
+// Streamed by Express (authenticated via ?token=) so it works behind hosts/proxies
+// that don't serve /uploads statically. Only valid for the current user's avatar.
+const STREAMED_AVATAR_PATH = `${API_BASE}/api/auth/profile/avatar/file`;
 
 const DEFAULT_AVATAR =
   "data:image/svg+xml," +
@@ -26,7 +32,19 @@ const SIZES = {
 
 export default function UserAvatar({ user, size = "sm", className, ring = false }) {
   const [imgError, setImgError] = useState(false);
-  const resolvedUrl = resolveAvatarUrl(user?.avatar_url);
+  const { user: currentUser } = useAuth();
+
+  // The current user's avatar is streamed through an authenticated Express route
+  // (works behind hosts/proxies that don't serve /uploads statically). Other
+  // users keep their stored avatar_url (absolute S3 URL or local /uploads path).
+  // The stored avatar_url is appended as a cache-buster (v=) so a newly uploaded
+  // photo changes the <img src> and the browser actually reloads it.
+  const isCurrentUser = !!user && !!currentUser && user.id === currentUser.id;
+  const resolvedUrl = isCurrentUser
+    ? (user?.avatar_url
+        ? `${STREAMED_AVATAR_PATH}?token=${encodeURIComponent(session.getCurrentToken() || "")}&v=${encodeURIComponent(user.avatar_url)}`
+        : null)
+    : resolveAvatarUrl(user?.avatar_url);
 
   // Reset the error flag whenever the avatar URL changes so a newly uploaded
   // image is actually attempted (otherwise a prior failed load would keep the

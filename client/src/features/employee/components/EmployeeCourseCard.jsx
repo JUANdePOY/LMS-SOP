@@ -1,5 +1,6 @@
 import { BookOpen, PlayCircle, Clock, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 const DIFFICULTY_META = {
   beginner: { label: "Beginner", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
@@ -19,7 +20,7 @@ export default function EmployeeCourseCard({ course, onClick, showProgress = fal
     >
       <div className="relative aspect-video bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 flex items-center justify-center overflow-hidden">
         {course.thumbnail_url ? (
-          <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+          <img src={resolveFileUrl(course.thumbnail_url)} alt={course.title} className="w-full h-full object-cover" />
         ) : (
           <div className="flex items-center justify-center">
             <BookOpen size={36} className="text-blue-400 dark:text-blue-500" />

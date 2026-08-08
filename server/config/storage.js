@@ -160,6 +160,25 @@ async function readFile(storedUrl) {
   return localRead(storedUrl);
 }
 
+// Read a stored file and return { buffer, contentType } for streaming to the
+// client through an authenticated Express route (avoids express.static, which
+// is unreliable behind some hosts/proxies). Works for both drivers.
+const STREAM_MIME = {
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+  '.webp': 'image/webp', '.gif': 'image/gif', '.pdf': 'application/pdf',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.doc': 'application/msword', '.xls': 'application/vnd.ms-excel',
+};
+
+async function streamFile(storedUrl) {
+  const buffer = await readFile(storedUrl);
+  if (!buffer) return null;
+  const clean = String(storedUrl).split('?')[0];
+  const ext = path.extname(clean).toLowerCase();
+  return { buffer, contentType: STREAM_MIME[ext] || 'application/octet-stream' };
+}
+
 function isExternalUrl(storedUrl) {
   return isS3Url(storedUrl) || /^https?:\/\//i.test(storedUrl || '');
 }
@@ -176,6 +195,7 @@ module.exports = {
   saveFile,
   deleteFile,
   readFile,
+  streamFile,
   ensureLocalRoot,
   // exposed for proxy route / advanced consumers
   s3PublicUrl,

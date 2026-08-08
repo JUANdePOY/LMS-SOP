@@ -5,6 +5,7 @@ const courseContentModel = require('../models/courseContentModel');
 const quizModel = require('../models/quizModel');
 const { authenticateToken, authorize } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
+const storage = require('../config/storage');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -48,20 +49,19 @@ async function uploadThumbnail(req, res) {
       return res.status(400).json({ success: false, message: 'No thumbnail file uploaded', code: 'NO_FILE' });
     }
 
-    const path = require('path');
-    const fs = require('fs/promises');
-    const { getUploadRoot, courseThumbnailDir, safeExtFromOriginal } = require('../config/uploads');
+    const { safeExtFromOriginal } = require('../config/uploads');
 
     const ext = safeExtFromOriginal(req.file.originalname) || '.jpg';
-    const dir = courseThumbnailDir();
-    await fs.mkdir(dir, { recursive: true });
-
     const filename = `thumb-${Date.now()}-${Math.round(Math.random() * 1e6)}${ext}`;
-    const absPath = path.join(dir, filename);
-    await fs.writeFile(absPath, req.file.buffer);
 
-    const relPath = path.relative(getUploadRoot(), absPath).replace(/\\/g, '/');
-    const thumbnailUrl = `/uploads/${relPath}`;
+    // Store through the storage abstraction (local disk or S3) so the file is
+    // served via the authenticated /api/files/stream route, not express.static.
+    const thumbnailUrl = await storage.saveFile({
+      buffer: req.file.buffer,
+      dir: 'course-thumbnails',
+      filename,
+      contentType: req.file.mimetype,
+    });
 
     logAudit('course.thumbnail.uploaded', req.user.id, { thumbnail_url: thumbnailUrl });
 

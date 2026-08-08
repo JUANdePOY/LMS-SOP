@@ -7,6 +7,7 @@ import {
   MessageSquare, ArrowRight,
 } from "lucide-react";
 import EmployeeCourseCard from "../components/EmployeeCourseCard";
+import { resolveFileUrl } from "@/lib/fileUrl";
 import { useEmployeeDashboard } from "../hooks/useEmployeeDashboard";
 import { useConversations } from "@/features/messaging/hooks/useMessages";
 import { usePageUpdates } from "@/shared/hooks/usePageUpdates";
@@ -160,7 +161,7 @@ export default function EmployeeDashboard() {
             <div className="flex items-start gap-4">
               <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-xl overflow-hidden bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center shrink-0">
                 {nextToContinue.course?.thumbnail_url ? (
-                  <img src={nextToContinue.course.thumbnail_url} alt={nextToContinue.course.title} className="h-full w-full object-cover" />
+                  <img src={resolveFileUrl(nextToContinue.course.thumbnail_url)} alt={nextToContinue.course.title} className="h-full w-full object-cover" />
                 ) : (
                   <BookOpen size={24} className="text-blue-600 dark:text-blue-400" />
                 )}

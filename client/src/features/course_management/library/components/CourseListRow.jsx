@@ -1,6 +1,7 @@
 import { BookOpen, PlayCircle, Users, CheckCircle2, ChevronRight, BarChart3 } from "lucide-react";
 import { Badge } from "@/shared/components/ui/badge";
 import { getDifficultyMeta, ProgressBar } from "../utils/courseVisuals";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 export default function CourseListRow({ course, onClick, myProgress }) {
   const enrollments = course.enrollment_count || course.enrollments_count || 0;
@@ -28,7 +29,7 @@ export default function CourseListRow({ course, onClick, myProgress }) {
       <div className="flex items-center gap-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 relative overflow-hidden">
           {course.thumbnail_url ? (
-            <img src={course.thumbnail_url} alt={course.title} className="h-full w-full rounded-md object-cover" />
+            <img src={resolveFileUrl(course.thumbnail_url)} alt={course.title} className="h-full w-full rounded-md object-cover" />
           ) : (
             <BookOpen size={20} className="text-blue-600 dark:text-blue-400" />
           )}

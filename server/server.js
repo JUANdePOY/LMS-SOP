@@ -75,6 +75,7 @@ const sopAttachmentPublicFile = require('./services/sopAttachmentPublicFile');
 
 const { getUploadRoot } = require('./config/uploads');
 const storage = require('./config/storage');
+const filesRouter = require('./routes/files');
 
 const loginDebug = process.env.LOGIN_DEBUG === 'true';
 if (loginDebug) {
@@ -139,6 +140,10 @@ const searchRoutes = require('./routes/search');
 app.use('/api/search', searchRoutes);
 
 app.use('/uploads', express.static(getUploadRoot()));
+
+// Authenticated file streaming (avoids express.static, which is unreliable
+// behind some hosts/proxies). Inline images/mini-files use this route.
+app.use('/api/files', filesRouter);
 
 // Proxy for objects stored in a private S3-compatible bucket. When STORAGE_DRIVER=s3
 // and the bucket is not public, store URLs as `/uploads/s3/<key>` (see config/storage.js

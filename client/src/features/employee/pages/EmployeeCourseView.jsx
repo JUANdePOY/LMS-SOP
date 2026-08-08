@@ -10,6 +10,7 @@ import LessonList from "@/features/course_management/components/LessonList";
 import LessonProgressBar from "@/features/course_management/components/LessonProgressBar";
 import CourseSOPsSection from "@/features/employee/components/CourseSOPsSection";
 import * as session from "@/services/session";
+import { resolveFileUrl } from "@/lib/fileUrl";
 import { useCourseCompletionCertificates } from "@/features/certificate-management/hooks/useCourseCompletionCertificates";
   import {
   getEmployeeCourseDetails,
@@ -182,7 +183,7 @@ export default function EmployeeCourseView() {
           <div className="relative h-48 sm:h-56 bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-700 dark:from-blue-900 dark:via-indigo-950 dark:to-purple-950">
             {course?.thumbnail_url && (
               <img
-                src={course.thumbnail_url}
+                src={resolveFileUrl(course.thumbnail_url)}
                 alt={course.title}
                 className="absolute inset-0 h-full w-full object-cover opacity-30 mix-blend-overlay"
               />

@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { ChevronLeft, BookOpen, Clock, Users, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 const DIFFICULTY_META = {
   beginner: { label: "Beginner", color: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30" },
@@ -59,7 +60,7 @@ export default function CourseOverviewHero({
                 <div className="pointer-events-none absolute inset-y-0 left-0 w-2 bg-gradient-to-r from-black/5 to-transparent dark:from-white/10" />
                 {course?.thumbnail_url ? (
                   <img
-                    src={course.thumbnail_url}
+                    src={resolveFileUrl(course.thumbnail_url)}
                     alt={course.title || "Course cover"}
                     className="h-full w-full object-cover"
                   />

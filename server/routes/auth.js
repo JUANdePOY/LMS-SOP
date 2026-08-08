@@ -492,8 +492,63 @@ router.put('/profile/password', authenticateToken, [
 });
 
 const multer = require('multer');
+const path = require('path');
 const { safeExtFromOriginal } = require('../config/uploads');
 const storage = require('../config/storage');
+const jwt = require('jsonwebtoken');
+const { JWT_SECRET } = require('../middleware/auth');
+
+const AVATAR_MIME = {
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif',
+};
+
+// Authenticate via Authorization header OR a ?token= query param. <img> tags
+// cannot send headers, so the frontend appends the JWT as a query param.
+async function authenticateAvatar(req, res, next) {
+  const headerToken = req.headers['authorization']?.split(' ')[1];
+  const token = headerToken || req.query.token;
+  if (!token) {
+    return res.status(401).json({ status: 'error', message: 'Access token required', code: 'NO_TOKEN' });
+  }
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const [users] = await db.query(
+      'SELECT id, is_active FROM users WHERE id = ?',
+      [decoded.userId]
+    );
+    if (!users.length || !users[0].is_active) {
+      return res.status(401).json({ status: 'error', message: 'Unauthorized', code: 'USER_NOT_FOUND' });
+    }
+    req.user = { id: users[0].id };
+    next();
+  } catch {
+    return res.status(401).json({ status: 'error', message: 'Invalid token', code: 'INVALID_TOKEN' });
+  }
+}
+
+// Stream the current user's avatar directly from storage (local disk or S3).
+// Served by Express itself so it works reliably behind hosts/proxies that do
+// not serve the /uploads static directory.
+router.get('/profile/avatar/file', authenticateAvatar, async (req, res) => {
+  try {
+    const [rows] = await db.query('SELECT avatar_url FROM users WHERE id = ?', [req.user.id]);
+    const url = rows[0]?.avatar_url;
+    if (!url) {
+      return res.status(404).json({ status: 'error', message: 'No avatar', code: 'NOT_FOUND' });
+    }
+    const buffer = await storage.readFile(url);
+    if (!buffer) {
+      return res.status(404).json({ status: 'error', message: 'Avatar missing', code: 'NOT_FOUND' });
+    }
+    const ext = path.extname(url.split('?')[0]).toLowerCase();
+    res.setHeader('Content-Type', AVATAR_MIME[ext] || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    return res.send(buffer);
+  } catch (error) {
+    console.error('Avatar file error:', error);
+    return res.status(500).json({ status: 'error', message: 'Failed to load avatar', code: 'SERVER_ERROR' });
+  }
+});
 
 const avatarStorage = multer.memoryStorage();
 const avatarUpload = multer({

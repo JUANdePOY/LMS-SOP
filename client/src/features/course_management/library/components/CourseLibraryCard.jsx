@@ -3,6 +3,7 @@ import { BookOpen, PlayCircle, Users, CheckCircle2, BarChart3, UserPlus } from "
 import { Badge } from "@/shared/components/ui/badge";
 import { useBookOpening } from "./BookOpeningTransition";
 import { getDifficultyMeta, ProgressBar } from "../utils/courseVisuals";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 export default function CourseLibraryCard({ course, onClick, onAssign, myProgress }) {
   const cardRef = useRef(null);
@@ -43,7 +44,7 @@ export default function CourseLibraryCard({ course, onClick, onAssign, myProgres
     >
       <div className="aspect-video bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center overflow-hidden relative">
         {course.thumbnail_url ? (
-          <img src={course.thumbnail_url} alt={course.title} className="h-full w-full object-cover" />
+          <img src={resolveFileUrl(course.thumbnail_url)} alt={course.title} className="h-full w-full object-cover" />
         ) : (
           <BookOpen size={32} className="text-blue-600 dark:text-blue-400" />
         )}

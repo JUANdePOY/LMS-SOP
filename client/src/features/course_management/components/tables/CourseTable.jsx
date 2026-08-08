@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronRight, Users, Layers, BookOpen } from "lucide-react";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 const STATUS_META = {
   published: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30",
@@ -168,7 +169,7 @@ export default function CourseTable({
                   <div className="flex items-center gap-3">
                     <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-800">
                       {c.thumbnail_url ? (
-                        <img src={c.thumbnail_url} alt="" className="h-full w-full object-cover" />
+                        <img src={resolveFileUrl(c.thumbnail_url)} alt="" className="h-full w-full object-cover" />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center">
                           <BookOpen size={16} className="text-neutral-400" />

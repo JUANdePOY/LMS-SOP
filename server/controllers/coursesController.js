@@ -418,14 +418,14 @@ function exportCoursePDF(req, res) {
     .catch((err) => sendError(res, err, 'Failed to export PDF'));
 }
 
-function uploadImage(req, res) {
+async function uploadImage(req, res) {
   const courseId = parseInt(req.params.courseId, 10);
   if (!req.file) {
     return res.status(400).json({ success: false, message: 'No image file uploaded', code: 'NO_FILE' });
   }
   try {
     const { saveCourseImage } = require('../middleware/courseImageUpload');
-    const url = saveCourseImage(courseId, req.file);
+    const url = await saveCourseImage(courseId, req.file);
     logAudit('course.image.uploaded', req.user.id, { course_id: courseId, url });
     res.status(201).json({ success: true, data: { view_url: url }, message: 'Image uploaded successfully' });
   } catch (err) {

@@ -3,6 +3,7 @@ import { Card } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
 import { SIGNATURE_TYPES } from '@/features/certificate-management/constants/certificateSections';
+import { resolveFileUrl } from '@/lib/fileUrl';
 
 export default function SignatureSlotManager({ slots = [], signatures = [], onChange, readonly = false }) {
   const [selectedId, setSelectedId] = useState('');
@@ -46,7 +47,7 @@ export default function SignatureSlotManager({ slots = [], signatures = [], onCh
             >
               <div className="flex items-center gap-3">
                 <img
-                  src={`/uploads/${slot.storage_path}`}
+                  src={resolveFileUrl(`/uploads/${slot.storage_path}`)}
                   alt={slot.label}
                   className="h-8 w-16 rounded object-contain"
                   onError={(e) => {
