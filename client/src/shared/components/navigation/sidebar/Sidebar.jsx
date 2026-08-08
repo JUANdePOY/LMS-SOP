@@ -11,8 +11,6 @@ import {
   Megaphone,
   Calendar,
   CheckSquare,
-  BarChart3,
-  PieChart,
   Settings,
   Shield,
   LogOut,
@@ -106,14 +104,6 @@ const MENU_ITEMS = [
     group: true,
     items: [
       { name: "Tasks & Projects", path: "/tasks", icon: CheckSquare, roles: ['super_admin', 'admin'] },
-    ],
-  },
-  {
-    name: "REPORTS & ANALYTICS",
-    group: true,
-    items: [
-      { name: "Reports", path: "/reports", icon: BarChart3, roles: ['super_admin', 'admin'] },
-      { name: "Analytics", path: "/analytics", icon: PieChart, roles: ['super_admin', 'admin'] },
     ],
   },
   {

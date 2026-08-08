@@ -80,6 +80,48 @@ npm run hostinger:start
 └── package.json            # Root package with hostinger scripts
 ```
 
+## File Storage & Image Persistence
+
+Uploaded images (avatars, course images, attachments, certificates) are stored via
+`server/config/storage.js`, which supports two drivers selected by `STORAGE_DRIVER`:
+
+### 1. Local driver (default) — `STORAGE_DRIVER=local`
+Files are written under `UPLOAD_ROOT` (defaults to `server/uploads`). On a VPS where the
+app directory is replaced/cleaned on each redeploy, **images are lost** because
+`server/uploads` is git-ignored and gets wiped. Fix: point `UPLOAD_ROOT` at a path OUTSIDE
+the deployed app directory (persists across redeploys).
+
+- VPS / Hostinger Node.js: `deploy-hostinger.sh` sets `UPLOAD_ROOT=/var/lib/lms-sop/uploads`
+  automatically and creates it. The directory lives outside the repo, so git pulls / clean
+  reinstalls never touch it.
+- Local dev (WAMP): the default `server/uploads` is fine; it is git-ignored by design
+  (do not commit user uploads).
+
+> Note: `server/uploads` is excluded from git on purpose — uploads must live in the
+> persistent `UPLOAD_ROOT`, never be committed or baked into the app dir.
+
+### 2. S3-compatible driver — `STORAGE_DRIVER=s3`
+The only way to keep images **in sync between the live and local systems** AND safe across
+redeploys. All environments that point at the **same bucket** read and write the exact same
+files in real time. Configure:
+
+```
+STORAGE_DRIVER=s3
+S3_BUCKET=your-bucket
+S3_REGION=auto
+S3_ENDPOINT=https://s3.your-provider.com   # e.g. AWS, Cloudflare R2, DigitalOcean Spaces
+S3_PUBLIC_ENDPOINT=https://cdn.your-provider.com   # optional, for public URLs
+S3_ACCESS_KEY_ID=your-access-key
+S3_SECRET_ACCESS_KEY=your-secret-key
+S3_KEY_PREFIX=lms-sop
+S3_FORCE_PATH_STYLE=true
+S3_ACL=public-read
+```
+
+With S3, stored URLs are absolute object URLs, so they render identically in any
+environment. For private buckets, store URLs as `/uploads/s3/<key>` and the server proxies
+them via a signed request (handled automatically by `config/storage.js` + `server.js`).
+
 ## Important Notes
 
 - The `server/.env` file contains the actual database credentials — **never commit this file**

@@ -1,5 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+
+const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/api\/?$/, "");
+
+function resolveAvatarUrl(url) {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/")) return `${API_BASE}${url}`;
+  return url;
+}
 
 const DEFAULT_AVATAR =
   "data:image/svg+xml," +
@@ -17,8 +26,17 @@ const SIZES = {
 
 export default function UserAvatar({ user, size = "sm", className, ring = false }) {
   const [imgError, setImgError] = useState(false);
-  const avatarUrl = user?.avatar_url;
-  const src = avatarUrl && !imgError ? avatarUrl : DEFAULT_AVATAR;
+  const resolvedUrl = resolveAvatarUrl(user?.avatar_url);
+
+  // Reset the error flag whenever the avatar URL changes so a newly uploaded
+  // image is actually attempted (otherwise a prior failed load would keep the
+  // default placeholder until the component remounts). This makes the sidebar
+  // and top-header avatars update instantly after a profile picture change.
+  useEffect(() => {
+    setImgError(false);
+  }, [resolvedUrl]);
+
+  const src = resolvedUrl && !imgError ? resolvedUrl : DEFAULT_AVATAR;
 
   return (
     <span

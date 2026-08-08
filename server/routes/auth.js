@@ -162,6 +162,7 @@ router.post('/login', loginLimiter, [
           department_name: user.department_name,
           position_title: user.position_title,
           employee_id: user.employee_id,
+          avatar_url: user.avatar_url,
         }
       }
     });
@@ -491,9 +492,8 @@ router.put('/profile/password', authenticateToken, [
 });
 
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs/promises');
-const { getUploadRoot, avatarDir, isAllowedMime, safeExtFromOriginal } = require('../config/uploads');
+const { safeExtFromOriginal } = require('../config/uploads');
+const storage = require('../config/storage');
 
 const avatarStorage = multer.memoryStorage();
 const avatarUpload = multer({
@@ -517,15 +517,23 @@ router.post('/profile/avatar', authenticateToken, avatarUpload.single('avatar'),
 
     const userId = req.user.id;
     const ext = safeExtFromOriginal(req.file.originalname) || '.jpg';
-    const dir = avatarDir(userId);
-    await fs.mkdir(dir, { recursive: true });
-
     const filename = `avatar-${Date.now()}${ext}`;
-    const absPath = path.join(dir, filename);
-    await fs.writeFile(absPath, req.file.buffer);
 
-    const relPath = path.relative(getUploadRoot(), absPath).replace(/\\/g, '/');
-    const avatarUrl = `/uploads/${relPath}`;
+    // Remove any previously stored avatar before writing the new one so we
+    // don't leak orphaned files (important when storage is shared/persistent).
+    const [prevRows] = await db.query('SELECT avatar_url FROM users WHERE id = ?', [userId]);
+    if (prevRows[0]?.avatar_url) {
+      await storage.deleteFile(prevRows[0].avatar_url).catch(() => {});
+    }
+
+    // Logical path kept stable so local and S3 drivers both store under avatars/<id>/.
+    const dir = `avatars/${userId}`;
+    const avatarUrl = await storage.saveFile({
+      buffer: req.file.buffer,
+      dir,
+      filename,
+      contentType: req.file.mimetype,
+    });
 
     await db.query('UPDATE users SET avatar_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [avatarUrl, userId]);
 
@@ -550,9 +558,7 @@ router.delete('/profile/avatar', authenticateToken, async (req, res) => {
     const [rows] = await db.query('SELECT avatar_url FROM users WHERE id = ?', [userId]);
     const user = rows[0];
     if (user?.avatar_url) {
-      const rel = user.avatar_url.replace(/^\/uploads\//, '');
-      const abs = path.join(getUploadRoot(), rel);
-      fs.unlink(abs).catch(() => {});
+      await storage.deleteFile(user.avatar_url).catch(() => {});
     }
     await db.query('UPDATE users SET avatar_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
     res.json({ status: 'success', message: 'Avatar removed' });

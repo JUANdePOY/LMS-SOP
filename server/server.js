@@ -74,6 +74,7 @@ const { certificateCourseLinkRouter } = require('./routes/certificate-course-lin
 const sopAttachmentPublicFile = require('./services/sopAttachmentPublicFile');
 
 const { getUploadRoot } = require('./config/uploads');
+const storage = require('./config/storage');
 
 const loginDebug = process.env.LOGIN_DEBUG === 'true';
 if (loginDebug) {
@@ -138,6 +139,38 @@ const searchRoutes = require('./routes/search');
 app.use('/api/search', searchRoutes);
 
 app.use('/uploads', express.static(getUploadRoot()));
+
+// Proxy for objects stored in a private S3-compatible bucket. When STORAGE_DRIVER=s3
+// and the bucket is not public, store URLs as `/uploads/s3/<key>` (see config/storage.js
+// s3KeyFor) and this route streams the object back with a fresh signed request. Public
+// buckets can store absolute object URLs instead and skip this proxy entirely.
+if (storage.isS3()) {
+  app.get('/uploads/s3/:key(*)', async (req, res) => {
+    try {
+      const key = req.params.key;
+      if (!key || key.includes('..')) {
+        return res.status(400).json({ status: 'error', message: 'Invalid key', code: 'BAD_KEY' });
+      }
+      const buffer = await storage.readFile(`/uploads/s3/${key}`);
+      if (!buffer) {
+        return res.status(404).json({ status: 'error', message: 'Not found', code: 'NOT_FOUND' });
+      }
+      const ext = require('path').extname(key).toLowerCase();
+      const MIME = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+        '.webp': 'image/webp', '.gif': 'image/gif', '.pdf': 'application/pdf',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      };
+      res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream');
+      res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+      return res.send(buffer);
+    } catch (err) {
+      console.error('S3 proxy error:', err.message);
+      return res.status(500).json({ status: 'error', message: 'Failed to load file', code: 'PROXY_ERROR' });
+    }
+  });
+}
 
 // Certificate management routes
 // Public frame route must be mounted BEFORE the admin-protected template
@@ -221,6 +254,12 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
+// Guarantee the local upload directory exists on boot. With STORAGE_DRIVER=local
+// this MUST live on a persistent volume so uploaded images survive redeploys.
+storage.ensureLocalRoot().catch((err) => {
+  console.error('Failed to ensure upload root directory:', err.message);
+});
 
 const server = app.listen(PORT, () => {
   console.log(`LMS-SOP Server running on port ${PORT}`);
