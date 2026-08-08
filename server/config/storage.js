@@ -1,12 +1,17 @@
 const fs = require('fs/promises');
 const path = require('path');
 const crypto = require('crypto');
+const db = require('../config/database');
 const { getUploadRoot, absolutePathFromRelative } = require('./uploads');
 
 const DRIVER = (process.env.STORAGE_DRIVER || 'local').toLowerCase();
 
 function isS3() {
   return DRIVER === 's3';
+}
+
+function isDbBlob() {
+  return DRIVER === 'mysql_blob';
 }
 
 function safeKey(key) {
@@ -138,6 +143,55 @@ function randomName(ext) {
  * Returns the URL to store in the DB: a relative /uploads/... path for local,
  * or an absolute object URL for S3. Both render correctly in any environment.
  */
+function dbKeyFromStoredUrl(storedUrl) {
+  if (!storedUrl || typeof storedUrl !== 'string') return null;
+  const clean = storedUrl.split('?')[0];
+  if (clean.startsWith('/uploads/')) {
+    return clean.replace(/^\/uploads\//, '');
+  }
+  if (clean.startsWith('db://')) {
+    return clean.slice('db://'.length);
+  }
+  return null;
+}
+
+async function dbSave(buffer, relativePath, contentType) {
+  const key = safeKey(relativePath);
+  if (!key) {
+    throw new Error('Missing storage key for DB blob save');
+  }
+  await db.query(
+    'INSERT INTO file_blobs (`path`, content_type, size_bytes, file_data) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE content_type = VALUES(content_type), size_bytes = VALUES(size_bytes), file_data = VALUES(file_data), updated_at = CURRENT_TIMESTAMP',
+    [key, contentType || null, Buffer.byteLength(buffer), buffer]
+  );
+  return `/uploads/${key}`;
+}
+
+async function dbDelete(storedUrl) {
+  const key = dbKeyFromStoredUrl(storedUrl);
+  if (!key) return;
+  await db.query('DELETE FROM file_blobs WHERE `path` = ?', [key]).catch(() => {});
+}
+
+async function dbRead(storedUrl) {
+  const key = dbKeyFromStoredUrl(storedUrl);
+  if (!key) return null;
+  const [rows] = await db.query('SELECT file_data FROM file_blobs WHERE `path` = ? LIMIT 1', [key]);
+  if (!rows || rows.length === 0) return null;
+  return rows[0].file_data || null;
+}
+
+async function dbStream(storedUrl) {
+  const key = dbKeyFromStoredUrl(storedUrl);
+  if (!key) return null;
+  const [rows] = await db.query('SELECT file_data, content_type FROM file_blobs WHERE `path` = ? LIMIT 1', [key]);
+  if (!rows || rows.length === 0) return null;
+  return {
+    buffer: rows[0].file_data,
+    contentType: rows[0].content_type || null,
+  };
+}
+
 async function saveFile({ buffer, dir, filename, contentType }) {
   const ext = path.extname(filename || '');
   const base = filename ? path.basename(filename) : randomName(ext || '.bin');
@@ -145,18 +199,23 @@ async function saveFile({ buffer, dir, filename, contentType }) {
   if (isS3()) {
     return s3Save(buffer, relativePath, contentType);
   }
+  if (isDbBlob()) {
+    return dbSave(buffer, relativePath, contentType);
+  }
   return localSave(buffer, relativePath);
 }
 
 async function deleteFile(storedUrl) {
   if (!storedUrl) return;
   if (isS3()) return s3Delete(storedUrl);
+  if (isDbBlob()) return dbDelete(storedUrl);
   return localDelete(storedUrl);
 }
 
 async function readFile(storedUrl) {
   if (!storedUrl) return null;
   if (isS3()) return s3Read(storedUrl);
+  if (isDbBlob()) return dbRead(storedUrl);
   return localRead(storedUrl);
 }
 
@@ -172,6 +231,16 @@ const STREAM_MIME = {
 };
 
 async function streamFile(storedUrl) {
+  if (isDbBlob()) {
+    const result = await dbStream(storedUrl);
+    if (!result || !result.buffer) return null;
+    const clean = String(storedUrl).split('?')[0];
+    const ext = path.extname(clean).toLowerCase();
+    return {
+      buffer: result.buffer,
+      contentType: result.contentType || STREAM_MIME[ext] || 'application/octet-stream',
+    };
+  }
   const buffer = await readFile(storedUrl);
   if (!buffer) return null;
   const clean = String(storedUrl).split('?')[0];
@@ -184,7 +253,7 @@ function isExternalUrl(storedUrl) {
 }
 
 async function ensureLocalRoot() {
-  if (isS3()) return;
+  if (isS3() || isDbBlob()) return;
   await fs.mkdir(getUploadRoot(), { recursive: true });
 }
 
