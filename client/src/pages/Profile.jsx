@@ -3,7 +3,10 @@ import { User, Calendar, Phone, MapPin, Shield, Loader2, Save, Lock, Mail, Camer
 import { getProfile, updateProfile, changePassword, uploadAvatar, deleteAvatar } from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthContext';
+import * as session from '@/services/session';
 import { cn } from '@/lib/utils';
+
+const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/api\/?$/, "");
 
 const DEFAULT_AVATAR_SVG =
   "data:image/svg+xml," +
@@ -217,7 +220,9 @@ export default function Profile() {
             profile?.avatar_url && "border-blue-500"
           )}>
             <img
-              src={profile?.avatar_url || DEFAULT_AVATAR_SVG}
+              src={profile?.avatar_url
+                ? `${API_BASE}/api/auth/profile/avatar/file?token=${encodeURIComponent(session.getCurrentToken() || "")}&v=${encodeURIComponent(profile.avatar_url)}`
+                : DEFAULT_AVATAR_SVG}
               alt="Avatar"
               className="h-full w-full object-cover"
             />

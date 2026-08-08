@@ -536,12 +536,39 @@ router.get('/profile/avatar/file', authenticateAvatar, async (req, res) => {
     if (!url) {
       return res.status(404).json({ status: 'error', message: 'No avatar', code: 'NOT_FOUND' });
     }
-    const buffer = await storage.readFile(url);
+    let buffer = await storage.readFile(url);
+    let contentType = null;
+    let ext = path.extname(url.split('?')[0]).toLowerCase();
+
+    if (!buffer) {
+      const avatarDir = path.join(getUploadRoot(), 'avatars', String(req.user.id));
+      try {
+        const files = await fs.readdir(avatarDir);
+        const fallbackFile = files.find((file) => {
+          const fileExt = path.extname(file).toLowerCase();
+          return ['.jpg', '.jpeg', '.png', '.webp', '.gif'].includes(fileExt);
+        });
+        if (fallbackFile) {
+          const fallbackPath = path.join(avatarDir, fallbackFile);
+          const resolved = path.resolve(fallbackPath);
+          const root = path.resolve(getUploadRoot());
+          const rel = path.relative(root, resolved);
+          if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) {
+            buffer = await fs.readFile(resolved);
+            ext = path.extname(fallbackFile).toLowerCase();
+          }
+        }
+      } catch (fallbackError) {
+        // ignore and continue to return 404 below
+      }
+    }
+
     if (!buffer) {
       return res.status(404).json({ status: 'error', message: 'Avatar missing', code: 'NOT_FOUND' });
     }
-    const ext = path.extname(url.split('?')[0]).toLowerCase();
-    res.setHeader('Content-Type', AVATAR_MIME[ext] || 'application/octet-stream');
+
+    contentType = AVATAR_MIME[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
     return res.send(buffer);
   } catch (error) {
