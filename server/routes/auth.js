@@ -536,8 +536,10 @@ router.get('/profile/avatar/file', authenticateAvatar, async (req, res) => {
     if (!url) {
       return res.status(404).json({ status: 'error', message: 'No avatar', code: 'NOT_FOUND' });
     }
-    let buffer = await storage.readFile(url);
-    let contentType = null;
+
+    const fileResult = await storage.streamFile(url);
+    let buffer = fileResult?.buffer || null;
+    let contentType = fileResult?.contentType || null;
     let ext = path.extname(url.split('?')[0]).toLowerCase();
 
     if (!buffer) {
@@ -567,7 +569,7 @@ router.get('/profile/avatar/file', authenticateAvatar, async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Avatar missing', code: 'NOT_FOUND' });
     }
 
-    contentType = AVATAR_MIME[ext] || 'application/octet-stream';
+    contentType = contentType || AVATAR_MIME[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
     return res.send(buffer);
