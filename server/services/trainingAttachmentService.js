@@ -9,6 +9,7 @@ const {
   trainingDir,
   absolutePathFromRelative,
 } = require('../config/uploads');
+const storage = require('../config/storage');
 
 function mapPublicRow(row) {
   if (!row) return null;
@@ -41,8 +42,11 @@ async function unlinkQuiet(absPath) {
 }
 
 async function unlinkRelativePaths(relativePaths) {
-  const root = getUploadRoot();
   for (const rel of relativePaths) {
+    if (storage.isS3() || storage.isExternalUrl(rel)) {
+      await storage.deleteFile(rel).catch(() => {});
+      continue;
+    }
     const abs = absolutePathFromRelative(rel);
     if (abs) await unlinkQuiet(abs);
   }
@@ -140,6 +144,19 @@ async function getDownloadStreamContext(attachmentId, trainingId) {
     err.statusCode = 404;
     throw err;
   }
+  if (storage.isS3() || storage.isExternalUrl(row.relative_path)) {
+    const buffer = await storage.readFile(row.relative_path);
+    if (!buffer) {
+      const err = new Error('File missing on storage');
+      err.statusCode = 404;
+      throw err;
+    }
+    return {
+      buffer,
+      originalFilename: row.original_filename,
+      mimeType: row.mime_type,
+    };
+  }
   const abs = absolutePathFromRelative(row.relative_path);
   if (!abs) {
     const err = new Error('Invalid attachment path');
@@ -198,8 +215,12 @@ async function deleteAttachment(attachmentId, trainingId) {
     conn.release();
   }
 
-  const abs = absolutePathFromRelative(row.relative_path);
-  if (abs) await unlinkQuiet(abs);
+  if (storage.isS3() || storage.isExternalUrl(row.relative_path)) {
+    await storage.deleteFile(row.relative_path).catch(() => {});
+  } else {
+    const abs = absolutePathFromRelative(row.relative_path);
+    if (abs) await unlinkQuiet(abs);
+  }
 
   return { id: attachmentId };
 }

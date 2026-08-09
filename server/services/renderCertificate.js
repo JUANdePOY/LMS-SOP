@@ -4,6 +4,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const { CERTIFICATE_SECTIONS } = require('../shared/certificateSections');
 const { absolutePathFromRelative, certificateRoot } = require('../config/uploads');
+const storage = require('../config/storage');
 
 function wrapLine(text, font, size, maxWidth) {
   if (!text) return [''];
@@ -66,6 +67,8 @@ async function renderCertificate({ template, resolvedSections, signatures, isPre
   let frameBytes;
   if (template.frame_data) {
     frameBytes = template.frame_data;
+  } else if (storage.isS3() || storage.isExternalUrl(template.frame_storage_path)) {
+    frameBytes = await storage.readFile(template.frame_storage_path);
   } else {
     const frameAbsPath = absolutePathFromRelative(template.frame_storage_path)
       || path.resolve(certificateRoot(), template.frame_storage_path);
@@ -211,6 +214,8 @@ async function renderCertificate({ template, resolvedSections, signatures, isPre
           let sigBytes;
           if (sigRecord.signature_data) {
             sigBytes = sigRecord.signature_data;
+          } else if (sigRecord.storage_path && (storage.isS3() || storage.isExternalUrl(sigRecord.storage_path))) {
+            sigBytes = await storage.readFile(sigRecord.storage_path);
           } else if (sigRecord.storage_path) {
             const sigAbsPath = absolutePathFromRelative(sigRecord.storage_path)
               || path.resolve(certificateRoot(), sigRecord.storage_path);

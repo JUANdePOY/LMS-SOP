@@ -266,6 +266,16 @@ storage.ensureLocalRoot().catch((err) => {
   console.error('Failed to ensure upload root directory:', err.message);
 });
 
+if (storage.isS3()) {
+  try {
+    storage.validateS3Config();
+    console.log('S3 storage config validated');
+  } catch (err) {
+    console.error('S3 config error:', err.message);
+    process.exit(1);
+  }
+}
+
 const server = app.listen(PORT, () => {
   console.log(`LMS-SOP Server running on port ${PORT}`);
   console.log(`Database: ${process.env.DB_HOST}/${process.env.DB_NAME}`);

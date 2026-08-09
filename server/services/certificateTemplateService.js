@@ -12,6 +12,7 @@ const {
   absolutePathFromRelative,
 } = require('../config/uploads');
 const { renderCertificate } = require('./renderCertificate');
+const storage = require('../config/storage');
 
 async function ensureUploadRoot() {
   await fs.mkdir(certificateRoot(), { recursive: true });
@@ -25,22 +26,37 @@ async function saveFrameFile(file, publicId, ext) {
   }
 
   const dir = certificateTemplateDir(publicId);
+  const relativePath = path.posix.join('certificates', 'templates', publicId, `frame-${crypto.randomUUID()}${ext}`);
+
+  if (storage.isS3()) {
+    const url = await storage.saveFile({
+      buffer: file.buffer,
+      dir: path.posix.join('certificates', 'templates', publicId),
+      filename: `frame-${crypto.randomUUID()}${ext}`,
+      contentType: file.mimetype,
+    });
+    return {
+      filename: path.basename(relativePath),
+      storage_path: url,
+    };
+  }
+
   await fs.mkdir(dir, { recursive: true });
-
-  const filename = `frame-${crypto.randomUUID()}${ext}`;
-  const absPath = path.join(dir, filename);
-  const relativePath = path.posix.join('certificates', 'templates', publicId, filename);
-
+  const absPath = path.join(dir, `frame-${crypto.randomUUID()}${ext}`);
   await fs.writeFile(absPath, file.buffer);
 
   return {
-    filename: filename,
+    filename: path.basename(absPath),
     storage_path: relativePath,
   };
 }
 
 async function removeFrameFile(storagePath) {
   if (!storagePath) return;
+  if (storage.isS3() || storage.isExternalUrl(storagePath)) {
+    await storage.deleteFile(storagePath).catch(() => {});
+    return;
+  }
   const abs = absolutePathFromRelative(storagePath);
   if (abs) {
     try {
@@ -81,17 +97,25 @@ async function getTemplateFrame(identifier) {
     };
   }
 
-  // Fallback to filesystem copy if available
   if (template.frame_storage_path) {
-    const abs = absolutePathFromRelative(template.frame_storage_path);
-    if (abs) {
-      try {
-        const buf = await fs.readFile(abs);
+    if (storage.isS3() || storage.isExternalUrl(template.frame_storage_path)) {
+      const buf = await storage.readFile(template.frame_storage_path);
+      if (buf) {
         const ext = path.extname(template.frame_filename || template.frame_original_name || '').toLowerCase();
         const mime = template.frame_mime_type || (ext === '.png' ? 'image/png' : (ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'application/octet-stream'));
         return { buffer: buf, mime, filename: template.frame_filename || template.frame_original_name || null };
-      } catch (err) {
-        // fall through to not found
+      }
+    } else {
+      const abs = absolutePathFromRelative(template.frame_storage_path);
+      if (abs) {
+        try {
+          const buf = await fs.readFile(abs);
+          const ext = path.extname(template.frame_filename || template.frame_original_name || '').toLowerCase();
+          const mime = template.frame_mime_type || (ext === '.png' ? 'image/png' : (ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'application/octet-stream'));
+          return { buffer: buf, mime, filename: template.frame_filename || template.frame_original_name || null };
+        } catch (err) {
+          // fall through to not found
+        }
       }
     }
   }

@@ -8,6 +8,7 @@ const {
   certificateRoot,
   absolutePathFromRelative,
 } = require('../config/uploads');
+const storage = require('../config/storage');
 
 // Minimal 120x48 gray PNG placeholder used when a signature is
 // soft-deleted or hard-deleted but still referenced by a template
@@ -24,14 +25,23 @@ async function saveSignatureFile(file) {
     throw error;
   }
 
-  const dir = path.join(certificateRoot(), 'signatures');
-  await fs.mkdir(dir, { recursive: true });
-
   const ext = path.extname(file.originalname || '').toLowerCase() || '.png';
   const filename = `signature-${crypto.randomUUID()}${ext}`;
-  const absPath = path.join(dir, filename);
   const relativePath = path.posix.join('certificates', 'signatures', filename);
 
+  if (storage.isS3()) {
+    const url = await storage.saveFile({
+      buffer: file.buffer,
+      dir: 'certificates/signatures',
+      filename,
+      contentType: file.mimetype,
+    });
+    return { filename, storage_path: url };
+  }
+
+  const dir = path.join(certificateRoot(), 'signatures');
+  await fs.mkdir(dir, { recursive: true });
+  const absPath = path.join(dir, filename);
   await fs.writeFile(absPath, file.buffer);
 
   return { filename, storage_path: relativePath };
@@ -39,6 +49,10 @@ async function saveSignatureFile(file) {
 
 async function removeSignatureFile(storagePath) {
   if (!storagePath) return;
+  if (storage.isS3() || storage.isExternalUrl(storagePath)) {
+    await storage.deleteFile(storagePath).catch(() => {});
+    return;
+  }
   const abs = absolutePathFromRelative(storagePath);
   if (abs) {
     try {
@@ -85,6 +99,19 @@ async function getSignatureImage(id) {
     error.code = 'NOT_FOUND';
     throw error;
   }
+
+  if (storage.isS3() || storage.isExternalUrl(signature.storage_path)) {
+    const buffer = await storage.readFile(signature.storage_path);
+    if (!buffer) {
+      const error = new Error('Signature image not found');
+      error.code = 'NOT_FOUND';
+      throw error;
+    }
+    const ext = path.extname(signature.filename || signature.storage_path || '').toLowerCase();
+    const mime = signature.signature_mime_type || (ext === '.png' ? 'image/png' : (ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'application/octet-stream'));
+    return { buffer, mime, filename: signature.filename || path.basename(signature.storage_path) };
+  }
+
   const absPath = absolutePathFromRelative(signature.storage_path);
   if (!absPath) {
     const error = new Error('Invalid signature storage path');

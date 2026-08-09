@@ -5,6 +5,7 @@ const db = require('../config/database');
 const { getUploadRoot, absolutePathFromRelative } = require('./uploads');
 
 const DRIVER = (process.env.STORAGE_DRIVER || 'local').toLowerCase();
+const S3_PUBLIC = process.env.S3_PUBLIC !== 'false';
 
 function isS3() {
   return DRIVER === 's3';
@@ -76,14 +77,20 @@ async function s3Save(buffer, relativePath, contentType) {
   // eslint-disable-next-line global-require
   const { PutObjectCommand } = require('@aws-sdk/client-s3');
   const key = s3KeyFor(relativePath);
-  await getS3Client().send(new PutObjectCommand({
+  const params = {
     Bucket: process.env.S3_BUCKET,
     Key: key,
     Body: buffer,
     ContentType: contentType || 'application/octet-stream',
-    ACL: process.env.S3_ACL || 'public-read',
-  }));
-  return s3PublicUrl(key);
+  };
+  if (process.env.S3_ACL) {
+    params.ACL = process.env.S3_ACL;
+  }
+  await getS3Client().send(new PutObjectCommand(params));
+  if (S3_PUBLIC) {
+    return s3PublicUrl(key);
+  }
+  return `/uploads/s3/${safeKey(key)}`;
 }
 
 async function s3Delete(storedUrl) {
@@ -114,23 +121,33 @@ async function s3Read(storedUrl) {
 
 function isS3Url(storedUrl) {
   if (!storedUrl) return false;
+  const clean = String(storedUrl).split('?')[0];
+  if (clean.startsWith('/uploads/s3/')) return true;
   const endpoint = (process.env.S3_PUBLIC_ENDPOINT || process.env.S3_ENDPOINT || '').replace(/\/+$/, '');
   const bucket = process.env.S3_BUCKET;
-  if (endpoint && storedUrl.startsWith(`${endpoint}/${bucket}/`)) return true;
-  if (bucket && storedUrl.includes(`${bucket}.s3.`)) return true;
+  if (endpoint && clean.startsWith(`${endpoint}/${bucket}/`)) return true;
+  if (bucket && clean.includes(`${bucket}.s3.`)) return true;
+  if (bucket && clean.includes(`${bucket}.r2.`)) return true;
+  if (bucket && clean.includes('.r2.cloudflarestorage.com/')) return true;
   return false;
 }
 
 function s3UrlToKey(storedUrl) {
+  const clean = String(storedUrl).split('?')[0];
+  if (clean.startsWith('/uploads/s3/')) {
+    return clean.slice('/uploads/s3/'.length);
+  }
   const bucket = process.env.S3_BUCKET;
   const endpoint = (process.env.S3_PUBLIC_ENDPOINT || process.env.S3_ENDPOINT || '').replace(/\/+$/, '');
   if (endpoint) {
     const marker = `${endpoint}/${bucket}/`;
-    if (storedUrl.startsWith(marker)) return storedUrl.slice(marker.length);
+    if (clean.startsWith(marker)) return clean.slice(marker.length);
   }
   const region = process.env.S3_REGION || 'auto';
   const marker = `https://${bucket}.s3.${region}.amazonaws.com/`;
-  if (storedUrl.startsWith(marker)) return storedUrl.slice(marker.length);
+  if (clean.startsWith(marker)) return clean.slice(marker.length);
+  const r2Marker = `https://${bucket}.r2.cloudflarestorage.com/`;
+  if (clean.startsWith(r2Marker)) return clean.slice(r2Marker.length);
   return null;
 }
 
@@ -241,6 +258,18 @@ async function streamFile(storedUrl) {
       contentType: result.contentType || STREAM_MIME[ext] || 'application/octet-stream',
     };
   }
+  if (isS3Url(storedUrl)) {
+    const key = s3UrlToKey(storedUrl);
+    if (!key) return null;
+    const result = await s3Read(storedUrl);
+    if (!result) return null;
+    const clean = String(storedUrl).split('?')[0];
+    const ext = path.extname(clean).toLowerCase();
+    return {
+      buffer: result,
+      contentType: STREAM_MIME[ext] || 'application/octet-stream',
+    };
+  }
   const buffer = await readFile(storedUrl);
   if (!buffer) return null;
   const clean = String(storedUrl).split('?')[0];
@@ -257,6 +286,18 @@ async function ensureLocalRoot() {
   await fs.mkdir(getUploadRoot(), { recursive: true });
 }
 
+function validateS3Config() {
+  if (!isS3()) return;
+  const required = ['S3_BUCKET', 'S3_ACCESS_KEY_ID', 'S3_SECRET_ACCESS_KEY'];
+  const missing = required.filter((k) => !process.env[k]);
+  if (missing.length) {
+    throw new Error(`STORAGE_DRIVER=s3 requires ${missing.join(', ')} to be set`);
+  }
+  if (!process.env.S3_REGION && !process.env.S3_ENDPOINT) {
+    throw new Error('STORAGE_DRIVER=s3 requires S3_REGION or S3_ENDPOINT to be set');
+  }
+}
+
 module.exports = {
   DRIVER,
   isS3,
@@ -266,6 +307,7 @@ module.exports = {
   readFile,
   streamFile,
   ensureLocalRoot,
+  validateS3Config,
   // exposed for proxy route / advanced consumers
   s3PublicUrl,
   s3UrlToKey,
