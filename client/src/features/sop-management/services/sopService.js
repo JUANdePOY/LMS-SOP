@@ -1,5 +1,4 @@
-import api from '@/lib/api';
-import * as session from '@/services/session';
+﻿import api from '@/lib/api';
 
 export const getSops = (params = {}) => api.get('/sops', { params });
 export const getSop = (id) => api.get(`/sops/${id}`);
@@ -43,32 +42,24 @@ export const archiveSop = (sopId) => api.put(`/sops/${sopId}`, { status: 'Archiv
 export const unarchiveSop = (sopId) => api.put(`/sops/${sopId}`, { status: 'Draft' });
 
 export const transitionSop = (sopId, data) => api.post(`/sops/${sopId}/transition`, data);
-export const getSharedSopModules = (token, versionId = null) =>
-  api.get(`/sops/share/${token}/modules${versionId ? `?versionId=${versionId}` : ''}`);
+
+export const getSharedSopModules = (token, versionId = null) => {
+  const params = {};
+  if (versionId != null) params.versionId = versionId;
+  return api.get(`/sops/share/${token}/modules`, { params });
+};
 
 export const downloadSop = async (sopId) => {
-  try {
-    const token = session.getCurrentToken();
-    const response = await fetch(`/api/sops/${sopId}/export`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
-      throw new Error(data.error?.message || `Download failed (${response.status})`);
-    }
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `SOP-${sopId}.pdf`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error("SOP download failed:", err);
-    throw err;
-  }
+  const response = await api.get(`/sops/${sopId}/export`, {
+    responseType: 'blob',
+  });
+  const blob = response.data;
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', `SOP-${sopId}.pdf`);
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 };

@@ -185,6 +185,10 @@ select option {
 }
 
 @layer utilities {
+  .modal-open {
+    overflow: hidden;
+  }
+
   .scrollbar-none {
     scrollbar-width: none;
     -ms-overflow-style: none;

@@ -29,7 +29,15 @@ async function listAssignments(sopId) {
   return complianceModel.listAssignments(sopId);
 }
 
-const ALLOWED_ASSIGNMENT_STATUSES = ['Published'];
+const ALLOWED_ASSIGNMENT_STATUSES = ['Draft', 'Approved', 'Published'];
+const ALLOWED_STATUSES_LABEL = 'Draft, Approved and Published';
+
+function getNormalizedArray(normalized, singularKey, arrayKey) {
+  const arr = normalized[arrayKey];
+  if (Array.isArray(arr)) return arr;
+  const single = normalized[singularKey];
+  return single != null ? [single] : [];
+}
 
 async function createAssignment(sopId, payload, assignedBy) {
   const sop = await sopModel.findById(sopId);
@@ -40,7 +48,7 @@ async function createAssignment(sopId, payload, assignedBy) {
   }
 
   if (!ALLOWED_ASSIGNMENT_STATUSES.includes(sop.status)) {
-    const error = new Error(`Cannot assign SOP with status: ${sop.status}. Only Approved and Published SOPs can be assigned.`);
+    const error = new Error(`Cannot assign SOP with status: ${sop.status}. Only ${ALLOWED_STATUSES_LABEL} SOPs can be assigned.`);
     error.code = 'INVALID_SOP_STATUS';
     throw error;
   }
@@ -58,29 +66,41 @@ async function createAssignment(sopId, payload, assignedBy) {
     throw error;
   }
 
-  if (normalized.assignment_type === 'Department') {
-    const exists = await departmentExists(normalized.department_id);
-    if (!exists) {
-      const error = new Error('Department not found');
-      error.code = 'VALIDATION_ERROR';
-      throw error;
+  // The payload uses array-based fields (department_ids, position_names,
+  // user_ids). Resolve them from the array form, falling back to the legacy
+  // singular fields (department_id, position_title, user_id) for backwards
+  // compatibility with callers that still send the single-target shape.
+  const departmentIds = getNormalizedArray(normalized, 'department_id', 'department_ids');
+  const positionNames = getNormalizedArray(normalized, 'position_title', 'position_names');
+  const userIds = getNormalizedArray(normalized, 'user_id', 'user_ids');
+
+  // Validate that referenced departments exist when Department or Mixed type.
+  if (normalized.assignment_type === 'Department' || departmentIds.length > 0) {
+    for (const deptId of departmentIds) {
+      if (!(await departmentExists(deptId))) {
+        const error = new Error('Department not found');
+        error.code = 'VALIDATION_ERROR';
+        throw error;
+      }
     }
   }
 
-  if (normalized.assignment_type === 'User') {
-    const exists = await userExists(normalized.user_id);
-    if (!exists) {
-      const error = new Error('User not found or inactive');
-      error.code = 'VALIDATION_ERROR';
-      throw error;
+  // Validate that referenced users exist when User or Mixed type.
+  if (normalized.assignment_type === 'User' || userIds.length > 0) {
+    for (const userId of userIds) {
+      if (!(await userExists(userId))) {
+        const error = new Error('User not found or inactive');
+        error.code = 'VALIDATION_ERROR';
+        throw error;
+      }
     }
   }
 
   const duplicate = await complianceModel.findDuplicateAssignment({
     sop_id: sopId,
-    department_ids: normalized.department_id ? [normalized.department_id] : [],
-    position_names: normalized.position_title ? [normalized.position_title] : [],
-    user_ids: normalized.user_id ? [normalized.user_id] : [],
+    department_ids: departmentIds,
+    position_names: positionNames,
+    user_ids: userIds,
   });
 
   if (duplicate) {
@@ -92,9 +112,11 @@ async function createAssignment(sopId, payload, assignedBy) {
   const id = await complianceModel.createAssignment({
     sop_id: sopId,
     assignment_type: normalized.assignment_type,
-    department_id: normalized.department_id || null,
-    position_title: normalized.position_title || null,
-    user_id: normalized.user_id || null,
+    department_ids: departmentIds,
+    position_names: positionNames,
+    user_ids: userIds,
+    due_date: normalized.due_date || null,
+    notes: normalized.notes || null,
     assigned_by: assignedBy,
   });
 

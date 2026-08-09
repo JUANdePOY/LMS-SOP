@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, RefreshCw } from 'lucide-react';
 import OrganizationTree from '../components/hierarchy/OrganizationTree';
 import { useHierarchy } from '../hooks/useHierarchy';
+import { useHierarchyContext, HierarchyProvider } from '../components/hierarchy/HierarchyContext';
+import CreateSopModal from '../components/hierarchy/CreateSopModal';
 import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
 
-export default function HierarchyOverviewPage() {
+function HierarchyOverviewPageInner() {
   const navigate = useNavigate();
   const { hierarchy, loading, error, refresh } = useHierarchy();
+  const { sopModalOpen, createSopContext, closeCreateSop } = useHierarchyContext();
   const [searchQuery, setSearchQuery] = useState('');
 
   const safeQuery = sanitizeSearchQuery(searchQuery);
@@ -17,6 +20,11 @@ export default function HierarchyOverviewPage() {
     const err = validateSearchQuery(value);
     if (err) return;
     setSearchQuery(value);
+  };
+
+  const handleSopCreated = async (sopId) => {
+    await refresh();
+    navigate(`/sops/${sopId}`);
   };
 
   return (
@@ -81,6 +89,22 @@ export default function HierarchyOverviewPage() {
           />
         </>
       )}
+
+      <CreateSopModal
+        open={sopModalOpen}
+        onClose={closeCreateSop}
+        departmentId={createSopContext?.departmentId || null}
+        categoryId={createSopContext?.categoryId || null}
+        onCreated={handleSopCreated}
+      />
     </div>
+  );
+}
+
+export default function HierarchyOverviewPage() {
+  return (
+    <HierarchyProvider>
+      <HierarchyOverviewPageInner />
+    </HierarchyProvider>
   );
 }

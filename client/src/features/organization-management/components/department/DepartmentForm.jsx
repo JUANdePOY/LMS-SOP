@@ -150,7 +150,7 @@ export default function DepartmentForm({
           ))}
         </select>
       </div>
-    <div>
+      <div>
         <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Status</label>
         <select
           value={form.status}
@@ -161,7 +161,8 @@ export default function DepartmentForm({
           <option value="inactive">Inactive</option>
           <option value="archived">Archived</option>
         </select>
-      </div><div className="flex items-center justify-end gap-3 pt-2">
+      </div>
+      <div className="flex items-center justify-end gap-3 pt-2">
         {onCancel && (
           <button
             type="button"

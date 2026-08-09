@@ -122,7 +122,6 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
         await uploadBusinessLogo(businessId, formData);
         setLogoFile(null);
       } catch (err) {
-        console.error('Failed to upload logo:', err);
         setUploadError('Upload failed. Please try again.');
         setLogoPreviewUrl(initialData?.logo_data
           ? URL.createObjectURL(new Blob([initialData.logo_data], { type: initialData.logo_mime_type }))

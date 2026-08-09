@@ -4,7 +4,7 @@ import { validateId, sanitizeSearchQuery, validatePagination } from '../utils/va
 export const getDepartments = (params = {}) => {
   const { sanitized } = validatePagination(params);
   const query = params.query ? sanitizeSearchQuery(params.query) : '';
-  return api.get('/departments', { params: { ...sanitized, query, ...params } });
+  return api.get('/departments', { params: { ...params, ...sanitized, query } });
 };
 
 export const getDepartment = (id) => {

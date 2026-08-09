@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Search, LayoutGrid, LayoutList, Plus, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -50,7 +51,7 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop }) {
 
   if (viewMode === VIEW_MODES.GRID) {
     return (
-      <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col">
+      <div className="h-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col">
         <div className="flex-1">
           <Link to={`/sops/${sop.id}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline break-words leading-snug">{sop.title}</Link>
           {sop.description && <p className="mt-2 text-sm text-[var(--text-muted)] line-clamp-3">{sop.description}</p>}
@@ -145,7 +146,7 @@ function SOPListPage() {
   const renderSops = () => {
     if (loading) {
       return (
-        <div className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2'}>
+        <div className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5' : 'space-y-2'}>
           {[...Array(6)].map((_, i) => (
             <div key={i} className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 animate-pulse">
               <div className="h-4 w-3/4 rounded bg-[var(--bg-hover)]" />
@@ -169,7 +170,7 @@ function SOPListPage() {
     }
 
     return (
-      <StaggerList className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4' : 'space-y-2'}>
+      <StaggerList className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5' : 'space-y-2'}>
         {sops.map((sop) => (
           <MotionItem key={sop.id}>
             <SOPCard sop={sop} viewMode={viewMode} onEditStart={handleEditStart} onDeleteSop={handleDeleteSop} onArchiveSop={handleArchiveSop} />

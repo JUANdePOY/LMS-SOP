@@ -22,12 +22,9 @@ export function useBusinesses(initialParams = {}) {
     setLoading(true);
     setError(null);
     try {
-      const { valid, errors, sanitized } = validatePagination(params);
-      if (!valid) {
-        console.warn('Invalid pagination params:', errors);
-      }
+      const { sanitized } = validatePagination(params);
       const query = params.query ? sanitizeSearchQuery(params.query) : '';
-      const response = await getBusinesses({ ...sanitized, query, ...params });
+      const response = await getBusinesses({ ...params, ...sanitized, query });
       const payload = response.data;
       const list = payload?.data?.rows || payload?.data || [];
       const meta = payload?.data || {};

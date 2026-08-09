@@ -5,7 +5,7 @@ import DepartmentModal from '../components/department/DepartmentModal';
 import { useDepartments } from '../hooks/useDepartments';
 import { useBusinesses } from '../hooks/useBusinesses';
 import { useUsers } from '../hooks/useUsers';
-import { useToast } from '@/shared/components/Toast';
+import { useToast } from '@/shared/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthContext';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import ErrorBoundary from '@/shared/components/ErrorBoundary';
@@ -16,7 +16,7 @@ export default function DepartmentPage() {
   const { departments, loading, error, create, update, remove, refresh } = useDepartments();
   const { businesses } = useBusinesses();
   const { users: allUsers } = useUsers();
-  const { success, error: showError } = useToast();
+  const { toast } = useToast();
   const { user } = useAuth();
   const isSuperAdmin = user?.role === 'super_admin';
   const users = allUsers.filter(
@@ -67,13 +67,12 @@ export default function DepartmentPage() {
     setSubmitting(true);
     try {
       await create(data);
-      success('Department created successfully');
+      toast.success('Department created successfully');
       setModalOpen(false);
       setEditData(null);
     } catch (err) {
       const message = err.response?.data?.message || 'Failed to create department';
-      showError(message);
-      console.error('Failed to create department:', err);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -84,13 +83,12 @@ export default function DepartmentPage() {
     setSubmitting(true);
     try {
       await update(editData.id, data);
-      success('Department updated successfully');
+      toast.success('Department updated successfully');
       setModalOpen(false);
       setEditData(null);
     } catch (err) {
       const message = err.response?.data?.message || 'Failed to update department';
-      showError(message);
-      console.error('Failed to update department:', err);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -111,11 +109,10 @@ export default function DepartmentPage() {
     setDeleting(true);
     try {
       await remove(dept.id, { force: deleteConfirm.force });
-      success('Department deleted successfully');
+      toast.success('Department deleted successfully');
     } catch (err) {
       const message = err.response?.data?.message || 'Failed to delete department';
-      showError(message);
-      console.error('Failed to delete department:', err);
+      toast.error(message);
     } finally {
       setDeleting(false);
       setDeleteConfirm({ open: false, department: null });

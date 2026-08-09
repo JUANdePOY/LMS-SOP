@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, Layers, Users, FileText, Loader2 } from 'lucide-react';
+﻿import { useEffect, useState } from 'react';
+import { ChevronDown, ChevronRight, Layers, Users, FileText, Loader2, Plus } from 'lucide-react';
 import { useHierarchyContext } from './HierarchyContext';
 import SopCard from './SopCard';
+import CategoryNode from './CategoryNode';
 import { countLeaves, isLeafNode, sumMembers } from './hierarchyStats';
 import { getDepartmentSops } from '../../api/hierarchy.api';
 
@@ -13,7 +14,7 @@ function StatBadge({ node }) {
   return (
     <div className="flex items-center gap-3 shrink-0 text-xs">
       <span className="flex items-center gap-1 text-[var(--text-muted)]">
-        <Users className="h-3.5 w-3.5" />
+        <Users className="h-3 w-3" />
         {memberCount}
       </span>
       <span className="font-medium text-emerald-600 dark:text-emerald-400">
@@ -24,7 +25,7 @@ function StatBadge({ node }) {
 }
 
 export default function HierarchyNode({ node, depth = 0 }) {
-  const { expandedDeptIds, toggleDepartment } = useHierarchyContext();
+  const { expandedDeptIds, toggleDepartment, openCreateSop } = useHierarchyContext();
   const hasChildren = !isLeafNode(node);
   const isExpanded = expandedDeptIds.has(node.id);
 
@@ -70,9 +71,10 @@ export default function HierarchyNode({ node, depth = 0 }) {
         {isExpanded && (
           <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full bg-blue-500" />
         )}
-        <div
+        <button
+          type="button"
           onClick={handleRowClick}
-          className={`flex items-center gap-2.5 rounded-lg pl-3.5 pr-2.5 py-2.5 cursor-pointer border transition-colors ${
+          className={`flex w-full items-center gap-2.5 rounded-lg pl-3.5 pr-2.5 py-2.5 text-left border transition-colors ${
             isExpanded
               ? 'border-blue-200 bg-blue-500/5 dark:border-blue-900/60 dark:bg-blue-500/10'
               : 'border-transparent hover:border-[var(--border)] hover:bg-[var(--bg-hover)]'
@@ -106,51 +108,79 @@ export default function HierarchyNode({ node, depth = 0 }) {
               {node.sop_count ?? 0}
             </span>
           )}
-        </div>
+        </button>
       </div>
 
       {isExpanded && (
-        hasChildren ? (
-          <div className="relative ml-[28px] mt-1.5 divide-y divide-[var(--border)] border-l-2 border-[var(--border)] pl-4">
-            {node.children.map((child) => (
-              <div key={child.id} className="relative py-1 first:pt-0 last:pb-0">
-                <span className="absolute -left-4 top-[19px] h-[2px] w-4 bg-[var(--border)]" />
-                <HierarchyNode node={child} depth={depth + 1} />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="ml-[42px] mt-2 mb-1 border-t border-[var(--border)] pt-3">
-            <p className="mb-2 text-xs font-semibold tracking-wide text-[var(--text-muted)]">
-              SOPS {sops ? `(${sops.length})` : ''}
-            </p>
+        <>
+          {hasChildren && (
+            <div className="relative ml-[28px] mt-1.5 divide-y divide-[var(--border)] border-l-2 border-[var(--border)] pl-4">
+              {node.children.map((child) => (
+                <div key={child.id} className="relative py-1 first:pt-0 last:pb-0">
+                  <span className="absolute -left-4 top-[19px] h-[2px] w-4 bg-[var(--border)]" />
+                  <HierarchyNode node={child} depth={depth + 1} />
+                </div>
+              ))}
+            </div>
+          )}
 
-            {loadingSops && (
-              <div className="flex items-center gap-2 py-4 text-sm text-[var(--text-muted)]">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Loading SOPs...
-              </div>
-            )}
-
-            {!loadingSops && sopError && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
-                {sopError}
-              </div>
-            )}
-
-            {!loadingSops && !sopError && sops && sops.length === 0 && (
-              <p className="text-sm text-[var(--text-muted)]">No SOPs found for this department.</p>
-            )}
-
-            {!loadingSops && !sopError && sops && sops.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {sops.map((sop) => (
-                  <SopCard key={sop.id} sop={sop} />
+          {node.categories?.length > 0 && (
+            <div className="ml-[28px] mt-3">
+              <p className="text-xs font-semibold tracking-wide text-[var(--text-muted)] mb-2">
+                Categories ({node.categories.length})
+              </p>
+              <div className="space-y-1">
+                {node.categories.map((category) => (
+                  <CategoryNode key={category.id} category={category} departmentId={node.id} />
                 ))}
               </div>
-            )}
-          </div>
-        )
+            </div>
+          )}
+
+          {!hasChildren && (
+            <div className="ml-[42px] mt-2 mb-1 border-t border-[var(--border)] pt-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-semibold tracking-wide text-[var(--text-muted)]">
+                  SOPS {sops ? `(${sops.length})` : ''}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => openCreateSop(node.id, null)}
+                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+                  title="Create SOP in this department"
+                >
+                  <Plus className="h-3 w-3" />
+                  Create
+                </button>
+              </div>
+
+              {loadingSops && (
+                <div className="flex items-center gap-2 py-4 text-sm text-[var(--text-muted)]">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading SOPs...
+                </div>
+              )}
+
+              {!loadingSops && sopError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-400">
+                  {sopError}
+                </div>
+              )}
+
+              {!loadingSops && !sopError && sops && sops.length === 0 && (
+                <p className="text-sm text-[var(--text-muted)]">No SOPs found for this department.</p>
+              )}
+
+              {!loadingSops && !sopError && sops && sops.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {sops.map((sop) => (
+                    <SopCard key={sop.id} sop={sop} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

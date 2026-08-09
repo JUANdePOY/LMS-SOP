@@ -23,6 +23,7 @@ function handleError(res, error) {
     code === 'FORBIDDEN' ? 403 :
     code === 'APPROVAL_PENDING' ? 400 :
     code === 'INVALID_TRANSITION' ? 400 :
+    code === 'INVALID_SOP_STATUS' ? 400 :
     code === 'WORKFLOW_NOT_FOUND' ? 404 :
     code === 'DUPLICATE_ACKNOWLEDGEMENT' ? 409 :
     code === 'DUPLICATE_ASSIGNMENT' ? 409 :

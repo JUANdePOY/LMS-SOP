@@ -4,7 +4,7 @@ import { validateId, sanitizeSearchQuery, validatePagination } from '../../organ
 export const getCategories = (params = {}) => {
   const { sanitized } = validatePagination(params);
   const query = params.query ? sanitizeSearchQuery(params.query) : '';
-  return api.get('/categories', { params: { ...sanitized, query, ...params } });
+  return api.get('/categories', { params: { ...params, ...sanitized, query } });
 };
 
 export const getCategory = (id) => {
