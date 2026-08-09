@@ -4,7 +4,19 @@ const db = require('../config/database');
 
 const router = express.Router();
 
-const SEARCHABLE_CATEGORIES = ['users', 'courses', 'sops', 'departments', 'announcements', 'events'];
+const SEARCHABLE_CATEGORIES = [
+  'users',
+  'courses',
+  'sops',
+  'departments',
+  'announcements',
+  'events',
+  'quizzes',
+  'tasks',
+  'certificates',
+  'businesses',
+  'categories',
+];
 
 const MAX_TOTAL = 60;
 const PER_CATEGORY = 12;
@@ -132,6 +144,92 @@ async function searchAll(query, categories, requestingUser) {
         results.events = rows;
       } catch (err) {
         errors.events = err.message;
+      }
+    })());
+  }
+
+  if (categories.includes('quizzes')) {
+    tasks.push((async () => {
+      try {
+        const [rows] = await db.query(
+          `SELECT q.id, q.title, q.description, q.status, q.quiz_type, c.title AS course_title
+           FROM quizzes q
+           LEFT JOIN courses c ON q.course_id = c.id
+           WHERE q.is_deleted = FALSE AND (q.title LIKE ? OR q.description LIKE ?)
+           ORDER BY q.created_at DESC LIMIT ?`,
+          [term, term, PER_CATEGORY]
+        );
+        results.quizzes = rows;
+      } catch (err) {
+        errors.quizzes = err.message;
+      }
+    })());
+  }
+
+  if (categories.includes('tasks')) {
+    tasks.push((async () => {
+      try {
+        const [rows] = await db.query(
+          `SELECT id, title, description, priority, status, category
+           FROM tasks
+           WHERE (title LIKE ? OR description LIKE ? OR category LIKE ?)
+           ORDER BY created_at DESC LIMIT ?`,
+          [term, term, term, PER_CATEGORY]
+        );
+        results.tasks = rows;
+      } catch (err) {
+        errors.tasks = err.message;
+      }
+    })());
+  }
+
+  if (categories.includes('certificates')) {
+    tasks.push((async () => {
+      try {
+        const [rows] = await db.query(
+          `SELECT id, name, description, status
+           FROM certificate_templates
+           WHERE is_deleted = 0 AND (name LIKE ? OR description LIKE ?)
+           ORDER BY created_at DESC LIMIT ?`,
+          [term, term, PER_CATEGORY]
+        );
+        results.certificates = rows;
+      } catch (err) {
+        errors.certificates = err.message;
+      }
+    })());
+  }
+
+  if (categories.includes('businesses')) {
+    tasks.push((async () => {
+      try {
+        const [rows] = await db.query(
+          `SELECT id, business_code, business_name, description, status
+           FROM businesses
+           WHERE status = 'active' AND (business_name LIKE ? OR business_code LIKE ? OR description LIKE ?)
+           ORDER BY business_name ASC LIMIT ?`,
+          [term, term, term, PER_CATEGORY]
+        );
+        results.businesses = rows;
+      } catch (err) {
+        errors.businesses = err.message;
+      }
+    })());
+  }
+
+  if (categories.includes('categories')) {
+    tasks.push((async () => {
+      try {
+        const [rows] = await db.query(
+          `SELECT id, name, code, description, status
+           FROM categories
+           WHERE status = 'active' AND (name LIKE ? OR code LIKE ? OR description LIKE ?)
+           ORDER BY name ASC LIMIT ?`,
+          [term, term, term, PER_CATEGORY]
+        );
+        results.categories = rows;
+      } catch (err) {
+        errors.categories = err.message;
       }
     })());
   }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { globalSearch } from '@/services/api';
 
 export function useGlobalSearch() {
   const [query, setQuery] = useState('');
@@ -29,9 +30,10 @@ export function useGlobalSearch() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetchGlobalSearch(searchTerm);
-      setResults(response.results || {});
-      setTotal(response.total || 0);
+      const response = await globalSearch({ q: searchTerm });
+      const payload = response?.data?.data || {};
+      setResults(payload.results || {});
+      setTotal(payload.total || 0);
     } catch (err) {
       setError(err?.response?.data?.message || err.message || 'Search failed');
       setResults({});
@@ -47,12 +49,17 @@ export function useGlobalSearch() {
 
   const navigateToResult = useCallback((category, item) => {
     const paths = {
-      users: `/profile/${item.id}`,
+      users: `/profile`,
       courses: `/courses/${item.id}`,
       sops: `/sops/${item.id}`,
       departments: '/admin/organization/departments',
       announcements: '/announcements',
       events: '/events',
+      quizzes: `/assessments/quiz/${item.id}`,
+      tasks: `/tasks/${item.id}`,
+      certificates: '/certificates',
+      businesses: '/admin/organization/businesses',
+      categories: '/admin/organization/categories',
     };
     const target = paths[category];
     if (!target) return;
@@ -74,21 +81,4 @@ export function useGlobalSearch() {
     navigateToResult,
     reset,
   };
-}
-
-function fetchGlobalSearch(searchTerm) {
-  const params = new URLSearchParams({ q: searchTerm });
-  return fetch(`/api/search?${params.toString()}`, {
-    headers: {
-      Authorization: `Bearer ${session.getCurrentToken() || ''}`,
-    },
-  }).then(async (res) => {
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      const err = new Error(data.message || 'Search failed');
-      err.response = { data };
-      throw err;
-    }
-    return res.json().then((d) => d.data);
-  });
 }

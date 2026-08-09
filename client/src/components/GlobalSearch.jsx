@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, X, Users, BookOpen, FileText, Building, Megaphone, Calendar, Loader2 } from 'lucide-react';
+import { Search, X, Users, BookOpen, FileText, Building, Megaphone, Calendar, Loader2, ListChecks, CheckSquare, Award, Briefcase, Tag } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 
@@ -10,13 +10,18 @@ const CATEGORY_META = {
   departments: { label: 'Departments', icon: Building, color: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300' },
   announcements: { label: 'Announcements', icon: Megaphone, color: 'bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300' },
   events: { label: 'Events', icon: Calendar, color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300' },
+  quizzes: { label: 'Quizzes', icon: ListChecks, color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300' },
+  tasks: { label: 'Tasks', icon: CheckSquare, color: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300' },
+  certificates: { label: 'Certificates', icon: Award, color: 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300' },
+  businesses: { label: 'Businesses', icon: Briefcase, color: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/20 dark:text-fuchsia-300' },
+  categories: { label: 'Categories', icon: Tag, color: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300' },
 };
 
 function ResultRow({ category, item, onClick }) {
   const meta = CATEGORY_META[category];
   const Icon = meta.icon;
-  const title = item.title || item.full_name || item.name || item.code || 'Untitled';
-  const subtitle = item.department_name || item.subtitle || item.description || '';
+  const title = item.title || item.full_name || item.name || item.business_name || item.code || 'Untitled';
+  const subtitle = item.department_name || item.course_title || item.business_code || item.subtitle || item.description || '';
 
   return (
     <button
