@@ -8,7 +8,6 @@ import {
 import { cn } from "@/lib/utils";
 import LessonList from "@/features/course_management/components/LessonList";
 import LessonProgressBar from "@/features/course_management/components/LessonProgressBar";
-import CourseSOPsSection from "@/features/employee/components/CourseSOPsSection";
 import * as session from "@/services/session";
 import { resolveFileUrl } from "@/lib/fileUrl";
 import { useCourseCompletionCertificates } from "@/features/certificate-management/hooks/useCourseCompletionCertificates";
@@ -365,10 +364,7 @@ export default function EmployeeCourseView() {
                   courseId={courseId}
                 />
               </div>
-            </div>
-
-            <CourseSOPsSection courseId={courseId} />
-          </div>
+            </div>          </div>
 
           <div className="space-y-6">
             {learningOutcomes.length > 0 && (
@@ -446,3 +442,4 @@ export default function EmployeeCourseView() {
     </div>
   );
 }
+

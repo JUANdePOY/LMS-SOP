@@ -6,6 +6,5 @@ const { authenticateToken } = require('../middleware/auth');
 router.use(authenticateToken);
 
 router.get('/sops/:id', employeeSopController.getSop);
-router.get('/courses/:courseId/sops', employeeSopController.listCourseSops);
 
 module.exports = router;

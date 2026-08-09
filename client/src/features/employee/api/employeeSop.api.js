@@ -1,10 +1,10 @@
 import * as session from '@/services/session';
 
-const API_BASE = "/api/employee";
+const API_BASE = '/api/employee';
 
 function authHeaders() {
   const token = session.getCurrentToken();
-  const headers = { "Content-Type": "application/json" };
+  const headers = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 }
@@ -33,10 +33,5 @@ async function handle(res) {
 
 export async function getEmployeeSop(sopId) {
   const res = await fetch(`${API_BASE}/sops/${sopId}`, { headers: authHeaders() });
-  return handle(res);
-}
-
-export async function getCourseSops(courseId) {
-  const res = await fetch(`${API_BASE}/courses/${courseId}/sops`, { headers: authHeaders() });
   return handle(res);
 }

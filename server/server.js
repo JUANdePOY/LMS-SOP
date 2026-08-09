@@ -65,7 +65,6 @@ const eventsRoutes = require('./routes/events');
 const messagesRoutes = require('./routes/messages');
 const tasksRoutes = require('./routes/tasks');
 const taskAttachmentPublicFile = require('./services/taskAttachmentPublicFile');
-const sopCourseLinkRoutes = require('./routes/sopCourseLinks');
 const employeeRoutes = require('./routes/employee');
 const notificationsRoutes = require('./routes/notifications');
 
@@ -117,7 +116,6 @@ app.use('/api/sops/attachments', sopAttachmentPublicFile);
 app.use('/api/sops/share', sopSharePublicRouter);
 app.use('/api/sops', sopsRoutes);
 
-app.use('/api/courses', sopCourseLinkRoutes);
 app.use('/api/courses', coursesRoutes);
 app.use('/api/courses', progressCourseRoutes);
 app.use('/api/enrollments', enrollmentsRoutes);

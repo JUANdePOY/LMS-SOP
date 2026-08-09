@@ -1,8 +1,8 @@
 const sopModel = require('../models/sopModel');
 const sopVersionModel = require('../models/sopVersionModel');
 const sopModuleModel = require('../models/sopModuleModel');
-const sopCourseLinkModel = require('../models/sopCourseLinkModel');
 const enrollmentModel = require('../models/enrollmentModel');
+const db = require('../config/database');
 const sopAssignmentService = require('../services/sopAssignmentService');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -18,8 +18,6 @@ function sendError(res, err, fallback = 'Request failed') {
 }
 
 const ALLOWED_EMPLOYEE_SOP_STATUSES = ['Published'];
-
-
 
 async function getEmployeeSop(req, res) {
   try {
@@ -41,9 +39,15 @@ async function getEmployeeSop(req, res) {
 
     let hasAccess = false;
 
-    // 1. Check enrollment in a course that links this SOP
-    const hasLink = await sopCourseLinkModel.isLinkedToActiveEnrollment(sopId, userId);
-    if (hasLink) {
+    // 1. Check enrollment in a course that embeds this SOP as a lesson
+    const [linkedRows] = await db.query(`
+      SELECT 1 FROM module_content mc
+      JOIN course_modules cm ON cm.id = mc.module_id AND cm.is_deleted = FALSE
+      JOIN course_enrollments ce ON ce.course_id = cm.course_id AND ce.user_id = ? AND ce.status IN ('active', 'completed') AND ce.is_deleted = FALSE
+      WHERE mc.type = 'sop' AND mc.url = ? AND mc.is_deleted = FALSE
+      LIMIT 1
+    `, [userId, String(sopId)]);
+    if (linkedRows.length > 0) {
       hasAccess = true;
     }
 
@@ -73,7 +77,7 @@ async function getEmployeeSop(req, res) {
       action: 'employee.sop.viewed',
       entity_type: 'sop',
       entity_id: sopId,
-      metadata: { course_link: hasLink },
+      metadata: { course_link: hasAccess },
     });
 
     res.json({
@@ -89,31 +93,8 @@ async function getEmployeeSop(req, res) {
   }
 }
 
-async function listCourseSops(req, res) {
-  try {
-    const userId = req.user.id;
-    const courseId = parseInt(req.params.courseId, 10);
-
-    const enrollment = await enrollmentModel.findByCourseAndUser(courseId, userId);
-    if (!enrollment) {
-      const error = new Error('You are not enrolled in this course');
-      error.code = 'FORBIDDEN';
-      throw error;
-    }
-
-    const rows = await sopCourseLinkModel.listByCourse(courseId);
-
-    const allowed = rows.filter((row) => ALLOWED_EMPLOYEE_SOP_STATUSES.includes(row.sop_status));
-
-    res.json({ success: true, data: allowed });
-  } catch (error) {
-    sendError(res, error, 'Failed to list course SOPs');
-  }
-}
-
 const employeeSopController = {
   getSop: getEmployeeSop,
-  listCourseSops,
 };
 
 module.exports = employeeSopController;

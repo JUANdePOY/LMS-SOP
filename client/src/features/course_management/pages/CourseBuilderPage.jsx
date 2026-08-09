@@ -38,28 +38,6 @@ async function handleSopLink(res) {
   }
 }
 
-async function fetchCourseSops(courseId) {
-  const res = await fetch(`/api/courses/${courseId}/sops`, { headers: authHeaders() });
-  return handleSopLink(res);
-}
-
-async function linkSopToCourse(courseId, sopId, meta = {}) {
-  const res = await fetch(`/api/courses/${courseId}/sops`, {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({ sop_id: sopId, ...meta }),
-  });
-  return handleSopLink(res);
-}
-
-async function unlinkSopFromCourse(courseId, sopId) {
-  const res = await fetch(`/api/courses/${courseId}/sops/${sopId}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
-  return handleSopLink(res);
-}
-
 async function fetchCourseCertificates(courseId) {
   const res = await fetch("/api/certificate-courses/courses/" + courseId + "/certificates", { headers: authHeaders() });
   return handleSopLink(res);
@@ -244,8 +222,6 @@ export default function CourseBuilderPage() {
   const [selectedLessonId, setSelectedLessonId] = useState(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const handleSaveDraftRef = useRef(null);
-  const [courseSops, setCourseSops] = useState([]);
-  const courseSopsRef = useRef([]);
   const [courseCertificates, setCourseCertificates] = useState([]);
   const courseCertificatesRef = useRef([]);
 
@@ -319,20 +295,6 @@ export default function CourseBuilderPage() {
 
   useEffect(() => {
     if (!courseId) return;
-    fetchCourseSops(courseId)
-      .then((res) => {
-        const data = res?.data || res || [];
-        setCourseSops(Array.isArray(data) ? data : []);
-        courseSopsRef.current = Array.isArray(data) ? data : [];
-      })
-      .catch(() => {
-        setCourseSops([]);
-        courseSopsRef.current = [];
-      });
-  }, [courseId]);
-
-  useEffect(() => {
-    if (!courseId) return;
     fetchCourseCertificates(courseId)
       .then((res) => {
         const data = res?.data || res || [];
@@ -388,12 +350,7 @@ export default function CourseBuilderPage() {
           return mapped;
         });
       })
-      .then(() => fetchCourseSops(courseId))
-      .then((res) => {
-        const data = res?.data || res || [];
-        setCourseSops(Array.isArray(data) ? data : []);
-        courseSopsRef.current = Array.isArray(data) ? data : [];
-      })
+      .then(() => fetchCourseCertificates(courseId))
       .catch((err) => {
         toast.error(err.message || "Failed to refresh course");
       });
@@ -425,90 +382,6 @@ export default function CourseBuilderPage() {
       })),
     })),
   }), [form, modules]);
-
-  const getModuleSops = (moduleId) => {
-    if (!moduleId) return [];
-    return courseSops.filter((s) => s.module_id === moduleId);
-  };
-
-  const handleLinkSop = (moduleId, sopId) => {
-    const targetModule = modules.find((m) => m.id === moduleId);
-    if (!targetModule || targetModule.isNew) {
-      toast.error('This module isn\'t saved to the server yet. Click "Save Draft" in the right panel first, then link SOPs.');
-      return;
-    }
-    setCourseSops((prev) => {
-      const exists = prev.find((s) => s.sop_id === sopId && s.module_id === moduleId);
-      if (exists) return prev;
-      const next = [...prev, {
-        id: `temp-${Date.now()}-${sopId}`,
-        sop_id: sopId,
-        course_id: parseInt(courseId, 10),
-        module_id: moduleId,
-        display_order: prev.filter((s) => s.module_id === moduleId).length,
-        is_required: false,
-        link_type: "Reference",
-      }];
-      setHasUnsavedChanges(true);
-      return next;
-    });
-  };
-
-  const handleUnlinkSop = (moduleId, sopId) => {
-    setCourseSops((prev) => {
-      const next = prev.filter((s) => !(s.sop_id === sopId && s.module_id === moduleId));
-      setHasUnsavedChanges(true);
-      return next;
-    });
-  };
-
-  const syncCourseSops = async () => {
-    if (!courseId) return;
-    const previous = courseSopsRef.current || [];
-    const current = courseSops;
-
-    const previousIds = new Set(previous.map((s) => `${s.sop_id}-${s.module_id}`));
-    const currentIds = new Set(current.map((s) => `${s.sop_id}-${s.module_id}`));
-
-    const isSavedModuleId = (moduleId) => {
-      if (moduleId === null || moduleId === undefined || moduleId === "") return true; // course-level link, no module
-      return Number.isInteger(Number(moduleId)) && !modules.some((m) => m.id === moduleId && m.isNew);
-    };
-
-    const toAdd = current.filter((s) => !previousIds.has(`${s.sop_id}-${s.module_id}`));
-    const toRemove = previous.filter((s) => !currentIds.has(`${s.sop_id}-${s.module_id}`));
-
-    const addable = toAdd.filter((s) => isSavedModuleId(s.module_id));
-    const skipped = toAdd.length - addable.length;
-    if (skipped > 0) {
-      toast.error(`Skipped linking ${skipped} SOP${skipped === 1 ? "" : "s"} to an unsaved module. Save the module first, then link it.`);
-    }
-
-    for (const sop of addable) {
-      try {
-        await linkSopToCourse(courseId, sop.sop_id, {
-          module_id: sop.module_id,
-          display_order: sop.display_order,
-          is_required: sop.is_required,
-          link_type: sop.link_type,
-        });
-      } catch (err) {
-        if (err?.code !== 'DUPLICATE_LINK') {
-          toast.error(err?.message || 'Failed to link SOP');
-        }
-      }
-    }
-
-    for (const sop of toRemove) {
-      try {
-        await unlinkSopFromCourse(courseId, sop.sop_id);
-      } catch (err) {
-        toast.error(err?.message || 'Failed to unlink SOP');
-      }
-    }
-
-    courseSopsRef.current = current;
-  };
 
   const syncCourseCertificates = async () => {
     if (!courseId) return;
@@ -546,7 +419,6 @@ export default function CourseBuilderPage() {
   };
 
   const syncCourseData = async () => {
-    await syncCourseSops();
     await syncCourseCertificates();
   };
 
@@ -996,9 +868,6 @@ export default function CourseBuilderPage() {
               onDelete={() => removeModule(selectedModuleId)}
               saving={saving}
               courseId={courseId}
-              moduleSops={getModuleSops(selectedModuleId)}
-              onLinkSop={handleLinkSop}
-              onUnlinkSop={handleUnlinkSop}
               onMoveUp={() => moveModule(selectedModuleId, -1)}
               onMoveDown={() => moveModule(selectedModuleId, 1)}
               onNavigatePrev={() => {
