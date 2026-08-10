@@ -6,6 +6,7 @@ import { useMarkLessonComplete } from "../hooks/useMarkLessonComplete";
 import LessonProgressBar from "../components/LessonProgressBar";
 import LessonList from "../components/LessonList";
 import VideoPlayer from "../components/utils/VideoPlayer";
+import ImageLightbox from "@/shared/components/ui/ImageLightBox";
 import LB_PROSE from "../utils/lbProse";
 import { getQuizzes, getQuizById } from "@/features/assessments/api/quiz.api";
 import { listAttempts } from "@/features/assessments/api/attempt.api";
@@ -36,6 +37,9 @@ export default function LessonPage() {
   const [quizAttempts, setQuizAttempts] = useState([]);
   const [certificate, setCertificate] = useState(null);
   const [certificateLoading, setCertificateLoading] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [lightboxAlt, setLightboxAlt] = useState("");
+
 
   const [ sop, setSop ] = useState(null);
   const [ sopLoading, setSopLoading ] = useState(false);
@@ -199,7 +203,15 @@ export default function LessonPage() {
             {message}
           </div>
         )}
-        <div className="min-h-[200px] rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+        <div
+          onClick={(e) => {
+            const img = e.target.closest("img");
+            if (img) {
+              setLightboxSrc(img.src);
+              setLightboxAlt(img.alt || "");
+            }
+          }}
+        >
           {currentLesson.type === 'video' ? (
             <div className="p-4">
               <VideoPlayer src={currentLesson.url} title={currentLesson.title} />
@@ -451,7 +463,15 @@ export default function LessonPage() {
 
                   {/* Modules Section */}
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between px-1">
+                    <div 
+                    onClick={(e) =>{
+                      const img = e.target.closest("img");
+                      if (img) {
+                        setLightboxSrc(img.src);
+                        setLightboxAlt(img.alt || "");
+                      }
+                    }}
+                    >
                       <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
                         Modules
                       </h2>
@@ -552,6 +572,7 @@ export default function LessonPage() {
             )
           )}
         </div>
+        <ImageLightbox src={lightboxSrc} alt={lightboxAlt} onClose={() => setLightboxSrc(null)} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
