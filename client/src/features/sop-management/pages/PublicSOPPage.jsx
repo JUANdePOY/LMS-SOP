@@ -6,7 +6,7 @@ import {
 } from "@/features/sop-management/services/sopService";
 import SOP_CONTENT_STYLES from "@/features/sop-management/utils/sopContentStyles";
 import PublicModuleCard from "@/features/sop-management/components/SOPEditor/PublicModuleCard";
-import ImageLightbox from "@/shared/components/ui/ImageLightBox";
+import ImageLightbox from "@/shared/components/ui/ImageLightbox";
 import {
   Calendar,
   Clock,

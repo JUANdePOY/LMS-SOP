@@ -6,7 +6,7 @@ import { useMarkLessonComplete } from "../hooks/useMarkLessonComplete";
 import LessonProgressBar from "../components/LessonProgressBar";
 import LessonList from "../components/LessonList";
 import VideoPlayer from "../components/utils/VideoPlayer";
-import ImageLightbox from "@/shared/components/ui/ImageLightBox";
+import ImageLightbox from "@/shared/components/ui/ImageLightbox";
 import LB_PROSE from "../utils/lbProse";
 import { getQuizzes, getQuizById } from "@/features/assessments/api/quiz.api";
 import { listAttempts } from "@/features/assessments/api/attempt.api";
