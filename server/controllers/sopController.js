@@ -15,7 +15,7 @@ const approvalWorkflowController = require('../controllers/approvalWorkflowContr
 const { validateShareLinkPayload } = require('../validators/sopShareValidator');
 const businessModel = require('../models/businessModel');
 const departmentModel = require('../models/departmentModel');
-const cheerio = require('cheerio');
+const { createRoot } = require('../utils/dom');
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
@@ -689,7 +689,7 @@ function drawSectionHeading(doc, label) {
 function renderModuleContentForPdf(html, imageCache, doc) {
   if (!html || !html.trim()) return false;
 
-  const $ = cheerio.load(html, { decodeEntities: false });
+  const $ = createRoot(html);
   let hasContent = false;
   const startX = doc.page.margins.left;
   const width = contentWidthOf(doc);
