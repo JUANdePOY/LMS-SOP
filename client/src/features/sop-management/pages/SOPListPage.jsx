@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Search, LayoutGrid, LayoutList, Plus, X, GraduationCap } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -59,7 +58,7 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop }) {
             <span className="text-xs text-[var(--text-muted)] font-mono">{sop.sop_code}</span>
             <StatusBadge status={sop.status} />
             {sop.restriction_type && <RestrictionBadge restrictionType={sop.restriction_type} />}
-            {sop.is_default_onboarding && (
+            {!!sop.is_default_onboarding && (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
                 <GraduationCap size={10} />
                 Onboarding
@@ -84,7 +83,7 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop }) {
           <span className="text-xs text-[var(--text-muted)] shrink-0">{sop.sop_code}</span>
           <StatusBadge status={sop.status} />
           {sop.restriction_type && <RestrictionBadge restrictionType={sop.restriction_type} />}
-          {sop.is_default_onboarding && (
+          {!!sop.is_default_onboarding && (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 shrink-0">
               <GraduationCap size={10} />
               Onboarding
