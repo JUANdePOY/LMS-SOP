@@ -4,7 +4,7 @@ import { useHierarchyContext } from './HierarchyContext';
 import SopCard from './SopCard';
 import { getDepartmentSops } from '../../api/hierarchy.api';
 
-export default function CategoryNode({ category, departmentId }) {
+export default function CategoryNode({ category, departmentId, searchQuery = '' }) {
   const { expandedCategoryIds, toggleCategory, openCreateSop } = useHierarchyContext();
   const isExpanded = expandedCategoryIds.has(category.id);
 
@@ -39,15 +39,31 @@ export default function CategoryNode({ category, departmentId }) {
     };
   }, [isExpanded, sops, category.id, departmentId]);
 
+  const lowerQuery = searchQuery ? searchQuery.toLowerCase() : '';
+  const filteredSops = lowerQuery && Array.isArray(sops)
+    ? sops.filter((sop) => (sop.title || '').toLowerCase().includes(lowerQuery))
+    : sops;
+
+  const noSopsMessage = lowerQuery
+    ? 'No SOPs match your search.'
+    : 'No SOPs found for this category.';
+
   const handleRowClick = () => {
     toggleCategory(category.id);
   };
 
   return (
     <div className="select-none">
-      <button
-        type="button"
+            <div
+        role="button"
+        tabIndex="0"
         onClick={handleRowClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleRowClick();
+          }
+        }}
         aria-expanded={isExpanded}
         className={`flex w-full items-center gap-2.5 rounded-lg pl-3.5 pr-2.5 py-2 text-left border transition-colors ${
           isExpanded
@@ -73,23 +89,27 @@ export default function CategoryNode({ category, departmentId }) {
           <FileText className="h-3.5 w-3.5" />
           {category.sop_count ?? 0}
         </span>
-      </button>
+
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            openCreateSop(departmentId, category.id);
+          }}
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          title="Create SOP in this category"
+        >
+          <Plus className="h-3 w-3" />
+          Create
+        </button>
+      </div>
 
       {isExpanded && (
         <div className="ml-[42px] mt-2 mb-1 border-t border-[var(--border)] pt-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="mb-0 text-xs font-semibold tracking-wide text-[var(--text-muted)]">
-              SOPS {sops ? `(${sops.length})` : ''}
+              SOPS {filteredSops ? `(${filteredSops.length})` : ''}
             </p>
-            <button
-              type="button"
-              onClick={() => openCreateSop(departmentId, category.id)}
-              className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-              title="Create SOP in this category"
-            >
-              <Plus className="h-3 w-3" />
-              Create
-            </button>
           </div>
 
           {loadingSops && (
@@ -105,13 +125,13 @@ export default function CategoryNode({ category, departmentId }) {
             </div>
           )}
 
-          {!loadingSops && !sopError && sops && sops.length === 0 && (
-            <p className="text-sm text-[var(--text-muted)]">No SOPs found for this category.</p>
+          {!loadingSops && !sopError && filteredSops && filteredSops.length === 0 && (
+            <p className="text-sm text-[var(--text-muted)]">{noSopsMessage}</p>
           )}
 
-          {!loadingSops && !sopError && sops && sops.length > 0 && (
+          {!loadingSops && !sopError && filteredSops && filteredSops.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {sops.map((sop) => (
+              {filteredSops.map((sop) => (
                 <SopCard key={sop.id} sop={sop} />
               ))}
             </div>

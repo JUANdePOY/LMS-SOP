@@ -71,9 +71,16 @@ export default function HierarchyNode({ node, depth = 0 }) {
         {isExpanded && (
           <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full bg-blue-500" />
         )}
-        <button
-          type="button"
+               <div
+          role="button"
+          tabIndex="0"
           onClick={handleRowClick}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleRowClick();
+            }
+          }}
           className={`flex w-full items-center gap-2.5 rounded-lg pl-3.5 pr-2.5 py-2.5 text-left border transition-colors ${
             isExpanded
               ? 'border-blue-200 bg-blue-500/5 dark:border-blue-900/60 dark:bg-blue-500/10'
@@ -108,7 +115,20 @@ export default function HierarchyNode({ node, depth = 0 }) {
               {node.sop_count ?? 0}
             </span>
           )}
-        </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              openCreateSop(node.id, null);
+            }}
+            className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+            title="Create SOP in this department"
+          >
+            <Plus className="h-3 w-3" />
+            Create
+          </button>
+        </div>
       </div>
 
       {isExpanded && (
@@ -143,15 +163,6 @@ export default function HierarchyNode({ node, depth = 0 }) {
                 <p className="text-xs font-semibold tracking-wide text-[var(--text-muted)]">
                   SOPS {sops ? `(${sops.length})` : ''}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => openCreateSop(node.id, null)}
-                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-                  title="Create SOP in this department"
-                >
-                  <Plus className="h-3 w-3" />
-                  Create
-                </button>
               </div>
 
               {loadingSops && (
