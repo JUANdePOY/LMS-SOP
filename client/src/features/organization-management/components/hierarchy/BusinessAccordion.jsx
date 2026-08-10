@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Building2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Building2, Plus } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useHierarchyContext } from './HierarchyContext';
 import HierarchyNode from './HierarchyNode';
@@ -57,7 +57,7 @@ function BusinessLogo({ business }) {
   );
 }
 
-export default function BusinessAccordion({ business, departments = [], searchActive = false }) {
+export default function BusinessAccordion({ business, departments = [], searchActive = false, onCreateSop }) {
   const { expandedBusinessIds, toggleBusiness } = useHierarchyContext();
   const isExpanded = expandedBusinessIds.has(business.id);
   const unitSummary = summarizeUnitTypes({ children: departments });
@@ -95,6 +95,21 @@ export default function BusinessAccordion({ business, departments = [], searchAc
               </span>
             )}
           </div>
+          {onCreateSop && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onCreateSop(business.id);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0"
+              aria-label="Create SOP"
+              title="Create"
+            >
+              <Plus size={14} />
+              <span className="hidden sm:inline">Create</span>
+            </button>
+          )}
 
         </button>
       </div>

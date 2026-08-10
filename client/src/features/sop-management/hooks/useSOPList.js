@@ -176,6 +176,7 @@ export function useSOPList() {
     setEditDescription(sop.description || '');
     setEditStatus(sop.status);
     setEditCategoryId(sop.category_id || '');
+    setEditIsDefaultOnboarding(!!sop.is_default_onboarding);
     setEditAssignmentIds([]);
     setEditOriginalDeptIds([]);
     cascade.setSelectedPositions([]);
@@ -342,6 +343,7 @@ export function useSOPList() {
     // Onboarding
     newIsDefaultOnboarding,
     setNewIsDefaultOnboarding,
+    editIsDefaultOnboarding,
     setEditIsDefaultOnboarding,
   };
 }

@@ -119,7 +119,7 @@ function SOPCreateForm({
                   </option>
                 ))}
               </select>
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-2 mt-3">
                 <input
                   type="checkbox"
                   id="is_default_onboarding"
@@ -131,7 +131,7 @@ function SOPCreateForm({
                   Required for new employee onboarding
                 </label>
               </div>
-              <p className="text-xs text-[var(--text-muted)] -mt-1">
+              <p className="text-xs text-[var(--text-muted)] mt-2">
                 New employees must read and acknowledge this SOP before accessing employee features.
               </p>
             </div>

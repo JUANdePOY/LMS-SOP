@@ -6,12 +6,14 @@ import { useHierarchy } from '../hooks/useHierarchy';
 import { useHierarchyContext, HierarchyProvider } from '../components/hierarchy/HierarchyContext';
 import CreateSopModal from '../components/hierarchy/CreateSopModal';
 import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
+import BusinessSopCreateForm from '../components/hierarchy/BusinessSopCreateForm';
 
 function HierarchyOverviewPageInner() {
   const navigate = useNavigate();
   const { hierarchy, loading, error, refresh } = useHierarchy();
   const { sopModalOpen, createSopContext, closeCreateSop } = useHierarchyContext();
   const [searchQuery, setSearchQuery] = useState('');
+  const [sopCreateBusinessId, setSopCreateBusinessId] = useState(null);
 
   const safeQuery = sanitizeSearchQuery(searchQuery);
 
@@ -25,6 +27,14 @@ function HierarchyOverviewPageInner() {
   const handleSopCreated = async (sopId) => {
     await refresh();
     navigate(`/sops/${sopId}`);
+  };
+
+  const handleCreateSopClick = (businessId) => {
+    setSopCreateBusinessId(businessId);
+  };
+
+  const handleCloseSopCreate = () => {
+    setSopCreateBusinessId(null);
   };
 
   return (
@@ -86,6 +96,7 @@ function HierarchyOverviewPageInner() {
           <OrganizationTree
             hierarchy={hierarchy}
             searchQuery={safeQuery}
+            onCreateSop={handleCreateSopClick}
           />
         </>
       )}
@@ -97,6 +108,15 @@ function HierarchyOverviewPageInner() {
         categoryId={createSopContext?.categoryId || null}
         onCreated={handleSopCreated}
       />
+
+      {sopCreateBusinessId && (
+        <BusinessSopCreateForm
+          open={!!sopCreateBusinessId}
+          onClose={handleCloseSopCreate}
+          businessId={sopCreateBusinessId}
+          onCreated={handleSopCreated}
+        />
+      )}
     </div>
   );
 }
