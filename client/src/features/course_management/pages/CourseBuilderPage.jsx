@@ -242,12 +242,22 @@ export default function CourseBuilderPage() {
 
   const [selectedModuleId, setSelectedModuleId] = useState(null);
   const [selectedLessonId, setSelectedLessonId] = useState(null);
+  const selectedModuleIdRef = useRef(selectedModuleId);
+  const selectedLessonIdRef = useRef(selectedLessonId);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const handleSaveDraftRef = useRef(null);
   const [courseSops, setCourseSops] = useState([]);
   const courseSopsRef = useRef([]);
   const [courseCertificates, setCourseCertificates] = useState([]);
   const courseCertificatesRef = useRef([]);
+
+  useEffect(() => {
+    selectedModuleIdRef.current = selectedModuleId;
+  }, [selectedModuleId]);
+
+  useEffect(() => {
+    selectedLessonIdRef.current = selectedLessonId;
+  }, [selectedLessonId]);
 
   const statusConfig = STATUS_CONFIG[course?.status] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
@@ -365,28 +375,35 @@ export default function CourseBuilderPage() {
         setModules(enriched);
 
         // If the currently selected module/lesson had a temp client-side id
-        // (module not yet saved when the user selected it), remap the
+        // (module or lesson not yet saved when the user selected it), remap the
         // selection to the real id the server just assigned, by position,
         // so the editor doesn't silently lose the selection after a save
         // and the module doesn't keep looking "unsaved".
-        setSelectedModuleId((currentModuleId) => {
-          if (!currentModuleId) return currentModuleId;
-          if (enriched.some((m) => m.id === currentModuleId)) return currentModuleId;
-          const prevIdx = prevModules.findIndex((m) => m.id === currentModuleId);
-          const mapped = prevIdx >= 0 ? enriched[prevIdx]?.id ?? null : null;
-          if (mapped == null) return currentModuleId;
+        const newModuleId = (() => {
+          const current = selectedModuleIdRef.current;
+          if (!current) return current;
+          if (enriched.some((m) => m.id === current)) return current;
+          const prevIdx = prevModules.findIndex((m) => m.id === current);
+          return prevIdx >= 0 ? enriched[prevIdx]?.id ?? current : current;
+        })();
 
-          const prevModule = prevModules[prevIdx];
-          const newModule = enriched[prevIdx];
-          setSelectedLessonId((currentLessonId) => {
-            if (!currentLessonId) return currentLessonId;
-            if ((newModule.lessons || []).some((l) => l.id === currentLessonId)) return currentLessonId;
-            const lessonIdx = (prevModule.lessons || []).findIndex((l) => l.id === currentLessonId);
-            return lessonIdx >= 0 ? (newModule.lessons || [])[lessonIdx]?.id ?? null : null;
-          });
+        const newLessonId = (() => {
+          const current = selectedLessonIdRef.current;
+          if (!current) return current;
+          for (const m of enriched) {
+            if ((m.lessons || []).some((l) => l.id === current)) return current;
+          }
+          const prevModule = prevModules.find((m) => (m.lessons || []).some((l) => l.id === current));
+          if (!prevModule) return current;
+          const prevModuleIdx = prevModules.findIndex((m) => m.id === prevModule.id);
+          const newModule = enriched[prevModuleIdx];
+          if (!newModule) return current;
+          const lessonIdx = (prevModule.lessons || []).findIndex((l) => l.id === current);
+          return lessonIdx >= 0 ? (newModule.lessons || [])[lessonIdx]?.id ?? current : current;
+        })();
 
-          return mapped;
-        });
+        setSelectedModuleId(newModuleId);
+        setSelectedLessonId(newLessonId);
       })
       .then(() => fetchCourseSops(courseId))
       .then((res) => {
@@ -971,7 +988,6 @@ export default function CourseBuilderPage() {
         <main className="flex-1 min-w-0">
           {selectedLesson ? (
             <LessonEditor
-              key={selectedLessonId}
               lesson={selectedLesson}
               courseId={courseId}
               courseTitle={course?.title}

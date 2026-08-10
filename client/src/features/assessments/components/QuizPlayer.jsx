@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { shuffle } from "../utils/randomizeQuestions";
-import { ChevronLeft, ChevronRight, Send, AlertTriangle, Flag, BookOpen } from "lucide-react";
+import { ChevronLeft, ChevronRight, Send, AlertTriangle, Flag, BookOpen, Trophy, ArrowRight, RefreshCw } from "lucide-react";
 import { useKeyboardShortcuts } from "../hooks/useKeyboardShortcuts";
 import { Button } from "@/shared/components/ui/button";
 import ConfirmationDialog from "@/shared/components/ui/ConfirmationDialog";
@@ -95,6 +95,7 @@ function QuestionOption({ option, type, selected, onChange, disabled }) {
 
 export default function QuizPlayer({
   quiz,
+  attempt,
   answers,
   currentIndex,
   questions,
@@ -108,6 +109,10 @@ export default function QuizPlayer({
   status,
   containerRef,
   saving = false,
+  result: resultProp,
+  onRetake,
+  onBackToCourse,
+  onProceedToNextLesson,
 }) {
   const { user } = useAuth();
   const [now, setNow] = useState(() => Date.now());
@@ -122,6 +127,14 @@ export default function QuizPlayer({
   }, []);
 
   const question = questions[currentIndex];
+  const attemptNumber = attempt?.attempt_number ?? attempt?.attemptNumber ?? null;
+  const attemptsAllowed = quiz?.quiz_type === "final" ? (quiz?.attempts_allowed ?? 3) : null;
+  const attemptLabel =
+    attemptNumber != null
+      ? attemptsAllowed
+        ? `Attempt ${attemptNumber} of ${attemptsAllowed}`
+        : `Attempt ${attemptNumber}`
+      : null;
   const options = useMemo(() => {
     if (!question) return [];
     const base = normalizeOptions(question);
@@ -132,12 +145,11 @@ export default function QuizPlayer({
   const progress = questions.length ? Math.round(((currentIndex + 1) / questions.length) * 100) : 0;
   const remaining = timeLimit ? Number(timeLimit) - Number(timeElapsed) : null;
   const totalTimeLimit = timeLimit ? Number(timeLimit) : 0;
-
   const answeredCount = useMemo(() => {
     if (!answers || !questions) return 0;
     return questions.filter((q) => {
       const a = answers[q.id];
-      return a !== undefined && a !== null && a !== "";
+      return a !== undefined && a !== null && a !== "" && !(Array.isArray(a) && a.length === 0);
     }).length;
   }, [answers, questions]);
 
@@ -237,7 +249,12 @@ export default function QuizPlayer({
         <div className="lg:sticky lg:top-0 z-10 -mx-1 mb-4 rounded-xl border border-neutral-200 bg-white p-3 sm:p-4">
           <div className="flex items-center justify-between gap-3">
             <QuizTimer remaining={remaining} total={totalTimeLimit} />
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {attemptLabel && (
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                  {attemptLabel}
+                </span>
+              )}
               {saving && (
                 <span className="quiz-saving-pulse inline-flex items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400">
                   <span className="h-2 w-2 animate-spin rounded-full border border-neutral-400 border-t-transparent" />
@@ -324,36 +341,69 @@ export default function QuizPlayer({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <Button
-            variant="outline"
-            onClick={handleBack}
-            className="min-w-[80px] sm:min-w-[100px] transition-all hover:scale-[1.02] active:scale-[0.98]"
-          >
-            <ChevronLeft className="h-4 w-4" />
-            {currentIndex > 0 ? "Back" : "Cancel"}
-          </Button>
-
-          {!isLast ? (
+        {status !== "submitted" && (
+          <div className="flex items-center justify-between gap-2">
             <Button
-              onClick={handleNext}
+              variant="outline"
+              onClick={handleBack}
               className="min-w-[80px] sm:min-w-[100px] transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
-              Next
-              <ChevronRight className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4" />
+              {currentIndex > 0 ? "Back" : "Cancel"}
             </Button>
-          ) : (
-            <Button
-              onClick={handleSubmitClick}
-              disabled={status === "submitting"}
-              className="min-w-[100px] sm:min-w-[120px] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
-            >
-              {status === "submitting" ? "Submitting…" : "Submit Quiz"}
-              <Send className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+
+            {!isLast ? (
+              <Button
+                onClick={handleNext}
+                className="min-w-[80px] sm:min-w-[100px] transition-all hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSubmitClick}
+                disabled={status === "submitting"}
+                className="min-w-[100px] sm:min-w-[120px] transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100"
+              >
+                {status === "submitting" ? "Submitting…" : "Submit Quiz"}
+                <Send className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
+
+      {status === "submitted" && (
+        <div className="rounded-xl border border-neutral-200 bg-white p-5 sm:p-6 mb-4">
+          <div className="mb-4 flex items-center gap-2">
+            <Trophy className={`h-5 w-5 ${resultProp?.passed ? "text-emerald-600" : "text-amber-600"}`} />
+            <h3 className="text-base font-semibold text-neutral-800">
+              {resultProp?.passed ? "Attempt Passed" : "Attempt Submitted"}
+            </h3>
+          </div>
+          <p className="text-sm text-neutral-500 mb-4">Your answers have been recorded for review.</p>
+          <div className="flex flex-wrap items-center gap-3">
+            {onRetake && (
+              <Button variant="outline" onClick={onRetake} className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Retake Quiz
+              </Button>
+            )}
+            {onBackToCourse && (
+              <Button variant="outline" onClick={onBackToCourse} className="gap-2">
+                Back to Course
+              </Button>
+            )}
+            {resultProp?.passed && onProceedToNextLesson && (
+              <Button onClick={onProceedToNextLesson} className="gap-2">
+                Proceed to Next Lesson
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      )}
 
       <ConfirmationDialog
         isOpen={showCancelConfirm}
@@ -363,7 +413,7 @@ export default function QuizPlayer({
           cancel();
         }}
         title="Leave quiz?"
-        message="Your progress is saved. You can return to this quiz later from the Assessments page."
+        message="This attempt will be cancelled. You can start a new attempt later if attempts remain."
         confirmText="Leave quiz"
         cancelText="Stay"
         variant="destructive"

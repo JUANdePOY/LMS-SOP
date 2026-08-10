@@ -45,8 +45,9 @@ function normalizeQuestion(q, idx) {
     if (correct_answer && correct_answer !== 'true' && correct_answer !== 'false') {
       correct_answer = null;
     }
-  } else if (type === 'multiple_select' || type === 'multi_select') {
+  } else if (type === 'multi_select') {
     correct_answer = toCorrectAnswerArray(correct_answer || []);
+    console.error('DEBUG multi_select correct_answer after:', JSON.stringify(correct_answer), 'isArray:', Array.isArray(correct_answer));
   }
 
   const points = q.points != null ? Number(q.points) : 1;

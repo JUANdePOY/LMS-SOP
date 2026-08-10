@@ -10,6 +10,7 @@
     "build": "echo server ready"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.600.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "debug": "^4.4.3",
@@ -21,9 +22,9 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.22.3",
-    "@aws-sdk/client-s3": "^3.600.0",
     "pdf-lib": "^1.17.1",
-    "pdfkit": "^0.13.0"
+    "pdfkit": "^0.13.0",
+    "ws": "^8.21.3"
   },
   "overrides": {
     "uuid": "^11.1.1"

@@ -68,6 +68,7 @@ export function useQuizWizard({ toast, onComplete, onCancel, courseId } = {}) {
         title: settings.title.trim(),
         description: settings.description.trim() || undefined,
         quiz_type: settings.quiz_type,
+        status: "published",
         time_limit: settings.time_limit ? Number(settings.time_limit) : null,
         passing_score: settings.passing_score ? Number(settings.passing_score) : null,
         max_score: settings.max_score ? Number(settings.max_score) : null,

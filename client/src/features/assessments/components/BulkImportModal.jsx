@@ -302,17 +302,24 @@ export default function BulkImportModal({ open, onClose, quizId, toast, refetch 
                 Valid Questions ({validation.valid.length})
               </div>
               <div className="max-h-60 overflow-y-auto divide-y divide-neutral-100 dark:divide-neutral-800">
-                {validation.valid.slice(0, 50).map((q) => (
-                  <div key={q.row} className="flex items-center gap-3 px-3 py-2 text-xs">
-                    <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                    <span className="text-neutral-400 w-8 shrink-0">#{q.row}</span>
-                    <TypeBadge type={q.type} />
-                    <span className="flex-1 truncate text-neutral-700 dark:text-neutral-200">{q.question_text || "(empty)"}</span>
-                    <span className="text-neutral-400 shrink-0">
-                      {q.options ? `${q.options.length} opts` : "—"} · {q.points}pt
-                    </span>
-                  </div>
-                ))}
+                {validation.valid.slice(0, 50).map((q) => {
+                  const answerText = Array.isArray(q.correct_answer)
+                    ? q.correct_answer.join(", ")
+                    : q.correct_answer != null
+                    ? String(q.correct_answer)
+                    : "—";
+                  return (
+                    <div key={q.row} className="flex items-center gap-3 px-3 py-2 text-xs">
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                      <span className="text-neutral-400 w-8 shrink-0">#{q.row}</span>
+                      <TypeBadge type={q.type} />
+                      <span className="flex-1 truncate text-neutral-700 dark:text-neutral-200">{q.question_text || "(empty)"}</span>
+                      <span className="text-neutral-400 shrink-0 max-w-[40%] truncate" title={answerText}>
+                        {q.options ? `${q.options.length} opts` : "—"} · ✓ {answerText} · {q.points}pt
+                      </span>
+                    </div>
+                  );
+                })}
                 {validation.valid.length > 50 && (
                   <div className="px-3 py-2 text-center text-xs text-neutral-500">…and {validation.valid.length - 50} more valid questions</div>
                 )}

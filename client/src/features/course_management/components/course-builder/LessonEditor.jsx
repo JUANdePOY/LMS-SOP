@@ -1003,16 +1003,18 @@ export default function LessonEditor({
                           />
                           <div>
                             <span className="text-sm font-medium text-neutral-700">
-                              Require passing score
+                              Require quiz completion
                             </span>
-                            <p className="text-xs text-neutral-500 mt-0.5">Learners must pass to complete this lesson</p>
+                            <p className="text-xs text-neutral-500 mt-0.5">
+                              Learners must submit the attached quiz to mark the lesson complete.
+                            </p>
                           </div>
                         </label>
 
                         {requiresQuizPass && (
-                          <div className="mt-4 pl-7">
+                          <div className="mt-4 pl-7 space-y-2">
                             <label htmlFor="passing-score" className="block text-sm font-medium text-neutral-700 mb-2">
-                              Minimum Passing Score
+                              Minimum Passing Score (optional)
                             </label>
                             <div className="relative max-w-xs">
                               <input
@@ -1030,6 +1032,9 @@ export default function LessonEditor({
                               />
                               <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-neutral-500">%</span>
                             </div>
+                            <p className="text-xs text-neutral-500">
+                              Leave blank to require only quiz completion instead of a minimum score.
+                            </p>
                           </div>
                         )}
                       </div>

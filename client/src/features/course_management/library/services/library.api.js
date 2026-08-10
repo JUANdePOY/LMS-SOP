@@ -63,6 +63,20 @@ export async function assignEmployees(courseId, userIds) {
   return await bulkEnrollStudents({ course_id: courseId, user_ids: userIds, role: "learner" });
 }
 
+export async function assignDepartment(courseId, departmentId, role = "learner") {
+  return await fetch(`/api/enrollments/department/${departmentId}`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ course_id: courseId, role }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || "Failed to assign department");
+    }
+    return res.json();
+  });
+}
+
 export async function getLearningPaths(params = {}) {
   const qs = new URLSearchParams();
   Object.entries(params).forEach(([key, val]) => {

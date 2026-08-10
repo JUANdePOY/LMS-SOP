@@ -7,6 +7,7 @@ router.use(authenticateToken);
 
 router.post('/', enrollmentsController.enrollStudent);
 router.post('/bulk', enrollmentsController.bulkEnroll);
+router.post('/department/:department_id', enrollmentsController.bulkEnrollByDepartment);
 router.get('/', enrollmentsController.listEnrollments);
 router.get('/course/:courseId/progress', enrollmentsController.getClassProgress);
 router.patch('/:id/approve', enrollmentsController.approveEnrollment);

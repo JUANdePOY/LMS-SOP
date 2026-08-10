@@ -1,8 +1,9 @@
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 import { useParams, Link, useLocation, useNavigate } from "react-router-dom";
 import { useTakeQuiz } from "../hooks/useTakeQuiz";
 import { useQuiz } from "../hooks/useQuiz";
 import { useIntegrityMonitor } from "../hooks/useIntegrityMonitor";
+import { listAttempts } from "../api/attempt.api";
 import QuizPlayer from "../components/QuizPlayer";
 import QuizIntro from "../components/QuizIntro";
 import { Button } from "@/shared/components/ui/button";
@@ -11,11 +12,13 @@ import { formatDuration } from "../utils/formatDuration";
 import { markLessonComplete } from "../../course_management/services/lesson-progress.service";
 import { Trophy, CheckCircle, XCircle, ArrowRight, ArrowLeft } from "lucide-react";
 
-function ResultView({ result, quiz }) {
+function ResultView({ result, quiz, attempt, attemptsRemaining, attemptsAllowed, onRetake }) {
   const passed = result?.passed;
   const location = useLocation();
   const navigate = useNavigate();
   const [completing, setCompleting] = useState(false);
+  const attemptNumber = attempt?.attempt_number ?? attempt?.attemptNumber ?? null;
+  const canRetake = !passed && quiz?.quiz_type === "final" && attemptsRemaining > 0;
   const from = { ...(location.state || {}) };
   if (!from.courseId && !from.lessonId) {
     try {
@@ -79,6 +82,13 @@ function ResultView({ result, quiz }) {
               </span>
             </div>
           )}
+          {attemptNumber != null && (
+            <div className="text-sm text-neutral-500">
+              Attempt {attemptNumber}
+              {attemptsAllowed !== Infinity ? ` of ${attemptsAllowed}` : ""}
+              {attemptsRemaining !== Infinity ? ` · ${attemptsRemaining} attempt${attemptsRemaining === 1 ? "" : "s"} left` : ""}
+            </div>
+          )}
           {result.timeTakenSec != null && (
             <div className="text-sm text-neutral-500">Time taken: {formatDuration(result.timeTakenSec)}</div>
           )}
@@ -99,12 +109,16 @@ function ResultView({ result, quiz }) {
                 <ArrowLeft className="h-4 w-4 ml-1" />
               </Button>
             ) : (
-              <Button asChild>
-                <Link to={`/assessments/quiz/${quiz.id}/results`}>Review Results</Link>
-              </Button>
+              <div className="flex flex-wrap gap-3">
+                {canRetake && (
+                  <Button variant="outline" onClick={onRetake}>
+                    Retake Quiz
+                  </Button>
+                )}
+              </div>
             )}
-            <Button variant="outline" asChild>
-              <Link to="/assessments">Back to Assessments</Link>
+            <Button variant="outline" onClick={() => navigate(from.courseId ? `/courses/view/${from.courseId}` : "/courses")}>
+              Back to Course
             </Button>
           </div>
         </CardContent>
@@ -151,7 +165,7 @@ export default function TakeQuizPage() {
   const { quizId } = useParams();
   const containerRef = useRef(null);
   const engine = useTakeQuiz();
-  const { quiz, status, result, attempt, violationCount, limitReached, start, reportViolation } = engine;
+  const { quiz, status, result, attempt, violationCount, limitReached, start, reset, reportViolation } = engine;
   const { quiz: quizDetails, loading: loadingDetails, error: detailsError } = useQuiz(quizId);
 
   const handleViolation = useCallback(
@@ -169,6 +183,78 @@ export default function TakeQuizPage() {
     if (quizId) window.history.back();
   }, [quizId]);
 
+  const handleRetake = useCallback(() => {
+    reset();
+    if (quizId) start(quizId);
+  }, [quizId, reset, start]);
+
+  const location = useLocation();
+  const navigate = useNavigate();
+  const from = { ...(location.state || {}) };
+  if (!from.courseId && !from.lessonId) {
+    try {
+      const stored = JSON.parse(sessionStorage.getItem("quizReturnContext") || "{}");
+      from.courseId = from.courseId || stored.courseId;
+      from.lessonId = from.lessonId || stored.lessonId;
+      from.nextLessonId = from.nextLessonId || stored.nextLessonId;
+    } catch { /* ignore */ }
+  }
+
+  const handleBackToCourse = useCallback(() => {
+    if (from.lessonId) {
+      navigate(`/courses/view/${from.courseId}/lesson/${from.lessonId}`);
+    } else {
+      navigate(`/courses/view/${from.courseId}`);
+    }
+  }, [from.courseId, from.lessonId, navigate]);
+
+  const handleProceedToNextLesson = useCallback(async () => {
+    if (!from.lessonId) return;
+    try {
+      await markLessonComplete(from.lessonId);
+    } catch {
+      // non-fatal
+    }
+    if (from.nextLessonId) {
+      navigate(`/courses/view/${from.courseId}/lesson/${from.nextLessonId}`);
+    } else {
+      navigate(`/courses/view/${from.courseId}`);
+    }
+  }, [from.courseId, from.lessonId, from.nextLessonId, navigate]);
+
+  const isFinalDetails = quizDetails?.quiz_type === "final";
+  const [completedAttempts, setCompletedAttempts] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    if (isFinalDetails && quizId) {
+      listAttempts({ quizId })
+        .then((res) => {
+          const rows = res?.data || [];
+          if (!Array.isArray(rows) || !active) return;
+          const used = rows.filter((a) => ["completed", "graded"].includes(a.status)).length;
+          setCompletedAttempts(used);
+        })
+        .catch(() => {});
+    } else {
+      setCompletedAttempts(0);
+    }
+    return () => { active = false; };
+  }, [isFinalDetails, quizId]);
+
+  useEffect(() => {
+    if (status === "submitted" && isFinalDetails && quizId) {
+      listAttempts({ quizId })
+        .then((res) => {
+          const rows = res?.data || [];
+          if (!Array.isArray(rows)) return;
+          const used = rows.filter((a) => ["completed", "graded"].includes(a.status)).length;
+          setCompletedAttempts(used);
+        })
+        .catch(() => {});
+    }
+  }, [status, isFinalDetails, quizId]);
+
   if (status === "limit_reached") {
     return <LimitReachedView limitReached={limitReached} quiz={quizDetails} />;
   }
@@ -185,20 +271,37 @@ export default function TakeQuizPage() {
     return <div className="p-8 text-center text-neutral-600">Preparing your quiz…</div>;
   }
 
+  const attemptsAllowed = isFinalDetails ? (quizDetails?.attempts_allowed ?? 3) : Infinity;
+  const attemptsRemaining = isFinalDetails
+    ? Math.max(0, attemptsAllowed - completedAttempts)
+    : Infinity;
+
   if (status === "submitted") {
-    return <ResultView result={result} quiz={quiz} attempt={attempt} />;
+    return (
+      <ResultView
+        result={result}
+        quiz={quiz}
+        attempt={attempt}
+        attemptsRemaining={attemptsRemaining}
+        attemptsAllowed={attemptsAllowed}
+        onRetake={handleRetake}
+      />
+    );
   }
 
   if (status === "idle") {
-    const isFinal = quizDetails?.quiz_type === "final";
-    const attemptsRemaining = isFinal
-      ? quizDetails?.attempts_allowed ?? 3
+    const attemptsAllowed = isFinalDetails ? (quizDetails?.attempts_allowed ?? 3) : Infinity;
+    const attemptsRemaining = isFinalDetails
+      ? Math.max(0, attemptsAllowed - completedAttempts)
       : "∞";
+    const exhausted = isFinalDetails && attemptsRemaining <= 0;
+
     return (
       <div className="min-h-screen bg-neutral-50 py-6">
         <QuizIntro
           quiz={quizDetails}
           attemptsRemaining={attemptsRemaining}
+          startDisabled={exhausted}
           onStart={handleStart}
           onCancel={handleCancel}
         />
@@ -208,7 +311,16 @@ export default function TakeQuizPage() {
 
   return (
     <div className="min-h-screen bg-neutral-50 py-6">
-      <QuizPlayer key={quiz.id} {...engine} containerRef={containerRef} violationCount={violationCount} />
+      <QuizPlayer
+        key={quiz.id}
+        {...engine}
+        containerRef={containerRef}
+        violationCount={violationCount}
+        result={result}
+        onRetake={handleRetake}
+        onBackToCourse={handleBackToCourse}
+        onProceedToNextLesson={result?.passed ? handleProceedToNextLesson : undefined}
+      />
     </div>
   );
 }

@@ -3,6 +3,6 @@ import { validatePagination, sanitizeSearchQuery } from '../utils/validation';
 
 export const getUsers = (params = {}) => {
   const { sanitized } = validatePagination(params);
-  const query = params.query ? sanitizeSearchQuery(params.query) : '';
-  return api.get('/users', { params: { ...sanitized, query, ...params } });
+  const search = params.query ? sanitizeSearchQuery(params.query) : '';
+  return api.get('/users', { params: { ...sanitized, search, ...params } });
 };

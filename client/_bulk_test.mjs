@@ -1,4 +1,4 @@
-import { QUESTION_TYPES } from "../constants/questionTypes";
+const QUESTION_TYPES = { MULTIPLE_CHOICE: "multiple_choice", MULTI_SELECT: "multi_select", TRUE_FALSE: "true_false", SHORT_ANSWER: "short_answer" };
 
 const VALID_TYPES = new Set([
   QUESTION_TYPES.MULTIPLE_CHOICE,
@@ -53,7 +53,7 @@ export function normalizeQuestion(q, idx = 0) {
     if (correct_answer && correct_answer !== "true" && correct_answer !== "false") {
       correct_answer = null;
     }
-  } else if (type === "multiple_select" || type === "multi_select") {
+  } else if (type === "multi_select") {
     // Correct answer must be an array of option texts.
     correct_answer = toCorrectAnswerArray(correct_answer || []);
   }
@@ -134,6 +134,7 @@ export function validateQuestion(q, existingQuestions = []) {
 }
 
 export function validateBulkImport(questions, existingQuestions = []) {
+  console.error("DEBUG VALID_TYPES has multiple_select:", VALID_TYPES.has("multiple_select"), "size:", VALID_TYPES.size);
   const normalized = questions.map((q, idx) => normalizeQuestion(q, idx));
   const allErrors = [];
   const valid = [];

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
   startAttempt,
   submitAttempt,
@@ -7,6 +7,7 @@ import {
   logViolation,
 } from "../api/attempt.api";
 import { useToast } from "@/shared/components/ui/Toast";
+import { shuffle } from "../utils/randomizeQuestions";
 
 export function useTakeQuiz() {
   const { toast } = useToast();
@@ -187,7 +188,11 @@ export function useTakeQuiz() {
     }
   }, [status, quiz, timeElapsed, submit]);
 
-  const questions = quiz ? (quiz.questions || []) : [];
+  const questions = useMemo(() => {
+    if (!quiz) return [];
+    const base = quiz.questions || [];
+    return quiz.randomize_questions ? shuffle([...base]) : base;
+  }, [quiz]);
   const timeLimit = quiz ? Number(quiz.time_limit) * 60 : 0;
 
   return {

@@ -4,7 +4,7 @@ const COURSE_STATUSES = ['draft', 'published', 'archived', 'under_review'];
 const COURSE_DIFFICULTIES = ['beginner', 'intermediate', 'advanced', 'all_levels'];
 
 async function listCourses(filters = {}) {
-  const { search, status, category, difficulty, instructor_id, page = 1, limit = 20, sort, order } = filters;
+  const { search, status, category, difficulty, instructor_id, page = 1, limit = 20, sort, order, department_id } = filters;
   const offset = (page - 1) * limit;
 
   const allowedSort = {
@@ -45,6 +45,10 @@ async function listCourses(filters = {}) {
     sql += ' AND c.status = ?';
     params.push(status);
   }
+  if (department_id) {
+    sql += ' AND c.department_id = ?';
+    params.push(parseInt(department_id, 10));
+  }
   if (categories.length > 0) {
     sql += ` AND c.category IN (${categories.map(() => '?').join(',')})`;
     params.push(...categories);
@@ -70,7 +74,7 @@ async function listCourses(filters = {}) {
 }
 
 async function countCourses(filters = {}) {
-  const { search, status, category, difficulty, instructor_id } = filters;
+  const { search, status, category, difficulty, instructor_id, department_id } = filters;
 
   const categories = Array.isArray(category)
     ? category.filter(Boolean)
@@ -85,6 +89,10 @@ async function countCourses(filters = {}) {
   if (status) {
     sql += ' AND c.status = ?';
     params.push(status);
+  }
+  if (department_id) {
+    sql += ' AND c.department_id = ?';
+    params.push(parseInt(department_id, 10));
   }
   if (categories.length > 0) {
     sql += ` AND c.category IN (${categories.map(() => '?').join(',')})`;

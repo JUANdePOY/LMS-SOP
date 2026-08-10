@@ -15,7 +15,7 @@ function Stat({ icon: Icon, label, value, sub }) {
   );
 }
 
-export default function QuizIntro({ quiz, attemptsRemaining, onStart, onCancel }) {
+export default function QuizIntro({ quiz, attemptsRemaining, onStart, onCancel, startDisabled = false }) {
   const timeLimit = quiz?.time_limit ? `${quiz.time_limit} min` : "None";
   const questionCount = quiz?.question_count ?? quiz?.questions?.length ?? 0;
   const passingScore = quiz?.passing_score != null ? `${quiz.passing_score}%` : "Not set";
@@ -26,6 +26,13 @@ export default function QuizIntro({ quiz, attemptsRemaining, onStart, onCancel }
       : isFinal
       ? quiz?.attempts_allowed ?? 3
       : "∞";
+  const attemptsLabel = attemptsValue === "∞" ? "Unlimited" : attemptsValue;
+  const exhausted = isFinal && attemptsRemaining !== "∞" && Number(attemptsRemaining) <= 0;
+  const completionHint = isFinal
+    ? quiz?.passing_score != null
+      ? "This final quiz requires a passing score to be marked passed. Plan your attempt carefully."
+      : "This final quiz requires submission, but no minimum passing score is configured."
+    : "Practice quizzes can be retaken as many times as needed to build confidence.";
 
   return (
     <div className="mx-auto max-w-2xl py-8">
@@ -41,7 +48,11 @@ export default function QuizIntro({ quiz, attemptsRemaining, onStart, onCancel }
             <Stat icon={Clock} label="Time" value={timeLimit} />
             <Stat icon={BookOpen} label="Questions" value={questionCount} />
             <Stat icon={Trophy} label="Passing" value={passingScore} sub={isFinal ? "Final quiz" : "Practice"} />
-            <Stat icon={Shield} label="Attempts" value={attemptsValue} />
+            <Stat icon={Shield} label="Attempts" value={attemptsLabel} />
+          </div>
+
+          <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600 dark:border-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-300">
+            {completionHint}
           </div>
 
           {isFinal && (
@@ -51,10 +62,17 @@ export default function QuizIntro({ quiz, attemptsRemaining, onStart, onCancel }
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={onCancel}>Cancel</Button>
-            <Button onClick={onStart}>Start Quiz</Button>
-          </div>
+          {exhausted ? (
+            <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-500/40 dark:bg-red-500/10 dark:text-red-300">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>You have reached the maximum number of attempts for this final quiz. It is no longer available.</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={onCancel}>Cancel</Button>
+              <Button onClick={onStart} disabled={startDisabled}>Start Quiz</Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

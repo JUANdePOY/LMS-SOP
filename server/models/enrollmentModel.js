@@ -74,9 +74,35 @@ async function isEnrolled(userId, courseId) {
   return !!enrollment;
 }
 
+async function findExistingUserIds(courseId, userIds) {
+  if (!userIds || !userIds.length) return [];
+  const placeholders = userIds.map(() => '?').join(',');
+  const [rows] = await db.query(
+    `SELECT DISTINCT user_id FROM course_enrollments WHERE course_id = ? AND user_id IN (${placeholders}) AND is_deleted = FALSE`,
+    [courseId, ...userIds]
+  );
+  return rows.map((r) => r.user_id);
+}
+
 async function create(enrollmentData) {
   const { course_id, user_id, role, status } = enrollmentData;
 
+  // Check if a soft-deleted enrollment exists for this course/user
+  const [existing] = await db.query(
+    'SELECT id FROM course_enrollments WHERE course_id = ? AND user_id = ? AND is_deleted = TRUE LIMIT 1',
+    [course_id, user_id]
+  );
+
+  if (existing.length > 0) {
+    // Restore the soft-deleted enrollment
+    await db.query(
+      'UPDATE course_enrollments SET is_deleted = FALSE, role = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+      [role || 'learner', status || 'active', existing[0].id]
+    );
+    return existing[0].id;
+  }
+
+  // Create new enrollment
   const [result] = await db.query(
     `INSERT INTO course_enrollments (course_id, user_id, role, status) VALUES (?, ?, ?, ?)`,
     [
@@ -96,11 +122,27 @@ async function bulkCreate(enrollments) {
     await conn.beginTransaction();
     const ids = [];
     for (const e of enrollments) {
-      const [result] = await conn.query(
-        'INSERT INTO course_enrollments (course_id, user_id, role, status) VALUES (?, ?, ?, ?)',
-        [e.course_id, e.user_id, e.role || 'learner', e.status || 'active']
+      // Check if a soft-deleted enrollment exists for this course/user
+      const [existing] = await conn.query(
+        'SELECT id FROM course_enrollments WHERE course_id = ? AND user_id = ? AND is_deleted = TRUE LIMIT 1',
+        [e.course_id, e.user_id]
       );
-      ids.push(result.insertId);
+      
+      if (existing.length > 0) {
+        // Restore the soft-deleted enrollment
+        await conn.query(
+          'UPDATE course_enrollments SET is_deleted = FALSE, role = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          [e.role || 'learner', e.status || 'active', existing[0].id]
+        );
+        ids.push(existing[0].id);
+      } else {
+        // Create new enrollment
+        const [result] = await conn.query(
+          'INSERT INTO course_enrollments (course_id, user_id, role, status) VALUES (?, ?, ?, ?)',
+          [e.course_id, e.user_id, e.role || 'learner', e.status || 'active']
+        );
+        ids.push(result.insertId);
+      }
     }
     await conn.commit();
     return ids;
@@ -165,6 +207,7 @@ module.exports = {
   findById,
   findByCourseAndUser,
   isEnrolled,
+  findExistingUserIds,
   create,
   bulkCreate,
   update,

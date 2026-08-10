@@ -145,20 +145,32 @@ async function markLessonComplete(req, res) {
       await lessonProgressModel.markCompleted(conn, userId, lessonId, courseId);
 
       if (lesson.requires_quiz_pass) {
-        const quiz = await quizModel.listQuizzes(courseId, { module_id: lesson.module_id, limit: 1 });
-        const latestQuiz = quiz[0];
-        if (!latestQuiz || latestQuiz.passing_score === null) {
+        if (!lesson.quiz_id) {
           await conn.rollback();
-          return res.status(400).json({ success: false, message: 'Quiz not configured for this lesson', code: 'QUIZ_NOT_CONFIGURED' });
+          return res.status(400).json({ success: false, message: 'Quiz is not attached to this lesson', code: 'QUIZ_NOT_CONFIGURED' });
         }
-        const best = await quizModel.getBestAttempt(latestQuiz.id, userId);
+
+        const quiz = await quizModel.findById(lesson.quiz_id);
+        if (!quiz) {
+          await conn.rollback();
+          return res.status(400).json({ success: false, message: 'Quiz not found for this lesson', code: 'QUIZ_NOT_CONFIGURED' });
+        }
+
+        const threshold = lesson.passing_score != null
+          ? Number(lesson.passing_score)
+          : quiz.passing_score != null
+          ? Number(quiz.passing_score)
+          : null;
+
+        const best = await quizModel.getBestAttempt(quiz.id, userId);
         if (!best) {
           await conn.rollback();
           return res.status(400).json({ success: false, message: 'Quiz attempt required', code: 'QUIZ_REQUIRED' });
         }
-        if (!best.passed) {
+
+        if (threshold != null && Number(best.percentage) < threshold) {
           await conn.rollback();
-          return res.status(400).json({ success: false, message: `Quiz score ${best.percentage}% did not pass minimum ${latestQuiz.passing_score}%`, code: 'QUIZ_FAILED' });
+          return res.status(400).json({ success: false, message: `Quiz score ${best.percentage}% did not pass minimum ${threshold}%`, code: 'QUIZ_FAILED' });
         }
       }
 
