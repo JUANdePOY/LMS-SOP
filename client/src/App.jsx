@@ -12,6 +12,7 @@ import { CourseModalProvider } from "@/features/course_management/context/Course
 import { EnrollmentProvider } from "@/features/course_management/context/EnrollmentContext";
 import { GradingProvider } from "@/features/course_management/context/GradingContext";
 import { useAuth } from "@/contexts/AuthContext";
+import OnboardingGuard from "@/features/employee/components/OnboardingGuard";
 
 const Dashboard     = lazy(() => import("@/pages/Dashboard"));
 const EmployeeDashboard = lazy(() => import("@/features/employee/pages/EmployeeDashboard"));
@@ -19,6 +20,7 @@ const EmployeeTrainingDashboard = lazy(() => import("@/features/employee/pages/E
 const EmployeeCourseCatalog = lazy(() => import("@/features/employee/pages/EmployeeCourseCatalog"));
 const EmployeeCourseView = lazy(() => import("@/features/employee/pages/EmployeeCourseView"));
 const EmployeeSOPView = lazy(() => import("@/features/employee/pages/EmployeeSOPView"));
+const EmployeeOnboardingPage = lazy(() => import("@/features/employee/pages/EmployeeOnboardingPage"));
 const Profile       = lazy(() => import("@/pages/Profile"));
 const Login         = lazy(() => import("@/pages/Login"));
 const Settings      = lazy(() => import("@/pages/Settings"));
@@ -119,7 +121,7 @@ function RoleBasedDashboard() {
   const { isEmployee, isAdmin, isDepartmentHead, isSuperAdmin, isAuthenticated, loading } = useAuth();
   if (loading) return null;
   if (!isAuthenticated) return null;
-  if (isEmployee) return <EmployeeTrainingDashboard />;
+  if (isEmployee) return <OnboardingGuard><EmployeeTrainingDashboard /></OnboardingGuard>;
   if (isDepartmentHead || isAdmin || isSuperAdmin) return <Dashboard />;
   return null;
 }
@@ -146,12 +148,12 @@ const router = createBrowserRouter([
       </AuthRoute>
     ),
     children: [
-        { index: true, element: LMSProtectedWrapper(RoleBasedDashboard), handle: { title: "Dashboard" } },
-       { path: "my-learning", element: EmployeeProtectedWrapper(EmployeeDashboard), handle: { title: "My Learning" } },
-       { path: "my-learning/catalog", element: EmployeeProtectedWrapper(EmployeeCourseCatalog), handle: { title: "Course Catalog" } },
-       { path: "my-learning/course/:id", element: EmployeeProtectedWrapper(EmployeeCourseView), handle: { title: "Course" } },
-       { path: "my-learning/sops/:id", element: EmployeeProtectedWrapper(EmployeeSOPView), handle: { title: "SOP" } },
-       { path: "profile", element: LMSProtectedWrapper(Profile), handle: { title: "Profile" } },
+      { index: true, element: LMSProtectedWrapper(RoleBasedDashboard), handle: { title: "Dashboard" } },
+      { path: "my-learning", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeDashboard /></OnboardingGuard>), handle: { title: "My Learning" } },
+      { path: "my-learning/catalog", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeCourseCatalog /></OnboardingGuard>), handle: { title: "Course Catalog" } },
+      { path: "my-learning/course/:id", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeCourseView /></OnboardingGuard>), handle: { title: "Course" } },
+      { path: "my-learning/sops/:id", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeSOPView /></OnboardingGuard>), handle: { title: "SOP" } },
+      { path: "profile", element: LMSProtectedWrapper(Profile), handle: { title: "Profile" } },
       { path: "users", element: <Navigate to="/settings/users" replace /> },
       { path: "course-library", element: <Navigate to="/courses/library" replace /> },
       { path: "settings", element: AdminProtectedWrapper(Settings), handle: { title: "Settings" } },
@@ -195,6 +197,11 @@ const router = createBrowserRouter([
       { path: "tasks/:id", element: LMSProtectedWrapper(TaskDetailsPage), handle: { title: "Task Details" } },
       { path: "tasks/my", element: LMSProtectedWrapper(MyTasksPage), handle: { title: "My Tasks" } },
     ],
+  },
+  {
+    path: "/my-learning/onboarding",
+    element: EmployeeProtectedWrapper(EmployeeOnboardingPage),
+    handle: { title: "Onboarding" },
   },
 ]);
 

@@ -33,7 +33,7 @@ async function getSopById(id, user) {
 }
 
 async function createSop(data, actorId) {
-  const { title, description, department_id, category_id, status, restriction_type } = data;
+  const { title, description, department_id, category_id, status, restriction_type, is_default_onboarding } = data;
   const code = data.code || generateSopCode(title);
 
   const existing = await sopModel.findByCode(code);
@@ -53,6 +53,7 @@ async function createSop(data, actorId) {
     status: status || 'Draft',
     version: '1.0',
     restriction_type,
+    is_default_onboarding: is_default_onboarding ? 1 : 0,
   });
 
   await sopVersionModel.createVersion({
@@ -90,7 +91,7 @@ async function updateSop(id, data, actorId) {
   }
 
   const updates = {};
-  ['title', 'description', 'department_id', 'category_id', 'status', 'restriction_type'].forEach((field) => {
+    ['title', 'description', 'department_id', 'category_id', 'status', 'restriction_type', 'is_default_onboarding'].forEach((field) => {
     if (data[field] !== undefined) updates[field] = data[field];
   });
 

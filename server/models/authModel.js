@@ -31,6 +31,14 @@ async function create(userData) {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
     [full_name, email, password_hash, role, department_id ?? null, business_id ?? null, position_title ?? null, employee_id ?? null, contact_number ?? null, employment_status ?? 'Regular', date_hired ?? null, birthdate ?? null, address ?? null]
   );
+  // Assign default onboarding SOPs to the new user
+  try {
+    const onboardingService = require('./services/sopOnboardingService');
+    await onboardingService.assignOnboardingSopsToUser(result.insertId);
+  } catch (onboardingErr) {
+    console.error('[User Creating] Onboarding assignment failed:', onboardingErr);
+  }
+  
   return result.insertId;
 }
 

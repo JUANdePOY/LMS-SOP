@@ -47,6 +47,8 @@ export function useSOPList() {
   const [editAssignmentIds, setEditAssignmentIds] = useState([]);
   const [editOriginalDeptIds, setEditOriginalDeptIds] = useState([]);
   const [archivedTab, setArchivedTab] = useState(false);
+  const [newIsDefaultOnboarding, setNewIsDefaultOnboarding] = useState(false);
+  const [editIsDefaultOnboarding, setEditIsDefaultOnboarding] = useState(false);
 
   const filteredCategories = useMemo(() => {
     if (!categories.length) return [];
@@ -112,6 +114,7 @@ export function useSOPList() {
     cascade.setSelectedPositions([]);
     cascade.setSelectedUserIds([]);
     cascade.setUserSearch('');
+    setNewIsDefaultOnboarding(false);
   }, [cascade]);
 
   const handleCreate = async () => {
@@ -125,6 +128,7 @@ export function useSOPList() {
         category_id: newCategoryId || null,
         status: SOP_STATUSES.DRAFT,
         restriction_type: resolveRestrictionType(cascade.selectedDeptIds, cascade.selectedPositions, cascade.selectedUserIds),
+        is_default_onboarding: newIsDefaultOnboarding ? 1 : 0,
       });
       const sopId = sopData?.data?.id || sopData?.id;
       
@@ -216,6 +220,7 @@ export function useSOPList() {
     cascade.setSelectedUserIds([]);
     setEditAssignmentIds([]);
     setEditOriginalDeptIds([]);
+    setEditIsDefaultOnboarding(false)
   };
 
   const handleEditSave = async (sopId) => {
@@ -230,6 +235,7 @@ export function useSOPList() {
         category_id: editCategoryId || null,
         department_id: currentDeptIds.length > 0 ? currentDeptIds[0] : null,
         restriction_type: resolveRestrictionType(currentDeptIds, cascade.selectedPositions, cascade.selectedUserIds),
+        is_default_onboarding: editIsDefaultOnboarding ? 1 : 0, 
       });
 
       // Only touch the assignment records if the department selection
@@ -333,6 +339,10 @@ export function useSOPList() {
     handleArchiveSop,
     // Cascade
     cascade,
+    // Onboarding
+    newIsDefaultOnboarding,
+    setNewIsDefaultOnboarding,
+    setEditIsDefaultOnboarding,
   };
 }
 

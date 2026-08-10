@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Search, LayoutGrid, LayoutList, Plus, X } from 'lucide-react';
+import { Search, LayoutGrid, LayoutList, Plus, X, GraduationCap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useSOPList } from '@/features/sop-management/hooks/useSOPList';
@@ -55,10 +55,16 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop }) {
         <div className="flex-1">
           <Link to={`/sops/${sop.id}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline break-words leading-snug">{sop.title}</Link>
           {sop.description && <p className="mt-2 text-sm text-[var(--text-muted)] line-clamp-3">{sop.description}</p>}
-          <div className="mt-3 flex items-center gap-2 flex-wrap">
+           <div className="mt-3 flex items-center gap-2 flex-wrap">
             <span className="text-xs text-[var(--text-muted)] font-mono">{sop.sop_code}</span>
             <StatusBadge status={sop.status} />
             {sop.restriction_type && <RestrictionBadge restrictionType={sop.restriction_type} />}
+            {sop.is_default_onboarding && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+                <GraduationCap size={10} />
+                Onboarding
+              </span>
+            )}
           </div>
         </div>
         <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
@@ -74,10 +80,16 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop }) {
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3 hover:shadow-sm transition-shadow">
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <Link to={`/sops/${sop.id}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline truncate">{sop.title}</Link>
+         <Link to={`/sops/${sop.id}`} className="font-medium text-blue-600 dark:text-blue-400 hover:underline truncate">{sop.title}</Link>
           <span className="text-xs text-[var(--text-muted)] shrink-0">{sop.sop_code}</span>
           <StatusBadge status={sop.status} />
           {sop.restriction_type && <RestrictionBadge restrictionType={sop.restriction_type} />}
+          {sop.is_default_onboarding && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-500/10 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30 shrink-0">
+              <GraduationCap size={10} />
+              Onboarding
+            </span>
+          )}
         </div>
         <div className="flex gap-1 shrink-0">
           <button onClick={() => onEditStart(sop)} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors" title="Edit SOP" aria-label="Edit SOP">
@@ -104,7 +116,9 @@ function SOPListPage() {
     sops, loading, search, setSearch, status, setStatus,
     archivedTab, setArchivedTab, showCreate, setShowCreate,
     newTitle, setNewTitle, newDescription, setNewDescription, newLink, setNewLink,
-    newCategoryId, setNewCategoryId, categories, loadingCategories, filteredCategories,
+    newCategoryId, setNewCategoryId, loadingCategories, filteredCategories,
+    newIsDefaultOnboarding, setNewIsDefaultOnboarding,
+    editIsDefaultOnboarding, setEditIsDefaultOnboarding,
     editingSopId, editTitle, setEditTitle, editDescription, setEditDescription,
     editStatus, setEditStatus, editCategoryId, setEditCategoryId, handleCreate, fetchSops,
     resetForm,
@@ -244,6 +258,8 @@ function SOPListPage() {
             cascade={cascade}
             onCancel={resetForm}
             onCreate={handleCreate}
+            newIsDefaultOnboarding={newIsDefaultOnboarding}
+            setNewIsDefaultOnboarding={setNewIsDefaultOnboarding}
           />
 
           <div className="flex flex-col sm:flex-row gap-3">
@@ -319,6 +335,8 @@ function SOPListPage() {
               cascade={cascade}
               onCancel={handleEditCancel}
               onSave={handleEditSave}
+              editIsDefaultOnboarding={editIsDefaultOnboarding}
+              setEditIsDefaultOnboarding={setEditIsDefaultOnboarding}
             />
           </div>
         </div>

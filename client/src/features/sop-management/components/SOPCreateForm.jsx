@@ -17,6 +17,8 @@ function SOPCreateForm({
   cascade,
   onCancel,
   onCreate,
+  newIsDefaultOnboarding,
+  setNewIsDefaultOnboarding,
 }) {
   if (!showCreate) return null;
 
@@ -117,6 +119,21 @@ function SOPCreateForm({
                   </option>
                 ))}
               </select>
+              <div className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  id="is_default_onboarding"
+                  checked={newIsDefaultOnboarding || false}
+                  onChange={(e) => setNewIsDefaultOnboarding(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-[var(--border)] text-blue-600 focus:ring-blue-500"
+                />
+                <label htmlFor="is_default_onboarding" className="text-sm font-medium text-[var(--text-primary)]">
+                  Required for new employee onboarding
+                </label>
+              </div>
+              <p className="text-xs text-[var(--text-muted)] -mt-1">
+                New employees must read and acknowledge this SOP before accessing employee features.
+              </p>
             </div>
           </div>
         </div>
