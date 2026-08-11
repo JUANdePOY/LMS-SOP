@@ -221,7 +221,7 @@ async function handleCallback(code, userId) {
     googleEmail = null;
   }
 
-  return calendarModel.saveToken({
+  const result = await calendarModel.saveToken({
     userId,
     googleEmail,
     accessToken: tokens.access_token,
@@ -229,7 +229,40 @@ async function handleCallback(code, userId) {
     expiryDate: tokens.expiry_date,
     provider: PROVIDER,
   });
+
+  // Push existing LMS events to the freshly connected calendar so the user
+  // sees their current schedule immediately. Each event reuses the same
+  // upsert path as the manual per-event sync; failures are logged against
+  // the mapping but do not abort the connection.
+  let syncedEvents = 0;
+  try {
+    syncedEvents = await syncAllEventsForUser(userId);
+    console.log('[Calendar] Initial bulk sync complete for user', userId, '-', syncedEvents, 'event(s) pushed to Google Calendar');
+  } catch (syncErr) {
+    console.error('[Calendar] initial bulk sync failed for user', userId, syncErr.message);
+  }
+
+  return { ...result, syncedEvents };
 }
+
+  // Push every active LMS event to the user's connected Google Calendar.
+  // Returns the number of events successfully synced.
+  async function syncAllEventsForUser(userId) {
+    const events = await eventModel.findActive();
+    let synced = 0;
+    for (const event of events) {
+      try {
+        await upsertEventForUser(userId, event.id);
+        synced += 1;
+      } catch (err) {
+        console.error('[Calendar] bulk sync failed for user', userId, event.id, err.message);
+        try {
+          await calendarModel.updateMapStatus(userId, event.id, 'failed');
+        } catch { /* best effort */ }
+      }
+    }
+    return synced;
+  }
 
 module.exports = {
   SCOPES,
@@ -238,6 +271,7 @@ module.exports = {
   upsertEventForUser,
   deleteEventForUser,
   propagateEventChange,
+  syncAllEventsForUser,
   calendarModel,
   logAudit,
 };

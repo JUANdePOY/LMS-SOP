@@ -65,6 +65,13 @@ const eventModel = {
     await db.query('DELETE FROM events WHERE id = ?', [id]);
     return { id };
   },
+
+  async findActive() {
+    const [rows] = await db.query(
+      "SELECT * FROM events WHERE status = 'active' AND event_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) ORDER BY event_date ASC"
+    );
+    return rows;
+  },
 };
 
 module.exports = eventModel;

@@ -134,7 +134,6 @@ function ModuleOutlineItem({
   onToggle,
   selected,
   selectedLessonId,
-  onSelectModule,
   onSelectLesson,
   onUpdate,
   onRemove,

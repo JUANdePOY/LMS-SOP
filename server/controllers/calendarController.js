@@ -62,8 +62,8 @@ function handleCallback(req, res) {
         // Consume the state so it can't be replayed.
         return calendarModel.deleteOAuthState(state)
           .then(() => calendarService.handleCallback(code, userId))
-          .then(() => {
-            logAudit && logAudit('calendar.connect', userId, {});
+          .then((result) => {
+            logAudit && logAudit('calendar.connect', userId, { syncedEvents: result.syncedEvents || 0 });
             res.send(renderCallbackHtml(true, 'Calendar connected'));
           });
       })
