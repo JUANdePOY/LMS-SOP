@@ -29,12 +29,13 @@ const calendarModel = {
     if (!row) return null;
     const access_token = safeDecrypt(row.access_token);
     const refresh_token = safeDecrypt(row.refresh_token);
-    // Unusable (wrong key / corrupt) -> remove it so status reports
-    // disconnected and a fresh connect can INSERT a clean row encrypted with
-    // the current key. A valid row decrypts fine, so we never delete those.
+    // Unusable (wrong key / corrupt / rotated key) -> treat as not connected.
+    // We deliberately do NOT delete the row here on a plain read: a status poll
+    // can otherwise race with a fresh connect (which overwrites the row via
+    // saveToken) and silently wipe a just-stored token. Stale rows are purged
+    // explicitly by saveToken (delete-then-insert) and by deleteToken/disconnect.
     if ((row.access_token && !access_token) || (row.refresh_token && !refresh_token)) {
-      console.warn('[Calendar] Removing undecryptable token row for user', userId, 'provider', provider);
-      await this.deleteToken(userId, provider).catch(() => {});
+      console.warn('[Calendar] Undecryptable token row for user', userId, 'provider', provider, '- reconnect to replace it');
       return null;
     }
     return {
