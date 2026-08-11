@@ -1,12 +1,23 @@
 ﻿import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, Tag, FileText, Loader2, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, Loader2, Plus, Folder } from 'lucide-react';
 import { useHierarchyContext } from './HierarchyContext';
-import SopCard from './SopCard';
+import SopFile from './SopFile';
+import InlineCreateRow from './InlineCreateRow';
+import TreeConnector from './TreeConnector';
 import { getDepartmentSops } from '../../api/hierarchy.api';
 
-export default function CategoryNode({ category, departmentId, searchQuery = '' }) {
-  const { expandedCategoryIds, toggleCategory, openCreateSop } = useHierarchyContext();
+export default function CategoryNode({
+  category,
+  departmentId,
+  searchQuery = '',
+  creating = false,
+  onInlineCreateSop,
+}) {
+  const { expandedCategoryIds, toggleCategory, startCreateSop, cancelCreateSop, creatingSopFor } =
+    useHierarchyContext();
   const isExpanded = expandedCategoryIds.has(category.id);
+  const isCreatingSop =
+    creatingSopFor?.departmentId === departmentId && creatingSopFor?.categoryId === category.id;
 
   const [sops, setSops] = useState(null);
   const [loadingSops, setLoadingSops] = useState(false);
@@ -78,7 +89,7 @@ export default function CategoryNode({ category, departmentId, searchQuery = '' 
         )}
 
         <span className="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/10 shrink-0">
-          <Tag className="h-4 w-4 text-emerald-500" />
+          <Folder className="h-4 w-4 text-emerald-500" />
         </span>
 
         <div className="flex-1 min-w-0">
@@ -94,13 +105,20 @@ export default function CategoryNode({ category, departmentId, searchQuery = '' 
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            openCreateSop(departmentId, category.id);
+            if (isCreatingSop) {
+              cancelCreateSop();
+            } else {
+              if (!isExpanded) toggleCategory(category.id);
+              startCreateSop(departmentId, category.id);
+            }
           }}
-          className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-          title="Create SOP in this category"
+          disabled={creating}
+          className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+          aria-label={isCreatingSop ? 'Cancel SOP creation' : 'Create SOP'}
+          title={isCreatingSop ? 'Cancel SOP creation' : 'Create SOP'}
         >
           <Plus className="h-3 w-3" />
-          Create
+          SOP
         </button>
       </div>
 
@@ -108,9 +126,22 @@ export default function CategoryNode({ category, departmentId, searchQuery = '' 
         <div className="ml-[42px] mt-2 mb-1 border-t border-[var(--border)] pt-3">
           <div className="mb-2 flex items-center justify-between">
             <p className="mb-0 text-xs font-semibold tracking-wide text-[var(--text-muted)]">
-              SOPS {filteredSops ? `(${filteredSops.length})` : ''}
+              {category.name} SOPs {filteredSops ? `(${filteredSops.length})` : ''}
             </p>
           </div>
+
+          {isCreatingSop ? (
+            <div className="mb-2">
+              <InlineCreateRow
+                icon={FileText}
+                label="SOP"
+                defaultValue="Untitled SOP"
+                loading={creating}
+                onConfirm={(name) => onInlineCreateSop(departmentId, category.id, name)}
+                onCancel={cancelCreateSop}
+              />
+            </div>
+          ) : null}
 
           {loadingSops && (
             <div className="flex items-center gap-2 py-4 text-sm text-[var(--text-muted)]">
@@ -130,9 +161,11 @@ export default function CategoryNode({ category, departmentId, searchQuery = '' 
           )}
 
           {!loadingSops && !sopError && filteredSops && filteredSops.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filteredSops.map((sop) => (
-                <SopCard key={sop.id} sop={sop} />
+            <div className="relative border-l-2 border-[var(--border)] pl-4 space-y-0.5">
+              {filteredSops.map((sop, idx) => (
+                <TreeConnector key={sop.id} isLast={idx === filteredSops.length - 1} stubTop={15}>
+                  <SopFile sop={sop} />
+                </TreeConnector>
               ))}
             </div>
           )}
