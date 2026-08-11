@@ -17,19 +17,20 @@ function sendError(res, err, fallback = 'Request failed') {
   return res.status(code).json(body);
 }
 
-// Step 1: return OAuth consent URL. `state` is signed so the callback can verify it.
+// Step 1: return OAuth consent URL. We issue a random `state` token and store it
+// server-side (keyed by user) so the callback can verify it without depending on
+// a shared secret that may differ across worker processes.
 function getAuthUrl(req, res) {
   try {
     const userId = req.user.id;
-    const nonce = crypto.randomBytes(16).toString('hex');
-    const statePayload = Buffer.from(JSON.stringify({
-      u: userId,
-      n: nonce,
-      exp: Date.now() + 10 * 60 * 1000,
-    })).toString('base64url');
-    const state = `${statePayload}.${crypto.createHmac('sha256', process.env.JWT_SECRET).update(statePayload).digest('hex')}`;
-    const url = calendarService.buildAuthUrl(state);
-    res.json({ success: true, data: { url } });
+    const stateToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    calendarModel.saveOAuthState(userId, stateToken, expiresAt)
+      .then(() => {
+        const url = calendarService.buildAuthUrl(stateToken);
+        res.json({ success: true, data: { url } });
+      })
+      .catch((err) => sendError(res, err, 'Failed to start Google Calendar connection'));
   } catch (err) {
     sendError(res, err, 'Failed to start Google Calendar connection');
   }
@@ -51,23 +52,20 @@ function handleCallback(req, res) {
       console.error('[Calendar] Callback missing params. Query:', JSON.stringify(req.query));
       return res.status(400).send(renderCallbackHtml(false, 'Missing parameters'));
     }
-    const [payloadB64, sig] = String(state).split('.');
-    if (!payloadB64 || !sig) {
-      return res.status(400).send(renderCallbackHtml(false, 'Invalid state'));
-    }
-    const expectedSig = crypto.createHmac('sha256', process.env.JWT_SECRET).update(payloadB64).digest('hex');
-    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) {
-      return res.status(400).send(renderCallbackHtml(false, 'State verification failed'));
-    }
-    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8'));
-    if (!payload.u || payload.exp < Date.now()) {
-      return res.status(400).send(renderCallbackHtml(false, 'State expired'));
-    }
-    const userId = payload.u;
-    calendarService.handleCallback(code, userId)
-      .then(() => {
-        logAudit && logAudit('calendar.connect', userId, {});
-        res.send(renderCallbackHtml(true, 'Calendar connected'));
+    // Verify the state against the server-side record we created in getAuthUrl.
+    calendarModel.getOAuthState(state)
+      .then((row) => {
+        if (!row) {
+          return res.status(400).send(renderCallbackHtml(false, 'State verification failed'));
+        }
+        const userId = row.user_id;
+        // Consume the state so it can't be replayed.
+        return calendarModel.deleteOAuthState(state)
+          .then(() => calendarService.handleCallback(code, userId))
+          .then(() => {
+            logAudit && logAudit('calendar.connect', userId, {});
+            res.send(renderCallbackHtml(true, 'Calendar connected'));
+          });
       })
       .catch((err) => {
         sendError(res, err, 'Failed to connect calendar');

@@ -563,10 +563,25 @@ const MIGRATIONS = [
          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
          FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
          UNIQUE KEY uk_user_event (user_id, event_id),
-         INDEX idx_map_event (event_id),
-         INDEX idx_map_google (google_event_id)
-       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-   ];
+          INDEX idx_map_event (event_id),
+          INDEX idx_map_google (google_event_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+        // --- Google Calendar integration: short-lived OAuth state tokens ---
+        // Storing the issued state server-side (instead of signing it with a
+        // shared secret) avoids signature mismatches when the auth-start and
+        // callback requests are served by different worker processes.
+        `CREATE TABLE IF NOT EXISTS calendar_oauth_states (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          state_token VARCHAR(128) NOT NULL,
+          expires_at DATETIME NOT NULL,
+          created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE KEY uk_oauth_state_token (state_token),
+          INDEX idx_oauth_state_user (user_id),
+          INDEX idx_oauth_state_expires (expires_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    ];
 
 async function runMigrations() {
   const db = getPool();

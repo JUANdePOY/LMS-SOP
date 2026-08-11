@@ -111,6 +111,43 @@ const calendarModel = {
     );
     return { userId, eventId };
   },
+
+  // --- OAuth state (server-side, replaces HMAC-signed state) ---
+  async saveOAuthState(userId, stateToken, expiresAt) {
+    await db.query(
+      `INSERT INTO calendar_oauth_states (user_id, state_token, expires_at)
+       VALUES (?, ?, ?)`,
+      [userId, stateToken, expiresAt]
+    );
+    return stateToken;
+  },
+
+  // Returns the matching row if the state exists and is unexpired, else null.
+  async getOAuthState(stateToken) {
+    const [rows] = await db.query(
+      'SELECT * FROM calendar_oauth_states WHERE state_token = ?',
+      [stateToken]
+    );
+    const row = rows[0];
+    if (!row) return null;
+    if (new Date(row.expires_at).getTime() < Date.now()) return null;
+    return row;
+  },
+
+  async deleteOAuthState(stateToken) {
+    await db.query(
+      'DELETE FROM calendar_oauth_states WHERE state_token = ?',
+      [stateToken]
+    );
+    return stateToken;
+  },
+
+  // Best-effort cleanup of expired states.
+  async purgeExpiredOAuthStates() {
+    await db.query(
+      'DELETE FROM calendar_oauth_states WHERE expires_at < NOW()'
+    );
+  },
 };
 
 module.exports = calendarModel;
