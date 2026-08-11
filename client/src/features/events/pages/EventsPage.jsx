@@ -50,6 +50,32 @@ export default function EventsPage() {
     }
   }, [showCalendarModal]);
 
+  useEffect(() => {
+    const handleMessage = async (event) => {
+      if (!event?.data || event.data.type !== 'google-calendar-connected') return;
+      if (event.origin !== window.location.origin) return;
+      if (typeof calendar.loadStatus === 'function') {
+        try {
+          await calendar.loadStatus(true);
+        } catch {
+          /* ignore */
+        }
+      }
+      setShowCalendarModal(true);
+      setSyncPhase('done');
+      setSyncResult({ synced: items.length, failed: 0 });
+      calendar.markEventsSynced(items.map((i) => i.id));
+      toast.success(
+        items.length > 0
+          ? `${items.length} event${items.length === 1 ? '' : 's'} added to your Google Calendar`
+          : 'Google Calendar connected'
+      );
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [calendar, items, toast]);
+
   const selectedDayEvents = items.filter((item) => {
     if (!item.event_date || !selectedDate) return false;
     const d = new Date(item.event_date);

@@ -21,47 +21,45 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
     setBusy(true);
     setError(null);
     onConnectStart && onConnectStart();
+
+    let connectError = null;
     try {
       await connect();
-      onConnect && onConnect();
     } catch (err) {
-      // The popup-based flow can reject even though the backend actually
-      // connected (e.g. Cross-Origin-Opener-Policy blocks the popup's
-      // window.close, causing the connect promise to time out). To be
-      // robust, refresh the server-side status and check that instead of
-      // relying on the possibly-stale `status` object captured earlier.
-      try {
-        // Sometimes the status endpoint returns cached 304s or briefly lags.
-        // Retry a few times with short delays to give the backend a moment to
-        // reflect the newly stored token before declaring failure.
-        const MAX_CHECKS = 6;
-        const DELAY_MS = 500;
-        for (let i = 0; i < MAX_CHECKS; i++) {
-          try {
-            const statusRes = await getCalendarStatus(true);
-            if (statusRes.data?.success && statusRes.data.data?.connected) {
-              onConnect && onConnect();
-              return;
-            }
-          } catch (e) {
-            // ignore transient network errors and continue retrying
-          }
-          // small delay before retrying
-          await new Promise((res) => setTimeout(res, DELAY_MS));
-        }
-      } catch (e) {
-        // fall through to show the original error message below
-      }
+      connectError = err;
+    }
 
-      const code = err?.response?.data?.code;
+    let verified = false;
+    try {
+      const MAX_CHECKS = 6;
+      const DELAY_MS = 500;
+      for (let i = 0; i < MAX_CHECKS; i++) {
+        try {
+          const statusRes = await getCalendarStatus(true);
+          if (statusRes.data?.success && statusRes.data.data?.connected) {
+            verified = true;
+            break;
+          }
+        } catch (e) {
+          // ignore transient network errors and continue retrying
+        }
+        await new Promise((res) => setTimeout(res, DELAY_MS));
+      }
+    } catch (e) {
+      // fall through to show the error message below
+    }
+
+    if (verified) {
+      onConnect && onConnect();
+    } else {
+      const code = connectError?.response?.data?.code;
       if (code === "CALENDAR_DISABLED") {
         setError("Google Calendar isn't enabled on this server. Ask an admin to configure the Google OAuth credentials.");
       } else {
-        setError(err.message || "Failed to connect Google Calendar");
+        setError(connectError?.message || "Failed to connect Google Calendar");
       }
-    } finally {
-      setBusy(false);
     }
+    setBusy(false);
   };
 
   const handleDisconnect = async () => {
