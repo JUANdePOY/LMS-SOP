@@ -44,6 +44,25 @@ export function useGoogleCalendar() {
         return;
       }
 
+      const tryClosePopup = (win) => {
+        if (!win) return;
+        // Avoid accessing cross-origin properties like `location.href` which
+        // can trigger COOP console warnings. Reading `closed` is safe even
+        // for cross-origin windows in modern browsers, so use it to decide
+        // whether to call `close()`.
+        try {
+          if (typeof win.closed === "boolean" && !win.closed) {
+            try {
+              win.close();
+            } catch (e) {
+              /* ignore close errors */
+            }
+          }
+        } catch (e) {
+          // If even reading `closed` throws, give up silently.
+        }
+      };
+
       // Some hosting setups send Cross-Origin-Opener-Policy, which severs the
       // opener<->popup link and breaks both window.postMessage and popup.closed.
       // To stay resilient we poll our own /calendar/status endpoint instead of
@@ -57,7 +76,7 @@ export function useGoogleCalendar() {
           const statusRes = await getCalendarStatus();
           if (statusRes.data?.success && statusRes.data.data?.connected) {
             clearInterval(poll);
-            try { popup.close(); } catch { /* ignore */ }
+            tryClosePopup(popup);
             await loadStatus();
             resolve(true);
             return;
@@ -67,7 +86,7 @@ export function useGoogleCalendar() {
         }
         if (attempts >= MAX_ATTEMPTS) {
           clearInterval(poll);
-          try { popup.close(); } catch { /* ignore */ }
+          tryClosePopup(popup);
           // Final definitive check: the bulk sync may have just finished, so a
           // last status read decides success vs. timeout instead of guessing.
           try {

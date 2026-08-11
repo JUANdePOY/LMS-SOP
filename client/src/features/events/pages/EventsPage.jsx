@@ -23,8 +23,8 @@ export default function EventsPage() {
   const [editingItem, setEditingItem] = useState(null);
   const [saving, setSaving] = useState(false);
   // Tracks the initial bulk-sync phase shown in the Google Calendar modal:
-  // 'idle' (not connected), 'syncing' (pushing events), 'done' (finished).
-  const [syncPhase, setSyncPhase] = useState("idle");
+  // 'pending' (connected, bulk sync not yet observed), 'syncing' (pushing events), 'done' (finished).
+  const [syncPhase, setSyncPhase] = useState("pending");
   const [syncResult, setSyncResult] = useState({ synced: 0, failed: 0 });
 
   // Once the calendar reports connected, the server has already finished the
@@ -45,7 +45,7 @@ export default function EventsPage() {
   // Reset the sync summary whenever the modal is closed.
   useEffect(() => {
     if (!showCalendarModal) {
-      setSyncPhase("idle");
+      setSyncPhase("pending");
       setSyncResult({ synced: 0, failed: 0 });
     }
   }, [showCalendarModal]);
@@ -190,7 +190,7 @@ export default function EventsPage() {
           );
         }}
         onDisconnect={() => {
-          setSyncPhase("idle");
+            setSyncPhase("pending");
           setSyncResult({ synced: 0, failed: 0 });
           calendar.markEventsSynced([]);
           toast.success("Google Calendar disconnected");
