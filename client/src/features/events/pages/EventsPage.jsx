@@ -29,10 +29,14 @@ export default function EventsPage() {
 
   // Once the calendar reports connected, the server has already finished the
   // initial bulk sync — force the summary to "done" so the spinner can never
-  // get stuck if the connect callback is delayed or missed.
+  // get stuck if the connect promise/callback is delayed, missed, or blocked
+  // by Cross-Origin-Opener-Policy (which severs the popup<->opener link and
+  // can prevent the connect() promise from resolving in some browsers).
+  // Transition from ANY active phase ("syncing"/"pending"), not just "idle",
+  // otherwise the summary stays stuck on "Adding your events…".
   useEffect(() => {
     if (calendar.status.connected) {
-      setSyncPhase((prev) => (prev === "idle" ? "done" : prev));
+      setSyncPhase((prev) => (prev === "done" ? prev : "done"));
       setSyncResult((prev) => (prev.synced === 0 ? { synced: items.length, failed: 0 } : prev));
       calendar.markEventsSynced(items.map((i) => i.id));
     }

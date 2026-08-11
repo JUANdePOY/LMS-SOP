@@ -24,6 +24,15 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
       await connect();
       onConnect && onConnect();
     } catch (err) {
+      // The popup-based flow can reject even though the backend actually
+      // connected (e.g. Cross-Origin-Opener-Policy blocks the popup's
+      // window.close, causing the connect promise to time out). If the
+      // status now reports connected, treat it as success rather than
+      // showing a misleading failure.
+      if (status.connected) {
+        onConnect && onConnect();
+        return;
+      }
       const code = err?.response?.data?.code;
       if (code === 'CALENDAR_DISABLED') {
         setError("Google Calendar isn't enabled on this server. Ask an admin to configure the Google OAuth credentials.");
