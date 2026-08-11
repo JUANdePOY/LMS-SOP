@@ -24,14 +24,16 @@ export default function CourseListRow({ course, onClick, myProgress }) {
       aria-label={course.title ? `Open course ${course.title}` : "Open course"}
       onClick={onClick}
       onKeyDown={handleKeyDown}
-      className="group cursor-pointer rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      className="group cursor-pointer rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 hover:border-blue-200 dark:hover:border-blue-800 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
     >
-      <div className="flex items-center gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 relative overflow-hidden">
+      <div className="flex items-center gap-3 sm:gap-4">
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 sm:h-16 sm:w-16">
           {course.thumbnail_url ? (
-            <img src={resolveFileUrl(course.thumbnail_url)} alt={course.title} className="h-full w-full rounded-md object-cover" />
+            <img src={resolveFileUrl(course.thumbnail_url)} alt={course.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
           ) : (
-            <BookOpen size={20} className="text-blue-600 dark:text-blue-400" />
+            <div className="flex h-full w-full items-center justify-center">
+              <BookOpen size={20} className="text-blue-600 dark:text-blue-400" />
+            </div>
           )}
           <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity">
             <div className="rounded-full bg-white dark:bg-neutral-800 p-1.5 shadow-lg">
@@ -40,42 +42,40 @@ export default function CourseListRow({ course, onClick, myProgress }) {
           </div>
         </div>
 
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate group-hover:text-blue-600 transition-colors">
+            <div className="flex min-w-0 items-center gap-2">
+              <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100 group-hover:text-blue-600 transition-colors">
                 {course.title || "Untitled Course"}
               </h3>
               <Badge variant={difficultyMeta.variant} className="shrink-0">{difficultyMeta.label}</Badge>
               {course.category && (
-                <Badge variant="outline" className="shrink-0 hidden sm:inline-flex">{course.category}</Badge>
+                <Badge variant="outline" className="shrink-0 hidden md:inline-flex">{course.category}</Badge>
               )}
             </div>
-            <ChevronRight size={14} className="text-neutral-400 group-hover:text-neutral-600 shrink-0" />
+            <ChevronRight size={16} className="shrink-0 text-neutral-400 group-hover:text-neutral-600 transition-colors" />
           </div>
 
-          <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-1 mt-0.5">
+          <p className="mt-1 line-clamp-1 text-xs text-neutral-600 dark:text-neutral-400">
             {course.description || "No description provided"}
           </p>
 
-          <div className="mt-2">
-            <div className="mb-1 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
-              <span className="inline-flex items-center gap-1">
-                <BarChart3 size={10} />
-                {avgProgress}% {isEnrolled ? "your progress" : "avg progress"}
-              </span>
-              <span className="inline-flex items-center gap-3">
-                <span className="inline-flex items-center gap-1">
-                  <Users size={10} />
-                  {enrollments} enrolled
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <CheckCircle2 size={10} />
-                  {completed} completed
-                </span>
-              </span>
+          <div className="mt-2 flex items-center gap-3">
+            <div className="flex-1">
+              <ProgressBar value={avgProgress} />
             </div>
-            <ProgressBar value={avgProgress} />
+            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+              <BarChart3 size={11} />
+              {avgProgress}%
+            </span>
+            <span className="hidden items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400 sm:inline-flex" title="Enrollments">
+              <Users size={11} />
+              {enrollments}
+            </span>
+            <span className="hidden items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400 sm:inline-flex" title="Completed">
+              <CheckCircle2 size={11} />
+              {completed}
+            </span>
           </div>
         </div>
       </div>

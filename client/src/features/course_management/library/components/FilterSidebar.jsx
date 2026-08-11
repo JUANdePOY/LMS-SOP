@@ -30,10 +30,15 @@ function Chip({ active, label, onClick }) {
   );
 }
 
-function Section({ title, children }) {
+function Section({ title, count, children }) {
   return (
-    <div className="space-y-2">
-      <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">{title}</h4>
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">{title}</h4>
+        {count != null && (
+          <span className="text-[11px] text-neutral-400">{count}</span>
+        )}
+      </div>
       {children}
     </div>
   );
@@ -59,16 +64,16 @@ export default function FilterSidebar({
   if (!open) return null;
 
   return (
-    <aside className="w-full lg:w-72 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm" aria-label="Course filters">
-      <div>
-        <div className="mb-4 flex items-center justify-between">
+    <aside className="hidden w-full lg:block lg:w-72 shrink-0" aria-label="Course filters">
+      <div className="sticky top-[5.5rem] max-h-[calc(100vh-7rem)] overflow-y-auto rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm">
+        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-4 py-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-neutral-800 dark:text-neutral-100">
-            <SlidersHorizontal size={16} />
+            <SlidersHorizontal size={16} className="text-neutral-500 dark:text-neutral-400" />
             Filters
           </div>
           <div className="flex items-center gap-2">
             {hasActiveFilters && (
-              <button onClick={onClear} className="text-xs text-blue-600 hover:underline dark:text-blue-400">
+              <button onClick={onClear} className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">
                 Clear all
               </button>
             )}
@@ -77,14 +82,14 @@ export default function FilterSidebar({
                 <X size={16} />
               </button>
             )}
-            <button onClick={onClose} aria-label="Close filters" className="text-neutral-400 hover:text-neutral-700">
+            <button onClick={onClose} aria-label="Close filters" className="text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200">
               <X size={16} />
             </button>
           </div>
         </div>
 
-        <div className="space-y-5">
-          <Section title="Difficulty">
+        <div className="space-y-5 p-4">
+          <Section title="Difficulty" count={`${selectedDifficulties.length}/${DIFFICULTIES.length}`}>
             <div className="flex flex-wrap gap-2">
               {DIFFICULTIES.map((d) => (
                 <Chip
@@ -97,7 +102,7 @@ export default function FilterSidebar({
             </div>
           </Section>
 
-          <Section title="Category">
+          <Section title="Category" count={selectedCategories.length || undefined}>
             <div className="flex flex-wrap gap-2">
               {categories.map((c) => (
                 <Chip
@@ -121,19 +126,24 @@ export default function FilterSidebar({
                   type="button"
                   onClick={() => onSortChange(opt.value)}
                   aria-pressed={sortField === opt.value}
-                  className={`rounded-lg border px-3 py-1.5 text-left text-xs transition-colors ${
+                  className={`flex items-center justify-between rounded-lg border px-3 py-1.5 text-left text-xs transition-colors ${
                     sortField === opt.value
                       ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/20 dark:text-blue-300"
                       : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
                   }`}
                 >
                   {opt.label}
+                  {sortField === opt.value && (
+                    <span className="text-[10px] uppercase tracking-wide opacity-80">
+                      {sortDirection === "asc" ? "Asc" : "Desc"}
+                    </span>
+                  )}
                 </button>
               ))}
               <button
                 type="button"
                 onClick={onToggleDirection}
-                className="mt-1 self-start text-xs text-neutral-500 hover:text-neutral-700"
+                className="mt-1 self-start text-xs text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300"
               >
                 Direction: {sortDirection === "asc" ? "Ascending ↑" : "Descending ↓"}
               </button>

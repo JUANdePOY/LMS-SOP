@@ -32,7 +32,13 @@ const ImageResizable = Image.extend({
       width: {
         default: null,
         parseHTML: (el) => el.getAttribute('data-width') || el.style.width || null,
-        renderHTML: (attrs) => (attrs.width ? { 'data-width': attrs.width, style: `width: ${attrs.width}` } : {}),
+        // NOTE: intentionally no `style` output here. Tiptap merges every
+        // attribute's renderHTML() into one flat HTMLAttributes object
+        // before the node's own renderHTML() runs — a `style: width:...`
+        // here previously got forwarded onto the <img> (via `inheritedStyle`
+        // below) and silently shrank the image inside its own figure. The
+        // figure's width is applied explicitly in renderHTML() instead.
+        renderHTML: (attrs) => (attrs.width ? { 'data-width': attrs.width } : {}),
       },
       align: {
         default: 'center',
@@ -57,18 +63,35 @@ const ImageResizable = Image.extend({
   },
 
   renderHTML({ HTMLAttributes }) {
-    const { caption, 'data-align': dataAlign, 'data-width': dataWidth, style: inheritedStyle, ...imgAttrs } = HTMLAttributes;
+    const { caption, 'data-align': dataAlign, 'data-width': dataWidth, ...imgAttrs } = HTMLAttributes;
+    const align = dataAlign || 'center';
+
     const children = [['img', {
       ...imgAttrs,
-      style: `width: 100%; height: auto; display: block; ${inheritedStyle || ''}`.trim(),
+      style: 'width: 100%; height: auto; display: block;',
     }]];
     if (caption) children.push(['figcaption', {}, caption]);
 
-    const figureAttrs = { class: 'sop-image-figure', 'data-align': dataAlign || 'center' };
-    if (dataWidth) {
-      figureAttrs.style = `width: ${dataWidth}; max-width: 100%;`;
-      figureAttrs['data-width'] = dataWidth;
-    }
+    // Bake the chosen alignment directly into the figure's own inline style
+    // (as margin, not just the data-align attribute) so it renders correctly
+    // anywhere this HTML is dropped — PublicModuleCard, LessonPage, PDF
+    // export, etc. — without depending on an external stylesheet matching
+    // `data-align`, which is what let editor and public views drift apart.
+    const ALIGN_MARGIN = {
+      left: 'margin-left: 0; margin-right: auto;',
+      center: 'margin-left: auto; margin-right: auto;',
+      right: 'margin-left: auto; margin-right: 0;',
+    };
+
+    const figureAttrs = { class: 'sop-image-figure', 'data-align': align };
+    // Match ImageNodeView's own fallback (width || '60%') so an image the
+    // user never explicitly resized renders at the same box size here as it
+    // did live in the editor — otherwise it's full-bleed in the persisted
+    // HTML, which leaves no room for the alignment margin to do anything.
+    const widthPart = `width: ${dataWidth || '60%'}; max-width: 100%;`;
+    figureAttrs.style = `${widthPart} ${ALIGN_MARGIN[align] || ALIGN_MARGIN.center}`;
+    if (dataWidth) figureAttrs['data-width'] = dataWidth;
+
     return ['figure', figureAttrs, ...children];
   },
 

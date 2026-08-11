@@ -28,6 +28,7 @@ async function getSopsColumns() {
       hasIsPublished: cols.has('is_published'),
       hasIsArchived: cols.has('is_archived'),
       hasRestrictionType: cols.has('restriction_type'),
+      hasDefaultOnboarding: cols.has('is_default_onboarding'),
     };
   }
   return sopsColumns;
@@ -131,13 +132,41 @@ async function canAccessSop(sop, user) {
   return false;
 }
 
+// department_id now matches BOTH the SOP's legacy single "owner" department
+// (sops.department_id) AND any department it's been assigned to via the
+// sop_assignments -> sop_versions -> assignment_departments join. Previously
+// this only matched the owner column, so multi-department assignments were
+// invisible in any department other than the one the SOP was created under.
+//
+// When department_id is provided, each row also gets `is_owner_department`
+// (1/0) so callers (the hierarchy view) can visually distinguish "this
+// department owns the SOP" from "this SOP was assigned here."
 async function findAll(filters = {}) {
   const cols = await getSopsColumns();
   const { search, status, department_id, category_id, exclude_status, page = 1, limit = 20, user } = filters;
   const offset = (page - 1) * limit;
 
+ // is_assigned_department is purely about the sop_assignments /
+  // assignment_departments join — it does NOT check the legacy
+  // sops.department_id owner column. So a SOP gets the "Assigned" badge in
+  // every department it was explicitly assigned to, including a department
+  // that also happens to be its owner.
+  const assignedFlagSelect = (department_id && cols.hasDepartment)
+    ? `, EXISTS (
+        SELECT 1
+        FROM sop_assignments sa
+        INNER JOIN sop_versions sv ON sv.sop_id = s.id
+        INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
+        WHERE sa.sop_version_id = sv.id
+          AND sv.is_current = TRUE
+          AND sv.deleted_at IS NULL
+          AND sa.is_deleted = FALSE
+          AND ad.department_id = ?
+      ) AS is_assigned_department`
+    : '';
+
   let sql = `
-    SELECT s.*, d.name AS department_name, c.name AS category_name, u.full_name AS owner_name
+    SELECT s.*, d.name AS department_name, c.name AS category_name, u.full_name AS owner_name${assignedFlagSelect}
     FROM sops s
     LEFT JOIN departments d ON s.department_id = d.id
     LEFT JOIN categories c ON s.category_id = c.id
@@ -145,6 +174,12 @@ async function findAll(filters = {}) {
     WHERE ${notDeletedClause(cols)}
   `;
   const params = [];
+
+  // Must be pushed first: this placeholder sits in the SELECT clause, which
+  // is textually before every other `?` added below.
+  if (assignedFlagSelect) {
+    params.push(department_id);
+  }
 
   if (search) {
     sql += ' AND (s.title LIKE ? OR s.' + cols.code + ' LIKE ? OR s.description LIKE ?)';
@@ -159,8 +194,21 @@ async function findAll(filters = {}) {
     params.push(exclude_status);
   }
   if (department_id && cols.hasDepartment) {
-    sql += ' AND s.department_id = ?';
-    params.push(department_id);
+    sql += ` AND (
+      s.department_id = ?
+      OR EXISTS (
+        SELECT 1
+        FROM sop_assignments sa
+        INNER JOIN sop_versions sv ON sv.sop_id = s.id
+        INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
+        WHERE sa.sop_version_id = sv.id
+          AND sv.is_current = TRUE
+          AND sv.deleted_at IS NULL
+          AND sa.is_deleted = FALSE
+          AND ad.department_id = ?
+      )
+    )`;
+    params.push(department_id, department_id);
   }
   if (category_id && cols.hasCategory) {
     sql += ' AND s.category_id = ?';
@@ -194,8 +242,21 @@ async function findAll(filters = {}) {
     countParams.push(status);
   }
   if (department_id && cols.hasDepartment) {
-    countSql += ' AND s.department_id = ?';
-    countParams.push(department_id);
+    countSql += ` AND (
+      s.department_id = ?
+      OR EXISTS (
+        SELECT 1
+        FROM sop_assignments sa
+        INNER JOIN sop_versions sv ON sv.sop_id = s.id
+        INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
+        WHERE sa.sop_version_id = sv.id
+          AND sv.is_current = TRUE
+          AND sv.deleted_at IS NULL
+          AND sa.is_deleted = FALSE
+          AND ad.department_id = ?
+      )
+    )`;
+    countParams.push(department_id, department_id);
   }
   if (category_id && cols.hasCategory) {
     countSql += ' AND s.category_id = ?';
@@ -266,11 +327,13 @@ async function create(data) {
     status = 'Draft',
     version,
     restriction_type,
+    is_default_onboarding,
   } = data;
 
   const insertCols = ['title', cols.code, 'description', 'department_id', 'category_id', cols.owner, 'status'];
   const insertVals = [title, code || null, description || null, department_id || null, category_id || null, owner_user_id || null, status || 'Draft'];
   if (cols.hasRestrictionType) { insertCols.push('restriction_type'); insertVals.push(restriction_type || 'public'); }
+  if (cols.hasDefaultOnboarding) { insertCols.push('is_default_onboarding'); insertVals.push(is_default_onboarding ? 1 : 0); }
 
   // The real table has BOTH owner_user_id (nullable) and owner_id
   // (NOT NULL, no default). getSopsColumns() only detects/writes whichever
@@ -317,6 +380,7 @@ async function update(id, data) {
 
   const allowedFields = ['title', cols.code, 'description', 'department_id', 'category_id', 'status'];
   if (cols.hasRestrictionType) { allowedFields.push('restriction_type'); }
+  if (cols.hasDefaultOnboarding) { allowedFields.push('is_default_onboarding'); }
   for (const field of allowedFields) {
     if (data[field] !== undefined) {
       sets.push(`${field} = ?`);

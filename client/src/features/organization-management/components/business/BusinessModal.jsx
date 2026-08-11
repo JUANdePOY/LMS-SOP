@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+﻿import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import BusinessForm from './BusinessForm';
 
@@ -11,12 +11,11 @@ export default function BusinessModal({ open, onClose, onSubmit, initialData, lo
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    document.body.classList.add('modal-open');
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
-      document.body.style.overflow = previousOverflow;
+      document.body.classList.remove('modal-open');
     };
   }, [open, onClose, loading]);
 

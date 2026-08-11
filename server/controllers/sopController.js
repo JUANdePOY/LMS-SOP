@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const sopService = require('../services/sopService');
 const sopModuleService = require('../services/sopModuleService');
@@ -12,6 +13,9 @@ const sopAssignmentService = require('../services/sopAssignmentService');
 const sopAcknowledgementService = require('../services/sopAcknowledgementService');
 const approvalWorkflowController = require('../controllers/approvalWorkflowController');
 const { validateShareLinkPayload } = require('../validators/sopShareValidator');
+const businessModel = require('../models/businessModel');
+const departmentModel = require('../models/departmentModel');
+const { createRoot } = require('../utils/dom');
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
@@ -23,6 +27,7 @@ function handleError(res, error) {
     code === 'FORBIDDEN' ? 403 :
     code === 'APPROVAL_PENDING' ? 400 :
     code === 'INVALID_TRANSITION' ? 400 :
+    code === 'INVALID_SOP_STATUS' ? 400 :
     code === 'WORKFLOW_NOT_FOUND' ? 404 :
     code === 'DUPLICATE_ACKNOWLEDGEMENT' ? 409 :
     code === 'DUPLICATE_ASSIGNMENT' ? 409 :
@@ -533,7 +538,7 @@ const acknowledgementController = {
  * ---- PDF export styling constants ----
  */
 const PDF_COLORS = {
-  accent: '#1F4E8C',
+  accent: '#F25C05',
   accentDark: '#173D6E',
   text: '#1A1A1A',
   muted: '#6B7280',
@@ -550,6 +555,8 @@ const STATUS_COLORS = {
   Archived: '#6B7280',
   Deprecated: '#DC2626',
 };
+
+const DEFAULT_LOGO_PATH = path.join(__dirname, '../../public/AirForce-logo.png');
 
 function getStatusColor(status) {
   return STATUS_COLORS[status] || PDF_COLORS.muted;
@@ -571,40 +578,36 @@ function ensureSpace(doc, minHeight) {
  * Draws the full-width cover header (title, code, status pill) used at the
  * top of the first page.
  */
-function drawCoverHeader(doc, sop) {
+function drawCoverHeader(doc, sop, logoBuffer, logoMimeType) {
   const bandHeight = 96;
   const pageWidth = doc.page.width;
+  const margin = doc.page.margins.left;
 
   doc.rect(0, 0, pageWidth, bandHeight).fill(PDF_COLORS.accent);
+
+  // --- Draw Logo ---
+  const logoMaxWidth = 90;
+  const logoMaxHeight = 60;
+  const logoX = pageWidth - margin - logoMaxWidth;
+  const logoY = 18;
+
+  if (logoBuffer) {
+    try {
+      doc.image(logoBuffer, logoX, logoY, {
+        fit: [logoMaxWidth, logoMaxHeight],
+        align: 'right',
+      });
+    } catch {
+      // skip if unrenderable
+    }
+  }
 
   doc.fillColor(PDF_COLORS.white)
     .font('Helvetica-Bold')
     .fontSize(22)
-    .text(sop.title || 'SOP', doc.page.margins.left, 26, {
-      width: pageWidth - doc.page.margins.left - doc.page.margins.right - 110,
+    .text(sop.title || 'SOP', margin, 26, {
+      width: pageWidth - margin - margin - 110,
     });
-
-  if (sop.code) {
-    doc.font('Helvetica')
-      .fontSize(10)
-      .fillColor('#D6E4F5')
-      .text(sop.code, doc.page.margins.left, 58);
-  }
-
-  if (sop.status) {
-    const label = String(sop.status);
-    doc.font('Helvetica-Bold').fontSize(9);
-    const pillPaddingX = 10;
-    const pillWidth = doc.widthOfString(label) + pillPaddingX * 2;
-    const pillHeight = 20;
-    const pillX = pageWidth - doc.page.margins.right - pillWidth;
-    const pillY = 28;
-    doc.roundedRect(pillX, pillY, pillWidth, pillHeight, 10).fill(getStatusColor(sop.status));
-    doc.fillColor(PDF_COLORS.white).text(label, pillX, pillY + 5, {
-      width: pillWidth,
-      align: 'center',
-    });
-  }
 
   doc.fillColor(PDF_COLORS.text);
   doc.y = bandHeight + 24;
@@ -684,80 +687,417 @@ function drawSectionHeading(doc, label) {
  * Returns true if any content was rendered, false otherwise.
  */
 function renderModuleContentForPdf(html, imageCache, doc) {
-  // Split HTML into text segments and <img> tags
-  const imgTagRegex = /(<img[^>]+>)/g;
-  const parts = html.split(imgTagRegex);
+  if (!html || !html.trim()) return false;
+
+  const $ = createRoot(html);
   let hasContent = false;
   const startX = doc.page.margins.left;
+  const width = contentWidthOf(doc);
 
-  for (const part of parts) {
-    const trimmed = part.trim();
-    if (!trimmed) continue;
+  // Known block-level tags we handle explicitly
+  const BLOCK_TAGS = new Set([
+    'h2', 'h3', 'h4', 'h5', 'h6',
+    'p', 'ul', 'ol', 'li',
+    'blockquote',
+    'figure', 'figcaption',
+    'table', 'thead', 'tbody', 'tr', 'th', 'td',
+    'br',
+    'div', 'section', 'article', 'main', 'aside', 'header', 'footer', 'nav',
+  ]);
 
-    // Check if this part is an <img> tag
-    const imgMatch = trimmed.match(/<img[^>]+src="([^"]+)"[^>]*>/);
-    if (imgMatch) {
-      const src = imgMatch[1];
-      const idMatch = src.match(/\/api\/sops\/attachments\/(\d+)\/file/);
-      if (idMatch) {
-        const attId = parseInt(idMatch[1], 10);
-        const image = imageCache.get(attId);
-        if (image) {
-          try {
-            const maxWidth = contentWidthOf(doc);
-            const maxHeight = 300;
+  function renderTextNode(text, x, w, fontSize, font, color, lineGap) {
+    if (!text) return;
+    doc.fillColor(color || PDF_COLORS.text)
+       .font(font || 'Helvetica')
+       .fontSize(fontSize || 10);
+    doc.text(text, x, doc.y, { width: w, lineGap: lineGap || 4 });
+  }
 
-            // doc.image()/{fit:...} does NOT auto-paginate — it just draws
-            // at the current y, so a tall image can run straight through
-            // the bottom margin and overlap the footer/next content. Work
-            // out the actual scaled height up front so ensureSpace can
-            // trigger a real page break when it won't fit.
-            let renderHeight = maxHeight;
-            try {
-              const dims = doc.openImage(image.data);
-              if (dims && dims.width && dims.height) {
-                const scale = Math.min(maxWidth / dims.width, maxHeight / dims.height, 1);
-                renderHeight = dims.height * scale;
-              }
-            } catch {
-              // Unknown dims — fall back to the worst-case (max) height.
-            }
+  function getTextAlign($node) {
+    const style = $node.attr('style') || '';
+    const match = style.match(/text-align:\s*(left|center|right|justify)/i);
+    if (match) return match[1].toLowerCase();
+    return 'left';
+  }
 
-            ensureSpace(doc, renderHeight + 16);
-            doc.image(image.data, {
-              fit: [maxWidth, maxHeight],
-              align: 'center',
-            });
-            doc.x = startX;
-            doc.moveDown(0.5);
+  function processNode(node) {
+    const tag = node.tagName?.toLowerCase();
+    if (!tag) return;
+
+    switch (tag) {
+             case 'h2': {
+          doc.fillColor(PDF_COLORS.text).font('Helvetica-Bold').fontSize(16);
+          const text = $(node).text().trim();
+          if (text) {
+            doc.text(text, startX, doc.y, { width, lineGap: 4, align: getTextAlign($(node)) });
+            doc.moveDown(1.0);
             hasContent = true;
-          } catch {
-            // Skip images that can't be embedded
+          }
+          break;
+        }
+      case 'h3': {
+          doc.fillColor(PDF_COLORS.text).font('Helvetica-Bold').fontSize(14);
+          const text = $(node).text().trim();
+          if (text) {
+            doc.text(text, startX, doc.y, { width, lineGap: 4, align: getTextAlign($(node)) });
+            doc.moveDown(0.8);
+            hasContent = true;
+          }
+          break;
+        }
+      case 'h4':
+        case 'h5':
+        case 'h6': {
+          doc.fillColor(PDF_COLORS.text).font('Helvetica-Bold').fontSize(12);
+          const text = $(node).text().trim();
+          if (text) {
+            doc.text(text, startX, doc.y, { width, lineGap: 4, align: getTextAlign($(node)) });
+            doc.moveDown(0.6);
+            hasContent = true;
+          }
+          break;
+        }
+        
+        case 'p': {
+          renderInlineContent($, node, doc, {
+            fontSize: 10,
+            font: 'Helvetica',
+            width,
+            x: startX,
+            lineGap: 4,
+            align: getTextAlign($(node)),
+          });
+          doc.moveDown(0.6);
+          hasContent = true;
+          break;
+        }
+
+      case 'ul':
+      case 'ol': {
+        const isOrdered = tag === 'ol';
+        const isTaskList = $(node).attr('data-type') === 'taskList';
+        const items = $(node).find('li').toArray();
+
+        items.forEach((li, idx) => {
+          ensureSpace(doc, 20);
+          const bulletX = startX + 4;
+          const textX = startX + 22;
+
+          if (isTaskList) {
+            const checked = $(li).attr('data-checked') === 'true';
+            doc.rect(bulletX, doc.y + 2, 12, 12).lineWidth(1).stroke(PDF_COLORS.muted);
+            if (checked) {
+              doc.moveTo(bulletX + 2, doc.y + 6)
+                 .lineTo(bulletX + 6, doc.y + 10)
+                 .lineTo(bulletX + 12, doc.y + 3)
+                 .lineWidth(1.5).stroke(PDF_COLORS.accent);
+            }
+          } else {
+            const bullet = isOrdered ? `${idx + 1}.` : '\u2022';
+            doc.fillColor(PDF_COLORS.text).font('Helvetica-Bold').fontSize(10);
+            doc.text(bullet, bulletX, doc.y, { width: 16, align: 'right' });
+          }
+
+          renderInlineContent($, li, doc, {
+            fontSize: 10,
+            font: 'Helvetica',
+            width: width - 22,
+            x: textX,
+            lineGap: 3,
+          });
+          doc.moveDown(0.4);
+          hasContent = true;
+        });
+        doc.moveDown(0.4);
+        break;
+      }
+      case 'blockquote': {
+          const quoteX = startX + 12;
+          const quoteWidth = width - 12;
+          const quoteY = doc.y;
+
+          doc.moveTo(quoteX - 8, quoteY)
+             .lineTo(quoteX - 8, quoteY + 20)
+             .lineWidth(2)
+             .stroke(PDF_COLORS.muted);
+
+          renderInlineContent($, node, doc, {
+            fontSize: 10,
+            font: 'Helvetica-Oblique',
+            width: quoteWidth,
+            x: quoteX,
+            color: PDF_COLORS.muted,
+            lineGap: 3,
+            align: getTextAlign($(node)),
+          });
+          doc.moveDown(0.6);
+          hasContent = true;
+          break;
+        }
+      case 'figure': {
+        renderFigure($, node, doc, imageCache, startX, width);
+        hasContent = true;
+        break;
+      }
+      case 'table': {
+        renderTable($, node, doc, startX, width);
+        hasContent = true;
+        break;
+      }
+      case 'br': {
+        doc.moveDown(0.4);
+        hasContent = true;
+        break;
+      }
+      default: {
+        // Container wrapper — recurse into children
+        const children = $(node).children();
+        if (children.length > 0) {
+          children.each((i, child) => processNode(child));
+        } else {
+          // Leaf node — render text if any
+          const text = $(node).text().trim();
+          if (text) {
+            renderTextNode(text, startX, width, 10, 'Helvetica', PDF_COLORS.text, 4);
+            doc.moveDown(0.3);
+            hasContent = true;
           }
         }
       }
-      continue;
     }
+  }
 
-    // Plain text segment — strip remaining HTML tags
-    const text = trimmed
-      .replace(/<[^>]*>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/&amp;/g, '&')
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .trim();
-
-    if (text) {
-      doc.fillColor(PDF_COLORS.text).fontSize(10).font('Helvetica')
-        .text(text, startX, doc.y, { width: contentWidthOf(doc), align: 'justify', lineGap: 4 });
-      doc.x = startX;
-      hasContent = true;
+  // Start from root children — this covers TipTap's root wrapper
+  try {
+    $.root().children().each((i, el) => processNode(el));
+  } catch (err) {
+    console.error('[PDF] renderModuleContentForPdf error:', err.message);
+    const allText = $.root().text().trim();
+    if (allText) {
+      const paragraphs = allText.split(/\n+/).filter(p => p.trim());
+      paragraphs.forEach((para) => {
+        ensureSpace(doc, 20);
+        doc.fillColor(PDF_COLORS.text).font('Helvetica').fontSize(10);
+        doc.text(para.trim(), startX, doc.y, { width, lineGap: 4 });
+        doc.moveDown(0.5);
+        hasContent = true;
+      });
+    }
+  }
+  // Fallback: if no structured content was rendered, dump all text as paragraphs
+  if (!hasContent) {
+    const allText = $.root().text().trim();
+    if (allText) {
+      const paragraphs = allText.split(/\n+/).filter(p => p.trim());
+      paragraphs.forEach((para) => {
+        ensureSpace(doc, 20);
+        renderTextNode(para.trim(), startX, width, 10, 'Helvetica', PDF_COLORS.text, 4);
+        doc.moveDown(0.5);
+        hasContent = true;
+      });
     }
   }
 
   return hasContent;
+}
+
+function extractTextSegments($, el) {
+  const segments = [];
+
+  $(el).contents().each((i, child) => {
+    if (child.type === 'text') {
+      let text = (child.data || '')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (text) segments.push({ text, bold: false, italic: false, underline: false, link: null });
+    } else if (child.type === 'tag') {
+      const tag = child.tagName?.toLowerCase();
+      const isBold = ['strong', 'b'].includes(tag);
+      const isItalic = ['em', 'i'].includes(tag);
+      const isUnderline = ['u', 'ins'].includes(tag);
+      const isLink = tag === 'a';
+
+      if (isLink) {
+        const href = child.attribs?.href || '';
+        const text = $(child).text().replace(/&nbsp;/g, ' ').trim();
+        if (text) segments.push({ text, bold: false, italic: false, underline: true, link: href });
+      } else if (isBold || isItalic || isUnderline) {
+        const nested = extractTextSegments($, child);
+        nested.forEach(seg => {
+          if (isBold) seg.bold = true;
+          if (isItalic) seg.italic = true;
+          if (isUnderline) seg.underline = true;
+        });
+        segments.push(...nested);
+      } else {
+        segments.push(...extractTextSegments($, child));
+      }
+    }
+  });
+
+  return segments;
+}
+
+function renderInlineContent($, el, doc, options = {}) {
+  const {
+    fontSize = 10,
+    font = 'Helvetica',
+    width = contentWidthOf(doc),
+    x = doc.page.margins.left,
+    color = PDF_COLORS.text,
+    lineGap = 4,
+    align = 'left',
+  } = options;
+
+    const segments = extractTextSegments($, el);
+  if (segments.length === 0) return;
+
+  let isFirst = true;
+  for (const seg of segments) {
+    const segFont = seg.bold ? 'Helvetica-Bold' : seg.italic ? 'Helvetica-Oblique' : font;
+    doc.font(segFont).fontSize(fontSize).fillColor(seg.link ? '#4f46e5' : color);
+
+    const underline = (seg.underline || seg.link) ? { color: seg.link ? '#4f46e5' : color } : false;
+
+    if (isFirst) {
+      doc.text(seg.text, x, doc.y, { width, lineGap, align, continued: true, underline });
+      isFirst = false;
+    } else {
+      doc.text(seg.text, undefined, undefined, { lineGap, align, continued: true, underline });
+    }
+  }
+  doc.text('', undefined, undefined);
+  doc.x = x;
+}
+
+function renderFigure($, el, doc, imageCache, startX, width) {
+  const figure = $(el);
+  const img = figure.find('img').first();
+  const figcaption = figure.find('figcaption').first();
+
+  const src = img.attr('src') || '';
+  const idMatch = src.match(/\/api\/sops\/attachments\/(\d+)\/file/);
+
+  if (!idMatch) return;
+
+  const attId = parseInt(idMatch[1], 10);
+  const image = imageCache.get(attId);
+  if (!image) return;
+
+  let align = 'center';
+const dataAlign = figure.attr('data-align');
+if (dataAlign) {
+  align = dataAlign.toLowerCase().trim();
+} else {
+  const style = (figure.attr('style') || '').toLowerCase();
+  if (style.includes('margin-left: 0') && style.includes('margin-right: auto')) {
+    align = 'left';
+  } else if (style.includes('margin-left: auto') && style.includes('margin-right: 0')) {
+    align = 'right';
+  }
+}
+
+  const dataWidth = figure.attr('data-width') || '60%';
+
+  let imgWidth = width * 0.6;
+  if (dataWidth.endsWith('%')) {
+    imgWidth = width * (parseInt(dataWidth) / 100);
+  }
+
+  const maxWidth = Math.min(imgWidth, width);
+  const maxHeight = 300;
+
+  let renderHeight = maxHeight;
+  try {
+    const dims = doc.openImage(image.data);
+    if (dims && dims.width && dims.height) {
+      const scale = Math.min(maxWidth / dims.width, maxHeight / dims.height, 1);
+      renderHeight = dims.height * scale;
+    }
+  } catch {
+    // fallback
+  }
+
+  ensureSpace(doc, renderHeight + 16);
+
+  let imgX = startX;
+  if (align === 'center') {
+    imgX = startX + (width - maxWidth) / 2;
+  } else if (align === 'right') {
+    imgX = startX + width - maxWidth;
+  }
+
+  doc.image(image.data, imgX, doc.y, {
+    fit: [maxWidth, maxHeight],
+    align: align,
+  });
+  doc.x = startX;
+  doc.moveDown(0.5);
+
+  const caption = figcaption.text().trim();
+  if (caption) {
+    doc.fillColor(PDF_COLORS.muted).font('Helvetica-Oblique').fontSize(9);
+    doc.text(caption, startX, doc.y, { width, align: align === 'center' ? 'center' : align, lineGap: 3 });
+    doc.moveDown(0.5);
+  }
+}
+
+function renderTable($, el, doc, startX, width) {
+  const $rows = $('tr', el);
+  if (!$rows.length) return;
+
+  const rowHeight = 28;
+  const padding = 8;
+  const colCount = Math.max(...$rows.map((i, tr) => $('td, th', tr).length).get()) || 1;
+  const colWidth = width / colCount;
+
+  let totalHeight = 0;
+  $rows.each((i, tr) => {
+    totalHeight += rowHeight;
+  });
+
+  ensureSpace(doc, totalHeight + 20);
+
+  $rows.each((i, tr) => {
+    const $cells = $('td, th', tr);
+    let colIdx = 0;
+
+    $cells.each((j, cell) => {
+      const isHeader = cell.tagName?.toLowerCase() === 'th';
+      const cellX = startX + colIdx * colWidth;
+      const cellWidth = colWidth;
+      const cellY = doc.y;
+
+      if (isHeader) {
+        doc.rect(cellX, cellY, cellWidth, rowHeight).fill(PDF_COLORS.lightBg);
+      }
+
+      doc.rect(cellX, cellY, cellWidth, rowHeight).lineWidth(0.5).stroke(PDF_COLORS.border);
+
+      const text = $(cell).text().trim();
+      if (text) {
+        doc.fillColor(PDF_COLORS.text)
+           .font(isHeader ? 'Helvetica-Bold' : 'Helvetica')
+           .fontSize(9);
+        doc.text(text, cellX + padding, cellY + padding, {
+          width: cellWidth - padding * 2,
+          height: rowHeight - padding * 2,
+          align: 'left',
+        });
+      }
+
+      colIdx++;
+    });
+
+    doc.y += rowHeight;
+  });
+
+  doc.moveDown(0.5);
 }
 
 /** Draws the "Page X of Y" / generated-on footer on the given (already active) page. */
@@ -810,6 +1150,34 @@ const exportController = {
         : (sop.current_version_id || null);
       const modules = await sopModuleService.listModules(sopId, versionId);
 
+      // --- Resolve business logo ---
+      let logoBuffer = null;
+      let logoMimeType = null;
+
+      if (sop.department_id) {
+        try {
+          const department = await departmentModel.findById(sop.department_id);
+          if (department?.business_id) {
+            const businessLogo = await businessModel.getLogo(department.business_id);
+            if (businessLogo?.logo_data) {
+              logoBuffer = businessLogo.logo_data;
+              logoMimeType = businessLogo.logo_mime_type || 'image/png';
+            }
+          }
+        } catch {
+          // fallback to default logo below
+        }
+      }
+
+      if (!logoBuffer) {
+        try {
+          logoBuffer = fs.readFileSync(DEFAULT_LOGO_PATH);
+          logoMimeType = 'image/png';
+        } catch {
+          logoBuffer = null;
+        }
+      }
+
       const doc = new PDFDocument({ margin: 50, bufferPages: true });
       const filename = `SOP-${sop.code || sop.id}.pdf`;
 
@@ -825,10 +1193,11 @@ const exportController = {
         drawContinuationHeader(doc, sop);
       });
 
-      drawCoverHeader(doc, sop);
+      drawCoverHeader(doc, sop, logoBuffer, logoMimeType);
 
       // Metadata box
       const metaFields = [];
+      if (sop.code) metaFields.push(['Code', sop.code]);
       if (sop.status) metaFields.push(['Status', sop.status]);
       if (sop.department_name) metaFields.push(['Department', sop.department_name]);
       if (sop.category_name) metaFields.push(['Category', sop.category_name]);
@@ -858,6 +1227,7 @@ const exportController = {
         const attachmentIds = new Set();
         modules.forEach((module) => {
           if (!module.content) return;
+          imgSrcRegex.lastIndex = 0; // Reset regex state for each module
           let match;
           while ((match = imgSrcRegex.exec(module.content)) !== null) {
             const src = match[1];
@@ -941,8 +1311,8 @@ const exportController = {
       }
 
       doc.end();
-    } catch (error) {
-      handleError(res, error);
+        } catch (error) {
+        handleError(res, error);
     }
   },
 };

@@ -6,10 +6,24 @@ import { useMarkLessonComplete } from "../hooks/useMarkLessonComplete";
 import LessonProgressBar from "../components/LessonProgressBar";
 import LessonList from "../components/LessonList";
 import VideoPlayer from "../components/utils/VideoPlayer";
+import ImageLightbox from "@/shared/components/ui/ImageLightbox";
 import LB_PROSE from "../utils/lbProse";
 import { getQuizzes, getQuizById } from "@/features/assessments/api/quiz.api";
 import { listAttempts } from "@/features/assessments/api/attempt.api";
 import { getIssuancesByUser } from "@/features/certificate-management/services/certificateService";
+import SOP_CONTENT_STYLES from "@/features/sop-management/utils/sopContentStyles";
+import PublicModuleCard from "@/features/sop-management/components/SOPEditor/PublicModuleCard";
+import { getEmployeeSop } from "@/features/employee/api/employeeSop.api";
+
+function formatDate(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 export default function LessonPage() {
   const { id: courseId, lessonId } = useParams();
@@ -23,6 +37,13 @@ export default function LessonPage() {
   const [quizAttempts, setQuizAttempts] = useState([]);
   const [certificate, setCertificate] = useState(null);
   const [certificateLoading, setCertificateLoading] = useState(false);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [lightboxAlt, setLightboxAlt] = useState("");
+
+
+  const [ sop, setSop ] = useState(null);
+  const [ sopLoading, setSopLoading ] = useState(false);
+  const [ sopError, setSopError ] = useState(null);
 
   const modules = data?.modules || [];
   const currentLesson = data?.lessons?.find((l) => String(l.id) === String(lessonId));
@@ -87,6 +108,22 @@ export default function LessonPage() {
         .finally(() => setCertificateLoading(false));
     }
   }, [currentLesson?.type, currentLesson?.certificateTemplateId, courseId]);
+
+    useEffect(() => {
+    if (currentLesson?.type !== 'sop' || !currentLesson?.url) return;
+    setSopLoading(true);
+    setSopError(null);
+    getEmployeeSop(currentLesson.url)
+      .then((res) => {
+        const data = res?.data || res;
+        setSop(data);
+      })
+      .catch((err) => {
+        setSopError(err?.message || 'Failed to load SOP');
+        setSop(null);
+      })
+      .finally(() => setSopLoading(false));
+  }, [currentLesson?.type, currentLesson?.url]);
 
   const handleMarkComplete = async () => {
     setMessage(null);
@@ -166,7 +203,15 @@ export default function LessonPage() {
             {message}
           </div>
         )}
-        <div className="min-h-[200px] rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+        <div
+          onClick={(e) => {
+            const img = e.target.closest("img");
+            if (img) {
+              setLightboxSrc(img.src);
+              setLightboxAlt(img.alt || "");
+            }
+          }}
+        >
           {currentLesson.type === 'video' ? (
             <div className="p-4">
               <VideoPlayer src={currentLesson.url} title={currentLesson.title} />
@@ -311,42 +356,157 @@ export default function LessonPage() {
                 </div>
               )}
             </div>
-          ) : currentLesson.type === 'sop' ? (
-            <div className="p-6">
-              <div className="flex items-start gap-3">
-                <FileText size={24} className="text-blue-600 mt-0.5" />
-                <div>
-                  <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
-                  {currentLesson.description && (
-                    <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">{currentLesson.description}</p>
-                  )}
-                  {currentLesson.url && (
-                    <a
-                      href={`/sops/${currentLesson.url}`}
-                      className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 hover:underline"
-                    >
-                      View SOP document
-                    </a>
-                  )}
+        ) : currentLesson.type === 'sop' ? (
+            <div className="p-6 space-y-6">
+              {sopLoading ? (
+                <div className="flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-3">
+                  <Loader2 size={18} className="animate-spin text-neutral-500" />
+                  <p className="text-sm text-neutral-500">Loading SOP...</p>
                 </div>
-              </div>
-            </div>
-          ) : currentLesson.type === 'document' ? (
-            <div className="p-6">
-              <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
-              {currentLesson.description && (
-                <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">{currentLesson.description}</p>
-              )}
-              {currentLesson.url ? (
-                <a href={currentLesson.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 hover:underline">
-                  <ExternalLink size={14} />
-                  Open document
-                </a>
+              ) : sopError ? (
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                  <AlertCircle size={18} className="mt-0.5 text-red-600" />
+                  <div>
+                    <p className="text-sm font-medium text-red-800">Failed to load SOP</p>
+                    <p className="text-xs text-red-600 mt-0.5">{sopError}</p>
+                  </div>
+                </div>
+              ) : sop ? (
+                <>
+                  {/* SOP Header - matching PublicSOPPage style */}
+                  <div className="bg-white dark:bg-neutral-800 rounded-2xl border border-neutral-200 dark:border-neutral-700 shadow-sm overflow-hidden">
+                    <div className="px-6 sm:px-8 py-6 sm:py-8">
+                      {/* Title & Actions */}
+                      <div className="flex items-start justify-between gap-4 mb-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-2">
+                            {sop?.sop_code && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-400 text-xs font-mono font-medium">
+                                {sop.sop_code}
+                              </span>
+                            )}
+                            {sop?.status && (
+                              <span className={`px-2.5 py-0.5 rounded-lg text-xs font-medium border border-transparent ${
+                                sop.status === 'Published' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                sop.status === 'Draft' ? 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300' :
+                                sop.status === 'In Review' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
+                                'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                              }`}>
+                                {sop.status}
+                              </span>
+                            )}
+                          </div>
+                          <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight leading-tight">
+                            {sop?.title}
+                          </h1>
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      {sop?.description && (
+                        <p className="text-neutral-600 dark:text-neutral-400 text-sm sm:text-base leading-relaxed mb-6 max-w-3xl">
+                          {sop.description}
+                        </p>
+                      )}
+
+                      {/* Metadata Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {sop?.department_name && (
+                          <div className="flex items-center gap-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-750 px-3 py-2.5">
+                            <div className="min-w-0">
+                              <p className="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-500 font-medium">Department</p>
+                              <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300 truncate">{sop.department_name}</p>
+                            </div>
+                          </div>
+                        )}
+                        {sop?.category_name && (
+                          <div className="flex items-center gap-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-750 px-3 py-2.5">
+                            <div className="min-w-0">
+                              <p className="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-500 font-medium">Category</p>
+                              <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300 truncate">{sop.category_name}</p>
+                            </div>
+                          </div>
+                        )}
+                        {sop?.owner_name && (
+                          <div className="flex items-center gap-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-750 px-3 py-2.5">
+                            <div className="min-w-0">
+                              <p className="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-500 font-medium">Owner</p>
+                              <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300 truncate">{sop.owner_name}</p>
+                            </div>
+                          </div>
+                        )}
+                        {sop?.created_at && (
+                          <div className="flex items-center gap-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-750 px-3 py-2.5">
+                            <div className="min-w-0">
+                              <p className="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-500 font-medium">Created</p>
+                              <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">{formatDate(sop.created_at)}</p>
+                            </div>
+                          </div>
+                        )}
+                        {sop?.updated_at && (
+                          <div className="flex items-center gap-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-750 px-3 py-2.5">
+                            <div className="min-w-0">
+                              <p className="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-500 font-medium">Updated</p>
+                              <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">{formatDate(sop.updated_at)}</p>
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-750 px-3 py-2.5">
+                          <div className="min-w-0">
+                            <p className="text-[10px] uppercase tracking-wider text-neutral-400 dark:text-neutral-500 font-medium">Modules</p>
+                            <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">{Array.isArray(sop.modules) ? sop.modules.length : 0}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modules Section */}
+                  <div className="space-y-4">
+                    <div 
+                    onClick={(e) =>{
+                      const img = e.target.closest("img");
+                      if (img) {
+                        setLightboxSrc(img.src);
+                        setLightboxAlt(img.alt || "");
+                      }
+                    }}
+                    >
+                      <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                        Modules
+                      </h2>
+                      {Array.isArray(sop.modules) && sop.modules.length > 0 && (
+                        <span className="text-xs text-neutral-400 dark:text-neutral-500">
+                          {sop.modules.length} {sop.modules.length === 1 ? 'module' : 'modules'}
+                        </span>
+                      )}
+                    </div>
+
+                    {Array.isArray(sop.modules) && sop.modules.length > 0 ? (
+                      <div className="space-y-4">
+                        {sop.modules.map((mod, idx) => (
+                          <PublicModuleCard key={mod.id} module={mod} index={idx} />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-dashed border-neutral-300 dark:border-neutral-600 p-10 text-center">
+                        <div className="w-14 h-14 rounded-full bg-neutral-50 dark:bg-neutral-750 flex items-center justify-center mx-auto mb-3">
+                          <FileText size={24} className="text-neutral-400 dark:text-neutral-500" />
+                        </div>
+                        <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">No modules in this SOP yet.</p>
+                        <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-1">Check back later for updates.</p>
+                      </div>
+                    )}
+                  </div>
+                </>
               ) : (
-                <p className="text-sm text-neutral-500">No document attached.</p>
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                  <AlertCircle size={18} className="mt-0.5 text-amber-600" />
+                  <p className="text-sm text-amber-700 dark:text-amber-300">SOP content is not available.</p>
+                </div>
               )}
-            </div>
-          ) : currentLesson.type === 'certificate' ? (
+            </div>          
+            ) : currentLesson.type === 'certificate' ? (
             <div className="p-6">
               <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
               {currentLesson.description && (
@@ -412,6 +572,7 @@ export default function LessonPage() {
             )
           )}
         </div>
+        <ImageLightbox src={lightboxSrc} alt={lightboxAlt} onClose={() => setLightboxSrc(null)} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

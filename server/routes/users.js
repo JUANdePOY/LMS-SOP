@@ -92,6 +92,13 @@ router.post('/', requireAdmin, [
       position_title, employee_id, contact_number, employment_status,
       date_hired: date_hired || null, birthdate: birthdate || null, address: address || null,
     });
+        // Assign default onboarding SOPs
+        try {
+          const onboardingService = require('../services/sopOnboardingService');
+          await onboardingService.assignOnboardingSopsToUser(userId);
+        } catch (onboardingErr) {
+          console.error('[Bulk Upload] Onboarding assignment failed for', email, onboardingErr);
+        }
 
     logAudit({
       user_id: req.user.id,

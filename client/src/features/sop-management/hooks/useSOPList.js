@@ -1,12 +1,25 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { getSops, createSop, updateSop, deleteSop, archiveSop, unarchiveSop } from '@/features/sop-management/services/sopService';
-import { createAssignment } from '@/features/sop-management/services/assignmentService';
+import { createAssignment, fetchAssigned, deleteAssignment } from '@/features/sop-management/services/assignmentService';
 import { createModule } from '@/features/sop-management/services/moduleService';
 import { createLink } from '@/features/sop-management/services/attachmentService';
 import { useAssignmentCascade } from '@/features/sop-management/hooks/useAssignmentCascade';
 import { getCategories } from '@/features/organization-management/api/category.api';
 import { SOP_STATUSES } from '@/features/sop-management/constants/sopConstants';
 import { useToast } from '@/shared/components/ui/Toast';
+
+// A SOP's `restriction_type` gates who can actually see it (sopModel's
+// restrictionWhere/canAccessSop): 'department' only ever checks the single
+// sops.department_id column, while 'assigned' checks every department,
+// position, and user recorded in sop_assignments. Whenever more than the
+// SOP's single home department is involved, 'department' silently hides
+// the SOP from everyone assigned via the other departments/positions/users
+// even though their assignment rows were created correctly — so any real
+// assignment (one or many) must use 'assigned' to actually be visible.
+function resolveRestrictionType(deptIds = [], positions = [], userIds = []) {
+  const hasAnyAssignment = deptIds.length > 0 || positions.length > 0 || userIds.length > 0;
+  return hasAnyAssignment ? 'assigned' : 'public';
+}
 
 export function useSOPList() {
   const { toast } = useToast();
@@ -19,7 +32,6 @@ export function useSOPList() {
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newLink, setNewLink] = useState('');
-  const [newRestrictionType, setNewRestrictionType] = useState('department');
   const [newCategoryId, setNewCategoryId] = useState('');
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
@@ -28,7 +40,15 @@ export function useSOPList() {
   const [editDescription, setEditDescription] = useState('');
   const [editStatus, setEditStatus] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
+  // The assignment row IDs currently persisted for the SOP being edited,
+  // and the department IDs they represent — captured in handleEditStart so
+  // handleEditSave can tell whether the selection actually changed and,
+  // if so, replace the old rows instead of leaving stale ones behind.
+  const [editAssignmentIds, setEditAssignmentIds] = useState([]);
+  const [editOriginalDeptIds, setEditOriginalDeptIds] = useState([]);
   const [archivedTab, setArchivedTab] = useState(false);
+  const [newIsDefaultOnboarding, setNewIsDefaultOnboarding] = useState(false);
+  const [editIsDefaultOnboarding, setEditIsDefaultOnboarding] = useState(false);
 
   const filteredCategories = useMemo(() => {
     if (!categories.length) return [];
@@ -88,13 +108,13 @@ export function useSOPList() {
     setNewTitle('');
     setNewDescription('');
     setNewLink('');
-    setNewRestrictionType('department');
     setNewCategoryId('');
     cascade.setSelectedBusinessIds([]);
     cascade.setSelectedDeptIds([]);
     cascade.setSelectedPositions([]);
     cascade.setSelectedUserIds([]);
     cascade.setUserSearch('');
+    setNewIsDefaultOnboarding(false);
   }, [cascade]);
 
   const handleCreate = async () => {
@@ -104,10 +124,11 @@ export function useSOPList() {
       const { data: sopData } = await createSop({
         title: newTitle,
         description: newDescription,
-        department_id: cascade.selectedDeptIds.length > 0 ? cascade.selectedDeptIds[0] : (cascade.filteredDepartments[0]?.id || null),
+        department_id: cascade.selectedDeptIds.length > 0 ? cascade.selectedDeptIds[0] : null,
         category_id: newCategoryId || null,
         status: SOP_STATUSES.DRAFT,
-        restriction_type: newRestrictionType,
+        restriction_type: resolveRestrictionType(cascade.selectedDeptIds, cascade.selectedPositions, cascade.selectedUserIds),
+        is_default_onboarding: newIsDefaultOnboarding ? 1 : 0,
       });
       const sopId = sopData?.data?.id || sopData?.id;
       
@@ -143,18 +164,49 @@ export function useSOPList() {
       await fetchSops();
       toast.success('SOP created successfully');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create SOP');
+      toast.error(err?.response?.data?.error?.message || err?.message || 'Failed to create SOP');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleEditStart = (sop) => {
+  const handleEditStart = async (sop) => {
     setEditingSopId(sop.id);
     setEditTitle(sop.title);
     setEditDescription(sop.description || '');
     setEditStatus(sop.status);
     setEditCategoryId(sop.category_id || '');
+    setEditIsDefaultOnboarding(!!sop.is_default_onboarding);
+    setEditAssignmentIds([]);
+    setEditOriginalDeptIds([]);
+    cascade.setSelectedPositions([]);
+    cascade.setSelectedUserIds([]);
+
+    // Set business/department selection exactly once, straight to its
+    // final value, rather than clearing to [] and then repopulating —
+    // an intermediate empty selectedDeptIds would trip the effect above
+    // that blanks editCategoryId whenever no department is selected,
+    // wiping the category we just set even though departments end up
+    // repopulated a moment later.
+    try {
+      const { data } = await fetchAssigned(sop.id);
+      const assignments = data?.data || [];
+      const assignmentIds = assignments.map((a) => a.assignment_id);
+      const deptIds = [...new Set(assignments.flatMap((a) => (a.departments || []).map((d) => d.id)))];
+      const businessIds = [...new Set(
+        cascade.departments.filter((d) => deptIds.includes(d.id)).map((d) => d.business_id)
+      )];
+
+      setEditAssignmentIds(assignmentIds);
+      setEditOriginalDeptIds(deptIds);
+      cascade.setSelectedBusinessIds(businessIds);
+      cascade.setSelectedDeptIds(deptIds);
+    } catch {
+      // No saved assignments (or the lookup failed) — leave the cascade
+      // empty rather than blocking the edit form from opening.
+      cascade.setSelectedBusinessIds([]);
+      cascade.setSelectedDeptIds([]);
+    }
   };
 
   const handleEditCancel = () => {
@@ -163,22 +215,58 @@ export function useSOPList() {
     setEditDescription('');
     setEditStatus('');
     setEditCategoryId('');
+    cascade.setSelectedBusinessIds([]);
+    cascade.setSelectedDeptIds([]);
+    cascade.setSelectedPositions([]);
+    cascade.setSelectedUserIds([]);
+    setEditAssignmentIds([]);
+    setEditOriginalDeptIds([]);
+    setEditIsDefaultOnboarding(false)
   };
 
   const handleEditSave = async (sopId) => {
     if (!editTitle.trim()) return;
     try {
+      const currentDeptIds = cascade.selectedDeptIds;
+
       await updateSop(sopId, {
         title: editTitle,
         description: editDescription,
         status: editStatus,
         category_id: editCategoryId || null,
+        department_id: currentDeptIds.length > 0 ? currentDeptIds[0] : null,
+        restriction_type: resolveRestrictionType(currentDeptIds, cascade.selectedPositions, cascade.selectedUserIds),
+        is_default_onboarding: editIsDefaultOnboarding ? 1 : 0, 
       });
+
+      // Only touch the assignment records if the department selection
+      // actually changed — avoids churning (and re-auditing) assignments
+      // on every save, and avoids a false DUPLICATE_ASSIGNMENT rejection
+      // from re-creating the same assignment the SOP already has.
+      const deptsChanged =
+        currentDeptIds.length !== editOriginalDeptIds.length ||
+        currentDeptIds.some((id) => !editOriginalDeptIds.includes(id));
+
+      if (deptsChanged) {
+        for (const assignmentId of editAssignmentIds) {
+          await deleteAssignment(assignmentId);
+        }
+        if (currentDeptIds.length > 0) {
+          await createAssignment(sopId, {
+            department_ids: currentDeptIds,
+            position_names: cascade.selectedPositions,
+            user_ids: cascade.selectedUserIds,
+            due_date: null,
+            notes: '',
+          });
+        }
+      }
+
       setEditingSopId(null);
       await fetchSops();
       toast.success('SOP updated successfully');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update SOP');
+      toast.error(err?.response?.data?.error?.message || err?.response?.data?.message || 'Failed to update SOP');
     }
   };
 
@@ -226,8 +314,6 @@ export function useSOPList() {
     setNewDescription,
     newLink,
     setNewLink,
-    newRestrictionType,
-    setNewRestrictionType,
     newCategoryId,
     setNewCategoryId,
     categories,
@@ -254,6 +340,11 @@ export function useSOPList() {
     handleArchiveSop,
     // Cascade
     cascade,
+    // Onboarding
+    newIsDefaultOnboarding,
+    setNewIsDefaultOnboarding,
+    editIsDefaultOnboarding,
+    setEditIsDefaultOnboarding,
   };
 }
 

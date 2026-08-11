@@ -4,12 +4,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
 import {
   BookOpen, PlayCircle, RefreshCw, Clock,
-  MessageSquare, ArrowRight,
+  ArrowRight,
 } from "lucide-react";
 import EmployeeCourseCard from "../components/EmployeeCourseCard";
 import { resolveFileUrl } from "@/lib/fileUrl";
 import { useEmployeeDashboard } from "../hooks/useEmployeeDashboard";
-import { useConversations } from "@/features/messaging/hooks/useMessages";
+
 import { usePageUpdates } from "@/shared/hooks/usePageUpdates";
 import UpdateNotificationBanner from "@/shared/components/ui/UpdateNotificationBanner";
 
@@ -34,7 +34,6 @@ export default function EmployeeDashboard() {
   const { toast } = useToast();
 
   const { enrollments, loading, error, refetch } = useEmployeeDashboard();
-  const { conversations } = useConversations();
 
   const { hasUpdate, loading: refreshingUpdates, refresh: refreshUpdates, dismiss: dismissUpdates } = usePageUpdates({
     intervalMs: 30000,
@@ -50,6 +49,7 @@ export default function EmployeeDashboard() {
       }));
     },
   });
+
 
   const handleRefreshUpdates = useCallback(() => {
     refreshUpdates(refetch).catch(() => {});
@@ -98,20 +98,6 @@ export default function EmployeeDashboard() {
       </div>
     );
   }
-
-  const SectionHeader = ({ icon: Icon, title, onViewAll }) => (
-    <div className="flex items-center justify-between">
-      <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-        {Icon && <Icon size={16} className="text-neutral-400 dark:text-neutral-500" />}
-        {title}
-      </h2>
-      {onViewAll && (
-        <button onClick={onViewAll} className="text-xs font-medium text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-200 transition-colors">
-          View all <ArrowRight size={12} className="inline ml-0.5" />
-        </button>
-      )}
-    </div>
-  );
 
   return (
     <div className="w-full max-w-none mx-auto max-w-6xl space-y-6">
@@ -191,39 +177,6 @@ export default function EmployeeDashboard() {
               <PlayCircle size={16} />
               Continue
             </button>
-          </div>
-        </div>
-      )}
-
-      {conversations.length > 0 && (
-        <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-5 sm:p-6 shadow-sm space-y-4">
-          <SectionHeader icon={MessageSquare} title="Recent Message" onViewAll={() => navigate("/messaging")} />
-          <div className="space-y-2">
-            {conversations.slice(0, 3).map((conv) => (
-              <div key={conv.id} onClick={() => navigate("/messaging")} className="group cursor-pointer rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm hover:shadow-md transition-all">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-300">
-                    <MessageSquare size={18} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">{conv.subject || "Conversation"}</h3>
-                      {conv.unread_count > 0 && (
-                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-100 border border-blue-200 dark:border-blue-500/30">
-                          {conv.unread_count} unread
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2">
-                      {conv.last_message_body || "No messages yet"}
-                    </p>
-                    <p className="text-[10px] text-neutral-400 mt-1">
-                      {conv.last_message_at ? new Date(conv.last_message_at).toLocaleString() : ''}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       )}

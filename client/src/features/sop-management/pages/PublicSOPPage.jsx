@@ -6,6 +6,7 @@ import {
 } from "@/features/sop-management/services/sopService";
 import SOP_CONTENT_STYLES from "@/features/sop-management/utils/sopContentStyles";
 import PublicModuleCard from "@/features/sop-management/components/SOPEditor/PublicModuleCard";
+import ImageLightbox from "@/shared/components/ui/ImageLightbox";
 import {
   Calendar,
   Clock,
@@ -57,6 +58,8 @@ export default function PublicSOPPage() {
   const [loading, setLoading] = useState(true);
   const [modulesLoading, setModulesLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const [lightboxAlt, setLightboxAlt] = useState("");
   const [modulesError, setModulesError] = useState(null);
 
   useEffect(() => {
@@ -345,12 +348,21 @@ export default function PublicSOPPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div
+            onClick={(e) =>{
+              const img = e.target.closest("img");
+              if (img) {
+                setLightboxSrc(img.src);
+                setLightboxAlt(img.alt || "");
+              }
+            }}
+            >
               {modules.map((module, idx) => (
                 <PublicModuleCard key={module.id} module={module} index={idx} />
               ))}
             </div>
           )}
+           <ImageLightbox src={lightboxSrc} alt={lightboxAlt} onClose={() => setLightboxSrc(null)} />
         </div>
 
         {/* Footer */}

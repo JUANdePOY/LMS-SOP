@@ -31,7 +31,15 @@ async function handle(res) {
   }
 }
 
-export async function getEmployeeSop(sopId) {
-  const res = await fetch(`${API_BASE}/sops/${sopId}`, { headers: authHeaders() });
+export async function getMyOnboarding() {
+  const res = await fetch(`${API_BASE}/onboarding`, { headers: authHeaders() });
+  return handle(res);
+}
+
+export async function acknowledgeOnboardingSop(ackId) {
+  const res = await fetch(`${API_BASE}/onboarding/${ackId}/acknowledge`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
   return handle(res);
 }

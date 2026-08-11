@@ -152,12 +152,13 @@ export default function AppLayout() {
         />
       )}
 
+      {!(isEmployee && location.pathname === '/my-learning/onboarding') && (
       <Sidebar
         collapsed={collapsed}
         mobileOpen={mobileOpen}
         onMobileClose={() => setMobileOpen(false)}
       />
-
+      )}
       <main
         id="main-content"
         className={cn(
@@ -373,37 +374,39 @@ export default function AppLayout() {
         </div>
       )}
 
-      <nav
-        className={cn(
-          "fixed bottom-0 left-0 right-0 z-50 lg:hidden",
-          "bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md",
-          "border-t border-[var(--border)]",
-          "flex items-center justify-around px-2 py-1.5",
-          "safe-area-inset-bottom"
-        )}
-        aria-label="Mobile navigation"
-      >
-        {mobileNav.map((item) => {
-          const Icon = item.icon;
-          const active = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
-          return (
-            <a
-              key={item.path}
-              href={item.path}
-              className={cn(
-                "flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg min-w-[56px]",
-                "transition-colors duration-150",
-                active
-                  ? "text-blue-600"
-                  : "text-neutral-500 hover:text-neutral-700"
-              )}
-            >
-              <Icon size={20} strokeWidth={active ? 2.5 : 2} />
-              <span className="text-[10px] font-medium truncate w-full text-center">{item.name}</span>
-            </a>
-          );
-        })}
-      </nav>
+      {!(isEmployee && location.pathname === '/my-learning/onboarding') && (
+        <nav
+          className={cn(
+            "fixed bottom-0 left-0 right-0 z-50 lg:hidden",
+            "bg-white/90 dark:bg-neutral-900/90 backdrop-blur-md",
+            "border-t border-[var(--border)]",
+            "flex items-center justify-around px-2 py-1.5",
+            "safe-area-inset-bottom"
+          )}
+          aria-label="Mobile navigation"
+        >
+          {mobileNav.map((item) => {
+            const Icon = item.icon;
+            const active = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
+            return (
+              <a
+                key={item.path}
+                href={item.path}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg min-w-[56px]",
+                  "transition-colors duration-150",
+                  active
+                    ? "text-blue-600"
+                    : "text-neutral-500 hover:text-neutral-700"
+                )}
+              >
+                <Icon size={20} strokeWidth={active ? 2.5 : 2} />
+                <span className="text-[10px] font-medium truncate w-full text-center">{item.name}</span>
+              </a>
+            );
+          })}
+        </nav>
+      )}
     </div>
   );
 }

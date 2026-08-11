@@ -1,30 +1,42 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronRight, Hash, Calendar, User, Building2, Tag, Clock, FileText } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { ChevronDown, ChevronRight, Hash, FileText } from 'lucide-react';
 import SOP_CONTENT_STYLES from '../../utils/sopContentStyles';
 
-const STATUS_STYLES = {
-  Draft: 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300',
-  'In Review': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  Approved: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  'For Review': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  Published: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  Archived: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400',
-};
-
-function formatDate(dateStr) {
-  if (!dateStr) return null;
-  const d = new Date(dateStr);
-  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-}
+const SOP_IMAGE_STYLES = `
+  .sop-image-figure[data-align="center"] { margin-left: auto; margin-right: auto; }
+  .sop-image-figure[data-align="left"] { margin-right: auto; }
+  .sop-image-figure[data-align="right"] { margin-left: auto; }
+  .sop-image-figure img { display: block; max-width: 100%; height: auto; }
+`;
 
 function PublicModuleCard({ module, index }) {
   const [expanded, setExpanded] = useState(true);
+  const contentRef = useRef(null);
   const hasContent = module.content && module.content.replace(/<[^>]*>/g, '').trim();
-  const statusClass = STATUS_STYLES[module.status] || STATUS_STYLES.Draft;
+
+  useEffect(() => {
+    if (!hasContent) return;
+    const container = contentRef.current;
+    if (!container) return;
+    const figures = container.querySelectorAll('figure.sop-image-figure');
+    figures.forEach((fig) => {
+      const align = fig.getAttribute('data-align');
+      fig.style.marginLeft = '';
+      fig.style.marginRight = '';
+      if (align === 'center') {
+        fig.style.marginLeft = 'auto';
+        fig.style.marginRight = 'auto';
+      } else if (align === 'right') {
+        fig.style.marginLeft = 'auto';
+      } else if (align === 'left') {
+        fig.style.marginRight = 'auto';
+      }
+    });
+  }, [hasContent, module.content]);
 
   return (
     <div className="module-card group rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 shadow-sm hover:shadow-md transition-all duration-200">
-      {/* Header */}
+      <style>{SOP_IMAGE_STYLES}</style>
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
@@ -40,11 +52,6 @@ function PublicModuleCard({ module, index }) {
             <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm truncate">
               {module.title}
             </h3>
-            {module.status && (
-              <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium border border-transparent ${statusClass}`}>
-                {module.status}
-              </span>
-            )}
           </div>
           {!expanded && hasContent && (
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 line-clamp-1">
@@ -68,9 +75,8 @@ function PublicModuleCard({ module, index }) {
         </div>
       </button>
 
-      {/* Content */}
       {expanded && (
-        <div className="px-5 pb-5 pt-0">
+        <div ref={contentRef} className="px-5 pb-5 pt-0 overflow-hidden">
           <div className="border-t border-neutral-100 dark:border-neutral-700/60 pt-4">
             {hasContent ? (
               <div

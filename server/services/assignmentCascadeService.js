@@ -81,7 +81,7 @@ async function getUserCountByDepartment(departmentId, opts = {}) {
 }
 
 async function getAssignedAssignments(sopId) {
-  const vRows = await db.query(
+  const [vRows] = await db.query(
     'SELECT id FROM sop_versions WHERE sop_id = ? AND is_current = TRUE AND deleted_at IS NULL LIMIT 1',
     [sopId]
   );

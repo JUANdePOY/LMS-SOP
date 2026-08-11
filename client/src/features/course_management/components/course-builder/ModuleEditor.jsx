@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { Trash2, Settings, Save, Loader2, CheckCircle2, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, BookOpen } from "lucide-react";
 import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichTextEditor";
-import ModuleSOPsTab from "./ModuleSOPsTab";
 
 const TABS = [
   { id: "content", label: "Content", icon: null },
-  { id: "sops", label: "SOPs", icon: null },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -15,9 +13,6 @@ export default function ModuleEditor({
   onDelete,
   saving,
   courseId,
-  moduleSops = [],
-  onLinkSop,
-  onUnlinkSop,
   onMoveUp,
   onMoveDown,
   onNavigatePrev,
@@ -218,17 +213,6 @@ export default function ModuleEditor({
                 </label>
               </div>
             </div>
-          )}
-
-          {activeTab === "sops" && (
-            <ModuleSOPsTab
-              moduleId={module.id}
-              courseId={courseId}
-              sops={moduleSops}
-              onLinkSop={onLinkSop}
-              onUnlinkSop={onUnlinkSop}
-              saving={saving}
-            />
           )}
         </div>
       </div>

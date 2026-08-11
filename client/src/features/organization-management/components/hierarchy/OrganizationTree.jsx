@@ -1,5 +1,4 @@
 import { Building2 } from 'lucide-react';
-import { HierarchyProvider } from '../hierarchy/HierarchyContext';
 import BusinessAccordion from './BusinessAccordion';
 
 // Non-mutating replacement for the old filterDepartments that mutated
@@ -10,17 +9,20 @@ function filterDepartments(departments, query) {
 
   return departments.reduce((acc, dept) => {
     const matches = dept.name.toLowerCase().includes(lowerQuery);
+    const categoryMatches = (dept.categories || []).some(
+      (cat) => cat.name.toLowerCase().includes(lowerQuery)
+    );
     const hasChildren = dept.children && dept.children.length > 0;
     const filteredChildren = hasChildren ? filterDepartments(dept.children, query) : dept.children;
 
-    if (matches || (filteredChildren && filteredChildren.length > 0)) {
+    if (matches || categoryMatches || (filteredChildren && filteredChildren.length > 0)) {
       acc.push({ ...dept, children: filteredChildren });
     }
     return acc;
   }, []);
 }
 
-export default function OrganizationTree({ hierarchy = [], searchQuery = '' }) {
+export default function OrganizationTree({ hierarchy = [], searchQuery = '', onCreateSop }) {
   if (!hierarchy || hierarchy.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -31,22 +33,21 @@ export default function OrganizationTree({ hierarchy = [], searchQuery = '' }) {
   }
 
   return (
-    <HierarchyProvider>
-      <div className="space-y-4">
-        {hierarchy.map((business) => {
-          const departments = business.departments || [];
-          const filteredDepartments = searchQuery ? filterDepartments(departments, searchQuery) : departments;
+    <div className="space-y-4">
+      {hierarchy.map((business) => {
+        const departments = business.departments || [];
+        const filteredDepartments = searchQuery ? filterDepartments(departments, searchQuery) : departments;
 
-          return (
-            <BusinessAccordion
-              key={business.id}
-              business={business}
-              departments={filteredDepartments}
-              searchActive={Boolean(searchQuery)}
-            />
-          );
-        })}
-      </div>
-    </HierarchyProvider>
+        return (
+          <BusinessAccordion
+            key={business.id}
+            business={business}
+            departments={filteredDepartments}
+            searchActive={Boolean(searchQuery)}
+            onCreateSop={onCreateSop}
+          />
+        );
+      })}
+    </div>
   );
 }

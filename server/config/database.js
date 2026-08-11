@@ -531,6 +531,8 @@ const MIGRATIONS = [
       INDEX idx_task_comments_task (task_id),
       INDEX idx_task_comments_user (user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+      `ALTER TABLE sops ADD COLUMN IF NOT EXISTS is_default_onboarding TINYINT(1) NOT NULL DEFAULT 0 AFTER restriction_type`,
+      `CREATE INDEX idx_sops_default_onboarding ON sops(is_default_onboarding) WHERE is_default_onboarding = 1`,
   ];
 
 async function runMigrations() {
@@ -588,14 +590,6 @@ async function runMigrations() {
     console.log('Certificate course link migrations applied');
   } catch (err) {
     console.error('Certificate course link migration error:', err.message);
-  }
-
-  try {
-    const { runSopCourseLinkMigrations } = require('../migrations/sopCourseLinks');
-    await runSopCourseLinkMigrations();
-    console.log('SOP course link migrations applied');
-  } catch (err) {
-    console.error('SOP course link migration error:', err.message);
   }
 }
 

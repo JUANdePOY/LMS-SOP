@@ -14,6 +14,8 @@ function SOPEditForm({
   cascade,
   onCancel,
   onSave,
+  editIsDefaultOnboarding,
+  setEditIsDefaultOnboarding,
 }) {
   return (
     <div className="space-y-4">
@@ -84,9 +86,24 @@ function SOPEditForm({
                 {cat.name}
               </option>
             ))}
-          </select>
+          </select> 
+          </div>
         </div>
-      </div>
+        <div className="flex items-start gap-2">
+          <input
+            type="checkbox"
+            id="edit_is_default_onboarding"
+            checked={editIsDefaultOnboarding || false}
+            onChange={(e) => setEditIsDefaultOnboarding(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-[var(--border)] text-blue-600 focus:ring-blue-500"
+          />
+          <label htmlFor="edit_is_default_onboarding" className="text-sm font-medium text-[var(--text-primary)]">
+            Required for new employee onboarding
+          </label>
+        </div>
+        <p className="text-xs text-[var(--text-muted)] -mt-1">
+          New employees must read and acknowledge this SOP before accessing employee features.
+        </p>
 
       <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-1">
         <button

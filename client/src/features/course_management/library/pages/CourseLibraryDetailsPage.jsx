@@ -1,11 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Edit3, Users, BarChart3, CheckCircle, Search, Download, BookOpen, GraduationCap, Layers } from "lucide-react";
+import { Edit3, Users, BarChart3, CheckCircle, Download, BookOpen, GraduationCap, Layers, PlayCircle, Video, FileText, ListChecks, Clock, ChevronRight } from "lucide-react";
 import { useCourseLibraryDetails } from "../hooks/useCourseLibraryDetails";
 import { useCourseAnalytics } from "../hooks/useCourseAnalytics";
-import { useUsers } from "@/features/organization-management/hooks/useUsers";
-import { useDepartments } from "@/features/organization-management/hooks/useDepartments";
-import { assignEmployees } from "../services/library.api";
+import { useModules } from "@/features/course_management/hooks/useModules";
+import { getContent } from "@/features/course_management/api/content.api";
 import { exportGradesCSV, exportEnrollmentsExcel, exportCoursePDF } from "@/features/course_management/services/export.service";
 import { useToast } from "@/shared/components/ui/Toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,9 +13,9 @@ import CourseOverviewHero from "../components/CourseOverviewHero";
 import OverviewSection from "../components/OverviewSection";
 import BookOpeningTransition from "../components/BookOpeningTransition";
 import CourseContentSection from "../components/CourseContentSection";
+import QuickAssignModal from "../components/QuickAssignModal";
 import { ProgressBar } from "../utils/courseVisuals";
 import { StaggerList, MotionItem } from "@/shared/motion";
-import { isAdminView } from "../utils/rbac";
 
 const ENROLLMENT_STATUS_META = {
   active: {
@@ -64,21 +63,162 @@ function formatDate(date) {
   }
 }
 
+const LESSON_TYPE_META = {
+  video: { icon: Video, label: "Video" },
+  document: { icon: FileText, label: "Document" },
+  quiz: { icon: ListChecks, label: "Quiz" },
+  text: { icon: FileText, label: "Reading" },
+};
+
+function LessonRow({ lesson, onView }) {
+  const meta = LESSON_TYPE_META[lesson.type] || LESSON_TYPE_META.text;
+  const Icon = meta.icon;
+  return (
+    <button
+      type="button"
+      onClick={() => onView({ lessonId: lesson.id, title: lesson.title, type: lesson.type })}
+      className="group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/60"
+    >
+      <Icon size={15} className="shrink-0 text-neutral-400 dark:text-neutral-500" />
+      <span className="flex-1 min-w-0 truncate text-neutral-700 dark:text-neutral-200">{lesson.title}</span>
+      {lesson.is_required && (
+        <span className="hidden sm:inline text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">Required</span>
+      )}
+      {lesson.duration ? (
+        <span className="inline-flex items-center gap-1 text-[11px] text-neutral-400 dark:text-neutral-500">
+          <Clock size={11} />
+          {lesson.duration}m
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function ModuleAccordion({ courseId, module, index, onView, getContent }) {
+  const [open, setOpen] = useState(false);
+  const [lessons, setLessons] = useState([]);
+  const [loadState, setLoadState] = useState("idle");
+
+  const toggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (next && lessons.length === 0 && loadState === "idle") {
+      setLoadState("loading");
+      try {
+        const res = await getContent(courseId, module.id);
+        setLessons(res.data || res || []);
+        setLoadState("done");
+      } catch {
+        setLessons([]);
+        setLoadState("error");
+      }
+    }
+  };
+
+  const count = module.content_count ?? lessons.length;
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900">
+      <button
+        type="button"
+        onClick={toggle}
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50/70 dark:hover:bg-neutral-800/40"
+      >
+        <ChevronRight
+          size={16}
+          className={`shrink-0 text-neutral-400 transition-transform ${open ? "rotate-90" : ""}`}
+        />
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-xs font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+          {index + 1}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{module.title}</p>
+          {module.description && (
+            <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{module.description}</p>
+          )}
+        </div>
+        <span className="shrink-0 text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
+          {count} {count === 1 ? "lesson" : "lessons"}
+        </span>
+      </button>
+
+      {open && (
+        <div className="border-t border-neutral-100 dark:border-neutral-800 px-3 py-2">
+          {loadState === "loading" ? (
+            <div className="space-y-2 px-2.5 py-2">
+              {Array.from({ length: Math.max(1, count) }).map((_, i) => (
+                <div key={i} className="h-4 w-2/3 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+              ))}
+            </div>
+          ) : loadState === "error" ? (
+            <p className="px-2.5 py-2 text-xs text-red-500">Could not load lessons.</p>
+          ) : lessons.length === 0 ? (
+            <p className="px-2.5 py-2 text-xs text-neutral-400">No lessons in this module yet</p>
+          ) : (
+            <div className="space-y-0.5">
+              {lessons.map((lesson) => (
+                <LessonRow key={lesson.id} lesson={lesson} onView={onView} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CourseLessonsSection({ courseId, modules, modulesLoading, onView }) {
+  if (modules.length === 0) return null;
+
+  const totalLessons = modules.reduce((sum, m) => sum + (m.content_count ?? 0), 0);
+
+  return (
+    <OverviewSection title="Modules & Lessons" icon={BookOpen}>
+      <div className="mb-3 flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
+        <span className="inline-flex items-center gap-1.5">
+          <GraduationCap size={14} className="text-blue-600 dark:text-blue-400" />
+          {modules.length} {modules.length === 1 ? "module" : "modules"}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <BookOpen size={14} className="text-blue-600 dark:text-blue-400" />
+          {totalLessons} {totalLessons === 1 ? "lesson" : "lessons"}
+        </span>
+      </div>
+
+      {modulesLoading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-14 animate-pulse rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900" />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {modules.map((module, i) => (
+            <ModuleAccordion
+              key={module.id}
+              courseId={courseId}
+              module={module}
+              index={i}
+              onView={onView}
+              getContent={getContent}
+            />
+          ))}
+        </div>
+      )}
+    </OverviewSection>
+  );
+}
+
 export default function CourseLibraryDetailsPage() {
   const { id: courseId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const adminView = isAdminView(user);
+  const isEmployee = user?.role === "employee";
   const { course, enrollments, analytics, loading, error, refetch } = useCourseLibraryDetails(courseId);
-  const { users: allUsers } = useUsers({ page: 1, limit: 100 });
-  const { departments } = useDepartments({ limit: 100 });
   const { track, trackTabView, trackContentView, getSessionSummary } = useCourseAnalytics(courseId);
-  const [isAssigning, setIsAssigning] = useState(false);
-  const [selectedEmployees, setSelectedEmployees] = useState([]);
+  const { data: modules, loading: modulesLoading } = useModules(courseId);
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [employeeSearch, setEmployeeSearch] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
 
   useEffect(() => {
     if (error) {
@@ -91,38 +231,6 @@ export default function CourseLibraryDetailsPage() {
     if (!mine) return undefined;
     return typeof mine.progress_percentage === "number" ? mine.progress_percentage : Number(mine.progress) || 0;
   }, [enrollments, user?.id]);
-
-  const enrolledUserIds = new Set(enrollments.map((e) => e.user_id));
-  let availableEmployees = allUsers.filter((u) => !enrolledUserIds.has(u.id));
-  if (departmentFilter) {
-    availableEmployees = availableEmployees.filter((u) => String(u.department_id) === String(departmentFilter));
-  }
-
-  const filteredEmployees = employeeSearch
-    ? availableEmployees.filter(
-        (u) =>
-          (u.full_name || "").toLowerCase().includes(employeeSearch.toLowerCase()) ||
-          (u.email || "").toLowerCase().includes(employeeSearch.toLowerCase())
-      )
-    : availableEmployees;
-
-  const handleAssignEmployees = async () => {
-    if (!selectedEmployees.length) return;
-    setIsAssigning(true);
-    try {
-      await assignEmployees(courseId, selectedEmployees);
-      track("assign", { count: selectedEmployees.length });
-      toast.success(`${selectedEmployees.length} employee(s) assigned to course`);
-      setShowAssignModal(false);
-      setSelectedEmployees([]);
-      setEmployeeSearch("");
-      refetch();
-    } catch (err) {
-      toast.error(err.message || "Failed to assign employees");
-    } finally {
-      setIsAssigning(false);
-    }
-   };
 
   const handleExport = async (format) => {
     try {
@@ -143,12 +251,6 @@ export default function CourseLibraryDetailsPage() {
     }
   };
 
-  const handleSelectEmployee = (userId) => {
-    setSelectedEmployees((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-    );
-  };
-
   const [activeTab, setActiveTab] = useState("overview");
 
   const tabs = useMemo(() => {
@@ -156,14 +258,14 @@ export default function CourseLibraryDetailsPage() {
       { key: "overview", label: "Overview" },
       { key: "content", label: "Content", icon: Layers },
     ];
-    if (!adminView) return base;
+    if (isEmployee) return base;
     return [
       ...base,
       { key: "enrollments", label: "Enrollments", icon: Users },
       { key: "analytics", label: "Analytics", icon: BarChart3 },
       { key: "actions", label: "Actions", icon: CheckCircle },
     ];
-  }, [adminView]);
+  }, [isEmployee]);
 
   const handleTabChange = useCallback(
     (key) => {
@@ -272,7 +374,15 @@ export default function CourseLibraryDetailsPage() {
             breadcrumb="Back to Library"
             progress={myProgress}
             primaryAction={
-          adminView ? (
+          isEmployee ? (
+            <button
+              onClick={() => navigate(`/my-learning/course/${courseId}`)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-all"
+            >
+              <PlayCircle size={14} />
+              Open Course
+            </button>
+          ) : (
             <button
               onClick={() => navigate(`/courses/${courseId}/builder`)}
               className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-blue-300 dark:hover:border-blue-500/60 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
@@ -280,11 +390,11 @@ export default function CourseLibraryDetailsPage() {
               <Edit3 size={14} />
               Edit Course
             </button>
-          ) : null
+          )
         }
       />
 
-      {!adminView && (
+      {!isEmployee && (
         <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 p-1 shadow-sm dark:shadow-none">
           {tabs.map((tab) => {
             const active = activeTab === tab.key;
@@ -314,24 +424,26 @@ export default function CourseLibraryDetailsPage() {
 
       <div className="mx-auto max-w-3xl space-y-5 sm:space-y-6">
         {activeTab === "content" ? (
-          <>
-            <CourseContentSection
-              courseId={courseId}
-              onLessonView={(payload) => trackContentView(payload)}
-              headerAction={
-                !adminView && myProgress !== undefined ? (
-                  <button
-                    onClick={() => navigate(`/my-learning/course/${courseId}`)}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-blue-300 dark:hover:border-blue-500/60 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
-                  >
-                    <BookOpen size={14} />
-                    Go to Course
-                  </button>
-                ) : null
-              }
-            />
-          </>
-        ) : (!adminView && activeTab !== "overview") ? (
+          <CourseContentSection
+            courseId={courseId}
+            onLessonView={(payload) =>
+              isEmployee
+                ? navigate(`/my-learning/course/${courseId}`)
+                : trackContentView(payload)
+            }
+            headerAction={
+              isEmployee ? (
+                <button
+                  onClick={() => navigate(`/my-learning/course/${courseId}`)}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+                >
+                  <PlayCircle size={14} />
+                  Open in Learner View
+                </button>
+              ) : null
+            }
+          />
+        ) : (!isEmployee && activeTab !== "overview") ? (
           <>
             {activeTab === "enrollments" && (
               <OverviewSection title="Enrolled Employees" icon={Users}>
@@ -536,6 +648,17 @@ export default function CourseLibraryDetailsPage() {
               </StaggerList>
             </OverviewSection>
 
+            <CourseLessonsSection
+              courseId={courseId}
+              modules={modules}
+              modulesLoading={modulesLoading}
+              onView={(payload) =>
+                isEmployee
+                  ? navigate(`/my-learning/course/${courseId}`)
+                  : trackContentView(payload)
+              }
+            />
+
             {course?.instructor_name && (
               <OverviewSection title="Instructor">
                 <div className="flex items-center gap-3">
@@ -553,44 +676,13 @@ export default function CourseLibraryDetailsPage() {
         )}
       </div>
 
-      {showAssignModal && !adminView && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-2xl rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-neutral-700/80 px-5 py-3.5">
-              <h2 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Assign Employees to Course</h2>
-              <button onClick={() => { setShowAssignModal(false); setSelectedEmployees([]); setEmployeeSearch(""); }} className="rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800 dark:hover:text-neutral-200" aria-label="Close">×</button>
-            </div>
-            <div className="p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-                  <input value={employeeSearch} onChange={(e) => setEmployeeSearch(e.target.value)} placeholder="Search employees..." className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-3 py-1.5 text-sm" />
-                </div>
-                <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-sm">
-                  <option value="">All Departments</option>
-                  {departments.map((dept) => (<option key={dept.id} value={dept.id}>{dept.name}</option>))}
-                </select>
-              </div>
-              <div className="max-h-60 overflow-y-auto border border-neutral-200 dark:border-neutral-700 rounded-md">
-                {filteredEmployees.length === 0 ? <div className="p-3 text-xs text-neutral-500">No employees found</div> : filteredEmployees.map((user) => (
-                  <div key={user.id} className="flex items-center gap-2 p-2 cursor-pointer hover:bg-neutral-50 dark:hover:bg-neutral-800" onClick={() => handleSelectEmployee(user.id)}>
-                    <input type="checkbox" checked={selectedEmployees.includes(user.id)} onChange={() => handleSelectEmployee(user.id)} className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500" />
-                    <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">{(user.full_name || "U").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}</div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100 truncate">{user.full_name || "Unknown User"}</p>
-                      <p className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate">{user.email || "—"}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center justify-between pt-2 border-t border-neutral-200 dark:border-neutral-700">
-                <span className="text-xs text-neutral-500">{selectedEmployees.length} employee(s) selected</span>
-                <button onClick={handleAssignEmployees} disabled={isAssigning || !selectedEmployees.length} className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50">{isAssigning ? "Assigning..." : "Assign"}</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <QuickAssignModal
+        open={showAssignModal}
+        course={course}
+        onClose={() => setShowAssignModal(false)}
+        onAssigned={() => refetch()}
+        toast={toast}
+      />
       </div>
       );
     }}

@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Copy,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { getSops } from "@/features/sop-management/services/sopService";
 import { getQuizzes, duplicateQuiz } from "@/features/assessments/api/quiz.api";
 import { getCertificateTemplates } from "@/features/certificate-management/services/certificateService";
@@ -137,6 +138,7 @@ export default function LessonEditor({
   canMoveDown,
   onOpenQuizBuilder,
 }) {
+  const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [type, setType] = useState("reading");
   const [url, setUrl] = useState("");
@@ -572,7 +574,11 @@ export default function LessonEditor({
                                   });
                                 }}
                                 onOpen={() => {
-                                  if (url) window.open(`/sop/${url}`, "_blank", "noopener,noreferrer");
+                                  if (!url) return;
+                                  const role = (user?.role?.name || user?.role?.role || user?.role || '').toLowerCase();
+                                  const isAdmin = ['super_admin', 'admin'].includes(role);
+                                  const target = isAdmin ? `/sops/${url}` : `/my-learning/sops/${url}`;
+                                  window.open(target, "_blank", "noopener,noreferrer");
                                 }}
                               />
                             )}
@@ -581,7 +587,10 @@ export default function LessonEditor({
                           <SopPreview
                             sop={availableSops.find((s) => String(s.id) === String(url)) || null}
                             onOpen={() => {
-                              if (url) window.open(`/sop/${url}`, "_blank", "noopener,noreferrer");
+                            const role = (user?.role?.name || user?.role?.role || user?.role || '').toLowerCase();
+                            const isAdmin = ['super_admin', 'admin'].includes(role);
+                            const target = isAdmin ? `/certificates` : `/my-learning/certificates`;
+                            window.open(target, "_blank", "noopener,noreferrer");
                             }}
                           />
 

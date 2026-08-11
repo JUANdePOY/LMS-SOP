@@ -210,14 +210,91 @@ async function getHierarchy() {
     business.departments = await getDepartmentTreeForBusiness(business.id);
   }
 
+  const allDeptIds = [];
+  for (const business of businesses) {
+    collectDepartmentIds(business.departments || [], allDeptIds);
+  }
+
+  if (allDeptIds.length > 0) {
+    const categoriesByDeptId = await getCategoriesByDepartmentIds(allDeptIds);
+    attachCategoriesToTree(businesses, categoriesByDeptId);
+  }
+
   return businesses;
 }
 
+function collectDepartmentIds(departments, ids) {
+  for (const dept of departments) {
+    ids.push(dept.id);
+    if (dept.children && dept.children.length > 0) {
+      collectDepartmentIds(dept.children, ids);
+    }
+  }
+}
+
+async function getCategoriesByDepartmentIds(deptIds) {
+  const placeholders = deptIds.map(() => '?').join(',');
+  const [rows] = await db.query(
+    `SELECT c.id, c.name, c.description, c.department_id,
+            (SELECT COUNT(*) FROM sops s WHERE s.category_id = c.id AND s.deleted_at IS NULL) AS sop_count
+     FROM categories c
+     WHERE c.department_id IN (${placeholders}) AND c.deleted_at IS NULL
+     ORDER BY c.department_id ASC, c.name ASC`,
+    deptIds
+  );
+
+  const grouped = {};
+  for (const row of rows) {
+    if (!grouped[row.department_id]) {
+      grouped[row.department_id] = [];
+    }
+    grouped[row.department_id].push(row);
+  }
+  return grouped;
+}
+
+function attachCategoriesToTree(businesses, categoriesByDeptId) {
+  for (const business of businesses) {
+    attachCategories(business.departments || [], categoriesByDeptId);
+  }
+}
+
+function attachCategories(departments, categoriesByDeptId) {
+  for (const dept of departments) {
+    dept.categories = categoriesByDeptId[dept.id] || [];
+    if (dept.children && dept.children.length > 0) {
+      attachCategories(dept.children, categoriesByDeptId);
+    }
+  }
+}
+
+// sop_count now includes SOPs assigned to this department via
+// sop_assignments -> sop_versions -> assignment_departments, not just SOPs
+// whose legacy sops.department_id column points here. COUNT(DISTINCT s.id)
+// prevents a SOP that's assigned to several departments (or matches both
+// the owner column and an assignment) from being double-counted within a
+// single department's badge.
 async function getDepartmentTreeForBusiness(businessId) {
   const [rootDepts] = await db.query(
     `SELECT d.*, m.full_name AS head_name,
             (SELECT COUNT(*) FROM users u WHERE u.department_id = d.id AND u.is_active = TRUE) AS user_count,
-            (SELECT COUNT(*) FROM sops s WHERE s.department_id = d.id AND s.deleted_at IS NULL) AS sop_count
+            (SELECT COUNT(DISTINCT s.id) FROM sops s
+              WHERE s.deleted_at IS NULL
+                AND (
+                  s.department_id = d.id
+                  OR EXISTS (
+                    SELECT 1
+                    FROM sop_assignments sa
+                    INNER JOIN sop_versions sv ON sv.sop_id = s.id
+                    INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
+                    WHERE sa.sop_version_id = sv.id
+                      AND sv.is_current = TRUE
+                      AND sv.deleted_at IS NULL
+                      AND sa.is_deleted = FALSE
+                      AND ad.department_id = d.id
+                  )
+                )
+            ) AS sop_count
      FROM departments d
      LEFT JOIN users m ON d.head_user_id = m.id
      WHERE d.business_id = ? AND d.parent_department_id IS NULL
@@ -236,7 +313,23 @@ async function getDepartmentChildren(parentId) {
   const [rows] = await db.query(
     `SELECT d.*, m.full_name AS head_name,
             (SELECT COUNT(*) FROM users u WHERE u.department_id = d.id AND u.is_active = TRUE) AS user_count,
-            (SELECT COUNT(*) FROM sops s WHERE s.department_id = d.id AND s.deleted_at IS NULL) AS sop_count
+            (SELECT COUNT(DISTINCT s.id) FROM sops s
+              WHERE s.deleted_at IS NULL
+                AND (
+                  s.department_id = d.id
+                  OR EXISTS (
+                    SELECT 1
+                    FROM sop_assignments sa
+                    INNER JOIN sop_versions sv ON sv.sop_id = s.id
+                    INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
+                    WHERE sa.sop_version_id = sv.id
+                      AND sv.is_current = TRUE
+                      AND sv.deleted_at IS NULL
+                      AND sa.is_deleted = FALSE
+                      AND ad.department_id = d.id
+                  )
+                )
+            ) AS sop_count
      FROM departments d
      LEFT JOIN users m ON d.head_user_id = m.id
      WHERE d.parent_department_id = ?

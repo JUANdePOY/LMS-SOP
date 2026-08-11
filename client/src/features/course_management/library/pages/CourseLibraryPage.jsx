@@ -365,8 +365,8 @@ export default function CourseLibraryPage() {
       <div className="flex gap-6 items-start">
         <div className="min-w-0 flex-1 space-y-6">
           {hasActiveFilters && (
-            <div className="flex flex-wrap items-center gap-2 text-xs" aria-live="polite">
-              <span className="text-neutral-500 dark:text-neutral-400">Active filters:</span>
+            <div className="flex flex-wrap items-center gap-2 text-xs rounded-lg border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50 px-3 py-2" aria-live="polite">
+              <span className="font-medium text-neutral-500 dark:text-neutral-400">Active filters:</span>
               {search && (
                 <FilterChip label={`Search: "${search}"`} onClear={() => setSearchInput("")} />
               )}
@@ -383,7 +383,6 @@ export default function CourseLibraryPage() {
             </div>
           )}
 
-          <div className="min-w-0 flex-1 space-y-6">
             {!loading && continueLearning.length > 0 && (
               <section>
               <h2 className="mb-3 text-sm font-semibold text-neutral-700 dark:text-neutral-200">Continue Learning</h2>
@@ -512,28 +511,22 @@ export default function CourseLibraryPage() {
         </div>
 
         {sidebarOpen && (
-          <aside className="hidden lg:block w-72 shrink-0">
-            <div className="sticky top-[5.5rem]">
-              <FilterSidebar
-                open
-                onClose={() => setSidebarOpen(false)}
-                categories={categories}
-                selectedDifficulties={selectedDifficulties}
-                selectedCategories={selectedCategories}
-                sortField={sortField}
-                sortDirection={sortDirection}
-                onToggleDifficulty={toggleDifficulty}
-                onToggleCategory={toggleCategory}
-                onSortChange={(f) => handleSort(f)}
-                onToggleDirection={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
-                onClear={clearFilters}
-                hasActiveFilters={hasActiveFilters}
-              />
-            </div>
-          </aside>
+          <FilterSidebar
+            open
+            onClose={() => setSidebarOpen(false)}
+            categories={categories}
+            selectedDifficulties={selectedDifficulties}
+            selectedCategories={selectedCategories}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onToggleDifficulty={toggleDifficulty}
+            onToggleCategory={toggleCategory}
+            onSortChange={(f) => handleSort(f)}
+            onToggleDirection={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+            onClear={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+          />
         )}
-      </div>
-
       </div>
 
       {isAnyAdmin && (
