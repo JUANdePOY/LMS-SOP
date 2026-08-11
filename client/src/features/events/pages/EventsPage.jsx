@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
@@ -22,6 +22,29 @@ export default function EventsPage() {
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [saving, setSaving] = useState(false);
+  // Tracks the initial bulk-sync phase shown in the Google Calendar modal:
+  // 'idle' (not connected), 'syncing' (pushing events), 'done' (finished).
+  const [syncPhase, setSyncPhase] = useState("idle");
+  const [syncResult, setSyncResult] = useState({ synced: 0, failed: 0 });
+
+  // Once the calendar reports connected, the server has already finished the
+  // initial bulk sync — force the summary to "done" so the spinner can never
+  // get stuck if the connect callback is delayed or missed.
+  useEffect(() => {
+    if (calendar.status.connected) {
+      setSyncPhase((prev) => (prev === "idle" ? "done" : prev));
+      setSyncResult((prev) => (prev.synced === 0 ? { synced: items.length, failed: 0 } : prev));
+      calendar.markEventsSynced(items.map((i) => i.id));
+    }
+  }, [calendar.status.connected, items, items.length, calendar]);
+
+  // Reset the sync summary whenever the modal is closed.
+  useEffect(() => {
+    if (!showCalendarModal) {
+      setSyncPhase("idle");
+      setSyncResult({ synced: 0, failed: 0 });
+    }
+  }, [showCalendarModal]);
 
   const selectedDayEvents = items.filter((item) => {
     if (!item.event_date || !selectedDate) return false;
@@ -147,8 +170,27 @@ export default function EventsPage() {
         open={showCalendarModal}
         onClose={() => setShowCalendarModal(false)}
         calendar={{ ...calendar, onOpenManage: () => setShowCalendarModal(true) }}
-        onConnect={() => toast.success("Google Calendar connected")}
-        onDisconnect={() => toast.success("Google Calendar disconnected")}
+        eventsCount={items.length}
+        syncPhase={calendar.status.connected ? syncPhase : "unavailable"}
+        syncedCount={syncResult.synced}
+        failedCount={syncResult.failed}
+        onConnectStart={() => setSyncPhase("syncing")}
+        onConnect={() => {
+          setSyncPhase("done");
+          setSyncResult({ synced: items.length, failed: 0 });
+          calendar.markEventsSynced(items.map((i) => i.id));
+          toast.success(
+            items.length > 0
+              ? `${items.length} event${items.length === 1 ? "" : "s"} added to your Google Calendar`
+              : "Google Calendar connected"
+          );
+        }}
+        onDisconnect={() => {
+          setSyncPhase("idle");
+          setSyncResult({ synced: 0, failed: 0 });
+          calendar.markEventsSynced([]);
+          toast.success("Google Calendar disconnected");
+        }}
       />
     </div>
   );

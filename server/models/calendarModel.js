@@ -48,18 +48,22 @@ const calendarModel = {
   async saveToken({ userId, provider = 'google', googleEmail, accessToken, refreshToken, expiryDate }) {
     const encAccess = encrypt(accessToken);
     const encRefresh = refreshToken ? encrypt(refreshToken) : null;
-    const id = crypto.randomUUID();
-    // Remove any existing row first, then INSERT. This guarantees a clean row
-    // encrypted with the CURRENT key, even if the previous row was encrypted
-    // with a different (e.g. rotated/leaked) CALENDAR_TOKEN_ENCRYPTION_KEY.
-    await db.query(
-      'DELETE FROM user_calendar_tokens WHERE user_id = ? AND provider = ?',
-      [userId, provider]
-    );
+    // Atomic upsert on the (user_id, provider) unique key. Using
+    // INSERT ... ON DUPLICATE KEY UPDATE (instead of DELETE-then-INSERT) means
+    // the row is never briefly absent, so a concurrent /calendar/status poll
+    // during connect can't read "not connected" and leave the client spinner
+    // stuck. A row previously encrypted with a rotated key is simply overwritten
+    // here with a fresh row encrypted using the current key.
     await db.query(
       `INSERT INTO user_calendar_tokens (id, user_id, provider, google_email, access_token, refresh_token, expiry_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, userId, provider, googleEmail || null, encAccess, encRefresh, expiryDate || null]
+       VALUES (UUID(), ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         google_email = VALUES(google_email),
+         access_token = VALUES(access_token),
+         refresh_token = VALUES(refresh_token),
+         expiry_date = VALUES(expiry_date),
+         updated_at = CURRENT_TIMESTAMP`,
+      [userId, provider, googleEmail || null, encAccess, encRefresh, expiryDate || null]
     );
     return this.getToken(userId, provider);
   },

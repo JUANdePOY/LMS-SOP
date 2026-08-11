@@ -113,6 +113,20 @@ export function useGoogleCalendar() {
     }
   }, []);
 
+  // Reflect a successful bulk sync (e.g. right after connecting) on the
+  // individual event buttons so each card shows the "Synced" state instead of
+  // staying on "Add to calendar". Only marks ids that aren't already in an
+  // error state, so a prior failed sync isn't silently hidden.
+  const markEventsSynced = useCallback((eventIds = []) => {
+    setSyncingIds((prev) => {
+      const next = { ...prev };
+      for (const id of eventIds) {
+        if (next[id] !== "error") next[id] = "synced";
+      }
+      return next;
+    });
+  }, []);
+
   return {
     status,
     loadingStatus,
@@ -122,5 +136,6 @@ export function useGoogleCalendar() {
     disconnect,
     syncEvent,
     unsyncEvent,
+    markEventsSynced,
   };
 }

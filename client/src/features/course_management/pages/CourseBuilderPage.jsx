@@ -6,7 +6,6 @@ import CourseOutline from "../components/course-builder/CourseOutline";
 import LessonEditor from "../components/course-builder/LessonEditor";
 import ModuleEditor from "../components/course-builder/ModuleEditor";
 import PublishReadiness from "../components/course-builder/PublishReadiness";
-import CourseCertificatesSection from "../components/course-builder/CourseCertificatesSection";
 import { builderGet, builderUpdate, publishCourse } from "../api/course.api";
 import * as session from "@/services/session";
 
@@ -36,28 +35,6 @@ async function handleSopLink(res) {
     }
     return { message: text || res.statusText };
   }
-}
-
-async function fetchCourseCertificates(courseId) {
-  const res = await fetch("/api/certificate-courses/courses/" + courseId + "/certificates", { headers: authHeaders() });
-  return handleSopLink(res);
-}
-
-async function linkCertificateToCourse(courseId, templateId, meta = {}) {
-  const res = await fetch("/api/certificate-courses/courses/" + courseId + "/certificates", {
-    method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({ template_id: templateId, ...meta }),
-  });
-  return handleSopLink(res);
-}
-
-async function unlinkCertificateFromCourse(courseId, templateId) {
-  const res = await fetch("/api/certificate-courses/courses/" + courseId + "/certificates/" + templateId, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
-  return handleSopLink(res);
 }
 
 const STATUS_CONFIG = {
@@ -224,8 +201,6 @@ export default function CourseBuilderPage() {
   const selectedLessonIdRef = useRef(selectedLessonId);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const handleSaveDraftRef = useRef(null);
-  const [courseCertificates, setCourseCertificates] = useState([]);
-  const courseCertificatesRef = useRef([]);
 
   useEffect(() => {
     selectedModuleIdRef.current = selectedModuleId;
@@ -687,11 +662,7 @@ export default function CourseBuilderPage() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => {
-              window.dispatchEvent(new Event("open-system-sidebar"));
-              navigate("/courses");
-            }}
-            aria-label="Back to courses"
+            onClick={() => navigate("/courses")}
             className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
           >
             <ChevronLeft size={16} />

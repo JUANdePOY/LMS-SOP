@@ -1,15 +1,18 @@
 import { useState } from "react";
 import { Calendar, Check, Loader2, Unlink, AlertCircle } from "lucide-react";
 import { Modal } from "@/shared/components/ui/modal";
+import CalendarSyncSummary from "./CalendarSyncSummary";
 
-export default function GoogleCalendarModal({ open, onClose, calendar, onConnect, onDisconnect }) {
+export default function GoogleCalendarModal({ open, onClose, calendar, onConnect, onDisconnect, onConnectStart, eventsCount = 0, syncPhase = "unavailable", syncedCount = 0, failedCount = 0 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const { status, connect, disconnect } = calendar;
 
   const handleConnect = async () => {
+    if (busy || status.connected) return;
     setBusy(true);
     setError(null);
+    onConnectStart && onConnectStart();
     try {
       await connect();
       onConnect && onConnect();
@@ -76,6 +79,12 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
                 Connected as <span className="font-semibold">{status.googleEmail}</span>
               </span>
             </div>
+            <CalendarSyncSummary
+              phase={syncPhase}
+              totalEvents={eventsCount}
+              syncedCount={syncedCount}
+              failedCount={failedCount}
+            />
             <button
               onClick={handleDisconnect}
               disabled={busy}
