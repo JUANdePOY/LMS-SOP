@@ -59,8 +59,8 @@ export default function FilterSidebar({
   if (!open) return null;
 
   return (
-    <aside className="w-full shrink-0 lg:w-64" aria-label="Course filters">
-      <div className="sticky top-[5.5rem] rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm">
+    <aside className="w-full lg:w-72 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-4 shadow-sm" aria-label="Course filters">
+      <div>
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm font-semibold text-neutral-800 dark:text-neutral-100">
             <SlidersHorizontal size={16} />
@@ -77,7 +77,7 @@ export default function FilterSidebar({
                 <X size={16} />
               </button>
             )}
-            <button onClick={onClose} aria-label="Close filters" className="text-neutral-400 hover:text-neutral-700 lg:hidden">
+            <button onClick={onClose} aria-label="Close filters" className="text-neutral-400 hover:text-neutral-700">
               <X size={16} />
             </button>
           </div>

@@ -16,6 +16,7 @@ import BookOpeningTransition from "../components/BookOpeningTransition";
 import CourseContentSection from "../components/CourseContentSection";
 import { ProgressBar } from "../utils/courseVisuals";
 import { StaggerList, MotionItem } from "@/shared/motion";
+import { isAdminView } from "../utils/rbac";
 
 const ENROLLMENT_STATUS_META = {
   active: {
@@ -68,7 +69,7 @@ export default function CourseLibraryDetailsPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const isEmployee = user?.role === "employee";
+  const adminView = isAdminView(user);
   const { course, enrollments, analytics, loading, error, refetch } = useCourseLibraryDetails(courseId);
   const { users: allUsers } = useUsers({ page: 1, limit: 100 });
   const { departments } = useDepartments({ limit: 100 });
@@ -155,14 +156,14 @@ export default function CourseLibraryDetailsPage() {
       { key: "overview", label: "Overview" },
       { key: "content", label: "Content", icon: Layers },
     ];
-    if (isEmployee) return base;
+    if (!adminView) return base;
     return [
       ...base,
       { key: "enrollments", label: "Enrollments", icon: Users },
       { key: "analytics", label: "Analytics", icon: BarChart3 },
       { key: "actions", label: "Actions", icon: CheckCircle },
     ];
-  }, [isEmployee]);
+  }, [adminView]);
 
   const handleTabChange = useCallback(
     (key) => {
@@ -271,7 +272,7 @@ export default function CourseLibraryDetailsPage() {
             breadcrumb="Back to Library"
             progress={myProgress}
             primaryAction={
-          !isEmployee ? (
+          adminView ? (
             <button
               onClick={() => navigate(`/courses/${courseId}/builder`)}
               className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-blue-300 dark:hover:border-blue-500/60 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
@@ -283,7 +284,7 @@ export default function CourseLibraryDetailsPage() {
         }
       />
 
-      {!isEmployee && (
+      {!adminView && (
         <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 p-1 shadow-sm dark:shadow-none">
           {tabs.map((tab) => {
             const active = activeTab === tab.key;
@@ -313,11 +314,24 @@ export default function CourseLibraryDetailsPage() {
 
       <div className="mx-auto max-w-3xl space-y-5 sm:space-y-6">
         {activeTab === "content" ? (
-          <CourseContentSection
-            courseId={courseId}
-            onLessonView={(payload) => trackContentView(payload)}
-          />
-        ) : (!isEmployee && activeTab !== "overview") ? (
+          <>
+            <CourseContentSection
+              courseId={courseId}
+              onLessonView={(payload) => trackContentView(payload)}
+              headerAction={
+                !adminView && myProgress !== undefined ? (
+                  <button
+                    onClick={() => navigate(`/my-learning/course/${courseId}`)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-blue-300 dark:hover:border-blue-500/60 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
+                  >
+                    <BookOpen size={14} />
+                    Go to Course
+                  </button>
+                ) : null
+              }
+            />
+          </>
+        ) : (!adminView && activeTab !== "overview") ? (
           <>
             {activeTab === "enrollments" && (
               <OverviewSection title="Enrolled Employees" icon={Users}>
@@ -539,7 +553,7 @@ export default function CourseLibraryDetailsPage() {
         )}
       </div>
 
-      {showAssignModal && !isEmployee && (
+      {showAssignModal && !adminView && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-2xl rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-2xl">
             <div className="flex items-center justify-between border-b border-neutral-200/80 dark:border-neutral-700/80 px-5 py-3.5">

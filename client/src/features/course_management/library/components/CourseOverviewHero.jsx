@@ -104,7 +104,7 @@ export default function CourseOverviewHero({
                 {hasProgress && (
                   <div className="pt-1">
                     <div className="mb-1 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
-                      <span className="font-medium text-neutral-600 dark:text-neutral-300">Your progress</span>
+                      <span className="font-medium text-neutral-600 dark:text-neutral-300">Your progressss</span>
                       <span>{progress}%</span>
                     </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">

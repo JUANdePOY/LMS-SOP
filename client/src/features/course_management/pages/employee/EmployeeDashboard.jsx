@@ -6,6 +6,7 @@ import { getEnrollments } from "@/features/course_management/api/enrollment.api"
 import { Search, BookOpen, Clock, PlayCircle, TrendingUp, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StaggerList, MotionItem } from "@/shared/motion";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 const DIFFICULTY_META = {
   beginner: { label: "Beginner", color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-100 border-emerald-200 dark:border-emerald-500/30" },
@@ -51,7 +52,7 @@ function CourseCard({ course, onClick, showProgress = false, progress = 0 }) {
     >
       <div className="relative aspect-video bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center overflow-hidden">
         {course.thumbnail_url ? (
-          <img src={course.thumbnail_url} alt={course.title} className="w-full h-full object-cover" />
+          <img src={resolveFileUrl(course.thumbnail_url)} alt={course.title} className="w-full h-full object-cover" />
         ) : (
           <div className="flex items-center justify-center">
             <BookOpen size={48} className="text-blue-400 dark:text-blue-500" />
@@ -159,7 +160,13 @@ export default function EmployeeDashboard() {
 
   const fetchPublishedCourses = useCallback(async () => {
     try {
-      const res = await getCourseList({ status: "published", limit: 12 });
+      const currentUser = user;
+      const params = { status: "published", limit: 12 };
+      if (currentUser && !['super_admin', 'admin', 'department_head'].includes(currentUser.role)) {
+        if (currentUser.department_id) params.department_id = currentUser.department_id;
+        if (currentUser.business_id) params.business_id = currentUser.business_id;
+      }
+      const res = await getCourseList(params);
       if (res?.data) {
         const courses = Array.isArray(res.data) ? res.data : (res.data?.rows || []);
         setPublishedCourses(courses);
@@ -167,7 +174,7 @@ export default function EmployeeDashboard() {
     } catch (err) {
       console.error("Failed to load courses:", err);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const load = async () => {

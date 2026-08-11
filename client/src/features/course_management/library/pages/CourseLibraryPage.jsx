@@ -11,6 +11,7 @@ import QuickAssignModal from "../components/QuickAssignModal";
 import { useToast } from "@/shared/components/ui/Toast";
 import { StaggerList, MotionItem } from "@/shared/motion";
 import * as session from "@/services/session";
+import { useAuth } from "@/contexts/AuthContext";
 
 const ADMIN_ROLES = ["super_admin", "admin", "department_head"];
 const ALL_DIFFICULTIES = ["beginner", "intermediate", "advanced", "all_levels"];
@@ -73,7 +74,6 @@ export default function CourseLibraryPage() {
   const [sortField, setSortField] = useState(initialSort);
   const [sortDirection, setSortDirection] = useState(initialOrder);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [filtersCollapsed, setFiltersCollapsed] = useState(false);
   const [assignCourse, setAssignCourse] = useState(null);
 
   const { categories } = useCourseCategories({ status: "published" });
@@ -125,26 +125,35 @@ export default function CourseLibraryPage() {
     });
   }, [viewMode, search, selectedDifficulties, selectedCategories, sortField, sortDirection, syncUrl]);
 
-  const queryParams = useMemo(
-    () => ({
-      search,
-      difficulty: selectedDifficulties.join(","),
-      category: selectedCategories.join(","),
-      sort: sortField,
-      order: sortDirection,
-      status: "published",
-      page: 1,
-      limit: viewMode === "grid" ? 12 : 20,
-    }),
-    [search, selectedDifficulties, selectedCategories, sortField, sortDirection, viewMode]
-  );
+   const userRole = session.getCurrentUser()?.role;
+   const isAdminRole = ADMIN_ROLES.includes(userRole);
 
-  const { courses, loading, error, pagination, refetch } = usePublishedCourses(queryParams);
+   const { isAnyAdmin } = useAuth();
 
-  const userRole = session.getCurrentUser()?.role;
-  const isAdminRole = ADMIN_ROLES.includes(userRole);
+   const queryParams = useMemo(
+     () => {
+       const currentUser = session.getCurrentUser();
+       return ({
+        search,
+        difficulty: selectedDifficulties.join(","),
+        category: selectedCategories.join(","),
+        sort: sortField,
+        order: sortDirection,
+        status: "published",
+        page: 1,
+        limit: viewMode === "grid" ? 12 : 20,
+        ...(isAnyAdmin ? {} : {
+          department_id: currentUser?.department_id || "",
+          business_id: currentUser?.business_id || "",
+        }),
+      });
+     },
+     [search, selectedDifficulties, selectedCategories, sortField, sortDirection, viewMode, isAnyAdmin]
+    );
 
-  const decoratedCourses = useMemo(() => {
+   const { courses, loading, error, pagination, refetch } = usePublishedCourses(queryParams);
+
+   const decoratedCourses = useMemo(() => {
     return courses.map((c) => ({
       ...c,
       myProgress: myEnrollments[c.id] ? myEnrollments[c.id].progress : null,
@@ -247,7 +256,7 @@ export default function CourseLibraryPage() {
       course={course}
       myProgress={course.myProgress}
       onClick={() => handleCourseClick(course.id)}
-      onAssign={handleAssign}
+      onAssign={isAnyAdmin ? handleAssign : undefined}
     />
   );
 
@@ -267,17 +276,11 @@ export default function CourseLibraryPage() {
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center justify-between">
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Course Library</h1>
-            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">Browse and assign published courses to employees</p>
+            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
+              {isAnyAdmin ? "Browse and assign published courses to employees" : "Browse available courses for your department"}
+            </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-xs text-neutral-600 hover:text-neutral-800 lg:hidden"
-            >
-              <SlidersHorizontal size={14} />
-              Filters
-            </button>
             <div className="flex items-center rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-1">
               <button
                 type="button"
@@ -342,68 +345,47 @@ export default function CourseLibraryPage() {
                 Clear
               </button>
             )}
+            <button
+              type="button"
+              onClick={() => setSidebarOpen((o) => !o)}
+              aria-pressed={sidebarOpen}
+              className={`ml-auto inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
+                sidebarOpen || hasActiveFilters
+                  ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/20 dark:text-blue-300"
+                  : "border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-600 hover:text-neutral-800"
+              }`}
+            >
+              <SlidersHorizontal size={14} />
+              Filters
+            </button>
           </div>
         </div>
       </div>
 
-      {hasActiveFilters && (
-        <div className="flex flex-wrap items-center gap-2 text-xs" aria-live="polite">
-          <span className="text-neutral-500 dark:text-neutral-400">Active filters:</span>
-          {search && (
-            <FilterChip label={`Search: "${search}"`} onClear={() => setSearchInput("")} />
-          )}
-          {selectedDifficulties.map((d) => (
-            <FilterChip
-              key={d}
-              label={`Difficulty: ${DIFFICULTY_LABELS[d] || d}`}
-              onClear={() => toggleDifficulty(d)}
-            />
-          ))}
-          {selectedCategories.map((c) => (
-            <FilterChip key={c} label={`Category: ${c}`} onClear={() => toggleCategory(c)} />
-          ))}
-        </div>
-      )}
-
-      <div className="flex gap-6">
-        {filtersCollapsed ? (
-          <div className="hidden lg:block">
-            <button
-              type="button"
-              onClick={() => setFiltersCollapsed(false)}
-              className="sticky top-[5.5rem] inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-xs font-medium text-neutral-600 shadow-sm hover:text-neutral-900 dark:text-neutral-300 dark:hover:text-neutral-100"
-            >
-              <SlidersHorizontal size={14} />
-              Show filters
-            </button>
-          </div>
-        ) : (
-          <div className="hidden lg:block">
-            <div className="sticky top-[5.5rem]">
-              <FilterSidebar
-                open
-                collapsible
-                onCollapse={() => setFiltersCollapsed(true)}
-                categories={categories}
-                selectedDifficulties={selectedDifficulties}
-                selectedCategories={selectedCategories}
-                sortField={sortField}
-                sortDirection={sortDirection}
-                onToggleDifficulty={toggleDifficulty}
-                onToggleCategory={toggleCategory}
-                onSortChange={(f) => handleSort(f)}
-                onToggleDirection={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
-                onClear={clearFilters}
-                hasActiveFilters={hasActiveFilters}
-                onClose={() => setSidebarOpen(false)}
-              />
-            </div>
-          </div>
-        )}
-
+      <div className="flex gap-6 items-start">
         <div className="min-w-0 flex-1 space-y-6">
-          {!loading && continueLearning.length > 0 && (
-            <section>
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 text-xs" aria-live="polite">
+              <span className="text-neutral-500 dark:text-neutral-400">Active filters:</span>
+              {search && (
+                <FilterChip label={`Search: "${search}"`} onClear={() => setSearchInput("")} />
+              )}
+              {selectedDifficulties.map((d) => (
+                <FilterChip
+                  key={d}
+                  label={`Difficulty: ${DIFFICULTY_LABELS[d] || d}`}
+                  onClear={() => toggleDifficulty(d)}
+                />
+              ))}
+              {selectedCategories.map((c) => (
+                <FilterChip key={c} label={`Category: ${c}`} onClear={() => toggleCategory(c)} />
+              ))}
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1 space-y-6">
+            {!loading && continueLearning.length > 0 && (
+              <section>
               <h2 className="mb-3 text-sm font-semibold text-neutral-700 dark:text-neutral-200">Continue Learning</h2>
               <StaggerList className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
                 {continueLearning.map((course) => (
@@ -528,31 +510,41 @@ export default function CourseLibraryPage() {
             </>
           )}
         </div>
+
+        {sidebarOpen && (
+          <aside className="hidden lg:block w-72 shrink-0">
+            <div className="sticky top-[5.5rem]">
+              <FilterSidebar
+                open
+                onClose={() => setSidebarOpen(false)}
+                categories={categories}
+                selectedDifficulties={selectedDifficulties}
+                selectedCategories={selectedCategories}
+                sortField={sortField}
+                sortDirection={sortDirection}
+                onToggleDifficulty={toggleDifficulty}
+                onToggleCategory={toggleCategory}
+                onSortChange={(f) => handleSort(f)}
+                onToggleDirection={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+                onClear={clearFilters}
+                hasActiveFilters={hasActiveFilters}
+              />
+            </div>
+          </aside>
+        )}
       </div>
 
-      <FilterSidebar
-        open={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        categories={categories}
-        selectedDifficulties={selectedDifficulties}
-        selectedCategories={selectedCategories}
-        sortField={sortField}
-        sortDirection={sortDirection}
-        onToggleDifficulty={toggleDifficulty}
-        onToggleCategory={toggleCategory}
-        onSortChange={(f) => handleSort(f)}
-        onToggleDirection={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
-        onClear={clearFilters}
-        hasActiveFilters={hasActiveFilters}
-      />
+      </div>
 
-      <QuickAssignModal
-        open={Boolean(assignCourse)}
-        course={assignCourse}
-        onClose={() => setAssignCourse(null)}
-        onAssigned={handleAssigned}
-        toast={toast}
-      />
+      {isAnyAdmin && (
+        <QuickAssignModal
+          open={Boolean(assignCourse)}
+          course={assignCourse}
+          onClose={() => setAssignCourse(null)}
+          onAssigned={handleAssigned}
+          toast={toast}
+        />
+      )}
     </div>
   );
 }

@@ -110,7 +110,7 @@ function ModuleBlock({ courseId, module, index, onLessonView }) {
   );
 }
 
-export default function CourseContentSection({ courseId, onLessonView }) {
+export default function CourseContentSection({ courseId, onLessonView, headerAction }) {
   const { data: modules, loading, error } = useModules(courseId);
 
   const totalLessons = modules.reduce(
@@ -151,15 +151,18 @@ export default function CourseContentSection({ courseId, onLessonView }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
-        <span className="inline-flex items-center gap-1.5">
-          <GraduationCap size={14} className="text-blue-600 dark:text-blue-400" />
-          {modules.length} {modules.length === 1 ? "module" : "modules"}
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <BookOpen size={14} className="text-blue-600 dark:text-blue-400" />
-          {totalLessons} {totalLessons === 1 ? "lesson" : "lessons"}
-        </span>
+      <div className="flex items-center justify-between gap-4 text-xs text-neutral-500 dark:text-neutral-400">
+        <div className="flex items-center gap-4">
+          <span className="inline-flex items-center gap-1.5">
+            <GraduationCap size={14} className="text-blue-600 dark:text-blue-400" />
+            {modules.length} {modules.length === 1 ? "module" : "modules"}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <BookOpen size={14} className="text-blue-600 dark:text-blue-400" />
+            {totalLessons} {totalLessons === 1 ? "lesson" : "lessons"}
+          </span>
+        </div>
+        {headerAction}
       </div>
 
       <div className="space-y-3">

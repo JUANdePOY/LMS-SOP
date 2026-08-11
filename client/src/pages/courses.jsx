@@ -6,6 +6,7 @@ import {
 import CreateCourseModal from "@/features/course_management/components/modals/CreateCourseModal";
 import { useToast } from "@/shared/components/ui/Toast";
 import { StaggerList, MotionItem } from "@/shared/motion";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 const STATUS_META = {
   published: {
@@ -375,7 +376,7 @@ export default function Courses({ departments = [] }) {
                       <td className="px-3 py-3.5 w-10"></td>
                       <td className="px-3 py-3.5 hidden sm:table-cell">
                         {c.thumbnail_url ? (
-                          <img src={c.thumbnail_url} alt={c.title} className="h-10 w-10 rounded-lg object-cover border border-neutral-200 dark:border-neutral-700" />
+                          <img src={resolveFileUrl(c.thumbnail_url)} alt={c.title} className="h-10 w-10 rounded-lg object-cover border border-neutral-200 dark:border-neutral-700" />
                         ) : (
                           <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-sm ring-1 ring-blue-400/30 shrink-0">
                             <span className="text-sm font-bold">📚</span>

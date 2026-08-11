@@ -1,6 +1,7 @@
 const enrollmentModel = require('../models/enrollmentModel');
 const courseModel = require('../models/courseModel');
 const lessonProgressModel = require('../models/lessonProgressModel');
+const departmentModel = require('../models/departmentModel');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -111,6 +112,44 @@ function bulkEnroll(req, res) {
     .catch((err) => sendError(res, err, 'Failed to bulk enroll students'));
 }
 
+async function bulkEnrollByDepartment(req, res) {
+  const userId = req.user?.id;
+  const { course_id, role } = req.body;
+  const departmentId = parseInt(req.params.department_id, 10);
+
+  if (!course_id) {
+    return res.status(400).json({ success: false, message: 'course_id is required', code: 'VALIDATION_ERROR' });
+  }
+  if (!departmentId || Number.isNaN(departmentId)) {
+    return res.status(400).json({ success: false, message: 'Valid department_id is required', code: 'VALIDATION_ERROR' });
+  }
+
+  try {
+    const course = await courseModel.findById(course_id);
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+
+    const users = await departmentModel.getUsers(departmentId);
+    const activeUserIds = users.filter((u) => u.is_active).map((u) => u.id);
+    if (!activeUserIds.length) {
+      return res.status(400).json({ success: false, message: 'No active users found in this department', code: 'NO_USERS' });
+    }
+
+    const existingUserIds = await enrollmentModel.findExistingUserIds(course_id, activeUserIds);
+    const newUserIds = activeUserIds.filter((id) => !existingUserIds.includes(id));
+    if (!newUserIds.length) {
+      return res.status(409).json({ success: false, message: 'All active department users are already enrolled in this course', code: 'ALREADY_ENROLLED' });
+    }
+
+    const enrollments = newUserIds.map((uid) => ({ course_id, user_id: uid, role: role || 'learner', status: 'active' }));
+    const ids = await enrollmentModel.bulkCreate(enrollments);
+
+    logAudit('enrollment.bulk_create_by_department', userId, { course_id, department_id: departmentId, count: ids.length });
+    return res.status(201).json({ success: true, message: `${ids.length} students enrolled successfully`, data: { ids } });
+  } catch (err) {
+    sendError(res, err, 'Failed to bulk enroll by department');
+  }
+}
+
 function unenrollStudent(req, res) {
   const userId = req.user?.id;
   const enrollmentId = parseInt(req.params.id, 10);
@@ -209,6 +248,7 @@ module.exports = {
   getEnrollment,
   enrollStudent,
   bulkEnroll,
+  bulkEnrollByDepartment,
   unenrollStudent,
   updateEnrollmentStatus,
   approveEnrollment,

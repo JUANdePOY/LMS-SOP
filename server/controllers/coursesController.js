@@ -21,13 +21,13 @@ function sendError(res, err, fallback = 'Request failed') {
 }
 
 function listCourses(req, res) {
-  const { search, status, category, difficulty, instructor_id, page, limit } = req.query;
+  const { search, status, category, difficulty, instructor_id, page, limit, department_id, business_id } = req.query;
   const pageNum = parseInt(page || '1', 10);
   const limitNum = parseInt(limit || '20', 10);
 
   Promise.all([
-    courseModel.listCourses({ search, status, category, difficulty, instructor_id, page: pageNum, limit: limitNum }),
-    courseModel.countCourses({ search, status, category, difficulty, instructor_id }),
+    courseModel.listCourses({ search, status, category, difficulty, instructor_id, page: pageNum, limit: limitNum, department_id, business_id }),
+    courseModel.countCourses({ search, status, category, difficulty, instructor_id, department_id, business_id }),
   ])
     .then(([data, total]) => {
       res.json({
