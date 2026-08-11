@@ -179,7 +179,14 @@ export default function EventsPage() {
         syncedCount={syncResult.synced}
         failedCount={syncResult.failed}
         onConnectStart={() => setSyncPhase("syncing")}
-        onConnect={() => {
+        onConnect={async () => {
+          if (typeof calendar.loadStatus === "function") {
+            try {
+              await calendar.loadStatus();
+            } catch {
+              /* ignore */
+            }
+          }
           setSyncPhase("done");
           setSyncResult({ synced: items.length, failed: 0 });
           calendar.markEventsSynced(items.map((i) => i.id));

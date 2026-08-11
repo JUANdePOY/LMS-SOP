@@ -38,7 +38,7 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
         const DELAY_MS = 500;
         for (let i = 0; i < MAX_CHECKS; i++) {
           try {
-            const statusRes = await getCalendarStatus();
+            const statusRes = await getCalendarStatus(true);
             if (statusRes.data?.success && statusRes.data.data?.connected) {
               onConnect && onConnect();
               return;

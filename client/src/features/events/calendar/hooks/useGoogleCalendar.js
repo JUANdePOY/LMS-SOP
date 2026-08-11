@@ -46,12 +46,12 @@ export function useGoogleCalendar() {
 
       const tryClosePopup = (win) => {
         if (!win) return;
-        // Avoid accessing cross-origin properties like `location.href` which
-        // can trigger COOP console warnings. Reading `closed` is safe even
-        // for cross-origin windows in modern browsers, so use it to decide
-        // whether to call `close()`.
+        // Only attempt to close the popup if it still references this opener.
+        // When COOP/COEP severs the opener link, `win.opener` becomes `null` —
+        // checking `opener` is less likely to trigger COOP console warnings
+        // than reading `closed` or `location` on the popup.
         try {
-          if (typeof win.closed === "boolean" && !win.closed) {
+          if (win.opener === window) {
             try {
               win.close();
             } catch (e) {
@@ -59,7 +59,7 @@ export function useGoogleCalendar() {
             }
           }
         } catch (e) {
-          // If even reading `closed` throws, give up silently.
+          // If reading `opener` throws, give up silently.
         }
       };
 

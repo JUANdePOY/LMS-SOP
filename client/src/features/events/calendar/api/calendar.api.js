@@ -2,8 +2,9 @@ import { request } from "@/services/api";
 
 const API_BASE = "/calendar";
 
-export async function getCalendarStatus() {
-  return request(`${API_BASE}/status`);
+export async function getCalendarStatus(force = false) {
+  const url = `${API_BASE}/status${force ? `?_=${Date.now()}` : ''}`;
+  return request(url);
 }
 
 export async function getCalendarAuthUrl() {
