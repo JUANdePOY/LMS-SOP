@@ -674,7 +674,14 @@ async function initDatabase() {
       }
       console.error('Server will start but DB-dependent features will fail');
     }
-    await runMigrations();
+    // Auto-migrate on boot by default. Set RUN_MIGRATIONS=false to skip the
+    // migration pass entirely once all tables already exist (avoids the noisy
+    // "Migration skipped" logs and any per-boot migration cost).
+    if (process.env.RUN_MIGRATIONS === 'false') {
+      console.log('Skipping DB migrations (RUN_MIGRATIONS=false)');
+    } else {
+      await runMigrations();
+    }
   })();
   return initPromise;
 }
