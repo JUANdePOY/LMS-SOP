@@ -1,8 +1,10 @@
 ﻿import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, Layers, Users, FileText, Loader2, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Users, FileText, Loader2, Plus, Folder } from 'lucide-react';
 import { useHierarchyContext } from './HierarchyContext';
-import SopCard from './SopCard';
+import SopFile from './SopFile';
+import InlineCreateRow from './InlineCreateRow';
 import CategoryNode from './CategoryNode';
+import TreeConnector from './TreeConnector';
 import { countLeaves, isLeafNode, sumMembers } from './hierarchyStats';
 import { getDepartmentSops } from '../../api/hierarchy.api';
 
@@ -24,10 +26,25 @@ function StatBadge({ node }) {
   );
 }
 
-export default function HierarchyNode({ node, depth = 0 }) {
-  const { expandedDeptIds, toggleDepartment, openCreateSop } = useHierarchyContext();
+export default function HierarchyNode({ node, depth = 0, creating = false, onInlineCreateCategory, onInlineCreateSop }) {
+  const {
+    expandedDeptIds,
+    toggleDepartment,
+    startCreateCategory,
+    cancelCreateCategory,
+    creatingCategoryFor,
+    startCreateSop,
+    cancelCreateSop,
+    creatingSopFor,
+  } = useHierarchyContext();
   const hasChildren = !isLeafNode(node);
   const isExpanded = expandedDeptIds.has(node.id);
+  const isCreatingCategory = creatingCategoryFor === node.id;
+  // Inline "new file" mode for this department's own (uncategorized) SOPs.
+  const isCreatingLeafSop =
+    !hasChildren &&
+    creatingSopFor?.departmentId === node.id &&
+    creatingSopFor?.categoryId == null;
 
   // For leaf departments, expanding fetches & shows this department's own SOPs inline.
   const [sops, setSops] = useState(null); // null = not fetched yet
@@ -95,7 +112,7 @@ export default function HierarchyNode({ node, depth = 0 }) {
           )}
 
           <span className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-500/10 shrink-0">
-            <Layers className="h-4 w-4 text-indigo-500" />
+            <Folder className="h-4 w-4 text-indigo-500" />
           </span>
 
           <div className="flex-1 min-w-0 flex items-center gap-2">
@@ -120,13 +137,19 @@ export default function HierarchyNode({ node, depth = 0 }) {
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              openCreateSop(node.id, null);
+              if (isCreatingCategory) {
+                cancelCreateCategory();
+              } else {
+                if (!isExpanded) toggleDepartment(node.id);
+                startCreateCategory(node.id);
+              }
             }}
-            className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
-            title="Create SOP in this department"
+            disabled={creating}
+            className="inline-flex items-center justify-center rounded-md border border-[var(--border)] bg-[var(--bg-surface)] w-7 h-7 text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0 disabled:opacity-50"
+            aria-label={isCreatingCategory ? 'Cancel category creation' : 'Create Category'}
+            title={isCreatingCategory ? 'Cancel category creation' : 'Create Category'}
           >
-            <Plus className="h-3 w-3" />
-            Create
+            <Plus className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -134,36 +157,93 @@ export default function HierarchyNode({ node, depth = 0 }) {
       {isExpanded && (
         <>
           {hasChildren && (
-            <div className="relative ml-[28px] mt-1.5 divide-y divide-[var(--border)] border-l-2 border-[var(--border)] pl-4">
-              {node.children.map((child) => (
-                <div key={child.id} className="relative py-1 first:pt-0 last:pb-0">
-                  <span className="absolute -left-4 top-[19px] h-[2px] w-4 bg-[var(--border)]" />
-                  <HierarchyNode node={child} depth={depth + 1} />
-                </div>
-              ))}
+            <div className="relative ml-[28px] mt-1.5 border-l-2 border-[var(--border)] pl-4 space-y-1">
+               {node.children.map((child, idx) => (
+                 <TreeConnector key={child.id} isLast={idx === node.children.length - 1} stubTop={19}>
+                  <HierarchyNode
+                      node={child}
+                      depth={depth + 1}
+                      creating={creating}
+                      onInlineCreateCategory={onInlineCreateCategory}
+                      onInlineCreateSop={onInlineCreateSop}
+                    />
+                 </TreeConnector>
+               ))}
             </div>
           )}
 
-          {node.categories?.length > 0 && (
+          {node.categories?.length > 0 || isCreatingCategory ? (
             <div className="ml-[28px] mt-3">
               <p className="text-xs font-semibold tracking-wide text-[var(--text-muted)] mb-2">
-                Categories ({node.categories.length})
+                Categories ({node.categories?.length || 0})
               </p>
-              <div className="space-y-1">
-                {node.categories.map((category) => (
-                  <CategoryNode key={category.id} category={category} departmentId={node.id} />
+
+              {isCreatingCategory && (
+                <div className="mb-2 -ml-[28px]">
+                  <InlineCreateRow
+                    icon={Folder}
+                    label="Category"
+                    defaultValue="Untitled Category"
+                    loading={creating}
+                    onConfirm={(name) => onInlineCreateCategory(node.id, name)}
+                    onCancel={cancelCreateCategory}
+                  />
+                </div>
+              )}
+
+              <div className="relative border-l-2 border-[var(--border)] pl-4 space-y-1">
+                {(node.categories || []).map((category, idx) => (
+                  <TreeConnector
+                    key={category.id}
+                    isLast={idx === (node.categories?.length || 0) - 1}
+                    stubTop={18}
+                  >
+                    <CategoryNode
+                      category={category}
+                      departmentId={node.id}
+                      creating={creating}
+                      onInlineCreateSop={onInlineCreateSop}
+                    />
+                  </TreeConnector>
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
 
           {!hasChildren && (
-            <div className="ml-[42px] mt-2 mb-1 border-t border-[var(--border)] pt-3">
+            <div className="ml-[28px] mt-2 mb-1 border-t border-[var(--border)] pt-3">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-semibold tracking-wide text-[var(--text-muted)]">
-                  SOPS {sops ? `(${sops.length})` : ''}
+                  {node.name} SOPs {sops ? `(${sops.length})` : ''}
                 </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isCreatingLeafSop) cancelCreateSop();
+                    else startCreateSop(node.id, null);
+                  }}
+                  disabled={creating}
+                  className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+                  aria-label="Create SOP"
+                  title="Create SOP"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>SOP</span>
+                </button>
               </div>
+
+              {isCreatingLeafSop ? (
+                <div className="mb-2">
+                  <InlineCreateRow
+                    icon={FileText}
+                    label="SOP"
+                    defaultValue="Untitled SOP"
+                    loading={creating}
+                    onConfirm={(name) => onInlineCreateSop(node.id, null, name)}
+                    onCancel={cancelCreateSop}
+                  />
+                </div>
+              ) : null}
 
               {loadingSops && (
                 <div className="flex items-center gap-2 py-4 text-sm text-[var(--text-muted)]">
@@ -183,9 +263,11 @@ export default function HierarchyNode({ node, depth = 0 }) {
               )}
 
               {!loadingSops && !sopError && sops && sops.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {sops.map((sop) => (
-                    <SopCard key={sop.id} sop={sop} />
+                <div className="relative border-l-2 border-[var(--border)] pl-4 space-y-0.5">
+                  {sops.map((sop, idx) => (
+                    <TreeConnector key={sop.id} isLast={idx === sops.length - 1} stubTop={15}>
+                      <SopFile sop={sop} />
+                    </TreeConnector>
                   ))}
                 </div>
               )}

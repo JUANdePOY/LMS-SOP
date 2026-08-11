@@ -22,7 +22,15 @@ function filterDepartments(departments, query) {
   }, []);
 }
 
-export default function OrganizationTree({ hierarchy = [], searchQuery = '', onCreateSop }) {
+export default function OrganizationTree({
+  hierarchy = [],
+  searchQuery = '',
+  creating = false,
+  creatingDepartmentFor = null,
+  onInlineCreateDepartment,
+  onInlineCreateCategory,
+  onInlineCreateSop,
+}) {
   if (!hierarchy || hierarchy.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -44,7 +52,11 @@ export default function OrganizationTree({ hierarchy = [], searchQuery = '', onC
             business={business}
             departments={filteredDepartments}
             searchActive={Boolean(searchQuery)}
-            onCreateSop={onCreateSop}
+            creating={creating}
+            creatingDepartmentFor={creatingDepartmentFor}
+            onInlineCreateDepartment={onInlineCreateDepartment}
+            onInlineCreateCategory={onInlineCreateCategory}
+            onInlineCreateSop={onInlineCreateSop}
           />
         );
       })}

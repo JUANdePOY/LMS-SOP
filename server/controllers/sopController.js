@@ -713,16 +713,29 @@ function renderModuleContentForPdf(html, imageCache, doc) {
     doc.text(text, x, doc.y, { width: w, lineGap: lineGap || 4 });
   }
 
-  function getTextAlign($node) {
-    const style = $node.attr('style') || '';
+    function getTextAlign($node) {
+    const node = $node.length ? $node.toArray()[0] : $node;
+    const style = (node && node.attribs && node.attribs.style) || '';
     const match = style.match(/text-align:\s*(left|center|right|justify)/i);
     if (match) return match[1].toLowerCase();
+    
+    // Check parent containers for inherited alignment
+    let parent = node;
+    while (parent && parent.parent) {
+      parent = parent.parent;
+      const parentStyle = (parent.attribs && parent.attribs.style) || '';
+      const parentMatch = parentStyle.match(/text-align:\s*(left|center|right|justify)/i);
+      if (parentMatch) return parentMatch[1].toLowerCase();
+    }
+    
     return 'left';
   }
 
   function processNode(node) {
     const tag = node.tagName?.toLowerCase();
     if (!tag) return;
+
+    console.error('[PDF] processNode tag:', tag);
 
     switch (tag) {
              case 'h2': {
@@ -835,9 +848,8 @@ function renderModuleContentForPdf(html, imageCache, doc) {
           break;
         }
       case 'figure': {
+        console.error('[PDF] processNode found figure tag');
         renderFigure($, node, doc, imageCache, startX, width);
-        hasContent = true;
-        break;
       }
       case 'table': {
         renderTable($, node, doc, startX, width);
@@ -852,6 +864,7 @@ function renderModuleContentForPdf(html, imageCache, doc) {
       default: {
         // Container wrapper — recurse into children
         const children = $(node).children();
+        console.error('[PDF] container:', tag, 'children:', [...new Set([...children.toArray().map(c => c.tagName?.toLowerCase())])]);
         if (children.length > 0) {
           children.each((i, child) => processNode(child));
         } else {
@@ -863,13 +876,23 @@ function renderModuleContentForPdf(html, imageCache, doc) {
             hasContent = true;
           }
         }
+        
+        // Also check for direct figure/table children that might have been missed
+        const figures = $(node).find('figure').toArray();
+        figures.forEach(fig => {
+          if (!fig._pdfRendered) {
+            fig._pdfRendered = true;
+            renderFigure($, fig, doc, imageCache, startX, width);
+            hasContent = true;
+          }
+        });
       }
     }
   }
 
   // Start from root children — this covers TipTap's root wrapper
   try {
-    $.root().children().each((i, el) => processNode(el));
+  $.root().each((i, el) => processNode(el));
   } catch (err) {
     console.error('[PDF] renderModuleContentForPdf error:', err.message);
     const allText = $.root().text().trim();
@@ -975,19 +998,29 @@ function renderInlineContent($, el, doc, options = {}) {
   doc.x = x;
 }
 
-function renderFigure($, el, doc, imageCache, startX, width) {
+function renderFigure($, el, doc, imageCache, startX, width) {  console.error('[PDF] renderFigure CALLED');
+
   const figure = $(el);
   const img = figure.find('img').first();
   const figcaption = figure.find('figcaption').first();
 
   const src = img.attr('src') || '';
+  console.error('[PDF] figure src:', src);
   const idMatch = src.match(/\/api\/sops\/attachments\/(\d+)\/file/);
+  console.error('[PDF] figure idMatch:', idMatch ? idMatch[1] : null);
 
-  if (!idMatch) return;
+  if (!idMatch) {
+    console.error('[PDF] renderFigure early return - no idMatch');
+    return;
+  }
 
   const attId = parseInt(idMatch[1], 10);
   const image = imageCache.get(attId);
-  if (!image) return;
+  console.error('[PDF] renderFigure attId:', attId, 'image in cache:', !!image);
+  if (!image) {
+    console.error('[PDF] renderFigure early return - no image in cache');
+    return;
+  }
 
   let align = 'center';
 const dataAlign = figure.attr('data-align');
@@ -1220,23 +1253,25 @@ const exportController = {
 
       // Pre-fetch all images referenced in module content
       const imageCache = new Map();
-      const imgSrcRegex = /<img[^>]+src="([^"]+)"/g;
+      const imgSrcRegex = /<img[^>]*src=(["'])([^"']+)\1/g;
       const attachmentIdRegex = /\/api\/sops\/attachments\/(\d+)\/file/;
 
       if (modules && modules.length > 0) {
         const attachmentIds = new Set();
         modules.forEach((module) => {
           if (!module.content) return;
-          imgSrcRegex.lastIndex = 0; // Reset regex state for each module
+          imgSrcRegex.lastIndex = 0;
           let match;
           while ((match = imgSrcRegex.exec(module.content)) !== null) {
-            const src = match[1];
+            const src = match[2];
             const idMatch = src.match(attachmentIdRegex);
             if (idMatch) {
               attachmentIds.add(parseInt(idMatch[1], 10));
             }
           }
         });
+      console.error('[PDF] attachmentIds collected:', [...attachmentIds]);
+
 
         for (const attId of attachmentIds) {
           try {
@@ -1251,6 +1286,7 @@ const exportController = {
             // Skip attachments that can't be loaded
           }
         }
+        console.error('[PDF] imageCache keys:', [...imageCache.keys()]);
       }
 
       // Modules
@@ -1274,7 +1310,8 @@ const exportController = {
           doc.fillColor(PDF_COLORS.text).font('Helvetica-Bold').fontSize(11.5)
             .text(module.title || 'Untitled', startX + badgeSize + 10, titleY + 4, {
               width: width - badgeSize - 10,
-            });
+            }); 
+
 
           doc.x = startX;
           doc.y = Math.max(doc.y, titleY + badgeSize) + 10;

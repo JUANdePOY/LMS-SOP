@@ -4,44 +4,104 @@ import { Plus, RefreshCw } from 'lucide-react';
 import OrganizationTree from '../components/hierarchy/OrganizationTree';
 import { useHierarchy } from '../hooks/useHierarchy';
 import { useHierarchyContext, HierarchyProvider } from '../components/hierarchy/HierarchyContext';
-import CreateSopModal from '../components/hierarchy/CreateSopModal';
+import { createDepartment } from '../api/department.api';
+import { createCategory } from '../api/category.api';
+import { quickCreateSop } from '../services/sopQuickCreate.service';
+import { generateDepartmentCode } from '../utils/generateDepartmentCode';
+import { useToast } from '@/shared/components/ui/Toast';
 import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
-import BusinessSopCreateForm from '../components/hierarchy/BusinessSopCreateForm';
 
 function HierarchyOverviewPageInner() {
   const navigate = useNavigate();
   const { hierarchy, loading, error, refresh } = useHierarchy();
-  const { sopModalOpen, createSopContext, closeCreateSop } = useHierarchyContext();
+  const { toast } = useToast();
+  const {
+    creatingDepartmentFor,
+    cancelCreateDepartment,
+    cancelCreateCategory,
+    cancelCreateSop,
+  } = useHierarchyContext();
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [sopCreateBusinessId, setSopCreateBusinessId] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const safeQuery = sanitizeSearchQuery(searchQuery);
 
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-    const err = validateSearchQuery(value);
-    if (err) return;
+  const handleSearchChange = (event) => {
+    const value = event.target.value;
+    if (validateSearchQuery(value)) return;
     setSearchQuery(value);
   };
 
-  const handleSopCreated = async (sopId) => {
-    await refresh();
-    navigate(`/sops/${sopId}`);
+  // Inline (file-style) creation: SOP under a Department (+ optional Category).
+  const handleInlineCreateSop = async (departmentId, categoryId, name) => {
+    setSubmitting(true);
+    try {
+      const sopId = await quickCreateSop({
+        title: name,
+        departmentId,
+        categoryId,
+      });
+      toast.success('SOP created successfully');
+      cancelCreateSop();
+      await refresh();
+      navigate(`/sops/${sopId}`);
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message || err?.message || 'Failed to create SOP'
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleCreateSopClick = (businessId) => {
-    setSopCreateBusinessId(businessId);
+  // Inline (folder-style) creation: Department under a Business.
+  const handleInlineCreateDepartment = async (businessId, name) => {
+    setSubmitting(true);
+    try {
+      await createDepartment({
+        name,
+        code: generateDepartmentCode(name),
+        description: '',
+        parent_department_id: null,
+        head_user_id: null,
+        business_id: businessId,
+        status: 'active',
+      });
+      toast.success('Department created successfully');
+      cancelCreateDepartment();
+      await refresh();
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message || err?.message || 'Failed to create department'
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleCloseSopCreate = () => {
-    setSopCreateBusinessId(null);
+  // Inline (folder-style) creation: Category under a Department.
+  const handleInlineCreateCategory = async (departmentId, name) => {
+    setSubmitting(true);
+    try {
+      await createCategory({ name, description: '', department_id: departmentId });
+      toast.success('Category created successfully');
+      cancelCreateCategory();
+      await refresh();
+    } catch (err) {
+      toast.error(
+        err?.response?.data?.message || err?.message || 'Failed to create category'
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Dashboard </h1>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Dashboard</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">
             Visual overview of your business structure and departments.
           </p>
@@ -87,8 +147,18 @@ function HierarchyOverviewPageInner() {
                 maxLength={100}
                 className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] py-2 px-3 pl-9 text-sm text-[var(--text-primary)] outline-none"
               />
-              <svg className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <svg
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
               </svg>
             </div>
           </div>
@@ -96,26 +166,13 @@ function HierarchyOverviewPageInner() {
           <OrganizationTree
             hierarchy={hierarchy}
             searchQuery={safeQuery}
-            onCreateSop={handleCreateSopClick}
+            creating={submitting}
+            creatingDepartmentFor={creatingDepartmentFor}
+            onInlineCreateDepartment={handleInlineCreateDepartment}
+            onInlineCreateCategory={handleInlineCreateCategory}
+            onInlineCreateSop={handleInlineCreateSop}
           />
         </>
-      )}
-
-      <CreateSopModal
-        open={sopModalOpen}
-        onClose={closeCreateSop}
-        departmentId={createSopContext?.departmentId || null}
-        categoryId={createSopContext?.categoryId || null}
-        onCreated={handleSopCreated}
-      />
-
-      {sopCreateBusinessId && (
-        <BusinessSopCreateForm
-          open={!!sopCreateBusinessId}
-          onClose={handleCloseSopCreate}
-          businessId={sopCreateBusinessId}
-          onCreated={handleSopCreated}
-        />
       )}
     </div>
   );
