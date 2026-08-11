@@ -277,6 +277,30 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
+// Validate the Google Calendar token encryption key at boot. If it is missing
+// or malformed, calendar tokens cannot be decrypted on the next request and the
+// user is forced to reconnect every restart/deploy. A stable key MUST be set in
+// the environment (e.g. Hostinger app env vars) — not in a gitignored .env that
+// isn't deployed. This check fails fast with a clear message instead of letting
+// the reconnect loop fail silently.
+(function validateCalendarKey() {
+  const raw = process.env.CALENDAR_TOKEN_ENCRYPTION_KEY;
+  if (!raw) {
+    console.error(
+      '[Calendar] WARNING: CALENDAR_TOKEN_ENCRYPTION_KEY is not set. Google Calendar ' +
+      'tokens cannot be decrypted across restarts — users will be forced to reconnect ' +
+      'after every deploy. Set a stable 64-char hex key in the environment.'
+    );
+    return;
+  }
+  if (!/^[0-9a-fA-F]{64}$/.test(raw)) {
+    console.error(
+      '[Calendar] WARNING: CALENDAR_TOKEN_ENCRYPTION_KEY is not a valid 64-char hex ' +
+      'string (32 bytes). Tokens encrypted with it may fail to decrypt. Fix the key value.'
+    );
+  }
+})();
+
 // Guarantee the local upload directory exists on boot. With STORAGE_DRIVER=local
 // this MUST live on a persistent volume so uploaded images survive redeploys.
 storage.ensureLocalRoot().catch((err) => {
