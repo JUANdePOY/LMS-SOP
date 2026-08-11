@@ -37,9 +37,18 @@ function getAuthUrl(req, res) {
 
 // Step 2: OAuth callback. Verifies state, exchanges code, stores tokens.
 function handleCallback(req, res) {
-  const { code, state } = req.query;
+  const { code, state, error, error_description } = req.query;
   try {
+    // Google redirects back with ?error=... (e.g. access_denied,
+    // redirect_uri_mismatch) instead of ?code=... when consent fails or the
+    // redirect URI doesn't match what's registered in Google Cloud. Surface it
+    // instead of the generic "Missing parameters".
+    if (error) {
+      console.error('[Calendar] Google OAuth error:', error, error_description || '');
+      return res.status(400).send(renderCallbackHtml(false, `Google error: ${error}${error_description ? ` (${error_description})` : ''}`));
+    }
     if (!state || !code) {
+      console.error('[Calendar] Callback missing params. Query:', JSON.stringify(req.query));
       return res.status(400).send(renderCallbackHtml(false, 'Missing parameters'));
     }
     const [payloadB64, sig] = String(state).split('.');
