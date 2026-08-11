@@ -89,26 +89,7 @@ function handleCallback(req, res) {
 
 function renderCallbackHtml(success, message) {
   const notifyButton = success ? `
-    <button id="notify-btn" style="margin-top:16px;padding:10px 16px;border:none;border-radius:8px;background:#2563eb;color:#fff;cursor:pointer">
-      Notify app of success
-    </button>
-    <p id="notify-status" style="margin-top:12px;font-size:12px;color:#555"></p>
-    <p style="margin-top:12px;font-size:12px;color:#777">Please close this window and return to the app.</p>
-    <script>
-      function notifyOpener() {
-        try {
-          window.opener.postMessage({ type: 'google-calendar-connected' }, '*');
-          document.getElementById('notify-status').textContent = 'App notified. You may close this window.';
-        } catch (err) {
-          document.getElementById('notify-status').textContent = 'Unable to notify the app. Please return to the app and refresh manually.';
-        }
-      }
-      window.addEventListener('load', () => {
-        var notify = document.getElementById('notify-btn');
-        if (notify) notify.addEventListener('click', notifyOpener);
-        notifyOpener();
-      });
-    </script>
+    <p style="margin-top:12px;font-size:12px;color:#555">Connected successfully. Return to the app and refresh the calendar modal if needed.</p>
   ` : '';
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>Google Calendar</title></head>
