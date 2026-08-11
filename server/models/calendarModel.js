@@ -4,7 +4,11 @@ const { encrypt, decrypt } = require('../utils/calendarCrypto');
 
 // Decrypt but never throw on corrupt/stale data (e.g. row encrypted with a
 // previous CALENDAR_TOKEN_ENCRYPTION_KEY after a key rotation). Returns null
-// so the caller can treat the token as absent and re-store it.
+// so the caller can treat the token as absent. We intentionally do NOT delete
+// the row here: during a re-connect the polling status check can read the
+// still-stale row and would race with saveToken's INSERT, wiping the freshly
+// stored token. saveToken overwrites the row via ON DUPLICATE KEY UPDATE, so
+// the row heals on connect without a destructive race.
 function safeDecrypt(value) {
   if (!value) return null;
   try {
@@ -25,11 +29,10 @@ const calendarModel = {
     if (!row) return null;
     const access_token = safeDecrypt(row.access_token);
     const refresh_token = safeDecrypt(row.refresh_token);
-    // If decryption failed, the stored row is unusable (wrong key / corrupt).
-    // Delete it so the connect flow can re-store a valid token.
+    // Unusable (wrong key / corrupt) -> treat as not connected. Do NOT delete
+    // here; saveToken will overwrite it on the next connect attempt.
     if ((row.access_token && !access_token) || (row.refresh_token && !refresh_token)) {
-      console.warn('[Calendar] Removing undecryptable token row for user', userId, 'provider', provider);
-      await this.deleteToken(userId, provider).catch(() => {});
+      console.warn('[Calendar] Undecryptable token row for user', userId, 'provider', provider, '- will be overwritten on reconnect');
       return null;
     }
     return {
