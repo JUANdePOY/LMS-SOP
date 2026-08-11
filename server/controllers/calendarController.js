@@ -75,7 +75,13 @@ function renderCallbackHtml(success, message) {
   <h3 style="margin:0 0 8px;color:${success ? '#16a34a' : '#dc2626'}">${success ? 'Connected' : 'Error'}</h3>
   <p style="margin:0;color:#555">${message}</p>
   <p style="margin:12px 0 0;font-size:12px;color:#999">You can close this window.</p>
-  <script>if (window.opener) { try { window.opener.postMessage({ type: 'calendar-callback', success: ${success} }, '*'); } catch(e){} setTimeout(function(){ window.close(); }, 1200); }</script>
+  <script>
+    try { if (window.opener) { window.opener.postMessage({ type: 'calendar-callback', success: ${success} }, '*'); } } catch (e) {}
+    // Best-effort auto-close. Under Cross-Origin-Opener-Policy the opener link
+    // may be severed, so the opener polls /calendar/status instead and closes
+    // this popup itself; closing here handles the normal case.
+    setTimeout(function(){ try { window.close(); } catch (e) {} }, 1500);
+  </script>
 </div></body></html>`;
 }
 

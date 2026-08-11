@@ -43,23 +43,34 @@ export function useGoogleCalendar() {
         reject(new Error("Popup blocked. Please allow popups and try again."));
         return;
       }
-      const onMessage = (e) => {
-        if (e.data && e.data.type === "calendar-callback") {
-          window.removeEventListener("message", onMessage);
-          if (e.data.success) {
-            loadStatus().then(() => resolve(true));
-          } else {
-            reject(new Error("Google Calendar connection failed"));
+
+      // Some hosting setups send Cross-Origin-Opener-Policy, which severs the
+      // opener<->popup link and breaks both window.postMessage and popup.closed.
+      // To stay resilient we poll our own /calendar/status endpoint instead of
+      // relying on cross-window signaling. The connection is confirmed once the
+      // backend reports the token as stored.
+      let attempts = 0;
+      const MAX_ATTEMPTS = 40; // ~60s at 1.5s intervals
+      const poll = setInterval(async () => {
+        attempts += 1;
+        try {
+          const statusRes = await getCalendarStatus();
+          if (statusRes.data?.success && statusRes.data.data?.connected) {
+            clearInterval(poll);
+            try { popup.close(); } catch { /* ignore */ }
+            await loadStatus();
+            resolve(true);
+            return;
           }
+        } catch {
+          // ignore transient errors while the popup is mid-flow
         }
-      };
-      window.addEventListener("message", onMessage);
-      const timer = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(timer);
-          window.removeEventListener("message", onMessage);
+        if (attempts >= MAX_ATTEMPTS) {
+          clearInterval(poll);
+          try { popup.close(); } catch { /* ignore */ }
+          reject(new Error("Google Calendar connection timed out. Please try again."));
         }
-      }, 1000);
+      }, 1500);
     });
   }, [loadStatus]);
 

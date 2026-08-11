@@ -37,7 +37,8 @@ function getClientConfig() {
 
 function buildOAuthClient() {
   const { clientId, clientSecret, redirectUri } = getClientConfig();
-  return new getGoogle().auth.OAuth2(clientId, clientSecret, redirectUri);
+  const OAuth2 = getGoogle().auth.OAuth2;
+  return new OAuth2(clientId, clientSecret, redirectUri);
 }
 
 function buildAuthUrl(state) {
