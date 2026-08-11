@@ -84,10 +84,11 @@ function renderCallbackHtml(success, message) {
   <p style="margin:12px 0 0;font-size:12px;color:#999">You can close this window.</p>
   <script>
     try { if (window.opener) { window.opener.postMessage({ type: 'calendar-callback', success: ${success} }, '*'); } } catch (e) {}
-    // Best-effort auto-close. Under Cross-Origin-Opener-Policy the opener link
-    // may be severed, so the opener polls /calendar/status instead and closes
-    // this popup itself; closing here handles the normal case.
-    setTimeout(function(){ try { window.close(); } catch (e) {} }, 1500);
+    // Do NOT auto-close the popup. Under Cross-Origin-Opener-Policy the close
+    // is often blocked anyway, and forcing it after ~1s made the "Calendar
+    // connected" confirmation vanish before the user could see it. The opener
+    // tab polls /calendar/status and updates its own modal; the user closes
+    // this popup manually (the page already says so).
   </script>
 </div></body></html>`;
 }
