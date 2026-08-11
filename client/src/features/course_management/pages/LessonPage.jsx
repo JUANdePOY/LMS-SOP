@@ -171,7 +171,7 @@ export default function LessonPage() {
     return (
       <div className="space-y-4">
         <h1 className="text-xl font-bold">{currentLesson.title}</h1>
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-lg border border-[rgba(217,163,0,0.25)] bg-warning-soft p-4 text-sm text-[var(--color-warning)]">
           <p className="font-medium">This lesson is locked.</p>
           <p className="mt-1">Complete the previous lesson to unlock this one.</p>
         </div>
@@ -234,16 +234,16 @@ export default function LessonPage() {
               </div>
               {quizLoading ? (
                 <div className="flex items-center gap-3 rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-neutral-50/70 dark:bg-neutral-800/40 px-5 py-4">
-                  <Loader2 size={18} className="animate-spin text-blue-600" />
+                  <Loader2 size={18} className="animate-spin text-[var(--color-primary)]" />
                   <p className="text-sm text-neutral-500">Loading quiz…</p>
                 </div>
               ) : moduleQuiz ? (
                 <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-sm">
-                  <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 via-white to-sky-50/60 dark:from-blue-500/10 dark:via-neutral-900 dark:to-sky-500/5 px-6 pt-5 pb-5">
+                  <div className="relative overflow-hidden bg-gradient-to-br from-[rgba(242,92,5,0.06)] via-white to-[rgba(242,92,5,0.04)] dark:from-[rgba(242,92,5,0.10)] dark:via-neutral-900 dark:to-[rgba(242,92,5,0.05)] px-6 pt-5 pb-5">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.18),transparent_70%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.12),transparent_55%)]" />
                     <div className="relative flex items-start justify-between gap-4">
                       <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 shadow-sm shadow-blue-600/20">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[var(--color-primary)] shadow-sm shadow-[rgba(242,92,5,0.20)]">
                           <HelpCircle size={22} className="text-white" />
                         </div>
                         <div className="min-w-0">
@@ -253,7 +253,7 @@ export default function LessonPage() {
                           )}
                         </div>
                       </div>
-                      <span className={`shrink-0 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${moduleQuiz.quiz_type === 'final' ? 'border-violet-200 bg-violet-100 text-violet-700 dark:border-violet-500/40 dark:bg-violet-500/15 dark:text-violet-300' : 'border-sky-200 bg-sky-100 text-sky-700 dark:border-sky-500/40 dark:bg-sky-500/15 dark:text-sky-300'}`}>
+                      <span className={`shrink-0 inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${moduleQuiz.quiz_type === 'final' ? 'border-[rgba(19,47,69,0.25)] bg-[rgba(19,47,69,0.12)] text-[var(--color-secondary)] dark:border-[rgba(19,47,69,0.30)] dark:bg-[rgba(19,47,69,0.18)] dark:text-[var(--color-secondary)]' : 'border-[rgba(242,92,5,0.25)] bg-[rgba(242,92,5,0.12)] text-[var(--color-primary)] dark:border-[rgba(242,92,5,0.30)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]'}`}>
                         {moduleQuiz.quiz_type === 'final' ? 'Final' : 'Practice'}
                       </span>
                     </div>
@@ -301,8 +301,8 @@ export default function LessonPage() {
                           <span
                             className={`inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                               latestAttempt.passed
-                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
-                                : 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
+                                ? 'bg-success-soft text-success dark:bg-success-soft dark:text-[var(--color-success)]'
+                                : 'bg-danger-soft text-danger dark:bg-danger-soft dark:text-[var(--color-danger)]'
                             }`}
                           >
                             {latestAttempt.percentage != null ? `${latestAttempt.percentage}%` : `${latestAttempt.score}/${latestAttempt.max_score}`}
@@ -329,7 +329,7 @@ export default function LessonPage() {
                               } catch { /* ignore */ }
                               navigate(`/assessments/quiz/${moduleQuiz.id}/take`, { state: { courseId, lessonId, nextLessonId: nextLesson?.id } });
                             }}
-                            className="group inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition-all hover:bg-blue-700 hover:shadow-md active:bg-blue-800"
+                            className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-[rgba(242,92,5,0.20)] transition-all hover-brand hover:shadow-md active:bg-[var(--color-primary-active)]"
                           >
                             {isRetake ? (
                               <>
@@ -350,9 +350,9 @@ export default function LessonPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 px-5 py-4">
-                  <AlertCircle size={18} className="mt-0.5 shrink-0 text-amber-600" />
-                  <p className="text-sm text-amber-700 dark:text-amber-300">No quiz is configured for this lesson.</p>
+                <div className="flex items-start gap-3 rounded-xl border border-[rgba(217,163,0,0.25)] bg-warning-soft dark:bg-warning-soft px-5 py-4">
+                  <AlertCircle size={18} className="mt-0.5 shrink-0 text-[var(--color-warning)]" />
+                  <p className="text-sm text-[var(--color-warning)] dark:text-[var(--color-warning)]">No quiz is configured for this lesson.</p>
                 </div>
               )}
             </div>
@@ -387,10 +387,10 @@ export default function LessonPage() {
                             )}
                             {sop?.status && (
                               <span className={`px-2.5 py-0.5 rounded-lg text-xs font-medium border border-transparent ${
-                                sop.status === 'Published' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                                sop.status === 'Published' ? 'bg-[rgba(242,92,5,0.12)] text-[var(--color-primary-hover)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]' :
                                 sop.status === 'Draft' ? 'bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300' :
-                                sop.status === 'In Review' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
-                                'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                sop.status === 'In Review' ? 'bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft dark:text-[var(--color-warning)]' :
+                                'bg-success-soft text-[var(--color-success)] dark:bg-success-soft dark:text-[var(--color-success)]'
                               }`}>
                                 {sop.status}
                               </span>
@@ -500,9 +500,9 @@ export default function LessonPage() {
                   </div>
                 </>
               ) : (
-                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-                  <AlertCircle size={18} className="mt-0.5 text-amber-600" />
-                  <p className="text-sm text-amber-700 dark:text-amber-300">SOP content is not available.</p>
+                <div className="flex items-start gap-2 rounded-lg border border-[rgba(217,163,0,0.25)] bg-warning-soft px-4 py-3">
+                  <AlertCircle size={18} className="mt-0.5 text-[var(--color-warning)]" />
+                  <p className="text-sm text-[var(--color-warning)] dark:text-[var(--color-warning)]">SOP content is not available.</p>
                 </div>
               )}
             </div>          
@@ -525,7 +525,7 @@ export default function LessonPage() {
                         href={certificate.pdf_storage_path}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                        className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-success)] px-3 py-1.5 text-xs font-medium text-white hover-success"
                       >
                         <Download size={14} />
                         Download PDF
@@ -534,14 +534,14 @@ export default function LessonPage() {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-amber-600">Certificate will be issued upon course completion.</p>
+                <p className="text-sm text-[var(--color-warning)]">Certificate will be issued upon course completion.</p>
               )}
             </div>
           ) : currentLesson.type === 'link' ? (
             <div className="p-6">
               <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
               {currentLesson.url && (
-                <a href={currentLesson.url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline">
+                <a href={currentLesson.url} target="_blank" rel="noreferrer" className="text-sm text-[var(--color-primary)] hover:underline">
                   {currentLesson.url}
                 </a>
               )}
@@ -555,7 +555,7 @@ export default function LessonPage() {
             <button
               onClick={() => nextLesson && navigate(`/courses/view/${courseId}/lesson/${nextLesson.id}`)}
               disabled={!nextLesson}
-              className="group inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/20 transition-all hover:bg-blue-700 hover:shadow-md active:bg-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-[rgba(242,92,5,0.20)] transition-all hover-brand hover:shadow-md active:bg-[var(--color-primary-active)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {nextLesson ? 'Proceed to Next Lesson' : 'Course Completed'}
               {nextLesson && <ArrowRight size={17} className="transition-transform group-hover:translate-x-0.5" />}
@@ -565,7 +565,7 @@ export default function LessonPage() {
               <button
                 onClick={handleMarkComplete}
                 disabled={marking}
-                className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-lg px-4 py-2 text-sm btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {marking ? 'Saving...' : 'Mark as Complete'}
               </button>

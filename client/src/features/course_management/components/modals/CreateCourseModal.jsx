@@ -309,7 +309,7 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
                   accept="image/png,image/jpeg,image/webp"
                   onChange={handleThumbnailUpload}
                   disabled={uploadingThumbnail || loading}
-                  className="file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 dark:file:bg-neutral-700 dark:file:text-neutral-200"
+                  className="file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-[rgba(242,92,5,0.08)] file:text-[var(--color-primary-hover)] hover:file:bg-blue-100 dark:file:bg-neutral-700 dark:file:text-neutral-200"
                 />
               </label>
               <p className="text-[10px] text-neutral-400">PNG, JPG, WebP up to 10MB</p>

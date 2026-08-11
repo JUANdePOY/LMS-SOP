@@ -9,12 +9,12 @@ export default function CourseCard({ course, onAction, actionLabel }) {
           <img src={resolveFileUrl(course.thumbnail_url)} alt={course.title} className="w-full h-full object-cover" />
         ) : (
           <div className="flex items-center justify-center">
-            <PlayCircle size={36} className="text-blue-400 dark:text-blue-500" />
+            <PlayCircle size={36} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
           </div>
         )}
         <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="rounded-full bg-white dark:bg-neutral-800 p-2.5 shadow-lg">
-            <PlayCircle size={22} className="text-blue-600 dark:text-blue-300" />
+            <PlayCircle size={22} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
           </div>
         </div>
       </div>

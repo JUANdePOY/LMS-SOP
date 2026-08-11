@@ -427,7 +427,7 @@ const handleSubmit = async () => {
     <div className="flex flex-col gap-6 pb-10">
       {loading && (
         <div className="flex h-40 items-center justify-center">
-          <Loader className="h-6 w-6 animate-spin text-indigo-500" />
+          <Loader className="h-6 w-6 animate-spin text-[var(--color-secondary)]" />
         </div>
       )}
 

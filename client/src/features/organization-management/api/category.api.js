@@ -5,6 +5,8 @@ export const getCategories = (params = {}) => {
   const { sanitized } = validatePagination(params);
   const search = params.query ? sanitizeSearchQuery(params.query) : '';
   return api.get('/categories', { params: { ...sanitized, search, ...params } });
+  const query = params.query ? sanitizeSearchQuery(params.query) : '';
+  return api.get('/categories', { params: { ...params, ...sanitized, query } });
 };
 
 export const getCategory = (id) => {

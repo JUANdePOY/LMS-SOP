@@ -115,7 +115,7 @@ export default function AnnouncementForm({ initialData, onSubmit, onCancel, savi
         <button type="button" onClick={onCancel} className="rounded-lg px-4 py-2 text-sm border border-neutral-300 dark:border-neutral-600">
           Cancel
         </button>
-        <button type="submit" disabled={saving} className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white disabled:opacity-50">
+        <button type="submit" disabled={saving} className="rounded-lg px-4 py-2 text-sm btn-primary disabled:opacity-50">
           {saving ? "Saving..." : initialData ? "Update" : "Create"}
         </button>
       </div>

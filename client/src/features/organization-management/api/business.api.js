@@ -3,8 +3,8 @@ import { validateId, sanitizeSearchQuery, validatePagination } from '../../organ
 
 export const getBusinesses = (params = {}) => {
   const { sanitized } = validatePagination(params);
-  const search = params.query ? sanitizeSearchQuery(params.query) : '';
-  return api.get('/businesses', { params: { ...sanitized, search, ...params } });
+  const query = params.query ? sanitizeSearchQuery(params.query) : '';
+  return api.get('/businesses', { params: { ...sanitized, query, ...params } });
 };
 
 export const getBusiness = (id) => {

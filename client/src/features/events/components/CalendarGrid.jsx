@@ -5,8 +5,8 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const PRIORITY_COLORS = {
   low: "bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-100 border-slate-200 dark:border-slate-500/30",
-  medium: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-100 border-blue-200 dark:border-blue-500/30",
-  high: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-100 border-amber-200 dark:border-amber-500/30",
+  medium: "bg-[rgba(242,92,5,0.08)] text-[var(--color-primary-hover)] dark:bg-[rgba(242,92,5,0.08)]0/15 dark:text-[var(--color-primary)] border-[rgba(242,92,5,0.25)] dark:border-[rgba(242,92,5,0.30)]",
+  high: "bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft dark:text-[var(--color-warning)] border-[rgba(217,163,0,0.25)] dark:border-[rgba(217,163,0,0.30)]",
   critical: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-100 border-red-200 dark:border-red-500/30",
 };
 
@@ -115,7 +115,7 @@ export default function CalendarGrid({ items, onSelectDay, onCreate, selectedDat
               onClick={() => onSelectDay && onSelectDay(dateObj)}
               className={`group relative min-h-[80px] sm:min-h-[100px] border-b border-r border-neutral-200 dark:border-neutral-700 p-1.5 cursor-pointer transition-colors ${
                 isSelected
-                  ? "bg-blue-50 dark:bg-blue-500/10"
+                  ? "bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)]"
                   : "bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
               }`}
             >
@@ -123,7 +123,7 @@ export default function CalendarGrid({ items, onSelectDay, onCreate, selectedDat
                 <span
                   className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium ${
                     isToday
-                      ? "bg-blue-600 text-white"
+                      ? "btn-primary"
                       : "text-neutral-700 dark:text-neutral-200"
                   }`}
                 >
@@ -137,7 +137,7 @@ export default function CalendarGrid({ items, onSelectDay, onCreate, selectedDat
                     }}
                     className="opacity-0 group-hover:opacity-100 transition-opacity"
                   >
-                    <Plus size={14} className="text-blue-600 dark:text-blue-400" />
+                    <Plus size={14} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
                   </button>
                 )}
               </div>

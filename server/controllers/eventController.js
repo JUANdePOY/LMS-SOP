@@ -1,6 +1,15 @@
 const eventModel = require('../models/eventModel');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
+const calendarService = require('../services/calendarService');
+
+// Fire-and-forget: push LMS event changes to each connected user's Google Calendar
+// without blocking the event response. Errors are logged and marked as failed.
+function propagate(eventId, action) {
+  calendarService.propagateEventChange(eventId, action).catch((err) => {
+    console.error('[Calendar] propagate error', action, eventId, err.message);
+  });
+}
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -80,6 +89,7 @@ function createEvent(req, res) {
   })
     .then((row) => {
       logAudit && logAudit('event.create', userId, { eventId: row.id });
+      propagate(row.id, 'update');
       res.status(201).json({ success: true, message: 'Event created successfully', data: row });
     })
     .catch((err) => sendError(res, err, 'Failed to create event'));
@@ -107,6 +117,7 @@ function updateEvent(req, res) {
     })
     .then((row) => {
       logAudit && logAudit('event.update', userId, { eventId: id });
+      propagate(id, 'update');
       res.json({ success: true, message: 'Event updated successfully', data: row });
     })
     .catch((err) => sendError(res, err, 'Failed to update event'));
@@ -123,6 +134,7 @@ function deleteEvent(req, res) {
     })
     .then(() => {
       logAudit && logAudit('event.delete', userId, { eventId: id });
+      propagate(id, 'delete');
       res.json({ success: true, message: 'Event deleted successfully' });
     })
     .catch((err) => sendError(res, err, 'Failed to delete event'));

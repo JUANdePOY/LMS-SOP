@@ -54,7 +54,7 @@ export default function ThumbnailSelector({ courseId, moduleId, value, onChange 
             value={value || ""}
             onChange={(e) => onChange(e.target.value || null)}
             placeholder="https://... or upload below"
-            className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+            className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600"
           />
 
           <div className="relative">
@@ -66,7 +66,7 @@ export default function ThumbnailSelector({ courseId, moduleId, value, onChange 
               className="absolute inset-0 w-full cursor-pointer opacity-0"
               disabled={uploading}
             />
-            <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-neutral-300 py-2 text-sm text-neutral-600 hover:border-blue-400 hover:text-blue-600">
+            <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-neutral-300 py-2 text-sm text-neutral-600 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]">
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
               {uploading ? `Uploading ${progress}%` : "Upload image"}
             </div>
@@ -75,7 +75,7 @@ export default function ThumbnailSelector({ courseId, moduleId, value, onChange 
           {uploading && (
             <div className="flex items-center gap-2">
               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-neutral-200">
-                <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${progress}%` }} />
+                <div className="h-full rounded-full bg-[var(--color-primary)] transition-all" style={{ width: `${progress}%` }} />
               </div>
               <button type="button" onClick={cancel} className="text-xs font-medium text-neutral-500 hover:text-red-600">
                 Cancel

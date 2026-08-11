@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { Send, Loader2, Check, CheckCheck, Users, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import UserAvatar from "@/shared/components/ui/Avatar";
 import {
-  getInitials,
   getConversationDisplayName,
   getOtherParticipants,
+  getDisplayName,
 } from "../utils/conversationDisplay";
 
 function formatTime(dateStr) {
@@ -42,18 +43,17 @@ function Header({ conversation }) {
     <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-4 py-2.5">
       <div className="flex items-center gap-3 min-w-0">
         <div className="relative shrink-0">
-          <span
-            className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium",
-              isGroup
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-                : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-            )}
-          >
-            {isGroup ? <Users size={18} /> : getInitials(name)}
-          </span>
-          {!isGroup && other && (
-            <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-neutral-900" />
+          {isGroup ? (
+            <span
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-success-soft text-success dark:bg-success-soft dark:text-[var(--color-success)]"
+            >
+              <Users size={18} />
+            </span>
+          ) : (
+            <UserAvatar user={other || { full_name: name }} size="lg" className="h-12 w-12" />
+          )}
+          {!isGroup && other?.online && (
+            <span className="presence-dot" style={{ width: "0.95rem", height: "0.95rem" }} aria-label="Online" />
           )}
         </div>
         <div className="min-w-0">
@@ -61,7 +61,7 @@ function Header({ conversation }) {
             {name}
           </h3>
           <p className="text-[11px] text-neutral-500 dark:text-neutral-400 truncate flex items-center gap-1.5">
-            {!isGroup && other && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+            {!isGroup && other && <span className="h-1.5 w-1.5 rounded-full bg-success-soft0" />}
             {subtitle}
           </p>
         </div>
@@ -188,6 +188,10 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
             const day = dayLabel(msg.sent_at);
             const showDay = day !== lastDay;
             lastDay = day;
+            const sender = {
+              full_name: msg.sender_name,
+              avatar_url: msg.sender_avatar_url,
+            };
             return (
               <div key={msg.id}>
                 {showDay && (
@@ -197,23 +201,30 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
                     </span>
                   </div>
                 )}
-                <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[75%] px-3 py-2 text-sm shadow-sm ${
+                <div className={`flex items-end gap-3 ${isMine ? "justify-end" : "justify-start"}`}>
+                  {!isMine && (
+                    <UserAvatar user={sender} size="sm" className="h-9 w-9" />
+                  )}
+                  <div className={`max-w-[75%] px-4 py-3 text-sm shadow-sm ${
                     isMine
-                      ? "bg-blue-600 text-white rounded-2xl rounded-br-md"
-                      : "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-2xl rounded-bl-md border border-neutral-100 dark:border-neutral-700"
+                      ? "btn-primary rounded-3xl rounded-br-[10px]"
+                      : "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 rounded-3xl rounded-bl-[10px] border border-neutral-100 dark:border-neutral-700"
                   }`}>
                     {!isMine && isGroup && (
-                      <p className="text-[10px] font-semibold mb-1 text-blue-600 dark:text-blue-400">
-                        {msg.sender_name || "User"}
-                      </p>
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-[11px] font-semibold fb-link">
+                          {getDisplayName(sender)}
+                        </p>
+                      </div>
                     )}
                     <p className="whitespace-pre-wrap break-words leading-snug">{msg.body}</p>
                     <div className={cn(
-                      "text-[10px] mt-1 flex items-center gap-1 justify-end",
-                      isMine ? "text-blue-100" : "text-neutral-400"
+                      "text-[10px] mt-2 flex items-center gap-1 justify-end",
+                      isMine ? "text-white/85" : "text-neutral-400"
                     )}>
-                      {formatTime(msg.sent_at)}
+                      <span title={msg.sent_at ? new Date(msg.sent_at).toLocaleString() : ""}>
+                        {formatTime(msg.sent_at)}
+                      </span>
                       {isMine && (isRead ? <CheckCheck size={11} /> : <Check size={11} />)}
                     </div>
                   </div>
@@ -232,12 +243,12 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="Type a message..."
-            className="flex-1 rounded-full border border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-800 px-4 py-2 text-sm focus:outline-none focus:border-blue-500"
+            className="flex-1 rounded-full border border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-800 px-4 py-2 text-sm focus:outline-none focus:border-[var(--color-primary)]"
           />
           <button
             type="submit"
             disabled={sending || !text.trim()}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-white disabled:opacity-50 hover:bg-blue-700"
+            className="flex h-10 w-10 items-center justify-center rounded-full btn-primary disabled:opacity-50 hover-brand"
           >
             {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
           </button>

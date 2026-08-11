@@ -1,3 +1,6 @@
+import { Clock, FileQuestion } from "lucide-react";
+import { ActionButton } from "@/shared/components/ui/actionIcons";
+
 export default function QuizCard({ quiz, onEdit, onDelete, onView, onTogglePublish, busy }) {
   const busyHere = busy === quiz.id;
   const status = quiz.status || 'draft';
@@ -9,9 +12,9 @@ export default function QuizCard({ quiz, onEdit, onDelete, onView, onTogglePubli
   };
   
   const statusClasses = (st) => {
-    if (st === 'published') return 'bg-emerald-100 text-emerald-700';
+    if (st === 'published') return 'bg-success-soft text-[var(--color-success)]';
     if (st === 'archived') return 'bg-neutral-200 text-neutral-600';
-    return 'bg-amber-100 text-amber-700';
+    return 'bg-warning-soft text-[var(--color-warning)]';
   };
 
   const questionCount = quiz.question_count ?? quiz.questionCount ?? 0;
@@ -32,48 +35,26 @@ export default function QuizCard({ quiz, onEdit, onDelete, onView, onTogglePubli
 
       <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-neutral-500">
         <span className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6M9 8h6M4 6a2 2 0 012-2h10a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6z" />
-          </svg>
+          <FileQuestion className="h-3 w-3" />
           {questionCountLabel}
         </span>
         {timeLimit && (
           <span className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" />
-            </svg>
+            <Clock className="h-3 w-3" />
             {timeLimit} min
           </span>
         )}
       </div>
 
       <div className="mt-4 flex items-center justify-end gap-1.5 pt-3 border-t border-neutral-100 dark:border-neutral-800">
-        <button onClick={() => onView?.(quiz)} disabled={busyHere} className="rounded-md p-1.5 text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 disabled:opacity-50 disabled:cursor-not-allowed" title="View">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8v8a1 1 0 01-1.447.724L15 14m-5 0L3.447 16.724A1 1 0 012 16V8a1 1 0 011.447-.724L10 10z" />
-          </svg>
-        </button>
-        <button onClick={() => onEdit?.(quiz)} disabled={busyHere} className="rounded-md p-1.5 text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed" title="Edit">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-5m-5 0v5m5-5v-5m0 5h-5" />
-          </svg>
-        </button>
-        <button onClick={() => onTogglePublish?.(quiz)} disabled={busyHere} className="rounded-md p-1.5 text-amber-600 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20 disabled:opacity-50 disabled:cursor-not-allowed" title={status === "published" ? "Archive" : "Publish"}>
-          {status === 'published' ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h7.59L5 15.59V21M5 8v13m12-13v13" />
-            </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6M12 3v12m9 9h-3V12l-3 9" />
-            </svg>
-          )}
-        </button>
-        <button onClick={() => onDelete?.(quiz)} disabled={busyHere} className="rounded-md p-1.5 text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-900/20 disabled:opacity-50 disabled:cursor-not-allowed" title="Delete">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.143 21H7.857a2 2 0 01-1.999-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
+        <ActionButton action="View" onClick={() => onView?.(quiz)} disabled={busyHere} />
+        <ActionButton action="Edit" onClick={() => onEdit?.(quiz)} disabled={busyHere} />
+        <ActionButton
+          action={status === 'published' ? 'Archive' : 'Publish'}
+          onClick={() => onTogglePublish?.(quiz)}
+          disabled={busyHere}
+        />
+        <ActionButton action="Delete" onClick={() => onDelete?.(quiz)} disabled={busyHere} />
       </div>
     </div>
   );

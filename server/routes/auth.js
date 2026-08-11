@@ -1,5 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const fs = require('fs/promises');
 const { body, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { comparePassword, generateToken, hashPassword } = require('../app/auth');
@@ -337,6 +338,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
         date_hired: user.date_hired,
         birthdate: user.birthdate,
         address: user.address,
+        bio: user.bio,
+        cover_photo_url: user.cover_photo_url,
         avatar_url: user.avatar_url,
       }
     });
@@ -359,6 +362,7 @@ router.put('/profile', authenticateToken, [
   body('date_hired').optional().isISO8601(),
   body('birthdate').optional().isISO8601(),
   body('address').optional(),
+  body('bio').optional().isString(),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -372,7 +376,7 @@ router.put('/profile', authenticateToken, [
     }
 
     const updates = {};
-    const allowed = ['full_name', 'email', 'position_title', 'contact_number', 'employment_status', 'date_hired', 'birthdate', 'address', 'avatar_url'];
+    const allowed = ['full_name', 'email', 'position_title', 'contact_number', 'employment_status', 'date_hired', 'birthdate', 'address', 'bio', 'avatar_url', 'cover_photo_url'];
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
@@ -649,6 +653,62 @@ router.delete('/profile/avatar', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Avatar delete error:', error);
     res.status(500).json({ status: 'error', message: 'Failed to remove avatar', code: 'DB_ERROR' });
+  }
+});
+
+router.post('/profile/cover-photo', authenticateToken, avatarUpload.single('cover_photo'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ status: 'error', message: 'No cover photo file uploaded', code: 'NO_FILE' });
+    }
+
+    const userId = req.user.id;
+    const ext = safeExtFromOriginal(req.file.originalname) || '.jpg';
+    const filename = `cover-${Date.now()}${ext}`;
+
+    const [prevRows] = await db.query('SELECT cover_photo_url FROM users WHERE id = ?', [userId]);
+    if (prevRows[0]?.cover_photo_url) {
+      await storage.deleteFile(prevRows[0].cover_photo_url).catch(() => {});
+    }
+
+    const dir = `cover-photos/${userId}`;
+    const coverPhotoUrl = await storage.saveFile({
+      buffer: req.file.buffer,
+      dir,
+      filename,
+      contentType: req.file.mimetype,
+    });
+
+    await db.query('UPDATE users SET cover_photo_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [coverPhotoUrl, userId]);
+
+    logAudit({
+      user_id: userId,
+      action: 'user.cover_photo_updated',
+      entity_type: 'user',
+      entity_id: userId,
+      new_values: { cover_photo_url: coverPhotoUrl },
+    });
+
+    res.json({ status: 'success', message: 'Cover photo uploaded', data: { cover_photo_url: coverPhotoUrl } });
+  } catch (error) {
+    console.error('Cover photo upload error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to upload cover photo', code: 'DB_ERROR' });
+  }
+});
+
+router.delete('/profile/cover-photo', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const [rows] = await db.query('SELECT cover_photo_url FROM users WHERE id = ?', [userId]);
+    const user = rows[0];
+    if (user?.cover_photo_url) {
+      await storage.deleteFile(user.cover_photo_url).catch(() => {});
+    }
+    await db.query('UPDATE users SET cover_photo_url = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [userId]);
+    res.json({ status: 'success', message: 'Cover photo removed' });
+  } catch (error) {
+    console.error('Cover photo delete error:', error);
+    res.status(500).json({ status: 'error', message: 'Failed to remove cover photo', code: 'DB_ERROR' });
   }
 });
 

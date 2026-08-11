@@ -263,7 +263,7 @@ const BlockRow = ({ innerRef, ...props }) => {
       onKeyDown={onKeyDown}
       tabIndex={0}
       className={`group relative rounded-xl border bg-white transition-shadow dark:bg-neutral-900 ${
-        isOver ? "border-blue-400 shadow-md" : "border-neutral-200 dark:border-neutral-700"
+        isOver ? "border-[var(--color-primary)] shadow-md" : "border-neutral-200 dark:border-neutral-700"
       } ${isDragging ? "opacity-50" : ""}`}
     >
       {/* Block chip + actions header */}
@@ -316,7 +316,7 @@ function BlockBody({ block, focused, onFocus, onUpdate, onImageUpload, onAddAfte
           onChange={(e) => onUpdate({ html: e.target.value })}
           onFocus={onFocus}
           placeholder={block.kind === "heading" ? "Section heading" : "Code snippet"}
-          className={`w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 ${
+          className={`w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-100 ${
             block.kind === "code" ? "font-mono" : "font-semibold"
           }`}
         />
@@ -397,10 +397,10 @@ function ImageBlock({ block, onUpdate, onImageUpload }) {
       )}
 
       <div className="flex gap-1">
-        <button type="button" onClick={() => setTab("url")} className={`rounded-md px-2 py-1 text-xs ${tab === "url" ? "bg-blue-100 text-blue-700" : "text-neutral-500 hover:bg-neutral-100"}`}>
+        <button type="button" onClick={() => setTab("url")} className={`rounded-md px-2 py-1 text-xs ${tab === "url" ? "bg-blue-100 text-[var(--color-primary-hover)]" : "text-neutral-500 hover:bg-neutral-100"}`}>
           URL
         </button>
-        <button type="button" onClick={() => setTab("upload")} className={`rounded-md px-2 py-1 text-xs ${tab === "upload" ? "bg-blue-100 text-blue-700" : "text-neutral-500 hover:bg-neutral-100"}`}>
+        <button type="button" onClick={() => setTab("upload")} className={`rounded-md px-2 py-1 text-xs ${tab === "upload" ? "bg-blue-100 text-[var(--color-primary-hover)]" : "text-neutral-500 hover:bg-neutral-100"}`}>
           Upload
         </button>
       </div>
@@ -411,7 +411,7 @@ function ImageBlock({ block, onUpdate, onImageUpload }) {
           value={block.src}
           onChange={(e) => onUpdate({ src: e.target.value })}
           placeholder="Image URL"
-          className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
+          className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
         />
       ) : (
         <div className="space-y-2">
@@ -423,13 +423,13 @@ function ImageBlock({ block, onUpdate, onImageUpload }) {
               className="absolute inset-0 w-full cursor-pointer opacity-0"
               disabled={uploading}
             />
-            <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-neutral-300 py-2 text-sm text-neutral-600 hover:border-blue-400 hover:text-blue-600 dark:border-neutral-600">
+            <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-neutral-300 py-2 text-sm text-neutral-600 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] dark:border-neutral-600">
               {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
               {uploading ? `Uploading ${progress}%` : "Choose image"}
             </div>
           </label>
           {uploading && (
-            <div className="flex items-center gap-2 text-xs text-blue-600">
+            <div className="flex items-center gap-2 text-xs text-[var(--color-primary)]">
               <Loader2 size={14} className="animate-spin" /> Uploading…
             </div>
           )}
@@ -440,7 +440,7 @@ function ImageBlock({ block, onUpdate, onImageUpload }) {
         value={block.caption || ""}
         onChange={(e) => onUpdate({ caption: e.target.value })}
         placeholder="Caption (optional)"
-        className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
+        className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-sm text-neutral-900 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-100"
       />
 
       {localError && (

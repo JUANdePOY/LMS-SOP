@@ -62,8 +62,8 @@ async function unlinkCertificateFromCourse(courseId, templateId) {
 
 const STATUS_CONFIG = {
   draft: { label: "Draft", color: "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300", icon: Clock },
-  published: { label: "Published", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300", icon: CheckCircle2 },
-  archived: { label: "Archived", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300", icon: AlertCircle },
+  published: { label: "Published", color: "bg-success-soft text-[var(--color-success)] dark:bg-success-soft dark:text-[var(--color-success)]", icon: CheckCircle2 },
+  archived: { label: "Archived", color: "bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft dark:text-[var(--color-warning)]", icon: AlertCircle },
 };
 
 function BuilderEmptyState({ modules, onAddModule, onSelectModule }) {
@@ -100,7 +100,7 @@ function BuilderEmptyState({ modules, onAddModule, onSelectModule }) {
       <div className="mx-auto w-full max-w-3xl space-y-5">
         <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-sm">
           <div className="relative overflow-hidden bg-gradient-to-br from-white via-neutral-50/80 to-neutral-100/80 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 px-8 pt-10 pb-8 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-600/20">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--color-primary)] shadow-lg shadow-[rgba(242,92,5,0.20)]">
               <Rocket size={28} className="text-white" />
             </div>
             <h3 className="mt-5 text-2xl font-semibold text-neutral-900 dark:text-neutral-100">{hero.title}</h3>
@@ -108,7 +108,7 @@ function BuilderEmptyState({ modules, onAddModule, onSelectModule }) {
             <button
               type="button"
               onClick={moduleCount === 0 ? onAddModule : () => onSelectModule(modules[0]?.id)}
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700 active:bg-blue-800"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover-brand active:bg-[var(--color-primary-active)]"
             >
               <Plus size={16} />
               {hero.cta}
@@ -660,7 +660,7 @@ export default function CourseBuilderPage() {
   if (!course && !loadingError) {
     return (
       <div className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
         <p className="text-sm text-neutral-500">Loading course...</p>
       </div>
     );
@@ -711,7 +711,7 @@ export default function CourseBuilderPage() {
             </span>
           )}
           {isSavingDraft && (
-            <span className="text-xs text-blue-600 dark:text-blue-400 hidden sm:inline-flex items-center gap-1">
+            <span className="text-xs text-[var(--color-primary)] dark:text-[var(--color-primary)] hidden sm:inline-flex items-center gap-1">
               <Clock size={12} />
               Saving...
             </span>
@@ -727,9 +727,9 @@ export default function CourseBuilderPage() {
               aria-pressed={showLeftSidebar}
               className={`
                 inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2
                 ${showLeftSidebar
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'btn-primary shadow-sm'
                   : 'text-neutral-700 dark:text-neutral-200 hover:bg-white dark:hover:bg-neutral-700'}
               `}
             >
@@ -747,9 +747,9 @@ export default function CourseBuilderPage() {
               aria-pressed={showRightSidebar}
               className={`
                 inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200
-                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2
+                focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)] focus-visible:ring-offset-2
                 ${showRightSidebar
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'btn-primary shadow-sm'
                   : 'text-neutral-700 dark:text-neutral-200 hover:bg-white dark:hover:bg-neutral-700'}
               `}
             >
@@ -964,7 +964,7 @@ export default function CourseBuilderPage() {
                       <Save size={14} />
                       {saving ? "Saving..." : "Save Draft"}
                     </button>
-                    <button onClick={handlePublish} disabled={saving} className="rounded-md bg-blue-600 px-2.5 py-1.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
+                    <button onClick={handlePublish} disabled={saving} className="rounded-md bg-[var(--color-primary)] px-2.5 py-1.5 text-sm font-medium text-white hover-brand disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
                       <Rocket size={14} />
                       {saving ? "Publishing..." : "Publish"}
                     </button>
@@ -1000,7 +1000,7 @@ export default function CourseBuilderPage() {
                 <Save size={14} />
                 {saving ? "Saving..." : "Save Draft"}
               </button>
-              <button onClick={handlePublish} disabled={saving} className="w-full rounded-md bg-blue-600 px-2.5 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
+              <button onClick={handlePublish} disabled={saving} className="w-full rounded-md bg-[var(--color-primary)] px-2.5 py-2 text-sm font-medium text-white hover-brand disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
                 <Rocket size={14} />
                 {saving ? "Publishing..." : "Publish"}
               </button>

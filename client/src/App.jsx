@@ -22,6 +22,7 @@ const EmployeeCourseView = lazy(() => import("@/features/employee/pages/Employee
 const EmployeeSOPView = lazy(() => import("@/features/employee/pages/EmployeeSOPView"));
 const EmployeeOnboardingPage = lazy(() => import("@/features/employee/pages/EmployeeOnboardingPage"));
 const Profile       = lazy(() => import("@/pages/Profile"));
+const UserProfilePage = lazy(() => import("@/features/profile/pages/UserProfilePage"));
 const Login         = lazy(() => import("@/pages/Login"));
 const Settings      = lazy(() => import("@/pages/Settings"));
 const AuditLogs     = lazy(() => import("@/pages/AuditLogs"));
@@ -61,6 +62,7 @@ const QuizzesPanel = lazy(() => import("@/pages/management/QuizzesPanel"));
 const AnnouncementsPage = lazy(() => import("@/features/announcements/pages/AnnouncementsPage"));
 const EventsPage = lazy(() => import("@/features/events/pages/EventsPage"));
 const MessagingPage = lazy(() => import("@/features/messaging/pages/MessagingPage"));
+const EmployeeDirectoryPage = lazy(() => import("@/features/employee-directory/pages/EmployeeDirectoryPage"));
 const TasksPage = lazy(() => import("@/features/task-management/pages/TasksPage"));
 const TaskDetailsPage = lazy(() => import("@/features/task-management/pages/TaskDetailsPage"));
 const MyTasksPage = lazy(() => import("@/features/task-management/pages/MyTasksPage"));
@@ -154,6 +156,7 @@ const router = createBrowserRouter([
       { path: "my-learning/course/:id", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeCourseView /></OnboardingGuard>), handle: { title: "Course" } },
       { path: "my-learning/sops/:id", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeSOPView /></OnboardingGuard>), handle: { title: "SOP" } },
       { path: "profile", element: LMSProtectedWrapper(Profile), handle: { title: "Profile" } },
+      { path: "profile/:userId", element: LMSProtectedWrapper(UserProfilePage), handle: { title: "Profile" } },
       { path: "users", element: <Navigate to="/settings/users" replace /> },
       { path: "course-library", element: <Navigate to="/courses/library" replace /> },
       { path: "settings", element: AdminProtectedWrapper(Settings), handle: { title: "Settings" } },
@@ -193,6 +196,7 @@ const router = createBrowserRouter([
       { path: "announcements", element: LMSProtectedWrapper(AnnouncementsPage), handle: { title: "Announcements" } },
       { path: "events", element: LMSProtectedWrapper(EventsPage), handle: { title: "Events" } },
       { path: "messaging", element: LMSProtectedWrapper(MessagingPage), handle: { title: "Messaging" } },
+      { path: "people", element: LMSProtectedWrapper(EmployeeDirectoryPage), handle: { title: "People" } },
       { path: "tasks", element: LMSProtectedWrapper(TasksPage), handle: { title: "Tasks & Projects" } },
       { path: "tasks/:id", element: LMSProtectedWrapper(TaskDetailsPage), handle: { title: "Task Details" } },
       { path: "tasks/my", element: LMSProtectedWrapper(MyTasksPage), handle: { title: "My Tasks" } },

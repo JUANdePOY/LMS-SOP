@@ -7,12 +7,13 @@ import CreateCourseModal from "@/features/course_management/components/modals/Cr
 import { useToast } from "@/shared/components/ui/Toast";
 import { StaggerList, MotionItem } from "@/shared/motion";
 import { resolveFileUrl } from "@/lib/fileUrl";
+import { ActionButton } from "@/shared/components/ui/actionIcons";
 
 const STATUS_META = {
   published: {
     label: "Published",
-    chip: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-100 border-emerald-200 dark:border-emerald-500/30",
-    dot: "bg-emerald-500",
+    chip: "bg-success-soft text-success dark:bg-success-soft dark:text-[var(--color-success)] border-[rgba(32,87,51,0.25)]",
+    dot: "bg-success",
   },
   draft: {
     label: "Draft",
@@ -21,21 +22,21 @@ const STATUS_META = {
   },
   archived: {
     label: "Archived",
-    chip: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-100 border-amber-200 dark:border-amber-500/30",
-    dot: "bg-amber-500",
+    chip: "bg-warning-soft text-warning dark:bg-warning-soft dark:text-[var(--color-warning)] border-[rgba(217,163,0,0.25)]",
+    dot: "bg-warning",
   },
   under_review: {
     label: "Under Review",
-    chip: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-100 border-blue-200 dark:border-blue-500/30",
-    dot: "bg-blue-500",
+    chip: "bg-[rgba(50,102,127,0.10)] text-[var(--color-info)] dark:bg-[rgba(50,102,127,0.18)] dark:text-[var(--color-info)] border-[rgba(50,102,127,0.25)]",
+    dot: "bg-[var(--color-info)]",
   },
 };
 
 const DIFFICULTY_META = {
-  beginner: { label: "Beginner", color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-100 border-emerald-200 dark:border-emerald-500/30" },
-  intermediate: { label: "Intermediate", color: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-100 border-amber-200 dark:border-amber-500/30" },
-  advanced: { label: "Advanced", color: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-100 border-rose-200 dark:border-rose-500/30" },
-  all_levels: { label: "All Levels", color: "bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-100 border-sky-200 dark:border-sky-500/30" },
+  beginner: { label: "Beginner", color: "bg-[rgba(50,102,127,0.10)] text-[var(--color-info)] dark:bg-[rgba(50,102,127,0.18)] dark:text-[var(--color-info)] border-[rgba(50,102,127,0.25)]" },
+  intermediate: { label: "Intermediate", color: "bg-warning-soft text-warning dark:bg-warning-soft dark:text-[var(--color-warning)] border-[rgba(217,163,0,0.25)]" },
+  advanced: { label: "Advanced", color: "bg-danger-soft text-danger dark:bg-danger-soft dark:text-[var(--color-danger)] border-[rgba(204,31,31,0.25)]" },
+  all_levels: { label: "All Levels", color: "bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)] border-[rgba(242,92,5,0.25)]" },
 };
 
 const DIFFICULTIES = ["beginner", "intermediate", "advanced", "all_levels"];
@@ -223,8 +224,8 @@ export default function Courses({ departments = [] }) {
     return (
       <div className="flex h-96 items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 dark:text-blue-400" />
+          <div className="h-10 w-10 rounded-xl bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)] flex items-center justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-primary)] dark:text-[var(--color-primary)]" />
           </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Loading courses...</p>
         </div>
@@ -241,7 +242,7 @@ export default function Courses({ departments = [] }) {
             <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Courses</h1>
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">Design learning experiences and manage enrollment</p>
           </div>
-          <button onClick={openAdd} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:shadow-md transition-all">
+          <button onClick={openAdd} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium shadow-sm hover:shadow-md transition-all">
             + Add Course
           </button>
         </div>
@@ -371,21 +372,21 @@ export default function Courses({ departments = [] }) {
                         }
                       }}
                       aria-label={`Open course ${c.title || "Untitled Course"}`}
-                      className={`${idx % 2 === 0 ? "bg-white dark:bg-neutral-800" : "bg-neutral-50/30 dark:bg-neutral-800/50"} cursor-pointer transition-colors hover:bg-blue-50/60 dark:hover:bg-blue-900/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
+                      className={`${idx % 2 === 0 ? "bg-white dark:bg-neutral-800" : "bg-neutral-50/30 dark:bg-neutral-800/50"} cursor-pointer transition-colors hover:bg-[rgba(242,92,5,0.06)] dark:hover:bg-[rgba(242,92,5,0.14)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500`}
                     >
                       <td className="px-3 py-3.5 w-10"></td>
                       <td className="px-3 py-3.5 hidden sm:table-cell">
                         {c.thumbnail_url ? (
                           <img src={resolveFileUrl(c.thumbnail_url)} alt={c.title} className="h-10 w-10 rounded-lg object-cover border border-neutral-200 dark:border-neutral-700" />
                         ) : (
-                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-sm ring-1 ring-blue-400/30 shrink-0">
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-hover)] flex items-center justify-center text-white shadow-sm ring-1 ring-[rgba(242,92,5,0.30)] shrink-0">
                             <span className="text-sm font-bold">📚</span>
                           </div>
                         )}
                       </td>
                       <td className="px-3 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-sm ring-1 ring-blue-400/30 shrink-0 sm:hidden">
+                          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-hover)] flex items-center justify-center text-white shadow-sm ring-1 ring-[rgba(242,92,5,0.30)] shrink-0 sm:hidden">
                             <span className="text-sm font-bold">📚</span>
                           </div>
                           <div className="min-w-0">
@@ -412,24 +413,14 @@ export default function Courses({ departments = [] }) {
                       <td className="px-3 py-3.5">
                         <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
                           {c.status === "draft" && (
-                            <button onClick={() => handleQuickAction(c, "publish")} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-emerald-600 hover:bg-emerald-50 transition-all" title="Publish">
-                              🌐
-                            </button>
+                            <ActionButton action="Publish" label={`Publish ${c.title}`} onClick={() => handleQuickAction(c, "publish")} />
                           )}
-                           {c.status === "published" && (
-                             <button onClick={() => handleQuickAction(c, "archive")} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-amber-600 hover:bg-amber-50 transition-all" title="Archive">
-                               📦
-                             </button>
-                           )}
-                           <button onClick={() => openEdit(c)} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-blue-600 hover:bg-blue-50 transition-all" title="Edit">
-                             ✏️
-                           </button>
-                           <button onClick={() => openBuilder(c)} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-indigo-600 hover:bg-indigo-50 transition-all" title="Open Builder">
-                             🛠️
-                           </button>
-                          <button onClick={() => openDelete(c)} className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-red-600 hover:bg-red-50 transition-all" title="Delete">
-                            🗑️
-                          </button>
+                          {c.status === "published" && (
+                            <ActionButton action="Archive" label={`Archive ${c.title}`} onClick={() => handleQuickAction(c, "archive")} />
+                          )}
+                          <ActionButton action="Edit" label={`Edit ${c.title}`} onClick={() => openEdit(c)} />
+                          <ActionButton action="View" label={`Open builder for ${c.title}`} onClick={() => openBuilder(c)} />
+                          <ActionButton action="Delete" label={`Delete ${c.title}`} onClick={() => openDelete(c)} />
                         </div>
                       </td>
                     </tr>
@@ -453,11 +444,11 @@ export default function Courses({ departments = [] }) {
                 <option value="100">100</option>
               </select>
               <div className="flex items-center gap-1">
-                <button onClick={() => setPage((p) => ({ ...p, current: Math.max(1, p.current - 1) }))} disabled={safePage <= 1} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-sm hover:border-blue-300 hover:text-blue-700 transition-all disabled:opacity-50">
+                <button onClick={() => setPage((p) => ({ ...p, current: Math.max(1, p.current - 1) }))} disabled={safePage <= 1} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-sm hover:border-brand-soft hover-brand transition-all disabled:opacity-50">
                   Previous
                 </button>
                 <span className="text-xs text-neutral-600 dark:text-neutral-300 min-w-[3rem] text-center font-medium">{safePage} / {totalPages}</span>
-                <button onClick={() => setPage((p) => ({ ...p, current: Math.min(totalPages, p.current + 1) }))} disabled={safePage >= totalPages} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-sm hover:border-blue-300 hover:text-blue-700 transition-all disabled:opacity-50">
+                <button onClick={() => setPage((p) => ({ ...p, current: Math.min(totalPages, p.current + 1) }))} disabled={safePage >= totalPages} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-sm hover:border-brand-soft hover-brand transition-all disabled:opacity-50">
                   Next
                 </button>
               </div>

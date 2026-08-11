@@ -4,17 +4,31 @@ import { cn } from '@/lib/utils';
 import { useGlobalSearch } from '@/hooks/useGlobalSearch';
 
 const CATEGORY_META = {
-  users: { label: 'Users', icon: Users, color: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' },
-  courses: { label: 'Courses', icon: BookOpen, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' },
+  users: { label: 'Users', icon: Users, color: 'bg-[rgba(242,92,5,0.12)] text-[var(--color-primary-hover)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]' },
+  courses: { label: 'Courses', icon: BookOpen, color: 'bg-success-soft text-[var(--color-success)] dark:bg-success-soft dark:text-[var(--color-success)]' },
   sops: { label: 'SOPs', icon: FileText, color: 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' },
-  departments: { label: 'Departments', icon: Building, color: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300' },
+  departments: { label: 'Departments', icon: Building, color: 'bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft dark:text-[var(--color-warning)]' },
   announcements: { label: 'Announcements', icon: Megaphone, color: 'bg-pink-100 text-pink-700 dark:bg-pink-500/20 dark:text-pink-300' },
   events: { label: 'Events', icon: Calendar, color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300' },
-  quizzes: { label: 'Quizzes', icon: ListChecks, color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300' },
+  quizzes: { label: 'Quizzes', icon: ListChecks, color: 'bg-[rgba(19,47,69,0.12)] text-[var(--color-secondary)] dark:bg-[rgba(19,47,69,0.18)] dark:text-[var(--color-secondary)]' },
   tasks: { label: 'Tasks', icon: CheckSquare, color: 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-300' },
   certificates: { label: 'Certificates', icon: Award, color: 'bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300' },
   businesses: { label: 'Businesses', icon: Briefcase, color: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-500/20 dark:text-fuchsia-300' },
-  categories: { label: 'Categories', icon: Tag, color: 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300' },
+  categories: { label: 'Categories', icon: Tag, color: 'bg-danger-soft text-[var(--color-danger)] dark:bg-danger-soft dark:text-[var(--color-danger)]' },
+};
+
+const CATEGORY_PATHS = {
+  users: (item) => `/profile/${item.id}`,
+  courses: (item) => `/courses/${item.id}`,
+  sops: (item) => `/sops/${item.id}`,
+  departments: () => '/admin/organization/departments',
+  announcements: () => '/announcements',
+  events: () => '/events',
+  quizzes: (item) => `/assessments/quiz/${item.id}`,
+  tasks: (item) => `/tasks/${item.id}`,
+  certificates: () => '/certificates',
+  businesses: () => '/admin/organization/businesses',
+  categories: () => '/admin/organization/categories',
 };
 
 function ResultRow({ category, item, onClick }) {
@@ -22,12 +36,18 @@ function ResultRow({ category, item, onClick }) {
   const Icon = meta.icon;
   const title = item.title || item.full_name || item.name || item.business_name || item.code || 'Untitled';
   const subtitle = item.department_name || item.course_title || item.business_code || item.subtitle || item.description || '';
+  const href = CATEGORY_PATHS[category]?.(item) || '#';
 
   return (
-    <button
-      type="button"
-      onClick={() => onClick(category, item)}
-      className="flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+    <a
+      href={href}
+      onClick={(e) => {
+        if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+          e.preventDefault();
+          onClick(category, item);
+        }
+      }}
+      className="flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-[rgba(242,92,5,0.30)]"
     >
       <span className={cn("mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg", meta.color)}>
         <Icon size={13} />
@@ -43,7 +63,7 @@ function ResultRow({ category, item, onClick }) {
       <span className="mt-0.5 text-xs font-medium text-neutral-400 dark:text-neutral-500">
         {meta.label}
       </span>
-    </button>
+    </a>
   );
 }
 
@@ -119,7 +139,7 @@ export default function GlobalSearch() {
             "placeholder:text-[var(--header-input-placeholder)]",
             "outline-none transition-all duration-200",
             "shadow-sm",
-            "focus:ring-2 focus:ring-[var(--header-input-focus-ring)] focus:border-blue-500 focus:shadow-md",
+            "focus:ring-2 focus:ring-[var(--header-input-focus-ring)] focus:border-[var(--color-primary)] focus:shadow-md",
             "dark:focus:ring-[var(--header-input-focus-ring)]"
           )}
         />

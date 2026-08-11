@@ -21,7 +21,7 @@ export default function ContentViewer({ content }) {
       <div className="rounded-xl border border-[var(--border)] bg-white dark:bg-neutral-900 p-6">
         <h3 className="text-lg font-semibold mb-2">{content.title}</h3>
         <p className="text-sm text-neutral-600">{content.description}</p>
-        {content.url && <a href={content.url} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline mt-2 inline-block">Open external resource</a>}
+        {content.url && <a href={content.url} target="_blank" rel="noreferrer" className="text-sm text-[var(--color-primary)] hover:underline mt-2 inline-block">Open external resource</a>}
       </div>
     );
   }

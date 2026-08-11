@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Edit3, Users, BarChart3, CheckCircle, Download, BookOpen, GraduationCap, Layers, PlayCircle, Video, FileText, ListChecks, Clock, ChevronRight } from "lucide-react";
+import { Users, BarChart3, CheckCircle, Download, BookOpen, GraduationCap, Layers, PlayCircle, Video, FileText, ListChecks, Clock, ChevronRight } from "lucide-react";
+import { ActionIcons } from "@/shared/components/ui/actionIcons";
 import { useCourseLibraryDetails } from "../hooks/useCourseLibraryDetails";
 import { useCourseAnalytics } from "../hooks/useCourseAnalytics";
 import { useModules } from "@/features/course_management/hooks/useModules";
@@ -20,18 +21,18 @@ import { StaggerList, MotionItem } from "@/shared/motion";
 const ENROLLMENT_STATUS_META = {
   active: {
     label: "Active",
-    chip: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-100 border-emerald-200 dark:border-emerald-500/30",
-    dot: "bg-emerald-500",
+    chip: "bg-success-soft text-[var(--color-success)] dark:bg-success-soft0/15 dark:text-emerald-100 border-emerald-200 dark:border-emerald-500/30",
+    dot: "bg-success-soft0",
   },
   pending: {
     label: "Pending",
-    chip: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-100 border-amber-200 dark:border-amber-500/30",
-    dot: "bg-amber-500",
+    chip: "bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft0/15 dark:text-amber-100 border-[rgba(217,163,0,0.25)] dark:border-amber-500/30",
+    dot: "bg-warning-soft0",
   },
   completed: {
     label: "Completed",
-    chip: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-100 border-blue-200 dark:border-blue-500/30",
-    dot: "bg-blue-500",
+    chip: "bg-[rgba(242,92,5,0.08)] text-[var(--color-primary-hover)] dark:bg-[rgba(242,92,5,0.08)]0/15 dark:text-[var(--color-primary)] border-[rgba(242,92,5,0.25)] dark:border-[rgba(242,92,5,0.30)]",
+    dot: "bg-[rgba(242,92,5,0.08)]0",
   },
   dropped: {
     label: "Dropped",
@@ -82,7 +83,7 @@ function LessonRow({ lesson, onView }) {
       <Icon size={15} className="shrink-0 text-neutral-400 dark:text-neutral-500" />
       <span className="flex-1 min-w-0 truncate text-neutral-700 dark:text-neutral-200">{lesson.title}</span>
       {lesson.is_required && (
-        <span className="hidden sm:inline text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">Required</span>
+        <span className="hidden sm:inline text-[10px] font-medium uppercase tracking-wide text-[var(--color-warning)] dark:text-[var(--color-warning)]">Required</span>
       )}
       {lesson.duration ? (
         <span className="inline-flex items-center gap-1 text-[11px] text-neutral-400 dark:text-neutral-500">
@@ -128,7 +129,7 @@ function ModuleAccordion({ courseId, module, index, onView, getContent }) {
           size={16}
           className={`shrink-0 text-neutral-400 transition-transform ${open ? "rotate-90" : ""}`}
         />
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-xs font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-xs font-bold text-[var(--color-primary-hover)] dark:bg-blue-900/20 dark:text-[var(--color-primary)]">
           {index + 1}
         </div>
         <div className="min-w-0 flex-1">
@@ -176,11 +177,11 @@ function CourseLessonsSection({ courseId, modules, modulesLoading, onView }) {
     <OverviewSection title="Modules & Lessons" icon={BookOpen}>
       <div className="mb-3 flex items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400">
         <span className="inline-flex items-center gap-1.5">
-          <GraduationCap size={14} className="text-blue-600 dark:text-blue-400" />
+          <GraduationCap size={14} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
           {modules.length} {modules.length === 1 ? "module" : "modules"}
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <BookOpen size={14} className="text-blue-600 dark:text-blue-400" />
+          <BookOpen size={14} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
           {totalLessons} {totalLessons === 1 ? "lesson" : "lessons"}
         </span>
       </div>
@@ -372,12 +373,12 @@ export default function CourseLibraryDetailsPage() {
             course={course}
             onBack={onBack}
             breadcrumb="Back to Library"
-            progress={myProgress}
+            progress={isEmployee ? myProgress : undefined}
             primaryAction={
           isEmployee ? (
             <button
               onClick={() => navigate(`/my-learning/course/${courseId}`)}
-              className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-all"
+              className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover-brand transition-all"
             >
               <PlayCircle size={14} />
               Open Course
@@ -385,9 +386,9 @@ export default function CourseLibraryDetailsPage() {
           ) : (
             <button
               onClick={() => navigate(`/courses/${courseId}/builder`)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-blue-300 dark:hover:border-blue-500/60 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
+              className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-[rgba(242,92,5,0.30)] dark:hover:border-[var(--color-primary)]/60 hover:text-[var(--color-primary-hover)] dark:hover:text-[var(--color-primary)] hover:bg-[rgba(242,92,5,0.08)] dark:hover:bg-[rgba(242,92,5,0.08)]0/10 transition-all"
             >
-              <Edit3 size={14} />
+              <ActionIcons.Edit size={14} />
               Edit Course
             </button>
           )
@@ -407,14 +408,14 @@ export default function CourseLibraryDetailsPage() {
                 className={cn(
                   "relative inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap",
                   active
-                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                    ? "bg-[rgba(242,92,5,0.08)] dark:bg-blue-900/20 text-[var(--color-primary-hover)] dark:text-[var(--color-primary)]"
                     : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100"
                 )}
               >
                 {Icon && <Icon size={13} />}
                 {tab.label}
                 {active && (
-                  <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-blue-600 dark:bg-blue-400" />
+                  <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[var(--color-primary)] dark:bg-blue-400" />
                 )}
               </button>
             );
@@ -435,7 +436,7 @@ export default function CourseLibraryDetailsPage() {
               isEmployee ? (
                 <button
                   onClick={() => navigate(`/my-learning/course/${courseId}`)}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover-brand transition-colors"
                 >
                   <PlayCircle size={14} />
                   Open in Learner View
@@ -449,7 +450,7 @@ export default function CourseLibraryDetailsPage() {
               <OverviewSection title="Enrolled Employees" icon={Users}>
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-xs text-neutral-500 dark:text-neutral-400">{enrollments.length} total</span>
-                  <button onClick={() => setShowAssignModal(true)} className="rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-blue-300 dark:hover:border-blue-500/60 hover:bg-blue-50 dark:hover:bg-blue-500/10">+ Assign Employees</button>
+                  <button onClick={() => setShowAssignModal(true)} className="rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-[rgba(242,92,5,0.30)] dark:hover:border-[var(--color-primary)]/60 hover:bg-[rgba(242,92,5,0.08)] dark:hover:bg-[rgba(242,92,5,0.08)]0/10">+ Assign Employees</button>
                 </div>
                 {enrollments.length === 0 ? (
                   <div className="text-center py-10 text-neutral-400">
@@ -479,7 +480,7 @@ export default function CourseLibraryDetailsPage() {
                             <tr key={enrollment.id} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
                               <td className="px-3 py-2.5">
                                 <div className="flex items-center gap-2">
-                                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">{(enrollment.user_name || "U").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}</div>
+                                  <div className="h-7 w-7 rounded-full bg-gradient-to-br from-[rgba(242,92,5,0.06)]0 to-[var(--color-secondary-hover)] flex items-center justify-center text-white text-xs font-bold">{(enrollment.user_name || "U").split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)}</div>
                                   <span className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{enrollment.user_name || "Unknown User"}</span>
                                 </div>
                               </td>
@@ -490,7 +491,7 @@ export default function CourseLibraryDetailsPage() {
                               <td className="px-3 py-2.5">
                                 <div className="ml-auto flex w-24 items-center gap-2">
                                   <div className="h-2 flex-1 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
-                                    <div className={`h-full rounded-full ${progress >= 80 ? "bg-emerald-500" : progress >= 50 ? "bg-blue-500" : "bg-amber-500"}`} style={{ width: `${progress}%` }} />
+                                    <div className={`h-full rounded-full ${progress >= 80 ? "bg-[var(--color-success)]" : progress >= 50 ? "bg-[var(--color-primary)]" : "bg-[var(--color-warning)]"}`} style={{ width: `${progress}%` }} />
                                   </div>
                                   <span className="w-9 text-right text-xs tabular-nums text-neutral-600 dark:text-neutral-400">{progress}%</span>
                                 </div>
@@ -613,7 +614,7 @@ export default function CourseLibraryDetailsPage() {
                   {learningOutcomes.map((outcome, i) => (
                     <MotionItem key={i}>
                       <li className="flex items-start gap-2.5 text-sm text-neutral-600 dark:text-neutral-300">
-                        <CheckCircle size={16} className="mt-0.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                        <CheckCircle size={16} className="mt-0.5 text-[var(--color-primary)] dark:text-[var(--color-primary)] shrink-0" />
                         <span>{outcome}</span>
                       </li>
                     </MotionItem>
@@ -662,7 +663,7 @@ export default function CourseLibraryDetailsPage() {
             {course?.instructor_name && (
               <OverviewSection title="Instructor">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
+                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center text-sm font-semibold text-[var(--color-primary-hover)] dark:text-[var(--color-primary)]">
                     {course.instructor_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                   </div>
                   <div>

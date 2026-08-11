@@ -1,8 +1,8 @@
 export default function ContentCard({ content, onClick }) {
   return (
-    <div onClick={onClick} className="cursor-pointer rounded-lg border border-[var(--border)] bg-white dark:bg-neutral-900 p-3 shadow-sm hover:border-blue-300 transition-colors">
+    <div onClick={onClick} className="cursor-pointer rounded-lg border border-[var(--border)] bg-white dark:bg-neutral-900 p-3 shadow-sm hover:border-[rgba(242,92,5,0.30)] transition-colors">
       <div className="flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary-hover)]">
           <span className="text-xs font-bold">{content.type?.[0]?.toUpperCase()}</span>
         </div>
         <div className="flex-1 min-w-0">

@@ -68,7 +68,7 @@ export default function ChapterEditor({ chapters = [], onChange }) {
               setOverIndex(null);
             }}
             className={`group flex items-stretch rounded-lg border bg-white transition-shadow ${
-              overIndex === index && dragIndex !== null ? "border-blue-400 shadow-md" : "border-neutral-200"
+              overIndex === index && dragIndex !== null ? "border-[var(--color-primary)] shadow-md" : "border-neutral-200"
             } ${dragIndex === index ? "opacity-50" : ""}`}
           >
             <div
@@ -89,7 +89,7 @@ export default function ChapterEditor({ chapters = [], onChange }) {
                   onChange={(e) => update(chapter.id, { start: parseTimestamp(e.target.value) ?? 0 })}
                   placeholder="0:00"
                   aria-label={`Chapter ${index + 1} start time`}
-                  className="w-full rounded-md border border-neutral-200 bg-white py-1.5 pl-7 pr-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                  className="w-full rounded-md border border-neutral-200 bg-white py-1.5 pl-7 pr-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600"
                 />
               </div>
               <input
@@ -98,7 +98,7 @@ export default function ChapterEditor({ chapters = [], onChange }) {
                 onChange={(e) => update(chapter.id, { title: e.target.value })}
                 placeholder={`Chapter ${index + 1} title`}
                 aria-label={`Chapter ${index + 1} title`}
-                className="min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600"
+                className="min-w-0 flex-1 rounded-md border border-neutral-200 bg-white px-3 py-1.5 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600"
               />
             </div>
 

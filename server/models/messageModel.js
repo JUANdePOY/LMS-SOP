@@ -75,9 +75,22 @@ const messageModel = {
     }
   },
 
+  async findDirectConversation(userA, userB) {
+    const [rows] = await db.query(`
+      SELECT c.id
+      FROM conversations c
+      INNER JOIN conversation_participants cp1 ON cp1.conversation_id = c.id AND cp1.user_id = ?
+      INNER JOIN conversation_participants cp2 ON cp2.conversation_id = c.id AND cp2.user_id = ?
+      WHERE (SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = c.id) = 2
+      LIMIT 1
+    `, [userA, userB]);
+    if (!rows.length) return null;
+    return this.getConversation(rows[0].id);
+  },
+
   async getParticipants(conversationId) {
     const [rows] = await db.query(`
-      SELECT cp.user_id as id, u.full_name, u.email, u.role
+      SELECT cp.user_id as id, u.full_name, u.email, u.role, u.avatar_url
       FROM conversation_participants cp
       LEFT JOIN users u ON u.id = cp.user_id
       WHERE cp.conversation_id = ?
@@ -143,7 +156,7 @@ const messageModel = {
 
   async getMessage(id) {
     const [rows] = await db.query(`
-      SELECT m.*, u.full_name as sender_name
+      SELECT m.*, u.full_name as sender_name, u.avatar_url as sender_avatar_url
       FROM messages m
       LEFT JOIN users u ON u.id = m.sender_id
       WHERE m.id = ?
@@ -153,7 +166,7 @@ const messageModel = {
 
   async listMessages(conversationId) {
     const [rows] = await db.query(`
-      SELECT m.*, u.full_name as sender_name
+      SELECT m.*, u.full_name as sender_name, u.avatar_url as sender_avatar_url
       FROM messages m
       LEFT JOIN users u ON u.id = m.sender_id
       WHERE m.conversation_id = ?

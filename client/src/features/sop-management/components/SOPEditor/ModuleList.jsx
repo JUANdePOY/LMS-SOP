@@ -1,5 +1,6 @@
 import SortableModuleList from './SortableModuleList';
 import ModuleToolbar from './ModuleToolbar';
+import { ActionIcons } from '@/shared/components/ui/actionIcons';
 
 function ModuleSkeleton() {
   return (
@@ -34,11 +35,9 @@ function ModuleList({ modules = [], loading, error, onAdd, onEdit, onDelete, onR
       <ModuleToolbar onAdd={onAdd} onReorder={onReorder} />
       {modules.length === 0 ? (
         <div className="text-center py-8">
-          <div className="w-12 h-12 bg-neutral-100 dark:bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-3">
-            <svg className="w-6 h-6 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-          </div>
+            <div className="w-12 h-12 bg-neutral-100 dark:bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-3">
+              <ActionIcons.Add className="w-6 h-6 text-neutral-400" />
+            </div>
           <p className="text-sm text-neutral-500 dark:text-neutral-400">No modules yet. Add one to get started.</p>
         </div>
       ) : (

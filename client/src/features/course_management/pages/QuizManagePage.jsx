@@ -66,10 +66,10 @@ export default function QuizManagePage() {
       </div>
 
       {error && (
-        <Card className="border-rose-200 bg-rose-50 dark:bg-rose-950/20">
+        <Card className="border-[rgba(204,31,31,0.25)] bg-danger-soft dark:bg-danger-soft">
           <div className="p-4 flex items-center gap-3">
-            <AlertCircle className="h-5 w-5 text-rose-600" />
-            <p className="text-sm text-rose-800 dark:text-rose-200">{error}</p>
+            <AlertCircle className="h-5 w-5 text-[var(--color-danger)]" />
+            <p className="text-sm text-[var(--color-danger)] dark:text-[var(--color-danger)]">{error}</p>
             <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
           </div>
         </Card>

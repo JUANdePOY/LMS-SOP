@@ -24,7 +24,7 @@ export default function CourseListRow({ course, onClick, myProgress }) {
       aria-label={course.title ? `Open course ${course.title}` : "Open course"}
       onClick={onClick}
       onKeyDown={handleKeyDown}
-      className="group cursor-pointer rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 hover:border-blue-200 dark:hover:border-blue-800 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+      className="group cursor-pointer rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 hover:border-[rgba(242,92,5,0.25)] dark:hover:border-blue-800 hover:bg-neutral-50 dark:hover:bg-neutral-800/40 transition-colors motion-reduce:transition-none focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
     >
       <div className="flex items-center gap-3 sm:gap-4">
         <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 sm:h-16 sm:w-16">
@@ -32,12 +32,12 @@ export default function CourseListRow({ course, onClick, myProgress }) {
             <img src={resolveFileUrl(course.thumbnail_url)} alt={course.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
-              <BookOpen size={20} className="text-blue-600 dark:text-blue-400" />
+              <BookOpen size={20} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
             </div>
           )}
           <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity">
             <div className="rounded-full bg-white dark:bg-neutral-800 p-1.5 shadow-lg">
-              <PlayCircle size={16} className="text-blue-600 dark:text-blue-300" />
+              <PlayCircle size={16} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
             </div>
           </div>
         </div>
@@ -45,7 +45,7 @@ export default function CourseListRow({ course, onClick, myProgress }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-2">
-              <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100 group-hover:text-blue-600 transition-colors">
+              <h3 className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100 group-hover:text-[var(--color-primary)] transition-colors">
                 {course.title || "Untitled Course"}
               </h3>
               <Badge variant={difficultyMeta.variant} className="shrink-0">{difficultyMeta.label}</Badge>

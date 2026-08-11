@@ -17,7 +17,7 @@ export default function AddModuleModal({ open, onClose, onSubmit }) {
             <option value="unit">Unit</option>
             <option value="lesson">Lesson</option>
           </select>
-          <button type="submit" className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white">Add Module</button>
+          <button type="submit" className="rounded-lg px-4 py-2 text-sm btn-primary">Add Module</button>
         </form>
       </div>
     </div>

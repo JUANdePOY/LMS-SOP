@@ -36,7 +36,7 @@ export default function VideoPreview({ url, onPickChapter, activeChapterStart })
 
   const badgeColor = {
     youtube: "bg-red-50 text-red-600",
-    vimeo: "bg-blue-50 text-blue-600",
+    vimeo: "bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)]",
     file: "bg-neutral-100 text-neutral-600",
   }[parsed.provider];
 
@@ -95,7 +95,7 @@ export default function VideoPreview({ url, onPickChapter, activeChapterStart })
           href={parsed.url}
           target="_blank"
           rel="noreferrer noopener"
-          className="inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
+          className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]"
         >
           Open original <ExternalLink size={12} />
         </a>

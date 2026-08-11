@@ -20,7 +20,7 @@ export default function AnalyticsTab({ analytics, onExport }) {
         </div>
       </div>
       <div className="flex justify-end">
-        <button onClick={onExport} className="rounded-lg px-3 py-1.5 text-sm bg-blue-600 text-white">Export Report</button>
+        <button onClick={onExport} className="rounded-lg px-3 py-1.5 text-sm btn-primary">Export Report</button>
       </div>
     </div>
   );

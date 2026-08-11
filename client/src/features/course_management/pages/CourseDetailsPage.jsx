@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useCourseDetails } from "../hooks/useCourseDetails";
 import { useModules } from "../hooks/useModules";
 import { useEnrollmentList } from "../hooks/useEnrollmentList";
@@ -7,10 +7,12 @@ import { useGrades } from "../hooks/useGrades";
 import { useAnalytics } from "../hooks/useAnalytics";
 import { useDiscussions } from "../hooks/useDiscussions";
 import { useUpdateCourse } from "../hooks/useUpdateCourse";
-import { Button } from "@/shared/components/ui/button";
-import { Card } from "@/shared/components/ui/card";
-import { useNavigate } from "react-router-dom";
-import { ChevronLeft, Edit3 } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
+import { ActionButton } from "@/shared/components/ui/actionIcons";
+import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
+import { useToast } from "@/shared/components/ui/Toast";
+import { useDeleteCourse } from "../hooks/useDeleteCourse";
+import { useCourseActions } from "../hooks/useCourseActions";
 import OverviewTab from "../components/tabs/OverviewTab";
 import ModulesTab from "../components/tabs/ModulesTab";
 import ContentTab from "../components/tabs/ContentTab";
@@ -44,6 +46,7 @@ const TABS = [
 
 export default function CourseDetailsPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { data: course, loading, error, refetch } = useCourseDetails(id);
   const { data: modules } = useModules(id);
   const { data: enrollments } = useEnrollmentList({ courseId: id });
@@ -51,8 +54,39 @@ export default function CourseDetailsPage() {
   const { data: analytics } = useAnalytics(id);
   const { data: discussions } = useDiscussions(id);
   const { update: updateCourseSettings, loading: updatingSettings } = useUpdateCourse();
+  const { toast } = useToast();
+  const { remove: removeCourse, loading: deleting } = useDeleteCourse();
+  const { archive, publish, loading: acting } = useCourseActions();
   const [tab, setTab] = useState("overview");
   const [modals, setModals] = useState({});
+  const [pendingArchive, setPendingArchive] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(false);
+
+  const confirmArchive = async () => {
+    if (!id) return;
+    try {
+      if (course.status === "archived") await publish(id);
+      else await archive(id);
+      toast.success(course.status === "archived" ? "Course unarchived" : "Course archived");
+      refetch?.();
+    } catch (err) {
+      toast.error(err.message || "Action failed");
+    } finally {
+      setPendingArchive(false);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!id) return;
+    try {
+      await removeCourse(id);
+      toast.success("Course deleted");
+      navigate("/courses");
+    } catch (err) {
+      toast.error(err.message || "Failed to delete course");
+      setPendingDelete(false);
+    }
+  };
 
   const toggleModal = (key) => setModals((p) => ({ ...p, [key]: !p[key] }));
 
@@ -95,14 +129,14 @@ export default function CourseDetailsPage() {
               </p>
             </div>
           </div>
-          <div className="flex items-center justify-end gap-2">
-            <button
-              onClick={() => toggleModal("edit")}
-              className="inline-flex items-center gap-1.5 rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-300 hover:border-blue-300 dark:hover:border-blue-500/60 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all"
-            >
-              <Edit3 size={14} />
-              Edit Course
-            </button>
+          <div className="flex items-center justify-end gap-1">
+            <ActionButton action="Edit" label="Edit Course" onClick={() => toggleModal("edit")} />
+            <ActionButton
+              action={course?.status === "archived" ? "Unarchive" : "Archive"}
+              label={course?.status === "archived" ? "Unarchive Course" : "Archive Course"}
+              onClick={() => setPendingArchive(true)}
+            />
+            <ActionButton action="Delete" label="Delete Course" onClick={() => setPendingDelete(true)} />
           </div>
         </div>
       </div>
@@ -113,7 +147,7 @@ export default function CourseDetailsPage() {
             onClick={() => setTab(t.key)}
             className={`px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
               tab === t.key
-                ? "border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-300"
+                ? "border-[var(--color-primary)] text-[var(--color-primary)] dark:border-[var(--color-primary)] dark:text-[var(--color-primary)]"
                 : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
             }`}
           >
@@ -140,6 +174,25 @@ export default function CourseDetailsPage() {
       <EnrollStudentsModal open={modals.enroll} onClose={() => toggleModal("enroll")} onSubmit={() => {}} />
       <GradeSubmissionModal open={modals.grade} onClose={() => toggleModal("grade")} onSubmit={() => {}} />
       <EditCourseModal open={modals.edit} onClose={() => toggleModal("edit")} course={course} />
+      <ConfirmDialog
+        open={pendingArchive}
+        title={course?.status === "archived" ? "Unarchive Course" : "Archive Course"}
+        description={course ? `Are you sure you want to ${course.status === "archived" ? "unarchive" : "archive"} "${course.title}"?` : ""}
+        confirmLabel={course?.status === "archived" ? "Unarchive" : "Archive"}
+        loading={acting}
+        onConfirm={confirmArchive}
+        onCancel={() => setPendingArchive(false)}
+      />
+      <ConfirmDialog
+        open={pendingDelete}
+        destructive
+        title="Delete Course"
+        description={course ? `Are you sure you want to delete "${course.title}"? This cannot be undone.` : ""}
+        confirmLabel="Delete"
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(false)}
+      />
     </div>
   );
 }

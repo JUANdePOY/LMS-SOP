@@ -5,7 +5,7 @@ import { usePublishedCourses } from "../hooks/usePublishedCourses";
 import { useCourseCategories } from "../hooks/useCourseCategories";
 import { useMyEnrollments } from "../hooks/useMyEnrollments";
 import CourseLibraryCard from "../components/CourseLibraryCard";
-import CourseListRow from "../components/CourseListRow";
+import CourseTable from "../components/CourseTable";
 import FilterSidebar from "../components/FilterSidebar";
 import QuickAssignModal from "../components/QuickAssignModal";
 import { useToast } from "@/shared/components/ui/Toast";
@@ -13,7 +13,6 @@ import { StaggerList, MotionItem } from "@/shared/motion";
 import * as session from "@/services/session";
 import { useAuth } from "@/contexts/AuthContext";
 
-const ADMIN_ROLES = ["super_admin", "admin", "department_head"];
 const ALL_DIFFICULTIES = ["beginner", "intermediate", "advanced", "all_levels"];
 const DIFFICULTY_LABELS = {
   beginner: "Beginner",
@@ -125,9 +124,6 @@ export default function CourseLibraryPage() {
     });
   }, [viewMode, search, selectedDifficulties, selectedCategories, sortField, sortDirection, syncUrl]);
 
-   const userRole = session.getCurrentUser()?.role;
-   const isAdminRole = ADMIN_ROLES.includes(userRole);
-
    const { isAnyAdmin } = useAuth();
 
    const queryParams = useMemo(
@@ -161,22 +157,13 @@ export default function CourseLibraryPage() {
   }, [courses, myEnrollments]);
 
   const continueLearning = useMemo(() => {
-    if (isAdminRole) return [];
     return decoratedCourses
       .filter((c) => c.myProgress != null && c.myProgress < 100)
       .sort((a, b) => b.myProgress - a.myProgress)
       .slice(0, 4);
-  }, [decoratedCourses, isAdminRole]);
+  }, [decoratedCourses]);
 
-  const continueLearningIds = useMemo(
-    () => new Set(continueLearning.map((c) => c.id)),
-    [continueLearning]
-  );
-
-  const mainCourses = useMemo(
-    () => decoratedCourses.filter((c) => !continueLearningIds.has(c.id)),
-    [decoratedCourses, continueLearningIds]
-  );
+  const mainCourses = decoratedCourses;
 
   const handleSearchChange = useCallback((e) => {
     setSearchInput(e.target.value);
@@ -260,15 +247,6 @@ export default function CourseLibraryPage() {
     />
   );
 
-  const renderRow = (course) => (
-    <CourseListRow
-      key={course.id}
-      course={course}
-      myProgress={course.myProgress}
-      onClick={() => handleCourseClick(course.id)}
-    />
-  );
-
   return (
     <div className="w-full max-w-none space-y-5 sm:space-y-6">
       <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-gradient-to-br from-white via-neutral-50/80 to-neutral-100/80 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 px-5 sm:px-6 py-4 sm:py-5 shadow-sm dark:shadow-none">
@@ -285,7 +263,7 @@ export default function CourseLibraryPage() {
               <button
                 type="button"
                 onClick={() => handleViewModeChange("grid")}
-                className={`rounded p-1 text-xs ${viewMode === "grid" ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300" : "text-neutral-500 hover:text-neutral-700"}`}
+                className={`rounded p-1 text-xs ${viewMode === "grid" ? "bg-[rgba(242,92,5,0.08)] dark:bg-blue-900/20 text-[var(--color-primary-hover)] dark:text-[var(--color-primary)]" : "text-neutral-500 hover:text-neutral-700"}`}
                 title="Grid view"
               >
                 <Grid size={14} />
@@ -293,7 +271,7 @@ export default function CourseLibraryPage() {
               <button
                 type="button"
                 onClick={() => handleViewModeChange("list")}
-                className={`rounded p-1 text-xs ${viewMode === "list" ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300" : "text-neutral-500 hover:text-neutral-700"}`}
+                className={`rounded p-1 text-xs ${viewMode === "list" ? "bg-[rgba(242,92,5,0.08)] dark:bg-blue-900/20 text-[var(--color-primary-hover)] dark:text-[var(--color-primary)]" : "text-neutral-500 hover:text-neutral-700"}`}
                 title="List view"
               >
                 <List size={14} />
@@ -312,7 +290,7 @@ export default function CourseLibraryPage() {
               onChange={handleSearchChange}
               placeholder="Search courses..."
               aria-label="Search courses"
-              className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm focus:border-blue-500 dark:focus:border-blue-400"
+              className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm focus:border-[var(--color-primary)] dark:focus:border-[var(--color-primary)]"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -351,7 +329,7 @@ export default function CourseLibraryPage() {
               aria-pressed={sidebarOpen}
               className={`ml-auto inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${
                 sidebarOpen || hasActiveFilters
-                  ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/20 dark:text-blue-300"
+                  ? "border-[var(--color-primary)] bg-[rgba(242,92,5,0.08)] text-[var(--color-primary-hover)] dark:border-[var(--color-primary)] dark:bg-blue-900/20 dark:text-[var(--color-primary)]"
                   : "border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-600 hover:text-neutral-800"
               }`}
             >
@@ -383,16 +361,25 @@ export default function CourseLibraryPage() {
             </div>
           )}
 
-            {!loading && continueLearning.length > 0 && (
+            {!loading && !isAnyAdmin && continueLearning.length > 0 && (
               <section>
               <h2 className="mb-3 text-sm font-semibold text-neutral-700 dark:text-neutral-200">Continue Learning</h2>
-              <StaggerList className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
-                {continueLearning.map((course) => (
-                  <MotionItem key={course.id}>
-                    {renderCard(course)}
-                  </MotionItem>
-                ))}
-              </StaggerList>
+              {viewMode === "grid" ? (
+                <StaggerList className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+                  {continueLearning.map((course) => (
+                    <MotionItem key={course.id}>
+                      {renderCard(course)}
+                    </MotionItem>
+                  ))}
+                </StaggerList>
+              ) : (
+                <CourseTable
+                  courses={continueLearning}
+                  onRowClick={handleCourseClick}
+                  getProgress={(c) => c.myProgress}
+                  showProgress={!isAnyAdmin}
+                />
+              )}
             </section>
           )}
 
@@ -410,16 +397,19 @@ export default function CourseLibraryPage() {
                 ))}
               </div>
             ) : (
-              <div className="space-y-2">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 animate-pulse">
-                    <div className="h-12 w-12 shrink-0 rounded-lg bg-neutral-200 dark:bg-neutral-700" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-neutral-200 dark:bg-neutral-700 rounded w-1/3" />
-                      <div className="h-3 bg-neutral-200 dark:bg-neutral-700 rounded w-2/3" />
+              <div className="overflow-hidden rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 animate-pulse">
+                <div className="h-9 border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50/80 dark:bg-neutral-800/60" />
+                <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 px-4 py-3">
+                      <div className="h-11 w-11 shrink-0 rounded-lg bg-neutral-200 dark:bg-neutral-700" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-neutral-200 dark:bg-neutral-700 rounded w-1/3" />
+                        <div className="h-3 bg-neutral-200 dark:bg-neutral-700 rounded w-2/3" />
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )
           )}
@@ -466,13 +456,12 @@ export default function CourseLibraryPage() {
                     ))}
                   </StaggerList>
                 ) : (
-                  <StaggerList className="space-y-2">
-                    {mainCourses.map((course) => (
-                      <MotionItem key={course.id}>
-                        {renderRow(course)}
-                      </MotionItem>
-                    ))}
-                  </StaggerList>
+                  <CourseTable
+                    courses={mainCourses}
+                    onRowClick={handleCourseClick}
+                    getProgress={(c) => c.myProgress}
+                    showProgress={!isAnyAdmin}
+                  />
                 )}
               </section>
 

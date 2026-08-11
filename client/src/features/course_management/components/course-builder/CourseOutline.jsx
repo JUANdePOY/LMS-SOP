@@ -17,12 +17,12 @@ import {
 } from "lucide-react";
 
 const TYPE_CONFIG = {
-  video: { icon: PlayCircle, label: "Video", color: "text-blue-500 bg-blue-50 dark:bg-blue-900/20" },
+  video: { icon: PlayCircle, label: "Video", color: "text-[var(--color-primary)] bg-[rgba(242,92,5,0.08)] dark:bg-blue-900/20" },
   reading: { icon: FileText, label: "Text", color: "text-green-500 bg-green-50 dark:bg-green-900/20" },
-  quiz: { icon: HelpCircle, label: "Quiz", color: "text-purple-500 bg-purple-50 dark:bg-purple-900/20" },
-  link: { icon: Link2, label: "Link", color: "text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20" },
-  sop: { icon: FileText, label: "SOP", color: "text-amber-500 bg-amber-50 dark:bg-amber-900/20" },
-  certificate: { icon: Award, label: "Cert", color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20" },
+  quiz: { icon: HelpCircle, label: "Quiz", color: "text-[var(--color-secondary)] bg-purple-50 dark:bg-purple-900/20" },
+  link: { icon: Link2, label: "Link", color: "text-[var(--color-secondary)] bg-[rgba(19,47,69,0.08)] dark:bg-indigo-900/20" },
+  sop: { icon: FileText, label: "SOP", color: "text-amber-500 bg-warning-soft dark:bg-warning-soft" },
+  certificate: { icon: Award, label: "Cert", color: "text-[var(--color-success)] bg-success-soft dark:bg-success-soft" },
   document: { icon: FileArchive, label: "File", color: "text-red-500 bg-red-50 dark:bg-red-900/20" },
 };
 
@@ -67,7 +67,7 @@ export default function CourseOutline({
           <button
             type="button"
             onClick={onAddModule}
-            className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700 transition-colors"
+            className="inline-flex items-center gap-1 rounded-md bg-[var(--color-primary)] px-2.5 py-1.5 text-xs font-medium text-white hover-brand transition-colors"
           >
             <Plus size={14} /> Add
           </button>
@@ -116,7 +116,7 @@ export default function CourseOutline({
               <button
                 type="button"
                 onClick={onAddModule}
-                className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                className="inline-flex items-center gap-1 rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover-brand"
               >
                 <Plus size={14} /> Add your first module
               </button>
@@ -187,7 +187,7 @@ function ModuleOutlineItem({
     <div
       className={`rounded-lg border transition-all ${
         selected
-          ? "border-blue-300 dark:border-blue-700 bg-blue-50/40 dark:bg-blue-900/10 shadow-sm"
+          ? "border-[rgba(242,92,5,0.30)] dark:border-blue-700 bg-[rgba(242,92,5,0.08)]/40 dark:bg-blue-900/10 shadow-sm"
           : "border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
       }`}
     >
@@ -216,7 +216,7 @@ function ModuleOutlineItem({
               onClick={onSelectModule}
               className={`w-full truncate text-left text-sm font-medium ${
                 selected
-                  ? "text-blue-700 dark:text-blue-300"
+                  ? "text-[var(--color-primary-hover)] dark:text-[var(--color-primary)]"
                   : "text-neutral-800 dark:text-neutral-200"
               }`}
               title={module.title || `Module ${index + 1}`}
@@ -228,7 +228,7 @@ function ModuleOutlineItem({
         <div className="flex items-center gap-1">
           <span
             className={`text-xs ${
-              hasLessons ? "text-neutral-500 dark:text-neutral-500" : "text-amber-600 dark:text-amber-400 font-medium"
+              hasLessons ? "text-neutral-500 dark:text-neutral-500" : "text-[var(--color-warning)] dark:text-[var(--color-warning)] font-medium"
             }`}
           >
             {hasLessons ? `${lessons.length}` : "0"}
@@ -381,7 +381,7 @@ function LessonOutlineItem({
             onClick={onSelect}
             className={`flex w-full items-center gap-1.5 truncate text-left text-sm ${
               isSelected
-                ? "text-blue-800 dark:text-blue-200 font-medium"
+                ? "text-blue-800 dark:text-white font-medium"
                 : "text-neutral-700 dark:text-neutral-300"
             }`}
             title={`${typeConfig.label}: ${lesson.title || `Lesson ${index + 1}`}`}

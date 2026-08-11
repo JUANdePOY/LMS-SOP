@@ -65,7 +65,7 @@ export default function ModuleEditor({
   };
 
   const saveStatus = saving ? (
-    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-blue-600">
+    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-[var(--color-primary)]">
       <Loader2 size={12} className="animate-spin" />
       Saving
     </span>
@@ -85,7 +85,7 @@ export default function ModuleEditor({
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="inline-flex items-center justify-center rounded px-1.5 py-1 text-[10px] font-medium text-blue-500 bg-blue-50">
+                  <span className="inline-flex items-center justify-center rounded px-1.5 py-1 text-[10px] font-medium text-[var(--color-primary)] bg-[rgba(242,92,5,0.08)]">
                     Module
                   </span>
                   <span className="text-xs font-medium uppercase tracking-wide text-neutral-400">
@@ -100,7 +100,7 @@ export default function ModuleEditor({
                   }}
                   placeholder="Module title"
                   aria-label="Module title"
-                  className="w-full text-lg font-semibold text-neutral-900 placeholder:text-neutral-400 bg-transparent border-0 border-b border-transparent hover:border-neutral-300 focus:border-blue-600 focus:ring-0 p-0 pb-1 transition-colors"
+                  className="w-full text-lg font-semibold text-neutral-900 placeholder:text-neutral-400 bg-transparent border-0 border-b border-transparent hover:border-neutral-300 focus:border-[var(--color-primary)] focus:ring-0 p-0 pb-1 transition-colors"
                 />
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -109,7 +109,7 @@ export default function ModuleEditor({
                   type="button"
                   onClick={handleSave}
                   disabled={saving}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover-brand disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   <span className="hidden sm:inline">{saving ? "Saving" : "Save"}</span>
@@ -145,7 +145,7 @@ export default function ModuleEditor({
                         inline-flex items-center gap-2 px-1 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors
                         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 rounded-t
                         ${active
-                          ? "border-blue-600 text-blue-700"
+                          ? "border-[var(--color-primary)] text-[var(--color-primary-hover)]"
                           : "border-transparent text-neutral-500 hover:text-neutral-700"}
                       `}
                     >

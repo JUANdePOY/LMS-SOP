@@ -1,10 +1,14 @@
 import { useState } from "react";
+import { Calendar } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
 import { useEvents } from "../hooks/useEvents";
+import { useGoogleCalendar } from "../calendar/hooks/useGoogleCalendar";
 import CalendarGrid from "../components/CalendarGrid";
 import EventDayDetail from "../components/EventDayDetail";
 import EventForm from "../components/EventForm";
+import GoogleCalendarModal from "../calendar/components/GoogleCalendarModal";
+import EventSyncButton from "../calendar/components/EventSyncButton";
 import { Modal } from "@/shared/components/ui/modal";
 
 export default function EventsPage() {
@@ -12,8 +16,10 @@ export default function EventsPage() {
   const canManage = ['super_admin', 'admin'].includes(user?.role);
   const { toast } = useToast();
   const { items, error, refresh, create, update, remove } = useEvents({ status: "active" });
+  const calendar = useGoogleCalendar();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -78,6 +84,13 @@ export default function EventsPage() {
           <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100">Events</h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">View upcoming events and company calendar</p>
         </div>
+        <button
+          onClick={() => setShowCalendarModal(true)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 dark:border-neutral-600 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+        >
+          <Calendar size={14} />
+          {calendar.status.connected ? (calendar.status.googleEmail || "Google Calendar") : "Connect Google Calendar"}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -92,6 +105,15 @@ export default function EventsPage() {
             onDelete={handleDelete}
             onCreate={handleCreate}
             canManage={canManage}
+            renderSync={(evt) => (
+              <EventSyncButton
+                eventId={evt.id}
+                calendar={calendar}
+                onOpenManage={() => setShowCalendarModal(true)}
+                onSynced={() => toast.success("Added to your Google Calendar")}
+                onUnsynced={() => toast.success("Removed from your Google Calendar")}
+              />
+            )}
           />
         </div>
       </div>
@@ -120,6 +142,14 @@ export default function EventsPage() {
           />
         </Modal>
       )}
+
+      <GoogleCalendarModal
+        open={showCalendarModal}
+        onClose={() => setShowCalendarModal(false)}
+        calendar={{ ...calendar, onOpenManage: () => setShowCalendarModal(true) }}
+        onConnect={() => toast.success("Google Calendar connected")}
+        onDisconnect={() => toast.success("Google Calendar disconnected")}
+      />
     </div>
   );
 }

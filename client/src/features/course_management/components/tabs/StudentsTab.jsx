@@ -5,7 +5,7 @@ export default function StudentsTab({ enrollments, onEnroll, onUnenroll, onView 
   return (
     <div className="space-y-2">
       <div className="flex justify-end">
-        {isAnyAdmin && <button onClick={onEnroll} className="rounded-lg px-3 py-1.5 text-sm bg-blue-600 text-white">Enroll Students</button>}
+        {isAnyAdmin && <button onClick={onEnroll} className="rounded-lg px-3 py-1.5 text-sm btn-primary">Enroll Students</button>}
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
@@ -24,7 +24,7 @@ export default function StudentsTab({ enrollments, onEnroll, onUnenroll, onView 
                 <td className="px-3 py-2 text-neutral-500">{e.role}</td>
                 <td className="px-3 py-2 text-neutral-500">{e.progress ?? 0}%</td>
                 <td className="px-3 py-2 text-right">
-                  {isAnyAdmin && <><button onClick={() => onView?.(e)} className="text-xs text-blue-600 hover:underline">View</button><button onClick={() => onUnenroll?.(e)} className="ml-2 text-xs text-red-600 hover:underline">Unenroll</button></>}
+                  {isAnyAdmin && <><button onClick={() => onView?.(e)} className="text-xs text-[var(--color-primary)] hover:underline">View</button><button onClick={() => onUnenroll?.(e)} className="ml-2 text-xs text-red-600 hover:underline">Unenroll</button></>}
                 </td>
               </tr>
             ))}

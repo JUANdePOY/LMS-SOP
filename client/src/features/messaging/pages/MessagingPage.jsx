@@ -1,15 +1,16 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { MessageSquare, Search, PenSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
 import { useConversations, useMessages } from "../hooks/useMessages";
 import { getConversation } from "../api/message.api";
-import { getConversationDisplayName } from "../utils/conversationDisplay";
+import { getConversationDisplayName, findExistingDirectConversation } from "../utils/conversationDisplay";
+import { getUser } from "@/services/api";
 import ConversationList from "../components/ConversationList";
 import MessageThread from "../components/MessageThread";
 import NewConversationModal from "../components/NewConversationModal";
-import { cn } from "@/lib/utils";
+import MessengerHeader from "../components/MessengerHeader";
 
 const FILTER = {
   ALL: "all",
@@ -23,6 +24,7 @@ export default function MessagingPage() {
   const { conversations, loading: convLoading, error, refresh: refreshConversations, create: createConversation, remove: removeConversation } = useConversations();
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [showNewConversation, setShowNewConversation] = useState(false);
+  const [presetUser, setPresetUser] = useState(null);
   const [filter, setFilter] = useState(FILTER.ALL);
   const [search, setSearch] = useState("");
 
@@ -45,6 +47,61 @@ export default function MessagingPage() {
         .catch(() => {});
     }
   }, [searchParams, conversations, selectedConversation]);
+
+  // Deep-link from the employee directory: "?to=<userId>" opens an existing
+  // 1:1 thread or pre-fills the new-conversation modal with that recipient.
+  const handleSelectConversation = useCallback(async (conv) => {
+    setSelectedConversation(conv);
+    try {
+      const res = await getConversation(conv.id);
+      if (res.data?.success && res.data.data) {
+        setSelectedConversation({ ...conv, ...res.data.data });
+      }
+    } catch {
+      /* keep list data if detail fetch fails */
+    }
+  }, []);
+
+  const handledToRef = useRef(null);
+  useEffect(() => {
+    const toId = searchParams.get("to");
+    if (!toId) {
+      handledToRef.current = null;
+      return undefined;
+    }
+    if (handledToRef.current === toId || convLoading) return undefined;
+
+    const id = Number(toId);
+    const existing = findExistingDirectConversation(conversations, id);
+    if (existing) {
+      handleSelectConversation(existing);
+      handledToRef.current = toId;
+      return undefined;
+    }
+
+    let active = true;
+    getUser(toId)
+      .then((res) => {
+        if (!active) return;
+        const u = res.data?.data;
+        if (u) {
+          setPresetUser({
+            id: u.id,
+            full_name: u.full_name,
+            email: u.email,
+            role: u.role,
+            employee_id: u.employee_id,
+            avatar_url: u.avatar_url,
+          });
+          setShowNewConversation(true);
+          handledToRef.current = toId;
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [searchParams, conversations, convLoading, handleSelectConversation]);
 
   const filteredConversations = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -69,18 +126,6 @@ export default function MessagingPage() {
     }
   }, [selectedConversation, messages, user?.id, markAllAsRead, refreshConversations]);
 
-  const handleSelectConversation = async (conv) => {
-    setSelectedConversation(conv);
-    try {
-      const res = await getConversation(conv.id);
-      if (res.data?.success && res.data.data) {
-        setSelectedConversation({ ...conv, ...res.data.data });
-      }
-    } catch {
-      /* keep list data if detail fetch fails */
-    }
-  };
-
   const handleSend = async (body) => {
     try {
       await send(body);
@@ -100,6 +145,10 @@ export default function MessagingPage() {
     } catch (err) {
       toast.error(err.message || "Failed to create conversation");
     }
+  };
+
+  const handleOpenExisting = (conv) => {
+    handleSelectConversation(conv);
   };
 
   const handleDeleteConversation = async (id) => {
@@ -133,45 +182,15 @@ export default function MessagingPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-180px)]">
-        <div className="md:col-span-1 overflow-hidden border border-neutral-200 dark:border-neutral-700 rounded-xl bg-white dark:bg-neutral-900 flex flex-col">
-          <div className="p-3 border-b border-neutral-200 dark:border-neutral-700 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Chats</h2>
-              <button
-                onClick={() => setShowNewConversation(true)}
-                title="New message"
-                className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
-              >
-                <PenSquare size={14} />
-                New
-              </button>
-            </div>
-            <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search chats"
-                className="w-full rounded-full border border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-800 pl-8 pr-3 py-1.5 text-sm focus:outline-none focus:border-blue-500"
-              />
-            </div>
-            <div className="inline-flex w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-800 p-0.5 text-xs">
-              {filters.map((f) => (
-                <button
-                  key={f.key}
-                  onClick={() => setFilter(f.key)}
-                  className={cn(
-                    "flex-1 rounded-md px-2.5 py-1 font-medium transition-colors",
-                    filter === f.key
-                      ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
-                      : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
-                  )}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-          </div>
+        <div className="md:col-span-1 overflow-hidden fb-card flex flex-col">
+          <MessengerHeader
+            filters={filters}
+            filter={filter}
+            onFilterChange={setFilter}
+            search={search}
+            onSearchChange={setSearch}
+            onNew={() => setShowNewConversation(true)}
+          />
           <div className="flex-1 overflow-y-auto">
             {convLoading && !selectedConversation ? (
               <div className="flex items-center justify-center py-8 text-neutral-500 text-xs">
@@ -188,7 +207,7 @@ export default function MessagingPage() {
             )}
           </div>
         </div>
-        <div className="md:col-span-2 overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900">
+        <div className="md:col-span-2 overflow-hidden fb-card">
           <MessageThread
             conversation={{ ...selectedConversation, messages, current_user_id: user?.id }}
             onSend={handleSend}
@@ -203,10 +222,16 @@ export default function MessagingPage() {
 
       <NewConversationModal
         open={showNewConversation}
-        onClose={() => setShowNewConversation(false)}
+        onClose={() => {
+          setShowNewConversation(false);
+          setPresetUser(null);
+        }}
         currentUserId={user?.id}
         canCreateGroup={canCreateGroup}
+        conversations={conversations}
+        presetUser={presetUser}
         onCreateSuccess={handleCreateConversation}
+        onOpenExisting={handleOpenExisting}
       />
     </div>
   );

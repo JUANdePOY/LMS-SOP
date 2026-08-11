@@ -17,7 +17,7 @@ export default function AssignmentTable({ assignments, onGrade }) {
               <td className="px-3 py-2 text-neutral-500">{a.dueDate ?? ""}</td>
               <td className="px-3 py-2 text-neutral-500">{a.maxScore ?? 0}</td>
               <td className="px-3 py-2 text-right">
-                <button onClick={() => onGrade?.(a)} className="text-xs text-blue-600 hover:underline">Grade</button>
+                <button onClick={() => onGrade?.(a)} className="text-xs text-[var(--color-primary)] hover:underline">Grade</button>
               </td>
             </tr>
           ))}

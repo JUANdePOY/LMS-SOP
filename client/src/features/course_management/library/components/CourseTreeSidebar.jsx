@@ -23,7 +23,7 @@ export default function CourseTreeSidebar({
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Browse by Structure</h3>
           {hasActiveFilters && (
-            <button onClick={onClear} className="text-xs text-blue-600 hover:underline dark:text-blue-400">
+            <button onClick={onClear} className="text-xs text-[var(--color-primary)] hover:underline dark:text-[var(--color-primary)]">
               Clear
             </button>
           )}
@@ -84,7 +84,7 @@ export default function CourseTreeSidebar({
                                     onClick={() => onSelect({ departmentId: dept.id ?? null, category: cat.name, difficulty: diff })}
                                     className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs ${
                                       active
-                                        ? "bg-blue-50 font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
+                                        ? "bg-[rgba(242,92,5,0.08)] font-medium text-[var(--color-primary-hover)] dark:bg-blue-900/20 dark:text-[var(--color-primary)]"
                                         : "text-neutral-500 hover:bg-neutral-50 dark:text-neutral-400 dark:hover:bg-neutral-800"
                                     }`}
                                   >

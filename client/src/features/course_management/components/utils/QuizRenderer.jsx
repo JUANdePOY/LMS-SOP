@@ -23,7 +23,7 @@ export default function QuizRenderer({ quiz, onSubmit, submittedResult }) {
           </div>
         </div>
       ))}
-      <button onClick={onSubmit} className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white">Submit Quiz</button>
+      <button onClick={onSubmit} className="rounded-lg px-4 py-2 text-sm btn-primary">Submit Quiz</button>
     </div>
   );
 }

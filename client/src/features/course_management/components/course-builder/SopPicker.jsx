@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { Search, FileText, Check } from "lucide-react";
 
 const STATUS_DOT = {
-  published: "bg-emerald-500",
-  draft: "bg-amber-500",
+  published: "bg-success-soft0",
+  draft: "bg-warning-soft0",
   archived: "bg-neutral-400",
 };
 
@@ -35,13 +35,13 @@ export default function SopPicker({ sops, value, onChange, onOpen }) {
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by title, code, or category..."
           aria-label="Search SOPs"
-          className="w-full rounded-md border border-neutral-200 bg-white pl-9 pr-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
+          className="w-full rounded-md border border-neutral-200 bg-white pl-9 pr-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
         />
       </div>
 
       {selected && (
-        <div className="flex items-center justify-between gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2">
-          <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-blue-700">
+        <div className="flex items-center justify-between gap-2 rounded-md border border-[rgba(242,92,5,0.25)] bg-[rgba(242,92,5,0.08)] px-3 py-2">
+          <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-[var(--color-primary-hover)]">
             <Check size={14} className="shrink-0" />
             <span className="truncate">{selected.title || "Untitled SOP"}</span>
           </span>
@@ -49,7 +49,7 @@ export default function SopPicker({ sops, value, onChange, onOpen }) {
             <button
               type="button"
               onClick={onOpen}
-              className="shrink-0 text-xs font-medium text-blue-600 hover:text-blue-700"
+              className="shrink-0 text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]"
             >
               Open
             </button>
@@ -73,7 +73,7 @@ export default function SopPicker({ sops, value, onChange, onOpen }) {
                     aria-selected={active}
                     onClick={() => onChange(String(sop.id))}
                     className={`flex w-full items-center gap-3 px-3 py-2 text-left transition-colors ${
-                      active ? "bg-blue-50" : "hover:bg-neutral-50"
+                      active ? "bg-[rgba(242,92,5,0.08)]" : "hover:bg-neutral-50"
                     }`}
                   >
                     <FileText size={16} className="shrink-0 text-neutral-400" />
@@ -94,7 +94,7 @@ export default function SopPicker({ sops, value, onChange, onOpen }) {
                         </span>
                       )}
                     </span>
-                    <span className={`flex shrink-0 items-center gap-1 text-[10px] font-medium ${active ? "text-blue-600" : "text-neutral-400"}`}>
+                    <span className={`flex shrink-0 items-center gap-1 text-[10px] font-medium ${active ? "text-[var(--color-primary)]" : "text-neutral-400"}`}>
                       <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[status] || STATUS_DOT.draft}`} />
                       {status}
                     </span>

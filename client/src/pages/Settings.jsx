@@ -11,9 +11,9 @@ import {
 
 const ROLE_META = {
   super_admin: { label: "Super Admin", icon: Shield, color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-500/10", border: "border-red-200 dark:border-red-500/30", desc: "Full system access" },
-  admin: { label: "Admin", icon: Shield, color: "text-blue-600 dark:text-blue-400", bg: "bg-blue-50 dark:bg-blue-500/10", border: "border-blue-200 dark:border-blue-500/30", desc: "Admin with scope management" },
-  department_head: { label: "Department Head", icon: Building2, color: "text-purple-600 dark:text-purple-400", bg: "bg-purple-50 dark:bg-purple-500/10", border: "border-purple-200 dark:border-purple-500/30", desc: "Department-level manager" },
-  employee: { label: "Employee", icon: Users, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-500/10", border: "border-emerald-200 dark:border-emerald-500/30", desc: "Standard user / learner" },
+  admin: { label: "Admin", icon: Shield, color: "text-[var(--color-primary)] dark:text-[var(--color-primary)]", bg: "bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)]", border: "border-[rgba(242,92,5,0.25)] dark:border-[rgba(242,92,5,0.30)]", desc: "Admin with scope management" },
+  department_head: { label: "Department Head", icon: Building2, color: "text-[var(--color-secondary)] dark:text-[var(--color-secondary)]", bg: "bg-[rgba(19,47,69,0.08)] dark:bg-[rgba(19,47,69,0.18)]", border: "border-[rgba(19,47,69,0.25)] dark:border-[rgba(19,47,69,0.30)]", desc: "Department-level manager" },
+  employee: { label: "Employee", icon: Users, color: "text-[var(--color-success)] dark:text-[var(--color-success)]", bg: "bg-success-soft dark:bg-success-soft", border: "border-[rgba(32,87,51,0.25)] dark:border-[rgba(32,87,51,0.30)]", desc: "Standard user / learner" },
 };
 
 const TABS = [
@@ -229,7 +229,7 @@ export default function Settings() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-secondary)] border-t-transparent" />
       </div>
     );
   }
@@ -247,7 +247,7 @@ export default function Settings() {
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
                 activeTab === tab.key
-                  ? "bg-blue-600 text-white"
+                  ? "bg-[var(--color-primary)] text-white"
                   : "bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700"
               )}
             >
@@ -265,7 +265,7 @@ export default function Settings() {
             <p className="text-xs text-neutral-500">{users.length} users</p>
             <button
               onClick={() => { setUserForm({}); setShowAddUser(true); }}
-              className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors"
+              className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-secondary-hover)] transition-colors"
             >
               <Plus size={13} /> Add User
             </button>
@@ -278,7 +278,7 @@ export default function Settings() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search users…"
-              className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40"
+              className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]"
             />
           </div>
 
@@ -323,7 +323,7 @@ export default function Settings() {
                         <span className={cn(
                           "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
                           user.is_active
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                            ? "bg-success-soft text-success dark:bg-success-soft dark:text-[var(--color-success)]"
                             : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
                         )}>
                           {user.is_active ? "Active" : "Inactive"}
@@ -345,7 +345,7 @@ export default function Settings() {
                               });
                               setEditingUser(user);
                             }}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"
+                            className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-[var(--color-secondary)] hover:bg-[rgba(19,47,69,0.08)] dark:hover:bg-[rgba(19,47,69,0.08)]0/10 transition-colors"
                             title="Edit user"
                           >
                             <Pencil size={13} />
@@ -382,20 +382,20 @@ export default function Settings() {
                 <div className="px-6 py-4 flex flex-col gap-4">
                   <div>
                     <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Full Name <span className="text-red-500">*</span></label>
-                    <input type="text" value={userForm.full_name || ''} onChange={(e) => setUserForm(f => ({ ...f, full_name: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" />
+                    <input type="text" value={userForm.full_name || ''} onChange={(e) => setUserForm(f => ({ ...f, full_name: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" />
                   </div>
                   <div>
                     <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Email <span className="text-red-500">*</span></label>
-                    <input type="email" value={userForm.email || ''} onChange={(e) => setUserForm(f => ({ ...f, email: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" />
+                    <input type="email" value={userForm.email || ''} onChange={(e) => setUserForm(f => ({ ...f, email: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" />
                   </div>
                   <div>
                     <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Password <span className="text-red-500">*</span></label>
-                    <input type="password" value={userForm.password || ''} onChange={(e) => setUserForm(f => ({ ...f, password: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" />
+                    <input type="password" value={userForm.password || ''} onChange={(e) => setUserForm(f => ({ ...f, password: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Role <span className="text-red-500">*</span></label>
-                      <select value={userForm.role || ''} onChange={(e) => setUserForm(f => ({ ...f, role: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40">
+                      <select value={userForm.role || ''} onChange={(e) => setUserForm(f => ({ ...f, role: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]">
                         <option value="">Select role…</option>
                         {Object.entries(ROLE_META).map(([key, meta]) => (
                           <option key={key} value={key}>{meta.label}</option>
@@ -404,7 +404,7 @@ export default function Settings() {
                     </div>
                     <div>
                       <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Department</label>
-                      <select value={userForm.department_id || ''} onChange={(e) => setUserForm(f => ({ ...f, department_id: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40">
+                      <select value={userForm.department_id || ''} onChange={(e) => setUserForm(f => ({ ...f, department_id: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]">
                         <option value="">Select department…</option>
                       </select>
                     </div>
@@ -412,7 +412,7 @@ export default function Settings() {
                 </div>
                 <div className="flex items-center justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
                   <button onClick={() => setShowAddUser(false)} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">Cancel</button>
-                  <button onClick={handleAddUser} disabled={saving || !userForm.email || !userForm.role} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors">
+                  <button onClick={handleAddUser} disabled={saving || !userForm.email || !userForm.role} className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-secondary-hover)] disabled:opacity-40 transition-colors">
                     {saving ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Plus size={14} />}
                     Create User
                   </button>
@@ -435,15 +435,15 @@ export default function Settings() {
                 <div className="px-6 py-4 flex flex-col gap-4">
                   <div>
                     <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Full Name</label>
-                    <input type="text" value={userForm.full_name || ''} onChange={(e) => setUserForm(f => ({ ...f, full_name: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" />
+                    <input type="text" value={userForm.full_name || ''} onChange={(e) => setUserForm(f => ({ ...f, full_name: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" />
                   </div>
                   <div>
                     <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Email</label>
-                    <input type="email" value={userForm.email || ''} onChange={(e) => setUserForm(f => ({ ...f, email: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" />
+                    <input type="email" value={userForm.email || ''} onChange={(e) => setUserForm(f => ({ ...f, email: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" />
                   </div>
                   <div>
                     <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Role</label>
-                    <select value={userForm.role || ''} onChange={(e) => setUserForm(f => ({ ...f, role: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40">
+                    <select value={userForm.role || ''} onChange={(e) => setUserForm(f => ({ ...f, role: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]">
                       {Object.entries(ROLE_META).map(([key, meta]) => (
                         <option key={key} value={key}>{meta.label}</option>
                       ))}
@@ -452,7 +452,7 @@ export default function Settings() {
                 </div>
                 <div className="flex items-center justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
                   <button onClick={() => setEditingUser(null)} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">Cancel</button>
-                  <button onClick={() => handleUpdateUser(editingUser.id)} disabled={saving} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors">
+                  <button onClick={() => handleUpdateUser(editingUser.id)} disabled={saving} className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-secondary-hover)] disabled:opacity-40 transition-colors">
                     {saving ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Save size={14} />}
                     Save Changes
                   </button>
@@ -491,10 +491,10 @@ export default function Settings() {
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-col gap-1">
                     <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Email</label>
-                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" />
+                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" />
                   </div>
                   <div className="flex justify-end">
-                    <button onClick={handleSaveProfile} disabled={profileSaving} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors">
+                    <button onClick={handleSaveProfile} disabled={profileSaving} className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-secondary-hover)] disabled:opacity-40 transition-colors">
                       {profileSaving ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Save size={14} />}
                       Save Profile
                     </button>
@@ -506,7 +506,7 @@ export default function Settings() {
 
           <div className="flex items-center justify-between">
             <p className="text-xs text-neutral-500">{settings.length} configuration settings</p>
-            <button onClick={() => setShowAddSetting(true)} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors">
+            <button onClick={() => setShowAddSetting(true)} className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-secondary-hover)] transition-colors">
               <Plus size={13} /> Add Setting
             </button>
           </div>
@@ -529,7 +529,7 @@ export default function Settings() {
                     </td>
                     <td className="px-4 py-3">
                       {editingSetting === s.key ? (
-                        <input type="text" value={settingValue} onChange={(e) => setSettingValue(e.target.value)} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" autoFocus />
+                        <input type="text" value={settingValue} onChange={(e) => setSettingValue(e.target.value)} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-1.5 text-xs text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" autoFocus />
                       ) : (
                         <span className="text-xs text-neutral-600 dark:text-neutral-400">{typeof s.value === 'object' ? JSON.stringify(s.value) : String(s.value)}</span>
                       )}
@@ -539,10 +539,10 @@ export default function Settings() {
                       {editingSetting === s.key ? (
                         <div className="flex items-center justify-end gap-1">
                           <button onClick={() => setEditingSetting(null)} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"><X size={13} /></button>
-                          <button onClick={() => handleSaveSetting(s.key)} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 transition-colors"><Save size={13} /></button>
+                          <button onClick={() => handleSaveSetting(s.key)} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-[var(--color-success)] hover:bg-success-soft dark:hover:bg-success-soft0/10 transition-colors"><Save size={13} /></button>
                         </div>
                       ) : (
-                        <button onClick={() => { setEditingSetting(s.key); setSettingValue(typeof s.value === 'object' ? JSON.stringify(s.value) : String(s.value)); }} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 transition-colors"><Pencil size={13} /></button>
+                        <button onClick={() => { setEditingSetting(s.key); setSettingValue(typeof s.value === 'object' ? JSON.stringify(s.value) : String(s.value)); }} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-[var(--color-secondary)] hover:bg-[rgba(19,47,69,0.08)] dark:hover:bg-[rgba(19,47,69,0.08)]0/10 transition-colors"><Pencil size={13} /></button>
                       )}
                     </td>
                   </tr>
@@ -561,13 +561,13 @@ export default function Settings() {
                   <button onClick={() => setShowAddSetting(false)} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"><X size={15} /></button>
                 </div>
                 <div className="px-6 py-4 flex flex-col gap-3">
-                  <div><label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Key <span className="text-red-500">*</span></label><input type="text" value={settingKey} onChange={(e) => setSettingKey(e.target.value)} placeholder="e.g. app_name" className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" /></div>
-                  <div><label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Value <span className="text-red-500">*</span></label><input type="text" value={settingValue} onChange={(e) => setSettingValue(e.target.value)} placeholder="e.g. true or 30" className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" /></div>
-                  <div><label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Description</label><input type="text" value={settingDesc} onChange={(e) => setSettingDesc(e.target.value)} placeholder="Optional description" className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40" /></div>
+                  <div><label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Key <span className="text-red-500">*</span></label><input type="text" value={settingKey} onChange={(e) => setSettingKey(e.target.value)} placeholder="e.g. app_name" className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" /></div>
+                  <div><label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Value <span className="text-red-500">*</span></label><input type="text" value={settingValue} onChange={(e) => setSettingValue(e.target.value)} placeholder="e.g. true or 30" className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" /></div>
+                  <div><label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Description</label><input type="text" value={settingDesc} onChange={(e) => setSettingDesc(e.target.value)} placeholder="Optional description" className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" /></div>
                 </div>
                 <div className="flex items-center justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
                   <button onClick={() => setShowAddSetting(false)} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">Cancel</button>
-                  <button onClick={handleAddSetting} disabled={saving || !settingKey.trim() || !settingValue.trim()} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors">
+                  <button onClick={handleAddSetting} disabled={saving || !settingKey.trim() || !settingValue.trim()} className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-secondary-hover)] disabled:opacity-40 transition-colors">
                     {saving ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Plus size={14} />}
                     Add Setting
                   </button>

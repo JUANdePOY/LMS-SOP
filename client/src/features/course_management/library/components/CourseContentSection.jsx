@@ -22,7 +22,7 @@ function LessonRow({ moduleId, lesson, onView }) {
       <Icon size={15} className="shrink-0 text-neutral-400 dark:text-neutral-500" />
       <span className="flex-1 min-w-0 truncate text-neutral-700 dark:text-neutral-200">{lesson.title}</span>
       {lesson.is_required && (
-        <span className="hidden sm:inline text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">Required</span>
+        <span className="hidden sm:inline text-[10px] font-medium uppercase tracking-wide text-[var(--color-warning)] dark:text-[var(--color-warning)]">Required</span>
       )}
       {lesson.duration ? (
         <span className="inline-flex items-center gap-1 text-[11px] text-neutral-400 dark:text-neutral-500">
@@ -68,7 +68,7 @@ function ModuleBlock({ courseId, module, index, onLessonView }) {
           size={16}
           className={`shrink-0 text-neutral-400 transition-transform ${open ? "rotate-90" : ""}`}
         />
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-xs font-bold text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-xs font-bold text-[var(--color-primary-hover)] dark:bg-blue-900/20 dark:text-[var(--color-primary)]">
           {index + 1}
         </div>
         <div className="min-w-0 flex-1">
@@ -154,11 +154,11 @@ export default function CourseContentSection({ courseId, onLessonView, headerAct
       <div className="flex items-center justify-between gap-4 text-xs text-neutral-500 dark:text-neutral-400">
         <div className="flex items-center gap-4">
           <span className="inline-flex items-center gap-1.5">
-            <GraduationCap size={14} className="text-blue-600 dark:text-blue-400" />
+            <GraduationCap size={14} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
             {modules.length} {modules.length === 1 ? "module" : "modules"}
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <BookOpen size={14} className="text-blue-600 dark:text-blue-400" />
+            <BookOpen size={14} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
             {totalLessons} {totalLessons === 1 ? "lesson" : "lessons"}
           </span>
         </div>

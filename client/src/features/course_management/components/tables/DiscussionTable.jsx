@@ -17,7 +17,7 @@ export default function DiscussionTable({ discussions, onReply, onToggle }) {
               <td className="px-3 py-2 text-neutral-500">{d.replyCount ?? 0}</td>
               <td className="px-3 py-2 text-neutral-500">{d.isOpen ? "Open" : "Closed"}</td>
               <td className="px-3 py-2 text-right">
-                <button onClick={() => onToggle?.(d)} className="text-xs text-blue-600 hover:underline">{d.isOpen ? "Close" : "Open"}</button>
+                <button onClick={() => onToggle?.(d)} className="text-xs text-[var(--color-primary)] hover:underline">{d.isOpen ? "Close" : "Open"}</button>
               </td>
             </tr>
           ))}

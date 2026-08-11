@@ -33,9 +33,9 @@ export default function PublishReadiness({ course, modules }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {allPass ? (
-            <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
+            <CheckCircle2 size={16} className="text-[var(--color-success)] dark:text-[var(--color-success)]" />
           ) : (
-            <AlertCircle size={16} className="text-amber-600 dark:text-amber-400" />
+            <AlertCircle size={16} className="text-[var(--color-warning)] dark:text-[var(--color-warning)]" />
           )}
           <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100">
             {allPass ? "Ready to publish" : "Not ready yet"}
@@ -49,7 +49,7 @@ export default function PublishReadiness({ course, modules }) {
       <div className="h-1.5 w-full rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-500 ${
-            allPass ? "bg-emerald-500" : "bg-amber-500"
+            allPass ? "bg-success-soft0" : "bg-warning-soft0"
           }`}
           style={{ width: `${progress}%` }}
         />

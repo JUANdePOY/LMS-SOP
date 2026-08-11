@@ -10,13 +10,14 @@ import {
   getCourseDiscussions,
   extractRows,
 } from "../api/message.api";
+import { getDedupedDisplayNames, findExistingDirectConversation } from "../utils/conversationDisplay";
 
 const MODE = {
   DIRECT: "direct",
   GROUP_FORUM: "group_forum",
 };
 
-export default function NewConversationModal({ open, onClose, currentUserId, onCreateSuccess, canCreateGroup = false }) {
+export default function NewConversationModal({ open, onClose, currentUserId, onCreateSuccess, canCreateGroup = false, conversations = [], onOpenExisting, presetUser = null }) {
   const [mode, setMode] = useState(MODE.DIRECT);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
@@ -40,6 +41,23 @@ export default function NewConversationModal({ open, onClose, currentUserId, onC
     () => selectedUsers.map((u) => u.id).filter((id) => id !== currentUserId),
     [selectedUsers, currentUserId]
   );
+
+  const dedupeLabels = useMemo(
+    () => getDedupedDisplayNames(selectedUsers),
+    [selectedUsers]
+  );
+
+  const existingThread = useMemo(() => {
+    if (mode !== MODE.DIRECT || selectedUsers.length !== 1) return null;
+    return findExistingDirectConversation(conversations, selectedUsers[0].id);
+  }, [mode, selectedUsers, conversations]);
+
+  // Deep-link from the employee directory: pre-select the recipient.
+  useEffect(() => {
+    if (open && presetUser && !selectedUsers.some((u) => u.id === presetUser.id)) {
+      setSelectedUsers([presetUser]);
+    }
+  }, [open, presetUser, selectedUsers]);
 
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -195,8 +213,8 @@ export default function NewConversationModal({ open, onClose, currentUserId, onC
       </button>
       <button
         onClick={handleCreate}
-        disabled={creating || !body.trim() || participantIds.length === 0}
-        className="rounded-lg px-3 py-1.5 text-xs bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+          disabled={creating || !body.trim() || participantIds.length === 0 || !!existingThread}
+        className="rounded-lg px-3 py-1.5 text-xs btn-primary hover-brand disabled:opacity-50"
       >
         {creating ? "Creating..." : "Create"}
       </button>
@@ -220,7 +238,7 @@ export default function NewConversationModal({ open, onClose, currentUserId, onC
               className={cn(
                 "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
                 mode === MODE.DIRECT
-                  ? "bg-blue-600 text-white"
+                  ? "btn-primary"
                   : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100"
               )}
             >
@@ -233,7 +251,7 @@ export default function NewConversationModal({ open, onClose, currentUserId, onC
               className={cn(
                 "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
                 mode === MODE.GROUP_FORUM
-                  ? "bg-blue-600 text-white"
+                  ? "btn-primary"
                   : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100"
               )}
             >
@@ -285,6 +303,7 @@ export default function NewConversationModal({ open, onClose, currentUserId, onC
             onSearchChange={setSearchQuery}
             onSelectUser={handleSelectUser}
             isSearching={isSearching}
+            labelsById={dedupeLabels}
             placeholder={mode === MODE.DIRECT ? "Search recipients..." : "Add recipients..."}
           />
           {searchError && (
@@ -294,6 +313,23 @@ export default function NewConversationModal({ open, onClose, currentUserId, onC
             <p className="text-[10px] text-neutral-500 dark:text-neutral-400 mt-1">
               {participantIds.length} recipient(s) selected
             </p>
+          )}
+          {existingThread && (
+            <div className="flex items-center justify-between gap-2 mt-1 rounded-md bg-warning-soft px-2.5 py-2">
+              <p className="text-[10px] text-neutral-600 dark:text-neutral-300">
+                You already have a conversation with this person.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  handleClose();
+                  onOpenExisting && onOpenExisting(existingThread);
+                }}
+                className="text-[10px] font-semibold fb-link hover-fb-link"
+              >
+                Open existing
+              </button>
+            </div>
           )}
         </div>
 

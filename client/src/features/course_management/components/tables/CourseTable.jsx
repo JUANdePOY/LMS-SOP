@@ -1,18 +1,19 @@
 import { useState } from "react";
-import { ChevronRight, Users, Layers, BookOpen } from "lucide-react";
+import { Users, Layers, BookOpen } from "lucide-react";
 import { resolveFileUrl } from "@/lib/fileUrl";
+import { ActionButton } from "@/shared/components/ui/actionIcons";
 
 const STATUS_META = {
-  published: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30",
+  published: "bg-success-soft text-[var(--color-success)] border-emerald-200 dark:bg-success-soft0/15 dark:text-[var(--color-success)] dark:border-emerald-500/30",
   draft: "bg-neutral-100 text-neutral-600 border-neutral-200 dark:bg-neutral-500/20 dark:text-neutral-300 dark:border-neutral-500/30",
-  archived: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30",
+  archived: "bg-warning-soft text-[var(--color-warning)] border-[rgba(217,163,0,0.25)] dark:bg-warning-soft0/15 dark:text-[var(--color-warning)] dark:border-amber-500/30",
 };
 
 const DIFFICULTY_META = {
-  beginner: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30",
-  intermediate: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30",
-  advanced: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30",
-  all_levels: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-500/30",
+  beginner: "bg-success-soft text-[var(--color-success)] border-emerald-200 dark:bg-success-soft0/15 dark:text-[var(--color-success)] dark:border-emerald-500/30",
+  intermediate: "bg-warning-soft text-[var(--color-warning)] border-[rgba(217,163,0,0.25)] dark:bg-warning-soft0/15 dark:text-[var(--color-warning)] dark:border-amber-500/30",
+  advanced: "bg-danger-soft text-rose-700 border-[rgba(204,31,31,0.25)] dark:bg-danger-soft0/15 dark:text-[var(--color-danger)] dark:border-rose-500/30",
+  all_levels: "bg-sky-50 text-[var(--color-primary)] border-[rgba(242,92,5,0.25)] dark:bg-[var(--color-primary)]/15 dark:text-[var(--color-primary)] dark:border-sky-500/30",
 };
 
 function StatusBadge({ status }) {
@@ -39,12 +40,12 @@ function SortHeader({ label, field, sortField, sortDirection, onSort, className 
   const active = sortField === field;
   return (
     <th
-      className={`text-left px-3 py-2.5 font-medium text-neutral-500 cursor-pointer select-none hover:text-blue-600 transition-colors ${className}`}
+      className={`text-left px-3 py-2.5 font-medium text-neutral-500 cursor-pointer select-none hover:text-[var(--color-primary)] transition-colors ${className}`}
       onClick={() => onSort?.(field)}
     >
       <span className="inline-flex items-center gap-1">
         {label}
-        {active && <span className="text-blue-600">{sortDirection === "asc" ? "↑" : "↓"}</span>}
+        {active && <span className="text-[var(--color-primary)]">{sortDirection === "asc" ? "↑" : "↓"}</span>}
       </span>
     </th>
   );
@@ -152,8 +153,8 @@ export default function CourseTable({
                 aria-label={`Open course ${c.title}`}
                 className={`group border-b border-[var(--border)] last:border-0 outline-none transition-all duration-150 cursor-pointer
                   hover:bg-neutral-50 dark:hover:bg-neutral-800/50
-                  focus-visible:bg-blue-50 dark:focus-visible:bg-blue-900/20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500
-                  ${isDragging ? "opacity-50 bg-blue-50 dark:bg-blue-900/20" : ""}
+                  focus-visible:bg-[rgba(242,92,5,0.08)] dark:focus-visible:bg-blue-900/20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500
+                  ${isDragging ? "opacity-50 bg-[rgba(242,92,5,0.08)] dark:bg-blue-900/20" : ""}
                   ${isOver ? "border-t-2 border-t-blue-400" : ""}`}
               >
                 <td className="px-3 py-3">
@@ -177,7 +178,7 @@ export default function CourseTable({
                       )}
                     </div>
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-neutral-900 dark:text-neutral-100 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+                      <p className="truncate font-medium text-neutral-900 dark:text-neutral-100 group-hover:text-[var(--color-primary-hover)] dark:group-hover:text-[var(--color-primary)] transition-colors">
                         {c.title}
                       </p>
                       <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">
@@ -203,17 +204,14 @@ export default function CourseTable({
                 </td>
                 <td className="px-3 py-3">
                   <div className="flex items-center justify-end gap-1" onClick={stop}>
-                    <button
-                      onClick={() => onView?.(c)}
-                      className="rounded-md p-1.5 text-neutral-400 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-300"
-                      title="Open"
-                      aria-label={`Open ${c.title}`}
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                    <button onClick={() => onEdit?.(c)} className="rounded-md px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100 hover:text-blue-600 dark:text-neutral-300 dark:hover:bg-neutral-800">Edit</button>
-                    <button onClick={() => onArchive?.(c)} className="rounded-md px-2 py-1 text-xs text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-500/10">Archive</button>
-                    <button onClick={() => onDelete?.(c.id)} className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10">Delete</button>
+                    <ActionButton action="View" label={`Open ${c.title}`} onClick={() => onView?.(c)} />
+                    <ActionButton action="Edit" label={`Edit ${c.title}`} onClick={() => onEdit?.(c)} />
+                    <ActionButton
+                      action={c.status === "archived" ? "Unarchive" : "Archive"}
+                      label={c.status === "archived" ? `Unarchive ${c.title}` : `Archive ${c.title}`}
+                      onClick={() => onArchive?.(c)}
+                    />
+                    <ActionButton action="Delete" label={`Delete ${c.title}`} onClick={() => onDelete?.(c)} />
                   </div>
                 </td>
               </tr>

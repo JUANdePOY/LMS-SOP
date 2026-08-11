@@ -13,7 +13,7 @@ export default function EnrollStudentsModal({ open, onClose, onSubmit }) {
         <h2 className="text-lg font-semibold">Enroll Students</h2>
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <textarea name="userIds" placeholder="Enter user IDs separated by commas" rows={4} required className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm" />
-          <button type="submit" className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white">Enroll</button>
+          <button type="submit" className="rounded-lg px-4 py-2 text-sm btn-primary">Enroll</button>
         </form>
       </div>
     </div>

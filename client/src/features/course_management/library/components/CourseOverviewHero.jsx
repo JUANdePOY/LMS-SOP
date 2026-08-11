@@ -4,10 +4,10 @@ import { cn } from "@/lib/utils";
 import { resolveFileUrl } from "@/lib/fileUrl";
 
 const DIFFICULTY_META = {
-  beginner: { label: "Beginner", color: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30" },
-  intermediate: { label: "Intermediate", color: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30" },
-  advanced: { label: "Advanced", color: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30" },
-  all_levels: { label: "All Levels", color: "bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:border-sky-500/30" },
+  beginner: { label: "Beginner", color: "bg-success-soft text-[var(--color-success)] border-emerald-200 dark:bg-success-soft0/10 dark:text-[var(--color-success)] dark:border-emerald-500/30" },
+  intermediate: { label: "Intermediate", color: "bg-warning-soft text-[var(--color-warning)] border-[rgba(217,163,0,0.25)] dark:bg-warning-soft0/10 dark:text-[var(--color-warning)] dark:border-amber-500/30" },
+  advanced: { label: "Advanced", color: "bg-danger-soft text-rose-700 border-[rgba(204,31,31,0.25)] dark:bg-danger-soft0/10 dark:text-[var(--color-danger)] dark:border-rose-500/30" },
+  all_levels: { label: "All Levels", color: "bg-sky-50 text-[var(--color-primary)] border-[rgba(242,92,5,0.25)] dark:bg-[var(--color-primary)]/10 dark:text-[var(--color-primary)] dark:border-sky-500/30" },
 };
 
 function MetaStat({ icon: Icon, value, label }) {
@@ -26,6 +26,7 @@ export default function CourseOverviewHero({
   secondaryAction,
   breadcrumb,
   progress,
+  progressLabel = "Your progress",
 }) {
   const difficulty = useMemo(() => {
     if (!course?.difficulty) return DIFFICULTY_META.all_levels;
@@ -65,8 +66,8 @@ export default function CourseOverviewHero({
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
-                    <BookOpen size={32} className="text-blue-400 dark:text-blue-500" />
+                  <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[rgba(242,92,5,0.06)] to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+                    <BookOpen size={32} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
                   </div>
                 )}
               </div>
@@ -104,12 +105,12 @@ export default function CourseOverviewHero({
                 {hasProgress && (
                   <div className="pt-1">
                     <div className="mb-1 flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
-                      <span className="font-medium text-neutral-600 dark:text-neutral-300">Your progressss</span>
+                      <span className="font-medium text-neutral-600 dark:text-neutral-300">Your progress</span>
                       <span>{progress}%</span>
                     </div>
                     <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
                       <div
-                        className="h-full rounded-full bg-blue-600 dark:bg-blue-400 transition-all"
+                        className="h-full rounded-full bg-[var(--color-primary)] dark:bg-blue-400 transition-all"
                         style={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
                       />
                     </div>

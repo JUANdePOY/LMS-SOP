@@ -65,6 +65,24 @@ select option {
   --status-green:    #205733;
   --status-red:      #cc1f1f;
 
+  /* ── Button role tokens (brand-consistent) ───────────────────────
+     primary = orange topbar color; secondary = navy; success/warning/danger
+     reuse existing status/accent tokens so everything stays single-source. */
+  --color-primary:        #F25C05;
+  --color-primary-hover:  #d94e04;
+  --color-primary-active: #c04504;
+  --color-secondary:      #132F45;
+  --color-secondary-hover:#1c3f5c;
+  --color-accent:         #F25C05;
+  --color-success:        #205733;
+  --color-success-hover:  #2a6e44;
+  --color-warning:        #d9a300;
+  --color-warning-hover:  #c08f00;
+  --color-danger:         #cc1f1f;
+  --color-danger-hover:   #b41a1a;
+  --color-info:           #32667F;
+  --color-info-hover:     #28536a;
+
   --shadow-sm:  0 1px 3px rgba(19,47,69,0.06);
   --shadow-md:  0 4px 12px rgba(19,47,69,0.10);
   --shadow-lg:  0 8px 24px rgba(19,47,69,0.13);
@@ -77,7 +95,7 @@ select option {
   --card-foreground: var(--text-primary);
   --popover: var(--bg-surface);
   --popover-foreground: var(--text-primary);
-  --primary: 60 2% 18%;
+  --primary: 25 91% 49%;       /* #F25C05 orange — brand primary button */
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 96%;
   --secondary-foreground: 0 0% 25%;
@@ -95,6 +113,16 @@ select option {
   --scrollbar-track: transparent;
   --scrollbar-width: 6px;
   --scrollbar-border-radius: 999px;
+
+  /* ── Facebook-style social tokens (layered on brand theme) ─────── */
+  --fb-blue:        #1877F2;
+  --fb-blue-hover:  #166FE5;
+  --fb-gray:        #F0F2F5;
+  --fb-gray-hover:  #E4E6EB;
+  --fb-divider:     #ced0d4;
+  --fb-online:      #31A24C;
+  --fb-bubble-in:   #F0F2F5;
+  --fb-shadow-card: 0 1px 2px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.04);
 }
 
 .dark {
@@ -146,8 +174,8 @@ select option {
   --card-foreground: var(--text-primary);
   --popover: var(--bg-surface);
   --popover-foreground: var(--text-primary);
-  --primary: 60 2% 88%;
-  --primary-foreground: 0 0% 12%;
+  --primary: 25 91% 49%;       /* #F25C05 orange — brand primary button */
+  --primary-foreground: 0 0% 100%;
   --secondary: 30 4% 20%;
   --secondary-foreground: 40 15% 90%;
   --muted: 30 4% 20%;
@@ -163,6 +191,16 @@ select option {
   --scrollbar-track: transparent;
   --scrollbar-width: 6px;
   --scrollbar-border-radius: 999px;
+
+  /* ── Facebook-style social tokens (dark) ──────────────────────── */
+  --fb-blue:        #1877F2;
+  --fb-blue-hover:  #166FE5;
+  --fb-gray:        #3A3A38;
+  --fb-gray-hover:  #454543;
+  --fb-divider:     #4A4A48;
+  --fb-online:      #31A24C;
+  --fb-bubble-in:   #3A3A38;
+  --fb-shadow-card: 0 1px 2px rgba(0,0,0,0.4);
 }
 
 @layer base {
@@ -311,6 +349,107 @@ select option {
     background: transparent;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   THEME-AWARE BUTTON ROLES
+   Reusable classes so every page uses the brand palette instead of scattered
+   blue/indigo Tailwind colors. Light + dark handled via tokens in :root/.dark.
+───────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  /* Solid primary (orange) */
+  .btn-primary {
+    background-color: var(--color-primary);
+    color: #ffffff;
+  }
+  .btn-primary:hover:not(:disabled) { background-color: var(--color-primary-hover); }
+  .btn-primary:active:not(:disabled) { background-color: var(--color-primary-active); }
+
+  /* Solid secondary (navy) */
+  .btn-secondary {
+    background-color: var(--color-secondary);
+    color: #ffffff;
+  }
+  .btn-secondary:hover:not(:disabled) { background-color: var(--color-secondary-hover); }
+
+  /* Solid danger */
+  .btn-danger {
+    background-color: var(--color-danger);
+    color: #ffffff;
+  }
+  .btn-danger:hover:not(:disabled) { background-color: var(--color-danger-hover); }
+
+  /* Success */
+  .btn-success {
+    background-color: var(--color-success);
+    color: #ffffff;
+  }
+  .btn-success:hover:not(:disabled) { background-color: var(--color-success-hover); }
+
+  /* Outline / ghost style — use text + hover bg derived from brand */
+  .btn-outline-brand {
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    background-color: transparent;
+  }
+  .btn-outline-brand:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background-color: rgba(242, 92, 5, 0.08);
+  }
+
+  /* Brand-tinted text + hover (replaces text-blue-600 / hover:text-blue-700) */
+  .text-brand { color: var(--color-primary); }
+  .hover-brand:hover { color: var(--color-primary-hover); }
+  .text-brand-secondary { color: var(--color-secondary); }
+  .hover-brand-secondary:hover { color: var(--color-secondary-hover); }
+
+  /* Success / warning / danger tints (replaces emerald/amber/rose) */
+  .text-success { color: var(--color-success); }
+  .hover-success:hover { color: var(--color-success-hover); }
+  .bg-success-soft { background-color: rgba(32, 87, 51, 0.10); }
+  .hover-success-soft:hover { background-color: rgba(32, 87, 51, 0.16); }
+
+  .text-warning { color: var(--color-warning); }
+  .hover-warning:hover { color: var(--color-warning-hover); }
+  .bg-warning-soft { background-color: rgba(217, 163, 0, 0.12); }
+  .hover-warning-soft:hover { background-color: rgba(217, 163, 0, 0.18); }
+
+  .text-danger { color: var(--color-danger); }
+  .hover-danger:hover { color: var(--color-danger-hover); }
+  .bg-danger-soft { background-color: rgba(204, 31, 31, 0.10); }
+  .hover-danger-soft:hover { background-color: rgba(204, 31, 31, 0.16); }
+
+  .border-brand { border-color: var(--color-primary); }
+  .border-brand-soft { border-color: rgba(242, 92, 5, 0.25); }
+  .ring-brand { --tw-ring-color: var(--color-primary); }
+
+  /* ── Facebook-style social surfaces ───────────────────────────── */
+  .fb-card {
+    background-color: var(--bg-surface);
+    border-radius: 0.75rem;
+    box-shadow: var(--fb-shadow-card);
+  }
+
+  .fb-link { color: var(--fb-blue); }
+  .hover-fb-link:hover { color: var(--fb-blue-hover); }
+
+  .fb-gray-surface { background-color: var(--fb-gray); }
+  .fb-gray-hover:hover { background-color: var(--fb-gray-hover); }
+
+  /* Circular online presence dot (overlay on avatars) */
+  .presence-dot {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 0.85rem;
+    height: 0.85rem;
+    border-radius: 999px;
+    background-color: var(--fb-online);
+    border: 2px solid var(--bg-surface);
+    box-sizing: border-box;
+  }
+}
+
 
 /* ─────────────────────────────────────────────────────────────────────────────
    LOGIN PAGE  — layout mirrors the card-with-coloured-header pattern

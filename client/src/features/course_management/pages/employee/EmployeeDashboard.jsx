@@ -9,10 +9,10 @@ import { StaggerList, MotionItem } from "@/shared/motion";
 import { resolveFileUrl } from "@/lib/fileUrl";
 
 const DIFFICULTY_META = {
-  beginner: { label: "Beginner", color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-100 border-emerald-200 dark:border-emerald-500/30" },
-  intermediate: { label: "Intermediate", color: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-100 border-amber-200 dark:border-amber-500/30" },
-  advanced: { label: "Advanced", color: "bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-100 border-rose-200 dark:border-rose-500/30" },
-  all_levels: { label: "All Levels", color: "bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-100 border-sky-200 dark:border-sky-500/30" },
+  beginner: { label: "Beginner", color: "bg-success-soft text-[var(--color-success)] dark:bg-success-soft0/15 dark:text-emerald-100 border-emerald-200 dark:border-emerald-500/30" },
+  intermediate: { label: "Intermediate", color: "bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft0/15 dark:text-amber-100 border-[rgba(217,163,0,0.25)] dark:border-amber-500/30" },
+  advanced: { label: "Advanced", color: "bg-danger-soft text-rose-700 dark:bg-danger-soft0/15 dark:text-rose-100 border-[rgba(204,31,31,0.25)] dark:border-rose-500/30" },
+  all_levels: { label: "All Levels", color: "bg-sky-50 text-[var(--color-primary)] dark:bg-[var(--color-primary)]/15 dark:text-sky-100 border-[rgba(242,92,5,0.25)] dark:border-sky-500/30" },
 };
 
 
@@ -26,13 +26,13 @@ function getInitials(name) {
 
 function getAvatarColor(name) {
   const colors = [
-    "bg-blue-100 text-blue-700 dark:bg-blue-500/25 dark:text-blue-200",
-    "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/25 dark:text-emerald-200",
+    "bg-blue-100 text-[var(--color-primary-hover)] dark:bg-[rgba(242,92,5,0.08)]0/25 dark:text-white",
+    "bg-success-soft text-[var(--color-success)] dark:bg-success-soft0/25 dark:text-emerald-200",
     "bg-purple-100 text-purple-700 dark:bg-purple-500/25 dark:text-purple-200",
-    "bg-amber-100 text-amber-700 dark:bg-amber-500/25 dark:text-amber-200",
-    "bg-rose-100 text-rose-700 dark:bg-rose-500/25 dark:text-rose-200",
+    "bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft0/25 dark:text-amber-200",
+    "bg-danger-soft text-rose-700 dark:bg-danger-soft0/25 dark:text-[var(--color-danger)]",
     "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/25 dark:text-cyan-200",
-    "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/25 dark:text-indigo-200",
+    "bg-indigo-100 text-indigo-700 dark:bg-[rgba(19,47,69,0.08)]0/25 dark:text-indigo-200",
     "bg-teal-100 text-teal-700 dark:bg-teal-500/25 dark:text-teal-200",
   ];
   if (!name) return colors[0];
@@ -55,18 +55,18 @@ function CourseCard({ course, onClick, showProgress = false, progress = 0 }) {
           <img src={resolveFileUrl(course.thumbnail_url)} alt={course.title} className="w-full h-full object-cover" />
         ) : (
           <div className="flex items-center justify-center">
-            <BookOpen size={48} className="text-blue-400 dark:text-blue-500" />
+            <BookOpen size={48} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
           </div>
         )}
         <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="rounded-full bg-white dark:bg-neutral-800 p-2.5 shadow-lg">
-            <PlayCircle size={22} className="text-blue-600 dark:text-blue-300" />
+            <PlayCircle size={22} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
           </div>
         </div>
       </div>
       <div className="p-4 space-y-3">
         <div>
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-1 group-hover:text-blue-700 dark:group-hover:text-blue-300 transition-colors">
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-1 group-hover:text-[var(--color-primary-hover)] dark:group-hover:text-[var(--color-primary)] transition-colors">
             {course.title || "Untitled Course"}
           </h3>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 line-clamp-2">
@@ -102,7 +102,7 @@ function CourseCard({ course, onClick, showProgress = false, progress = 0 }) {
               <div
                 className={cn(
                   "h-full rounded-full transition-all",
-                  isCompleted ? "bg-emerald-500" : progress >= 50 ? "bg-blue-500" : "bg-amber-500"
+                  isCompleted ? "bg-success-soft0" : progress >= 50 ? "bg-[rgba(242,92,5,0.08)]0" : "bg-warning-soft0"
                 )}
                 style={{ width: `${Math.min(progress, 100)}%` }}
               />
@@ -116,11 +116,11 @@ function CourseCard({ course, onClick, showProgress = false, progress = 0 }) {
 
 function StatCard({ title, value, icon: Icon, color = "blue" }) {
   const colorClasses = {
-    blue: "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300",
-    emerald: "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-300",
+    blue: "bg-blue-100 dark:bg-blue-900/30 text-[var(--color-primary)] dark:text-[var(--color-primary)]",
+    emerald: "bg-success-soft dark:bg-success-soft text-[var(--color-success)] dark:text-[var(--color-success)]",
     purple: "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300",
-    amber: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-300",
-    rose: "bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-300",
+    amber: "bg-warning-soft dark:bg-warning-soft text-[var(--color-warning)] dark:text-[var(--color-warning)]",
+    rose: "bg-danger-soft dark:bg-rose-900/30 text-[var(--color-danger)] dark:text-[var(--color-danger)]",
   };
 
   return (
@@ -211,8 +211,8 @@ export default function EmployeeDashboard() {
     return (
       <div className="flex h-96 items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent" />
+          <div className="h-10 w-10 rounded-xl bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)] flex items-center justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-primary)] dark:border-[var(--color-primary)] border-t-transparent" />
           </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Loading your learning dashboard...</p>
         </div>
@@ -244,7 +244,7 @@ export default function EmployeeDashboard() {
             <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">My Courses</h2>
             <button
               onClick={() => navigate("/courses/library")}
-              className="text-xs font-medium text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-200 transition-colors"
+              className="text-xs font-medium text-[var(--color-primary)] dark:text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] dark:hover:text-white transition-colors"
             >
               View all →
             </button>
@@ -274,7 +274,7 @@ export default function EmployeeDashboard() {
           <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Course Library</h2>
           <button
             onClick={handleLibraryClick}
-            className="text-xs font-medium text-blue-600 dark:text-blue-300 hover:text-blue-700 dark:hover:text-blue-200 transition-colors"
+            className="text-xs font-medium text-[var(--color-primary)] dark:text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] dark:hover:text-white transition-colors"
           >
             View all →
           </button>
@@ -286,7 +286,7 @@ export default function EmployeeDashboard() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search courses..."
-            className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm focus:border-blue-500 dark:focus:border-blue-400"
+            className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm focus:border-[var(--color-primary)] dark:focus:border-[var(--color-primary)]"
           />
         </div>
 

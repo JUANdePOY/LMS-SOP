@@ -13,7 +13,7 @@ export default function AssignmentManagePage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Assignments</h1>
-        <button onClick={() => setOpen(true)} className="rounded-lg px-3 py-1.5 text-sm bg-blue-600 text-white">Create Assignment</button>
+        <button onClick={() => setOpen(true)} className="rounded-lg px-3 py-1.5 text-sm btn-primary">Create Assignment</button>
       </div>
       <AssignmentTable assignments={assignments} onGrade={() => {}} />
       <CreateAssignmentModal open={open} onClose={() => setOpen(false)} onSubmit={() => {}} courseId={courseId} />

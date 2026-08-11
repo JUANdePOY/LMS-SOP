@@ -56,12 +56,12 @@ const TYPE_OPTIONS = [
 ];
 
 const TYPE_CONFIG = {
-  video: { icon: PlayCircle, label: "Video", color: "text-blue-500 bg-blue-50 dark:bg-blue-900/20" },
+  video: { icon: PlayCircle, label: "Video", color: "text-[var(--color-primary)] bg-[rgba(242,92,5,0.08)] dark:bg-blue-900/20" },
   reading: { icon: FileText, label: "Text", color: "text-green-500 bg-green-50 dark:bg-green-900/20" },
-  quiz: { icon: HelpCircle, label: "Quiz", color: "text-purple-500 bg-purple-50 dark:bg-purple-900/20" },
-  link: { icon: Link2, label: "Link", color: "text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20" },
-  sop: { icon: FileText, label: "SOP", color: "text-amber-500 bg-amber-50 dark:bg-amber-900/20" },
-  certificate: { icon: Award, label: "Cert", color: "text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20" },
+  quiz: { icon: HelpCircle, label: "Quiz", color: "text-[var(--color-secondary)] bg-purple-50 dark:bg-purple-900/20" },
+  link: { icon: Link2, label: "Link", color: "text-[var(--color-secondary)] bg-[rgba(19,47,69,0.08)] dark:bg-indigo-900/20" },
+  sop: { icon: FileText, label: "SOP", color: "text-amber-500 bg-warning-soft dark:bg-warning-soft" },
+  certificate: { icon: Award, label: "Cert", color: "text-[var(--color-success)] bg-success-soft dark:bg-success-soft" },
   document: { icon: FileArchive, label: "File", color: "text-red-500 bg-red-50 dark:bg-red-900/20" },
 };
 
@@ -375,7 +375,7 @@ export default function LessonEditor({
   };
 
   const saveStatus = saving ? (
-    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-blue-600">
+    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-[var(--color-primary)]">
       <Loader2 size={12} className="animate-spin" />
       Saving
     </span>
@@ -385,7 +385,7 @@ export default function LessonEditor({
       Saved {lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
     </span>
   ) : hasChanges ? (
-    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-amber-600">
+    <span className="hidden sm:inline-flex items-center gap-1.5 text-xs text-[var(--color-warning)]">
       <AlertCircle size={12} />
       Unsaved
     </span>
@@ -416,7 +416,7 @@ export default function LessonEditor({
                 }}
                 placeholder="Lesson title"
                 aria-label="Lesson title"
-                className="w-full text-lg font-semibold text-neutral-900 placeholder:text-neutral-400 bg-transparent border-0 border-b border-transparent hover:border-neutral-300 focus:border-blue-600 focus:ring-0 p-0 pb-1 transition-colors"
+                className="w-full text-lg font-semibold text-neutral-900 placeholder:text-neutral-400 bg-transparent border-0 border-b border-transparent hover:border-neutral-300 focus:border-[var(--color-primary)] focus:ring-0 p-0 pb-1 transition-colors"
               />
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
@@ -425,7 +425,7 @@ export default function LessonEditor({
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover-brand disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {saving ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -453,7 +453,7 @@ export default function LessonEditor({
                     inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors
                     focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600
                     ${active
-                      ? "bg-blue-600 text-white"
+                      ? "btn-primary"
                       : "text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100"}
                   `}
                 >
@@ -496,7 +496,7 @@ export default function LessonEditor({
                       inline-flex items-center gap-2 px-1 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors
                       focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 rounded-t
                       ${active
-                        ? "border-blue-600 text-blue-700"
+                        ? "border-[var(--color-primary)] text-[var(--color-primary-hover)]"
                         : "border-transparent text-neutral-500 hover:text-neutral-700"}
                     `}
                   >
@@ -702,7 +702,7 @@ export default function LessonEditor({
                               className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-8 text-center transition-colors ${
                                 documentFile
                                   ? "border-neutral-200 bg-neutral-50 hover:border-neutral-300"
-                                  : "border-neutral-300 bg-white hover:border-blue-400 hover:bg-blue-50/40"
+                                  : "border-neutral-300 bg-white hover:border-[var(--color-primary)] hover:bg-[rgba(242,92,5,0.08)]/40"
                               }`}
                             >
                               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
@@ -721,12 +721,12 @@ export default function LessonEditor({
                               )}
                             </label>
                             {documentFile && !isAcceptedDocument(documentFile.name) && (
-                              <p className="mt-1.5 text-xs text-amber-600">
+                              <p className="mt-1.5 text-xs text-[var(--color-warning)]">
                                 This file type isn’t supported. Use a PDF, Word, PowerPoint, Excel, or CSV file.
                               </p>
                             )}
                             {documentFile && documentFile.size > DOCUMENT_MAX_BYTES && (
-                              <p className="mt-1.5 text-xs text-amber-600">
+                              <p className="mt-1.5 text-xs text-[var(--color-warning)]">
                                 File is {formatBytes(documentFile.size)} — the limit is 25 MB and may fail to upload.
                               </p>
                             )}
@@ -756,7 +756,7 @@ export default function LessonEditor({
                                 emitPatch({ linkTitle: e.target.value });
                               }}
                               placeholder="e.g. Safety Manual v3"
-                              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
+                              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                             />
                             <p className="mt-1.5 text-xs text-neutral-500">
                               Shown in the course outline when set; otherwise the file name is used.
@@ -780,7 +780,7 @@ export default function LessonEditor({
                               }}
                               placeholder="https://youtube.com/watch?v=..."
                               aria-invalid={!!url && !parseVideoUrl(url)}
-                              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
+                              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                             />
                             {url && parseVideoUrl(url) && (
                               <p className="mt-1.5 text-xs text-neutral-500">
@@ -850,7 +850,7 @@ export default function LessonEditor({
                                   className={`w-full rounded-md border bg-white pl-9 pr-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-1 transition-colors ${
                                     url.trim() && !isValidUrl(url)
                                       ? "border-red-300 focus:border-red-600 focus:ring-red-600"
-                                      : "border-neutral-200 focus:border-blue-600 focus:ring-blue-600"
+                                      : "border-neutral-200 focus:border-[var(--color-primary)] focus:ring-blue-600"
                                   }`}
                                 />
                               </div>
@@ -886,7 +886,7 @@ export default function LessonEditor({
                                 emitPatch({ linkTitle: e.target.value });
                               }}
                               placeholder="e.g. Company Handbook"
-                              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
+                              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                             />
                             <p className="mt-1.5 text-xs text-neutral-500">Shown in the course outline when set; otherwise the link host is used.</p>
                           </div>
@@ -923,7 +923,7 @@ export default function LessonEditor({
                           <button
                             type="button"
                             onClick={() => setShowCreateQuiz(true)}
-                            className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-[rgba(242,92,5,0.25)] bg-[rgba(242,92,5,0.08)] px-2.5 py-1 text-xs font-medium text-[var(--color-primary-hover)] hover:bg-blue-100 transition-colors"
                           >
                             <Plus size={14} /> Create new
                           </button>
@@ -942,7 +942,7 @@ export default function LessonEditor({
                             id="quiz-select"
                             value={selectedQuizId || ""}
                             onChange={(e) => handleQuizChange(e.target.value ? Number(e.target.value) : null)}
-                            className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
+                            className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                           >
                             <option value="">Select a quiz...</option>
                             {quizzes.map((q) => (
@@ -968,14 +968,14 @@ export default function LessonEditor({
                       )}
 
                       {isQuiz && requiresQuizPass && !selectedQuizId && (
-                        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+                        <div className="flex items-start gap-2 rounded-md border border-[rgba(217,163,0,0.25)] bg-warning-soft px-3 py-2 text-xs text-[var(--color-warning)] dark:border-amber-800 dark:bg-amber-950/20 dark:text-[var(--color-warning)]">
                           <AlertCircle size={14} className="mt-0.5 shrink-0" />
                           <span>Attach a quiz before requiring a passing score, or this lesson cannot be completed.</span>
                         </div>
                       )}
 
                       {isQuiz && requiresQuizPass && selectedQuiz && (selectedQuiz.question_count ?? 0) === 0 && (
-                        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+                        <div className="flex items-start gap-2 rounded-md border border-[rgba(217,163,0,0.25)] bg-warning-soft px-3 py-2 text-xs text-[var(--color-warning)] dark:border-amber-800 dark:bg-amber-950/20 dark:text-[var(--color-warning)]">
                           <AlertCircle size={14} className="mt-0.5 shrink-0" />
                           <span>This quiz has no questions yet. Add questions in the Quiz Builder before publishing.</span>
                         </div>
@@ -1008,7 +1008,7 @@ export default function LessonEditor({
                               setRequiresQuizPass(e.target.checked);
                               emitPatch({ requiresQuizPass: e.target.checked });
                             }}
-                            className="mt-0.5 w-4 h-4 border-neutral-300 text-blue-600 focus:ring-blue-600 rounded"
+                            className="mt-0.5 w-4 h-4 border-neutral-300 text-[var(--color-primary)] focus:ring-blue-600 rounded"
                           />
                           <div>
                             <span className="text-sm font-medium text-neutral-700">
@@ -1037,7 +1037,7 @@ export default function LessonEditor({
                                 placeholder="e.g. 70"
                                 min="0"
                                 max="100"
-                                className="w-full rounded-md border border-neutral-200 bg-white pl-3 pr-8 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
+                                className="w-full rounded-md border border-neutral-200 bg-white pl-3 pr-8 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                               />
                               <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-neutral-500">%</span>
                             </div>
@@ -1078,7 +1078,7 @@ export default function LessonEditor({
                           }}
                           placeholder="e.g. 10"
                           min="0"
-                          className="w-full rounded-md border border-neutral-200 bg-white pl-3 pr-10 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-blue-600 focus:ring-1 focus:ring-blue-600 transition-colors"
+                          className="w-full rounded-md border border-neutral-200 bg-white pl-3 pr-10 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                         />
                         <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-neutral-500">min</span>
                       </div>
@@ -1096,7 +1096,7 @@ export default function LessonEditor({
                             setIsRequired(e.target.checked);
                             emitPatch({ is_required: e.target.checked });
                           }}
-                          className="w-4 h-4 border-neutral-300 text-blue-600 focus:ring-blue-600 rounded"
+                          className="w-4 h-4 border-neutral-300 text-[var(--color-primary)] focus:ring-blue-600 rounded"
                         />
                         <div>
                           <span className="text-sm text-neutral-700">Required lesson</span>
@@ -1205,7 +1205,7 @@ export default function LessonEditor({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-warning-soft text-[var(--color-warning)]">
                 <AlertCircle size={18} />
               </span>
               <div className="min-w-0">

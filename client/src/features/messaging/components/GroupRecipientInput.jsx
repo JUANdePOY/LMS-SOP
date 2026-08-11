@@ -17,7 +17,7 @@ function UserAvatar({ user, className = "h-5 w-5" }) {
   return (
     <span
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-[10px] font-medium",
+        "flex shrink-0 items-center justify-center rounded-full bg-[rgba(242,92,5,0.12)] text-[var(--color-primary-hover)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)] text-[10px] font-medium",
         className
       )}
     >
@@ -35,7 +35,10 @@ export default function GroupRecipientInput({
   isSearching = false,
   placeholder = "Search recipients...",
   maxResults = 7,
+  labelsById = null,
 }) {
+  const labelFor = (user) =>
+    (labelsById && labelsById.get(user.id)) || user.full_name || user.email;
   const [inputValue, setInputValue] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(-1);
@@ -126,7 +129,7 @@ export default function GroupRecipientInput({
       <div
         className={cn(
           "flex min-h-[36px] flex-wrap items-center gap-1.5 rounded-lg border bg-white dark:bg-neutral-800 px-2 py-1.5 cursor-text",
-          "border-neutral-300 dark:border-neutral-600 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/30"
+          "border-neutral-300 dark:border-neutral-600 focus-within:border-[var(--color-primary)] focus-within:ring-1 focus-within:ring-[rgba(242,92,5,0.30)]"
         )}
       >
         {selectedUsers.map((user) => (
@@ -136,7 +139,7 @@ export default function GroupRecipientInput({
           >
             <UserAvatar user={user} className="h-4 w-4" />
             <span className="max-w-[140px] truncate">
-              {user.full_name || user.email}
+              {labelFor(user)}
             </span>
             <button
               type="button"
@@ -189,9 +192,9 @@ export default function GroupRecipientInput({
               >
                 <UserAvatar user={user} className="h-6 w-6" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100 truncate">
-                    {user.full_name || "Unknown User"}
-                  </p>
+                <p className="text-xs font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                  {labelFor(user) || "Unknown User"}
+                </p>
                   <p className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate">
                     {user.email}
                   </p>

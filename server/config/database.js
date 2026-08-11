@@ -192,6 +192,8 @@ const MIGRATIONS = [
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS birthdate DATE DEFAULT NULL`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS address TEXT DEFAULT NULL`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255) DEFAULT NULL`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT NULL`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_photo_url VARCHAR(500) DEFAULT NULL`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500) DEFAULT NULL`,
   `CREATE TABLE IF NOT EXISTS file_blobs (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -531,9 +533,40 @@ const MIGRATIONS = [
       INDEX idx_task_comments_task (task_id),
       INDEX idx_task_comments_user (user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-      `ALTER TABLE sops ADD COLUMN IF NOT EXISTS is_default_onboarding TINYINT(1) NOT NULL DEFAULT 0 AFTER restriction_type`,
-      `CREATE INDEX idx_sops_default_onboarding ON sops(is_default_onboarding) WHERE is_default_onboarding = 1`,
-  ];
+       `ALTER TABLE sops ADD COLUMN IF NOT EXISTS is_default_onboarding TINYINT(1) NOT NULL DEFAULT 0 AFTER restriction_type`,
+       `CREATE INDEX idx_sops_default_onboarding ON sops(is_default_onboarding) WHERE is_default_onboarding = 1`,
+       // --- Google Calendar integration: per-user OAuth tokens (encrypted) ---
+       `CREATE TABLE IF NOT EXISTS user_calendar_tokens (
+         id INT AUTO_INCREMENT PRIMARY KEY,
+         user_id INT NOT NULL,
+         provider VARCHAR(32) NOT NULL DEFAULT 'google',
+         google_email VARCHAR(255) DEFAULT NULL,
+         access_token VARBINARY(2048) NOT NULL,
+         refresh_token VARBINARY(2048) DEFAULT NULL,
+         expiry_date BIGINT DEFAULT NULL,
+         connected_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+         UNIQUE KEY uk_user_provider (user_id, provider),
+         INDEX idx_tokens_user (user_id)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+       // --- Google Calendar integration: mapping between LMS events and Google events ---
+       `CREATE TABLE IF NOT EXISTS calendar_event_map (
+         id INT AUTO_INCREMENT PRIMARY KEY,
+         user_id INT NOT NULL,
+         event_id VARCHAR(36) NOT NULL,
+         google_event_id VARCHAR(255) NOT NULL,
+         google_calendar_id VARCHAR(255) NOT NULL DEFAULT 'primary',
+         last_synced_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         sync_status ENUM('synced','failed','deleted') NOT NULL DEFAULT 'synced',
+         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+         FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+         UNIQUE KEY uk_user_event (user_id, event_id),
+         INDEX idx_map_event (event_id),
+         INDEX idx_map_google (google_event_id)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+   ];
 
 async function runMigrations() {
   const db = getPool();

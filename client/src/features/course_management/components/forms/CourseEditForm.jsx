@@ -27,7 +27,7 @@ export default function CourseEditForm({ course, onSubmit, onCancel }) {
       </div>
       <div className="flex justify-end gap-2 pt-2">
         <button type="button" onClick={onCancel} className="rounded-lg px-4 py-2 text-sm border border-[var(--border)]">Cancel</button>
-        <button type="submit" className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white">Save Changes</button>
+        <button type="submit" className="rounded-lg px-4 py-2 text-sm btn-primary">Save Changes</button>
       </div>
     </form>
   );

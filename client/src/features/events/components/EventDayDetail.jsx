@@ -2,8 +2,8 @@ import { Calendar, MapPin, User, Edit, Trash2, Plus } from "lucide-react";
 
 const PRIORITY_COLORS = {
   low: "bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-100 border-slate-200 dark:border-slate-500/30",
-  medium: "bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-100 border-blue-200 dark:border-blue-500/30",
-  high: "bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-100 border-amber-200 dark:border-amber-500/30",
+  medium: "bg-[rgba(242,92,5,0.08)] text-[var(--color-primary-hover)] dark:bg-[rgba(242,92,5,0.08)]0/15 dark:text-[var(--color-primary)] border-[rgba(242,92,5,0.25)] dark:border-[rgba(242,92,5,0.30)]",
+  high: "bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft dark:text-[var(--color-warning)] border-[rgba(217,163,0,0.25)] dark:border-[rgba(217,163,0,0.30)]",
   critical: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-100 border-red-200 dark:border-red-500/30",
 };
 
@@ -22,14 +22,14 @@ function formatDate(dateObj) {
   return dateObj.toLocaleDateString("default", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 }
 
-export default function EventDayDetail({ date, events, onEdit, onDelete, onCreate, canManage }) {
+export default function EventDayDetail({ date, events, onEdit, onDelete, onCreate, canManage, renderSync }) {
   const sorted = [...events].sort((a, b) => new Date(a.event_date) - new Date(b.event_date));
 
   return (
     <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm">
       <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200 dark:border-neutral-700">
         <div className="flex items-center gap-2">
-          <Calendar size={16} className="text-blue-600 dark:text-blue-400" />
+          <Calendar size={16} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
           <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
             {formatDate(date)}
           </h3>
@@ -37,7 +37,7 @@ export default function EventDayDetail({ date, events, onEdit, onDelete, onCreat
         {canManage && (
           <button
             onClick={() => onCreate(date)}
-            className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-primary)] px-2.5 py-1.5 text-xs font-medium text-white hover-brand"
           >
             <Plus size={14} />
             Add
@@ -102,6 +102,11 @@ export default function EventDayDetail({ date, events, onEdit, onDelete, onCreat
                     >
                       <Trash2 size={14} />
                     </button>
+                  </div>
+                )}
+                {renderSync && (
+                  <div className="flex items-center">
+                    {renderSync(evt)}
                   </div>
                 )}
               </div>

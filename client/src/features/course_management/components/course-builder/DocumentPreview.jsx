@@ -54,7 +54,7 @@ export default function DocumentPreview({ file, url, onOpen, onRemove }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3 rounded-xl border border-neutral-200 bg-white p-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)]">
           <Icon size={22} />
         </span>
         <div className="min-w-0 flex-1">
@@ -91,7 +91,7 @@ export default function DocumentPreview({ file, url, onOpen, onRemove }) {
       </div>
 
       {tooLarge && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+        <div className="flex items-start gap-2 rounded-md border border-[rgba(217,163,0,0.25)] bg-warning-soft px-3 py-2 text-xs text-[var(--color-warning)] dark:border-amber-800 dark:bg-amber-950/20 dark:text-[var(--color-warning)]">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
           <span>This file exceeds the {MAX_SIZE_MB} MB limit and may fail to upload. Consider compressing it.</span>
         </div>

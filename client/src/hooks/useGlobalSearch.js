@@ -32,7 +32,11 @@ export function useGlobalSearch() {
     try {
       const response = await globalSearch({ q: searchTerm });
       const payload = response?.data?.data || {};
-      setResults(payload.results || {});
+      // The search API returns category results at the top level of `data`
+      // (e.g. { users, courses, total, query }); fall back to a nested
+      // `results` key for backwards compatibility.
+      const resultsMap = payload.results && typeof payload.results === 'object' ? payload.results : payload;
+      setResults(resultsMap || {});
       setTotal(payload.total || 0);
     } catch (err) {
       setError(err?.response?.data?.message || err.message || 'Search failed');
@@ -48,8 +52,9 @@ export function useGlobalSearch() {
   }, [debouncedQuery, fetchResults]);
 
   const navigateToResult = useCallback((category, item) => {
+    const userId = item?.id ?? item?.user_id ?? item?.userId;
     const paths = {
-      users: `/profile`,
+      users: userId ? `/profile/${userId}` : undefined,
       courses: `/courses/${item.id}`,
       sops: `/sops/${item.id}`,
       departments: '/admin/organization/departments',
@@ -63,13 +68,9 @@ export function useGlobalSearch() {
     };
     const target = paths[category];
     if (!target) return;
-    if (location.pathname === target) {
-      window.dispatchEvent(new PopStateEvent('popstate'));
-    } else {
-      navigate(target, { replace: true });
-    }
+    navigate(target);
     reset();
-  }, [navigate, location.pathname, reset]);
+  }, [navigate, reset]);
 
   return {
     query,

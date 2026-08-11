@@ -133,7 +133,7 @@ export default function AuditLogs() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search action, entity, user email..."
-                className="w-full pl-9 pr-4 py-2 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-sm text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 dark:placeholder:text-neutral-500 focus:outline-none focus:border-indigo-600"
+                className="w-full pl-9 pr-4 py-2 rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-sm text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 dark:placeholder:text-neutral-500 focus:outline-none focus:border-[var(--color-secondary)]"
               />
             </div>
           </div>
@@ -143,7 +143,7 @@ export default function AuditLogs() {
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
             placeholder="Action (e.g. reservist.updated)"
-            className="rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:border-indigo-600"
+            className="rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:border-[var(--color-secondary)]"
           />
 
           <input
@@ -151,21 +151,21 @@ export default function AuditLogs() {
             value={entityFilter}
             onChange={(e) => setEntityFilter(e.target.value)}
             placeholder="Entity type (e.g. reservist)"
-            className="rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:border-indigo-600"
+            className="rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:border-[var(--color-secondary)]"
           />
 
           <input
             type="date"
             value={fromDate}
             onChange={(e) => setFromDate(e.target.value)}
-            className="rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:border-indigo-600"
+            className="rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:border-[var(--color-secondary)]"
             title="From date"
           />
           <input
             type="date"
             value={toDate}
             onChange={(e) => setToDate(e.target.value)}
-            className="rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:border-indigo-600"
+            className="rounded-lg bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 focus:outline-none focus:border-[var(--color-secondary)]"
             title="To date"
           />
 
@@ -236,7 +236,7 @@ export default function AuditLogs() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-medium text-indigo-600 dark:text-indigo-400 align-top">
+                    <td className="px-4 py-3 font-medium text-[var(--color-secondary)] dark:text-[var(--color-secondary)] align-top">
                       {log.action}
                     </td>
                     <td className="px-4 py-3 align-top">
@@ -324,7 +324,7 @@ export default function AuditLogs() {
                 </div>
                 <div>
                   <div className="text-neutral-500 dark:text-neutral-400 text-xs mb-1">Action</div>
-                  <div className="font-mono text-indigo-600 dark:text-indigo-400">{selectedLog.action}</div>
+                  <div className="font-mono text-[var(--color-secondary)] dark:text-[var(--color-secondary)]">{selectedLog.action}</div>
                 </div>
                 <div>
                   <div className="text-neutral-500 dark:text-neutral-400 text-xs mb-1">Entity</div>

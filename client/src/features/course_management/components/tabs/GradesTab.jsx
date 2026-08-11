@@ -20,7 +20,7 @@ export default function GradesTab({ grades, onGrade }) {
                 <td className="px-3 py-2 text-neutral-500">{g.maxScore ?? 0}</td>
                 <td className="px-3 py-2 text-neutral-500">{g.letterGrade ?? "-"}</td>
                 <td className="px-3 py-2 text-right">
-                  {!g.grade && <button onClick={() => onGrade?.(g)} className="text-xs text-blue-600 hover:underline">Grade</button>}
+                  {!g.grade && <button onClick={() => onGrade?.(g)} className="text-xs text-[var(--color-primary)] hover:underline">Grade</button>}
                 </td>
               </tr>
             ))}

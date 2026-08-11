@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useSOPList } from '@/features/sop-management/hooks/useSOPList';
 import { SOP_STATUSES, VIEW_MODES } from '@/features/sop-management/constants/sopConstants';
+import { ActionButton, ActionIcons } from '@/shared/components/ui/actionIcons';
 import SOPCreateForm from '@/features/sop-management/components/SOPCreateForm';
 import SOPEditForm from '@/features/sop-management/components/SOPEditForm';
 import TrashPanel from '@/features/sop-management/components/TrashPanel';
@@ -67,9 +68,18 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop }) {
           </div>
         </div>
         <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
-          <button onClick={() => onEditStart(sop)} className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">Edit</button>
-          <button onClick={() => onArchiveSop(sop)} className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">{sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}</button>
-          <button onClick={() => onDeleteSop(sop.id)} className="flex-1 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">Delete</button>
+          <button onClick={() => onEditStart(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
+            <ActionIcons.Edit className="h-3.5 w-3.5" />
+            Edit
+          </button>
+          <button onClick={() => onArchiveSop(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
+            {sop.status === SOP_STATUSES.ARCHIVED ? <ActionIcons.Unarchive className="h-3.5 w-3.5" /> : <ActionIcons.Archive className="h-3.5 w-3.5" />}
+            {sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}
+          </button>
+          <button onClick={() => onDeleteSop(sop.id)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">
+            <ActionIcons.Delete className="h-3.5 w-3.5" />
+            Delete
+          </button>
         </div>
       </div>
     );
@@ -91,19 +101,13 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop }) {
           )}
         </div>
         <div className="flex gap-1 shrink-0">
-          <button onClick={() => onEditStart(sop)} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors" title="Edit SOP" aria-label="Edit SOP">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-          </button>
-          <button onClick={() => onArchiveSop(sop)} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 transition-colors" title={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive SOP' : 'Archive SOP'} aria-label={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive SOP' : 'Archive SOP'}>
-            {sop.status === SOP_STATUSES.ARCHIVED ? (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
-            )}
-          </button>
-          <button onClick={() => onDeleteSop(sop.id)} className="p-2 rounded-lg text-[var(--text-muted)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors" title="Delete SOP" aria-label="Delete SOP">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-          </button>
+          <ActionButton action="Edit" label="Edit SOP" onClick={() => onEditStart(sop)} />
+          <ActionButton
+            action={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}
+            label={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive SOP' : 'Archive SOP'}
+            onClick={() => onArchiveSop(sop)}
+          />
+          <ActionButton action="Delete" label="Delete SOP" onClick={() => onDeleteSop(sop.id)} />
         </div>
       </div>
     </div>

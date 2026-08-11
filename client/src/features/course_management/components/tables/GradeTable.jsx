@@ -19,7 +19,7 @@ export default function GradeTable({ grades, onGrade }) {
               <td className="px-3 py-2">{g.score ?? "-"}</td>
               <td className="px-3 py-2 text-neutral-500">{g.submittedAt ?? ""}</td>
               <td className="px-3 py-2 text-right">
-                {!g.grade && <button onClick={() => onGrade?.(g)} className="text-xs text-blue-600 hover:underline">Grade</button>}
+                {!g.grade && <button onClick={() => onGrade?.(g)} className="text-xs text-[var(--color-primary)] hover:underline">Grade</button>}
               </td>
             </tr>
           ))}

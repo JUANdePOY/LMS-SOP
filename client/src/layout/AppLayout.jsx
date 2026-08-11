@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Megaphone,
   Calendar,
+  User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -31,15 +32,13 @@ import { PageTransition } from "@/shared/motion";
 const MOBILE_BOTTOM_NAV_ADMIN = [
   { name: "Home", path: "/", icon: BookOpen },
   { name: "Courses", path: "/courses", icon: BookOpen },
-  { name: "SOPs", path: "/sops", icon: FileText },
   { name: "Users", path: "/settings/users", icon: Users },
 ];
 
 const MOBILE_BOTTOM_NAV_EMPLOYEE = [
   { name: "Home", path: "/", icon: BookOpen },
   { name: "Library", path: "/courses/library", icon: BookOpen },
-  { name: "SOPs", path: "/sops", icon: FileText },
-  { name: "Profile", path: "/profile", icon: Users },
+  { name: "Profile", path: "/profile", icon: User },
 ];
 
 const HEADER_QUICK_ACCESS = [
@@ -214,7 +213,7 @@ export default function AppLayout() {
                   <div className="flex items-center gap-1.5 text-sm min-w-0">
                     <span className={cn(
                       "font-semibold truncate",
-                      isEmployee ? "text-blue-200" : "text-white"
+                      isEmployee ? "text-white" : "text-white"
                     )}>
                       {breadcrumbs[0].title}
                     </span>
@@ -230,7 +229,7 @@ export default function AppLayout() {
                 ) : (
                   <span className={cn(
                     "text-sm font-semibold truncate",
-                    isEmployee ? "text-blue-200" : "text-white"
+                    isEmployee ? "text-white" : "text-white"
                   )}>
                     Learning
                   </span>
@@ -361,7 +360,7 @@ export default function AppLayout() {
                 autoFocus
                 type="text"
                 placeholder="Search courses, SOPs, materials…"
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-9 py-2 text-sm text-[var(--text-primary)] placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-9 py-2 text-sm text-[var(--text-primary)] placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] focus:border-[var(--color-primary)]"
               />
             </div>
             <button
@@ -396,7 +395,7 @@ export default function AppLayout() {
                   "flex flex-col items-center gap-0.5 px-2 py-1 rounded-lg min-w-[56px]",
                   "transition-colors duration-150",
                   active
-                    ? "text-blue-600"
+                    ? "text-[var(--color-primary)]"
                     : "text-neutral-500 hover:text-neutral-700"
                 )}
               >

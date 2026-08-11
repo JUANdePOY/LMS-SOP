@@ -58,7 +58,7 @@ export default function LinkPreview({ url, title }) {
         href={trimmed}
         target="_blank"
         rel="noreferrer noopener"
-        className="group flex items-center gap-3 rounded-xl border border-neutral-200 bg-white p-3 transition-colors hover:border-blue-300 hover:bg-blue-50/40"
+        className="group flex items-center gap-3 rounded-xl border border-neutral-200 bg-white p-3 transition-colors hover:border-[rgba(242,92,5,0.30)] hover:bg-[rgba(242,92,5,0.08)]/40"
       >
         <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
           {favicon ? (
@@ -73,10 +73,10 @@ export default function LinkPreview({ url, title }) {
           </span>
           <span className="block truncate text-xs text-neutral-500">{trimmed}</span>
         </span>
-        <ExternalLink size={16} className="shrink-0 text-neutral-400 transition-colors group-hover:text-blue-600" />
+        <ExternalLink size={16} className="shrink-0 text-neutral-400 transition-colors group-hover:text-[var(--color-primary)]" />
       </a>
 
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-600">
+      <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-[var(--color-success)]">
         <CheckCircle2 size={12} /> External link · {host}
       </span>
     </div>

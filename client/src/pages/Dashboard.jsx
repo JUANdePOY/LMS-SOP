@@ -124,9 +124,9 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                     <div className={cn(
                       "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                      card.color === 'blue' ? 'bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400' :
-                      card.color === 'emerald' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' :
-                      card.color === 'amber' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400' :
+                      card.color === 'blue' ? 'bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]' :
+                      card.color === 'emerald' ? 'bg-success-soft text-[var(--color-success)] dark:bg-success-soft dark:text-[var(--color-success)]' :
+                      card.color === 'amber' ? 'bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft0/10 dark:text-[var(--color-warning)]' :
                       'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
                     )}>
                       <Icon size={18} />
@@ -136,7 +136,7 @@ export default function Dashboard() {
                       <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 leading-tight">{card.value}</p>
                     </div>
                   </div>
-                   <span className="flex items-center gap-0.5 text-[10px] sm:text-xs font-medium text-emerald-600 dark:text-emerald-400 shrink-0">
+                   <span className="flex items-center gap-0.5 text-[10px] sm:text-xs font-medium text-[var(--color-success)] dark:text-[var(--color-success)] shrink-0">
                     <TrendingUp size={12} />
                     {card.delta}
                   </span>
@@ -154,7 +154,7 @@ export default function Dashboard() {
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
-            className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-blue-500/20 w-full sm:w-auto"
+            className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] w-full sm:w-auto"
           >
             <option value="month">This Month</option>
             <option value="week">This Week</option>
@@ -230,12 +230,12 @@ export default function Dashboard() {
         <Card className="p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Recent Announcements</h2>
-            <a href="#" className="text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-700">View All</a>
+            <a href="#" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
           </div>
           <div className="space-y-2.5 sm:space-y-3">
             {ANNOUNCEMENTS.map((item, i) => (
               <div key={i} className="flex items-start gap-2.5 sm:gap-3">
-                <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]">
                   <Megaphone size={14} />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -254,7 +254,7 @@ export default function Dashboard() {
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-[rgba(242,92,5,0.20)]"
             >
               <option value="month">This Month</option>
               <option value="week">This Week</option>
@@ -303,7 +303,7 @@ export default function Dashboard() {
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-[rgba(242,92,5,0.20)]"
             >
               <option value="week">This Week</option>
               <option value="month">This Month</option>
@@ -312,7 +312,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
             {USER_ACTIVITY_DATA.map((item) => (
               <div key={item.label} className="flex flex-col items-center text-center gap-1.5 sm:gap-2">
-                <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]">
                   <item.icon size={16} />
                 </div>
                 <div>
@@ -331,23 +331,23 @@ export default function Dashboard() {
         <Card className="p-3 sm:p-4 lg:col-span-2">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Internal Tasks Overview</h2>
-            <a href="#" className="text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-700">View All</a>
+            <a href="#" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
           </div>
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
             {TASK_OVERVIEW.map((task) => (
               <div key={task.label} className={cn(
                 "rounded-xl p-3 text-center",
                 task.color === 'red' ? 'bg-red-50 dark:bg-red-500/10' :
-                task.color === 'amber' ? 'bg-amber-50 dark:bg-amber-500/10' :
-                task.color === 'emerald' ? 'bg-emerald-50 dark:bg-emerald-500/10' :
-                'bg-blue-50 dark:bg-blue-500/10'
+                task.color === 'amber' ? 'bg-warning-soft dark:bg-warning-soft0/10' :
+                task.color === 'emerald' ? 'bg-success-soft dark:bg-success-soft' :
+                'bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)]'
               )}>
                 <p className={cn(
                   "text-xl sm:text-2xl font-bold",
                   task.color === 'red' ? 'text-red-600 dark:text-red-400' :
-                  task.color === 'amber' ? 'text-amber-600 dark:text-amber-400' :
-                  task.color === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' :
-                  'text-blue-600 dark:text-blue-400'
+                  task.color === 'amber' ? 'text-[var(--color-warning)] dark:text-[var(--color-warning)]' :
+                  task.color === 'emerald' ? 'text-[var(--color-success)] dark:text-[var(--color-success)]' :
+                  'text-[var(--color-primary)] dark:text-[var(--color-primary)]'
                 )}>{task.value}</p>
                  <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{task.label}</p>
               </div>
@@ -362,7 +362,7 @@ export default function Dashboard() {
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-[rgba(242,92,5,0.20)]"
             >
               <option value="month">This Month</option>
               <option value="week">This Week</option>
@@ -387,7 +387,7 @@ export default function Dashboard() {
                   <td className="px-2 sm:px-3 py-2.5 hidden sm:table-cell">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 min-w-[60px]">
-                        <div className="h-full rounded-full bg-blue-500" style={{ width: `${row.trainingCompletion}%` }} />
+                        <div className="h-full rounded-full bg-[rgba(242,92,5,0.08)]0" style={{ width: `${row.trainingCompletion}%` }} />
                       </div>
                       <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 w-10 text-right">{row.trainingCompletion}%</span>
                     </div>
@@ -395,7 +395,7 @@ export default function Dashboard() {
                   <td className="px-2 sm:px-3 py-2.5 hidden sm:table-cell">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 min-w-[60px]">
-                        <div className="h-full rounded-full bg-emerald-500" style={{ width: `${row.assessmentsPassed}%` }} />
+                        <div className="h-full rounded-full bg-success-soft0" style={{ width: `${row.assessmentsPassed}%` }} />
                       </div>
                       <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 w-10 text-right">{row.assessmentsPassed}%</span>
                     </div>
@@ -415,12 +415,12 @@ export default function Dashboard() {
         <Card className="p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Upcoming Events</h2>
-            <a href="#" className="text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-700">View All</a>
+            <a href="#" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2.5 sm:gap-3">
             {UPCOMING_EVENTS.map((event, i) => (
               <div key={i} className="flex items-center gap-2.5 sm:gap-3 p-2.5 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors">
-                <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]">
                   <Calendar size={14} />
                 </div>
                 <div className="min-w-0">
@@ -436,12 +436,12 @@ export default function Dashboard() {
         <Card className="p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Recent Messages</h2>
-            <a href="#" className="text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-700">View All</a>
+            <a href="#" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
           </div>
           <div className="space-y-2.5 sm:space-y-3">
             {RECENT_MESSAGES.map((msg, i) => (
               <div key={i} className="flex items-start gap-2.5 sm:gap-3">
-                <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-400 to-indigo-600 text-white text-xs font-bold">
+                <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-secondary)] to-[var(--color-secondary-hover)] text-white text-xs font-bold">
                   {msg.sender.charAt(0)}
                 </div>
                 <div className="flex-1 min-w-0">

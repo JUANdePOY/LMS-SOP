@@ -43,7 +43,21 @@ router.get('/stats', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const userId = parseInt(req.params.id);
-    const user = await authModel.findById(userId);
+    if (isNaN(userId)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid user id', code: 'VALIDATION_ERROR' });
+    }
+    const [rows] = await db.query(
+      `SELECT u.id, u.full_name, u.email, u.employee_id, u.role, u.department_id, u.business_id,
+              u.position_title, u.contact_number, u.employment_status, u.date_hired, u.birthdate,
+              u.address, u.bio, u.avatar_url, u.cover_photo_url AS cover_url, u.is_active, u.created_at,
+              d.name AS department_name, b.business_name
+       FROM users u
+       LEFT JOIN departments d ON u.department_id = d.id
+       LEFT JOIN businesses b ON u.business_id = b.id
+       WHERE u.id = ?`,
+      [userId]
+    );
+    const user = rows[0];
     if (!user) {
       return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
     }

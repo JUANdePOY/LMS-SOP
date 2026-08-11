@@ -59,7 +59,7 @@ export default function SettingsTab({ course, onSave, onArchive }) {
         />
       </div>
       <div className="flex justify-between">
-        <Button onClick={handleSave} disabled={saving || !onSave} className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white">
+        <Button onClick={handleSave} disabled={saving || !onSave} className="rounded-lg px-4 py-2 text-sm btn-primary">
           {saving ? 'Saving...' : 'Save Settings'}
         </Button>
         {onArchive && (

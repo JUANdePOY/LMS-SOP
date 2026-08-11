@@ -16,19 +16,19 @@ const ROLE_LABELS = {
 
 const ROLE_COLORS = {
   super_admin: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
-  admin: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300",
-  department_head: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300",
-  employee: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
+  admin: "bg-danger-soft text-rose-700 dark:bg-rose-900/30 dark:text-[var(--color-danger)]",
+  department_head: "bg-warning-soft text-warning dark:bg-warning-soft dark:text-[var(--color-warning)]",
+  employee: "bg-blue-100 text-[var(--color-primary-hover)] dark:bg-blue-900/30 dark:text-[var(--color-primary)]",
 };
 
 const AVATAR_COLORS = [
-  "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  "bg-blue-100 text-[var(--color-primary-hover)] dark:bg-blue-900/40 dark:text-[var(--color-primary)]",
+  "bg-success-soft text-[var(--color-success)] dark:bg-emerald-900/40 dark:text-[var(--color-success)]",
   "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
-  "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
-  "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+  "bg-warning-soft text-[var(--color-warning)] dark:bg-amber-900/40 dark:text-[var(--color-warning)]",
+  "bg-danger-soft text-rose-700 dark:bg-rose-900/40 dark:text-[var(--color-danger)]",
   "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
-  "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300",
+  "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-[var(--color-secondary)]",
   "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
 ];
 
@@ -65,7 +65,7 @@ function UserRow({ user, checked, enrolled, onToggle, index }) {
         group relative flex w-full items-center gap-3 rounded-xl border px-3.5 py-2.5 text-left transition-all duration-200
         hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40
         ${checked
-          ? "border-blue-500 bg-blue-50/70 dark:border-blue-400 dark:bg-blue-900/20 shadow-sm"
+          ? "border-[var(--color-primary)] bg-[rgba(242,92,5,0.08)]/70 dark:border-[var(--color-primary)] dark:bg-blue-900/20 shadow-sm"
           : "border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
         }
       `}
@@ -75,7 +75,7 @@ function UserRow({ user, checked, enrolled, onToggle, index }) {
         className={`
           flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-all duration-200
           ${checked
-            ? "border-blue-500 bg-blue-500 text-white scale-100"
+            ? "border-[var(--color-primary)] bg-[rgba(242,92,5,0.08)]0 text-white scale-100"
             : "border-neutral-300 dark:border-neutral-600 group-hover:border-neutral-400 dark:group-hover:border-neutral-500 scale-100"
           }
         `}
@@ -92,7 +92,7 @@ function UserRow({ user, checked, enrolled, onToggle, index }) {
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium text-neutral-800 dark:text-neutral-100">{name}</span>
           {enrolled && (
-            <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+            <span className="inline-flex items-center gap-0.5 rounded-full border border-emerald-200 bg-success-soft px-1.5 py-0.5 text-[10px] font-medium text-[var(--color-success)] dark:border-emerald-700 dark:bg-success-soft dark:text-[var(--color-success)]">
               <BadgeCheck size={10} /> Enrolled
             </span>
           )}
@@ -109,7 +109,7 @@ function UserRow({ user, checked, enrolled, onToggle, index }) {
         </div>
       </div>
       {checked && (
-        <div className="shrink-0 rounded-full bg-blue-100 p-1 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300">
+        <div className="shrink-0 rounded-full bg-blue-100 p-1 text-[var(--color-primary)] dark:bg-blue-900/40 dark:text-[var(--color-primary)]">
           <Check size={14} strokeWidth={2.5} />
         </div>
       )}
@@ -356,7 +356,7 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
       <div className="flex items-center gap-3">
         <span className="text-xs text-neutral-500 dark:text-neutral-400">
           {toEnroll.length > 0 && (
-            <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+            <span className="inline-flex items-center gap-1 text-[var(--color-primary)] dark:text-[var(--color-primary)] font-medium">
               <ArrowRight size={12} />
               {toEnroll.length} to assign
             </span>
@@ -365,7 +365,7 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
             <span className="text-neutral-300 dark:text-neutral-600 mx-1">·</span>
           )}
           {toUnenroll.length > 0 && (
-            <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
+            <span className="inline-flex items-center gap-1 text-[var(--color-warning)] dark:text-[var(--color-warning)] font-medium">
               <UserMinus size={12} />
               {toUnenroll.length} to unenroll
             </span>
@@ -416,7 +416,7 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
     <Modal open={open} onClose={submitting ? () => {} : onClose} title="Manage Enrollments" size="lg" footer={footer}>
       {success ? (
         <div className="flex flex-col items-center justify-center py-10 text-center">
-          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-300 animate-in fade-in zoom-in duration-300">
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-success-soft text-[var(--color-success)] dark:bg-success-soft dark:text-[var(--color-success)] animate-in fade-in zoom-in duration-300">
             <BadgeCheck size={32} />
           </div>
           <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">Enrollments updated</p>
@@ -439,7 +439,7 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
               </p>
             </div>
             {enrolledIds.length > 0 && (
-              <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+              <span className="shrink-0 rounded-full border border-emerald-200 bg-success-soft px-2.5 py-1 text-xs font-medium text-[var(--color-success)] dark:border-emerald-700 dark:bg-success-soft dark:text-[var(--color-success)]">
                 {enrolledIds.length} enrolled
               </span>
             )}
@@ -448,7 +448,7 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
           <div className="rounded-xl border border-dashed border-neutral-200 dark:border-neutral-700 bg-gradient-to-br from-neutral-50/80 to-neutral-100/50 dark:from-neutral-800/50 dark:to-neutral-800/30 p-4">
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-[var(--color-primary)] dark:bg-blue-900/30 dark:text-[var(--color-primary)]">
                   <Users size={16} />
                 </div>
                 <div>
@@ -467,7 +467,7 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
                         className={`
                           flex items-center gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-all
                           ${isSelected
-                            ? "border-blue-500 bg-blue-50/70 dark:border-blue-400 dark:bg-blue-900/20"
+                            ? "border-[var(--color-primary)] bg-[rgba(242,92,5,0.08)]/70 dark:border-[var(--color-primary)] dark:bg-blue-900/20"
                             : "border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 dark:hover:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
                           }
                         `}
@@ -482,7 +482,7 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
                               setSelectedDepartments((prev) => prev.filter((id) => String(id) !== String(dept.id)));
                             }
                           }}
-                          className="h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
+                          className="h-4 w-4 rounded border-neutral-300 text-[var(--color-primary)] focus:ring-blue-500"
                         />
                         <span className="text-xs font-medium text-neutral-700 dark:text-neutral-200 truncate">{dept.name}</span>
                       </label>
@@ -500,13 +500,13 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
                     return (
                       <span
                         key={deptId}
-                        className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                        className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-[var(--color-primary-hover)] dark:bg-blue-900/30 dark:text-[var(--color-primary)]"
                       >
                         {dept.name}
                         <button
                           type="button"
                           onClick={() => setSelectedDepartments((prev) => prev.filter((id) => String(id) !== String(deptId)))}
-                          className="rounded-full p-0.5 hover:bg-blue-200 dark:hover:bg-blue-800"
+                          className="rounded-full p-0.5 hover:bg-blue-200 dark:hover:bg-[var(--color-primary-active)]"
                         >
                           <X size={10} />
                         </button>
@@ -565,7 +565,7 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
                   onChange={(e) => onSearchChange(e.target.value)}
                   placeholder="Search by name or email…"
                   aria-label="Search employees"
-                  className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+                  className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] outline-none transition-all"
                 />
                 {query && (
                   <button
@@ -582,7 +582,7 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
                   value={departmentId}
                   onChange={(e) => onFilterChange(e.target.value, role)}
                   aria-label="Filter by department"
-                  className="appearance-none rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-3 pr-9 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all min-w-[150px]"
+                  className="appearance-none rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-3 pr-9 py-2 text-sm focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] outline-none transition-all min-w-[150px]"
                 >
                   <option value="">All Departments</option>
                   {departments.map((d) => (
@@ -598,7 +598,7 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
                   value={role}
                   onChange={(e) => onFilterChange(departmentId, e.target.value)}
                   aria-label="Filter by role"
-                  className="appearance-none rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-3 pr-9 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all min-w-[140px]"
+                  className="appearance-none rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-3 pr-9 py-2 text-sm focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] outline-none transition-all min-w-[140px]"
                 >
                   <option value="">All Roles</option>
                   {Object.entries(ROLE_LABELS).map(([value, label]) => (
@@ -617,7 +617,7 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
               <button
                 type="button"
                 onClick={toggleSelectAll}
-                className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                className="text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] dark:text-[var(--color-primary)] dark:hover:text-[var(--color-primary)] transition-colors"
               >
                 {allSelected ? "Deselect all" : "Select all (visible)"}
               </button>
@@ -691,24 +691,24 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
           )}
 
           {!loading && displayUsers.length > 0 && (
-            <div className="flex items-center justify-between rounded-lg bg-blue-50/50 dark:bg-blue-900/10 px-3 py-2 border border-blue-100 dark:border-blue-800/50">
+            <div className="flex items-center justify-between rounded-lg bg-[rgba(242,92,5,0.08)]/50 dark:bg-blue-900/10 px-3 py-2 border border-blue-100 dark:border-blue-800/50">
               <div className="flex items-center gap-4 text-xs">
                 <div className="flex items-center gap-1.5">
-                  <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <div className="h-2 w-2 rounded-full bg-success-soft0" />
                   <span className="text-neutral-600 dark:text-neutral-400">
                     <span className="font-medium text-neutral-800 dark:text-neutral-200">{enrolledIds.length}</span> enrolled
                   </span>
                 </div>
                 <div className="h-3 w-px bg-neutral-200 dark:bg-neutral-700" />
                 <div className="flex items-center gap-1.5">
-                  <div className="h-2 w-2 rounded-full bg-blue-500" />
+                  <div className="h-2 w-2 rounded-full bg-[rgba(242,92,5,0.08)]0" />
                   <span className="text-neutral-600 dark:text-neutral-400">
                     <span className="font-medium text-neutral-800 dark:text-neutral-200">{toEnroll.length}</span> to assign
                   </span>
                 </div>
                 <div className="h-3 w-px bg-neutral-200 dark:bg-neutral-700" />
                 <div className="flex items-center gap-1.5">
-                  <div className="h-2 w-2 rounded-full bg-amber-500" />
+                  <div className="h-2 w-2 rounded-full bg-warning-soft0" />
                   <span className="text-neutral-600 dark:text-neutral-400">
                     <span className="font-medium text-neutral-800 dark:text-neutral-200">{toUnenroll.length}</span> to unenroll
                   </span>

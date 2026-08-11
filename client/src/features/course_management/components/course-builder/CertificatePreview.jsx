@@ -3,8 +3,8 @@ import { Award, ExternalLink, AlertTriangle, ImageOff, Loader2 } from "lucide-re
 import api from "@/services/api";
 
 const STATUS_STYLES = {
-  active: "bg-emerald-50 text-emerald-600",
-  draft: "bg-amber-50 text-amber-600",
+  active: "bg-success-soft text-[var(--color-success)]",
+  draft: "bg-warning-soft text-[var(--color-warning)]",
   archived: "bg-neutral-100 text-neutral-600",
 };
 
@@ -116,7 +116,7 @@ export default function CertificatePreview({ template, onOpen }) {
 
         <div className="flex items-start justify-between gap-3 border-t border-neutral-100 p-4">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-success-soft text-[var(--color-success)]">
               <Award size={20} />
             </span>
             <div className="min-w-0">
@@ -161,7 +161,7 @@ export default function CertificatePreview({ template, onOpen }) {
       </div>
 
       {isProblematic && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300">
+        <div className="flex items-start gap-2 rounded-md border border-[rgba(217,163,0,0.25)] bg-warning-soft px-3 py-2 text-xs text-[var(--color-warning)] dark:border-amber-800 dark:bg-amber-950/20 dark:text-[var(--color-warning)]">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
           <span>
             This template is <span className="font-medium">{statusLabel(status).toLowerCase()}</span>. Learners may not

@@ -2,7 +2,11 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCourseList } from "../hooks/useCourseList";
 import { useCourseFilters } from "../hooks/useCourseFilters";
+import { useDeleteCourse } from "../hooks/useDeleteCourse";
+import { useCourseActions } from "../hooks/useCourseActions";
 import { Button } from "@/shared/components/ui/button";
+import { useToast } from "@/shared/components/ui/Toast";
+import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
 import { Search, Plus } from "lucide-react";
 import CourseTable from "../components/tables/CourseTable";
 import CreateCourseModal from "../components/modals/CreateCourseModal";
@@ -10,12 +14,46 @@ import { useCreateCourse } from "../hooks/useCreateCourse";
 
 export default function CourseCatalog() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { data, loading, error, refetch } = useCourseList({ status: "published" });
   const { filters, updateFilter } = useCourseFilters();
   const { create } = useCreateCourse();
+  const { remove: removeCourse, loading: deleting } = useDeleteCourse();
+  const { archive, publish, loading: acting } = useCourseActions();
   const [open, setOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [pendingArchive, setPendingArchive] = useState(null);
 
   const handleView = (course) => navigate(`/courses/${course.id}`);
+  const handleEdit = (course) => navigate(`/courses/${course.id}?edit=1`);
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    try {
+      await removeCourse(pendingDelete.id);
+      toast.success("Course deleted");
+      refetch();
+    } catch (err) {
+      toast.error(err.message || "Failed to delete course");
+    } finally {
+      setPendingDelete(null);
+    }
+  };
+
+  const confirmArchive = async () => {
+    if (!pendingArchive) return;
+    const isUnarchive = pendingArchive.status === "archived";
+    try {
+      if (isUnarchive) await publish(pendingArchive.id);
+      else await archive(pendingArchive.id);
+      toast.success(isUnarchive ? "Course unarchived" : "Course archived");
+      refetch();
+    } catch (err) {
+      toast.error(err.message || "Action failed");
+    } finally {
+      setPendingArchive(null);
+    }
+  };
 
   const handleCreate = async (values) => {
     await create(values);
@@ -54,7 +92,7 @@ export default function CourseCatalog() {
           placeholder="Search courses..."
           value={filters.search}
           onChange={(e) => updateFilter("search", e.target.value)}
-          className="w-full pl-9 sm:pl-10 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/20 transition-all"
+          className="w-full pl-9 sm:pl-10 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-[var(--color-primary)] dark:focus:border-[var(--color-primary)] focus:ring-[rgba(242,92,5,0.20)] transition-all"
         />
       </div>
 
@@ -66,8 +104,35 @@ export default function CourseCatalog() {
           <button onClick={refetch} className="mt-2 rounded-lg px-3 py-1.5 text-sm bg-red-600 text-white">Retry</button>
         </div>
       )}
-      {!loading && !error && <CourseTable courses={filtered} onView={handleView} />}
+      {!loading && !error && (
+        <CourseTable
+          courses={filtered}
+          onView={handleView}
+          onEdit={handleEdit}
+          onArchive={setPendingArchive}
+          onDelete={(id) => setPendingDelete({ id })}
+        />
+      )}
       <CreateCourseModal open={open} onClose={() => setOpen(false)} onSubmit={handleCreate} />
+      <ConfirmDialog
+        open={!!pendingDelete}
+        destructive
+        title="Delete Course"
+        description={pendingDelete ? `Are you sure you want to delete "${pendingDelete.title || "this course"}"? This cannot be undone.` : ""}
+        confirmLabel="Delete"
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setPendingDelete(null)}
+      />
+      <ConfirmDialog
+        open={!!pendingArchive}
+        title={pendingArchive?.status === "archived" ? "Unarchive Course" : "Archive Course"}
+        description={pendingArchive ? `Are you sure you want to ${pendingArchive.status === "archived" ? "unarchive" : "archive"} "${pendingArchive.title}"?` : ""}
+        confirmLabel={pendingArchive?.status === "archived" ? "Unarchive" : "Archive"}
+        loading={acting}
+        onConfirm={confirmArchive}
+        onCancel={() => setPendingArchive(null)}
+      />
     </div>
   );
 }

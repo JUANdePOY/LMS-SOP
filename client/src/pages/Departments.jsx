@@ -142,7 +142,7 @@ export default function DepartmentsPage() {
     return depts.map((dept) => (
       <div key={dept.id} style={{ paddingLeft: `${depth * 24}px` }} className="py-2">
         <div className="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800/30 transition-colors">
-          <Building2 size={16} className="text-blue-500 shrink-0" />
+          <Building2 size={16} className="text-[var(--color-primary)] shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{dept.name}</p>
             <p className="text-xs text-neutral-500 font-mono">{dept.code} · {dept.user_count || 0} users</p>
@@ -166,7 +166,7 @@ export default function DepartmentsPage() {
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
       </div>
     );
   }
@@ -210,7 +210,7 @@ export default function DepartmentsPage() {
         {/* Department Tree */}
         <Card className="p-4">
           <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200 mb-4 flex items-center gap-2">
-            <FolderTree size={16} className="text-blue-500" />
+            <FolderTree size={16} className="text-[var(--color-primary)]" />
             Department Hierarchy
           </h2>
           {hierarchy.length === 0 ? (
@@ -234,14 +234,14 @@ export default function DepartmentsPage() {
               filteredDepts.map((d) => (
                 <div key={d.id} className="px-4 py-3 flex items-center justify-between hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30 transition-colors">
                   <div className="flex items-center gap-3">
-                    <Building2 size={16} className="text-blue-500 shrink-0" />
+                    <Building2 size={16} className="text-[var(--color-primary)] shrink-0" />
                     <div>
                       <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{d.name}</p>
                       <p className="text-xs text-neutral-500 font-mono">{d.code}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${d.status === 'active' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' : d.status === 'inactive' ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'}`}>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${d.status === 'active' ? 'bg-success-soft text-success dark:bg-success-soft dark:text-[var(--color-success)]' : d.status === 'inactive' ? 'bg-warning-soft text-warning dark:bg-warning-soft dark:text-[var(--color-warning)]' : 'bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400'}`}>
                       {d.status}
                     </span>
                     <span className="text-xs text-neutral-400">{d.user_count || 0} users</span>

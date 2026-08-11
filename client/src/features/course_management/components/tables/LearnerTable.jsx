@@ -19,7 +19,7 @@ export default function LearnerTable({ learners, onView }) {
               <td className="px-3 py-2 text-neutral-500">{l.progress ?? 0}%</td>
               <td className="px-3 py-2 text-neutral-500">{l.grade ?? "-"}</td>
               <td className="px-3 py-2 text-right">
-                <button onClick={() => onView?.(l)} className="text-xs text-blue-600 hover:underline">View</button>
+                <button onClick={() => onView?.(l)} className="text-xs text-[var(--color-primary)] hover:underline">View</button>
               </td>
             </tr>
           ))}

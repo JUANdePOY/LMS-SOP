@@ -32,7 +32,7 @@ export default function OutlineRail({ items, onJump }) {
             <button
               type="button"
               onClick={() => onJump(item.id)}
-              className="block w-full truncate rounded-md px-2 py-1 text-left text-sm text-neutral-600 hover:bg-neutral-100 hover:text-blue-700 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-blue-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+              className="block w-full truncate rounded-md px-2 py-1 text-left text-sm text-neutral-600 hover:bg-neutral-100 hover:text-[var(--color-primary-hover)] dark:text-neutral-300 dark:hover:bg-neutral-800 dark:hover:text-[var(--color-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
               title={item.text}
             >
               {item.text || "Untitled section"}

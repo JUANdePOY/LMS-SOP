@@ -21,7 +21,7 @@ function Chip({ active, label, onClick }) {
       aria-pressed={active}
       className={`rounded-full border px-3 py-1 text-xs transition-colors ${
         active
-          ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/20 dark:text-blue-300"
+          ? "border-[var(--color-primary)] bg-[rgba(242,92,5,0.08)] text-[var(--color-primary-hover)] dark:border-[var(--color-primary)] dark:bg-blue-900/20 dark:text-[var(--color-primary)]"
           : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
       }`}
     >
@@ -73,7 +73,7 @@ export default function FilterSidebar({
           </div>
           <div className="flex items-center gap-2">
             {hasActiveFilters && (
-              <button onClick={onClear} className="text-xs font-medium text-blue-600 hover:underline dark:text-blue-400">
+              <button onClick={onClear} className="text-xs font-medium text-[var(--color-primary)] hover:underline dark:text-[var(--color-primary)]">
                 Clear all
               </button>
             )}
@@ -128,7 +128,7 @@ export default function FilterSidebar({
                   aria-pressed={sortField === opt.value}
                   className={`flex items-center justify-between rounded-lg border px-3 py-1.5 text-left text-xs transition-colors ${
                     sortField === opt.value
-                      ? "border-blue-500 bg-blue-50 text-blue-700 dark:border-blue-400 dark:bg-blue-900/20 dark:text-blue-300"
+                      ? "border-[var(--color-primary)] bg-[rgba(242,92,5,0.08)] text-[var(--color-primary-hover)] dark:border-[var(--color-primary)] dark:bg-blue-900/20 dark:text-[var(--color-primary)]"
                       : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
                   }`}
                 >

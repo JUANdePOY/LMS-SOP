@@ -14,7 +14,7 @@ export default function CreateAssignmentModal({ open, onClose, onSubmit }) {
           <input name="title" placeholder="Assignment title" required className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm" />
           <textarea name="description" placeholder="Description" rows={3} className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm" />
           <input name="dueDate" type="date" className="w-full rounded-lg border border-[var(--border)] px-3 py-2 text-sm" />
-          <button type="submit" className="rounded-lg px-4 py-2 text-sm bg-blue-600 text-white">Create Assignment</button>
+          <button type="submit" className="rounded-lg px-4 py-2 text-sm btn-primary">Create Assignment</button>
         </form>
       </div>
     </div>

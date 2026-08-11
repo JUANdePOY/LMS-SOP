@@ -20,7 +20,7 @@ export function ProgressBar({ value = 0, className = "" }) {
       aria-valuemax={100}
     >
       <div
-        className="h-full rounded-full bg-blue-600 motion-reduce:transition-none dark:bg-blue-400"
+        className="h-full rounded-full bg-[var(--color-primary)] motion-reduce:transition-none dark:bg-blue-400"
         style={{ width: `${clamped}%` }}
       />
     </div>

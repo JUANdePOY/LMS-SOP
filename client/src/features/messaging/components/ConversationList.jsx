@@ -1,25 +1,15 @@
 import { ChevronRight, Users, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import UserAvatar from "@/shared/components/ui/Avatar";
 import {
-  getInitials,
   getConversationDisplayName,
+  getDisplayName,
   timeAgo,
 } from "../utils/conversationDisplay";
 
-function Avatar({ name, isGroup, className = "h-12 w-12" }) {
-  return (
-    <span
-      className={cn(
-        "flex shrink-0 items-center justify-center rounded-full text-sm font-medium",
-        isGroup
-          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-          : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-        className
-      )}
-    >
-      {isGroup ? <Users size={20} /> : getInitials(name || "?")}
-    </span>
-  );
+function PresenceDot({ online }) {
+  if (!online) return null;
+  return <span className="presence-dot" aria-label="Online" />;
 }
 
 function StackedAvatars({ participants, max = 3 }) {
@@ -30,10 +20,11 @@ function StackedAvatars({ participants, max = 3 }) {
       {shown.map((p, i) => (
         <span
           key={p.id || i}
-          className="ring-2 ring-white dark:ring-neutral-900 rounded-full"
-          title={p.full_name || p.email}
+          className="ring-2 ring-white dark:ring-neutral-900 rounded-full relative"
+          title={getDisplayName(p)}
         >
-          <Avatar name={p.full_name || p.email} className="h-9 w-9 text-[11px]" />
+          <UserAvatar user={p} size="sm" className="h-9 w-9" ring />
+          <PresenceDot online={p.online} />
         </span>
       ))}
       {extra > 0 && (
@@ -59,21 +50,31 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
           const isUnread = unread > 0;
           const isGroup = conv.type === "group_forum";
           const name = getConversationDisplayName(conv, currentUserId);
+          const other = !isGroup
+            ? ((conv.participants || []).find((p) => p.id !== currentUserId) || null)
+            : null;
           return (
             <div
               key={conv.id}
               className={cn(
                 "group flex items-center gap-3 rounded-lg p-2.5 transition-colors",
                 selectedId === conv.id
-                  ? "bg-blue-50 dark:bg-blue-500/10"
-                  : "hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                  ? "bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)]"
+                  : "hover:bg-neutral-100 dark:hover:bg-neutral-800"
               )}
             >
               <button onClick={() => onSelect(conv)} className="flex flex-1 items-center gap-3 min-w-0 text-left">
                 {isGroup ? (
                   <StackedAvatars participants={conv.participants || []} />
                 ) : (
-                  <Avatar name={name} isGroup={false} />
+                  <span className="relative shrink-0">
+                    <UserAvatar
+                      user={other || { full_name: name }}
+                      size="md"
+                      className="h-12 w-12"
+                    />
+                    <PresenceDot online={other?.online} />
+                  </span>
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
@@ -86,7 +87,7 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
                     </p>
                     <span className={cn(
                       "text-[10px] shrink-0",
-                      isUnread ? "text-blue-600 dark:text-blue-400 font-medium" : "text-neutral-400 dark:text-neutral-500"
+                      isUnread ? "text-[var(--color-primary)] dark:text-[var(--color-primary)] font-medium" : "text-neutral-400 dark:text-neutral-500"
                     )}>
                       {timeAgo(conv.last_message_at || conv.updated_at)}
                     </span>
@@ -99,7 +100,7 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
                       {preview}
                     </p>
                     {isUnread && (
-                      <span className="flex h-5 min-w-[20px] px-1 items-center justify-center rounded-full bg-blue-600 text-[10px] font-bold text-white">
+                      <span className="flex h-5 min-w-[20px] px-1 items-center justify-center rounded-full bg-[var(--color-primary)] text-[10px] font-bold text-white">
                         {unread > 9 ? "9+" : unread}
                       </span>
                     )}

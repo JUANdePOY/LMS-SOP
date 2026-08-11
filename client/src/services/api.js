@@ -47,6 +47,10 @@ export const uploadAvatar = (formData) => api.post('/auth/profile/avatar', formD
   skipAuthRedirect: true,
 });
 export const deleteAvatar = () => api.delete('/auth/profile/avatar', { skipAuthRedirect: true });
+export const uploadCoverPhoto = (formData) => api.post('/auth/profile/cover-photo', formData, {
+  skipAuthRedirect: true,
+});
+export const deleteCoverPhoto = () => api.delete('/auth/profile/cover-photo', { skipAuthRedirect: true });
 
 export const getDashboard = (params = {}) => api.get('/dashboard', { params });
 

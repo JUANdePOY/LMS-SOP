@@ -3,15 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronRight, FileText, Video, HelpCircle, ClipboardCheck, ExternalLink, File, Clock, Award } from "lucide-react";
 
 const LESSON_TYPE_META = {
-  reading: { label: "Reading", icon: FileText, color: "text-blue-500" },
-  video: { label: "Video", icon: Video, color: "text-purple-500" },
-  quiz: { label: "Quiz", icon: HelpCircle, color: "text-amber-500" },
-  assignment: { label: "Assignment", icon: ClipboardCheck, color: "text-rose-500" },
-  document: { label: "Document", icon: File, color: "text-emerald-500" },
-  sop: { label: "SOP", icon: FileText, color: "text-indigo-500" },
-  certificate: { label: "Certificate", icon: Award, color: "text-emerald-500" },
+  reading: { label: "Reading", icon: FileText, color: "text-[var(--color-primary)]" },
+  video: { label: "Video", icon: Video, color: "text-[var(--color-secondary)]" },
+  quiz: { label: "Quiz", icon: HelpCircle, color: "text-[var(--color-warning)]" },
+  assignment: { label: "Assignment", icon: ClipboardCheck, color: "text-[var(--color-danger)]" },
+  document: { label: "Document", icon: File, color: "text-[var(--color-success)]" },
+  sop: { label: "SOP", icon: FileText, color: "text-[var(--color-secondary)]" },
+  certificate: { label: "Certificate", icon: Award, color: "text-[var(--color-success)]" },
   link: { label: "Link", icon: ExternalLink, color: "text-cyan-500" },
-  presentation: { label: "Presentation", icon: FileText, color: "text-violet-500" },
+  presentation: { label: "Presentation", icon: FileText, color: "text-[var(--color-secondary)]" },
   downloadable: { label: "Download", icon: File, color: "text-orange-500" },
   live_session: { label: "Live Session", icon: Video, color: "text-red-500" },
   interactive: { label: "Interactive", icon: FileText, color: "text-lime-500" },
@@ -158,7 +158,7 @@ export default function LessonList({ lessons, modules, onLessonClick, courseId }
                             isCompleted
                               ? "border-green-500 text-green-600 bg-green-50 dark:bg-green-500/10"
                               : isInProgress
-                              ? "border-blue-500 text-blue-600 bg-blue-50 dark:bg-blue-500/10"
+                              ? "border-[var(--color-primary)] text-[var(--color-primary)] bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)]"
                               : isLocked
                               ? "border-neutral-300 text-neutral-400"
                               : "border-neutral-300 text-neutral-500"
@@ -177,7 +177,7 @@ export default function LessonList({ lessons, modules, onLessonClick, courseId }
                           <span className="text-neutral-400">• {lesson.duration} min</span>
                         )}
                         {isInProgress && (
-                          <span className="text-xs text-blue-500 font-medium">In Progress</span>
+                          <span className="text-xs text-[var(--color-primary)] font-medium">In Progress</span>
                         )}
                         {isLocked && <span className="text-neutral-400">Locked</span>}
                       </span>

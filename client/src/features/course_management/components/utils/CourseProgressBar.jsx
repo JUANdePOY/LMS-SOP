@@ -7,7 +7,7 @@ export default function CourseProgressBar({ completed, total }) {
         <span className="font-medium">{pct}%</span>
       </div>
       <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-neutral-700 overflow-hidden">
-        <div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full bg-[var(--color-primary)] transition-all" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

@@ -1,3 +1,5 @@
+import { ActionButton } from "@/shared/components/ui/actionIcons";
+
 export default function ModuleTable({ modules, onEdit, onDelete }) {
   return (
     <div className="overflow-x-auto">
@@ -16,9 +18,11 @@ export default function ModuleTable({ modules, onEdit, onDelete }) {
               <td className="px-3 py-2">{m.title}</td>
               <td className="px-3 py-2 text-neutral-500">{m.type}</td>
               <td className="px-3 py-2 text-neutral-500">{m.contentCount ?? 0}</td>
-              <td className="px-3 py-2 text-right">
-                <button onClick={() => onEdit?.(m)} className="text-xs text-blue-600 hover:underline">Edit</button>
-                <button onClick={() => onDelete?.(m.id)} className="ml-2 text-xs text-red-600 hover:underline">Delete</button>
+              <td className="px-3 py-2">
+                <div className="flex items-center justify-end gap-1.5">
+                  <ActionButton action="Edit" size="sm" onClick={() => onEdit?.(m)} />
+                  <ActionButton action="Delete" size="sm" onClick={() => onDelete?.(m.id)} />
+                </div>
               </td>
             </tr>
           ))}

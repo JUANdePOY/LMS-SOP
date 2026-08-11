@@ -37,7 +37,7 @@ function getConversation(req, res) {
     .catch((err) => sendError(res, err, 'Failed to load conversation'));
 }
 
-function createConversation(req, res) {
+async function createConversation(req, res) {
   const userId = req.user?.id;
   const role = req.user?.role;
   const { subject, body, participantIds } = req.body;
@@ -55,6 +55,25 @@ function createConversation(req, res) {
         success: false,
         message: 'Only Super Admins and Admins can create a group forum',
         code: 'FORBIDDEN',
+      });
+    }
+  }
+
+  // For a 1:1 conversation, reuse the existing thread between the two users
+  // instead of creating a duplicate.
+  if (!isGroupForum && participants.length === 1) {
+    const existing = await messageModel.findDirectConversation(userId, participants[0]);
+    if (existing) {
+      const message = await messageModel.addMessage({
+        conversationId: existing.id,
+        senderId: userId,
+        body: body.trim(),
+      });
+      logAudit && logAudit('message.conversation.reuse', userId, { conversationId: existing.id });
+      return res.status(201).json({
+        success: true,
+        message: 'Conversation created',
+        data: { ...existing, messages: [message] },
       });
     }
   }

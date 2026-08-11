@@ -78,7 +78,7 @@ function QuizCard({ q, onTogglePublish, onDelete, busy }) {
           <div className="flex items-center justify-between gap-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
             <div className="flex items-center gap-1">
               <Button size="sm" variant="outline" asChild title="Open builder" className="h-8 w-8 p-0">
-                <Link to={`/assessments/quiz/${q.id}`}><Plus className="h-3.5 w-3.5" /></Link>
+                <Link to={`/assessments/quiz/${q.id}`}><Pencil className="h-3.5 w-3.5" /></Link>
               </Button>
               <Button size="sm" variant="outline" asChild title="View results" className="h-8 w-8 p-0">
                 <Link to={`/assessments/quiz/${q.id}/results`}><Trophy className="h-3.5 w-3.5" /></Link>

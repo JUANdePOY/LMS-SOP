@@ -43,7 +43,7 @@ async function create(userData) {
 }
 
 async function update(id, updates) {
-  const allowed = ['full_name', 'email', 'role', 'department_id', 'business_id', 'position_title', 'employee_id', 'contact_number', 'employment_status', 'date_hired', 'birthdate', 'address', 'is_active', 'avatar_url'];
+  const allowed = ['full_name', 'email', 'role', 'department_id', 'business_id', 'position_title', 'employee_id', 'contact_number', 'employment_status', 'date_hired', 'birthdate', 'address', 'bio', 'cover_photo_url', 'is_active', 'avatar_url'];
   const sets = [];
   const params = [];
   for (const key of allowed) {
@@ -81,8 +81,15 @@ async function listUsers(filters = {}) {
   const offset = (page - 1) * limit;
 
   let sql = `
-    SELECT u.*, d.name AS department_name, b.business_name,
-           u.full_name AS display_name
+    SELECT
+      u.id, u.full_name, u.email, u.role,
+      u.department_id, d.name AS department_name,
+      u.business_id, b.business_name,
+      u.position_title, u.employee_id, u.contact_number,
+      u.employment_status, u.date_hired, u.birthdate, u.address,
+      u.avatar_url, u.cover_photo_url, u.bio,
+      u.is_active, u.created_at, u.updated_at, u.last_login_at,
+      u.full_name AS display_name
     FROM users u
     LEFT JOIN departments d ON u.department_id = d.id
     LEFT JOIN businesses b ON u.business_id = b.id

@@ -27,7 +27,7 @@ export default function EnrollmentManagePage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">Enrollments</h1>
-        <button onClick={() => setOpen(true)} className="rounded-lg px-3 py-1.5 text-sm bg-blue-600 text-white">Enroll Students</button>
+        <button onClick={() => setOpen(true)} className="rounded-lg px-3 py-1.5 text-sm btn-primary">Enroll Students</button>
       </div>
       <EnrollmentTable enrollments={enrollments} onUnenroll={() => refetch?.()} />
       <EnrollStudentsModal open={open} onClose={() => setOpen(false)} onSubmit={() => refetch?.()} />
