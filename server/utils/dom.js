@@ -127,8 +127,8 @@ class Wrapper {
 
 function createRoot(html) {
   const dom = parseHtml(html);
-  const root = dom.length > 0 ? dom[0] : { type: 'tag', tagName: 'div', children: [] };
-  const wrapper = new Wrapper([root]);
+  const elements = dom.length > 0 ? dom : [{ type: 'tag', tagName: 'div', children: [] }];
+  const wrapper = new Wrapper(elements);
 
   const bound$ = (selectorOrElement, context) => {
     if (selectorOrElement == null) {
