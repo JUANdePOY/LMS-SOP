@@ -39,6 +39,23 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Relax Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy on document
+// (HTML) responses. Some hosting edges (e.g. Hostinger) inject
+// `Cross-Origin-Opener-Policy: same-origin` on HTML, which cross-origin-isolates
+// the SPA tab and severs its relationship with the Google OAuth popup — blocking
+// the popup's window.postMessage/window.close and leaving the calendar connect
+// flow unable to signal completion. Setting `unsafe-none` on the SPA document
+// (and matching it on /api/calendar/callback) lets the popup reach its opener.
+// Only applied to text/html so JSON API responses keep their normal behavior.
+app.use((req, res, next) => {
+  const type = res.getHeader('Content-Type');
+  if (!type || type.includes('text/html')) {
+    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  }
+  next();
+});
+
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const departmentsRoutes = require('./routes/departments');
