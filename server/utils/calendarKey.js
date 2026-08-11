@@ -90,4 +90,18 @@ function reset() {
   resolvePromise = null;
 }
 
-module.exports = { resolveKey, getCachedKey, reset, SETTINGS_KEY };
+async function getKeySource() {
+  // Return where the effective key will come from: 'env', 'db', 'generated', or 'none'
+  const envKey = process.env.CALENDAR_TOKEN_ENCRYPTION_KEY;
+  if (isValidHexKey(envKey)) return 'env';
+  try {
+    const stored = await loadFromSettings();
+    if (stored) return 'db';
+  } catch (err) {
+    // ignore
+  }
+  if (cachedKey) return 'generated';
+  return 'none';
+}
+
+module.exports = { resolveKey, getCachedKey, reset, SETTINGS_KEY, getKeySource };

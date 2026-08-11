@@ -233,6 +233,19 @@ app.get('/api/debug', (req, res) => {
   });
 });
 
+// Admin endpoint: report where the calendar token encryption key comes from.
+// Returns { source: 'env'|'db'|'generated'|'none' }
+app.get('/api/admin/calendar/key-source', async (req, res) => {
+  try {
+    const { getKeySource } = require('./utils/calendarKey');
+    const source = await getKeySource();
+    res.json({ source });
+  } catch (err) {
+    console.error('Failed to determine calendar key source:', err.message);
+    res.status(500).json({ error: 'Failed to determine key source' });
+  }
+});
+
 app.use(async (req, res, next) => {
   if (req.path.startsWith('/api')) {
     return next();
