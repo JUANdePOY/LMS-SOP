@@ -19,35 +19,59 @@ function safeDecrypt(value) {
   }
 }
 
+// Purge undecryptable (e.g. rotated-key) token rows for a user. Called from
+// getToken so a stale row can never mask a good one and make status report
+// "not connected" forever. The good row is preserved.
+async function purgeUndecryptableRows(userId, provider = 'google') {
+  try {
+    const [rows] = await db.query(
+      'SELECT id, access_token, refresh_token FROM user_calendar_tokens WHERE user_id = ? AND provider = ?',
+      [userId, provider]
+    );
+    const badIds = rows
+      .filter((r) => (r.access_token && !safeDecrypt(r.access_token)) || (r.refresh_token && !safeDecrypt(r.refresh_token)))
+      .map((r) => r.id);
+    if (badIds.length) {
+      await db.query('DELETE FROM user_calendar_tokens WHERE id IN (?)', [badIds]);
+      console.warn('[Calendar] Purged', badIds.length, 'undecryptable token row(s) for user', userId, 'provider', provider);
+    }
+  } catch (err) {
+    console.error('[Calendar] purgeUndecryptableRows failed:', err.message);
+  }
+}
+
 const calendarModel = {
   async getToken(userId, provider = 'google') {
     const [rows] = await db.query(
-      'SELECT * FROM user_calendar_tokens WHERE user_id = ? AND provider = ?',
+      'SELECT * FROM user_calendar_tokens WHERE user_id = ? AND provider = ? ORDER BY updated_at DESC',
       [userId, provider]
     );
-    const row = rows[0];
-    if (!row) return null;
-    const access_token = safeDecrypt(row.access_token);
-    const refresh_token = safeDecrypt(row.refresh_token);
-    // Unusable (wrong key / corrupt / rotated key) -> treat as not connected.
-    // We deliberately do NOT delete the row here on a plain read: a status poll
-    // can otherwise race with a fresh connect (which overwrites the row via
-    // saveToken) and silently wipe a just-stored token. Stale rows are purged
-    // explicitly by saveToken (delete-then-insert) and by deleteToken/disconnect.
-    if ((row.access_token && !access_token) || (row.refresh_token && !refresh_token)) {
-      console.warn('[Calendar] Undecryptable token row for user', userId, 'provider', provider, '- reconnect to replace it');
-      return null;
+    if (!rows.length) return null;
+    // Find the first decryptable row. If a stale undecryptable row exists
+    // alongside a good one (e.g. duplicate rows when the unique index is
+    // missing), prefer the good one and clean up the bad ones.
+    for (const row of rows) {
+      const access_token = safeDecrypt(row.access_token);
+      const refresh_token = safeDecrypt(row.refresh_token);
+      if (access_token) {
+        if (rows.length > 1) await purgeUndecryptableRows(userId, provider);
+        return { ...row, access_token, refresh_token };
+      }
     }
-    return {
-      ...row,
-      access_token,
-      refresh_token,
-    };
+    // No decryptable row found: clean up the stale ones and report disconnected.
+    await purgeUndecryptableRows(userId, provider);
+    console.warn('[Calendar] Undecryptable token row for user', userId, 'provider', provider, '- reconnect to replace it');
+    return null;
   },
 
   async saveToken({ userId, provider = 'google', googleEmail, accessToken, refreshToken, expiryDate }) {
     const encAccess = encrypt(accessToken);
     const encRefresh = refreshToken ? encrypt(refreshToken) : null;
+    // If the unique index is missing (e.g. an older table created before
+    // uk_user_provider existed), multiple rows may have accumulated — including
+    // undecryptable leftovers from a rotated key. Drop any row that doesn't
+    // decrypt so a single clean row remains, then upsert the new one.
+    await purgeUndecryptableRows(userId, provider);
     // Atomic upsert on the (user_id, provider) unique key. Using
     // INSERT ... ON DUPLICATE KEY UPDATE (instead of DELETE-then-INSERT) means
     // the row is never briefly absent, so a concurrent /calendar/status poll

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar, Check, Loader2, Unlink, AlertCircle } from "lucide-react";
 import { Modal } from "@/shared/components/ui/modal";
 import CalendarSyncSummary from "./CalendarSyncSummary";
@@ -7,6 +7,13 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const { status, connect, disconnect } = calendar;
+
+  // The connect() promise can occasionally lag (slow Google API / bulk sync).
+  // Once the backend reports connected, stop the button spinner immediately so
+  // the UI never appears stuck even if the promise hasn't resolved yet.
+  useEffect(() => {
+    if (status.connected) setBusy(false);
+  }, [status.connected]);
 
   const handleConnect = async () => {
     if (busy || status.connected) return;

@@ -50,7 +50,7 @@ export function useGoogleCalendar() {
       // relying on cross-window signaling. The connection is confirmed once the
       // backend reports the token as stored.
       let attempts = 0;
-      const MAX_ATTEMPTS = 40; // ~60s at 1.5s intervals
+      const MAX_ATTEMPTS = 90; // ~90s at 1s intervals (Google API + bulk sync can be slow)
       const poll = setInterval(async () => {
         attempts += 1;
         try {
@@ -68,9 +68,19 @@ export function useGoogleCalendar() {
         if (attempts >= MAX_ATTEMPTS) {
           clearInterval(poll);
           try { popup.close(); } catch { /* ignore */ }
+          // Final definitive check: the bulk sync may have just finished, so a
+          // last status read decides success vs. timeout instead of guessing.
+          try {
+            const finalRes = await getCalendarStatus();
+            if (finalRes.data?.success && finalRes.data.data?.connected) {
+              await loadStatus();
+              resolve(true);
+              return;
+            }
+          } catch { /* fall through to reject */ }
           reject(new Error("Google Calendar connection timed out. Please try again."));
         }
-      }, 1500);
+      }, 1000);
     });
   }, [loadStatus]);
 
