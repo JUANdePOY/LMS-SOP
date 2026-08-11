@@ -2,6 +2,19 @@ const crypto = require('crypto');
 const db = require('../config/database');
 const { encrypt, decrypt } = require('../utils/calendarCrypto');
 
+// Decrypt but never throw on corrupt/stale data (e.g. row encrypted with a
+// previous CALENDAR_TOKEN_ENCRYPTION_KEY after a key rotation). Returns null
+// so the caller can treat the token as absent and re-store it.
+function safeDecrypt(value) {
+  if (!value) return null;
+  try {
+    return decrypt(value);
+  } catch (err) {
+    console.error('[Calendar] Failed to decrypt token field, treating as invalid:', err.message);
+    return null;
+  }
+}
+
 const calendarModel = {
   async getToken(userId, provider = 'google') {
     const [rows] = await db.query(
@@ -10,10 +23,19 @@ const calendarModel = {
     );
     const row = rows[0];
     if (!row) return null;
+    const access_token = safeDecrypt(row.access_token);
+    const refresh_token = safeDecrypt(row.refresh_token);
+    // If decryption failed, the stored row is unusable (wrong key / corrupt).
+    // Delete it so the connect flow can re-store a valid token.
+    if ((row.access_token && !access_token) || (row.refresh_token && !refresh_token)) {
+      console.warn('[Calendar] Removing undecryptable token row for user', userId, 'provider', provider);
+      await this.deleteToken(userId, provider).catch(() => {});
+      return null;
+    }
     return {
       ...row,
-      access_token: row.access_token ? decrypt(row.access_token) : null,
-      refresh_token: row.refresh_token ? decrypt(row.refresh_token) : null,
+      access_token,
+      refresh_token,
     };
   },
 
