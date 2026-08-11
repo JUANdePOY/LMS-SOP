@@ -93,20 +93,9 @@ function renderCallbackHtml(success, message) {
       Notify app of success
     </button>
     <p id="notify-status" style="margin-top:12px;font-size:12px;color:#555"></p>
-    <button id="close-btn" style="margin-top:8px;padding:8px 14px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#111;cursor:pointer">
-      Close window
-    </button>
+    <p style="margin-top:12px;font-size:12px;color:#777">Please close this window and return to the app.</p>
     <script>
       function notifyOpener() {
-        try {
-          if (!window.opener || window.opener.closed) {
-            document.getElementById('notify-status').textContent = 'No opener window found. Return to the app and refresh the calendar modal.';
-            return;
-          }
-        } catch (e) {
-          document.getElementById('notify-status').textContent = 'Unable to access opener due to browser security policy. Return to the app and refresh the calendar modal.';
-          return;
-        }
         try {
           window.opener.postMessage({ type: 'google-calendar-connected' }, '*');
           document.getElementById('notify-status').textContent = 'App notified. You may close this window.';
@@ -116,18 +105,8 @@ function renderCallbackHtml(success, message) {
       }
       window.addEventListener('load', () => {
         var notify = document.getElementById('notify-btn');
-        var closeBtn = document.getElementById('close-btn');
         if (notify) notify.addEventListener('click', notifyOpener);
-        if (closeBtn) closeBtn.addEventListener('click', function() {
-          try { window.close(); } catch (e) { /* ignore close errors */ }
-        });
-        try {
-          if (window.opener && !window.opener.closed) {
-            notifyOpener();
-          }
-        } catch (e) {
-          // COOP may block window.opener.closed access; user can click the button above.
-        }
+        notifyOpener();
       });
     </script>
   ` : '';
