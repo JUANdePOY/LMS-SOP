@@ -542,6 +542,15 @@ const MIGRATIONS = [
       INDEX idx_task_comments_task (task_id),
       INDEX idx_task_comments_user (user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    // system_settings backs the persistent Google Calendar encryption key so it
+    // survives restarts/redeploys (see utils/calendarKey.js).
+    `CREATE TABLE IF NOT EXISTS system_settings (
+      \`key\` VARCHAR(255) NOT NULL PRIMARY KEY,
+      \`value\` TEXT NOT NULL,
+      description TEXT DEFAULT NULL,
+      updated_by INT DEFAULT NULL,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   ];
 
 async function runMigrations() {
