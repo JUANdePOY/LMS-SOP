@@ -44,3 +44,6 @@ server/*.log
 *.njsproj
 *.sln
 *.sw?
+
+# Runtime lock files
+server/.tmp/

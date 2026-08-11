@@ -1,10 +1,26 @@
-const { google } = require('googleapis');
 const calendarModel = require('../models/calendarModel');
 const eventModel = require('../models/eventModel');
 const { logAudit } = require('../utils/auditLogger');
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
 const PROVIDER = 'google';
+
+// Lazily load googleapis so the server can boot even if the optional
+// dependency is not installed. The Google Calendar feature only fails
+// (with a clear message) when it is actually invoked.
+let _google = null;
+function getGoogle() {
+  if (_google) return _google;
+  try {
+    _google = require('googleapis').google;
+  } catch (err) {
+    const e = new Error('Google Calendar is not available: the "googleapis" package is not installed');
+    e.statusCode = 503;
+    e.code = 'CALENDAR_DISABLED';
+    throw e;
+  }
+  return _google;
+}
 
 function getClientConfig() {
   const clientId = process.env.GOOGLE_CALENDAR_CLIENT_ID;
@@ -21,7 +37,7 @@ function getClientConfig() {
 
 function buildOAuthClient() {
   const { clientId, clientSecret, redirectUri } = getClientConfig();
-  return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
+  return new getGoogle().auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
 function buildAuthUrl(state) {
@@ -99,7 +115,7 @@ async function upsertEventForUser(userId, eventId) {
   }
 
   const client = await getAuthorizedClient(userId);
-  const calendar = google.calendar({ version: 'v3', auth: client });
+  const calendar = getGoogle().calendar({ version: 'v3', auth: client });
 
   const existing = await calendarModel.findMap(userId, eventId);
   const payload = eventToGooglePayload(event);
@@ -154,7 +170,7 @@ async function deleteEventForUser(userId, eventId) {
   if (existing && existing.sync_status !== 'deleted') {
     try {
       const client = await getAuthorizedClient(userId);
-      const calendar = google.calendar({ version: 'v3', auth: client });
+      const calendar = getGoogle().calendar({ version: 'v3', auth: client });
       await calendar.events.delete({
         calendarId: existing.google_calendar_id,
         eventId: existing.google_event_id,
@@ -197,7 +213,7 @@ async function handleCallback(code, userId) {
 
   let googleEmail = null;
   try {
-    const cal = google.calendar({ version: 'v3', auth: client });
+    const cal = getGoogle().calendar({ version: 'v3', auth: client });
     const about = await cal.about.get({ fields: 'user' });
     googleEmail = about.data.user?.emailAddress || null;
   } catch {
