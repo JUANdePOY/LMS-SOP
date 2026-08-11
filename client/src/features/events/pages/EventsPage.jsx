@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Calendar } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
@@ -26,6 +26,7 @@ export default function EventsPage() {
   // 'pending' (connected, bulk sync not yet observed), 'syncing' (pushing events), 'done' (finished).
   const [syncPhase, setSyncPhase] = useState("pending");
   const [syncResult, setSyncResult] = useState({ synced: 0, failed: 0 });
+  const hasMarkedSyncedRef = useRef(false);
 
   // Once the calendar reports connected, the server has already finished the
   // initial bulk sync — force the summary to "done" so the spinner can never
@@ -36,9 +37,14 @@ export default function EventsPage() {
   // otherwise the summary stays stuck on "Adding your events…".
   useEffect(() => {
     if (calendar.status.connected) {
-      setSyncPhase((prev) => (prev === "done" ? prev : "done"));
-      setSyncResult((prev) => (prev.synced === 0 ? { synced: items.length, failed: 0 } : prev));
-      calendar.markEventsSynced(items.map((i) => i.id));
+      if (!hasMarkedSyncedRef.current) {
+        hasMarkedSyncedRef.current = true;
+        setSyncPhase((prev) => (prev === "done" ? prev : "done"));
+        setSyncResult((prev) => (prev.synced === 0 ? { synced: items.length, failed: 0 } : prev));
+        calendar.markEventsSynced(items.map((i) => i.id));
+      }
+    } else {
+      hasMarkedSyncedRef.current = false;
     }
   }, [calendar.status.connected, items, items.length, calendar]);
 

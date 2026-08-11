@@ -40,12 +40,12 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
             verified = true;
             break;
           }
-        } catch (e) {
+        } catch {
           // ignore transient network errors and continue retrying
         }
         await new Promise((res) => setTimeout(res, DELAY_MS));
       }
-    } catch (e) {
+    } catch {
       // fall through to show the error message below
     }
 
