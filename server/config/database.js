@@ -23,23 +23,31 @@ const dbConfig = {
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 800;
 
-// Errors that should be retried because the underlying condition is expected
-// to clear on its own. The hosting MySQL user has a max_connections_per_hour
-// quota; once it is exceeded new physical connections are rejected until the
-// hourly counter resets. Retrying with backoff lets in-flight requests recover
-// automatically instead of surfacing a hard 500 to the user.
-function isTransientError(err) {
+// Quota/limit errors must NOT be retried: they only clear when the hosting
+// provider's hourly counter resets (up to ~60 min out). Retrying them just
+// burns more of the already-exhausted quota and hammers the DB, which is what
+// got us blocked in the first place. We fail these fast.
+function isQuotaOrLimitError(err) {
   const msg = (err && err.message) ? err.message : String(err);
   const code = err && err.code;
+  return (
+    msg.includes('max_connections_per_hour') ||
+    code === 'ER_USER_LIMIT_REACHED' ||
+    code === 'ER_CON_COUNT_ERROR'
+  );
+}
+
+// Errors that should be retried because the underlying condition is expected
+// to clear on its own (e.g. transient network drops). Quota/limit errors are
+// deliberately excluded (see isQuotaOrLimitError).
+function isTransientError(err) {
+  const msg = (err && err.message) ? err.message : String(err);
   return (
     msg.includes('ECONNRESET') ||
     msg.includes('PROTOCOL_CONNECTION_LOST') ||
     msg.includes('ENOTFOUND') ||
     msg.includes('ETIMEDOUT') ||
-    msg.includes('ECONNREFUSED') ||
-    msg.includes('max_connections_per_hour') ||
-    code === 'ER_USER_LIMIT_REACHED' ||
-    code === 'ER_CON_COUNT_ERROR'
+    msg.includes('ECONNREFUSED')
   );
 }
 
@@ -50,14 +58,15 @@ async function withRetry(fn, label = 'query') {
       return await fn();
     } catch (err) {
       lastErr = err;
+      // Fail fast on quota/limit errors — retrying cannot help until reset.
+      if (isQuotaOrLimitError(err)) {
+        throw err;
+      }
       const transient = isTransientError(err);
       if (!transient || attempt === MAX_RETRIES) {
         throw err;
       }
-      // Use a longer backoff for quota/connection-limit errors so we don't
-      // burn through attempts before the hourly counter has a chance to reset.
-      const isQuota = (err && err.code) === 'ER_USER_LIMIT_REACHED' || (err && err.message || '').includes('max_connections_per_hour');
-      const delay = (isQuota ? 5000 : RETRY_DELAY) * attempt;
+      const delay = RETRY_DELAY * attempt;
       console.warn(`MySQL ${label} transient error (attempt ${attempt}/${MAX_RETRIES}): ${(err && err.message) || err}`);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
