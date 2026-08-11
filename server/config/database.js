@@ -534,7 +534,7 @@ const MIGRATIONS = [
       INDEX idx_task_comments_user (user_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
        `ALTER TABLE sops ADD COLUMN IF NOT EXISTS is_default_onboarding TINYINT(1) NOT NULL DEFAULT 0 AFTER restriction_type`,
-       `CREATE INDEX idx_sops_default_onboarding ON sops(is_default_onboarding) WHERE is_default_onboarding = 1`,
+        `CREATE INDEX idx_sops_default_onboarding ON sops(is_default_onboarding)`,
        // --- Google Calendar integration: per-user OAuth tokens (encrypted) ---
        `CREATE TABLE IF NOT EXISTS user_calendar_tokens (
          id INT AUTO_INCREMENT PRIMARY KEY,

@@ -5,7 +5,7 @@ const fs = require('fs');
 const db = require('./config/database');
 
 
-require('dotenv').config();
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 console.log('LMS-SOP Server starting...');
 
