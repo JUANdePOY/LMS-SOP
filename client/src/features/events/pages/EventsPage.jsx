@@ -116,7 +116,10 @@ export default function EventsPage() {
           className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 dark:border-neutral-600 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800"
         >
           <Calendar size={14} />
-          {calendar.status.connected ? (calendar.status.googleEmail || "Google Calendar") : "Connect Google Calendar"}
+          {calendar.status.connected ? "Manage Google Calendar" : "Connect Google Calendar"}
+          {calendar.status.connected && calendar.status.googleEmail ? (
+            <span className="ml-1 text-[10px] text-neutral-500 dark:text-neutral-400">({calendar.status.googleEmail})</span>
+          ) : null}
         </button>
       </div>
 
