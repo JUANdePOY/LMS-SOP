@@ -98,8 +98,13 @@ function renderCallbackHtml(success, message) {
     </button>
     <script>
       function notifyOpener() {
-        if (!window.opener || window.opener.closed) {
-          document.getElementById('notify-status').textContent = 'No opener window found. Return to the app and refresh the calendar modal.';
+        try {
+          if (!window.opener || window.opener.closed) {
+            document.getElementById('notify-status').textContent = 'No opener window found. Return to the app and refresh the calendar modal.';
+            return;
+          }
+        } catch (e) {
+          document.getElementById('notify-status').textContent = 'Unable to access opener due to browser security policy. Return to the app and refresh the calendar modal.';
           return;
         }
         try {
@@ -113,9 +118,15 @@ function renderCallbackHtml(success, message) {
         var notify = document.getElementById('notify-btn');
         var closeBtn = document.getElementById('close-btn');
         if (notify) notify.addEventListener('click', notifyOpener);
-        if (closeBtn) closeBtn.addEventListener('click', () => window.close());
-        if (window.opener && !window.opener.closed) {
-          notifyOpener();
+        if (closeBtn) closeBtn.addEventListener('click', function() {
+          try { window.close(); } catch (e) { /* ignore close errors */ }
+        });
+        try {
+          if (window.opener && !window.opener.closed) {
+            notifyOpener();
+          }
+        } catch (e) {
+          // COOP may block window.opener.closed access; user can click the button above.
         }
       });
     </script>

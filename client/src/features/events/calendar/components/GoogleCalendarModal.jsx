@@ -22,44 +22,47 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
     setError(null);
     onConnectStart && onConnectStart();
 
-    let connectError = null;
     try {
-      await connect();
-    } catch (err) {
-      connectError = err;
-    }
+      let connectError = null;
+      try {
+        await connect();
+      } catch (err) {
+        connectError = err;
+      }
 
-    let verified = false;
-    try {
-      const MAX_CHECKS = 6;
-      const DELAY_MS = 500;
-      for (let i = 0; i < MAX_CHECKS; i++) {
-        try {
-          const statusRes = await getCalendarStatus(true);
-          if (statusRes.data?.success && statusRes.data.data?.connected) {
-            verified = true;
-            break;
+      let verified = false;
+      try {
+        const MAX_CHECKS = 6;
+        const DELAY_MS = 500;
+        for (let i = 0; i < MAX_CHECKS; i++) {
+          try {
+            const statusRes = await getCalendarStatus(true);
+            if (statusRes.data?.success && statusRes.data.data?.connected) {
+              verified = true;
+              break;
+            }
+          } catch {
+            // ignore transient network errors and continue retrying
           }
-        } catch {
-          // ignore transient network errors and continue retrying
+          await new Promise((res) => setTimeout(res, DELAY_MS));
         }
-        await new Promise((res) => setTimeout(res, DELAY_MS));
+      } catch {
+        // fall through to show the error message below
       }
-    } catch {
-      // fall through to show the error message below
-    }
 
-    if (verified) {
-      onConnect && onConnect();
-    } else {
-      const code = connectError?.response?.data?.code;
-      if (code === "CALENDAR_DISABLED") {
-        setError("Google Calendar isn't enabled on this server. Ask an admin to configure the Google OAuth credentials.");
+      if (verified) {
+        onConnect && onConnect();
       } else {
-        setError(connectError?.message || "Failed to connect Google Calendar");
+        const code = connectError?.response?.data?.code;
+        if (code === "CALENDAR_DISABLED") {
+          setError("Google Calendar isn't enabled on this server. Ask an admin to configure the Google OAuth credentials.");
+        } else {
+          setError(connectError?.message || "Failed to connect Google Calendar");
+        }
       }
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   };
 
   const handleDisconnect = async () => {
