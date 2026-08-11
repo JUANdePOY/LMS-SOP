@@ -90,7 +90,18 @@ async function getAuthorizedClient(userId) {
 
 function eventToGooglePayload(event) {
   const start = new Date(event.event_date);
-  const end = event.end_date ? new Date(event.end_date) : new Date(start.getTime() + 60 * 60 * 1000);
+  // Default to a 1-hour window when no end is provided. If an end_date exists
+  // but is not strictly after the start (equal or earlier), Google rejects the
+  // event with "The specified time range is empty." Clamp end to be at least
+  // one hour after start so such events still sync.
+  const MIN_DURATION_MS = 60 * 60 * 1000;
+  let end;
+  if (event.end_date) {
+    const parsedEnd = new Date(event.end_date);
+    end = parsedEnd.getTime() > start.getTime() ? parsedEnd : new Date(start.getTime() + MIN_DURATION_MS);
+  } else {
+    end = new Date(start.getTime() + MIN_DURATION_MS);
+  }
   return {
     summary: event.title,
     description: `${event.description || ''}\n\n— Synced from LMS-SOP\nOrganizer: ${event.organizer || 'System'}`,
