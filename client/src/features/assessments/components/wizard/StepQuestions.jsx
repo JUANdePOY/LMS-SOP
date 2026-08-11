@@ -5,8 +5,9 @@ import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
 import { useToast } from "@/shared/components/ui/Toast";
 import QuestionEditor from "../QuestionEditor";
 import QuestionTypeTabs from "../QuestionTypeTabs";
+import AnswerKeyList from "../AnswerKeyList";
 import BulkImportModal from "../BulkImportModal";
-import { Plus, Upload, Search, ListChecks } from "lucide-react";
+import { Plus, Upload, Search, ListChecks, CheckCircle2 } from "lucide-react";
 
 export default function StepQuestions({
   quizId,
@@ -100,6 +101,19 @@ export default function StepQuestions({
           onReorder={onReorder}
           searchQuery={search}
         />
+      )}
+
+      {questions.length > 0 && (
+        <details className="rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-sm">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100 select-none flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            Answer Key ({questions.length})
+            <span className="text-xs font-normal text-neutral-400">— view options &amp; correct answers</span>
+          </summary>
+          <div className="px-4 pb-4">
+            <AnswerKeyList questions={questions} />
+          </div>
+        </details>
       )}
 
       <BulkImportModal

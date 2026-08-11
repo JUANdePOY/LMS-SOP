@@ -31,6 +31,7 @@ import {
   ListChecks,
 } from "lucide-react";
 import QuestionTypeTabs from "../components/QuestionTypeTabs";
+import AnswerKeyList from "../components/AnswerKeyList";
 
 const fieldClass =
   "w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 outline-none";
@@ -509,6 +510,19 @@ export default function QuizBuilderPage() {
               onReorder={handleReorder}
               searchQuery={searchQuery}
             />
+          )}
+
+          {questions.length > 0 && (
+            <details className="rounded-xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-sm">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-neutral-900 dark:text-neutral-100 select-none flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                Answer Key ({questions.length})
+                <span className="text-xs font-normal text-neutral-400">— view options &amp; correct answers</span>
+              </summary>
+              <div className="px-4 pb-4">
+                <AnswerKeyList questions={questions} />
+              </div>
+            </details>
           )}
 
           <div className="flex gap-2">

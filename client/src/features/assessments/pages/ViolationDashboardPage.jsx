@@ -51,7 +51,7 @@ function csvEscape(value) {
 }
 
 function downloadCsv(data, filename) {
-  const headers = ["id", "timestamp", "student", "quiz", "attempt", "type", "metadata"];
+  const headers = ["id", "timestamp", "student", "quiz", "attempt", "type"];
   const rows = data.map((v) => [
     csvEscape(v.id),
     csvEscape(v.timestamp),
@@ -59,7 +59,6 @@ function downloadCsv(data, filename) {
     csvEscape(v.quiz_title || v.quiz_id),
     csvEscape(v.attempt_number),
     csvEscape(v.type),
-    csvEscape(formatMetadata(v.metadata)),
   ]);
   const csv = [headers.join(","), ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv" });
@@ -230,22 +229,21 @@ export default function ViolationDashboardPage() {
                   <th className="p-3 font-medium">Quiz</th>
                   <th className="p-3 font-medium">Attempt #</th>
                   <th className="p-3 font-medium">Type</th>
-                  <th className="p-3 font-medium">Metadata</th>
                   <th className="p-3" />
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   Array.from({ length: 6 }).map((_, i) => (
-                    <tr key={i} className="border-b animate-pulse">
-                      <td className="p-3" colSpan="7">
-                        <div className="h-4 w-full rounded bg-neutral-100 dark:bg-neutral-800" />
-                      </td>
-                    </tr>
+                     <tr key={i} className="border-b animate-pulse">
+                       <td className="p-3" colSpan="6">
+                         <div className="h-4 w-full rounded bg-neutral-100 dark:bg-neutral-800" />
+                       </td>
+                     </tr>
                   ))
                 ) : filteredViolations.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="p-10 text-center">
+                   <tr>
+                     <td colSpan="6" className="p-10 text-center">
                       <div className="flex flex-col items-center gap-2 text-neutral-400">
                         <ShieldAlert size={28} />
                         <p className="text-sm">{logSearch ? "No matching violations." : "No violations found."}</p>
@@ -281,9 +279,6 @@ export default function ViolationDashboardPage() {
                           <span className={"inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium " + SEVERITY_STYLES[severity]}>
                             {typeLabel(v.type)}
                           </span>
-                        </td>
-                        <td className="p-3 text-neutral-500 max-w-[260px] truncate" title={formatMetadata(v.metadata)}>
-                          {formatMetadata(v.metadata)}
                         </td>
                         <td className="p-3 text-right">
                           {isFlagged && (

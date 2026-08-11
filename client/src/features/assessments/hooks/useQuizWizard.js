@@ -7,6 +7,16 @@ import {
   getQuestions,
 } from "../api/quiz.api";
 
+function safeParse(value) {
+  if (value == null) return value;
+  if (typeof value !== "string") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return value;
+  }
+}
+
 const DEFAULT_SETTINGS = {
   courseId: "",
   title: "",
@@ -92,8 +102,13 @@ export function useQuizWizard({ toast, onComplete, onCancel, courseId } = {}) {
     async (payload) => {
       if (!quizId) return;
       const res = await createQuestion(quizId, payload);
-      const created = res?.data || { ...payload, id: `tmp-${Date.now()}` };
-      const item = { ...created, id: created.id || `tmp-${Date.now()}` };
+      // The server only echoes back { id }, so merge the full payload so the
+      // question list can render options and the correct answer immediately.
+      const serverId = res?.data?.id;
+      const item = {
+        ...payload,
+        id: serverId || `tmp-${Date.now()}`,
+      };
       setQuestions((qs) => [...qs, item]);
       toast?.success?.("Question added");
     },
@@ -103,10 +118,10 @@ export function useQuizWizard({ toast, onComplete, onCancel, courseId } = {}) {
   const updateQuestionById = useCallback(
     async (editing, payload) => {
       if (!quizId || !editing?.id) return;
-      const res = await updateQuestion(quizId, editing.id, payload);
-      const updated = res?.data || { ...editing, ...payload };
+      await updateQuestion(quizId, editing.id, payload);
+      // Merge payload over the existing question; the server doesn't echo fields.
       setQuestions((qs) =>
-        qs.map((q) => (q.id === editing.id ? { ...updated, id: editing.id } : q))
+        qs.map((q) => (q.id === editing.id ? { ...q, ...payload, id: editing.id } : q))
       );
       toast?.success?.("Question updated");
     },
@@ -158,7 +173,18 @@ export function useQuizWizard({ toast, onComplete, onCancel, courseId } = {}) {
     try {
       const res = await getQuestions(quizId);
       const list = res?.data?.questions || res?.data || [];
-      setQuestions(Array.isArray(list) ? list.map((q) => ({ ...q, id: q.id })) : []);
+      setQuestions(
+        Array.isArray(list)
+          ? list.map((q) => ({
+              ...q,
+              id: q.id,
+              // Server returns options/correct_answer as JSON strings; parse so
+              // the question list can render options and the correct answer.
+              options: safeParse(q.options),
+              correct_answer: safeParse(q.correct_answer),
+            }))
+          : []
+      );
     } catch {
       /* ignore */
     }

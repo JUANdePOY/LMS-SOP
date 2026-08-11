@@ -5,6 +5,7 @@ import { useQuizzesCatalog } from "../hooks/useQuizzesCatalog";
 import { publishQuiz, archiveQuiz, deleteQuiz } from "../api/quiz.api";
 import { getCourseList } from "@/features/course_management/api/course.api";
 import { useToast } from "@/shared/components/ui/Toast";
+import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/card";
 import CreateQuizModal from "../components/modals/CreateQuizModal";
@@ -168,6 +169,7 @@ export default function QuizListPage() {
   const [courses, setCourses] = useState([]);
   const [loadingCourses, setLoadingCourses] = useState(false);
   const [busy, setBusy] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   const { quizzes, pagination, loading, error, refetch } = useQuizzesCatalog({ ...filters, limit: 20 });
 
@@ -213,9 +215,13 @@ export default function QuizListPage() {
   const handleTogglePublish = async (q) => {
     setBusy(q.id);
     try {
-      if (q.status === "published") await archiveQuiz(q.id);
-      else await publishQuiz(q.id);
-      toast.success(q.status === "published" ? "Quiz archived." : "Quiz published.");
+      if (q.status === "published") {
+        await archiveQuiz(q.id);
+        toast.success(`Quiz “${q.title}” archived.`);
+      } else {
+        await publishQuiz(q.id);
+        toast.success(`Quiz “${q.title}” published.`);
+      }
       refetch({ ...filters, limit: 20 });
     } catch (err) {
       toast.error(err.message || "Failed to update quiz");
@@ -224,12 +230,15 @@ export default function QuizListPage() {
     }
   };
 
-  const handleDelete = async (q) => {
-    if (!window.confirm(`Delete quiz "${q.title}"? This cannot be undone.`)) return;
+  const requestDelete = (q) => setPendingDelete(q);
+
+  const confirmDelete = async () => {
+    const q = pendingDelete;
+    if (!q) return;
     setBusy(q.id);
     try {
       await deleteQuiz(q.id);
-      toast.success("Quiz deleted.");
+      toast.success(`Quiz “${q.title}” deleted.`);
       refetch({ ...filters, limit: 20 });
     } catch (err) {
       // If the quiz was already soft-deleted (e.g. its parent course was
@@ -237,7 +246,7 @@ export default function QuizListPage() {
       if (err?.status === 404) {
         try {
           await deleteQuiz(q.id, { force: true });
-          toast.success("Quiz deleted.");
+          toast.success(`Quiz “${q.title}” deleted.`);
           refetch({ ...filters, limit: 20 });
           return;
         } catch (forceErr) {
@@ -248,6 +257,7 @@ export default function QuizListPage() {
       toast.error(err.message || "Failed to delete quiz");
     } finally {
       setBusy(null);
+      setPendingDelete(null);
     }
   };
 
@@ -355,12 +365,12 @@ export default function QuizListPage() {
         <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {quizzes.map((q) => (
             <MotionItem key={q.id}>
-              <QuizCard q={q} onTogglePublish={handleTogglePublish} onDelete={handleDelete} busy={busy} />
+              <QuizCard q={q} onTogglePublish={handleTogglePublish} onDelete={requestDelete} busy={busy} />
             </MotionItem>
           ))}
         </StaggerList>
       ) : (
-        <QuizTable quizzes={quizzes} onTogglePublish={handleTogglePublish} onDelete={handleDelete} busy={busy} />
+        <QuizTable quizzes={quizzes} onTogglePublish={handleTogglePublish} onDelete={requestDelete} busy={busy} />
       )}
 
       {pagination && pagination.totalPages > 1 && (
@@ -386,6 +396,18 @@ export default function QuizListPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title="Delete quiz?"
+        description={pendingDelete ? `“${pendingDelete.title}” and all its questions and attempts will be permanently removed. This action cannot be undone.` : ""}
+        confirmLabel="Delete quiz"
+        cancelLabel="Cancel"
+        destructive
+        loading={busy === pendingDelete?.id}
+        onCancel={() => setPendingDelete(null)}
+        onConfirm={confirmDelete}
+      />
     </div>
   );
 }

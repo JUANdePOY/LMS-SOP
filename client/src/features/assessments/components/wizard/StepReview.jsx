@@ -1,3 +1,5 @@
+import AnswerKeyList from "../AnswerKeyList";
+
 export default function StepReview({ settings, courseTitle, questions, openBuilder, setOpenBuilder }) {
   const rows = [
     ["Course", courseTitle || "—"],
@@ -31,6 +33,15 @@ export default function StepReview({ settings, courseTitle, questions, openBuild
           ))}
         </dl>
       </div>
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 dark:text-neutral-500 mb-2">
+          Questions &amp; Answers ({questions.length})
+        </h3>
+        <div className="max-h-72 overflow-y-auto rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50/40 dark:bg-neutral-900/40 p-2">
+          <AnswerKeyList questions={questions} />
+        </div>
+      </div>
+
       <label className="flex items-center gap-2 text-sm text-neutral-700 dark:text-neutral-200">
         <input
           type="checkbox"

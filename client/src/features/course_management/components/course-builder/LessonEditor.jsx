@@ -51,7 +51,6 @@ const TYPE_OPTIONS = [
   { value: "quiz", label: "Quiz", Icon: HelpCircle, hint: "Attach an assessment" },
   { value: "link", label: "Link", Icon: Link2, hint: "Point to an external resource" },
   { value: "sop", label: "SOP", Icon: FileText, hint: "Embed a standard operating procedure" },
-  { value: "certificate", label: "Certificate", Icon: Award, hint: "Award a certificate on completion" },
   { value: "document", label: "Document", Icon: FileArchive, hint: "Upload a PDF, DOCX or PPTX" },
 ];
 

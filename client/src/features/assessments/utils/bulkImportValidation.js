@@ -49,10 +49,12 @@ export function normalizeQuestion(q, idx = 0) {
   if (type === "true_false") {
     // True/False has implicit, fixed options so they always display.
     if (!normalizedOptions) normalizedOptions = ["True", "False"];
-    correct_answer = correct_answer != null ? String(correct_answer).trim().toLowerCase() : null;
-    if (correct_answer && correct_answer !== "true" && correct_answer !== "false") {
-      correct_answer = null;
-    }
+    // Normalize the answer to the option casing ("True"/"False") so it
+    // matches the displayed option text and is highlighted correctly.
+    const raw = correct_answer != null ? String(correct_answer).trim().toLowerCase() : null;
+    if (raw === "true") correct_answer = "True";
+    else if (raw === "false") correct_answer = "False";
+    else correct_answer = null;
   } else if (type === "multiple_select" || type === "multi_select") {
     // Correct answer must be an array of option texts.
     correct_answer = toCorrectAnswerArray(correct_answer || []);

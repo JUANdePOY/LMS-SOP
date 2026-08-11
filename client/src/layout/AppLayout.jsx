@@ -135,6 +135,18 @@ export default function AppLayout() {
     }
   }, [location.pathname]);
 
+  useEffect(() => {
+    const openSystemSidebar = () => {
+      if (window.innerWidth >= 1024) {
+        setCollapsed(false);
+      } else {
+        setMobileOpen(true);
+      }
+    };
+    window.addEventListener("open-system-sidebar", openSystemSidebar);
+    return () => window.removeEventListener("open-system-sidebar", openSystemSidebar);
+  }, []);
+
   return (
     <div
       className={cn(

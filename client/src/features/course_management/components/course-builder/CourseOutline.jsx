@@ -93,7 +93,6 @@ export default function CourseOutline({
             onToggle={() => toggleModule(mod.id)}
             selected={selectedModuleId === mod.id}
             selectedLessonId={selectedLessonId}
-            onSelectModule={() => onSelectModule?.(mod.id)}
             onSelectLesson={(lessonId) => onSelectLesson?.(mod.id, lessonId)}
             onUpdate={(patch) => onUpdateModule?.(mod.id, patch)}
             onRemove={() => onRemoveModule?.(mod.id)}
@@ -185,46 +184,41 @@ function ModuleOutlineItem({
 
   return (
     <div
-      className={`rounded-lg border transition-all ${
-        selected
-          ? "border-[rgba(242,92,5,0.30)] dark:border-blue-700 bg-[rgba(242,92,5,0.08)]/40 dark:bg-blue-900/10 shadow-sm"
-          : "border-transparent hover:border-neutral-200 dark:hover:border-neutral-700"
-      }`}
+      className="rounded-lg border border-transparent transition-all"
     >
       <div className="flex items-center gap-1 px-2 py-2.5">
         <button
           type="button"
           onClick={onToggle}
-          className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors"
+          aria-expanded={expanded}
+          aria-label={expanded ? `Collapse ${module.title || `Module ${index + 1}`}` : `Expand ${module.title || `Module ${index + 1}`}`}
+          className="flex flex-1 min-w-0 items-center gap-1.5 text-left rounded-md transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
         >
-          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          <span className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors shrink-0">
+            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          </span>
+          <span className="flex-1 min-w-0">
+            {isEditingTitle ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={titleInput}
+                onChange={(e) => setTitleInput(e.target.value)}
+                onKeyDown={handleTitleKeyDown}
+                onBlur={handleTitleSave}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-sm text-neutral-900 dark:text-neutral-100"
+              />
+            ) : (
+              <span
+                className="block w-full truncate text-sm font-medium text-neutral-800 dark:text-neutral-200"
+                title={module.title || `Module ${index + 1}`}
+              >
+                {module.title || `Module ${index + 1}`}
+              </span>
+            )}
+          </span>
         </button>
-        <div className="flex-1 min-w-0">
-          {isEditingTitle ? (
-            <input
-              ref={titleInputRef}
-              type="text"
-              value={titleInput}
-              onChange={(e) => setTitleInput(e.target.value)}
-              onKeyDown={handleTitleKeyDown}
-              onBlur={handleTitleSave}
-              className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-sm text-neutral-900 dark:text-neutral-100"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={onSelectModule}
-              className={`w-full truncate text-left text-sm font-medium ${
-                selected
-                  ? "text-[var(--color-primary-hover)] dark:text-[var(--color-primary)]"
-                  : "text-neutral-800 dark:text-neutral-200"
-              }`}
-              title={module.title || `Module ${index + 1}`}
-            >
-              {module.title || `Module ${index + 1}`}
-            </button>
-          )}
-        </div>
         <div className="flex items-center gap-1">
           <span
             className={`text-xs ${
@@ -236,7 +230,10 @@ function ModuleOutlineItem({
           {selected && (
             <button
               type="button"
-              onClick={handleEditTitle}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEditTitle();
+              }}
               className="rounded p-1 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200"
               title="Rename module"
             >
@@ -245,7 +242,10 @@ function ModuleOutlineItem({
           )}
           <button
             type="button"
-            onClick={onRemove}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemove();
+            }}
             className="rounded p-1 text-neutral-400 hover:text-red-600"
             title="Delete module"
           >

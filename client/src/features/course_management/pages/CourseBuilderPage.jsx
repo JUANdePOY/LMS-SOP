@@ -6,9 +6,9 @@ import CourseOutline from "../components/course-builder/CourseOutline";
 import LessonEditor from "../components/course-builder/LessonEditor";
 import ModuleEditor from "../components/course-builder/ModuleEditor";
 import PublishReadiness from "../components/course-builder/PublishReadiness";
+import CourseCertificatesSection from "../components/course-builder/CourseCertificatesSection";
 import { builderGet, builderUpdate, publishCourse } from "../api/course.api";
 import * as session from "@/services/session";
-import CourseCertificatesSection from "../components/course-builder/CourseCertificatesSection";
 
 function authHeaders() {
   const token = session.getCurrentToken();
@@ -687,7 +687,11 @@ export default function CourseBuilderPage() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate("/courses")}
+            onClick={() => {
+              window.dispatchEvent(new Event("open-system-sidebar"));
+              navigate("/courses");
+            }}
+            aria-label="Back to courses"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
           >
             <ChevronLeft size={16} />

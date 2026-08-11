@@ -59,13 +59,16 @@ function getOptionText(opt) {
 }
 
 function isOptionCorrect(option, correctAnswer) {
-  const optText = getOptionText(option);
+  const optText = (getOptionText(option) || "").toString().trim().toLowerCase();
   if (Array.isArray(correctAnswer)) {
     return correctAnswer.some(
-      (ca) => JSON.stringify(ca) === JSON.stringify(option) || ca === optText
+      (ca) =>
+        (typeof ca === "string" ? ca.trim().toLowerCase() : JSON.stringify(ca).toLowerCase()) === optText ||
+        JSON.stringify(ca).toLowerCase() === JSON.stringify(option).toLowerCase()
     );
   }
-  return JSON.stringify(correctAnswer) === JSON.stringify(option) || correctAnswer === optText;
+  const caText = (correctAnswer != null ? correctAnswer : "").toString().trim().toLowerCase();
+  return JSON.stringify(correctAnswer).toLowerCase() === JSON.stringify(option).toLowerCase() || caText === optText;
 }
 
 function QuestionItem({ q, isSelected, onToggleSelect, onEdit, onDelete }) {

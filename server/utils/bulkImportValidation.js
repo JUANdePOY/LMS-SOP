@@ -41,10 +41,10 @@ function normalizeQuestion(q, idx) {
 
   if (type === 'true_false') {
     if (!normalizedOptions) normalizedOptions = ['True', 'False'];
-    correct_answer = correct_answer != null ? String(correct_answer).trim().toLowerCase() : null;
-    if (correct_answer && correct_answer !== 'true' && correct_answer !== 'false') {
-      correct_answer = null;
-    }
+    const raw = correct_answer != null ? String(correct_answer).trim().toLowerCase() : null;
+    if (raw === 'true') correct_answer = 'True';
+    else if (raw === 'false') correct_answer = 'False';
+    else correct_answer = null;
   } else if (type === 'multiple_select' || type === 'multi_select') {
     correct_answer = toCorrectAnswerArray(correct_answer || []);
   }
