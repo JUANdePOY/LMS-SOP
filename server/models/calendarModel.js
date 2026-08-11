@@ -29,10 +29,12 @@ const calendarModel = {
     if (!row) return null;
     const access_token = safeDecrypt(row.access_token);
     const refresh_token = safeDecrypt(row.refresh_token);
-    // Unusable (wrong key / corrupt) -> treat as not connected. Do NOT delete
-    // here; saveToken will overwrite it on the next connect attempt.
+    // Unusable (wrong key / corrupt) -> remove it so status reports
+    // disconnected and a fresh connect can INSERT a clean row encrypted with
+    // the current key. A valid row decrypts fine, so we never delete those.
     if ((row.access_token && !access_token) || (row.refresh_token && !refresh_token)) {
-      console.warn('[Calendar] Undecryptable token row for user', userId, 'provider', provider, '- will be overwritten on reconnect');
+      console.warn('[Calendar] Removing undecryptable token row for user', userId, 'provider', provider);
+      await this.deleteToken(userId, provider).catch(() => {});
       return null;
     }
     return {
@@ -46,15 +48,16 @@ const calendarModel = {
     const encAccess = encrypt(accessToken);
     const encRefresh = refreshToken ? encrypt(refreshToken) : null;
     const id = crypto.randomUUID();
+    // Remove any existing row first, then INSERT. This guarantees a clean row
+    // encrypted with the CURRENT key, even if the previous row was encrypted
+    // with a different (e.g. rotated/leaked) CALENDAR_TOKEN_ENCRYPTION_KEY.
+    await db.query(
+      'DELETE FROM user_calendar_tokens WHERE user_id = ? AND provider = ?',
+      [userId, provider]
+    );
     await db.query(
       `INSERT INTO user_calendar_tokens (id, user_id, provider, google_email, access_token, refresh_token, expiry_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         google_email = VALUES(google_email),
-         access_token = VALUES(access_token),
-         refresh_token = COALESCE(VALUES(refresh_token), refresh_token),
-         expiry_date = VALUES(expiry_date),
-         updated_at = CURRENT_TIMESTAMP`,
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [id, userId, provider, googleEmail || null, encAccess, encRefresh, expiryDate || null]
     );
     return this.getToken(userId, provider);
