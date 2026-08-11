@@ -182,7 +182,7 @@ export default function EventsPage() {
         onConnect={async () => {
           if (typeof calendar.loadStatus === "function") {
             try {
-              await calendar.loadStatus();
+              await calendar.loadStatus(true);
             } catch {
               /* ignore */
             }

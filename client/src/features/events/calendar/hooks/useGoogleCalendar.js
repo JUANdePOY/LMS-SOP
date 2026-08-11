@@ -12,10 +12,10 @@ export function useGoogleCalendar() {
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [syncingIds, setSyncingIds] = useState({});
 
-  const loadStatus = useCallback(async () => {
+  const loadStatus = useCallback(async (force = false) => {
     setLoadingStatus(true);
     try {
-      const res = await getCalendarStatus();
+      const res = await getCalendarStatus(force);
       if (res.data?.success) {
         setStatus({
           connected: !!res.data.data?.connected,
@@ -77,7 +77,7 @@ export function useGoogleCalendar() {
           if (statusRes.data?.success && statusRes.data.data?.connected) {
             clearInterval(poll);
             tryClosePopup(popup);
-            await loadStatus();
+            await loadStatus(true);
             resolve(true);
             return;
           }
@@ -92,7 +92,7 @@ export function useGoogleCalendar() {
           try {
             const finalRes = await getCalendarStatus();
             if (finalRes.data?.success && finalRes.data.data?.connected) {
-              await loadStatus();
+              await loadStatus(true);
               resolve(true);
               return;
             }
