@@ -68,7 +68,7 @@ const eventModel = {
 
   async findActive() {
     const [rows] = await db.query(
-      "SELECT * FROM events WHERE status = 'active' AND event_date >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) ORDER BY event_date ASC"
+      "SELECT * FROM events WHERE status = 'active' ORDER BY event_date ASC"
     );
     return rows;
   },
