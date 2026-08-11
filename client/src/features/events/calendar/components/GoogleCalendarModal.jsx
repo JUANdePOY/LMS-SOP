@@ -16,6 +16,12 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
     if (status.connected) setBusy(false);
   }, [status.connected]);
 
+  // Safety net: if the parent already marked the sync as done, make sure this
+  // modal is no longer in a busy/loading state.
+  useEffect(() => {
+    if (syncPhase === "done") setBusy(false);
+  }, [syncPhase]);
+
   const handleConnect = async () => {
     if (busy || status.connected) return;
     setBusy(true);
@@ -51,7 +57,9 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
       }
 
       if (verified) {
-        onConnect && onConnect();
+        onConnect && onConnect().catch(() => {
+          // ignore onConnect errors so the modal still stops loading
+        });
       } else {
         const code = connectError?.response?.data?.code;
         if (code === "CALENDAR_DISABLED") {
