@@ -49,7 +49,7 @@ function handleCallback(req, res) {
       return res.status(400).send(renderCallbackHtml(false, `Google error: ${error}${error_description ? ` (${error_description})` : ''}`));
     }
     if (!state || !code) {
-      console.error('[Calendar] Callback missing params. Query:', JSON.stringify(req.query));
+      console.error('[Calendar] Callback missing params. originalUrl:', req.originalUrl, '| query:', JSON.stringify(req.query));
       return res.status(400).send(renderCallbackHtml(false, 'Missing parameters'));
     }
     // Verify the state against the server-side record we created in getAuthUrl.
