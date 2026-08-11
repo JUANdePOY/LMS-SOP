@@ -4,6 +4,18 @@ const calendarModel = require('../models/calendarModel');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 
+// The OAuth callback runs in a popup window that signals its opener (the SPA tab)
+// via window.postMessage. Some hosting setups inject Cross-Origin-Opener-Policy:
+// same-origin on responses, which severs that relationship and blocks both
+// postMessage and window.close. We explicitly relax COOP/COEP here so the popup
+// can reach its opener. This is safe: the page only renders a static message and
+// posts a success flag; no sensitive data crosses the boundary.
+function sendCallback(res, statusCode, html) {
+  res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  res.status(statusCode).send(html);
+}
+
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
   const message = err.statusCode ? err.message : fallback;
@@ -46,17 +58,17 @@ function handleCallback(req, res) {
     // instead of the generic "Missing parameters".
     if (error) {
       console.error('[Calendar] Google OAuth error:', error, error_description || '');
-      return res.status(400).send(renderCallbackHtml(false, `Google error: ${error}${error_description ? ` (${error_description})` : ''}`));
+      return sendCallback(res, 400, renderCallbackHtml(false, `Google error: ${error}${error_description ? ` (${error_description})` : ''}`));
     }
     if (!state || !code) {
       console.error('[Calendar] Callback missing params. originalUrl:', req.originalUrl, '| query:', JSON.stringify(req.query));
-      return res.status(400).send(renderCallbackHtml(false, 'Missing parameters'));
+      return sendCallback(res, 400, renderCallbackHtml(false, 'Missing parameters'));
     }
     // Verify the state against the server-side record we created in getAuthUrl.
     calendarModel.getOAuthState(state)
       .then((row) => {
         if (!row) {
-          return res.status(400).send(renderCallbackHtml(false, 'State verification failed'));
+          return sendCallback(res, 400, renderCallbackHtml(false, 'State verification failed'));
         }
         const userId = row.user_id;
         // Consume the state so it can't be replayed.
@@ -64,7 +76,7 @@ function handleCallback(req, res) {
           .then(() => calendarService.handleCallback(code, userId))
           .then((result) => {
             logAudit && logAudit('calendar.connect', userId, { syncedEvents: result.syncedEvents || 0 });
-            res.send(renderCallbackHtml(true, 'Calendar connected'));
+            sendCallback(res, 200, renderCallbackHtml(true, 'Calendar connected'));
           });
       })
       .catch((err) => {
