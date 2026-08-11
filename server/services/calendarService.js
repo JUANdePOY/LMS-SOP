@@ -106,7 +106,12 @@ function eventToGooglePayload(event) {
 
 // Create or update the Google Calendar event for a single user.
 // Returns { googleEventId, action }.
-async function upsertEventForUser(userId, eventId) {
+// Pass `authClient` (an already-authorized OAuth client) to reuse a live
+// client — e.g. the one just obtained during the OAuth callback — instead of
+// re-reading (and re-decrypting) the stored token from the database. This
+// avoids a race where the bulk sync runs before/around the token being
+// persisted, which previously surfaced as "Google Calendar not connected".
+async function upsertEventForUser(userId, eventId, authClient) {
   const event = await eventModel.findById(eventId);
   if (!event) {
     const err = new Error('Event not found');
@@ -115,7 +120,7 @@ async function upsertEventForUser(userId, eventId) {
     throw err;
   }
 
-  const client = await getAuthorizedClient(userId);
+  const client = authClient || (await getAuthorizedClient(userId));
   const calendar = getGoogle().calendar({ version: 'v3', auth: client });
 
   const existing = await calendarModel.findMap(userId, eventId);
@@ -231,12 +236,12 @@ async function handleCallback(code, userId) {
   });
 
   // Push existing LMS events to the freshly connected calendar so the user
-  // sees their current schedule immediately. Each event reuses the same
-  // upsert path as the manual per-event sync; failures are logged against
-  // the mapping but do not abort the connection.
+  // sees their current schedule immediately. We pass the live OAuth `client`
+  // obtained above rather than re-reading the stored token, so the sync can
+  // never race with (or be blocked by) token persistence / decryption.
   let syncedEvents = 0;
   try {
-    syncedEvents = await syncAllEventsForUser(userId);
+    syncedEvents = await syncAllEventsForUser(userId, client);
     console.log('[Calendar] Initial bulk sync complete for user', userId, '-', syncedEvents, 'event(s) pushed to Google Calendar');
   } catch (syncErr) {
     console.error('[Calendar] initial bulk sync failed for user', userId, syncErr.message);
@@ -246,13 +251,15 @@ async function handleCallback(code, userId) {
 }
 
   // Push every active LMS event to the user's connected Google Calendar.
-  // Returns the number of events successfully synced.
-  async function syncAllEventsForUser(userId) {
+  // Returns the number of events successfully synced. Pass `authClient` to use
+  // a live OAuth client (e.g. from the connect callback) instead of re-reading
+  // the stored token, which avoids a connect/sync race.
+  async function syncAllEventsForUser(userId, authClient) {
     const events = await eventModel.findActive();
     let synced = 0;
     for (const event of events) {
       try {
-        await upsertEventForUser(userId, event.id);
+        await upsertEventForUser(userId, event.id, authClient);
         synced += 1;
       } catch (err) {
         console.error('[Calendar] bulk sync failed for user', userId, event.id, err.message);
