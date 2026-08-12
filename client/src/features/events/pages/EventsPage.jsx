@@ -184,7 +184,7 @@ export default function EventsPage() {
         <Modal
           open={showForm}
           onClose={() => { setShowForm(false); setEditingItem(null); }}
-          title={editingItem ? "Edit Event" : "New Event"}
+          title={editingItem ? "Edit Event" : "New Events"}
           footer={
             <div className="flex justify-end gap-2">
               <button

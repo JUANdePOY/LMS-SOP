@@ -666,7 +666,11 @@ export default function CourseBuilderPage() {
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate("/courses")}
+            onClick={() => {
+              window.dispatchEvent(new Event('open-system-sidebar'));
+              navigate("/courses");
+            }}
+            title="Back to courses"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
           >
             <ChevronLeft size={16} />
