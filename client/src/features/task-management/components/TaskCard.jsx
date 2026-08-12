@@ -1,5 +1,7 @@
+import { memo } from 'react';
 import { Link } from 'react-router-dom';
-import { TASK_STATUSES, PRIORITY_STYLES, STATUS_STYLES } from '../constants/taskConstants';
+import { PRIORITY_STYLES, STATUS_STYLES } from '../constants/taskConstants';
+import { formatDate } from '../utils/taskDateUtils';
 import { cn } from '@/lib/utils';
 import { User, Calendar, Clock } from 'lucide-react';
 
@@ -8,12 +10,6 @@ function TaskCard({ task, onEdit, onDelete, onView, canManage }) {
   const assigneeNames = assignments
     .filter((a) => a.assignment_type === 'User' && a.reference_name)
     .map((a) => a.reference_name);
-
-  const formatDate = (dateStr) => {
-    if (!dateStr) return '—';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
 
   const progressRate = typeof task.progress_rate === 'number' ? task.progress_rate : null;
 
@@ -56,7 +52,7 @@ function TaskCard({ task, onEdit, onDelete, onView, canManage }) {
 
       <div className="mt-3 pt-3 border-t border-[var(--border)] flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-wrap text-xs text-[var(--text-muted)]">
-          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded text-neutral-500 dark:text-neutral-400">
+          <span className="inline-flex items-center justify-center gap-1.5 font-mono text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded text-neutral-500 dark:text-neutral-400">
             #{task.id}
           </span>
           <span className="inline-flex items-center gap-1.5">
@@ -99,4 +95,4 @@ function TaskCard({ task, onEdit, onDelete, onView, canManage }) {
   );
 }
 
-export default TaskCard;
+export default memo(TaskCard);

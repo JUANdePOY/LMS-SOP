@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { TASK_STATUSES } from '../constants/taskConstants';
 
-function ProgressModal({ open, onClose, onSubmit, saving }) {
+const ProgressModal = memo(function ProgressModal({ open, onClose, onSubmit, saving }) {
   const [completionRate, setCompletionRate] = useState(0);
   const [status, setStatus] = useState('In Progress');
   const [notes, setNotes] = useState('');
@@ -90,6 +90,6 @@ function ProgressModal({ open, onClose, onSubmit, saving }) {
       </div>
     </div>
   );
-}
+});
 
 export default ProgressModal;

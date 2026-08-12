@@ -9,6 +9,7 @@ export function useTasks(filters = {}) {
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [stats, setStats] = useState(null);
+  const [statsLoading, setStatsLoading] = useState(false);
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
 
@@ -16,10 +17,7 @@ export function useTasks(filters = {}) {
     setLoading(true);
     setError(null);
     try {
-      const [tasksData, statsData] = await Promise.all([
-        getTasks(filtersRef.current),
-        getTaskStats(),
-      ]);
+      const tasksData = await getTasks(filtersRef.current);
       const data = Array.isArray(tasksData?.rows) ? tasksData.rows : [];
       setTasks(data);
       setPagination({
@@ -28,7 +26,6 @@ export function useTasks(filters = {}) {
         total: tasksData?.total || 0,
         totalPages: tasksData?.totalPages || 1,
       });
-      setStats(statsData || null);
     } catch (err) {
       setError(err.message || 'Failed to load tasks');
     } finally {
@@ -36,20 +33,40 @@ export function useTasks(filters = {}) {
     }
   }, []);
 
+  const loadStats = useCallback(async () => {
+    setStatsLoading(true);
+    try {
+      const statsData = await getTaskStats();
+      setStats(statsData || null);
+    } catch {
+      setStats(null);
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
   const refresh = useCallback(async () => {
+    await Promise.all([load(), loadStats()]);
+  }, [load, loadStats]);
+
+  const refreshTasks = useCallback(async () => {
     await load();
   }, [load]);
+
+  const refreshStats = useCallback(async () => {
+    await loadStats();
+  }, [loadStats]);
 
   const create = async (payload) => {
     await createTask(payload);
     toast.success('Task created successfully');
-    await refresh();
+    await load();
   };
 
   const update = async (id, payload) => {
     await updateTask(id, payload);
     toast.success('Task updated successfully');
-    await refresh();
+    await load();
   };
 
   const remove = async (id) => {
@@ -58,5 +75,5 @@ export function useTasks(filters = {}) {
     setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
-  return { tasks, loading, error, pagination, stats, refresh, create, update, remove };
+  return { tasks, loading, error, pagination, stats, statsLoading, refresh, refreshTasks, refreshStats, create, update, remove };
 }

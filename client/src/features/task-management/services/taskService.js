@@ -40,11 +40,6 @@ export async function assignTask(payload) {
   return ensureSuccess(res, 'Failed to assign task').data;
 }
 
-export async function unassignTask(taskId, assignmentType, referenceId) {
-  const res = await api.delete(`${API_BASE}/${taskId}/unassign/${assignmentType}/${referenceId}`);
-  return ensureSuccess(res, 'Failed to unassign task').data;
-}
-
 export async function updateProgress(payload) {
   const res = await api.post(`${API_BASE}/progress`, payload);
   return ensureSuccess(res, 'Failed to update progress').data;
@@ -53,11 +48,6 @@ export async function updateProgress(payload) {
 export async function addComment(payload) {
   const res = await api.post(`${API_BASE}/${payload.task_id}/comments`, { comment: payload.comment });
   return ensureSuccess(res, 'Failed to add comment').data;
-}
-
-export async function getComments(taskId) {
-  const res = await api.get(`${API_BASE}/${taskId}/comments`);
-  return ensureSuccess(res, 'Failed to load comments').data;
 }
 
 export async function uploadAttachment(taskId, formData) {
