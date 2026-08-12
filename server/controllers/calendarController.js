@@ -90,8 +90,14 @@ function handleCallback(req, res) {
 function renderCallbackHtml(success, message) {
   const postMessageScript = success ? `
     <script>
-      if (window.opener) {
-        window.opener.postMessage({ type: 'google-calendar-connected' }, window.location.origin);
+      try {
+        if (window.opener) {
+          window.opener.postMessage({ type: 'google-calendar-connected' }, window.location.origin);
+        }
+      } catch (e) {
+        // Cross-Origin-Opener-Policy or cross-origin restrictions may block
+        // cross-window messaging in some hosting/proxy setups. The SPA polls
+        // /api/calendar/status as a fallback and will pick up the connection.
       }
     </script>
   ` : '';
