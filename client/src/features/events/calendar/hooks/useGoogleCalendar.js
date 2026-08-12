@@ -73,7 +73,7 @@ export function useGoogleCalendar() {
       const poll = setInterval(async () => {
         attempts += 1;
         try {
-          const statusRes = await getCalendarStatus();
+          const statusRes = await getCalendarStatus(true);
           if (statusRes.data?.success && statusRes.data.data?.connected) {
             clearInterval(poll);
             tryClosePopup(popup);
@@ -90,7 +90,7 @@ export function useGoogleCalendar() {
           // Final definitive check: the bulk sync may have just finished, so a
           // last status read decides success vs. timeout instead of guessing.
           try {
-            const finalRes = await getCalendarStatus();
+            const finalRes = await getCalendarStatus(true);
             if (finalRes.data?.success && finalRes.data.data?.connected) {
               await loadStatus(true);
               resolve(true);
