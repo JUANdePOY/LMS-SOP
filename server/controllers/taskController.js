@@ -112,7 +112,8 @@ const taskController = {
 
   async addComment(req, res) {
     try {
-      const comment = await taskService.addComment(req.body, req.user.id);
+      const payload = { task_id: req.params.taskId, ...req.body };
+      const comment = await taskService.addComment(payload, req.user.id);
       res.status(201).json({ success: true, data: comment, message: 'Comment added successfully' });
     } catch (error) {
       handleError(res, error);
@@ -133,6 +134,9 @@ const taskController = {
   async uploadAttachment(req, res) {
     try {
       const taskId = parseInt(req.params.taskId, 10);
+      if (!Number.isFinite(taskId) || taskId <= 0) {
+        return res.status(400).json({ success: false, message: 'Invalid task ID', code: 'VALIDATION_ERROR' });
+      }
       if (!req.file) {
         return res.status(400).json({ success: false, message: 'File is required', code: 'VALIDATION_ERROR' });
       }
@@ -146,6 +150,9 @@ const taskController = {
   async deleteAttachment(req, res) {
     try {
       const attachmentId = parseInt(req.params.attachmentId, 10);
+      if (!Number.isFinite(attachmentId) || attachmentId <= 0) {
+        return res.status(400).json({ success: false, message: 'Invalid attachment ID', code: 'VALIDATION_ERROR' });
+      }
       await taskService.deleteAttachment(attachmentId, req.user.id);
       res.json({ success: true, message: 'Attachment deleted successfully' });
     } catch (error) {

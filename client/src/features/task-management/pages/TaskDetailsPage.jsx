@@ -4,12 +4,13 @@ import { ArrowLeft, Users, MessageSquare, Paperclip, BarChart3 } from 'lucide-re
 import { useToast } from '@/shared/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTaskDetails } from '../hooks/useTaskDetails';
-import { MAX_ATTACHMENT_SIZE_BYTES, ALLOWED_ATTACHMENT_MIME_TYPES, MAX_COMMENT_LENGTH } from '../constants/taskConstants';
+import { MAX_ATTACHMENT_SIZE_BYTES, ALLOWED_ATTACHMENT_MIME_TYPES } from '../constants/taskConstants';
 import { formatDate } from '../utils/taskDateUtils';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import AssignmentSection from '../components/AssignmentSection';
 import AttachmentSection from '../components/AttachmentSection';
 import CommentSection from '../components/CommentSection';
+import CommentInput from '../components/CommentInput';
 import ProgressModal from '../components/ProgressModal';
 import { PRIORITY_STYLES, STATUS_STYLES } from '../constants/taskConstants';
 
@@ -23,7 +24,7 @@ const TABS = [
 
 export default function TaskDetailsPage() {
   const { id } = useParams();
-  const { isAnyAdmin } = useAuth();
+  const { isAnyAdmin, user: currentUser } = useAuth();
   const { toast } = useToast();
   const { task, loading, error, saving, load, updateProgress, addComment, uploadFile, removeAttachment } = useTaskDetails(id);
 
@@ -33,10 +34,8 @@ export default function TaskDetailsPage() {
 
   const [activeTab, setActiveTab] = useState('info');
   const [showProgress, setShowProgress] = useState(false);
-  const [commentText, setCommentText] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
-  const [commentError, setCommentError] = useState('');
   const [pendingAttachmentId, setPendingAttachmentId] = useState(null);
 
   if (loading && !task) {
@@ -50,22 +49,6 @@ export default function TaskDetailsPage() {
   if (!task) {
     return <div className="text-sm text-[var(--text-muted)]">Task not found.</div>;
   }
-
-  const handleCommentSubmit = async () => {
-    const trimmed = commentText.trim();
-    if (!trimmed) return;
-    if (trimmed.length > MAX_COMMENT_LENGTH) {
-      setCommentError(`Comment must not exceed ${MAX_COMMENT_LENGTH} characters`);
-      return;
-    }
-    setCommentError('');
-    try {
-      await addComment(task.id, trimmed);
-      setCommentText('');
-    } catch {
-      // handled in hook
-    }
-  };
 
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -106,13 +89,7 @@ export default function TaskDetailsPage() {
 
   const confirmDeleteAttachment = async () => {
     if (pendingAttachmentId == null) return;
-    try {
-      await removeAttachment(task.id, pendingAttachmentId);
-    } catch {
-      // handled in hook
-    } finally {
-      setPendingAttachmentId(null);
-    }
+    await removeAttachment(task.id, pendingAttachmentId);
   };
 
   return (
@@ -148,7 +125,7 @@ export default function TaskDetailsPage() {
       </div>
 
       <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-sm overflow-hidden">
-        <div className="flex border-b border-[var(--border)] overflow-x-auto">
+        <div className="flex border-b border-[var(--border)] overflow-x-hidden">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             return (
@@ -212,14 +189,21 @@ export default function TaskDetailsPage() {
           )}
 
           {activeTab === 'comments' && (
-            <div className="space-y-4">
-              <CommentSection comments={task.comments} />
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <textarea value={commentText} onChange={(e) => { setCommentText(e.target.value); if (commentError) setCommentError(''); }} placeholder="Write a comment..." rows={2} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 placeholder:text-[var(--text-muted)]" />
-                  {commentError && <p className="text-xs text-red-500 mt-1">{commentError}</p>}
-                </div>
-                <button onClick={handleCommentSubmit} className="shrink-0 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-xs font-medium text-white dark:text-neutral-900 hover:bg-neutral-800">Send</button>
+            <div className="flex flex-col h-full min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <CommentSection
+                  comments={task.comments}
+                  currentUser={currentUser}
+                  isAdmin={isAnyAdmin}
+                  onAddComment={(comment, parentId) => addComment(task.id, comment, parentId)}
+                  canReply
+                />
+              </div>
+              <div className="shrink-0 border-t border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3">
+                <CommentInput
+                  onAddComment={(comment, parentId) => addComment(task.id, comment, parentId)}
+                  canComment
+                />
               </div>
             </div>
           )}
@@ -240,7 +224,7 @@ export default function TaskDetailsPage() {
         </div>
       </div>
 
-      <ProgressModal open={showProgress} onClose={() => setShowProgress(false)} onSubmit={updateProgress} saving={saving} />
+      <ProgressModal open={showProgress} onClose={() => setShowProgress(false)} onSubmit={updateProgress} saving={saving} taskId={task?.id} initialProgress={task?.progress?.[0]} />
 
       <ConfirmationDialog
         isOpen={pendingAttachmentId !== null}

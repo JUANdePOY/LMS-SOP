@@ -49,20 +49,67 @@ function AssigneeStack({ items }) {
   );
 }
 
-function ProgressBar({ rate }) {
-  if (typeof rate !== 'number') {
-    return <span className="text-sm text-[var(--text-muted)]">—</span>;
+function ProgressBar({ rate, taskId, onProgressChange }) {
+  const [editing, setEditing] = useState(false);
+  const [localRate, setLocalRate] = useState(typeof rate === 'number' ? rate : 0);
+
+  const displayRate = typeof rate === 'number' ? rate : 0;
+  const pct = Math.min(100, Math.max(0, editing ? localRate : displayRate));
+
+  const barColor = pct >= 100 ? 'bg-emerald-500' : 'bg-blue-500';
+
+  // Read-only mode: no onProgressChange — just show the bar
+  if (!onProgressChange) {
+    if (typeof rate !== 'number') {
+      return <span className="text-sm text-[var(--text-muted)]">—</span>;
+    }
+    return (
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="h-2 flex-1 min-w-[40px] overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
+          <span className={cn('block h-full rounded-full', barColor)} style={{ width: `${pct}%` }} />
+        </span>
+        <span className="text-xs font-medium text-[var(--text-secondary)] tabular-nums w-10 text-right">{pct}%</span>
+      </div>
+    );
   }
-  const pct = Math.min(100, Math.max(0, rate));
-  return (
-    <div className="flex items-center gap-2 min-w-0">
-      <span className="h-1.5 w-14 shrink-0 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
-        <span
-          className={cn('block h-full rounded-full', pct >= 100 ? 'bg-emerald-500' : 'bg-blue-500')}
-          style={{ width: `${pct}%` }}
+
+  // Edit mode: show slider
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 min-w-0" onClick={(e) => e.stopPropagation()}>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={pct}
+          onChange={(e) => {
+            const val = Number(e.target.value);
+            setLocalRate(val);
+            onProgressChange(taskId, val);
+          }}
+          onBlur={() => setEditing(false)}
+          autoFocus
+          className="flex-1 min-w-[40px] cursor-pointer"
         />
+        <span className="text-xs font-medium text-[var(--text-secondary)] tabular-nums w-10 text-right">{pct}%</span>
+      </div>
+    );
+  }
+
+  // Display mode: the entire bar + percentage is clickable
+  return (
+    <div
+      className="flex items-center gap-2 min-w-0 cursor-pointer"
+      onClick={(e) => {
+        e.stopPropagation();
+        setEditing(true);
+      }}
+      title="Click to edit progress"
+    >
+      <span className="h-3 flex-1 min-w-[40px] overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
+        <span className={cn('block h-full rounded-full', barColor)} style={{ width: `${pct}%` }} />
       </span>
-      <span className="text-xs font-medium text-[var(--text-secondary)] tabular-nums">{pct}%</span>
+      <span className="text-xs font-medium text-[var(--text-secondary)] tabular-nums w-10 text-right">{pct}%</span>
     </div>
   );
 }
@@ -221,7 +268,7 @@ const AssignedCell = memo(function AssignedCell({ assignments, onSave }) {
   );
 });
 
-const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, onInlineUpdate, onViewTask, canManage }) {
+const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, onInlineUpdate, onViewTask, onProgressChange, canManage }) {
   const assignments = task.assignments || [];
   const saveField = (changes) => {
     if (!canManage) return;
@@ -281,7 +328,7 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
       </div>
 
       <div className="min-w-0">
-        <ProgressBar rate={task.progress_rate} />
+        <ProgressBar rate={task.progress_rate} taskId={task.id} onProgressChange={onProgressChange} />
       </div>
 
       <div className="min-w-0">

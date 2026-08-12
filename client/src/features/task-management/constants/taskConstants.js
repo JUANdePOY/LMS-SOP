@@ -49,7 +49,7 @@ export const ALLOWED_ATTACHMENT_MIME_TYPES = [
 /* Table layout & display constants */
 
 /** CSS grid template columns for the task table. */
-export const TASK_TABLE_GRID_COLS = '40px minmax(220px,1fr) 210px 100px 150px 150px 80px';
+export const TASK_TABLE_GRID_COLS = '40px minmax(220px,1fr) 210px 180px 150px 150px 80px';
 
 /** Status display order in the task table. */
 export const TASK_STATUS_ORDER = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled'];

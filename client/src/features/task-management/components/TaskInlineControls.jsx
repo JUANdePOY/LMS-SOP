@@ -25,7 +25,7 @@ const getStatusConfig = (status) => STATUS_CONFIG[status] || STATUS_CONFIG['Not 
 
 const PRIORITY_DOT = TASK_PRIORITY_DOT;
 
-const InlineEditableText = memo(function InlineEditableText({ value, onSave, className, inputClassName, placeholder }) {
+  const InlineEditableText = memo(function InlineEditableText({ value, onSave, className, inputClassName, placeholder }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(value);
   const inputRef = useRef(null);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Plus, Filter, X, RefreshCw, AlertTriangle, ClipboardList, Clock, XCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -99,26 +99,37 @@ const handleDelete = (id) => {
   setPendingDeleteId(id);
 };
 
-const confirmDelete = async () => {
-  if (pendingDeleteId == null) return;
-  try {
+  const confirmDelete = async () => {
+    if (pendingDeleteId == null) return;
     await remove(pendingDeleteId);
-  } catch {
-    // error handled in hook
-  } finally {
-    setPendingDeleteId(null);
-  }
-};
+  };
 
   const handleStatusChange = async (task, newStatus) => {
     try {
-      await updateProgress({ task_id: task.id, status: newStatus });
+      const payload = { task_id: task.id, status: newStatus };
+      if (newStatus === 'Completed') {
+        payload.completion_rate = 100;
+      }
+      await updateProgress(payload);
       toast.success(`Status updated to ${newStatus}`);
       refresh();
     } catch (err) {
       toast.error(err.message || 'Failed to update status');
     }
   };
+
+  const handleProgressChange = useCallback(async (taskId, rate) => {
+    try {
+      const payload = { task_id: taskId, completion_rate: rate };
+      if (rate === 100) {
+        payload.status = 'Completed';
+      }
+      await updateProgress(payload);
+      refresh();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update progress');
+    }
+  }, [refresh, toast]);
 
   const handleInlineUpdate = async (task, changes) => {
     const payload = {
@@ -247,6 +258,7 @@ const confirmDelete = async () => {
           onInlineUpdate={handleInlineUpdate}
           onCreateTask={create}
           onViewTask={(task) => setViewingTaskId(task.id)}
+          onProgressChange={handleProgressChange}
           canManage
         />
       )}

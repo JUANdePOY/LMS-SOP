@@ -37,10 +37,10 @@ export function useTaskDetails(taskId) {
     }
   };
 
-  const addComment = async (taskId, comment) => {
+  const addComment = async (taskId, comment, parentId = null) => {
     setSaving(true);
     try {
-      await apiAddComment({ task_id: taskId, comment });
+      await apiAddComment({ task_id: taskId, comment, parent_id: parentId });
       toast.success('Comment added');
       await load();
     } catch (err) {

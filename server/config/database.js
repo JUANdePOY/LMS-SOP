@@ -609,6 +609,14 @@ async function runMigrations() {
   } catch (err) {
     console.error('Certificate course link migration error:', err.message);
   }
+
+  try {
+    const { runTaskMigrations } = require('../migrations/taskManagement');
+    await runTaskMigrations();
+    console.log('Task management migrations applied');
+  } catch (err) {
+    console.error('Task management migration error:', err.message);
+  }
 }
 
 async function initDatabase() {

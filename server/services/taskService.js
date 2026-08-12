@@ -123,7 +123,7 @@ async function getTask(id, actorId) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  if (!isAdmin && !isUserAssignedToTask(actorId, id)) {
+  if (!isAdmin && !(await isUserAssignedToTask(actorId, id))) {
     const error = new Error('You are not authorized to view this task');
     error.code = 'FORBIDDEN';
     throw error;
@@ -132,6 +132,7 @@ async function getTask(id, actorId) {
   const assignments = await taskAssignmentModel.findByTaskId(id);
   const progress = await taskProgressModel.findByTaskId(id);
   const comments = await taskCommentModel.findByTaskId(id);
+  const taskAttachments = await taskAttachmentModel.findByTaskId(id);
 
   const enrichedAssignments = await Promise.all(assignments.map(async (assignment) => {
     if (assignment.assignment_type === 'User') {
@@ -156,7 +157,16 @@ async function getTask(id, actorId) {
 
   const enrichedProgress = await Promise.all(progress.map(async (p) => {
     const attachments = await taskAttachmentModel.findByProgressId(p.id);
-    return { ...p, attachments };
+    const enrichedAttachments = attachments.map((att) => ({
+      ...att,
+      view_url: buildViewUrl(att.id),
+    }));
+    return { ...p, attachments: enrichedAttachments };
+  }));
+
+  const enrichedTaskAttachments = taskAttachments.map((att) => ({
+    ...att,
+    view_url: buildViewUrl(att.id),
   }));
 
   const autoStatus = computeAutoStatus(task.start_datetime, task.deadline_datetime, task.status);
@@ -168,6 +178,7 @@ async function getTask(id, actorId) {
     assignments: enrichedAssignments,
     progress: enrichedProgress,
     comments,
+    attachments: enrichedTaskAttachments,
   };
 }
 
@@ -312,6 +323,7 @@ async function deleteTask(id, actorId) {
     throw error;
   }
 
+  await taskAttachmentModel.removeByTaskId(id);
   await taskAssignmentModel.removeByTaskId(id);
   await taskCommentModel.removeByTaskId(id);
   await taskModel.remove(id);
@@ -417,17 +429,37 @@ async function updateProgress(payload, actorId) {
   }
 
   const autoStatus = computeAutoStatus(task.start_datetime, task.deadline_datetime, task.status);
-  const finalStatus = status || autoStatus;
+  let finalStatus = status || autoStatus;
 
+  // Business rule: 100% completion automatically marks task as Completed
+  if (completion_rate === 100 && !status) {
+    finalStatus = 'Completed';
+  }
+
+  // Business rule: marking as Completed implies 100% completion rate
   if (finalStatus === 'Completed' && (!completion_rate || completion_rate < 100)) {
-    const error = new Error('Completion rate must be 100% when marking as completed');
-    error.code = 'VALIDATION_ERROR';
-    throw error;
+    completion_rate = 100;
+  }
+
+  let targetUserId = actorId;
+  if (!isAssigned) {
+    const assignments = await taskAssignmentModel.findByTaskId(task_id);
+    const userAssignments = assignments.filter((a) => a.assignment_type === 'User');
+
+    if (userAssignments.length > 0) {
+      const userIds = userAssignments.map((a) => a.reference_id);
+      const [progressRows] = await db.query(
+        `SELECT user_id FROM task_progress WHERE task_id = ? AND user_id IN (?) ORDER BY updated_at DESC LIMIT 1`,
+        [task_id, userIds]
+      );
+
+      targetUserId = progressRows.length > 0 ? progressRows[0].user_id : userAssignments[0].reference_id;
+    }
   }
 
   await taskProgressModel.create({
     task_id,
-    user_id: actorId,
+    user_id: targetUserId,
     completion_rate: completion_rate ?? 0,
     status: finalStatus,
     notes,
@@ -454,7 +486,7 @@ async function addComment(payload, actorId) {
     throw error;
   }
 
-  const { task_id, comment } = validation.value;
+  const { task_id, comment, parent_id } = validation.value;
 
   const task = await taskModel.findById(task_id);
   if (!task) {
@@ -471,13 +503,23 @@ async function addComment(payload, actorId) {
     throw error;
   }
 
+  if (parent_id) {
+    const parent = await taskCommentModel.findById(parent_id);
+    if (!parent || parent.task_id !== task_id) {
+      const error = new Error('Parent comment not found');
+      error.code = 'NOT_FOUND';
+      throw error;
+    }
+  }
+
   const commentId = await taskCommentModel.create({
     task_id,
     user_id: actorId,
     comment,
+    parent_id: parent_id || null,
   });
 
-  logAudit('task.comment.create', actorId, { task_id, comment_id });
+  logAudit('task.comment.create', actorId, { task_id, comment_id: commentId });
 
   return await taskCommentModel.findById(commentId);
 }
@@ -554,18 +596,7 @@ async function deleteAttachment(attachmentId, actorId) {
 }
 
 async function getMyTasks(userId, filters = {}) {
-  const isAdmin = await isUserAdmin(userId);
-  if (isAdmin) {
-    return await taskModel.findAll(filters);
-  }
-
-  const assignedTaskIds = await getAssignedTaskIdsForUser(userId);
-  if (assignedTaskIds.length === 0) {
-    return { rows: [], total: 0, page: 1, limit: 20, totalPages: 0 };
-  }
-
-  filters.task_ids = assignedTaskIds;
-  return await taskModel.findAll(filters);
+  return await listTasks(filters, userId);
 }
 
 async function getTaskStats(filters = {}, actorId) {

@@ -57,7 +57,10 @@ async function findById(id) {
 
 async function findByProgressId(progressId) {
   const [rows] = await db.query(
-    'SELECT * FROM task_attachments WHERE task_progress_id = ? ORDER BY created_at DESC',
+    `SELECT id, task_progress_id, task_id, file_name, original_name, mime_type, size_bytes, uploaded_by, created_at
+     FROM task_attachments
+     WHERE task_progress_id = ?
+     ORDER BY created_at DESC`,
     [progressId]
   );
   return rows;
@@ -65,7 +68,10 @@ async function findByProgressId(progressId) {
 
 async function findByTaskId(taskId) {
   const [rows] = await db.query(
-    'SELECT * FROM task_attachments WHERE task_id = ? ORDER BY created_at DESC',
+    `SELECT id, task_progress_id, task_id, file_name, original_name, mime_type, size_bytes, uploaded_by, created_at
+     FROM task_attachments
+     WHERE task_id = ? AND task_progress_id IS NULL
+     ORDER BY created_at DESC`,
     [taskId]
   );
   return rows;
@@ -73,6 +79,11 @@ async function findByTaskId(taskId) {
 
 async function remove(id) {
   const [result] = await db.query('DELETE FROM task_attachments WHERE id = ?', [id]);
+  return result.affectedRows;
+}
+
+async function removeByTaskId(taskId) {
+  const [result] = await db.query('DELETE FROM task_attachments WHERE task_id = ?', [taskId]);
   return result.affectedRows;
 }
 
@@ -85,4 +96,5 @@ module.exports = {
   findByProgressId,
   findByTaskId,
   remove,
+  removeByTaskId,
 };
