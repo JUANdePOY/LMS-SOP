@@ -67,17 +67,8 @@ const calendarModel = {
   async saveToken({ userId, provider = 'google', googleEmail, accessToken, refreshToken, expiryDate }) {
     const encAccess = encrypt(accessToken);
     const encRefresh = refreshToken ? encrypt(refreshToken) : null;
-    // If the unique index is missing (e.g. an older table created before
-    // uk_user_provider existed), multiple rows may have accumulated — including
-    // undecryptable leftovers from a rotated key. Drop any row that doesn't
-    // decrypt so a single clean row remains, then upsert the new one.
+    console.log('[Calendar] saveToken start userId=', userId, 'provider=', provider, 'email=', googleEmail, 'hasAccess=', !!accessToken, 'hasRefresh=', !!refreshToken);
     await purgeUndecryptableRows(userId, provider);
-    // Atomic upsert on the (user_id, provider) unique key. Using
-    // INSERT ... ON DUPLICATE KEY UPDATE (instead of DELETE-then-INSERT) means
-    // the row is never briefly absent, so a concurrent /calendar/status poll
-    // during connect can't read "not connected" and leave the client spinner
-    // stuck. A row previously encrypted with a rotated key is simply overwritten
-    // here with a fresh row encrypted using the current key.
     await db.query(
       `INSERT INTO user_calendar_tokens (id, user_id, provider, google_email, access_token, refresh_token, expiry_date)
        VALUES (UUID(), ?, ?, ?, ?, ?, ?)
@@ -89,7 +80,10 @@ const calendarModel = {
          updated_at = CURRENT_TIMESTAMP`,
       [userId, provider, googleEmail || null, encAccess, encRefresh, expiryDate || null]
     );
-    return this.getToken(userId, provider);
+    console.log('[Calendar] saveToken persisted userId=', userId);
+    const result = await this.getToken(userId, provider);
+    console.log('[Calendar] saveToken re-read userId=', userId, 'found=', !!result, 'email=', result?.google_email);
+    return result;
   },
 
   // Used when refreshing: only update access token + expiry, never drop refresh token.

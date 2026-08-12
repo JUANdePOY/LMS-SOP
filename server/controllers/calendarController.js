@@ -52,10 +52,6 @@ function getAuthUrl(req, res) {
 function handleCallback(req, res) {
   const { code, state, error, error_description } = req.query;
   try {
-    // Google redirects back with ?error=... (e.g. access_denied,
-    // redirect_uri_mismatch) instead of ?code=... when consent fails or the
-    // redirect URI doesn't match what's registered in Google Cloud. Surface it
-    // instead of the generic "Missing parameters".
     if (error) {
       console.error('[Calendar] Google OAuth error:', error, error_description || '');
       return sendCallback(res, 400, renderCallbackHtml(false, `Google error: ${error}${error_description ? ` (${error_description})` : ''}`));
@@ -64,25 +60,29 @@ function handleCallback(req, res) {
       console.error('[Calendar] Callback missing params. originalUrl:', req.originalUrl, '| query:', JSON.stringify(req.query));
       return sendCallback(res, 400, renderCallbackHtml(false, 'Missing parameters'));
     }
-    // Verify the state against the server-side record we created in getAuthUrl.
+    console.log('[Calendar] Callback start state=', state, 'code=', code);
     calendarModel.getOAuthState(state)
       .then((row) => {
         if (!row) {
+          console.error('[Calendar] State verification failed for state=', state);
           return sendCallback(res, 400, renderCallbackHtml(false, 'State verification failed'));
         }
         const userId = row.user_id;
-        // Consume the state so it can't be replayed.
+        console.log('[Calendar] State verified userId=', userId);
         return calendarModel.deleteOAuthState(state)
           .then(() => calendarService.handleCallback(code, userId))
           .then((result) => {
+            console.log('[Calendar] handleCallback success userId=', userId, 'result keys=', Object.keys(result || {}));
             logAudit && logAudit('calendar.connect', userId, { syncedEvents: result.syncedEvents || 0 });
             sendCallback(res, 200, renderCallbackHtml(true, 'Calendar connected'));
           });
       })
       .catch((err) => {
+        console.error('[Calendar] handleCallback error:', err.message);
         sendError(res, err, 'Failed to connect calendar');
       });
   } catch (err) {
+    console.error('[Calendar] handleCallback unexpected error:', err.message);
     sendError(res, err, 'Failed to connect calendar');
   }
 }
@@ -106,7 +106,11 @@ function getStatus(req, res) {
   const userId = req.user.id;
   calendarModel.getToken(userId)
     .then((token) => {
-      if (!token) return res.json({ success: true, data: { connected: false } });
+      if (!token) {
+        console.log('[Calendar] getStatus userId=', userId, 'connected=false');
+        return res.json({ success: true, data: { connected: false } });
+      }
+      console.log('[Calendar] getStatus userId=', userId, 'connected=true', 'email=', token.google_email, 'updated_at=', token.updated_at);
       return res.json({
         success: true,
         data: {
@@ -116,7 +120,10 @@ function getStatus(req, res) {
         },
       });
     })
-    .catch((err) => sendError(res, err, 'Failed to read calendar status'));
+    .catch((err) => {
+      console.error('[Calendar] getStatus error userId=', userId, err.message);
+      sendError(res, err, 'Failed to read calendar status');
+    });
 }
 
 function syncEvent(req, res) {
