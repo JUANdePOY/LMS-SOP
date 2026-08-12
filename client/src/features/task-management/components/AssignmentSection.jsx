@@ -1,13 +1,13 @@
-import { ASSIGNMENT_TYPE_LABELS, ASSIGNMENT_TYPES } from '../constants/taskConstants';
-import { User, Building2, Briefcase } from 'lucide-react';
+import { memo } from 'react';
+import { ASSIGNMENT_TYPE_LABELS } from '../constants/taskConstants';
+import { User, Building2 } from 'lucide-react';
 
 const TYPE_ICONS = {
   User: User,
   Department: Building2,
-  Position: Briefcase,
 };
 
-function AssignmentSection({ assignments }) {
+const AssignmentSection = memo(function AssignmentSection({ assignments }) {
   if (!assignments || assignments.length === 0) {
     return <p className="text-sm text-[var(--text-muted)]">No assignments yet.</p>;
   }
@@ -33,6 +33,6 @@ function AssignmentSection({ assignments }) {
       })}
     </div>
   );
-}
+});
 
 export default AssignmentSection;

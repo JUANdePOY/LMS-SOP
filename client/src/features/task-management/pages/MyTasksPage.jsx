@@ -1,34 +1,33 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useMyTasks } from '../hooks/useMyTasks';
-import TaskCard from '../components/TaskCard';
+import { updateProgress } from '../services/taskService';
+import { TASK_STATUSES, PRIORITY_STYLES, STATUS_STYLES } from '../constants/taskConstants';
+import { formatDate } from '../utils/taskDateUtils';
 import TaskCardSkeleton from '../components/TaskCardSkeleton';
 import ProgressModal from '../components/ProgressModal';
-import { TASK_PRIORITIES, TASK_STATUSES, PRIORITY_STYLES, STATUS_STYLES } from '../constants/taskConstants';
-import { updateProgress } from '../services/taskService';
 
 export default function MyTasksPage() {
   const { isAnyAdmin } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { tasks, loading, error, pagination, refresh } = useMyTasks();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const filters = useMemo(() => ({ search, status: statusFilter }), [search, statusFilter]);
+  const { tasks, loading, error, refresh } = useMyTasks(filters);
   const [progressTask, setProgressTask] = useState(null);
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [refresh]);
 
   useEffect(() => {
     const timeout = setTimeout(() => refresh(), 300);
     return () => clearTimeout(timeout);
-  }, [search, statusFilter]);
-
-  const handleProgress = async (payload) => {
+  }, [filters, refresh]);  const handleProgress = async (payload) => {
     try {
       await updateProgress({ task_id: progressTask.id, ...payload });
       toast.success('Progress updated');
@@ -88,8 +87,8 @@ export default function MyTasksPage() {
                 </button>
               </div>
               <div className="mt-3 flex items-center gap-3 text-xs text-[var(--text-muted)]">
-                <span>Start: {new Date(task.start_datetime).toLocaleDateString()}</span>
-                <span>Deadline: {new Date(task.deadline_datetime).toLocaleDateString()}</span>
+                <span>Start: {formatDate(task.start_datetime)}</span>
+                <span>Deadline: {formatDate(task.deadline_datetime)}</span>
               </div>
             </div>
           ))

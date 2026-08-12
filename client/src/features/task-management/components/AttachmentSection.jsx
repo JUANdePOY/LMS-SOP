@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { Paperclip, Trash2, Download, Eye } from 'lucide-react';
 
-function AttachmentSection({ attachments, onDelete, canManage }) {
+const AttachmentSection = memo(function AttachmentSection({ attachments, onDelete, canManage }) {
   const [viewing, setViewing] = useState(null);
 
   const getFileIcon = (mimeType) => {
@@ -52,6 +52,6 @@ function AttachmentSection({ attachments, onDelete, canManage }) {
       )}
     </div>
   );
-}
+});
 
 export default AttachmentSection;

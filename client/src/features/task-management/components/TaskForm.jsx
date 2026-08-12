@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { TASK_PRIORITIES, TASK_STATUSES } from '../constants/taskConstants';
+import { validateTaskPayload } from '../utils/taskValidation';
 import AssignmentInput from './AssignmentInput';
 
 function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
@@ -61,23 +62,20 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
   };
 
   const validate = () => {
-    const newErrors = {};
-    if (!title.trim()) newErrors.title = 'Title is required';
-    if (!startDatetime) newErrors.startDatetime = 'Start date is required';
-    if (!deadlineDatetime) newErrors.deadlineDatetime = 'Deadline is required';
-    if (startDatetime && deadlineDatetime && new Date(deadlineDatetime) <= new Date(startDatetime)) {
-      newErrors.deadlineDatetime = 'Deadline must be after start date';
-    }
-    if (estimatedHours !== '' && estimatedHours !== null && estimatedHours !== undefined) {
-      const hours = Number(estimatedHours);
-      if (!Number.isFinite(hours) || hours < 0 || !Number.isInteger(hours)) {
-        newErrors.estimatedHours = 'Estimated hours must be a non-negative whole number';
-      }
-    }
-    const validAssignments = assignments.filter((a) => a.reference_id || a.reference_name);
-    if (validAssignments.length === 0) newErrors.assignments = 'At least one assignment is required';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const payload = {
+      title,
+      description,
+      priority,
+      status,
+      start_datetime: startDatetime,
+      deadline_datetime: deadlineDatetime,
+      estimated_hours: estimatedHours,
+      category,
+      assignments,
+    };
+    const result = validateTaskPayload(payload, true);
+    setErrors(result.errors);
+    return result.valid;
   };
 
   const handleSubmit = () => {
@@ -170,9 +168,9 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
                 type="datetime-local"
                 value={startDatetime}
                 onChange={(e) => setStartDatetime(e.target.value)}
-                className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 ${errors.startDatetime ? 'border-red-500' : 'border-[var(--border)]'}`}
+                className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 ${errors.start_datetime ? 'border-red-500' : 'border-[var(--border)]'}`}
               />
-              {errors.startDatetime && <p className="text-xs text-red-500 mt-1">{errors.startDatetime}</p>}
+              {errors.start_datetime && <p className="text-xs text-red-500 mt-1">{errors.start_datetime}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Deadline *</label>
@@ -180,9 +178,9 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
                 type="datetime-local"
                 value={deadlineDatetime}
                 onChange={(e) => setDeadlineDatetime(e.target.value)}
-                className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 ${errors.deadlineDatetime ? 'border-red-500' : 'border-[var(--border)]'}`}
+                className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 ${errors.deadline_datetime ? 'border-red-500' : 'border-[var(--border)]'}`}
               />
-              {errors.deadlineDatetime && <p className="text-xs text-red-500 mt-1">{errors.deadlineDatetime}</p>}
+              {errors.deadline_datetime && <p className="text-xs text-red-500 mt-1">{errors.deadline_datetime}</p>}
             </div>
           </div>
 
@@ -195,9 +193,9 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
                 onChange={(e) => setEstimatedHours(e.target.value)}
                 placeholder="Optional"
                 min="0"
-                className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 placeholder:text-[var(--text-muted)] ${errors.estimatedHours ? 'border-red-500' : 'border-[var(--border)]'}`}
+                className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 placeholder:text-[var(--text-muted)] ${errors.estimated_hours ? 'border-red-500' : 'border-[var(--border)]'}`}
               />
-              {errors.estimatedHours && <p className="text-xs text-red-500 mt-1">{errors.estimatedHours}</p>}
+              {errors.estimated_hours && <p className="text-xs text-red-500 mt-1">{errors.estimated_hours}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Category</label>

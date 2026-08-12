@@ -47,6 +47,8 @@ async function listTasks(filters = {}, actorId) {
 
   const taskIds = result.rows.map((task) => task.id);
   let progressMap = {};
+  let assignmentsMap = {};
+
   if (taskIds.length > 0) {
     const [progressRows] = await db.query(
       `SELECT tp.task_id, tp.completion_rate
@@ -62,12 +64,51 @@ async function listTasks(filters = {}, actorId) {
     progressRows.forEach((p) => {
       progressMap[p.task_id] = p.completion_rate;
     });
+
+    const [assignmentRows] = await db.query(
+      `SELECT ta.task_id, ta.assignment_type, ta.reference_id
+       FROM task_assignments ta
+       WHERE ta.task_id IN (?)
+       ORDER BY ta.assigned_at ASC`,
+      [taskIds]
+    );
+
+    const userIds = [...new Set(assignmentRows.filter((a) => a.assignment_type === 'User').map((a) => Number(a.reference_id)).filter(Boolean))];
+    const deptIds = [...new Set(assignmentRows.filter((a) => a.assignment_type === 'Department').map((a) => Number(a.reference_id)).filter(Boolean))];
+
+    const userMap = {};
+    if (userIds.length > 0) {
+      const [users] = await db.query(
+        'SELECT id, full_name FROM users WHERE id IN (?)',
+        [userIds]
+      );
+      users.forEach((u) => { userMap[u.id] = u.full_name; });
+    }
+
+    const deptMap = {};
+    if (deptIds.length > 0) {
+      const [depts] = await db.query(
+        'SELECT id, name FROM departments WHERE id IN (?)',
+        [deptIds]
+      );
+      depts.forEach((d) => { deptMap[d.id] = d.name; });
+    }
+
+    assignmentRows.forEach((a) => {
+      if (!assignmentsMap[a.task_id]) assignmentsMap[a.task_id] = [];
+      let referenceName = null;
+      if (a.assignment_type === 'User') referenceName = userMap[a.reference_id] || null;
+      else if (a.assignment_type === 'Department') referenceName = deptMap[a.reference_id] || null;
+      else if (a.assignment_type === 'Position') referenceName = a.reference_id;
+      assignmentsMap[a.task_id].push({ ...a, reference_name: referenceName });
+    });
   }
 
   const rows = result.rows.map((task) => ({
     ...task,
-    status: computeAutoStatus(task.start_datetime, task.deadline_datetime, task.status),
+    status: task.status,
     progress_rate: progressMap[task.id] ?? null,
+    assignments: assignmentsMap[task.id] || [],
   }));
 
   return { ...result, rows };
@@ -123,7 +164,7 @@ async function getTask(id, actorId) {
   return {
     ...task,
     auto_status: autoStatus,
-    status: autoStatus,
+    status: task.status,
     assignments: enrichedAssignments,
     progress: enrichedProgress,
     comments,
@@ -219,6 +260,37 @@ async function updateTask(id, payload, actorId) {
   }
 
   await taskModel.update(id, validation.value);
+
+  const assignments = Array.isArray(payload.assignments) ? payload.assignments : [];
+  if (assignments.length > 0) {
+    const currentAssignments = await taskAssignmentModel.findByTaskId(id);
+    const currentMap = new Map(currentAssignments.map((a) => [`${a.assignment_type}:${a.reference_id}`, a]));
+    const newMap = new Map(assignments.map((a) => [`${a.assignment_type}:${a.reference_id}`, a]));
+
+    for (const [key, assignment] of currentMap) {
+      if (!newMap.has(key)) {
+        await taskAssignmentModel.removeByTaskAndRef(id, assignment.assignment_type, assignment.reference_id);
+      }
+    }
+
+    for (const [key, assignment] of newMap) {
+      if (!currentMap.has(key)) {
+        const assignmentValidation = validateAssignmentPayload({ ...assignment, task_id: id });
+        if (!assignmentValidation.valid) {
+          const error = new Error('Invalid assignment in update payload');
+          error.code = 'VALIDATION_ERROR';
+          error.details = assignmentValidation.errors;
+          throw error;
+        }
+        await taskAssignmentModel.create({
+          task_id: id,
+          assignment_type: assignmentValidation.value.assignment_type,
+          reference_id: assignmentValidation.value.reference_id,
+          assigned_by: actorId,
+        });
+      }
+    }
+  }
 
   logAudit('task.update', actorId, { task_id: id, changes: validation.value });
 

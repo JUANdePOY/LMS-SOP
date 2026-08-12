@@ -78,6 +78,6 @@ export function useTaskDetails(taskId) {
       setSaving(false);
     }
   };
-
   return { task, loading, error, saving, load, updateProgress, addComment, uploadFile, removeAttachment };
 }
+

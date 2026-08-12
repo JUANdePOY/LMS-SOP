@@ -24,7 +24,6 @@ import UserAvatar from "@/shared/components/ui/Avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { filterMenuByRole, LMS_ROLES } from "@/config/menuItems";
 import { useNotificationStore } from "@/shared/stores/notificationStore.js";
-import { useMyTaskCount } from "@/features/task-management/hooks/useMyTaskCount";
 
 const EMPLOYEE_MENU_ITEMS = [
   {
@@ -145,12 +144,6 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
     return unreadBannerIds.length;
   };
 
-  const { refresh: refreshTaskCount } = useMyTaskCount();
-
-  useEffect(() => {
-    refreshTaskCount();
-  }, [refreshTaskCount]);
-
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -167,11 +160,6 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
       setExpandedSubMenus(prev => ({ ...prev, "SOP Management": true }));
     }
   }, [location.pathname]);
-
-  // Refresh task count when route changes
-  useEffect(() => {
-    refreshTaskCount();
-  }, [location.pathname, refreshTaskCount]);
 
   const toggleSubMenu = (name) => {
     setExpandedSubMenus((prev) => ({ ...prev, [name]: !prev[name] }));

@@ -5,23 +5,27 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/components/ui/Toast';
 import { cn } from '@/lib/utils';
 import { useTasks } from '../hooks/useTasks';
-import { getTask } from '../services/taskService';
-import TaskCard from '../components/TaskCard';
-import TaskCardSkeleton from '../components/TaskCardSkeleton';
-import TaskForm from '../components/TaskForm';
+import { getTask, updateProgress } from '../services/taskService';
 import { TASK_PRIORITIES, TASK_STATUSES } from '../constants/taskConstants';
+import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
+import TaskListTable from '../components/TaskListTable';
+import TaskListTableSkeleton from '../components/TaskListTableSkeleton';
+import TaskForm from '../components/TaskForm';
 
 export default function TasksPage() {
   const { isAnyAdmin } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { tasks, loading, error, stats, refresh, create, update, remove } = useTasks();
-  const [showForm, setShowForm] = useState(false);
-  const [editingTask, setEditingTask] = useState(null);
-  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
+
+  const filters = useMemo(() => ({ search, status: statusFilter, priority: priorityFilter }), [search, statusFilter, priorityFilter]);
+
+  const { tasks, loading, error, stats, refresh, refreshTasks, refreshStats, create, update, remove } = useTasks(filters);
+  const [showForm, setShowForm] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!isAnyAdmin) {
@@ -29,13 +33,18 @@ export default function TasksPage() {
     }
   }, [isAnyAdmin, navigate]);
 
-  if (!isAnyAdmin) {
-    return null;
-  }
-
+  // Load stats once on mount (not on every filter change)
   useEffect(() => {
-    refresh();
-  }, []);
+    if (!isAnyAdmin) return;
+    refreshStats();
+  }, [isAnyAdmin, refreshStats]);
+
+  // Load tasks on mount and when filters change (debounced)
+  useEffect(() => {
+    if (!isAnyAdmin) return;
+    const timeout = setTimeout(() => refreshTasks(), 300);
+    return () => clearTimeout(timeout);
+  }, [filters, isAnyAdmin, refreshTasks]);
 
   const statItems = useMemo(() => {
     if (!stats) return [];
@@ -57,11 +66,6 @@ export default function TasksPage() {
     setPriorityFilter('');
   };
 
-  useEffect(() => {
-    const timeout = setTimeout(() => refresh(), 300);
-    return () => clearTimeout(timeout);
-  }, [search, statusFilter, priorityFilter]);
-
   const handleSubmit = async (payload) => {
     setSaving(true);
     try {
@@ -77,10 +81,6 @@ export default function TasksPage() {
     }
   };
 
-  const handleView = (task) => {
-    navigate(`/tasks/${task.id}`);
-  };
-
   const handleEdit = async (task) => {
     try {
       const data = await getTask(task.id);
@@ -91,14 +91,60 @@ export default function TasksPage() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this task?')) return;
+const [pendingDeleteId, setPendingDeleteId] = useState(null);
+
+const handleDelete = (id) => {
+  setPendingDeleteId(id);
+};
+
+const confirmDelete = async () => {
+  if (pendingDeleteId == null) return;
+  try {
+    await remove(pendingDeleteId);
+  } catch {
+    // error handled in hook
+  } finally {
+    setPendingDeleteId(null);
+  }
+};
+
+  const handleStatusChange = async (task, newStatus) => {
     try {
-      await remove(id);
+      await updateProgress({ task_id: task.id, status: newStatus });
+      toast.success(`Status updated to ${newStatus}`);
+      refresh();
     } catch (err) {
-      // error handled in hook
+      toast.error(err.message || 'Failed to update status');
     }
   };
+
+  const handleInlineUpdate = async (task, changes) => {
+    const payload = {
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      status: task.status,
+      start_datetime: task.start_datetime,
+      deadline_datetime: task.deadline_datetime,
+      estimated_hours: task.estimated_hours,
+      category: task.category,
+      assignments: (task.assignments || []).map((a) => ({
+        assignment_type: a.assignment_type,
+        reference_id: a.reference_id,
+        reference_name: a.reference_name,
+      })),
+      ...changes,
+    };
+    try {
+      await update(task.id, payload);
+    } catch (err) {
+      toast.error(err.message || 'Failed to update task');
+    }
+  };
+
+  if (!isAnyAdmin) {
+    return null;
+  }
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -180,23 +226,27 @@ export default function TasksPage() {
       )}
 
       {/* Task List */}
-      <div className="space-y-3">
-        {loading && tasks.length === 0 ? (
-          <TaskCardSkeleton count={4} />
-        ) : tasks.length === 0 ? (
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-12 text-center">
-            <ClipboardList size={32} className="text-[var(--text-muted)] mx-auto mb-3" />
-            <p className="text-sm text-[var(--text-muted)] mb-1">No tasks found</p>
-            {hasActiveFilters && (
-              <p className="text-xs text-[var(--text-muted)]">Try adjusting your search or filters</p>
-            )}
-          </div>
-        ) : (
-          tasks.map((task) => (
-            <TaskCard key={task.id} task={task} onView={handleView} onEdit={handleEdit} onDelete={handleDelete} canManage />
-          ))
-        )}
-      </div>
+      {loading && tasks.length === 0 ? (
+        <TaskListTableSkeleton count={5} />
+      ) : tasks.length === 0 ? (
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-12 text-center">
+          <ClipboardList size={32} className="text-[var(--text-muted)] mx-auto mb-3" />
+          <p className="text-sm text-[var(--text-muted)] mb-1">No tasks found</p>
+          {hasActiveFilters && (
+            <p className="text-xs text-[var(--text-muted)]">Try adjusting your search or filters</p>
+          )}
+        </div>
+      ) : (
+        <TaskListTable
+          tasks={tasks}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onStatusChange={handleStatusChange}
+          onInlineUpdate={handleInlineUpdate}
+          onCreateTask={create}
+          canManage
+        />
+      )}
 
       <TaskForm
         show={showForm}
@@ -204,6 +254,16 @@ export default function TasksPage() {
         onSubmit={handleSubmit}
         saving={saving}
         initialData={editingTask}
+      />
+
+      <ConfirmationDialog
+        isOpen={pendingDeleteId !== null}
+        onClose={() => setPendingDeleteId(null)}
+        onConfirm={confirmDelete}
+        title="Delete Task"
+        message="Are you sure you want to delete this task? This action cannot be undone."
+        confirmText="Delete"
+        variant="destructive"
       />
     </div>
   );

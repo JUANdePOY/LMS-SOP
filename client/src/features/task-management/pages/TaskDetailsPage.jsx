@@ -4,6 +4,9 @@ import { ArrowLeft, Users, MessageSquare, Paperclip, BarChart3 } from 'lucide-re
 import { useToast } from '@/shared/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTaskDetails } from '../hooks/useTaskDetails';
+import { MAX_ATTACHMENT_SIZE_BYTES, ALLOWED_ATTACHMENT_MIME_TYPES, MAX_COMMENT_LENGTH } from '../constants/taskConstants';
+import { formatDate } from '../utils/taskDateUtils';
+import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import AssignmentSection from '../components/AssignmentSection';
 import AttachmentSection from '../components/AttachmentSection';
 import CommentSection from '../components/CommentSection';
@@ -22,7 +25,7 @@ export default function TaskDetailsPage() {
   const { id } = useParams();
   const { isAnyAdmin } = useAuth();
   const { toast } = useToast();
-  const { task, loading, error, load, updateProgress, addComment, uploadFile, removeAttachment } = useTaskDetails(id);
+  const { task, loading, error, saving, load, updateProgress, addComment, uploadFile, removeAttachment } = useTaskDetails(id);
 
   useEffect(() => {
     load();
@@ -34,21 +37,7 @@ export default function TaskDetailsPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [commentError, setCommentError] = useState('');
-
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-  const ALLOWED_FILE_TYPES = [
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'image/jpg',
-    'application/pdf',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    'application/vnd.ms-excel',
-    'application/zip',
-    'application/x-zip-compressed',
-  ];
+  const [pendingAttachmentId, setPendingAttachmentId] = useState(null);
 
   if (loading && !task) {
     return <div className="text-center py-12 text-sm text-[var(--text-muted)]">Loading task...</div>;
@@ -65,16 +54,16 @@ export default function TaskDetailsPage() {
   const handleCommentSubmit = async () => {
     const trimmed = commentText.trim();
     if (!trimmed) return;
-    if (trimmed.length > 5000) {
-      setCommentError('Comment must not exceed 5000 characters');
+    if (trimmed.length > MAX_COMMENT_LENGTH) {
+      setCommentError(`Comment must not exceed ${MAX_COMMENT_LENGTH} characters`);
       return;
     }
     setCommentError('');
     try {
       await addComment(task.id, trimmed);
       setCommentText('');
-    } catch (err) {
-      // handled
+    } catch {
+      // handled in hook
     }
   };
 
@@ -83,14 +72,15 @@ export default function TaskDetailsPage() {
     if (!file) return;
     setUploadError('');
 
-    if (file.size > MAX_FILE_SIZE) {
-      const sizeMB = (MAX_FILE_SIZE / (1024 * 1024)).toFixed(0);
-      setUploadError(`File is too large. Maximum size is ${sizeMB}MB.`);
+    const maxSizeMB = (MAX_ATTACHMENT_SIZE_BYTES / (1024 * 1024)).toFixed(0);
+
+    if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+      setUploadError(`File is too large. Maximum size is ${maxSizeMB}MB.`);
       e.target.value = '';
       return;
     }
 
-    if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+    if (!ALLOWED_ATTACHMENT_MIME_TYPES.includes(file.type)) {
       setUploadError('Invalid file type. Allowed: images, PDF, Word, Excel, ZIP.');
       e.target.value = '';
       return;
@@ -110,12 +100,18 @@ export default function TaskDetailsPage() {
     }
   };
 
-  const handleDeleteAttachment = async (attachmentId) => {
-    if (!window.confirm('Delete this attachment?')) return;
+  const handleDeleteAttachment = (attachmentId) => {
+    setPendingAttachmentId(attachmentId);
+  };
+
+  const confirmDeleteAttachment = async () => {
+    if (pendingAttachmentId == null) return;
     try {
-      await removeAttachment(task.id, attachmentId);
-    } catch (err) {
-      // handled
+      await removeAttachment(task.id, pendingAttachmentId);
+    } catch {
+      // handled in hook
+    } finally {
+      setPendingAttachmentId(null);
     }
   };
 
@@ -144,8 +140,8 @@ export default function TaskDetailsPage() {
         </div>
 
         <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-          <div><span className="text-[var(--text-muted)]">Start:</span> <span className="font-medium">{new Date(task.start_datetime).toLocaleString()}</span></div>
-          <div><span className="text-[var(--text-muted)]">Deadline:</span> <span className="font-medium">{new Date(task.deadline_datetime).toLocaleString()}</span></div>
+          <div><span className="text-[var(--text-muted)]">Start:</span> <span className="font-medium">{formatDate(task.start_datetime)}</span></div>
+          <div><span className="text-[var(--text-muted)]">Deadline:</span> <span className="font-medium">{formatDate(task.deadline_datetime)}</span></div>
           <div><span className="text-[var(--text-muted)]">Est. Hours:</span> <span className="font-medium">{task.estimated_hours || '—'}</span></div>
           <div><span className="text-[var(--text-muted)]">Created By:</span> <span className="font-medium">{task.created_by_name || '—'}</span></div>
         </div>
@@ -173,8 +169,8 @@ export default function TaskDetailsPage() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="text-[var(--text-muted)]">Priority:</span> <span className="font-medium">{task.priority}</span></div>
                 <div><span className="text-[var(--text-muted)]">Status:</span> <span className="font-medium">{task.status}</span></div>
-                <div><span className="text-[var(--text-muted)]">Start:</span> <span className="font-medium">{new Date(task.start_datetime).toLocaleString()}</span></div>
-                <div><span className="text-[var(--text-muted)]">Deadline:</span> <span className="font-medium">{new Date(task.deadline_datetime).toLocaleString()}</span></div>
+                <div><span className="text-[var(--text-muted)]">Start:</span> <span className="font-medium">{formatDate(task.start_datetime)}</span></div>
+                <div><span className="text-[var(--text-muted)]">Deadline:</span> <span className="font-medium">{formatDate(task.deadline_datetime)}</span></div>
               </div>
             </div>
           )}
@@ -190,7 +186,7 @@ export default function TaskDetailsPage() {
                   <div key={p.id} className="rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-[var(--text-primary)]">{p.user_name}</span>
-                      <span className="text-xs text-[var(--text-muted)]">{new Date(p.updated_at).toLocaleString()}</span>
+                      <span className="text-xs text-[var(--text-muted)]">{formatDate(p.updated_at)}</span>
                     </div>
                     <div className="flex items-center gap-2 mb-1">
                       <div className="flex-1 h-2 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
@@ -244,7 +240,17 @@ export default function TaskDetailsPage() {
         </div>
       </div>
 
-      <ProgressModal open={showProgress} onClose={() => setShowProgress(false)} onSubmit={updateProgress} saving={false} />
+      <ProgressModal open={showProgress} onClose={() => setShowProgress(false)} onSubmit={updateProgress} saving={saving} />
+
+      <ConfirmationDialog
+        isOpen={pendingAttachmentId !== null}
+        onClose={() => setPendingAttachmentId(null)}
+        onConfirm={confirmDeleteAttachment}
+        title="Delete Attachment"
+        message="Are you sure you want to delete this attachment?"
+        confirmText="Delete"
+        variant="destructive"
+      />
     </div>
   );
 }

@@ -1,4 +1,6 @@
-function CommentSection({ comments }) {
+import { memo } from 'react';
+
+const CommentSection = memo(function CommentSection({ comments }) {
   if (!comments || comments.length === 0) {
     return <p className="text-sm text-[var(--text-muted)]">No comments yet.</p>;
   }
@@ -16,6 +18,6 @@ function CommentSection({ comments }) {
       ))}
     </div>
   );
-}
+});
 
 export default CommentSection;
