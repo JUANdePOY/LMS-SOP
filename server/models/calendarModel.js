@@ -73,9 +73,12 @@ const calendarModel = {
     const encRefresh = refreshToken ? encrypt(refreshToken) : null;
     console.log('[Calendar] saveToken start userId=', userId, 'provider=', provider, 'email=', googleEmail, 'hasAccess=', !!accessToken, 'hasRefresh=', !!refreshToken, 'encAccessLen=', encAccess && encAccess.length, 'encRefreshLen=', encRefresh && encRefresh.length);
     await purgeUndecryptableRows(userId, provider);
+
+    const values = [userId, provider, googleEmail || null, encAccess, encRefresh, expiryDate || null];
     let inserted = false;
+
     try {
-      await db.query(
+      const [result] = await db.query(
         `INSERT INTO user_calendar_tokens (user_id, provider, google_email, access_token, refresh_token, expiry_date)
          VALUES (?, ?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE
@@ -84,28 +87,50 @@ const calendarModel = {
            refresh_token = VALUES(refresh_token),
            expiry_date = VALUES(expiry_date),
            updated_at = CURRENT_TIMESTAMP`,
-        [userId, provider, googleEmail || null, encAccess, encRefresh, expiryDate || null]
+        values
       );
       inserted = true;
+      console.log('[Calendar] saveToken insert/upsert result affectedRows=', result && result.affectedRows, 'insertId=', result && result.insertId);
     } catch (err) {
-      console.warn('[Calendar] saveToken insert fallback userId=', userId, 'err=', err && err.message, 'code=', err && err.code);
+      console.warn('[Calendar] saveToken insert failed userId=', userId, 'err=', err && err.message, 'code=', err && err.code);
       try {
-        await db.query(
+        const [updateResult] = await db.query(
           `UPDATE user_calendar_tokens
            SET google_email = ?, access_token = ?, refresh_token = ?, expiry_date = ?, updated_at = CURRENT_TIMESTAMP
            WHERE user_id = ? AND provider = ?`,
           [googleEmail || null, encAccess, encRefresh, expiryDate || null, userId, provider]
         );
-        inserted = true;
+        console.log('[Calendar] saveToken update result affectedRows=', updateResult && updateResult.affectedRows);
+        if (updateResult && updateResult.affectedRows > 0) {
+          inserted = true;
+        }
       } catch (updateErr) {
         console.error('[Calendar] saveToken update also failed userId=', userId, 'err=', updateErr && updateErr.message, 'code=', updateErr && updateErr.code);
-        throw updateErr || err;
       }
     }
+
     if (!inserted) {
-      console.error('[Calendar] saveToken neither insert nor update succeeded userId=', userId);
+      console.warn('[Calendar] saveToken insert+update missed userId=', userId, '- attempting explicit-id INSERT');
+      try {
+        const [maxRows] = await db.query('SELECT MAX(id) AS max_id FROM user_calendar_tokens');
+        const nextId = (maxRows && maxRows[0] && maxRows[0].max_id) ? Number(maxRows[0].max_id) + 1 : 1;
+        const [explicitResult] = await db.query(
+          `INSERT INTO user_calendar_tokens (id, user_id, provider, google_email, access_token, refresh_token, expiry_date)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [nextId, userId, provider, googleEmail || null, encAccess, encRefresh, expiryDate || null]
+        );
+        console.log('[Calendar] saveToken explicit-id INSERT result affectedRows=', explicitResult && explicitResult.affectedRows, 'insertId=', explicitResult && explicitResult.insertId);
+        inserted = true;
+      } catch (explicitErr) {
+        console.error('[Calendar] saveToken explicit-id INSERT failed userId=', userId, 'err=', explicitErr && explicitErr.message, 'code=', explicitErr && explicitErr.code);
+      }
+    }
+
+    if (!inserted) {
+      console.error('[Calendar] saveToken failed to persist userId=', userId);
       throw new Error('Failed to persist calendar token');
     }
+
     console.log('[Calendar] saveToken persisted userId=', userId);
     const result = await this.getToken(userId, provider);
     console.log('[Calendar] saveToken re-read userId=', userId, 'found=', !!result, 'email=', result?.google_email);
