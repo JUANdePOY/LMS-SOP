@@ -47,6 +47,10 @@ const calendarModel = {
       [userId, provider]
     );
     if (!rows.length) return null;
+    console.log('[Calendar] getToken userId=', userId, 'rows=', rows.length, 'columns=', Object.keys(rows[0] || {}), 'firstUpdated=', rows[0]?.updated_at);
+    for (const row of rows) {
+      console.log('[Calendar] getToken row id=', row.id, 'accessLen=', row.access_token && row.access_token.length, 'refreshLen=', row.refresh_token && row.refresh_token.length);
+    }
     // Find the first decryptable row. If a stale undecryptable row exists
     // alongside a good one (e.g. duplicate rows when the unique index is
     // missing), prefer the good one and clean up the bad ones.
@@ -67,7 +71,7 @@ const calendarModel = {
   async saveToken({ userId, provider = 'google', googleEmail, accessToken, refreshToken, expiryDate }) {
     const encAccess = encrypt(accessToken);
     const encRefresh = refreshToken ? encrypt(refreshToken) : null;
-    console.log('[Calendar] saveToken start userId=', userId, 'provider=', provider, 'email=', googleEmail, 'hasAccess=', !!accessToken, 'hasRefresh=', !!refreshToken);
+    console.log('[Calendar] saveToken start userId=', userId, 'provider=', provider, 'email=', googleEmail, 'hasAccess=', !!accessToken, 'hasRefresh=', !!refreshToken, 'encAccessLen=', encAccess && encAccess.length, 'encRefreshLen=', encRefresh && encRefresh.length);
     await purgeUndecryptableRows(userId, provider);
     await db.query(
       `INSERT INTO user_calendar_tokens (id, user_id, provider, google_email, access_token, refresh_token, expiry_date)

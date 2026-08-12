@@ -20,8 +20,6 @@ function envKeyBuffer() {
 }
 
 function getKey() {
-  // Prefer the explicit env var; otherwise the resolved (possibly DB-persisted)
-  // key. One of these must be present after resolveKey() completes.
   const key = envKeyBuffer() || getCachedKey();
   if (!key) {
     const err = new Error('CALENDAR_TOKEN_ENCRYPTION_KEY is not available (env not set and key not yet resolved)');
@@ -33,6 +31,8 @@ function getKey() {
     err.statusCode = 500;
     throw err;
   }
+  const fingerprint = crypto.createHash('sha256').update(key).digest('hex').slice(0, 12);
+  console.log('[Calendar] getKey fingerprint=', fingerprint, 'len=', key.length, 'source=', envKeyBuffer() ? 'env' : 'cached');
   return key;
 }
 
