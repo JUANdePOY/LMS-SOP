@@ -6,7 +6,9 @@ import CourseOutline from "../components/course-builder/CourseOutline";
 import LessonEditor from "../components/course-builder/LessonEditor";
 import ModuleEditor from "../components/course-builder/ModuleEditor";
 import PublishReadiness from "../components/course-builder/PublishReadiness";
+import CourseCertificatesSection from "../components/course-builder/CourseCertificatesSection";
 import { builderGet, builderUpdate, publishCourse } from "../api/course.api";
+import { listCourseCertificates, linkCertificateToCourse, unlinkCertificateFromCourse } from "../api/certificateCourseLink.api";
 import * as session from "@/services/session";
 
 function authHeaders() {
@@ -182,6 +184,8 @@ export default function CourseBuilderPage() {
   const [lastSaved, setLastSaved] = useState(null);
   const [outlineFilter, setOutlineFilter] = useState("");
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [courseCertificates, setCourseCertificates] = useState([]);
+  const courseCertificatesRef = useRef([]);
 
   useEffect(() => {
     setShowRightSidebar(false);
@@ -280,7 +284,7 @@ export default function CourseBuilderPage() {
 
   useEffect(() => {
     if (!courseId) return;
-    fetchCourseCertificates(courseId)
+    listCourseCertificates(courseId)
       .then((res) => {
         const data = res?.data || res || [];
         setCourseCertificates(Array.isArray(data) ? data : []);
@@ -342,7 +346,7 @@ export default function CourseBuilderPage() {
         setSelectedModuleId(newModuleId);
         setSelectedLessonId(newLessonId);
       })
-      .then(() => fetchCourseCertificates(courseId))
+      .then(() => listCourseCertificates(courseId))
       .catch((err) => {
         toast.error(err.message || "Failed to refresh course");
       });
