@@ -1,4 +1,14 @@
 import { useState, useEffect } from "react";
+import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichTextEditor";
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 const PRIORITY_OPTIONS = [
   { value: "low", label: "Low" },
@@ -64,13 +74,14 @@ export default function AnnouncementForm({ initialData, onSubmit, onCancel, savi
       </div>
       <div>
         <label className="block text-xs font-medium text-neutral-700 mb-1">Content</label>
-        <textarea
+        <RichTextEditor
           value={body}
-          onChange={(e) => setBody(e.target.value)}
-          required
-          rows={4}
-          className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
+          onChange={(html) => setBody(html)}
           placeholder="Enter announcement content..."
+          onImageUpload={async (file) => {
+            const dataUrl = await fileToDataUrl(file);
+            return dataUrl;
+          }}
         />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
