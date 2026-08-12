@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { toPng } from 'html-to-image';
 import api from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
 import { CERTIFICATE_SECTIONS } from '@/features/certificate-management/constants/certificateSections';
@@ -33,14 +34,14 @@ const VIEWPORT_MAX_HEIGHT_VH = 70;
  * does not change font size. Font size is adjusted via the accordion's
  * Size input.
  */
-export default function CertificatePreviewCanvas({
+const CertificatePreviewCanvas = forwardRef(function CertificatePreviewCanvas({
   sections,
   framePreview,
   orientation,
    widthPx,
   heightPx,
   onSectionPatch,
-}) {
+}, ref) {
   const { toast } = useToast();
 
   // font_size values are authored against the template's native
@@ -96,6 +97,43 @@ export default function CertificatePreviewCanvas({
   const zoomOut = () => setManualZoom(zoom - ZOOM_STEP);
   const zoomToActualSize = () => setManualZoom(1);
   const zoomToFit = () => setZoomMode('fit');
+
+  useImperativeHandle(ref, () => ({
+    downloadAsImage(filename = 'certificate.png') {
+      const node = containerRef.current;
+      if (!node) {
+        toast.error('Certificate preview is not ready yet');
+        return;
+      }
+
+      const originalTransform = node.style.transform;
+      node.style.transform = 'scale(1)';
+
+      return toPng(node, {
+        width: safeWidth,
+        height: safeHeight,
+        pixelRatio: 1,
+        cacheBust: false,
+        skipFonts: true,
+      })
+        .then((dataUrl) => {
+          const link = document.createElement('a');
+          link.download = filename;
+          link.href = dataUrl;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          toast.success('Certificate image downloaded');
+        })
+        .catch((error) => {
+          console.error('Failed to export certificate image:', error);
+          toast.error(error.message || 'Failed to export certificate image');
+        })
+        .finally(() => {
+          node.style.transform = originalTransform;
+        });
+    },
+  }));
 
   const recipientSection = CERTIFICATE_SECTIONS.find((s) => s.key === 'recipient_name');
   const recipientYPercent = sections.recipient_name?.y_percent ?? recipientSection?.yPercent ?? 47;
@@ -532,4 +570,6 @@ export default function CertificatePreviewCanvas({
       </div>
     </div>
   );
-}
+});
+
+export default CertificatePreviewCanvas;

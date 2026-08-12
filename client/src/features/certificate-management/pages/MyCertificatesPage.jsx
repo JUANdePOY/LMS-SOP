@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '@/shared/components/ui/card';
 import { Button } from '@/shared/components/ui/button';
@@ -8,7 +8,7 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { useIssuances } from '@/features/certificate-management/hooks/useIssuances';
 import { ISSUANCE_STATUSES } from '@/features/certificate-management/constants/certificateSections';
 import * as session from '@/services/session';
-import { Download, Award } from 'lucide-react';
+import { Download, Award, Image } from 'lucide-react';
 import CertificatePreviewCanvas from '@/features/certificate-management/components/CertificatePreviewCanvas';
 import { StaggerList, MotionItem } from "@/shared/motion";
 
@@ -23,6 +23,7 @@ export default function MyCertificatesPage() {
 
   const [selectedIssuance, setSelectedIssuance] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const canvasRef = useRef(null);
 
   useEffect(() => {
     fetchByUser(resolvedUserId);
@@ -37,6 +38,12 @@ export default function MyCertificatesPage() {
     if (pdfPath) {
       window.open(`/uploads/${pdfPath}`, '_blank');
     }
+  };
+
+  const handleDownloadImage = async () => {
+    if (!selectedIssuance || !canvasRef.current) return;
+    const certNumber = selectedIssuance.certificate_number || 'certificate';
+    await canvasRef.current.downloadAsImage(`certificate-${certNumber}.png`);
   };
 
   const handleCloseModal = () => {
@@ -108,6 +115,15 @@ export default function MyCertificatesPage() {
         <div className="flex w-full justify-end gap-3">
           <Button
             size="sm"
+            variant="outline"
+            onClick={handleDownloadImage}
+            className="flex items-center gap-1"
+          >
+            <Image size={14} />
+            Download Image
+          </Button>
+          <Button
+            size="sm"
             onClick={() => handleViewPdf(selectedIssuance.pdf_storage_path)}
             className="flex items-center gap-1"
           >
@@ -125,15 +141,16 @@ export default function MyCertificatesPage() {
                     ? JSON.parse(selectedIssuance.resolved_sections)
                     : selectedIssuance.resolved_sections;
                   if (!sections) return <p className="text-sm text-gray-500 p-4">No preview available.</p>;
-                  return (
-                    <CertificatePreviewCanvas
-                      sections={sections}
-                       framePreview={selectedIssuance.template_public_id ? `/api/certificate-templates/${selectedIssuance.template_public_id}/frame` : null}
-                      orientation={selectedIssuance.template_orientation || 'landscape'}
-                      widthPx={selectedIssuance.template_width_px}
-                      heightPx={selectedIssuance.template_height_px}
-                    />
-                  );
+                   return (
+                     <CertificatePreviewCanvas
+                       ref={canvasRef}
+                       sections={sections}
+                        framePreview={selectedIssuance.template_public_id ? `/api/certificate-templates/${selectedIssuance.template_public_id}/frame` : null}
+                       orientation={selectedIssuance.template_orientation || 'landscape'}
+                       widthPx={selectedIssuance.template_width_px}
+                       heightPx={selectedIssuance.template_height_px}
+                     />
+                   );
                 } catch {
                   return <p className="text-sm text-gray-500 p-4">Unable to render preview.</p>;
                 }
