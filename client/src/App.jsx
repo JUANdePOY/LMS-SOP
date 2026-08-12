@@ -109,6 +109,16 @@ function AdminProtectedWrapper(Component) {
   );
 }
 
+function SuperAdminProtectedWrapper(Component) {
+  return (
+    <ProtectedRoute allowedRoles={['super_admin']}>
+      <Suspense fallback={<PageLoader />}>
+        <Component />
+      </Suspense>
+    </ProtectedRoute>
+  );
+}
+
 function EmployeeProtectedWrapper(Component) {
   return (
     <ProtectedRoute allowedRoles={['employee']}>
@@ -186,13 +196,13 @@ const router = createBrowserRouter([
       { path: "admin/organization/categories", element: AdminProtectedWrapper(OrgCategoryPage), handle: { title: "Categories" } },
       { path: "admin/organization/sop-management", element: AdminProtectedWrapper(RedirectToSOP), handle: { title: "SOP Management" } },
       { path: "assessments", element: LMSProtectedWrapper(AssessmentsDashboardPage), handle: { title: "My Quizzes" } },
-      { path: "assessments/manage", element: LMSProtectedWrapper(QuizzesPanel), handle: { title: "Manage Quizzes" } },
+      { path: "assessments/manage", element: AdminProtectedWrapper(QuizzesPanel), handle: { title: "Manage Quizzes" } },
       { path: "assessments/leaderboard", element: LMSProtectedWrapper(QuizLeaderboardPage), handle: { title: "Leaderboard" } },
-      { path: "assessments/integrity", element: LMSProtectedWrapper(ViolationDashboardPage), handle: { title: "Integrity Reports" } },
-      { path: "assessments/quiz/:quizId/results", element: LMSProtectedWrapper(QuizResultsPage), handle: { title: "Quiz Results" } },
+      { path: "assessments/integrity", element: SuperAdminProtectedWrapper(ViolationDashboardPage), handle: { title: "Integrity Reports" } },
+      { path: "assessments/quiz/:quizId/results", element: AdminProtectedWrapper(QuizResultsPage), handle: { title: "Quiz Results" } },
       { path: "assessments/quiz/:quizId/leaderboard", element: LMSProtectedWrapper(QuizLeaderboardPage), handle: { title: "Leaderboard" } },
       { path: "assessments/quiz/:quizId/take/:attemptId?", element: LMSProtectedWrapper(TakeQuizPage), handle: { title: "Take Quiz" } },
-      { path: "assessments/quiz/:quizId", element: LMSProtectedWrapper(QuizBuilderPage), handle: { title: "Quiz Builder" } },
+      { path: "assessments/quiz/:quizId", element: AdminProtectedWrapper(QuizBuilderPage), handle: { title: "Quiz Builder" } },
       { path: "announcements", element: LMSProtectedWrapper(AnnouncementsPage), handle: { title: "Announcements" } },
       { path: "events", element: LMSProtectedWrapper(EventsPage), handle: { title: "Events" } },
       { path: "messaging", element: LMSProtectedWrapper(MessagingPage), handle: { title: "Messaging" } },

@@ -27,7 +27,7 @@ async function enforceCourseScope(course, user) {
   if (role === 'super_admin') return;
 
   const deptId = course.department_id;
-  if (!deptId) return;
+  const courseBusinessId = course.business_id || null;
 
   if (role === 'admin') {
     if (!user.business_id) {
@@ -35,21 +35,28 @@ async function enforceCourseScope(course, user) {
       error.statusCode = 403;
       throw error;
     }
-    const [[dept]] = await db.query(
-      'SELECT business_id FROM departments WHERE id = ?',
-      [deptId]
-    );
-    if (!dept || dept.business_id !== user.business_id) {
+    if (courseBusinessId && courseBusinessId !== user.business_id) {
       const error = new Error('Access denied: course is outside your business scope');
       error.statusCode = 403;
       throw error;
+    }
+    if (!courseBusinessId && deptId) {
+      const [[dept]] = await db.query(
+        'SELECT business_id FROM departments WHERE id = ?',
+        [deptId]
+      );
+      if (!dept || dept.business_id !== user.business_id) {
+        const error = new Error('Access denied: course is outside your business scope');
+        error.statusCode = 403;
+        throw error;
+      }
     }
     return;
   }
 
   if (role === 'department_head') {
     const scopedDeptIds = user.scoped_department_ids || (user.department_id ? [user.department_id] : []);
-    if (!scopedDeptIds.includes(deptId)) {
+    if (deptId && !scopedDeptIds.includes(deptId)) {
       const error = new Error('Access denied: course is outside your department scope');
       error.statusCode = 403;
       throw error;
@@ -92,7 +99,9 @@ function getCourse(req, res) {
   courseModel.findById(parseInt(req.params.id, 10))
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return res.json({ success: true, message: 'OK', data: course });
+      return enforceCourseScope(course, req.user).then(() => {
+        return res.json({ success: true, message: 'OK', data: course });
+      });
     })
     .catch((err) => sendError(res, err, 'Failed to load course'));
 }
@@ -103,13 +112,13 @@ function createCourse(req, res) {
     return res.status(401).json({ success: false, message: 'Authentication required' });
   }
 
-  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id } = req.body;
+  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, business_id } = req.body;
 
   if (!title || !title.trim()) {
     return res.status(400).json({ success: false, message: 'Course title is required', code: 'VALIDATION_ERROR' });
   }
 
-  const doCreate = () => {
+  const doCreate = (effectiveBusinessId, effectiveDepartmentId) => {
     courseModel.create({
       title: title.trim(),
       description,
@@ -127,6 +136,8 @@ function createCourse(req, res) {
       allow_self_enrollment,
       send_completion_certificates: send_completion_certificates === undefined ? true : send_completion_certificates,
       status: status || 'draft',
+      department_id: effectiveDepartmentId,
+      business_id: effectiveBusinessId,
     })
       .then((id) => {
         logAudit('course.create', userId, { courseId: id, title });
@@ -135,24 +146,43 @@ function createCourse(req, res) {
       .catch((err) => sendError(res, err, 'Failed to create course'));
   };
 
-  if (req.user.role !== 'super_admin') {
+  const resolveBusinessId = async () => {
+    if (req.user.role === 'super_admin') {
+      if (business_id) return parseInt(business_id, 10);
+      if (department_id) {
+        const deptId = parseInt(department_id, 10);
+        const [[dept]] = await db.query('SELECT business_id FROM departments WHERE id = ?', [deptId]);
+        return dept ? dept.business_id : null;
+      }
+      return null;
+    }
+
     if (!req.user.business_id) {
       return res.status(403).json({ success: false, message: 'No business scope assigned', code: 'NO_BUSINESS_SCOPE' });
     }
+
     if (department_id) {
       const deptId = parseInt(department_id, 10);
-      return db.query('SELECT business_id FROM departments WHERE id = ?', [deptId])
-        .then(([dept]) => {
-          if (!dept || dept.business_id !== req.user.business_id) {
-            return res.status(403).json({ success: false, message: 'Cannot create courses in another business', code: 'BUSINESS_SCOPE_DENIED' });
-          }
-          doCreate();
-        })
-        .catch((err) => sendError(res, err, 'Failed to validate department'));
+      const [[dept]] = await db.query('SELECT business_id FROM departments WHERE id = ?', [deptId]);
+      if (!dept || dept.business_id !== req.user.business_id) {
+        return res.status(403).json({ success: false, message: 'Cannot create courses in another business', code: 'BUSINESS_SCOPE_DENIED' });
+      }
     }
-  }
 
-  doCreate();
+    if (business_id && parseInt(business_id, 10) !== req.user.business_id) {
+      return res.status(403).json({ success: false, message: 'Cannot create courses in another business', code: 'BUSINESS_SCOPE_DENIED' });
+    }
+
+    return req.user.business_id;
+  };
+
+  resolveBusinessId()
+    .then((effectiveBusinessId) => {
+      if (effectiveBusinessId === undefined) return;
+      const effectiveDepartmentId = department_id ? parseInt(department_id, 10) : null;
+      doCreate(effectiveBusinessId, effectiveDepartmentId);
+    })
+    .catch((err) => sendError(res, err, 'Failed to create course'));
 }
 
 function updateCourse(req, res) {
@@ -218,10 +248,12 @@ function listModules(req, res) {
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return courseModuleModel.listModules(courseId, { search, type, page: pageNum, limit: limitNum })
-        .then((modules) => {
-          res.json({ success: true, message: 'OK', data: modules });
-        });
+      return enforceCourseScope(course, req.user).then(() => {
+        return courseModuleModel.listModules(courseId, { search, type, page: pageNum, limit: limitNum })
+          .then((modules) => {
+            res.json({ success: true, message: 'OK', data: modules });
+          });
+      });
     })
     .catch((err) => sendError(res, err, 'Failed to list modules'));
 }
@@ -233,9 +265,11 @@ function createModule(req, res) {
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return courseModuleModel.create({
-        course_id: courseId,
-        ...req.body,
+      return enforceCourseScope(course, req.user).then(() => {
+        return courseModuleModel.create({
+          course_id: courseId,
+          ...req.body,
+        });
       });
     })
     .then((id) => {
@@ -255,19 +289,21 @@ function updateModule(req, res) {
       return courseModel.findById(mod.course_id)
         .then((course) => {
           if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-          const allowed = ['title', 'description', 'type', 'order_index', 'release_date', 'due_date', 'is_graded', 'max_score', 'is_visible'];
-          const updates = {};
-          for (const key of allowed) {
-            if (Object.prototype.hasOwnProperty.call(req.body, key)) {
-              updates[key] = req.body[key];
+          return enforceCourseScope(course, req.user).then(() => {
+            const allowed = ['title', 'description', 'type', 'order_index', 'release_date', 'due_date', 'is_graded', 'max_score', 'is_visible'];
+            const updates = {};
+            for (const key of allowed) {
+              if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+                updates[key] = req.body[key];
+              }
             }
-          }
-          if (!Object.keys(updates).length) {
-            return res.status(400).json({ success: false, message: 'No changes provided', code: 'VALIDATION_ERROR' });
-          }
-          return courseModuleModel.update(moduleId, updates).then(() => {
-            logAudit('course.module.update', userId, { courseId: mod.course_id, moduleId, updates });
-            return res.json({ success: true, message: 'Module updated successfully' });
+            if (!Object.keys(updates).length) {
+              return res.status(400).json({ success: false, message: 'No changes provided', code: 'VALIDATION_ERROR' });
+            }
+            return courseModuleModel.update(moduleId, updates).then(() => {
+              logAudit('course.module.update', userId, { courseId: mod.course_id, moduleId, updates });
+              return res.json({ success: true, message: 'Module updated successfully' });
+            });
           });
         });
     })
@@ -281,10 +317,16 @@ function deleteModule(req, res) {
   courseModuleModel.findById(moduleId)
     .then((mod) => {
       if (!mod) return res.status(404).json({ success: false, message: 'Module not found' });
-      return courseModuleModel.softDelete(moduleId).then(() => {
-        logAudit('course.module.delete', userId, { moduleId, courseId: mod.course_id });
-        return res.json({ success: true, message: 'Module deleted successfully' });
-      });
+      return courseModel.findById(mod.course_id)
+        .then((course) => {
+          if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+          return enforceCourseScope(course, req.user).then(() => {
+            return courseModuleModel.softDelete(moduleId).then(() => {
+              logAudit('course.module.delete', userId, { moduleId, courseId: mod.course_id });
+              return res.json({ success: true, message: 'Module deleted successfully' });
+            });
+          });
+        });
     })
     .catch((err) => sendError(res, err, 'Failed to delete module'));
 }
@@ -297,14 +339,16 @@ function listContent(req, res) {
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return courseModuleModel.findById(moduleId)
-        .then((mod) => {
-          if (!mod) return res.status(404).json({ success: false, message: 'Module not found' });
-          return courseContentModel.listContent(moduleId, { search, type })
-            .then((content) => {
-              res.json({ success: true, message: 'OK', data: content });
-            });
-        });
+      return enforceCourseScope(course, req.user).then(() => {
+        return courseModuleModel.findById(moduleId)
+          .then((mod) => {
+            if (!mod) return res.status(404).json({ success: false, message: 'Module not found' });
+            return courseContentModel.listContent(moduleId, { search, type })
+              .then((content) => {
+                res.json({ success: true, message: 'OK', data: content });
+              });
+          });
+      });
     })
     .catch((err) => sendError(res, err, 'Failed to list content'));
 }
@@ -317,14 +361,16 @@ function createContent(req, res) {
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return courseModuleModel.findById(moduleId)
-        .then((mod) => {
-          if (!mod) return res.status(404).json({ success: false, message: 'Module not found' });
-          return courseContentModel.create({
-            module_id: moduleId,
-            ...req.body,
+      return enforceCourseScope(course, req.user).then(() => {
+        return courseModuleModel.findById(moduleId)
+          .then((mod) => {
+            if (!mod) return res.status(404).json({ success: false, message: 'Module not found' });
+            return courseContentModel.create({
+              module_id: moduleId,
+              ...req.body,
+            });
           });
-        });
+      });
     })
     .then((id) => {
       logAudit('course.content.create', userId, { courseId, moduleId, contentId: id });
@@ -340,20 +386,30 @@ function updateContent(req, res) {
   courseContentModel.findById(contentId)
     .then((content) => {
       if (!content) return res.status(404).json({ success: false, message: 'Content not found' });
-      const allowed = ['title', 'type', 'description', 'order_index', 'url', 'duration', 'is_required', 'allow_access_after', 'chapters', 'thumbnail_url'];
-      const updates = {};
-      for (const key of allowed) {
-        if (Object.prototype.hasOwnProperty.call(req.body, key)) {
-          updates[key] = req.body[key];
-        }
-      }
-      if (!Object.keys(updates).length) {
-        return res.status(400).json({ success: false, message: 'No changes provided', code: 'VALIDATION_ERROR' });
-      }
-      return courseContentModel.update(contentId, updates).then(() => {
-        logAudit('course.content.update', userId, { contentId, updates });
-        return res.json({ success: true, message: 'Content updated successfully' });
-      });
+      return courseModuleModel.findById(content.module_id)
+        .then((mod) => {
+          if (!mod) return res.status(404).json({ success: false, message: 'Module not found' });
+          return courseModel.findById(mod.course_id)
+            .then((course) => {
+              if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+              return enforceCourseScope(course, req.user).then(() => {
+                const allowed = ['title', 'type', 'description', 'order_index', 'url', 'duration', 'is_required', 'allow_access_after', 'chapters', 'thumbnail_url'];
+                const updates = {};
+                for (const key of allowed) {
+                  if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+                    updates[key] = req.body[key];
+                  }
+                }
+                if (!Object.keys(updates).length) {
+                  return res.status(400).json({ success: false, message: 'No changes provided', code: 'VALIDATION_ERROR' });
+                }
+                return courseContentModel.update(contentId, updates).then(() => {
+                  logAudit('course.content.update', userId, { contentId, updates });
+                  return res.json({ success: true, message: 'Content updated successfully' });
+                });
+              });
+            });
+        });
     })
     .catch((err) => sendError(res, err, 'Failed to update content'));
 }
@@ -365,10 +421,20 @@ function deleteContent(req, res) {
   courseContentModel.findById(contentId)
     .then((content) => {
       if (!content) return res.status(404).json({ success: false, message: 'Content not found' });
-      return courseContentModel.softDelete(contentId).then(() => {
-        logAudit('course.content.delete', userId, { contentId });
-        return res.json({ success: true, message: 'Content deleted successfully' });
-      });
+      return courseModuleModel.findById(content.module_id)
+        .then((mod) => {
+          if (!mod) return res.status(404).json({ success: false, message: 'Module not found' });
+          return courseModel.findById(mod.course_id)
+            .then((course) => {
+              if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+              return enforceCourseScope(course, req.user).then(() => {
+                return courseContentModel.softDelete(contentId).then(() => {
+                  logAudit('course.content.delete', userId, { contentId });
+                  return res.json({ success: true, message: 'Content deleted successfully' });
+                });
+              });
+            });
+        });
     })
     .catch((err) => sendError(res, err, 'Failed to delete content'));
 }
@@ -503,6 +569,12 @@ async function uploadImage(req, res) {
     return res.status(400).json({ success: false, message: 'No image file uploaded', code: 'NO_FILE' });
   }
   try {
+    const course = await courseModel.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+    await enforceCourseScope(course, req.user);
+
     const { saveCourseImage } = require('../middleware/courseImageUpload');
     const url = await saveCourseImage(courseId, req.file);
     logAudit('course.image.uploaded', req.user.id, { course_id: courseId, url });

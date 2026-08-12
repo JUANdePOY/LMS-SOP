@@ -55,7 +55,7 @@ function restrictionWhere(user, cols, alias = 's') {
   if (!user || !cols.hasRestrictionType) return '';
 
   const role = user.role || '';
-  if (role === 'super_admin') return '';
+  if (role === 'super_admin' || role === 'admin') return '';
 
   const userDepartmentId = user.department_id || null;
   const userId = user.id || null;
@@ -106,12 +106,26 @@ async function businessScopeWhere(user, cols, alias = 's') {
       return { sql: 'AND 1=0', params: [] };
     }
     return {
-      sql: `AND EXISTS (
-        SELECT 1 FROM departments d
-        WHERE d.id = ${alias}.department_id
-          AND d.business_id = ?
+      sql: `AND (
+        EXISTS (
+          SELECT 1 FROM departments d
+          WHERE d.id = ${alias}.department_id
+            AND d.business_id = ?
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM sop_assignments sa
+          INNER JOIN sop_versions sv ON sv.sop_id = ${alias}.id
+          INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
+          INNER JOIN departments d ON d.id = ad.department_id
+          WHERE sa.sop_version_id = sv.id
+            AND sv.is_current = TRUE
+            AND sv.deleted_at IS NULL
+            AND sa.is_deleted = FALSE
+            AND d.business_id = ?
+        )
       )`,
-      params: [user.business_id],
+      params: [user.business_id, user.business_id],
     };
   }
 

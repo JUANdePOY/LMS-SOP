@@ -13,7 +13,6 @@ export default function AssessmentsDashboardPage() {
   const { isAnyAdmin } = useAuth();
   const { data: quizzes, loading, error } = useMyQuizzes();
 
-  // Admins manage all quizzes from the dedicated sub-page.
   if (isAnyAdmin) return <Navigate to="/assessments/manage" replace />;
 
   return (
@@ -22,9 +21,6 @@ export default function AssessmentsDashboardPage() {
         <div>
           <h1 className="text-2xl font-bold">My Quizzes</h1>
           <p className="text-sm text-neutral-500">Quizzes assigned to you across your courses.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button asChild><Link to="/assessments/leaderboard">Leaderboard</Link></Button>
         </div>
       </div>
 

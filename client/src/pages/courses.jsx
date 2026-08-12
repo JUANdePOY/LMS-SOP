@@ -8,6 +8,7 @@ import { useToast } from "@/shared/components/ui/Toast";
 import { StaggerList, MotionItem } from "@/shared/motion";
 import { resolveFileUrl } from "@/lib/fileUrl";
 import { ActionButton } from "@/shared/components/ui/actionIcons";
+import { useAuth } from "@/contexts/AuthContext";
 
 const STATUS_META = {
   published: {
@@ -44,6 +45,8 @@ const DIFFICULTIES = ["beginner", "intermediate", "advanced", "all_levels"];
 export default function Courses({ departments = [] }) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { hasPermission, isSuperAdmin, isAdmin, isDepartmentHead } = useAuth();
+  const canManageCourses = hasPermission('manage_courses');
   const [courses, setCourses] = useState([]);
   const [stats, setStats] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -113,6 +116,35 @@ export default function Courses({ departments = [] }) {
       // ignore
     }
   }, [courses]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setPage((p) => ({ ...p, current: 1 })), filters.search ? 250 : 0);
+    return () => clearTimeout(timer);
+  }, [filters.search]);
+
+  useEffect(() => { fetchCourses(); }, [fetchCourses]);
+  useEffect(() => { refreshStats(); }, [refreshStats]);
+
+  const getRoleLabel = () => {
+    if (isSuperAdmin) return "All Courses";
+    if (isAdmin) return "My Business Courses";
+    if (isDepartmentHead) return "My Department Courses";
+    return "My Courses";
+  };
+
+  const getEmptyMessage = () => {
+    if (isSuperAdmin) return "Get started by creating your first course";
+    if (isAdmin) return "No courses found in your business";
+    if (isDepartmentHead) return "No courses found in your department";
+    return "No courses available";
+  };
+
+  const getEmptySubMessage = () => {
+    if (isSuperAdmin) return "";
+    if (isAdmin) return "Create a course to get started";
+    if (isDepartmentHead) return "Contact your admin to create courses";
+    return "";
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setPage((p) => ({ ...p, current: 1 })), filters.search ? 250 : 0);
@@ -239,12 +271,16 @@ export default function Courses({ departments = [] }) {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.30),rgba(147,51,234,0.08),transparent_75%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.15),rgba(168,85,247,0.12),transparent_45%)]" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Courses</h1>
-            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">Design learning experiences and manage enrollment</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">{getRoleLabel()}</h1>
+            <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
+              {isSuperAdmin ? "Manage courses across all businesses" : isAdmin ? "Manage courses for your business" : isDepartmentHead ? "Manage courses for your department" : "Browse available courses"}
+            </p>
           </div>
-          <button onClick={openAdd} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium shadow-sm hover:shadow-md transition-all">
-            + Add Course
-          </button>
+          {canManageCourses && (
+            <button onClick={openAdd} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium shadow-sm hover:shadow-md transition-all">
+              + Add Course
+            </button>
+          )}
         </div>
       </div>
 
@@ -338,22 +374,22 @@ export default function Courses({ departments = [] }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-700/80">
-              {pagedCourses.length === 0 ? (
+               {pagedCourses.length === 0 ? (
                 <tr>
                    <td colSpan={6} className="px-4 py-20 text-center">
-                    <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">No courses found</p>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-                      {filters.search || filters.status || filters.difficulty || filters.category
-                        ? "Try adjusting your filters or clear them to see all courses"
-                        : "Get started by creating your first course for learners"}
-                    </p>
-                    {!filters.search && !filters.status && !filters.difficulty && !filters.category && (
-                      <button onClick={openAdd} className="mt-4 rounded-lg border border-neutral-200 px-3 py-2 text-sm hover:border-neutral-300">
-                        + Create Course
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                   <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">{getEmptyMessage()}</p>
+                   <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                     {getEmptySubMessage() || (filters.search || filters.status || filters.difficulty || filters.category
+                       ? "Try adjusting your filters or clear them to see all courses"
+                       : "Get started by creating your first course")}
+                   </p>
+                   {canManageCourses && !filters.search && !filters.status && !filters.difficulty && !filters.category && (
+                     <button onClick={openAdd} className="mt-4 rounded-lg border border-neutral-200 px-3 py-2 text-sm hover:border-neutral-300">
+                       + Create Course
+                     </button>
+                   )}
+                 </td>
+               </tr>
               ) : (
                 pagedCourses.map((c, idx) => {
                   const statusKey = computeStatus(c);
@@ -412,15 +448,19 @@ export default function Courses({ departments = [] }) {
                       </td>
                       <td className="px-3 py-3.5">
                         <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
-                          {c.status === "draft" && (
+                          {canManageCourses && c.status === "draft" && (
                             <ActionButton action="Publish" label={`Publish ${c.title}`} onClick={() => handleQuickAction(c, "publish")} />
                           )}
-                          {c.status === "published" && (
+                          {canManageCourses && c.status === "published" && (
                             <ActionButton action="Archive" label={`Archive ${c.title}`} onClick={() => handleQuickAction(c, "archive")} />
                           )}
-                          <ActionButton action="Edit" label={`Edit ${c.title}`} onClick={() => openEdit(c)} />
+                          {canManageCourses && (
+                            <ActionButton action="Edit" label={`Edit ${c.title}`} onClick={() => openEdit(c)} />
+                          )}
                           <ActionButton action="View" label={`Open builder for ${c.title}`} onClick={() => openBuilder(c)} />
-                          <ActionButton action="Delete" label={`Delete ${c.title}`} onClick={() => openDelete(c)} />
+                          {canManageCourses && (
+                            <ActionButton action="Delete" label={`Delete ${c.title}`} onClick={() => openDelete(c)} />
+                          )}
                         </div>
                       </td>
                     </tr>

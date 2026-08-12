@@ -96,7 +96,7 @@ function ViewAllLink({ onClick, label = "View All" }) {
 }
 
 export default function EmployeeTrainingDashboard() {
-  const { user } = useAuth();
+  const { user, isAnyAdmin } = useAuth();
   const navigate = useNavigate();
   const firstName = user?.full_name?.split(" ")[0] || "Jane";
   const department = user?.department || "HR Department";
@@ -247,9 +247,11 @@ export default function EmployeeTrainingDashboard() {
             ))}
           </ul>
           <div className="mt-3 text-center">
-            <button onClick={() => navigate("/assessments/leaderboard")} className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
-              View full leaderboard
-            </button>
+            {!isAnyAdmin && (
+              <button onClick={() => navigate("/assessments/leaderboard")} className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                View full leaderboard
+              </button>
+            )}
           </div>
         </PanelCard>
 

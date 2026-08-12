@@ -145,19 +145,22 @@ async function create(courseData) {
   const {
     title, description, category, difficulty, instructor_id, thumbnail_url,
     prerequisites, learning_outcomes, max_enrollments, start_date, end_date,
-    grading_scale, allow_self_enrollment, send_completion_certificates, status
+    grading_scale, allow_self_enrollment, send_completion_certificates, status,
+    department_id, business_id, category_id
   } = courseData;
 
   const [result] = await db.query(
     `INSERT INTO courses (
-      title, description, category, difficulty, status, instructor_id, thumbnail_url,
+      title, description, category, category_id, difficulty, status, instructor_id, thumbnail_url,
       prerequisites, learning_outcomes, max_enrollments, start_date, end_date,
-      grading_scale, allow_self_enrollment, send_completion_certificates
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      grading_scale, allow_self_enrollment, send_completion_certificates,
+      department_id, business_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       title,
       description ?? null,
       category ?? null,
+      category_id ? parseInt(category_id, 10) : null,
       difficulty || 'beginner',
       status || 'draft',
       instructor_id ?? null,
@@ -170,6 +173,8 @@ async function create(courseData) {
       grading_scale || 'STANDARD',
       allow_self_enrollment ?? true,
       send_completion_certificates ?? false,
+      department_id ? parseInt(department_id, 10) : null,
+      business_id ? parseInt(business_id, 10) : null,
     ]
   );
   return result.insertId;
@@ -177,10 +182,10 @@ async function create(courseData) {
 
 async function update(id, updates) {
   const allowed = [
-    'title', 'description', 'category', 'difficulty', 'status', 'instructor_id',
+    'title', 'description', 'category', 'category_id', 'difficulty', 'status', 'instructor_id',
     'thumbnail_url', 'prerequisites', 'learning_outcomes', 'max_enrollments',
     'start_date', 'end_date', 'grading_scale', 'allow_self_enrollment',
-    'send_completion_certificates'
+    'send_completion_certificates', 'department_id', 'business_id'
   ];
 
   const sets = [];
@@ -191,6 +196,9 @@ async function update(id, updates) {
       let value = updates[key];
       if ((key === 'prerequisites' || key === 'learning_outcomes') && value && typeof value === 'object') {
         value = JSON.stringify(value);
+      }
+      if ((key === 'category_id' || key === 'department_id' || key === 'business_id') && value) {
+        value = parseInt(value, 10);
       }
       sets.push(`${key} = ?`);
       params.push(value);
@@ -204,6 +212,7 @@ async function update(id, updates) {
     `UPDATE courses SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND is_deleted = FALSE`,
     params
   );
+
   return result.affectedRows;
 }
 

@@ -504,24 +504,54 @@ async function incrementAttemptViolationCount(attemptId) {
 // Leaderboard
 // ---------------------------------------------------------------------------
 
-async function getLeaderboard(quizId, limit = 50) {
+async function getLeaderboard(quizId, limit = 50, scope = {}) {
   const safeLimit = Math.max(1, Number(limit) || 50);
+  const { role, businessId, scopedDepartmentIds } = scope;
+  const conditions = ['a.quiz_id = ?', "a.status IN ('completed','graded')", 'a.is_deleted = FALSE'];
+  const params = [quizId];
+
+  if (role === 'admin' && businessId) {
+    conditions.push('u.business_id = ?');
+    params.push(businessId);
+  } else if (role === 'department_head' && Array.isArray(scopedDepartmentIds) && scopedDepartmentIds.length) {
+    const placeholders = scopedDepartmentIds.map(() => '?').join(',');
+    conditions.push(`u.department_id IN (${placeholders})`);
+    params.push(...scopedDepartmentIds);
+  }
+
+  const whereClause = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+
   const [rows] = await db.query(
     `SELECT u.id AS user_id, u.full_name AS user_name, u.email AS user_email,
             a.score, a.max_score, a.percentage, a.time_taken_sec, a.attempt_number,
             ROW_NUMBER() OVER (ORDER BY a.score DESC, a.time_taken_sec ASC, a.attempt_number ASC) AS rank
      FROM quiz_attempts a
      JOIN users u ON a.user_id = u.id
-     WHERE a.quiz_id = ? AND a.status IN ('completed','graded') AND a.is_deleted = FALSE
+     ${whereClause}
      ORDER BY a.score DESC, a.time_taken_sec ASC, a.attempt_number ASC
      LIMIT ?`,
-    [quizId, safeLimit]
+    [...params, safeLimit]
   );
   return rows;
 }
 
-async function getCourseLeaderboard(courseId, limit = 50) {
+async function getCourseLeaderboard(courseId, limit = 50, scope = {}) {
   const safeLimit = Math.max(1, Number(limit) || 50);
+  const { role, businessId, scopedDepartmentIds } = scope;
+  const conditions = ['q.course_id = ?', "a.status IN ('completed','graded')", 'a.is_deleted = FALSE', 'q.is_deleted = FALSE'];
+  const params = [courseId];
+
+  if (role === 'admin' && businessId) {
+    conditions.push('u.business_id = ?');
+    params.push(businessId);
+  } else if (role === 'department_head' && Array.isArray(scopedDepartmentIds) && scopedDepartmentIds.length) {
+    const placeholders = scopedDepartmentIds.map(() => '?').join(',');
+    conditions.push(`u.department_id IN (${placeholders})`);
+    params.push(...scopedDepartmentIds);
+  }
+
+  const whereClause = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+
   const [rows] = await db.query(
     `SELECT u.id AS user_id, u.full_name AS user_name, u.email AS user_email,
             a.score, a.max_score, a.percentage, a.time_taken_sec, a.attempt_number,
@@ -529,10 +559,10 @@ async function getCourseLeaderboard(courseId, limit = 50) {
      FROM quiz_attempts a
      JOIN quizzes q ON a.quiz_id = q.id
      JOIN users u ON a.user_id = u.id
-     WHERE q.course_id = ? AND a.status IN ('completed','graded') AND a.is_deleted = FALSE AND q.is_deleted = FALSE
+     ${whereClause}
      ORDER BY a.score DESC, a.time_taken_sec ASC, a.attempt_number ASC
      LIMIT ?`,
-    [courseId, safeLimit]
+    [...params, safeLimit]
   );
   return rows;
 }
@@ -670,12 +700,12 @@ async function getUserSubmissions(userId, quizId) {
   return rows;
 }
 
-async function getMyQuizzes(userId, role, courseId) {
+async function getMyQuizzes(userId, role, courseId, businessId, scopedDepartmentIds) {
   const adminRoles = ['super_admin', 'admin', 'department_head'];
   const courseFilter = courseId ? ' AND q.course_id = ?' : '';
   const courseParam = courseId ? [courseId] : [];
 
-  if (adminRoles.includes(role)) {
+  if (role === 'super_admin') {
     const [rows] = await db.query(
       `SELECT q.*, c.title AS course_title, c.id AS course_id
        FROM quizzes q
@@ -683,6 +713,41 @@ async function getMyQuizzes(userId, role, courseId) {
        WHERE q.is_deleted = FALSE AND q.status = 'published'${courseFilter}
        ORDER BY q.created_at DESC`,
       courseParam
+    );
+    return rows;
+  }
+
+  if (role === 'admin') {
+    if (!businessId) {
+      return [];
+    }
+    const [rows] = await db.query(
+      `SELECT q.*, c.title AS course_title, c.id AS course_id
+       FROM quizzes q
+       JOIN courses c ON q.course_id = c.id
+       LEFT JOIN departments d ON c.department_id = d.id
+       WHERE q.is_deleted = FALSE AND q.status = 'published'${courseFilter}
+         AND d.business_id = ?
+       ORDER BY q.created_at DESC`,
+      [...courseParam, businessId]
+    );
+    return rows;
+  }
+
+  if (role === 'department_head') {
+    const deptIds = Array.isArray(scopedDepartmentIds) ? scopedDepartmentIds.filter(Boolean) : [];
+    if (!deptIds.length) {
+      return [];
+    }
+    const placeholders = deptIds.map(() => '?').join(',');
+    const [rows] = await db.query(
+      `SELECT q.*, c.title AS course_title, c.id AS course_id
+       FROM quizzes q
+       JOIN courses c ON q.course_id = c.id
+       WHERE q.is_deleted = FALSE AND q.status = 'published'${courseFilter}
+         AND c.department_id IN (${placeholders})
+       ORDER BY q.created_at DESC`,
+      [...courseParam, ...deptIds]
     );
     return rows;
   }

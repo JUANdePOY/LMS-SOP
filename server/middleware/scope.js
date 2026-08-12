@@ -74,11 +74,12 @@ function requireDepartmentScope(departmentIdParam = 'departmentId') {
 
 function requirePermission(permissionName) {
   return async (req, res, next) => {
-    if (req.user.role === 'super_admin') {
+    const role = req.user?.role || '';
+    if (role === 'super_admin' || role === 'admin') {
       return next();
     }
 
-    const perms = req.user.permissions || [];
+    const perms = req.user?.permissions || [];
     if (!perms.includes(permissionName)) {
       return res.status(403).json({
         status: 'error',

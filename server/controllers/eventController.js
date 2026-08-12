@@ -3,8 +3,6 @@ const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 const calendarService = require('../services/calendarService');
 
-// Fire-and-forget: push LMS event changes to each connected user's Google Calendar
-// without blocking the event response. Errors are logged and marked as failed.
 function propagate(eventId, action) {
   calendarService.propagateEventChange(eventId, action).catch((err) => {
     console.error('[Calendar] propagate error', action, eventId, err.message);
@@ -24,31 +22,34 @@ function sendError(res, err, fallback = 'Request failed') {
   return res.status(code).json(body);
 }
 
+function getEventBusinessFilter(user) {
+  if (user?.role === 'super_admin') {
+    return { business_id: null };
+  }
+  const businessId = user?.business_id;
+  if (!businessId) {
+    return { business_id: null };
+  }
+  return { business_id: businessId };
+}
+
 function listEvents(req, res) {
   const { event_type, priority, status, page = 1, limit = 20 } = req.query;
   const pageNum = parseInt(page, 10);
   const limitNum = parseInt(limit, 10);
+  const { business_id } = getEventBusinessFilter(req.user);
 
-  eventModel.findAll()
+  eventModel.findAll({ business_id, event_type, priority, status, page: pageNum, limit: limitNum })
     .then((rows) => {
-      let filtered = rows;
-      if (event_type) filtered = filtered.filter((r) => r.event_type === event_type);
-      if (priority) filtered = filtered.filter((r) => r.priority === priority);
-      if (status) filtered = filtered.filter((r) => r.status === status);
-
-      const total = filtered.length;
-      const start = (pageNum - 1) * limitNum;
-      const data = filtered.slice(start, start + limitNum);
-
       res.json({
         success: true,
         message: 'OK',
-        data,
+        data: rows,
         pagination: {
           page: pageNum,
           limit: limitNum,
-          total,
-          totalPages: Math.ceil(total / limitNum) || 1,
+          total: rows.length,
+          totalPages: 1,
         },
       });
     })
@@ -60,6 +61,9 @@ function getEvent(req, res) {
   eventModel.findById(id)
     .then((row) => {
       if (!row) return res.status(404).json({ success: false, message: 'Event not found', code: 'NOT_FOUND' });
+      if (req.user?.role !== 'super_admin' && row.business_id && row.business_id !== req.user?.business_id) {
+        return res.status(403).json({ success: false, message: 'Access denied: event is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+      }
       res.json({ success: true, message: 'OK', data: row });
     })
     .catch((err) => sendError(res, err, 'Failed to load event'));
@@ -76,6 +80,8 @@ function createEvent(req, res) {
     return res.status(400).json({ success: false, message: 'Event date is required', code: 'VALIDATION_ERROR' });
   }
 
+  const businessId = req.user?.business_id || null;
+
   eventModel.create({
     title: title.trim(),
     description: description?.trim() || '',
@@ -86,6 +92,7 @@ function createEvent(req, res) {
     end_date: end_date || null,
     location: location || null,
     organizer: req.user?.full_name || 'System',
+    business_id: businessId,
   })
     .then((row) => {
       logAudit && logAudit('event.create', userId, { eventId: row.id });
@@ -103,6 +110,9 @@ function updateEvent(req, res) {
   eventModel.findById(id)
     .then((row) => {
       if (!row) return res.status(404).json({ success: false, message: 'Event not found', code: 'NOT_FOUND' });
+      if (req.user?.role !== 'super_admin' && row.business_id && row.business_id !== req.user?.business_id) {
+        return res.status(403).json({ success: false, message: 'Access denied: event is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+      }
       return eventModel.update(id, {
         title: title?.trim() || row.title,
         description: description?.trim() || row.description,
@@ -113,6 +123,7 @@ function updateEvent(req, res) {
         end_date: end_date ?? row.end_date,
         location: location ?? row.location,
         organizer: row.organizer,
+        business_id: row.business_id,
       });
     })
     .then((row) => {
@@ -130,6 +141,9 @@ function deleteEvent(req, res) {
   eventModel.findById(id)
     .then((row) => {
       if (!row) return res.status(404).json({ success: false, message: 'Event not found', code: 'NOT_FOUND' });
+      if (req.user?.role !== 'super_admin' && row.business_id && row.business_id !== req.user?.business_id) {
+        return res.status(403).json({ success: false, message: 'Access denied: event is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+      }
       return eventModel.delete(id);
     })
     .then(() => {

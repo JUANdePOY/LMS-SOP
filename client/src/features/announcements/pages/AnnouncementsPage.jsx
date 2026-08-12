@@ -9,8 +9,8 @@ import AnnouncementDetail from "../components/AnnouncementDetail";
 import { Modal } from "@/shared/components/ui/modal";
 
 export default function AnnouncementsPage() {
-  const { user } = useAuth();
-  const canManage = ['super_admin', 'admin'].includes(user?.role);
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission('manage_announcements');
   const { toast } = useToast();
   const { items, error, refresh, create, update, remove } = useAnnouncements({ status: "active" });
   const [showForm, setShowForm] = useState(false);

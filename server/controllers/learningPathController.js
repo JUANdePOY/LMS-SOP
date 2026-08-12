@@ -13,8 +13,9 @@ function sendError(res, err, fallback = 'Request failed') {
 
 function listPaths(req, res) {
   const { department_id, status } = req.query;
+  const businessId = req.user?.business_id || null;
   learningPathModel
-    .listPaths({ department_id, status })
+    .listPaths({ department_id, status, business_id })
     .then((data) => res.json({ success: true, message: 'OK', data }))
     .catch((err) => sendError(res, err, 'Failed to list learning paths'));
 }

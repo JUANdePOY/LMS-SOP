@@ -137,6 +137,12 @@ export function AuthProvider({ children }) {
   const scopedDepartmentIds = user?.scoped_department_ids || [];
   const businessId = user?.business_id || null;
 
+  const hasPermission = useCallback((permission) => {
+    if (!permission || !Array.isArray(permissions)) return false;
+    if (isSuperAdmin) return true;
+    return permissions.includes(permission);
+  }, [permissions, isSuperAdmin]);
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -156,6 +162,7 @@ export function AuthProvider({ children }) {
       permissions,
       scopedDepartmentIds,
       businessId,
+      hasPermission,
       setError,
     }}>
       {children}

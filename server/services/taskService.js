@@ -747,6 +747,27 @@ async function getBusinessScopedTaskIdsForAdmin(userId) {
 async function getMyTaskCount(userId) {
   const isAdmin = await isUserAdmin(userId);
   if (isAdmin) {
+    const [userRows] = await db.query(
+      'SELECT role, business_id FROM users WHERE id = ? LIMIT 1',
+      [userId]
+    );
+    const user = userRows[0];
+
+    if (user && user.role === 'admin' && user.business_id) {
+      const [countRow] = await db.query(
+        `SELECT COUNT(DISTINCT t.id) AS total
+         FROM tasks t
+         LEFT JOIN users u ON t.created_by = u.id
+         LEFT JOIN task_assignments ta ON ta.task_id = t.id
+         WHERE t.status NOT IN ('Completed', 'Cancelled')
+           AND (u.business_id = ?
+             OR (ta.assignment_type = 'Department'
+               AND ta.reference_id IN (SELECT d.id FROM departments d WHERE d.business_id = ?)))`,
+        [user.business_id, user.business_id]
+      );
+      return countRow[0]?.total ?? 0;
+    }
+
     const [countRow] = await db.query(
       "SELECT COUNT(*) AS total FROM tasks WHERE status NOT IN ('Completed', 'Cancelled')"
     );

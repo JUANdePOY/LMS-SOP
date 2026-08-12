@@ -2,7 +2,9 @@ const assignmentCascadeService = require('../services/assignmentCascadeService')
 
 async function listDepartments(req, res) {
   try {
-    const departments = await assignmentCascadeService.getDepartments();
+    const isSuperAdmin = req.user?.role === 'super_admin';
+    const businessId = isSuperAdmin ? null : (req.user?.business_id || null);
+    const departments = await assignmentCascadeService.getDepartments(true, businessId);
     res.json({ success: true, data: departments });
   } catch (error) {
     res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });

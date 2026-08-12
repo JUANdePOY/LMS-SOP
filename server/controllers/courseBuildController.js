@@ -73,13 +73,28 @@ async function uploadThumbnail(req, res) {
 }
 
 function getVisibleCoursesWhere(user) {
+  if (user.role === 'super_admin') {
+    return { where: '1 = 1', params: [] };
+  }
+
+  if (user.role === 'admin') {
+    if (!user.business_id) {
+      return { where: '1 = 0', params: [] };
+    }
+    return {
+      where: 'EXISTS (SELECT 1 FROM departments d WHERE d.id = c.department_id AND d.business_id = ?)',
+      params: [user.business_id],
+    };
+  }
+
   if (user.role === 'department_head') {
     return {
       where: 'c.department_id = ? OR c.department_id IS NULL',
       params: [user.department_id],
     };
   }
-  return { where: '1 = 1', params: [] };
+
+  return { where: '1 = 0', params: [] };
 }
 
 async function listCourses(req, res) {
@@ -150,6 +165,19 @@ async function getCourse(req, res) {
       const deptId = req.user.department_id;
       if (course.department_id !== deptId) {
         return res.json({ success: true, message: 'OK', data: course, readOnly: true, modules: [], lessons: [] });
+      }
+    } else if (req.user.role === 'admin') {
+      if (!req.user.business_id) {
+        return res.status(403).json({ success: false, message: 'Your account has no business scope', code: 'BUSINESS_SCOPE_DENIED' });
+      }
+      if (course.department_id) {
+        const [[dept]] = await db.query(
+          'SELECT business_id FROM departments WHERE id = ?',
+          [course.department_id]
+        );
+        if (!dept || dept.business_id !== req.user.business_id) {
+          return res.status(403).json({ success: false, message: 'Course is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+        }
       }
     }
 
@@ -329,6 +357,19 @@ async function updateCourse(req, res) {
       const deptId = req.user.department_id;
       if (course.department_id !== deptId) {
         return res.status(403).json({ success: false, message: 'Forbidden - course does not belong to your department', code: 'FORBIDDEN' });
+      }
+    } else if (req.user.role === 'admin') {
+      if (!req.user.business_id) {
+        return res.status(403).json({ success: false, message: 'Your account has no business scope', code: 'BUSINESS_SCOPE_DENIED' });
+      }
+      if (course.department_id) {
+        const [[dept]] = await db.query(
+          'SELECT business_id FROM departments WHERE id = ?',
+          [course.department_id]
+        );
+        if (!dept || dept.business_id !== req.user.business_id) {
+          return res.status(403).json({ success: false, message: 'Course is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+        }
       }
     }
 
@@ -554,6 +595,19 @@ async function deleteCourse(req, res) {
       const deptId = req.user.department_id;
       if (course.department_id !== deptId) {
         return res.status(403).json({ success: false, message: 'Forbidden - course does not belong to your department', code: 'FORBIDDEN' });
+      }
+    } else if (req.user.role === 'admin') {
+      if (!req.user.business_id) {
+        return res.status(403).json({ success: false, message: 'Your account has no business scope', code: 'BUSINESS_SCOPE_DENIED' });
+      }
+      if (course.department_id) {
+        const [[dept]] = await db.query(
+          'SELECT business_id FROM departments WHERE id = ?',
+          [course.department_id]
+        );
+        if (!dept || dept.business_id !== req.user.business_id) {
+          return res.status(403).json({ success: false, message: 'Course is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+        }
       }
     }
 

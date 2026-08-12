@@ -12,8 +12,8 @@ import EventSyncButton from "../calendar/components/EventSyncButton";
 import { Modal } from "@/shared/components/ui/modal";
 
 export default function EventsPage() {
-  const { user } = useAuth();
-  const canManage = ['super_admin', 'admin'].includes(user?.role);
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission('manage_events');
   const { toast } = useToast();
   const { items, error, refresh, create, update, remove } = useEvents({ status: "active" });
   const calendar = useGoogleCalendar();
@@ -22,8 +22,6 @@ export default function EventsPage() {
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [saving, setSaving] = useState(false);
-  // Tracks the initial bulk-sync phase shown in the Google Calendar modal:
-  // 'pending' (connected, bulk sync not yet observed), 'syncing' (pushing events), 'done' (finished).
   const [syncPhase, setSyncPhase] = useState("pending");
   const [syncResult, setSyncResult] = useState({ synced: 0, failed: 0 });
   const hasMarkedSyncedRef = useRef(false);

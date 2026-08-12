@@ -599,6 +599,18 @@ const MIGRATIONS = [
       INDEX idx_refresh_tokens_token (token_hash),
       INDEX idx_refresh_tokens_expires (expires_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    // Add business_id scoping to announcements
+    `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS business_id INT DEFAULT NULL AFTER id`,
+    `ALTER TABLE announcements ADD CONSTRAINT fk_announcements_business FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE SET NULL`,
+    `CREATE INDEX IF NOT EXISTS idx_announcements_business ON announcements(business_id)`,
+    // Add business_id scoping to events
+    `ALTER TABLE events ADD COLUMN IF NOT EXISTS business_id INT DEFAULT NULL AFTER id`,
+    `ALTER TABLE events ADD CONSTRAINT fk_events_business FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE SET NULL`,
+    `CREATE INDEX IF NOT EXISTS idx_events_business ON events(business_id)`,
+    // Add business_id scoping to courses
+    `ALTER TABLE courses ADD COLUMN business_id INT DEFAULT NULL AFTER id`,
+    `ALTER TABLE courses ADD CONSTRAINT fk_courses_business FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE SET NULL`,
+    `CREATE INDEX IF NOT EXISTS idx_courses_business ON courses(business_id)`,
   ];
 
 async function runMigrations() {
