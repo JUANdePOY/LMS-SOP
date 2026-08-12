@@ -398,8 +398,38 @@ export default function QuizBuilderPage() {
                     <option value="final">Final (3 attempts)</option>
                   </select>
                 </Field>
-                <Field label="Time Limit (minutes)">
-                  <input type="number" className={fieldClass} value={settings?.time_limit ?? ""} onChange={(e) => handleSetting("time_limit", e.target.value ? Number(e.target.value) : null)} />
+                <Field label="Time Limit">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      {[5, 10, 15, 20, 30, 45, 60, 90, 120].map((mins) => {
+                        const active = settings?.time_limit === mins;
+                        return (
+                          <button
+                            key={mins}
+                            type="button"
+                            onClick={() => handleSetting("time_limit", mins)}
+                            className={`inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
+                              active
+                                ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+                            }`}
+                          >
+                            {mins} min
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        className={fieldClass}
+                        value={settings?.time_limit ?? ""}
+                        placeholder="Custom minutes"
+                        min="0"
+                        onChange={(e) => handleSetting("time_limit", e.target.value ? Number(e.target.value) : null)}
+                      />
+                    </div>
+                  </div>
                 </Field>
                 <Field label="Passing Score (%)">
                   <input type="number" min={0} max={100} className={fieldClass} value={settings?.passing_score ?? ""} onChange={(e) => handleSetting("passing_score", e.target.value ? Number(e.target.value) : null)} />
