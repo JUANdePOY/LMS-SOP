@@ -73,17 +73,30 @@ const calendarModel = {
     const encRefresh = refreshToken ? encrypt(refreshToken) : null;
     console.log('[Calendar] saveToken start userId=', userId, 'provider=', provider, 'email=', googleEmail, 'hasAccess=', !!accessToken, 'hasRefresh=', !!refreshToken, 'encAccessLen=', encAccess && encAccess.length, 'encRefreshLen=', encRefresh && encRefresh.length);
     await purgeUndecryptableRows(userId, provider);
-    await db.query(
-      `INSERT INTO user_calendar_tokens (id, user_id, provider, google_email, access_token, refresh_token, expiry_date)
-       VALUES (UUID(), ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE
-         google_email = VALUES(google_email),
-         access_token = VALUES(access_token),
-         refresh_token = VALUES(refresh_token),
-         expiry_date = VALUES(expiry_date),
-         updated_at = CURRENT_TIMESTAMP`,
-      [userId, provider, googleEmail || null, encAccess, encRefresh, expiryDate || null]
-    );
+    try {
+      await db.query(
+        `INSERT INTO user_calendar_tokens (user_id, provider, google_email, access_token, refresh_token, expiry_date)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           google_email = VALUES(google_email),
+           access_token = VALUES(access_token),
+           refresh_token = VALUES(refresh_token),
+           expiry_date = VALUES(expiry_date),
+           updated_at = CURRENT_TIMESTAMP`,
+        [userId, provider, googleEmail || null, encAccess, encRefresh, expiryDate || null]
+      );
+    } catch (err) {
+      if (err && err.code === 'ER_DUP_ENTRY') {
+        await db.query(
+          `UPDATE user_calendar_tokens
+           SET google_email = ?, access_token = ?, refresh_token = ?, expiry_date = ?, updated_at = CURRENT_TIMESTAMP
+           WHERE user_id = ? AND provider = ?`,
+          [googleEmail || null, encAccess, encRefresh, expiryDate || null, userId, provider]
+        );
+      } else {
+        throw err;
+      }
+    }
     console.log('[Calendar] saveToken persisted userId=', userId);
     const result = await this.getToken(userId, provider);
     console.log('[Calendar] saveToken re-read userId=', userId, 'found=', !!result, 'email=', result?.google_email);
