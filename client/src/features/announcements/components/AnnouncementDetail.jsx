@@ -26,11 +26,10 @@ export default function AnnouncementDetail({ item }) {
         </div>
       </div>
 
-      <div className="prose dark:prose-invert prose-sm max-w-none">
-        <p className="text-sm text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-wrap break-words">
-          {item.body}
-        </p>
-      </div>
+      <div
+        className="prose dark:prose-invert prose-sm max-w-none"
+        dangerouslySetInnerHTML={{ __html: item.body || "" }}
+      />
 
       <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400 pt-2 border-t border-neutral-200 dark:border-neutral-700">
         <span className="inline-flex items-center gap-1">

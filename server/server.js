@@ -39,6 +39,23 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
+// Relax Cross-Origin-Opener-Policy / Cross-Origin-Embedder-Policy on document
+// (HTML) responses. Some hosting edges (e.g. Hostinger) inject
+// `Cross-Origin-Opener-Policy: same-origin` on HTML, which cross-origin-isolates
+// the SPA tab and severs its relationship with the Google OAuth popup — blocking
+// the popup's window.postMessage/window.close and leaving the calendar connect
+// flow unable to signal completion. Setting `unsafe-none` on the SPA document
+// (and matching it on /api/calendar/callback) lets the popup reach its opener.
+// Only applied to text/html so JSON API responses keep their normal behavior.
+app.use((req, res, next) => {
+  const type = res.getHeader('Content-Type');
+  if (!type || type.includes('text/html')) {
+    res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  }
+  next();
+});
+
 const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const departmentsRoutes = require('./routes/departments');
@@ -216,6 +233,19 @@ app.get('/api/debug', (req, res) => {
   });
 });
 
+// Admin endpoint: report where the calendar token encryption key comes from.
+// Returns { source: 'env'|'db'|'generated'|'none' }
+app.get('/api/admin/calendar/key-source', async (req, res) => {
+  try {
+    const { getKeySource } = require('./utils/calendarKey');
+    const source = await getKeySource();
+    res.json({ source });
+  } catch (err) {
+    console.error('Failed to determine calendar key source:', err.message);
+    res.status(500).json({ error: 'Failed to determine key source' });
+  }
+});
+
 app.use(async (req, res, next) => {
   if (req.path.startsWith('/api')) {
     return next();
@@ -259,6 +289,30 @@ app.use((req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
+// Validate the Google Calendar token encryption key at boot. If it is missing
+// or malformed, calendar tokens cannot be decrypted on the next request and the
+// user is forced to reconnect every restart/deploy. A stable key MUST be set in
+// the environment (e.g. Hostinger app env vars) — not in a gitignored .env that
+// isn't deployed. This check fails fast with a clear message instead of letting
+// the reconnect loop fail silently.
+(function validateCalendarKey() {
+  const raw = process.env.CALENDAR_TOKEN_ENCRYPTION_KEY;
+  if (!raw) {
+    console.error(
+      '[Calendar] WARNING: CALENDAR_TOKEN_ENCRYPTION_KEY is not set. Google Calendar ' +
+      'tokens cannot be decrypted across restarts — users will be forced to reconnect ' +
+      'after every deploy. Set a stable 64-char hex key in the environment.'
+    );
+    return;
+  }
+  if (!/^[0-9a-fA-F]{64}$/.test(raw)) {
+    console.error(
+      '[Calendar] WARNING: CALENDAR_TOKEN_ENCRYPTION_KEY is not a valid 64-char hex ' +
+      'string (32 bytes). Tokens encrypted with it may fail to decrypt. Fix the key value.'
+    );
+  }
+})();
 
 // Guarantee the local upload directory exists on boot. With STORAGE_DRIVER=local
 // this MUST live on a persistent volume so uploaded images survive redeploys.

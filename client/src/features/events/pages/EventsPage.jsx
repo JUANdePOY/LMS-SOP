@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Calendar } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
@@ -23,28 +23,64 @@ export default function EventsPage() {
   const [editingItem, setEditingItem] = useState(null);
   const [saving, setSaving] = useState(false);
   // Tracks the initial bulk-sync phase shown in the Google Calendar modal:
-  // 'idle' (not connected), 'syncing' (pushing events), 'done' (finished).
-  const [syncPhase, setSyncPhase] = useState("idle");
+  // 'pending' (connected, bulk sync not yet observed), 'syncing' (pushing events), 'done' (finished).
+  const [syncPhase, setSyncPhase] = useState("pending");
   const [syncResult, setSyncResult] = useState({ synced: 0, failed: 0 });
+  const hasMarkedSyncedRef = useRef(false);
 
   // Once the calendar reports connected, the server has already finished the
   // initial bulk sync — force the summary to "done" so the spinner can never
-  // get stuck if the connect callback is delayed or missed.
+  // get stuck if the connect promise/callback is delayed, missed, or blocked
+  // by Cross-Origin-Opener-Policy (which severs the popup<->opener link and
+  // can prevent the connect() promise from resolving in some browsers).
+  // Transition from ANY active phase ("syncing"/"pending"), not just "idle",
+  // otherwise the summary stays stuck on "Adding your events…".
   useEffect(() => {
     if (calendar.status.connected) {
-      setSyncPhase((prev) => (prev === "idle" ? "done" : prev));
-      setSyncResult((prev) => (prev.synced === 0 ? { synced: items.length, failed: 0 } : prev));
-      calendar.markEventsSynced(items.map((i) => i.id));
+      if (!hasMarkedSyncedRef.current) {
+        hasMarkedSyncedRef.current = true;
+        setSyncPhase((prev) => (prev === "done" ? prev : "done"));
+        setSyncResult((prev) => (prev.synced === 0 ? { synced: items.length, failed: 0 } : prev));
+        calendar.markEventsSynced(items.map((i) => i.id));
+      }
+    } else {
+      hasMarkedSyncedRef.current = false;
     }
   }, [calendar.status.connected, items, items.length, calendar]);
 
   // Reset the sync summary whenever the modal is closed.
   useEffect(() => {
     if (!showCalendarModal) {
-      setSyncPhase("idle");
+      setSyncPhase("pending");
       setSyncResult({ synced: 0, failed: 0 });
     }
   }, [showCalendarModal]);
+
+  useEffect(() => {
+    const handleMessage = async (event) => {
+      if (!event?.data || event.data.type !== 'google-calendar-connected') return;
+      if (event.origin !== window.location.origin) return;
+      if (typeof calendar.loadStatus === 'function') {
+        try {
+          await calendar.loadStatus(true);
+        } catch {
+          /* ignore */
+        }
+      }
+      setShowCalendarModal(true);
+      setSyncPhase('done');
+      setSyncResult({ synced: items.length, failed: 0 });
+      calendar.markEventsSynced(items.map((i) => i.id));
+      toast.success(
+        items.length > 0
+          ? `${items.length} event${items.length === 1 ? '' : 's'} added to your Google Calendar`
+          : 'Google Calendar connected'
+      );
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [calendar, items, toast]);
 
   const selectedDayEvents = items.filter((item) => {
     if (!item.event_date || !selectedDate) return false;
@@ -112,7 +148,10 @@ export default function EventsPage() {
           className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 dark:border-neutral-600 px-3 py-1.5 text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800"
         >
           <Calendar size={14} />
-          {calendar.status.connected ? (calendar.status.googleEmail || "Google Calendar") : "Connect Google Calendar"}
+          {calendar.status.connected ? "Manage Google Calendar" : "Connect Google Calendar"}
+          {calendar.status.connected && calendar.status.googleEmail ? (
+            <span className="ml-1 text-[10px] text-neutral-500 dark:text-neutral-400">({calendar.status.googleEmail})</span>
+          ) : null}
         </button>
       </div>
 
@@ -145,17 +184,7 @@ export default function EventsPage() {
         <Modal
           open={showForm}
           onClose={() => { setShowForm(false); setEditingItem(null); }}
-          title={editingItem ? "Edit Event" : "New Event"}
-          footer={
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => { setShowForm(false); setEditingItem(null); }}
-                className="rounded-lg px-3 py-1.5 text-xs border border-neutral-300 dark:border-neutral-600"
-              >
-                Cancel
-              </button>
-            </div>
-          }
+          title={editingItem ? "Edit Event" : "New Events"}
         >
           <EventForm
             initialData={editingItem}
@@ -175,7 +204,14 @@ export default function EventsPage() {
         syncedCount={syncResult.synced}
         failedCount={syncResult.failed}
         onConnectStart={() => setSyncPhase("syncing")}
-        onConnect={() => {
+        onConnect={async () => {
+          if (typeof calendar.loadStatus === "function") {
+            try {
+              await calendar.loadStatus(true);
+            } catch {
+              /* ignore */
+            }
+          }
           setSyncPhase("done");
           setSyncResult({ synced: items.length, failed: 0 });
           calendar.markEventsSynced(items.map((i) => i.id));
@@ -186,7 +222,7 @@ export default function EventsPage() {
           );
         }}
         onDisconnect={() => {
-          setSyncPhase("idle");
+            setSyncPhase("pending");
           setSyncResult({ synced: 0, failed: 0 });
           calendar.markEventsSynced([]);
           toast.success("Google Calendar disconnected");

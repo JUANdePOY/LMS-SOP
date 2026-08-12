@@ -4,6 +4,18 @@ const calendarModel = require('../models/calendarModel');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 
+// The OAuth callback runs in a popup window that signals its opener (the SPA tab)
+// via window.postMessage. Some hosting setups inject Cross-Origin-Opener-Policy:
+// same-origin on responses, which severs that relationship and blocks both
+// postMessage and window.close. We explicitly relax COOP/COEP here so the popup
+// can reach its opener. This is safe: the page only renders a static message and
+// posts a success flag; no sensitive data crosses the boundary.
+function sendCallback(res, statusCode, html) {
+  res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  res.status(statusCode).send(html);
+}
+
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
   const message = err.statusCode ? err.message : fallback;
@@ -40,56 +52,53 @@ function getAuthUrl(req, res) {
 function handleCallback(req, res) {
   const { code, state, error, error_description } = req.query;
   try {
-    // Google redirects back with ?error=... (e.g. access_denied,
-    // redirect_uri_mismatch) instead of ?code=... when consent fails or the
-    // redirect URI doesn't match what's registered in Google Cloud. Surface it
-    // instead of the generic "Missing parameters".
     if (error) {
       console.error('[Calendar] Google OAuth error:', error, error_description || '');
-      return res.status(400).send(renderCallbackHtml(false, `Google error: ${error}${error_description ? ` (${error_description})` : ''}`));
+      return sendCallback(res, 400, renderCallbackHtml(false, `Google error: ${error}${error_description ? ` (${error_description})` : ''}`));
     }
     if (!state || !code) {
       console.error('[Calendar] Callback missing params. originalUrl:', req.originalUrl, '| query:', JSON.stringify(req.query));
-      return res.status(400).send(renderCallbackHtml(false, 'Missing parameters'));
+      return sendCallback(res, 400, renderCallbackHtml(false, 'Missing parameters'));
     }
-    // Verify the state against the server-side record we created in getAuthUrl.
+    console.log('[Calendar] Callback start state=', state, 'code=', code);
     calendarModel.getOAuthState(state)
       .then((row) => {
         if (!row) {
-          return res.status(400).send(renderCallbackHtml(false, 'State verification failed'));
+          console.error('[Calendar] State verification failed for state=', state);
+          return sendCallback(res, 400, renderCallbackHtml(false, 'State verification failed'));
         }
         const userId = row.user_id;
-        // Consume the state so it can't be replayed.
+        console.log('[Calendar] State verified userId=', userId);
         return calendarModel.deleteOAuthState(state)
           .then(() => calendarService.handleCallback(code, userId))
           .then((result) => {
+            console.log('[Calendar] handleCallback success userId=', userId, 'result keys=', Object.keys(result || {}));
             logAudit && logAudit('calendar.connect', userId, { syncedEvents: result.syncedEvents || 0 });
-            res.send(renderCallbackHtml(true, 'Calendar connected'));
+            sendCallback(res, 200, renderCallbackHtml(true, 'Calendar connected'));
           });
       })
       .catch((err) => {
+        console.error('[Calendar] handleCallback error:', err.message);
         sendError(res, err, 'Failed to connect calendar');
       });
   } catch (err) {
+    console.error('[Calendar] handleCallback unexpected error:', err.message);
     sendError(res, err, 'Failed to connect calendar');
   }
 }
 
 function renderCallbackHtml(success, message) {
+  const notifyButton = success ? `
+    <p style="margin-top:12px;font-size:12px;color:#555">Connected successfully. Return to the app and refresh the calendar modal if needed.</p>
+  ` : '';
+
   return `<!doctype html><html><head><meta charset="utf-8"><title>Google Calendar</title></head>
 <body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5">
 <div style="text-align:center;padding:24px;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08)">
   <h3 style="margin:0 0 8px;color:${success ? '#16a34a' : '#dc2626'}">${success ? 'Connected' : 'Error'}</h3>
   <p style="margin:0;color:#555">${message}</p>
+  ${notifyButton}
   <p style="margin:12px 0 0;font-size:12px;color:#999">You can close this window.</p>
-  <script>
-    try { if (window.opener) { window.opener.postMessage({ type: 'calendar-callback', success: ${success} }, '*'); } } catch (e) {}
-    // Do NOT auto-close the popup. Under Cross-Origin-Opener-Policy the close
-    // is often blocked anyway, and forcing it after ~1s made the "Calendar
-    // connected" confirmation vanish before the user could see it. The opener
-    // tab polls /calendar/status and updates its own modal; the user closes
-    // this popup manually (the page already says so).
-  </script>
 </div></body></html>`;
 }
 
@@ -97,7 +106,11 @@ function getStatus(req, res) {
   const userId = req.user.id;
   calendarModel.getToken(userId)
     .then((token) => {
-      if (!token) return res.json({ success: true, data: { connected: false } });
+      if (!token) {
+        console.log('[Calendar] getStatus userId=', userId, 'connected=false');
+        return res.json({ success: true, data: { connected: false } });
+      }
+      console.log('[Calendar] getStatus userId=', userId, 'connected=true', 'email=', token.google_email, 'updated_at=', token.updated_at);
       return res.json({
         success: true,
         data: {
@@ -107,7 +120,10 @@ function getStatus(req, res) {
         },
       });
     })
-    .catch((err) => sendError(res, err, 'Failed to read calendar status'));
+    .catch((err) => {
+      console.error('[Calendar] getStatus error userId=', userId, err.message);
+      sendError(res, err, 'Failed to read calendar status');
+    });
 }
 
 function syncEvent(req, res) {

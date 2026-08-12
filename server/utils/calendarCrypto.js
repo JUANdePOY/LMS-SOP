@@ -1,17 +1,33 @@
 const crypto = require('crypto');
+const { resolveKey, getCachedKey } = require('./calendarKey');
 
 // AES-256-GCM encryption for sensitive data (Google OAuth tokens) at rest.
-// Key is provided via CALENDAR_TOKEN_ENCRYPTION_KEY as a 64-char hex string (32 bytes).
+// The key is resolved (env var, else a DB-persisted key) by calendarKey.js so it
+// stays stable across restarts/redeploys. We kick off async resolution at module
+// load; getKey() falls back to a direct env read synchronously for the common
+// case, then uses the resolved key once available.
 const ALGO = 'aes-256-gcm';
 
-function getKey() {
+// Start resolving the key eagerly so it's ready before the first token op.
+resolveKey().catch((err) => {
+  console.error('[Calendar] Encryption key resolution failed:', err.message);
+});
+
+function envKeyBuffer() {
   const raw = process.env.CALENDAR_TOKEN_ENCRYPTION_KEY;
-  if (!raw) {
-    const err = new Error('CALENDAR_TOKEN_ENCRYPTION_KEY is not configured');
+  if (raw && /^[0-9a-fA-F]{64}$/.test(raw)) return Buffer.from(raw, 'hex');
+  return null;
+}
+
+function getKey() {
+  // Prefer the explicit env var; otherwise the resolved (possibly DB-persisted)
+  // key. One of these must be present after resolveKey() completes.
+  const key = envKeyBuffer() || getCachedKey();
+  if (!key) {
+    const err = new Error('CALENDAR_TOKEN_ENCRYPTION_KEY is not available (env not set and key not yet resolved)');
     err.statusCode = 500;
     throw err;
   }
-  const key = Buffer.from(raw, 'hex');
   if (key.length !== 32) {
     const err = new Error('CALENDAR_TOKEN_ENCRYPTION_KEY must be 32 bytes (64 hex chars)');
     err.statusCode = 500;

@@ -12,10 +12,10 @@ export function useGoogleCalendar() {
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [syncingIds, setSyncingIds] = useState({});
 
-  const loadStatus = useCallback(async () => {
+  const loadStatus = useCallback(async (force = false) => {
     setLoadingStatus(true);
     try {
-      const res = await getCalendarStatus();
+      const res = await getCalendarStatus(force);
       if (res.data?.success) {
         setStatus({
           connected: !!res.data.data?.connected,
@@ -44,21 +44,40 @@ export function useGoogleCalendar() {
         return;
       }
 
+      const tryClosePopup = (win) => {
+        if (!win) return;
+        // Only attempt to close the popup if it still references this opener.
+        // When COOP/COEP severs the opener link, `win.opener` becomes `null` —
+        // checking `opener` is less likely to trigger COOP console warnings
+        // than reading `closed` or `location` on the popup.
+        try {
+          if (win.opener === window) {
+            try {
+              win.close();
+            } catch (e) {
+              /* ignore close errors */
+            }
+          }
+        } catch (e) {
+          // If reading `opener` throws, give up silently.
+        }
+      };
+
       // Some hosting setups send Cross-Origin-Opener-Policy, which severs the
       // opener<->popup link and breaks both window.postMessage and popup.closed.
       // To stay resilient we poll our own /calendar/status endpoint instead of
       // relying on cross-window signaling. The connection is confirmed once the
       // backend reports the token as stored.
       let attempts = 0;
-      const MAX_ATTEMPTS = 40; // ~60s at 1.5s intervals
+      const MAX_ATTEMPTS = 90; // ~90s at 1s intervals (Google API + bulk sync can be slow)
       const poll = setInterval(async () => {
         attempts += 1;
         try {
-          const statusRes = await getCalendarStatus();
+          const statusRes = await getCalendarStatus(true);
           if (statusRes.data?.success && statusRes.data.data?.connected) {
             clearInterval(poll);
-            try { popup.close(); } catch { /* ignore */ }
-            await loadStatus();
+            tryClosePopup(popup);
+            await loadStatus(true);
             resolve(true);
             return;
           }
@@ -67,10 +86,20 @@ export function useGoogleCalendar() {
         }
         if (attempts >= MAX_ATTEMPTS) {
           clearInterval(poll);
-          try { popup.close(); } catch { /* ignore */ }
+          tryClosePopup(popup);
+          // Final definitive check: the bulk sync may have just finished, so a
+          // last status read decides success vs. timeout instead of guessing.
+          try {
+            const finalRes = await getCalendarStatus(true);
+            if (finalRes.data?.success && finalRes.data.data?.connected) {
+              await loadStatus(true);
+              resolve(true);
+              return;
+            }
+          } catch { /* fall through to reject */ }
           reject(new Error("Google Calendar connection timed out. Please try again."));
         }
-      }, 1500);
+      }, 1000);
     });
   }, [loadStatus]);
 

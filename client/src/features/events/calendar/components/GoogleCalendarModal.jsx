@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Calendar, Check, Loader2, Unlink, AlertCircle } from "lucide-react";
 import { Modal } from "@/shared/components/ui/modal";
+import { getCalendarStatus } from "../api/calendar.api";
 import CalendarSyncSummary from "./CalendarSyncSummary";
 
 export default function GoogleCalendarModal({ open, onClose, calendar, onConnect, onDisconnect, onConnectStart, eventsCount = 0, syncPhase = "unavailable", syncedCount = 0, failedCount = 0 }) {
@@ -8,20 +9,64 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
   const [error, setError] = useState(null);
   const { status, connect, disconnect } = calendar;
 
+  // The connect() promise can occasionally lag (slow Google API / bulk sync).
+  // Once the backend reports connected, stop the button spinner immediately so
+  // the UI never appears stuck even if the promise hasn't resolved yet.
+  useEffect(() => {
+    if (status.connected) setBusy(false);
+  }, [status.connected]);
+
+  // Safety net: if the parent already marked the sync as done, make sure this
+  // modal is no longer in a busy/loading state.
+  useEffect(() => {
+    if (syncPhase === "done") setBusy(false);
+  }, [syncPhase]);
+
   const handleConnect = async () => {
     if (busy || status.connected) return;
     setBusy(true);
     setError(null);
     onConnectStart && onConnectStart();
+
     try {
-      await connect();
-      onConnect && onConnect();
-    } catch (err) {
-      const code = err?.response?.data?.code;
-      if (code === 'CALENDAR_DISABLED') {
-        setError("Google Calendar isn't enabled on this server. Ask an admin to configure the Google OAuth credentials.");
+      let connectError = null;
+      try {
+        await connect();
+      } catch (err) {
+        connectError = err;
+      }
+
+      let verified = false;
+      try {
+        const MAX_CHECKS = 6;
+        const DELAY_MS = 500;
+        for (let i = 0; i < MAX_CHECKS; i++) {
+          try {
+            const statusRes = await getCalendarStatus(true);
+            if (statusRes.data?.success && statusRes.data.data?.connected) {
+              verified = true;
+              break;
+            }
+          } catch {
+            // ignore transient network errors and continue retrying
+          }
+          await new Promise((res) => setTimeout(res, DELAY_MS));
+        }
+      } catch {
+        // fall through to show the error message below
+      }
+
+      if (verified) {
+        onConnect && onConnect().catch(() => {
+          // ignore onConnect errors so the modal still stops loading
+        });
       } else {
-        setError(err.message || "Failed to connect Google Calendar");
+        const code = connectError?.response?.data?.code;
+        if (code === "CALENDAR_DISABLED") {
+          setError("Google Calendar isn't enabled on this server. Ask an admin to configure the Google OAuth credentials.");
+        } else {
+          setError(connectError?.message || "Failed to connect Google Calendar");
+        }
       }
     } finally {
       setBusy(false);

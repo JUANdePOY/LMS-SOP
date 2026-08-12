@@ -8,6 +8,10 @@ const PRIORITY_COLORS = {
   critical: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-100 border-red-200 dark:border-red-500/30",
 };
 
+function stripHtml(html) {
+  return (html || "").replace(/<[^>]*>/g, "").trim();
+}
+
 export default function AnnouncementList({ items, onEdit, onDelete, onCreate, canManage, onView }) {
   const [deleteId, setDeleteId] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -61,7 +65,7 @@ export default function AnnouncementList({ items, onEdit, onDelete, onCreate, ca
                   </span>
                   <span className="text-[10px] text-neutral-500">{item.type}</span>
                 </div>
-                <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2">{item.body}</p>
+                 <p className="text-xs text-neutral-600 dark:text-neutral-400 line-clamp-2">{stripHtml(item.body)}</p>
                 <p className="text-[10px] text-neutral-400 mt-1">
                   {item.author} &middot; {new Date(item.created_at).toLocaleString()}
                 </p>

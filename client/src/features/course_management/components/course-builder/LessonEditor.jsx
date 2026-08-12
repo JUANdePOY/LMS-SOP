@@ -1062,27 +1062,52 @@ export default function LessonEditor({
               {activeTab === "settings" && (
                 <div className="space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div>
-                      <label htmlFor="duration" className="block text-sm font-medium text-neutral-700 mb-2">
-                        Duration
-                      </label>
-                      <div className="relative">
-                        <input
-                          id="duration"
-                          type="number"
-                          value={duration}
-                          onChange={(e) => {
-                            setDuration(e.target.value);
-                            emitPatch({ duration: e.target.value ? parseInt(e.target.value, 10) : null });
-                          }}
-                          placeholder="e.g. 10"
-                          min="0"
-                          className="w-full rounded-md border border-neutral-200 bg-white pl-3 pr-10 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
-                        />
-                        <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-neutral-500">min</span>
-                      </div>
-                      <p className="text-xs text-neutral-500 mt-1.5">Estimated completion time</p>
-                    </div>
+                     <div>
+                       <label htmlFor="duration" className="block text-sm font-medium text-neutral-700 mb-2">
+                         Duration
+                       </label>
+                       <div className="space-y-2">
+                         <div className="flex flex-wrap gap-1.5">
+                           {[5, 10, 15, 20, 30, 45, 60, 90, 120].map((mins) => {
+                             const active = duration === String(mins);
+                             return (
+                               <button
+                                 key={mins}
+                                 type="button"
+                                 onClick={() => {
+                                   setDuration(String(mins));
+                                   emitPatch({ duration: mins });
+                                 }}
+                                 className={`inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
+                                   active
+                                     ? "border-[var(--color-primary)] bg-[rgba(242,92,5,0.08)] text-[var(--color-primary-hover)] dark:bg-blue-900/20"
+                                     : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
+                                 }`}
+                               >
+                                 {mins} min
+                               </button>
+                             );
+                           })}
+                         </div>
+                         <div className="relative">
+                           <input
+                             id="duration"
+                             type="number"
+                             value={duration}
+                             onChange={(e) => {
+                               const val = e.target.value;
+                               setDuration(val);
+                               emitPatch({ duration: val ? parseInt(val, 10) : null });
+                             }}
+                             placeholder="Custom minutes"
+                             min="0"
+                             className="w-full rounded-md border border-neutral-200 bg-white pl-3 pr-10 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
+                           />
+                           <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-neutral-500">min</span>
+                         </div>
+                       </div>
+                       <p className="text-xs text-neutral-500 mt-1.5">Estimated completion time</p>
+                     </div>
                     <div>
                       <label className="block text-sm font-medium text-neutral-700 mb-2">
                         Visibility

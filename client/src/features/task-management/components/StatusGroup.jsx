@@ -79,14 +79,6 @@ function StatusGroup({
       </button>
       {(!collapsed || (isCreating && isNotStarted)) && (
         <>
-          {tasks.map((task) => (
-            <TaskRow key={task.id} task={task} {...props} />
-          ))}
-          {tasks.length === 0 && !isCreating && (
-            <div className="px-4 py-3 text-xs text-[var(--text-muted)] italic">
-              No {TASK_STATUS_LABELS[status]?.toLowerCase() || status} tasks.
-            </div>
-          )}
           {isNotStarted && isCreating && (
             <div
               ref={createRowRef}
@@ -282,9 +274,17 @@ function StatusGroup({
                   </>
                 )}
               </span>
-            </div>
-          )}
-        </>
+             </div>
+           )}
+           {tasks.map((task) => (
+             <TaskRow key={task.id} task={task} {...props} />
+           ))}
+           {tasks.length === 0 && !isCreating && (
+             <div className="px-4 py-3 text-xs text-[var(--text-muted)] italic">
+               No {TASK_STATUS_LABELS[status]?.toLowerCase() || status} tasks.
+             </div>
+           )}
+         </>
       )}
     </div>
   );
