@@ -679,7 +679,10 @@ async function runMigrations() {
     console.log('Push notification migrations applied');
   } catch (err) {
     console.error('Push notification migration error:', err.message);
-  }
+    const { runTaskMigrations } = require('../migrations/taskManagement');
+    await runTaskMigrations();
+    console.log('Task management migrations applied');
+  } 
 }
 
 async function initDatabase() {

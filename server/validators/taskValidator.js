@@ -174,6 +174,19 @@ function validateCommentPayload(body) {
     }
   }
 
+  if (body.parent_id !== undefined) {
+    if (body.parent_id === '' || body.parent_id === null) {
+      value.parent_id = null;
+    } else {
+      const parentId = parseInt(body.parent_id, 10);
+      if (!Number.isFinite(parentId) || parentId <= 0) {
+        errors.push('parent_id must be a positive integer');
+      } else {
+        value.parent_id = parentId;
+      }
+    }
+  }
+
   return { valid: errors.length === 0, value, errors };
 }
 

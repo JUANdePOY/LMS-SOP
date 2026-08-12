@@ -46,7 +46,10 @@ export async function updateProgress(payload) {
 }
 
 export async function addComment(payload) {
-  const res = await api.post(`${API_BASE}/${payload.task_id}/comments`, { comment: payload.comment });
+  const res = await api.post(`${API_BASE}/${payload.task_id}/comments`, {
+    comment: payload.comment,
+    parent_id: payload.parent_id ?? null,
+  });
   return ensureSuccess(res, 'Failed to add comment').data;
 }
 
