@@ -13,6 +13,7 @@ import { useModules } from '@/features/sop-management/hooks/useModules';
 import { useAttachments } from '@/features/sop-management/hooks/useAttachments';
 import { useVersions } from '@/features/sop-management/hooks/useVersions';
 import { getSop, getWorkflow, getAuditLogs, submitSop, approveSop, rejectSop, publishSop, transitionSop } from '@/features/sop-management/services/sopService';
+import { enqueueBanner } from '@/shared/stores/notificationStore.js';
 
 function SidebarCard({ title, children, className }) {
   return (
@@ -116,6 +117,18 @@ function SOPWorkspacePage() {
       await fetchWorkflow();
       await fetchAuditLogs();
       toast.success(`SOP ${actionLabels[action] || 'updated'} successfully`);
+      if (action === 'publish' && sop?.id) {
+        enqueueBanner({
+          id: `new-sop-${sop.id}`,
+          type: 'new_sop',
+          title: 'New SOP Published',
+          message: sop.title || 'A new SOP is now available.',
+          link: `/sops/${sop.id}`,
+          ctaLabel: 'View SOP',
+          priority: 1,
+          persistDismiss: true,
+        });
+      }
     } catch (err) {
       const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || `${action} failed`;
       console.error(`${action} failed:`, err);

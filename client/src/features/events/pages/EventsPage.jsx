@@ -10,13 +10,19 @@ import EventForm from "../components/EventForm";
 import GoogleCalendarModal from "../calendar/components/GoogleCalendarModal";
 import EventSyncButton from "../calendar/components/EventSyncButton";
 import { Modal } from "@/shared/components/ui/modal";
+import { useNotifications } from "@/shared/stores/notificationStore.js";
 
 export default function EventsPage() {
   const { hasPermission } = useAuth();
   const canManage = hasPermission('manage_events');
   const { toast } = useToast();
+  const { markEntityTypeRead } = useNotifications();
   const { items, error, refresh, create, update, remove } = useEvents({ status: "active" });
   const calendar = useGoogleCalendar();
+
+  useEffect(() => {
+    markEntityTypeRead('event');
+  }, [markEntityTypeRead]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);

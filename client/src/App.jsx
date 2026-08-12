@@ -26,6 +26,7 @@ const UserProfilePage = lazy(() => import("@/features/profile/pages/UserProfileP
 const Login         = lazy(() => import("@/pages/Login"));
 const Settings      = lazy(() => import("@/pages/Settings"));
 const AuditLogs     = lazy(() => import("@/pages/AuditLogs"));
+const NotificationsPage = lazy(() => import("@/pages/Notifications"));
 const Courses = lazy(() => import("@/pages/courses"));
 const CourseDetailsPage = lazy(() => import("@/features/course_management/pages/CourseDetailsPage"));
 const CourseLearnerView = lazy(() => import("@/features/course_management/pages/CourseLearnerView"));
@@ -173,6 +174,7 @@ const router = createBrowserRouter([
       { path: "settings/users", element: AdminProtectedWrapper(UsersPanel), handle: { title: "User Management" } },
       { path: "settings/roles", element: AdminProtectedWrapper(RolesPanel), handle: { title: "Roles & Permissions" } },
       { path: "audit-logs", element: AdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
+      { path: "notifications", element: LMSProtectedWrapper(NotificationsPage), handle: { title: "Notifications" } },
       { path: "sops", element: AdminProtectedWrapper(SOPListPage), handle: { title: "SOP Library" } },
       { path: "courses", element: LMSProtectedWrapper(Courses), handle: { title: "Course Catalog" } },
       { path: "courses/:id", element: LMSProtectedWrapper(CourseDetailsPage), handle: { title: "Course Details" } },

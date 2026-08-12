@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { createPortal } from 'react-dom';
 
 export default function ConfirmationDialog({ isOpen, onClose, onConfirm, title, message, confirmText = 'Confirm', cancelText = 'Cancel', variant = 'default', children }) {
   if (!isOpen) return null;
@@ -10,9 +11,9 @@ export default function ConfirmationDialog({ isOpen, onClose, onConfirm, title, 
   };
   const { icon: Icon, iconColor, btnColor } = variantConfig[variant];
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity duration-200" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-xl transition-opacity duration-200" onClick={onClose} />
       <div className="relative z-10 w-full max-w-md rounded-xl bg-white dark:bg-neutral-900 p-6 shadow-xl border border-neutral-200 dark:border-neutral-800 transition-all duration-200 transform scale-100 opacity-100">
         <div className="flex items-start gap-4">
           <div className={cn(
@@ -57,6 +58,7 @@ export default function ConfirmationDialog({ isOpen, onClose, onConfirm, title, 
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

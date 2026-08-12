@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Bell, Info, AlertCircle, Check } from "lucide-react";
+import { Bell, Info, AlertCircle, Check, BookOpen, FileText, HelpCircle, Award, BookMarked, UserPlus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import NotificationBadge from "@/shared/components/ui/NotificationBadge";
@@ -19,6 +19,33 @@ const TYPE_COLOR = {
   success: "bg-emerald-100 text-emerald-600",
 };
 
+const ENTITY_ICON = {
+  course: BookOpen,
+  sop: FileText,
+  quiz: HelpCircle,
+  certificate: Award,
+  library: BookMarked,
+  enrollment: UserPlus,
+};
+
+const ENTITY_BORDER = {
+  course: "border-l-orange-400",
+  sop: "border-l-blue-400",
+  quiz: "border-l-purple-400",
+  certificate: "border-l-emerald-400",
+  library: "border-l-teal-400",
+  enrollment: "border-l-sky-400",
+};
+
+const ENTITY_ICON_COLOR = {
+  course: "bg-orange-100 text-orange-600",
+  sop: "bg-blue-100 text-blue-600",
+  quiz: "bg-purple-100 text-purple-600",
+  certificate: "bg-emerald-100 text-emerald-600",
+  library: "bg-teal-100 text-teal-600",
+  enrollment: "bg-sky-100 text-sky-600",
+};
+
 function formatTime(timestamp) {
   if (!timestamp) return "";
   const date = new Date(timestamp);
@@ -35,7 +62,7 @@ function formatTime(timestamp) {
   return date.toLocaleDateString();
 }
 
-export default function NotificationDropdown({ showBadge = true, onFetch }) {
+export default function NotificationDropdown({ showBadge = true, onFetch, count }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
   const { unreadCount, notifications, loading, fetched, fetch, markRead, markAllRead } = useNotifications();
@@ -91,7 +118,7 @@ export default function NotificationDropdown({ showBadge = true, onFetch }) {
         className="relative flex h-9 w-9 items-center justify-center rounded-xl text-white hover:text-white hover:bg-white/15 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-white/30"
       >
         <Bell size={18} />
-        {showBadge && <NotificationBadge count={unreadCount} />}
+        {showBadge && <NotificationBadge count={count != null ? count : unreadCount} />}
       </button>
 
       {open && (
@@ -119,56 +146,90 @@ export default function NotificationDropdown({ showBadge = true, onFetch }) {
                 Loading notifications...
               </div>
             ) : notifications.length === 0 ? (
-              <div className="p-4 text-center text-sm text-neutral-500 dark:text-neutral-400">
-                No notifications
+              <div className="p-6 text-center">
+                <Bell size={24} className="mx-auto text-neutral-300 dark:text-neutral-600 mb-2" />
+                <p className="text-sm text-neutral-500 dark:text-neutral-400">You are all caught up!</p>
+                <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-1">No new notifications yet</p>
               </div>
             ) : (
-              <ul className="py-1">
-                {notifications.map((notification) => {
-                  const Icon = TYPE_ICON[notification.type] || Info;
-                  const iconColor = TYPE_COLOR[notification.type] || TYPE_COLOR.info;
-                  return (
-                    <li key={notification.id}>
-                      <button
-                        type="button"
-                        onClick={() => handleNotificationClick(notification)}
-                        className={cn(
-                          "w-full flex items-start gap-3 px-4 py-2.5 text-left transition-colors",
-                          "hover:bg-neutral-50 dark:hover:bg-neutral-800/50 focus:outline-none focus:bg-neutral-50 dark:focus:bg-neutral-800/50",
-                          !notification.is_read && "bg-blue-50/30 dark:bg-blue-900/10"
-                        )}
-                      >
-                        <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg shadow-sm", iconColor)}>
-                          <Icon size={14} />
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className={cn(
-                              "text-sm font-medium",
-                              notification.is_read
-                                ? "text-neutral-700 dark:text-neutral-300"
-                                : "text-neutral-900 dark:text-neutral-100"
-                            )}
-                          >
-                            {notification.title}
-                          </p>
-                          {notification.body && (
-                            <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 break-words">
-                              {notification.body}
+              <div>
+                {(() => {
+                  const systemNotifications = notifications.filter((n) => n.entity_type);
+                  const otherNotifications = notifications.filter((n) => !n.entity_type);
+
+                  const renderSection = (items, sectionLabel) => {
+                    if (items.length === 0) return null;
+                    return (
+                      <div>
+                        {sectionLabel && (
+                          <div className="px-4 pt-3 pb-1">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 dark:text-neutral-500">
+                              {sectionLabel}
                             </p>
-                          )}
-                          <p className="mt-1 text-[10px] text-neutral-400 dark:text-neutral-500">
-                            {formatTime(notification.created_at)}
-                          </p>
-                        </div>
-                        {!notification.is_read && (
-                          <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                          </div>
                         )}
-                      </button>
-                    </li>
+                        <ul className="py-1">
+                          {items.map((notification) => {
+                            const EntityIcon = ENTITY_ICON[notification.entity_type] || TYPE_ICON[notification.type] || Info;
+                            const iconColor = ENTITY_ICON_COLOR[notification.entity_type]
+                              || TYPE_COLOR[notification.type]
+                              || TYPE_COLOR.info;
+                            const borderClass = ENTITY_BORDER[notification.entity_type] || "border-l-transparent";
+                            return (
+                              <li key={notification.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleNotificationClick(notification)}
+                                  className={cn(
+                                    "w-full flex items-start gap-3 px-4 py-2.5 text-left transition-colors border-l-2",
+                                    borderClass,
+                                    "hover:bg-neutral-50 dark:hover:bg-neutral-800/50 focus:outline-none focus:bg-neutral-50 dark:focus:bg-neutral-800/50",
+                                    !notification.is_read && "bg-blue-50/30 dark:bg-blue-900/10"
+                                  )}
+                                >
+                                  <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-lg shadow-sm", iconColor)}>
+                                    <EntityIcon size={14} />
+                                  </span>
+                                  <div className="flex-1 min-w-0">
+                                    <p
+                                      className={cn(
+                                        "text-sm font-medium",
+                                        notification.is_read
+                                          ? "text-neutral-700 dark:text-neutral-300"
+                                          : "text-neutral-900 dark:text-neutral-100"
+                                      )}
+                                    >
+                                      {notification.title}
+                                    </p>
+                                    {notification.body && (
+                                      <p className="mt-0.5 text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 break-words">
+                                        {notification.body}
+                                      </p>
+                                    )}
+                                    <p className="mt-1 text-[10px] text-neutral-400 dark:text-neutral-500">
+                                      {formatTime(notification.created_at)}
+                                    </p>
+                                  </div>
+                                  {!notification.is_read && (
+                                    <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                                  )}
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <>
+                      {renderSection(systemNotifications, "What's New")}
+                      {renderSection(otherNotifications, "Recent")}
+                    </>
                   );
-                })}
-              </ul>
+                })()}
+              </div>
             )}
           </div>
 

@@ -5,7 +5,6 @@ import {
   PanelRightClose,
   Search,
   BookOpen,
-  FileText,
   Users,
   Sun,
   Moon,
@@ -26,8 +25,10 @@ import { Scrollbar } from "@/shared/components/ui/Scrollbar";
 import BannerSection from "@/shared/components/ui/BannerSection";
 import GlobalSearch from "@/components/GlobalSearch";
 import NotificationDropdown from "@/shared/components/ui/NotificationDropdown";
-import { useNotificationStore, useNotificationPoller } from "@/shared/stores/notificationStore.js";
+import NotificationBadge from "@/shared/components/ui/NotificationBadge";
+import { useNotificationStore, useNotificationPoller, useNotifications } from "@/shared/stores/notificationStore.js";
 import { PageTransition } from "@/shared/motion";
+import { useWebSocket } from "@/features/notifications/hooks/useWebSocket";
 
 const MOBILE_BOTTOM_NAV_ADMIN = [
   { name: "Home", path: "/", icon: BookOpen },
@@ -109,6 +110,12 @@ export default function AppLayout() {
   const themeToggleLabel = isDark ? "Switch to light theme" : "Switch to dark theme";
   useNotificationStore();
   useNotificationPoller();
+  useWebSocket();
+  const notificationData = useNotifications();
+  const messageBadgeCount = notificationData.unreadMessageCount || 0;
+  const eventBadgeCount = notificationData.getUnreadCountByEntityType('event') || 0;
+  const announcementBadgeCount = notificationData.getUnreadCountByEntityType('announcement') || 0;
+  const systemBadgeCount = notificationData.getSystemNotificationCount() || 0;
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -265,12 +272,19 @@ export default function AppLayout() {
                 <Search size={18} />
               </button>
 
-              <NotificationDropdown showBadge={true} />
+              <NotificationDropdown showBadge={true} count={systemBadgeCount} />
 
               <div className="flex items-center gap-0.5">
                 {HEADER_QUICK_ACCESS.map((item) => {
                   const Icon = item.icon;
                   const active = location.pathname === item.path || location.pathname.startsWith(item.path);
+                  const badgeCount = item.path === "/messaging"
+                    ? messageBadgeCount
+                    : item.path === "/events"
+                      ? eventBadgeCount
+                      : item.path === "/announcements"
+                        ? announcementBadgeCount
+                        : 0;
                   return (
                     <button
                       key={item.path}
@@ -278,12 +292,13 @@ export default function AppLayout() {
                       aria-label={item.name}
                       aria-current={active ? "page" : undefined}
                       className={cn(
-                        "flex h-9 w-9 items-center justify-center rounded-xl text-white",
+                        "relative flex h-9 w-9 items-center justify-center rounded-xl text-white",
                         "hover:text-white hover:bg-white/15 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-white/30",
                         active && "text-white bg-white/20"
                       )}
                     >
                       <Icon size={18} strokeWidth={active ? 2.5 : 2} />
+                      {badgeCount > 0 && <NotificationBadge count={badgeCount} />}
                     </button>
                   );
                 })}
@@ -345,11 +360,8 @@ export default function AppLayout() {
             </div>
           </header>
 
-          <div className="px-4 sm:px-6 pt-4">
-            <BannerSection />
-          </div>
-
           <div className="flex-1 w-full px-4 sm:px-6 py-4 sm:py-6">
+            <BannerSection />
             <PageTransition>
               <Outlet />
             </PageTransition>

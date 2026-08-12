@@ -23,7 +23,7 @@ import SidebarItem from "./SidebarItem";
 import UserAvatar from "@/shared/components/ui/Avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { filterMenuByRole, LMS_ROLES } from "@/config/menuItems";
-import { useNotificationStore } from "@/shared/stores/notificationStore.js";
+import { useNotificationStore, useNotifications } from "@/shared/stores/notificationStore.js";
 
 const EMPLOYEE_MENU_ITEMS = [
   {
@@ -133,10 +133,16 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   const baseMenuItems = isEmployee ? EMPLOYEE_MENU_ITEMS : MENU_ITEMS;
   const activeMenuItems = filterMenuByRole(baseMenuItems, user?.role);
   const notificationStore = useNotificationStore();
+  const notifications = useNotifications();
 
   const PATH_BANNER_MAP = { "/announcements": ["1"], "/events": ["2"] };
   const getBadgeCount = (path) => {
     if (path === "/messaging") return notificationStore.unreadMessageCount || 0;
+    if (path === "/my-learning") return notifications.getEnrollmentNotificationCount?.() || 0;
+    if (path === "/announcements") return notifications.getUnreadCountByEntityType?.('announcement') || 0;
+    if (path === "/events") return notifications.getUnreadCountByEntityType?.('event') || 0;
+    if (path === "/courses/library") return notifications.getUnreadCountByEntityType?.('course') || 0;
+    if (path === "/certificates/my-certificates") return notifications.getUnreadCountByEntityType?.('certificate') || 0;
     const bannerIds = PATH_BANNER_MAP[path] || [];
     const unreadBannerIds = bannerIds.filter(
       (id) => !notificationStore.dismissed.includes(id)

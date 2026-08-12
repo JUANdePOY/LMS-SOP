@@ -168,4 +168,24 @@ export const createCourseContent = (courseId, moduleId, data) => api.post(`/cour
 export const updateCourseContent = (courseId, moduleId, contentId, data) => api.put(`/courses/${courseId}/modules/${moduleId}/content/${contentId}`, data);
 export const deleteCourseContent = (courseId, moduleId, contentId) => api.delete(`/courses/${courseId}/modules/${moduleId}/content/${contentId}`);
 
+export const getSopStats = () => api.get('/sops/stats');
+
+export const getMySopAcknowledgements = () => api.get('/sops/acknowledgements/my');
+
+export const getAnnouncements = (params = {}) => api.get('/announcements', { params });
+
+export const getEvents = (params = {}) => api.get('/events', { params });
+
+export const getMyTasks = (params = {}) => api.get('/tasks/my', { params });
+
+export const getTaskStats = () => api.get('/tasks/stats');
+
+export const getMyTaskCount = () => api.get('/tasks/my/count');
+
+export const getCertificateStats = () => api.get('/certificate-issuances/stats');
+
+export const getUserCertificates = (userId) => api.get(`/certificate-issuances/user/${userId}`);
+
+export const getAdminDashboard = () => api.get('/admin/dashboard');
+
 export default api;

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
   builderList, builderDelete, publishCourse, archiveCourse,
 } from "@/features/course_management/api/course.api";
+import { enqueueBanner } from "@/shared/stores/notificationStore.js";
 import CreateCourseModal from "@/features/course_management/components/modals/CreateCourseModal";
 import { useToast } from "@/shared/components/ui/Toast";
 import { StaggerList, MotionItem } from "@/shared/motion";
@@ -212,7 +213,19 @@ export default function Courses({ departments = [] }) {
     try {
       if (action === "publish") {
         const res = await publishCourse(course.id);
-        if (res?.success) toast.success("Course published");
+        if (res?.success) {
+          toast.success("Course published");
+          enqueueBanner({
+            id: `new-course-${course.id}`,
+            type: "new_course",
+            title: "New Course Published",
+            message: course.title || "A new course is now available.",
+            link: `/courses/library/${course.id}`,
+            ctaLabel: "Check course",
+            priority: 1,
+            persistDismiss: true,
+          });
+        }
       } else if (action === "archive") {
         const res = await archiveCourse(course.id);
         if (res?.success) toast.success("Course archived");

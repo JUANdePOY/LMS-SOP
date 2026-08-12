@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Settings as SettingsIcon, Users, Shield, Plus, Pencil, Save, X, Trash2, ChevronRight, History, Building2, CheckCircle, Search } from "lucide-react";
+import { Settings as SettingsIcon, Users, Shield, Plus, Pencil, Save, X, Search, Building2, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/shared/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getSettings, updateSetting, createSetting,
-  getUsers, createUser, updateUser, deleteUser,
+  getUsers,
   getProfile, updateProfile,
 } from "@/services/api";
+import { useNavigate } from "react-router-dom";
+import { usePushNotifications } from "@/features/notifications/hooks/usePushNotifications";
 
 const ROLE_META = {
   super_admin: { label: "Super Admin", icon: Shield, color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-500/10", border: "border-red-200 dark:border-red-500/30", desc: "Full system access" },
@@ -24,17 +26,14 @@ const TABS = [
 export default function Settings() {
   const toast = useToast();
   const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("users");
   const [users, setUsers] = useState([]);
   const [settings, setSettings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showAddUser, setShowAddUser] = useState(false);
   const [showAddSetting, setShowAddSetting] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
   const [editingSetting, setEditingSetting] = useState(null);
-  const [deletingUserId, setDeletingUserId] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [userForm, setUserForm] = useState({});
   const [settingKey, setSettingKey] = useState("");
   const [settingValue, setSettingValue] = useState("");
   const [settingDesc, setSettingDesc] = useState("");
@@ -95,56 +94,6 @@ export default function Settings() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated]);
-
-  const handleAddUser = async () => {
-    setSaving(true);
-    try {
-      const res = await createUser(userForm);
-      if (res.data.status === 'success') {
-        toast.success("User created successfully");
-        setShowAddUser(false);
-        setUserForm({});
-        fetchUsers();
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to create user");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleUpdateUser = async (id) => {
-    setSaving(true);
-    try {
-      const res = await updateUser(id, userForm);
-      if (res.data.status === 'success') {
-        toast.success("User updated successfully");
-        setEditingUser(null);
-        setUserForm({});
-        fetchUsers();
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to update user");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeleteUser = async (id) => {
-    setSaving(true);
-    try {
-      const res = await deleteUser(id);
-      if (res.data.status === 'success') {
-        toast.success("User deactivated successfully");
-        setDeletingUserId(null);
-        fetchUsers();
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to deactivate user");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const handleSaveSetting = async (key) => {
     setSaving(true);
@@ -264,7 +213,7 @@ export default function Settings() {
           <div className="flex items-center justify-between">
             <p className="text-xs text-neutral-500">{users.length} users</p>
             <button
-              onClick={() => { setUserForm({}); setShowAddUser(true); }}
+              onClick={() => navigate('/settings/users')}
               className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-secondary-hover)] transition-colors"
             >
               <Plus size={13} /> Add User
@@ -332,19 +281,7 @@ export default function Settings() {
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => {
-                              setUserForm({
-                                full_name: user.full_name || '',
-                                email: user.email || '',
-                                role: user.role || '',
-                                department_id: user.department_id || '',
-                                position_title: user.position_title || '',
-                                employee_id: user.employee_id || '',
-                                contact_number: user.contact_number || '',
-                                employment_status: user.employment_status || '',
-                              });
-                              setEditingUser(user);
-                            }}
+                            onClick={() => navigate('/settings/users')}
                             className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-[var(--color-secondary)] hover:bg-[rgba(19,47,69,0.08)] dark:hover:bg-[rgba(19,47,69,0.08)]0/10 transition-colors"
                             title="Edit user"
                           >
@@ -352,7 +289,7 @@ export default function Settings() {
                           </button>
                           {user.role !== 'super_admin' && (
                             <button
-                              onClick={() => setDeletingUserId(user.id)}
+                              onClick={() => navigate('/settings/users')}
                               className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                               title="Deactivate user"
                             >
@@ -367,117 +304,6 @@ export default function Settings() {
               </tbody>
             </table>
           </div>
-
-          {/* Add User Modal */}
-          {showAddUser && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-              <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setShowAddUser(false)} />
-              <div className="relative z-10 w-full max-w-lg rounded-2xl shadow-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
-                <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
-                  <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-50">Add New User</h2>
-                  <button onClick={() => setShowAddUser(false)} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
-                    <X size={15} />
-                  </button>
-                </div>
-                <div className="px-6 py-4 flex flex-col gap-4">
-                  <div>
-                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Full Name <span className="text-red-500">*</span></label>
-                    <input type="text" value={userForm.full_name || ''} onChange={(e) => setUserForm(f => ({ ...f, full_name: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Email <span className="text-red-500">*</span></label>
-                    <input type="email" value={userForm.email || ''} onChange={(e) => setUserForm(f => ({ ...f, email: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Password <span className="text-red-500">*</span></label>
-                    <input type="password" value={userForm.password || ''} onChange={(e) => setUserForm(f => ({ ...f, password: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Role <span className="text-red-500">*</span></label>
-                      <select value={userForm.role || ''} onChange={(e) => setUserForm(f => ({ ...f, role: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]">
-                        <option value="">Select role…</option>
-                        {Object.entries(ROLE_META).map(([key, meta]) => (
-                          <option key={key} value={key}>{meta.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Department</label>
-                      <select value={userForm.department_id || ''} onChange={(e) => setUserForm(f => ({ ...f, department_id: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]">
-                        <option value="">Select department…</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
-                  <button onClick={() => setShowAddUser(false)} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">Cancel</button>
-                  <button onClick={handleAddUser} disabled={saving || !userForm.email || !userForm.role} className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-secondary-hover)] disabled:opacity-40 transition-colors">
-                    {saving ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Plus size={14} />}
-                    Create User
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Edit User Modal */}
-          {editingUser && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-              <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setEditingUser(null)} />
-              <div className="relative z-10 w-full max-w-lg rounded-2xl shadow-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
-                <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 px-6 py-4">
-                  <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-50">Edit User</h2>
-                  <button onClick={() => setEditingUser(null)} className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
-                    <X size={15} />
-                  </button>
-                </div>
-                <div className="px-6 py-4 flex flex-col gap-4">
-                  <div>
-                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Full Name</label>
-                    <input type="text" value={userForm.full_name || ''} onChange={(e) => setUserForm(f => ({ ...f, full_name: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Email</label>
-                    <input type="email" value={userForm.email || ''} onChange={(e) => setUserForm(f => ({ ...f, email: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]" />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">Role</label>
-                    <select value={userForm.role || ''} onChange={(e) => setUserForm(f => ({ ...f, role: e.target.value }))} className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]">
-                      {Object.entries(ROLE_META).map(([key, meta]) => (
-                        <option key={key} value={key}>{meta.label}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div className="flex items-center justify-end gap-2 border-t border-neutral-100 dark:border-neutral-800 px-6 py-4">
-                  <button onClick={() => setEditingUser(null)} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">Cancel</button>
-                  <button onClick={() => handleUpdateUser(editingUser.id)} disabled={saving} className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--color-secondary-hover)] disabled:opacity-40 transition-colors">
-                    {saving ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Save size={14} />}
-                    Save Changes
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Delete Confirmation */}
-          {deletingUserId && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
-              <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={() => setDeletingUserId(null)} />
-              <div className="relative z-10 w-full max-w-md rounded-2xl shadow-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6">
-                <h2 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 mb-2">Deactivate User</h2>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">Are you sure you want to deactivate this user? They will no longer be able to log in.</p>
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setDeletingUserId(null)} className="rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors">Cancel</button>
-                  <button onClick={() => handleDeleteUser(deletingUserId)} disabled={saving} className="flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-40 transition-colors">
-                    {saving ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <Trash2 size={14} />}
-                    Deactivate
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -503,6 +329,8 @@ export default function Settings() {
               </div>
             )}
           </div>
+
+          <PushNotificationsSection />
 
           <div className="flex items-center justify-between">
             <p className="text-xs text-neutral-500">{settings.length} configuration settings</p>
@@ -577,6 +405,54 @@ export default function Settings() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function PushNotificationsSection() {
+  const { permission, loading, requestPermission, unsubscribe, isSupported } = usePushNotifications();
+
+  if (!isSupported) {
+    return (
+      <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4">
+        <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Browser Push Notifications</h3>
+        <p className="text-xs text-neutral-500 mt-1">Push notifications are not supported in this browser.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Browser Push Notifications</h3>
+          <p className="text-xs text-neutral-500 mt-1">
+            {permission === 'granted'
+              ? 'Receive notifications even when the app is closed.'
+              : 'Get alerts on your device even when the app is closed.'}
+          </p>
+        </div>
+        <div>
+          {permission === 'granted' ? (
+            <button
+              onClick={unsubscribe}
+              disabled={loading}
+              className="flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 transition-colors"
+            >
+              {loading ? 'Disabling...' : 'Disable Push Notifications'}
+            </button>
+          ) : (
+            <button
+              onClick={requestPermission}
+              disabled={loading}
+              className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-4 py-2 text-xs font-semibold text-white hover:bg-[var(--color-secondary-hover)] disabled:opacity-40 transition-colors"
+            >
+              <Bell size={14} />
+              {loading ? 'Enabling...' : 'Enable Push Notifications'}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

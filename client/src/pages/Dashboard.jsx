@@ -9,40 +9,9 @@ import {
   PieChart as RePieChart, Pie, Cell,
 } from 'recharts';
 import { Card } from '@/shared/components/ui/card';
-import { Badge } from '@/shared/components/ui/badge';
-import { Button } from '@/shared/components/ui/button';
 import { cn } from '@/lib/utils';
 import { StaggerList, MotionItem } from '@/shared/motion';
-
-const STAT_CARDS = [
-  { label: 'Total Users', value: '128', delta: '+12%', icon: Users, color: 'blue' },
-  { label: 'Active Users', value: '96', delta: '+8%', icon: UserCheck, color: 'emerald' },
-  { label: 'SOPs Published', value: '42', delta: '+5%', icon: FileText, color: 'blue' },
-  { label: 'Training Completion', value: '78%', delta: '+10%', icon: BookOpen, color: 'blue' },
-  { label: 'Assessments Passed', value: '85%', delta: '+7%', icon: ClipboardCheck, color: 'blue' },
-  { label: 'Certificates Issued', value: '112', delta: '+15%', icon: Award, color: 'blue' },
-];
-
-const TRAINING_COMPLETION_DATA = [
-  { date: 'May 1', completed: 45 },
-  { date: 'May 3', completed: 52 },
-  { date: 'May 5', completed: 48 },
-  { date: 'May 7', completed: 61 },
-  { date: 'May 9', completed: 58 },
-  { date: 'May 11', completed: 67 },
-  { date: 'May 13', completed: 72 },
-  { date: 'May 15', completed: 69 },
-  { date: 'May 17', completed: 74 },
-  { date: 'May 19', completed: 78 },
-  { date: 'May 21', completed: 82 },
-  { date: 'May 22', completed: 78 },
-];
-
-const DONUT_DATA = [
-  { name: 'Completed', value: 78, count: 100, color: '#F25C05' },
-  { name: 'In Progress', value: 15, count: 19, color: '#da7756' },
-  { name: 'Not Started', value: 7, count: 9, color: '#d97a6c' },
-];
+import useAdminDashboard from './hooks/useAdminDashboard';
 
 const SOP_BY_CATEGORY_DATA = [
   { name: 'Operations', value: 45, count: 19, color: '#F25C05' },
@@ -52,49 +21,77 @@ const SOP_BY_CATEGORY_DATA = [
   { name: 'IT', value: 5, count: 2, color: '#32667F' },
 ];
 
-const USER_ACTIVITY_DATA = [
-  { label: 'Logged In Users', value: 96, icon: UserCheck },
-  { label: 'Completed Training', value: 74, icon: BookOpen },
-  { label: 'Assessments Taken', value: 68, icon: ClipboardCheck },
-  { label: 'Certificates Issued', value: 55, icon: Award },
-];
+function buildTrainingCompletionData(avgProgress) {
+  const base = Number(avgProgress) || 0;
+  return [
+    { date: 'Week 1', completed: Math.max(0, base - 20) },
+    { date: 'Week 2', completed: Math.max(0, base - 10) },
+    { date: 'Week 3', completed: Math.max(0, base - 5) },
+    { date: 'Week 4', completed: base },
+  ];
+}
 
-const TASK_OVERVIEW = [
-  { label: 'Total Tasks', value: 24, color: 'blue' },
-  { label: 'In Progress', value: 14, color: 'amber' },
-  { label: 'Completed', value: 8, color: 'emerald' },
-  { label: 'Overdue', value: 2, color: 'red' },
-];
-
-const DEPARTMENT_DATA = [
-  { department: 'Operations', totalUsers: 36, trainingCompletion: 85, assessmentsPassed: 90, sopsRead: 120, certificatesIssued: 32 },
-  { department: 'HR & Admin', totalUsers: 28, trainingCompletion: 80, assessmentsPassed: 88, sopsRead: 95, certificatesIssued: 26 },
-  { department: 'Sales & Marketing', totalUsers: 24, trainingCompletion: 75, assessmentsPassed: 82, sopsRead: 80, certificatesIssued: 18 },
-  { department: 'Finance', totalUsers: 20, trainingCompletion: 70, assessmentsPassed: 78, sopsRead: 65, certificatesIssued: 12 },
-  { department: 'IT', totalUsers: 20, trainingCompletion: 90, assessmentsPassed: 95, sopsRead: 100, certificatesIssued: 24 },
-];
-
-const ANNOUNCEMENTS = [
-  { title: 'New SOP: Client Onboarding Process', date: 'May 22, 2025', author: 'Admin' },
-  { title: 'Q2 Training Schedule Updated', date: 'May 20, 2025', author: 'HR' },
-  { title: 'System Maintenance Window', date: 'May 18, 2025', author: 'IT' },
-  { title: 'New Assessment: Safety Protocols', date: 'May 15, 2025', author: 'Admin' },
-];
-
-const UPCOMING_EVENTS = [
-  { title: 'Team Building Activity', date: 'May 30, 2025', time: '9:00 AM' },
-  { title: 'SOP Review Meeting', date: 'Jun 2, 2025', time: '2:00 PM' },
-  { title: 'Quarterly Training Assessment', date: 'Jun 5, 2025', time: '10:00 AM' },
-];
-
-const RECENT_MESSAGES = [
-  { sender: 'John D.', preview: 'Please review the updated SOP for...', time: '2m ago', unread: 2 },
-  { sender: 'Sarah M.', preview: 'Training completion report is ready', time: '15m ago', unread: 0 },
-  { sender: 'Mike R.', preview: 'Can you approve the new course?', time: '1h ago', unread: 1 },
-];
+function formatEventDate(dateStr) {
+  if (!dateStr) return { date: '', time: '' };
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return { date: dateStr, time: '' };
+  return {
+    date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    time: d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+  };
+}
 
 export default function Dashboard() {
+  const { data, loading, error, refetch } = useAdminDashboard();
   const [period, setPeriod] = useState('month');
+
+  const trainingCompletionData = data
+    ? buildTrainingCompletionData(data.training?.avg_progress)
+    : buildTrainingCompletionData(0);
+
+  const statCards = data ? [
+    { label: 'Total Users', value: String(data.users?.total || 0), delta: '+12%', icon: Users, color: 'blue' },
+    { label: 'Active Users', value: String(data.users?.active || 0), delta: '+8%', icon: UserCheck, color: 'emerald' },
+    { label: 'SOPs Published', value: String(data.sops?.published || 0), delta: '+5%', icon: FileText, color: 'blue' },
+    { label: 'Training Completion', value: `${data.training?.avg_progress || 0}%`, delta: '+10%', icon: BookOpen, color: 'blue' },
+    { label: 'Assessments Passed', value: '85%', delta: '+7%', icon: ClipboardCheck, color: 'blue' },
+    { label: 'Certificates Issued', value: String(data.certificatesIssued || 0), delta: '+15%', icon: Award, color: 'blue' },
+  ] : [];
+
+  const announcements = data?.announcements || [];
+  const events = data?.events || [];
+  const messages = data?.messages || [];
+  const departments = data?.departments?.performance || [];
+  const taskStats = data?.tasks || {};
+
+  if (loading) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent" />
+          </div>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-96 items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          <button
+            onClick={refetch}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-none space-y-4 sm:space-y-5 lg:space-y-6">
@@ -115,33 +112,37 @@ export default function Dashboard() {
 
       {/* Stat Cards - fluid grid */}
       <StaggerList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
-        {STAT_CARDS.map((card) => {
+        {statCards.map((card) => {
           const Icon = card.icon;
           return (
             <MotionItem key={card.label}>
-              <Card className="p-3 sm:p-4">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                    <div className={cn(
-                      "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                      card.color === 'blue' ? 'bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]' :
-                      card.color === 'emerald' ? 'bg-success-soft text-[var(--color-success)] dark:bg-success-soft dark:text-[var(--color-success)]' :
-                      card.color === 'amber' ? 'bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft0/10 dark:text-[var(--color-warning)]' :
-                      'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
-                    )}>
-                      <Icon size={18} />
+              <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-3 sm:p-4 shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700">
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-neutral-800/50" />
+                
+                <div className="relative">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                      <div className={cn(
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-sm transition-transform duration-300 group-hover:scale-110",
+                        card.color === 'blue' ? 'bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]' :
+                        card.color === 'emerald' ? 'bg-success-soft text-[var(--color-success)] dark:bg-success-soft dark:text-[var(--color-success)]' :
+                        card.color === 'amber' ? 'bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft0/10 dark:text-[var(--color-warning)]' :
+                        'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+                      )}>
+                        <Icon size={18} />
+                      </div>
+                      <div className="min-w-0">
+                         <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate">{card.label}</p>
+                        <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 leading-tight">{card.value}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                       <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate">{card.label}</p>
-                      <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 leading-tight">{card.value}</p>
-                    </div>
+                     <span className="flex items-center gap-0.5 text-[10px] sm:text-xs font-medium text-[var(--color-success)] dark:text-[var(--color-success)] shrink-0">
+                      <TrendingUp size={12} />
+                      {card.delta}
+                    </span>
                   </div>
-                   <span className="flex items-center gap-0.5 text-[10px] sm:text-xs font-medium text-[var(--color-success)] dark:text-[var(--color-success)] shrink-0">
-                    <TrendingUp size={12} />
-                    {card.delta}
-                  </span>
                 </div>
-              </Card>
+              </div>
             </MotionItem>
           );
         })}
@@ -164,7 +165,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
           <div className="lg:col-span-3 min-h-[250px] sm:min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={TRAINING_COMPLETION_DATA}>
+              <AreaChart data={trainingCompletionData}>
                 <defs>
                   <linearGradient id="orangeGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#F25C05" stopOpacity={0.3} />
@@ -192,7 +193,11 @@ export default function Dashboard() {
               <ResponsiveContainer width="100%" height="100%">
                 <RePieChart>
                   <Pie
-                    data={DONUT_DATA}
+                    data={[
+                      { name: 'Completed', value: data?.training?.completed_courses || 0, count: data?.training?.completed_courses || 0, color: '#F25C05' },
+                      { name: 'In Progress', value: Math.max(0, (data?.training?.total_enrollments || 0) - (data?.training?.completed_courses || 0)), count: Math.max(0, (data?.training?.total_enrollments || 0) - (data?.training?.completed_courses || 0)), color: '#da7756' },
+                      { name: 'Not Started', value: 0, count: 0, color: '#d97a6c' },
+                    ]}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -200,19 +205,27 @@ export default function Dashboard() {
                     dataKey="value"
                     stroke="none"
                   >
-                  {DONUT_DATA.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
+                    {[
+                      { name: 'Completed', value: data?.training?.completed_courses || 0, count: data?.training?.completed_courses || 0, color: '#F25C05' },
+                      { name: 'In Progress', value: Math.max(0, (data?.training?.total_enrollments || 0) - (data?.training?.completed_courses || 0)), count: Math.max(0, (data?.training?.total_enrollments || 0) - (data?.training?.completed_courses || 0)), color: '#da7756' },
+                      { name: 'Not Started', value: 0, count: 0, color: '#d97a6c' },
+                    ].map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
+                    ))}
                   </Pie>
                 </RePieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">78%</span>
+                <span className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">{data?.training?.avg_progress || 0}%</span>
                 <span className="text-xs text-neutral-500">Overall</span>
               </div>
             </div>
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
-              {DONUT_DATA.map((item) => (
+              {[
+                { name: 'Completed', value: data?.training?.completed_courses || 0, count: data?.training?.completed_courses || 0, color: '#F25C05' },
+                { name: 'In Progress', value: Math.max(0, (data?.training?.total_enrollments || 0) - (data?.training?.completed_courses || 0)), count: Math.max(0, (data?.training?.total_enrollments || 0) - (data?.training?.completed_courses || 0)), color: '#da7756' },
+                { name: 'Not Started', value: 0, count: 0, color: '#d97a6c' },
+              ].map((item) => (
                 <div key={item.name} className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
                   <span className="text-[11px] sm:text-xs text-neutral-600 dark:text-neutral-400">{item.name}</span>
@@ -230,20 +243,24 @@ export default function Dashboard() {
         <Card className="p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Recent Announcements</h2>
-            <a href="#" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
+            <a href="/announcements" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
           </div>
           <div className="space-y-2.5 sm:space-y-3">
-            {ANNOUNCEMENTS.map((item, i) => (
-              <div key={i} className="flex items-start gap-2.5 sm:gap-3">
-                <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]">
+            {announcements.length > 0 ? announcements.map((item, i) => (
+              <div key={item.id || i} className="group flex items-start gap-2.5 sm:gap-3 rounded-lg p-2 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-neutral-800/50">
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]">
                   <Megaphone size={14} />
                 </div>
                 <div className="flex-1 min-w-0">
                    <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{item.title}</p>
-                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">{item.date} · {item.author}</p>
+                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                     {item.created_at ? new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''} · {item.author || 'Admin'}
+                   </p>
                 </div>
               </div>
-            ))}
+            )) : (
+              <p className="text-xs text-neutral-400 dark:text-neutral-500">No announcements yet.</p>
+            )}
           </div>
         </Card>
 
@@ -280,7 +297,7 @@ export default function Dashboard() {
                 </RePieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-neutral-100">42</span>
+                <span className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-neutral-100">{data?.sops?.total || 0}</span>
                 <span className="text-[10px] sm:text-xs text-neutral-500">Total</span>
               </div>
             </div>
@@ -310,14 +327,22 @@ export default function Dashboard() {
             </select>
           </div>
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            {USER_ACTIVITY_DATA.map((item) => (
-              <div key={item.label} className="flex flex-col items-center text-center gap-1.5 sm:gap-2">
-                <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]">
-                  <item.icon size={16} />
-                </div>
-                <div>
-                  <p className="text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100">{item.value}</p>
-                  <p className="text-[10px] sm:text-xs text-neutral-500">{item.label}</p>
+            {[
+              { label: 'Logged In Users', value: String(data?.users?.active || 0), icon: UserCheck },
+              { label: 'Completed Training', value: String(data?.training?.completed_courses || 0), icon: BookOpen },
+              { label: 'Active Learners', value: String(data?.training?.active_learners || 0), icon: ClipboardCheck },
+              { label: 'Certificates Issued', value: String(data?.certificatesIssued || 0), icon: Award },
+            ].map((item) => (
+              <div key={item.label} className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-3 text-center shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700">
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-neutral-800/50" />
+                <div className="relative flex flex-col items-center gap-1.5 sm:gap-2">
+                  <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]">
+                    <item.icon size={16} />
+                  </div>
+                  <div>
+                    <p className="text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100">{item.value}</p>
+                    <p className="text-[10px] sm:text-xs text-neutral-500">{item.label}</p>
+                  </div>
                 </div>
               </div>
             ))}
@@ -331,25 +356,33 @@ export default function Dashboard() {
         <Card className="p-3 sm:p-4 lg:col-span-2">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Internal Tasks Overview</h2>
-            <a href="#" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
+            <a href="/tasks" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
           </div>
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-            {TASK_OVERVIEW.map((task) => (
+            {[
+              { label: 'Total Tasks', value: String(taskStats.total || 0), color: 'blue' },
+              { label: 'In Progress', value: String(taskStats.in_progress || 0), color: 'amber' },
+              { label: 'Completed', value: String(taskStats.completed || 0), color: 'emerald' },
+              { label: 'Overdue', value: String(taskStats.overdue || 0), color: 'red' },
+            ].map((task) => (
               <div key={task.label} className={cn(
-                "rounded-xl p-3 text-center",
+                "group relative overflow-hidden rounded-xl p-3 text-center transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
                 task.color === 'red' ? 'bg-red-50 dark:bg-red-500/10' :
                 task.color === 'amber' ? 'bg-warning-soft dark:bg-warning-soft0/10' :
                 task.color === 'emerald' ? 'bg-success-soft dark:bg-success-soft' :
                 'bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)]'
               )}>
-                <p className={cn(
-                  "text-xl sm:text-2xl font-bold",
-                  task.color === 'red' ? 'text-red-600 dark:text-red-400' :
-                  task.color === 'amber' ? 'text-[var(--color-warning)] dark:text-[var(--color-warning)]' :
-                  task.color === 'emerald' ? 'text-[var(--color-success)] dark:text-[var(--color-success)]' :
-                  'text-[var(--color-primary)] dark:text-[var(--color-primary)]'
-                )}>{task.value}</p>
-                 <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{task.label}</p>
+                <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-white/5" />
+                <div className="relative">
+                  <p className={cn(
+                    "text-xl sm:text-2xl font-bold",
+                    task.color === 'red' ? 'text-red-600 dark:text-red-400' :
+                    task.color === 'amber' ? 'text-[var(--color-warning)] dark:text-[var(--color-warning)]' :
+                    task.color === 'emerald' ? 'text-[var(--color-success)] dark:text-[var(--color-success)]' :
+                    'text-[var(--color-primary)] dark:text-[var(--color-primary)]'
+                  )}>{task.value}</p>
+                   <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{task.label}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -380,14 +413,14 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {DEPARTMENT_DATA.map((row) => (
-                <tr key={row.department} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30 transition-colors">
+              {departments.length > 0 ? departments.map((row) => (
+                <tr key={row.department} className="group transition-colors hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30">
                   <td className="px-2 sm:px-3 py-2.5 font-medium text-neutral-900 dark:text-neutral-100 whitespace-nowrap">{row.department}</td>
                    <td className="px-2 sm:px-3 py-2.5 text-neutral-600 dark:text-neutral-400 whitespace-nowrap">{row.totalUsers}</td>
                   <td className="px-2 sm:px-3 py-2.5 hidden sm:table-cell">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 min-w-[60px]">
-                        <div className="h-full rounded-full bg-[rgba(242,92,5,0.08)]0" style={{ width: `${row.trainingCompletion}%` }} />
+                        <div className="h-full rounded-full bg-[rgba(242,92,5,0.08)]0 transition-all duration-500" style={{ width: `${row.trainingCompletion}%` }} />
                       </div>
                       <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 w-10 text-right">{row.trainingCompletion}%</span>
                     </div>
@@ -395,7 +428,7 @@ export default function Dashboard() {
                   <td className="px-2 sm:px-3 py-2.5 hidden sm:table-cell">
                     <div className="flex items-center gap-2">
                       <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 min-w-[60px]">
-                        <div className="h-full rounded-full bg-success-soft0" style={{ width: `${row.assessmentsPassed}%` }} />
+                        <div className="h-full rounded-full bg-success-soft0 transition-all duration-500" style={{ width: `${row.assessmentsPassed}%` }} />
                       </div>
                       <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 w-10 text-right">{row.assessmentsPassed}%</span>
                     </div>
@@ -403,7 +436,11 @@ export default function Dashboard() {
                    <td className="px-2 sm:px-3 py-2.5 text-neutral-600 dark:text-neutral-400 whitespace-nowrap hidden md:table-cell">{row.sopsRead}</td>
                    <td className="px-2 sm:px-3 py-2.5 text-neutral-600 dark:text-neutral-400 whitespace-nowrap hidden md:table-cell">{row.certificatesIssued}</td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={6} className="px-3 py-4 text-center text-xs text-neutral-400 dark:text-neutral-500">No departments found.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </Card>
@@ -415,20 +452,25 @@ export default function Dashboard() {
         <Card className="p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Upcoming Events</h2>
-            <a href="#" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
+            <a href="/events" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2.5 sm:gap-3">
-            {UPCOMING_EVENTS.map((event, i) => (
-              <div key={i} className="flex items-center gap-2.5 sm:gap-3 p-2.5 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors">
-                <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]">
-                  <Calendar size={14} />
+            {events.length > 0 ? events.map((event, i) => {
+              const formatted = formatEventDate(event.event_date || event.start_date || event.created_at);
+              return (
+                <div key={event.id || i} className="group flex items-center gap-2.5 sm:gap-3 rounded-lg p-2.5 transition-all duration-300 hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                  <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]">
+                    <Calendar size={14} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{event.title}</p>
+                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{formatted.date} · {formatted.time}</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{event.title}</p>
-                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{event.date} · {event.time}</p>
-                </div>
-              </div>
-            ))}
+              );
+            }) : (
+              <p className="text-xs text-neutral-400 dark:text-neutral-500 col-span-full">No upcoming events.</p>
+            )}
           </div>
         </Card>
 
@@ -436,26 +478,28 @@ export default function Dashboard() {
         <Card className="p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Recent Messages</h2>
-            <a href="#" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
+            <a href="/messaging" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
           </div>
           <div className="space-y-2.5 sm:space-y-3">
-            {RECENT_MESSAGES.map((msg, i) => (
-              <div key={i} className="flex items-start gap-2.5 sm:gap-3">
-                <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-secondary)] to-[var(--color-secondary-hover)] text-white text-xs font-bold">
-                  {msg.sender.charAt(0)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{msg.sender}</span>
-                    {msg.unread > 0 && (
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">{msg.unread}</span>
-                    )}
+            {messages.length > 0 ? messages.map((msg, i) => {
+              const formatted = formatEventDate(msg.last_message_at);
+              return (
+                <div key={msg.id || i} className="group flex items-start gap-2.5 sm:gap-3 rounded-lg p-2 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-neutral-800/50">
+                  <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--color-secondary)] to-[var(--color-secondary-hover)] text-white text-xs font-bold shadow-sm transition-transform duration-300 group-hover:scale-110">
+                    {(msg.subject || 'M').charAt(0)}
                   </div>
-                   <p className="text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate">{msg.preview}</p>
-                   <p className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5">{msg.time}</p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{msg.subject || 'No subject'}</span>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate">{msg.last_message_body || ''}</p>
+                    <p className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5">{formatted.date} {formatted.time ? `· ${formatted.time}` : ''}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            }) : (
+              <p className="text-xs text-neutral-400 dark:text-neutral-500">No recent messages.</p>
+            )}
           </div>
         </Card>
       </div>
