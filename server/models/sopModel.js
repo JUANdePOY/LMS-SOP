@@ -55,7 +55,7 @@ function restrictionWhere(user, cols, alias = 's') {
   if (!user || !cols.hasRestrictionType) return '';
 
   const role = user.role || '';
-  if (role === 'admin' || role === 'super_admin') return '';
+  if (role === 'super_admin' || role === 'admin') return '';
 
   const userDepartmentId = user.department_id || null;
   const userId = user.id || null;
@@ -90,6 +90,71 @@ function restrictionWhere(user, cols, alias = 's') {
       )
     )
   `;
+}
+
+// Builds an organizational scope filter based on the user's role and assigned
+// business/departments. This is separate from restrictionWhere() which handles
+// content-level visibility (public/private/department/assigned).
+async function businessScopeWhere(user, cols, alias = 's') {
+  if (!user || !cols.hasDepartment) return { sql: '', params: [] };
+
+  const role = user.role || '';
+  if (role === 'super_admin') return { sql: '', params: [] };
+
+  if (role === 'admin') {
+    if (!user.business_id) {
+      return { sql: 'AND 1=0', params: [] };
+    }
+    return {
+      sql: `AND (
+        EXISTS (
+          SELECT 1 FROM departments d
+          WHERE d.id = ${alias}.department_id
+            AND d.business_id = ?
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM sop_assignments sa
+          INNER JOIN sop_versions sv ON sv.sop_id = ${alias}.id
+          INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
+          INNER JOIN departments d ON d.id = ad.department_id
+          WHERE sa.sop_version_id = sv.id
+            AND sv.is_current = TRUE
+            AND sv.deleted_at IS NULL
+            AND sa.is_deleted = FALSE
+            AND d.business_id = ?
+        )
+      )`,
+      params: [user.business_id, user.business_id],
+    };
+  }
+
+  if (role === 'department_head') {
+    const scopedDeptIds = user.scoped_department_ids || (user.department_id ? [user.department_id] : []);
+    if (!scopedDeptIds.length) {
+      return { sql: 'AND 1=0', params: [] };
+    }
+    const placeholders = scopedDeptIds.map(() => '?').join(',');
+    return {
+      sql: `AND (
+        ${alias}.department_id IN (${placeholders})
+        OR EXISTS (
+          SELECT 1
+          FROM sop_assignments sa
+          INNER JOIN sop_versions sv ON sv.sop_id = ${alias}.id
+          INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
+          WHERE sa.sop_version_id = sv.id
+            AND sv.is_current = TRUE
+            AND sv.deleted_at IS NULL
+            AND sa.is_deleted = FALSE
+            AND ad.department_id IN (${placeholders})
+        )
+      )`,
+      params: [...scopedDeptIds, ...scopedDeptIds],
+    };
+  }
+
+  return { sql: '', params: [] };
 }
 
 async function canAccessSop(sop, user) {
@@ -146,7 +211,7 @@ async function findAll(filters = {}) {
   const { search, status, department_id, category_id, exclude_status, page = 1, limit = 20, user } = filters;
   const offset = (page - 1) * limit;
 
- // is_assigned_department is purely about the sop_assignments /
+  // is_assigned_department is purely about the sop_assignments /
   // assignment_departments join — it does NOT check the legacy
   // sops.department_id owner column. So a SOP gets the "Assigned" badge in
   // every department it was explicitly assigned to, including a department
@@ -221,6 +286,12 @@ async function findAll(filters = {}) {
     params.push(user.department_id, user.id, user.department_id, user.id);
   }
 
+  const scope = await businessScopeWhere(user, cols, 's');
+  if (scope.sql) {
+    sql += ' ' + scope.sql;
+    params.push(...scope.params);
+  }
+
   sql += ' ORDER BY s.created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
@@ -267,6 +338,12 @@ async function findAll(filters = {}) {
   if (countRestrictionSql) {
     countSql += ' AND ' + countRestrictionSql;
     countParams.push(user.department_id, user.id, user.department_id, user.id);
+  }
+
+  const countScope = await businessScopeWhere(user, cols, 's');
+  if (countScope.sql) {
+    countSql += ' ' + countScope.sql;
+    countParams.push(...countScope.params);
   }
 
   const [countRows] = await db.query(countSql, countParams);
@@ -452,7 +529,7 @@ async function permanentDelete(id) {
 
 async function listTrashed(filters = {}) {
   const cols = await getSopsColumns();
-  const { search, department_id, category_id, page = 1, limit = 20 } = filters;
+  const { search, department_id, category_id, page = 1, limit = 20, user } = filters;
   const offset = (page - 1) * limit;
 
   let sql = `
@@ -478,6 +555,12 @@ async function listTrashed(filters = {}) {
     params.push(category_id);
   }
 
+  const scope = await businessScopeWhere(user, cols, 's');
+  if (scope.sql) {
+    sql += ' ' + scope.sql;
+    params.push(...scope.params);
+  }
+
   sql += ' ORDER BY s.updated_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
 
@@ -500,6 +583,12 @@ async function listTrashed(filters = {}) {
   if (category_id && cols.hasCategory) {
     countSql += ' AND s.category_id = ?';
     countParams.push(category_id);
+  }
+
+  const countScope = await businessScopeWhere(user, cols, 's');
+  if (countScope.sql) {
+    countSql += ' ' + countScope.sql;
+    countParams.push(...countScope.params);
   }
 
   const [countRows] = await db.query(countSql, countParams);

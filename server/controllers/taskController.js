@@ -1,5 +1,6 @@
 const taskService = require('../services/taskService');
 const { validateFilters } = require('../validators/taskValidator');
+const { broadcastSystemChange } = require('../services/notificationService');
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
@@ -51,6 +52,14 @@ const taskController = {
   async createTask(req, res) {
     try {
       const task = await taskService.createTask(req.body, req.user.id);
+      broadcastSystemChange({
+        title: 'New Task Created',
+        body: task.title,
+        type: 'info',
+        link: `/tasks/${task.id}`,
+        entityType: 'task',
+        entityId: task.id,
+      }).catch(() => {});
       res.status(201).json({ success: true, data: task, message: 'Task created successfully' });
     } catch (error) {
       handleError(res, error);
@@ -61,6 +70,14 @@ const taskController = {
     try {
       const taskId = parseInt(req.params.id, 10);
       const task = await taskService.updateTask(taskId, req.body, req.user.id);
+      broadcastSystemChange({
+        title: 'Task Updated',
+        body: task.title,
+        type: 'info',
+        link: `/tasks/${task.id}`,
+        entityType: 'task',
+        entityId: task.id,
+      }).catch(() => {});
       res.json({ success: true, data: task, message: 'Task updated successfully' });
     } catch (error) {
       handleError(res, error);
@@ -80,6 +97,14 @@ const taskController = {
   async assignTask(req, res) {
     try {
       const assignment = await taskService.assignTask(req.body, req.user.id);
+      broadcastSystemChange({
+        title: 'Task Assigned',
+        body: assignment.title || 'A task has been assigned',
+        type: 'info',
+        link: `/tasks/${assignment.task_id || assignment.id}`,
+        entityType: 'task',
+        entityId: assignment.task_id || assignment.id,
+      }).catch(() => {});
       res.status(201).json({ success: true, data: assignment, message: 'Task assigned successfully' });
     } catch (error) {
       handleError(res, error);

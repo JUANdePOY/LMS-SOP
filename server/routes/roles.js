@@ -1,12 +1,85 @@
 const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const db = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireSuperAdmin } = require('../middleware/auth');
+const { resolveUserPermissions } = require('../middleware/scope');
 const { logAudit } = require('../utils/auditLogger');
 
 const router = express.Router();
 
 router.use(authenticateToken);
+
+// GET /api/roles/my-permissions
+router.get('/my-permissions', authenticateToken, async (req, res) => {
+  try {
+    const permissions = await resolveUserPermissions(req.user.id, req.user.role);
+    res.json({ status: 'success', data: { permissions, role: req.user.role } });
+  } catch (err) {
+    console.error('My permissions error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch permissions', code: 'DB_ERROR' });
+  }
+});
+
+// GET /api/roles/users/:userId/permissions
+router.get('/users/:userId/permissions', authenticateToken, requireSuperAdmin, async (req, res) => {
+  try {
+    const targetUserId = parseInt(req.params.userId);
+    const [userRows] = await db.query('SELECT id, role FROM users WHERE id = ?', [targetUserId]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
+    }
+
+    const [overrides] = await db.query(
+      'SELECT permission_name, granted FROM user_permission_overrides WHERE user_id = ?',
+      [targetUserId]
+    );
+    res.json({ status: 'success', data: { role: userRows[0].role, overrides } });
+  } catch (err) {
+    console.error('User permissions fetch error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch user permissions', code: 'DB_ERROR' });
+  }
+});
+
+// PUT /api/roles/users/:userId/permissions
+router.put('/users/:userId/permissions', authenticateToken, requireSuperAdmin, [
+  body('overrides').isArray().withMessage('overrides must be an array'),
+  body('overrides.*.permission_name').notEmpty().withMessage('permission_name is required'),
+  body('overrides.*.granted').isBoolean().withMessage('granted must be boolean'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
+    }
+
+    const targetUserId = parseInt(req.params.userId);
+    const [userRows] = await db.query('SELECT id FROM users WHERE id = ?', [targetUserId]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
+    }
+
+    const overrides = req.body.overrides || [];
+    await db.query('DELETE FROM user_permission_overrides WHERE user_id = ?', [targetUserId]);
+
+    if (overrides.length > 0) {
+      const values = overrides.map(o => [targetUserId, o.permission_name, o.granted ? 1 : 0, req.user.id]);
+      await db.query('INSERT INTO user_permission_overrides (user_id, permission_name, granted, granted_by) VALUES ?', [values]);
+    }
+
+    logAudit({
+      user_id: req.user.id,
+      action: 'user.permissions_updated',
+      entity_type: 'user',
+      entity_id: targetUserId,
+      new_values: { override_count: overrides.length }
+    });
+
+    res.json({ status: 'success', message: 'User permissions updated' });
+  } catch (err) {
+    console.error('User permissions update error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to update user permissions', code: 'DB_ERROR' });
+  }
+});
 
 // GET /api/roles
 router.get('/', async (req, res) => {
@@ -37,7 +110,7 @@ router.get('/permissions', async (req, res) => {
 });
 
 // PUT /api/roles/permissions/:roleName
-router.put('/permissions/:roleName', [
+router.put('/permissions/:roleName', authenticateToken, requireSuperAdmin, [
   body('permission_names').optional().isArray().withMessage('permission_names must be an array'),
 ], async (req, res) => {
   try {
@@ -98,7 +171,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /api/roles
-router.post('/', [
+router.post('/', authenticateToken, requireSuperAdmin, [
   body('name').trim().isLength({ min: 2, max: 100 }).withMessage('Role name is required (2-100 chars)'),
   body('display_name').trim().isLength({ min: 2, max: 255 }).withMessage('Display name is required (2-255 chars)'),
   body('description').optional().trim(),
@@ -134,7 +207,7 @@ router.post('/', [
 });
 
 // PUT /api/roles/:id
-router.put('/:id', [
+router.put('/:id', authenticateToken, requireSuperAdmin, [
   body('display_name').optional().trim().isLength({ min: 2, max: 255 }),
   body('description').optional().trim(),
   body('is_active').optional().isBoolean(),
@@ -184,7 +257,7 @@ router.put('/:id', [
 });
 
 // DELETE /api/roles/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {

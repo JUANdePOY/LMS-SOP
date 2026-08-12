@@ -53,6 +53,16 @@ async function createAssignment(sopId, payload, assignedBy) {
     throw error;
   }
 
+  const actor = await db.query(
+    'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+    [assignedBy]
+  ).then(([rows]) => rows[0] || null);
+  if (actor && sop.business_id && actor.business_id !== sop.business_id) {
+    const error = new Error('Access denied: SOP is outside your business scope');
+    error.code = 'FORBIDDEN';
+    throw error;
+  }
+
   const normalized = {
     ...payload,
     assignment_type: normalizeAssignmentType(payload.assignment_type),
@@ -129,6 +139,19 @@ async function deleteAssignment(assignmentId) {
     const error = new Error('Assignment not found');
     error.code = 'NOT_FOUND';
     throw error;
+  }
+
+  const sop = await sopModel.findById(assignment.sop_id);
+  if (sop) {
+    const [actor] = await db.query(
+      'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+      [assignment.assigned_by || null]
+    ).then(([rows]) => rows[0] || null);
+    if (actor && sop.business_id && actor.business_id !== sop.business_id) {
+      const error = new Error('Access denied: SOP is outside your business scope');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
   }
 
   await complianceModel.softDeleteAssignment(assignmentId);

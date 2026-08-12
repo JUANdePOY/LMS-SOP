@@ -24,7 +24,7 @@ import SidebarItem from "./SidebarItem";
 import UserAvatar from "@/shared/components/ui/Avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { filterMenuByRole, LMS_ROLES } from "@/config/menuItems";
-import { useNotificationStore } from "@/shared/stores/notificationStore.js";
+import { useNotificationStore, useNotifications } from "@/shared/stores/notificationStore.js";
 
 const EMPLOYEE_MENU_ITEMS = [
   {
@@ -87,7 +87,7 @@ const MENU_ITEMS = [
       },
        { name: "Course Management", path: "/courses", icon: BookOpen, roles: ['super_admin', 'admin', 'department_head'] },
        { name: "Course Library", path: "/courses/library", icon: Library, roles: LMS_ROLES },
-       { name: "Quizzes", path: "/assessments", icon: ClipboardCheck, sub: ["Manage", "Leaderboard", "Integrity"], roles: ['super_admin', 'admin', 'department_head'] },
+        { name: "Quizzes", path: "/assessments", icon: ClipboardCheck, sub: [{name:"Manage", roles:['super_admin','admin','department_head']}, {name:"Leaderboard", roles:['super_admin','admin','department_head']}, {name:"Integrity", roles:['super_admin']}], roles: ['super_admin', 'admin', 'department_head'] },
        { name: "Certificates", path: "/certificates", icon: Award, roles: ['super_admin', 'admin'] },
     ],
   },
@@ -135,10 +135,16 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   const baseMenuItems = isEmployee ? EMPLOYEE_MENU_ITEMS : MENU_ITEMS;
   const activeMenuItems = filterMenuByRole(baseMenuItems, user?.role);
   const notificationStore = useNotificationStore();
+  const notifications = useNotifications();
 
   const PATH_BANNER_MAP = { "/announcements": ["1"], "/events": ["2"] };
   const getBadgeCount = (path) => {
     if (path === "/messaging") return notificationStore.unreadMessageCount || 0;
+    if (path === "/my-learning") return notifications.getEnrollmentNotificationCount?.() || 0;
+    if (path === "/announcements") return notifications.getUnreadCountByEntityType?.('announcement') || 0;
+    if (path === "/events") return notifications.getUnreadCountByEntityType?.('event') || 0;
+    if (path === "/courses/library") return notifications.getUnreadCountByEntityType?.('course') || 0;
+    if (path === "/certificates/my-certificates") return notifications.getUnreadCountByEntityType?.('certificate') || 0;
     const bannerIds = PATH_BANNER_MAP[path] || [];
     const unreadBannerIds = bannerIds.filter(
       (id) => !notificationStore.dismissed.includes(id)
@@ -178,13 +184,14 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
 
   const isAnySubActive = (subItems, basePath) => {
     return subItems.some((subItem) => {
-      if (subItem === "Files") {
+      const name = typeof subItem === 'string' ? subItem : subItem.name;
+      if (name === "Files") {
         return location.pathname.startsWith("/sops");
       }
-      if (subItem === "Dashboard") {
+      if (name === "Dashboard") {
         return location.pathname.startsWith("/admin/organization");
       }
-      const subPath = `${basePath}/${subItem.toLowerCase().replace(/\s+/g, '-')}`;
+      const subPath = `${basePath}/${name.toLowerCase().replace(/\s+/g, '-')}`;
       return location.pathname.startsWith(subPath);
     });
   };
@@ -309,37 +316,41 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                             <div className="overflow-hidden transition-all duration-200 ease-out">
                               <div className="relative ml-[22px] mt-0.5 border-l border-[var(--border-sidebar)] pb-0.5">
                                 <ul className="space-y-0.5 py-0.5" role="list">
-                                  {sub.sub.map((subItem) => {
-                                    const isSopMgmt = subItem === "Files";
-                                    const isDashboard = subItem === "Dashboard";
-                                    const subPath = isSopMgmt ? "/sops" : isDashboard ? "/admin/organization" : `${sub.path}/${subItem.toLowerCase().replace(/\s+/g, '-')}`;
-                                    const active = isDashboard
-                                      ? location.pathname === "/admin/organization" || location.pathname === "/admin/organization/hierarchy"
-                                      : isActive(subPath);
-                                    return (
-                                      <li key={subItem}>
-                                        <Link
-                                          to={subPath}
-                                          onClick={handleNavClick}
-                                          className={cn(
-                                            "relative flex items-center gap-2.5 rounded-lg py-2 pl-9 pr-3 w-full",
-                                            "text-[13px] font-medium leading-none tracking-[-0.01em]",
-                                            "transition-all duration-150 ease-out",
-                                            active
-                                              ? [
-                                                  "text-[var(--text-on-sidebar)] bg-[var(--bg-active)]",
-                                                  "before:absolute before:left-[18px] before:top-1/2 before:-translate-y-1/2",
-                                                  "before:h-[14px] before:w-0.5 before:rounded-full",
-                                                  "before:bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]",
-                                                ]
-                                              : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:text-[var(--text-on-sidebar)] hover:bg-[var(--bg-hover)]"
-                                          )}
-                                        >
-                                          {subItem}
-                                        </Link>
-                                      </li>
-                                    );
-                                  })}
+                                   {sub.sub.filter((subItem) => {
+                                     const itemRoles = typeof subItem === 'string' ? undefined : subItem.roles;
+                                     return !itemRoles || itemRoles.includes(user?.role);
+                                   }).map((subItem) => {
+                                     const subItemName = typeof subItem === 'string' ? subItem : subItem.name;
+                                     const isSopMgmt = subItemName === "Files";
+                                     const isDashboard = subItemName === "Dashboard";
+                                     const subPath = isSopMgmt ? "/sops" : isDashboard ? "/admin/organization" : `${sub.path}/${subItemName.toLowerCase().replace(/\s+/g, '-')}`;
+                                     const active = isDashboard
+                                       ? location.pathname === "/admin/organization" || location.pathname === "/admin/organization/hierarchy"
+                                       : isActive(subPath);
+                                     return (
+                                       <li key={subItemName}>
+                                         <Link
+                                           to={subPath}
+                                           onClick={handleNavClick}
+                                           className={cn(
+                                             "relative flex items-center gap-2.5 rounded-lg py-2 pl-9 pr-3 w-full",
+                                             "text-[13px] font-medium leading-none tracking-[-0.01em]",
+                                             "transition-all duration-150 ease-out",
+                                             active
+                                               ? [
+                                                   "text-[var(--text-on-sidebar)] bg-[var(--bg-active)]",
+                                                   "before:absolute before:left-[18px] before:top-1/2 before:-translate-y-1/2",
+                                                   "before:h-[14px] before:w-0.5 before:rounded-full",
+                                                   "before:bg-[color-mix(in_srgb,var(--accent-amber)_70%,transparent)]",
+                                                 ]
+                                               : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:text-[var(--text-on-sidebar)] hover:bg-[var(--bg-hover)]"
+                                           )}
+                                         >
+                                           {subItemName}
+                                         </Link>
+                                       </li>
+                                     );
+                                   })}
                                 </ul>
                               </div>
                             </div>
@@ -415,7 +426,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                 </button>
                 <div className="border-t border-neutral-100 dark:border-neutral-800 my-1" />
                 <button
-                  onClick={(e) => { e.stopPropagation(); setProfileMenuOpen(false); logout(); window.location.href = '/login'; }}
+                  onClick={async (e) => { e.stopPropagation(); setProfileMenuOpen(false); await logout(); navigate('/login'); }}
                   className="flex w-full items-center gap-3 px-3 py-2 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                 >
                   <LogOut size={14} /> Logout

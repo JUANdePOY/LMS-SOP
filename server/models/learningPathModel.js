@@ -1,7 +1,7 @@
 const db = require('../config/database');
 
 async function listPaths(filters = {}) {
-  const { department_id, status, page = 1, limit = 50 } = filters;
+  const { department_id, status, page = 1, limit = 50, business_id } = filters;
   const offset = (page - 1) * limit;
 
   let sql = `
@@ -20,6 +20,10 @@ async function listPaths(filters = {}) {
   if (status) {
     sql += ' AND lp.is_active = ?';
     params.push(status === 'active' ? 1 : 0);
+  }
+  if (business_id) {
+    sql += ' AND d.business_id = ?';
+    params.push(parseInt(business_id, 10));
   }
 
   sql += ' ORDER BY lp.title ASC LIMIT ? OFFSET ?';

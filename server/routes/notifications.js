@@ -1,6 +1,12 @@
 const router = require('express').Router();
 const db = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { broadcastSystemChange, createSystemNotification } = require('../services/notificationService');
+const { subscribe, unsubscribe } = require('../services/pushNotificationService');
+
+function sendError(res, statusCode, code, message) {
+  return res.status(statusCode).json({ success: false, code, message });
+}
 
 router.use(authenticateToken);
 
@@ -15,7 +21,7 @@ router.get('/', async (req, res) => {
       whereClause += ' AND is_read = FALSE';
     }
     const [rows] = await db.query(
-      `SELECT id, title, body, type, is_read, link, created_at FROM notifications ${whereClause} ORDER BY created_at DESC LIMIT ?`,
+      `SELECT id, title, body, type, is_read, link, entity_type, entity_id, created_at FROM notifications ${whereClause} ORDER BY created_at DESC LIMIT ?`,
       [...params, limit]
     );
     const [unreadResult] = await db.query(
@@ -29,6 +35,60 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error('Notification fetch error:', err);
     res.status(500).json({ code: 'NOTIFICATION_FETCH_ERROR', message: 'Failed to fetch notifications' });
+  }
+});
+
+router.post('/', requireAdmin, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { title, body, type = 'info', link, entity_type, entity_id } = req.body;
+
+    if (!title) {
+      return sendError(res, 400, 'VALIDATION_ERROR', 'Title is required');
+    }
+
+    const notificationId = await createSystemNotification({
+      userId,
+      title,
+      body,
+      type,
+      link,
+      entityType: entity_type,
+      entityId: entity_id ? Number(entity_id) : null,
+    });
+
+    if (!notificationId) {
+      return sendError(res, 500, 'NOTIFICATION_CREATE_ERROR', 'Failed to create notification');
+    }
+
+    res.status(201).json({ success: true, data: { id: notificationId } });
+  } catch (err) {
+    console.error('Notification create error:', err);
+    res.status(500).json({ code: 'NOTIFICATION_CREATE_ERROR', message: 'Failed to create notification' });
+  }
+});
+
+router.post('/broadcast', requireAdmin, async (req, res) => {
+  try {
+    const { title, body, type = 'info', link, entity_type, entity_id } = req.body;
+
+    if (!title || !entity_type || !entity_id) {
+      return sendError(res, 400, 'VALIDATION_ERROR', 'Title, entity_type, and entity_id are required');
+    }
+
+    const ids = await broadcastSystemChange({
+      title,
+      body,
+      type,
+      link,
+      entityType: entity_type,
+      entityId: Number(entity_id),
+    });
+
+    res.status(201).json({ success: true, data: { count: ids.length } });
+  } catch (err) {
+    console.error('Notification broadcast error:', err);
+    res.status(500).json({ code: 'NOTIFICATION_BROADCAST_ERROR', message: 'Failed to broadcast notification' });
   }
 });
 
@@ -71,6 +131,37 @@ router.patch('/read-all', async (req, res) => {
     console.error('Mark all read error:', err);
     res.status(500).json({ code: 'MARK_ALL_READ_ERROR', message: 'Failed to mark all notifications as read' });
   }
+});
+
+router.post('/push/subscribe', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    await subscribe(userId, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Push subscribe error:', err);
+    const code = err.message === 'INVALID_SUBSCRIPTION' ? 'INVALID_SUBSCRIPTION' : 'PUSH_SUBSCRIBE_ERROR';
+    res.status(400).json({ success: false, code, message: 'Failed to save push subscription' });
+  }
+});
+
+router.post('/push/unsubscribe', authenticateToken, async (req, res) => {
+  try {
+    const endpoint = req.body.endpoint;
+    await unsubscribe(endpoint);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Push unsubscribe error:', err);
+    res.status(500).json({ success: false, code: 'PUSH_UNSUBSCRIBE_ERROR', message: 'Failed to remove push subscription' });
+  }
+});
+
+router.get('/push/check', authenticateToken, (req, res) => {
+  res.json({
+    supported: typeof window !== 'undefined'
+      ? 'serviceWorker' in navigator && 'PushManager' in window
+      : false,
+  });
 });
 
 module.exports = router;

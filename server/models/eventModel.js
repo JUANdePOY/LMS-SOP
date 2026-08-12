@@ -12,13 +12,15 @@ const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS events (
   end_date DATETIME DEFAULT NULL,
   location VARCHAR(255) DEFAULT NULL,
   organizer VARCHAR(100) NOT NULL DEFAULT 'CO Admin',
+  business_id INT DEFAULT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_event_type (event_type),
   KEY idx_priority (priority),
   KEY idx_status (status),
-  KEY idx_event_date (event_date)
+  KEY idx_event_date (event_date),
+  KEY idx_business_id (business_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`;
 
 async function ensureTable() {
@@ -32,8 +34,34 @@ async function ensureTable() {
 ensureTable();
 
 const eventModel = {
-  async findAll() {
-    const [rows] = await db.query('SELECT * FROM events ORDER BY event_date ASC');
+  async findAll(filters = {}) {
+    const { business_id, event_type, priority, status, page = 1, limit = 20 } = filters;
+    const offset = (page - 1) * limit;
+    const params = [];
+    const where = [];
+
+    if (business_id) {
+      where.push('business_id = ?');
+      params.push(business_id);
+    }
+    if (event_type) {
+      where.push('event_type = ?');
+      params.push(event_type);
+    }
+    if (priority) {
+      where.push('priority = ?');
+      params.push(priority);
+    }
+    if (status) {
+      where.push('status = ?');
+      params.push(status);
+    }
+
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const [rows] = await db.query(
+      `SELECT * FROM events ${whereSql} ORDER BY event_date ASC LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
     return rows;
   },
 
@@ -43,20 +71,20 @@ const eventModel = {
   },
 
   async create(event) {
-    const { title, description, event_type, priority, status, event_date, end_date, location, organizer } = event;
+    const { title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id } = event;
     const id = crypto.randomUUID();
     await db.query(
-      'INSERT INTO events (id, title, description, event_type, priority, status, event_date, end_date, location, organizer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, title, description, event_type || 'Training', priority || 'medium', status || 'active', event_date, end_date, location, organizer || 'CO Admin']
+      'INSERT INTO events (id, title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, title, description, event_type || 'Training', priority || 'medium', status || 'active', event_date, end_date, location, organizer || 'CO Admin', business_id || null]
     );
     return this.findById(id);
   },
 
   async update(id, event) {
-    const { title, description, event_type, priority, status, event_date, end_date, location, organizer } = event;
+    const { title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id } = event;
     await db.query(
-      'UPDATE events SET title = ?, description = ?, event_type = ?, priority = ?, status = ?, event_date = ?, end_date = ?, location = ?, organizer = ? WHERE id = ?',
-      [title, description, event_type, priority, status, event_date, end_date, location, organizer, id]
+      'UPDATE events SET title = ?, description = ?, event_type = ?, priority = ?, status = ?, event_date = ?, end_date = ?, location = ?, organizer = ?, business_id = ? WHERE id = ?',
+      [title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id, id]
     );
     return this.findById(id);
   },

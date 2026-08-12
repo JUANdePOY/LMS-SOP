@@ -9,6 +9,7 @@ import PublishReadiness from "../components/course-builder/PublishReadiness";
 import CourseCertificatesSection from "../components/course-builder/CourseCertificatesSection";
 import { builderGet, builderUpdate, publishCourse } from "../api/course.api";
 import { listCourseCertificates, linkCertificateToCourse, unlinkCertificateFromCourse } from "../api/certificateCourseLink.api";
+import { enqueueBanner } from "@/shared/stores/notificationStore.js";
 import * as session from "@/services/session";
 
 function authHeaders() {
@@ -488,6 +489,16 @@ export default function CourseBuilderPage() {
       await saveNow(payload);
       await publishCourse(courseId);
       toast.success("Course published");
+      enqueueBanner({
+        id: `new-course-${courseId}`,
+        type: "new_course",
+        title: "New Course Published",
+        message: title.trim() || "A new course is now available.",
+        link: `/courses/library/${courseId}`,
+        ctaLabel: "Check course",
+        priority: 1,
+        persistDismiss: true,
+      });
       setHasUnsavedChanges(false);
       navigate("/courses/library");
     } catch {

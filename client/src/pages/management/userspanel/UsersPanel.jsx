@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getUsers, createUser, updateUser, deleteUser, getUserStats, getBusinesses, getDepartmentHierarchy } from '@/services/api';
+import { getUsers, createUser, updateUser, deleteUser, getUserStats, getBusinesses, getDepartments, getDepartmentHierarchy } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -59,7 +59,7 @@ function formatDate(date) {
 
 export default function UsersPanel({ departments: initialDepartments = [], activeTab = 'users' }) {
   const { toast } = useToast();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [departments, setDepartments] = useState(initialDepartments);
@@ -630,9 +630,10 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role <span className="text-red-500">*</span></label>
                 <Select value={formData.role || ''} onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
                   <option value="">Select role…</option>
-                  {Object.entries(ROLE_META).map(([key, meta]) => (
-                    <option key={key} value={key}>{meta.label}</option>
-                  ))}
+                  {Object.entries(ROLE_META).map(([key, meta]) => {
+                    if (key === 'super_admin' && user?.role !== 'super_admin') return null;
+                    return <option key={key} value={key}>{meta.label}</option>;
+                  })}
                 </Select>
               </div>
               <div>
@@ -679,6 +680,16 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                 </Select>
               </div>
             </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Date Hired</label>
+                <Input type="date" value={formData.date_hired || ''} onChange={(e) => setFormData(prev => ({ ...prev, date_hired: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Birthdate</label>
+                <Input type="date" value={formData.birthdate || ''} onChange={(e) => setFormData(prev => ({ ...prev, birthdate: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
+              </div>
+            </div>
             <div>
               <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Address</label>
               <Input value={formData.address || ''} onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))} placeholder="Optional" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
@@ -708,15 +719,16 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role</label>
-                <Select value={formData.role || ''} onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                  <option value="">Select role…</option>
-                  {Object.entries(ROLE_META).map(([key, meta]) => (
-                    <option key={key} value={key}>{meta.label}</option>
-                  ))}
-                </Select>
-              </div>
+               <div>
+                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role</label>
+                 <Select value={formData.role || ''} onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                   <option value="">Select role…</option>
+                   {Object.entries(ROLE_META).map(([key, meta]) => {
+                     if (key === 'super_admin' && user?.role !== 'super_admin') return null;
+                     return <option key={key} value={key}>{meta.label}</option>;
+                   })}
+                 </Select>
+               </div>
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
                 <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">

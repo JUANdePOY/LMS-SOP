@@ -39,8 +39,21 @@ let dismissed = getDismissedFromStorage();
 let serverNotifications = [];
 let unreadServerCount = 0;
 let unreadMessageCount = 0;
+let pendingBanners = [];
 
 let cachedSnapshot = null;
+
+function sortBanners(entries) {
+  return [...entries].sort((a, b) => {
+    const priorityDiff = (b.priority || 0) - (a.priority || 0);
+    if (priorityDiff !== 0) return priorityDiff;
+    return (a.createdAt || 0) - (b.createdAt || 0);
+  });
+}
+
+function isBannerExpired(entry) {
+  return Boolean(entry.expiresAt && Date.now() > entry.expiresAt);
+}
 
 function computeSnapshot() {
   return {
@@ -50,6 +63,7 @@ function computeSnapshot() {
     unreadMessageCount,
     unreadTotal: unreadServerCount + unreadMessageCount,
     unreadBannerCount: APP_BANNER_IDS.filter((id) => !dismissed.includes(id)).length,
+    pendingBanners,
   };
 }
 
@@ -152,12 +166,42 @@ export const NotificationStore = {
     }
   },
 
+  async markEntityTypeRead(entityType) {
+    const ids = serverNotifications
+      .filter((n) => n.entity_type === entityType && !n.is_read)
+      .map((n) => n.id);
+    if (ids.length === 0) return;
+    try {
+      await markNotificationsRead(ids);
+      serverNotifications = serverNotifications.map((n) =>
+        ids.includes(n.id) ? { ...n, is_read: true } : n
+      );
+      unreadServerCount = Math.max(0, unreadServerCount - ids.length);
+      emitChange();
+    } catch {
+      /* ignore */
+    }
+  },
+
   clearAll() {
     dismissed = [];
     setDismissedToStorage(dismissed);
     serverNotifications = [];
     unreadServerCount = 0;
     unreadMessageCount = 0;
+    pendingBanners = [];
+    emitChange();
+  },
+
+  enqueueBanner(entry) {
+    if (!entry?.id || dismissed.includes(entry.id) || isBannerExpired(entry)) return;
+    if (pendingBanners.some((b) => b.id === entry.id)) return;
+    pendingBanners = sortBanners([...pendingBanners, entry]);
+    emitChange();
+  },
+
+  clearEnqueuedBanners() {
+    pendingBanners = [];
     emitChange();
   },
 
@@ -168,6 +212,32 @@ export const NotificationStore = {
     return () => {
       listeners.delete(callback);
     };
+  },
+
+  getSystemNotifications() {
+    return serverNotifications.filter((n) => n.entity_type);
+  },
+
+  getUnreadSystemNotifications() {
+    return serverNotifications.filter((n) => n.entity_type && !n.is_read);
+  },
+
+  getEnrollmentNotificationCount() {
+    return serverNotifications.filter((n) => n.entity_type === 'enrollment' && !n.is_read).length;
+  },
+
+  getUnreadEnrollmentNotifications() {
+    return serverNotifications
+      .filter((n) => n.entity_type === 'enrollment' && !n.is_read)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  },
+
+  getUnreadCountByEntityType(entityType) {
+    return serverNotifications.filter((n) => n.entity_type === entityType && !n.is_read).length;
+  },
+
+  getSystemNotificationCount() {
+    return serverNotifications.filter((n) => ['sop', 'course', 'task'].includes(n.entity_type) && !n.is_read).length;
   },
 };
 
@@ -204,6 +274,10 @@ export const useNotifications = () => {
     await NotificationStore.markAllRead();
   }, []);
 
+  const markEntityTypeReadAction = useCallback(async (entityType) => {
+    await NotificationStore.markEntityTypeRead(entityType);
+  }, []);
+
   return {
     notifications: store.serverNotifications,
     unreadCount: store.unreadTotal,
@@ -216,6 +290,13 @@ export const useNotifications = () => {
     refresh,
     markRead,
     markAllRead: markAllReadAction,
+    markEntityTypeRead: markEntityTypeReadAction,
+    getSystemNotifications: () => NotificationStore.getSystemNotifications(),
+    getUnreadSystemNotifications: () => NotificationStore.getUnreadSystemNotifications(),
+    getEnrollmentNotificationCount: () => NotificationStore.getEnrollmentNotificationCount(),
+    getUnreadEnrollmentNotifications: () => NotificationStore.getUnreadEnrollmentNotifications(),
+    getUnreadCountByEntityType: (entityType) => NotificationStore.getUnreadCountByEntityType(entityType),
+    getSystemNotificationCount: () => NotificationStore.getSystemNotificationCount(),
   };
 };
 
@@ -262,4 +343,12 @@ export function clearAllDismissedBanners() {
 
 export function getUnreadByPath(bannerIds, path) {
   return bannerIds.filter((id) => BANNER_PATH_MAP[id] === path && !dismissed.includes(id)).length;
+}
+
+export function enqueueBanner(entry) {
+  NotificationStore.enqueueBanner(entry);
+}
+
+export function clearEnqueuedBanners() {
+  NotificationStore.clearEnqueuedBanners();
 }

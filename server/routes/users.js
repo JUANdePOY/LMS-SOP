@@ -1,8 +1,8 @@
 const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const db = require('../config/database');
-const { authenticateToken } = require('../middleware/auth');
-const { requireSuperAdmin, requireAdmin, authorize } = require('../middleware/auth');
+const { authenticateToken, requireSuperAdmin, requireAdmin, authorize } = require('../middleware/auth');
+const { requireBusinessScope, requireDepartmentScope, requirePermission } = require('../middleware/scope');
 const { logAudit } = require('../utils/auditLogger');
 const authModel = require('../models/authModel');
 const departmentModel = require('../models/departmentModel');
@@ -14,11 +14,17 @@ router.use(authenticateToken);
 router.get('/', async (req, res) => {
   try {
     const { search, role, department_id, business_id, employment_status, page = 1, limit = 50 } = req.query;
+
+    let effectiveBusinessId = business_id ? parseInt(business_id) : undefined;
+    if (req.user.role !== 'super_admin') {
+      effectiveBusinessId = req.user.business_id;
+    }
+
     const result = await authModel.listUsers({
       search: search || undefined,
       role: role || undefined,
       department_id: department_id ? parseInt(department_id) : undefined,
-      business_id: business_id ? parseInt(business_id) : undefined,
+      business_id: effectiveBusinessId,
       employment_status: employment_status || undefined,
       page: parseInt(page),
       limit: parseInt(limit),
@@ -61,6 +67,11 @@ router.get('/:id', async (req, res) => {
     if (!user) {
       return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
     }
+
+    if (req.user.role !== 'super_admin' && req.user.business_id !== user.business_id) {
+      return res.status(403).json({ status: 'error', message: 'Access denied to this user', code: 'BUSINESS_SCOPE_DENIED' });
+    }
+
     const { password_hash, ...safeUser } = user;
     res.json({ status: 'success', data: safeUser });
   } catch (err) {
@@ -92,6 +103,18 @@ router.post('/', requireAdmin, [
 
     const { full_name, email, password, role, department_id, business_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address } = req.body;
 
+    if (req.user.role !== 'super_admin') {
+      if (!req.user.business_id) {
+        return res.status(403).json({ status: 'error', message: 'Your account is not assigned to a business', code: 'NO_BUSINESS_SCOPE' });
+      }
+      if (business_id && parseInt(business_id) !== req.user.business_id) {
+        return res.status(403).json({ status: 'error', message: 'Cannot create users in another business', code: 'BUSINESS_SCOPE_DENIED' });
+      }
+      if (role === 'super_admin') {
+        return res.status(403).json({ status: 'error', message: 'Cannot assign super_admin role', code: 'ROLE_ASSIGN_DENIED' });
+      }
+    }
+
     const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
     if (existing.length > 0) {
       return res.status(409).json({ status: 'error', message: 'Email already registered', code: 'EMAIL_EXISTS' });
@@ -99,10 +122,12 @@ router.post('/', requireAdmin, [
 
     const passwordHash = await require('../app/auth').hashPassword(password);
 
+    const finalBusinessId = req.user.role === 'super_admin' ? (business_id ? parseInt(business_id) : null) : req.user.business_id;
+
     const userId = await authModel.create({
       full_name, email, password_hash: passwordHash, role,
       department_id: department_id ? parseInt(department_id) : null,
-      business_id: business_id ? parseInt(business_id) : null,
+      business_id: finalBusinessId,
       position_title, employee_id, contact_number, employment_status,
       date_hired: date_hired || null, birthdate: birthdate || null, address: address || null,
     });
@@ -119,7 +144,7 @@ router.post('/', requireAdmin, [
       action: 'user.created',
       entity_type: 'user',
       entity_id: userId,
-      new_values: { email, role }
+      new_values: { email, role, business_id: finalBusinessId }
     });
 
     res.status(201).json({ status: 'success', message: 'User created successfully', data: { id: userId, email, role } });
@@ -175,6 +200,16 @@ router.put('/:id', [
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
       }
+    }
+
+    if (req.user.role !== 'super_admin') {
+      if (updates.business_id !== undefined && updates.business_id !== null && updates.business_id !== req.user.business_id) {
+        return res.status(403).json({ status: 'error', message: 'Cannot reassign users to another business', code: 'BUSINESS_SCOPE_DENIED' });
+      }
+      if (updates.role === 'super_admin') {
+        return res.status(403).json({ status: 'error', message: 'Cannot assign super_admin role', code: 'ROLE_ASSIGN_DENIED' });
+      }
+      updates.business_id = req.user.business_id;
     }
 
     if (Object.keys(updates).length === 0) {

@@ -2,6 +2,7 @@ const discussionModel = require('../models/discussionModel');
 const courseModel = require('../models/courseModel');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
+const db = require('../config/database');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -16,6 +17,21 @@ function sendError(res, err, fallback = 'Request failed') {
   return res.status(code).json(body);
 }
 
+async function enforceDiscussionScope(courseId, user) {
+  if (!user || user.role === 'super_admin') return;
+  const course = await courseModel.findById(courseId);
+  if (!course || !course.department_id) return;
+  const [[dept]] = await db.query(
+    'SELECT business_id FROM departments WHERE id = ?',
+    [course.department_id]
+  );
+  if (!dept || user.business_id !== dept.business_id) {
+    const error = new Error('Access denied: discussion is outside your business scope');
+    error.statusCode = 403;
+    throw error;
+  }
+}
+
 function listDiscussions(req, res) {
   const courseId = parseInt(req.params.courseId, 10);
   const { module_id, is_closed, page, limit } = req.query;
@@ -25,26 +41,34 @@ function listDiscussions(req, res) {
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return discussionModel.listDiscussions(courseId, { module_id, is_closed, page: pageNum, limit: limitNum })
+      return enforceDiscussionScope(courseId, req.user)
+        .then(() => discussionModel.listDiscussions(courseId, { module_id, is_closed, page: pageNum, limit: limitNum }))
         .then((discussions) => {
           res.json({ success: true, message: 'OK', data: discussions });
         });
     })
-    .catch((err) => sendError(res, err, 'Failed to list discussions'));
+    .catch((err) => {
+      if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message, code: 'BUSINESS_SCOPE_DENIED' });
+      sendError(res, err, 'Failed to list discussions');
+    });
 }
 
 function getDiscussion(req, res) {
   const discussionId = parseInt(req.params.discussionId, 10);
 
   discussionModel.findById(discussionId)
-    .then((discussion) => {
+    .then(async (discussion) => {
       if (!discussion) return res.status(404).json({ success: false, message: 'Discussion not found' });
+      await enforceDiscussionScope(discussion.course_id, req.user);
       return discussionModel.listReplies(discussionId)
         .then((replies) => {
           res.json({ success: true, message: 'OK', data: { ...discussion, replies } });
         });
     })
-    .catch((err) => sendError(res, err, 'Failed to load discussion'));
+    .catch((err) => {
+      if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message, code: 'BUSINESS_SCOPE_DENIED' });
+      sendError(res, err, 'Failed to load discussion');
+    });
 }
 
 function createDiscussion(req, res) {
@@ -57,8 +81,9 @@ function createDiscussion(req, res) {
   }
 
   courseModel.findById(courseId)
-    .then((course) => {
+    .then(async (course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+      await enforceDiscussionScope(courseId, req.user);
       return discussionModel.create({
         course_id: courseId,
         module_id,
@@ -72,7 +97,10 @@ function createDiscussion(req, res) {
       logAudit('discussion.create', userId, { discussionId: id, courseId });
       return res.status(201).json({ success: true, message: 'Discussion created successfully', data: { id } });
     })
-    .catch((err) => sendError(res, err, 'Failed to create discussion'));
+    .catch((err) => {
+      if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message, code: 'BUSINESS_SCOPE_DENIED' });
+      sendError(res, err, 'Failed to create discussion');
+    });
 }
 
 function updateDiscussion(req, res) {
@@ -80,8 +108,9 @@ function updateDiscussion(req, res) {
   const userId = req.user?.id;
 
   discussionModel.findById(discussionId)
-    .then((discussion) => {
+    .then(async (discussion) => {
       if (!discussion) return res.status(404).json({ success: false, message: 'Discussion not found' });
+      await enforceDiscussionScope(discussion.course_id, req.user);
       const allowed = ['title', 'description', 'is_pinned', 'is_closed'];
       const updates = {};
       for (const key of allowed) {
@@ -97,7 +126,10 @@ function updateDiscussion(req, res) {
         return res.json({ success: true, message: 'Discussion updated successfully' });
       });
     })
-    .catch((err) => sendError(res, err, 'Failed to update discussion'));
+    .catch((err) => {
+      if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message, code: 'BUSINESS_SCOPE_DENIED' });
+      sendError(res, err, 'Failed to update discussion');
+    });
 }
 
 function deleteDiscussion(req, res) {
@@ -105,14 +137,18 @@ function deleteDiscussion(req, res) {
   const userId = req.user?.id;
 
   discussionModel.findById(discussionId)
-    .then((discussion) => {
+    .then(async (discussion) => {
       if (!discussion) return res.status(404).json({ success: false, message: 'Discussion not found' });
+      await enforceDiscussionScope(discussion.course_id, req.user);
       return discussionModel.softDelete(discussionId).then(() => {
         logAudit('discussion.delete', userId, { discussionId });
         return res.json({ success: true, message: 'Discussion deleted successfully' });
       });
     })
-    .catch((err) => sendError(res, err, 'Failed to delete discussion'));
+    .catch((err) => {
+      if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message, code: 'BUSINESS_SCOPE_DENIED' });
+      sendError(res, err, 'Failed to delete discussion');
+    });
 }
 
 function createReply(req, res) {
@@ -125,11 +161,12 @@ function createReply(req, res) {
   }
 
   discussionModel.findById(discussionId)
-    .then((discussion) => {
+    .then(async (discussion) => {
       if (!discussion) return res.status(404).json({ success: false, message: 'Discussion not found' });
       if (discussion.is_closed) {
         return res.status(400).json({ success: false, message: 'Discussion is closed', code: 'DISCUSSION_CLOSED' });
       }
+      await enforceDiscussionScope(discussion.course_id, req.user);
       return discussionModel.createReply({
         discussion_id: discussionId,
         parent_reply_id,
@@ -144,7 +181,10 @@ function createReply(req, res) {
       logAudit('discussion.reply', userId, { discussionId, replyId });
       return res.status(201).json({ success: true, message: 'Reply created successfully', data: { id: replyId } });
     })
-    .catch((err) => sendError(res, err, 'Failed to create reply'));
+    .catch((err) => {
+      if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message, code: 'BUSINESS_SCOPE_DENIED' });
+      sendError(res, err, 'Failed to create reply');
+    });
 }
 
 function pinDiscussion(req, res) {
@@ -152,14 +192,18 @@ function pinDiscussion(req, res) {
   const userId = req.user?.id;
 
   discussionModel.findById(discussionId)
-    .then((discussion) => {
+    .then(async (discussion) => {
       if (!discussion) return res.status(404).json({ success: false, message: 'Discussion not found' });
+      await enforceDiscussionScope(discussion.course_id, req.user);
       return discussionModel.update(discussionId, { is_pinned: !discussion.is_pinned }).then(() => {
         logAudit('discussion.pin', userId, { discussionId, pinned: !discussion.is_pinned });
         return res.json({ success: true, message: discussion.is_pinned ? 'Discussion unpinned' : 'Discussion pinned' });
       });
     })
-    .catch((err) => sendError(res, err, 'Failed to pin discussion'));
+    .catch((err) => {
+      if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message, code: 'BUSINESS_SCOPE_DENIED' });
+      sendError(res, err, 'Failed to pin discussion');
+    });
 }
 
 function closeDiscussion(req, res) {
@@ -167,14 +211,18 @@ function closeDiscussion(req, res) {
   const userId = req.user?.id;
 
   discussionModel.findById(discussionId)
-    .then((discussion) => {
+    .then(async (discussion) => {
       if (!discussion) return res.status(404).json({ success: false, message: 'Discussion not found' });
+      await enforceDiscussionScope(discussion.course_id, req.user);
       return discussionModel.update(discussionId, { is_closed: !discussion.is_closed }).then(() => {
         logAudit('discussion.close', userId, { discussionId, closed: !discussion.is_closed });
         return res.json({ success: true, message: discussion.is_closed ? 'Discussion reopened' : 'Discussion closed' });
       });
     })
-    .catch((err) => sendError(res, err, 'Failed to close discussion'));
+    .catch((err) => {
+      if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message, code: 'BUSINESS_SCOPE_DENIED' });
+      sendError(res, err, 'Failed to close discussion');
+    });
 }
 
 module.exports = {

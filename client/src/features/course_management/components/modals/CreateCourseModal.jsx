@@ -7,9 +7,11 @@ import { useToast } from "@/shared/components/ui/Toast";
 import { getBusinesses } from "@/features/organization-management/api/business.api";
 import { getDepartments } from "@/services/api";
 import { getCategories } from "@/features/organization-management/api/category.api";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function CreateCourseModal({ open, onClose, loading, course = null, onSuccess }) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const isEdit = Boolean(course);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -24,34 +26,62 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
 
+  const role = user?.role || "";
+  const isSuperAdmin = role === "super_admin";
+  const isAdmin = role === "admin";
+  const isDepartmentHead = role === "department_head";
+  const scopedBusinessId = user?.business_id || null;
+  const scopedDepartmentId = user?.department_id || null;
+
   useEffect(() => {
     if (!open) return;
     if (isEdit && course) {
       setTitle(course.title || "");
       setDescription(course.description || "");
       setThumbnailUrl(course.thumbnail_url || "");
-      setBusinessId(course.business_id || course.businesses?.id || "");
+      const courseBusinessId = course.business_id || course.businesses?.id || "";
+      const courseDepartmentId = course.department_id || "";
+      setBusinessId(courseBusinessId);
       setCategory(course.category || "");
       setCategoryId(course.category_id || "");
-      setDepartmentId(course.department_id || "");
-      fetchBusinesses();
+      setDepartmentId(courseDepartmentId);
+      fetchBusinesses(courseBusinessId);
+      if (courseDepartmentId) {
+        fetchDepartments(courseBusinessId, courseDepartmentId);
+        fetchCategories(courseDepartmentId);
+      } else if (courseBusinessId) {
+        fetchDepartments(courseBusinessId);
+      } else {
+        fetchDepartments();
+      }
     } else if (!isEdit) {
       setTitle("");
       setDescription("");
       setCategory("");
-      setBusinessId("");
-      setDepartmentId("");
-      setCategoryId("");
       setThumbnailUrl("");
-      fetchBusinesses();
-      fetchDepartments();
+      if (isAdmin && scopedBusinessId) {
+        setBusinessId(String(scopedBusinessId));
+        fetchBusinesses(scopedBusinessId);
+        fetchDepartments(String(scopedBusinessId));
+      } else if (isDepartmentHead && scopedBusinessId) {
+        setBusinessId(String(scopedBusinessId));
+        setDepartmentId(String(scopedDepartmentId));
+        fetchBusinesses(scopedBusinessId);
+        fetchDepartments(String(scopedBusinessId), String(scopedDepartmentId));
+        fetchCategories(String(scopedDepartmentId));
+      } else {
+        setBusinessId("");
+        setDepartmentId("");
+        fetchBusinesses();
+        fetchDepartments();
+      }
     }
   }, [open, isEdit, course]);
 
   useEffect(() => {
     if (!open) return;
     if (isEdit) {
-      fetchDepartments(businessId ? businessId : undefined);
+      fetchDepartments(businessId ? businessId : undefined, departmentId || undefined);
       return;
     }
     if (!businessId) {
@@ -59,7 +89,17 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
       setCategories([]);
       setCategory("");
       setCategoryId("");
-      fetchDepartments();
+      if (isAdmin && scopedBusinessId) {
+        fetchDepartments(String(scopedBusinessId));
+      } else {
+        fetchDepartments();
+      }
+      return;
+    }
+    if (isDepartmentHead && scopedDepartmentId) {
+      setDepartmentId(String(scopedDepartmentId));
+      fetchDepartments(businessId, String(scopedDepartmentId));
+      fetchCategories(String(scopedDepartmentId));
       return;
     }
     setDepartmentId("");
@@ -81,10 +121,19 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
     fetchCategories(departmentId);
   }, [departmentId, open, isEdit]);
 
-  const fetchBusinesses = async () => {
+  const fetchBusinesses = async (forcedBusinessId) => {
     setLoadingOptions((p) => ({ ...p, businesses: true }));
     try {
-      const res = await getBusinesses({ status: "active", limit: 100 });
+      const params = { status: "active", limit: 100 };
+      if (isAdmin && scopedBusinessId) {
+        params.business_id = String(scopedBusinessId);
+      } else if (isDepartmentHead && scopedBusinessId) {
+        params.business_id = String(scopedBusinessId);
+      }
+      if (forcedBusinessId) {
+        params.business_id = String(forcedBusinessId);
+      }
+      const res = await getBusinesses(params);
       const rows = res?.data?.data?.rows || [];
       setBusinesses(rows);
     } catch {
@@ -94,13 +143,29 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
     }
   };
 
-  const fetchDepartments = async (busId) => {
+  const fetchDepartments = async (busId, forcedDeptId) => {
     setLoadingOptions((p) => ({ ...p, departments: true }));
     try {
       const params = { status: "all", limit: 200 };
-      if (busId) params.business_id = busId;
+      if (isAdmin && scopedBusinessId) {
+        params.business_id = String(scopedBusinessId);
+      } else if (isDepartmentHead && scopedBusinessId) {
+        params.business_id = String(scopedBusinessId);
+      }
+      if (busId) {
+        params.business_id = String(busId);
+      }
       const res = await getDepartments(params);
-      const rows = res?.data?.data?.rows || [];
+      let rows = res?.data?.data?.rows || [];
+      if (isDepartmentHead && scopedDepartmentId) {
+        rows = rows.filter((d) => String(d.id) === String(scopedDepartmentId));
+      }
+      if (forcedDeptId) {
+        const forced = rows.find((d) => String(d.id) === String(forcedDeptId));
+        if (forced && !rows.find((d) => String(d.id) === String(forcedDeptId))) {
+          rows = [forced, ...rows];
+        }
+      }
       setDepartments(rows);
     } catch {
       setDepartments([]);
@@ -124,18 +189,29 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
 
   const handleCategoryChange = (e) => {
     const value = e.target.value;
-    const selected = categories.find((c) => String(c.id) === value);
-    if (selected) {
-      setCategoryId(selected.id);
-      setCategory(selected.name);
+    if (value === "__all__") {
+      setCategoryId("");
+      setCategory("");
+    } else if (value) {
+      const selected = categories.find((c) => String(c.id) === value);
+      if (selected) {
+        setCategoryId(selected.id);
+        setCategory(selected.name);
+      } else {
+        setCategoryId("");
+        setCategory(value);
+      }
     } else {
       setCategoryId("");
-      setCategory(value);
+      setCategory("");
     }
   };
 
   const handleBusinessChange = (e) => {
     const value = e.target.value;
+    if (isAdmin || isDepartmentHead) {
+      return;
+    }
     setBusinessId(value);
     setDepartmentId("");
     setCategories([]);
@@ -145,6 +221,9 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
 
   const handleDepartmentChange = (e) => {
     const value = e.target.value;
+    if (isDepartmentHead) {
+      return;
+    }
     setDepartmentId(value);
     setCategories([]);
     setCategory("");
@@ -189,6 +268,7 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
         category,
         category_id: categoryId ? parseInt(categoryId, 10) : undefined,
         department_id: departmentId ? parseInt(departmentId, 10) : undefined,
+        business_id: businessId ? parseInt(businessId, 10) : undefined,
         modules: [],
         thumbnail_url: thumbnailUrl.trim() || undefined,
       };
@@ -254,10 +334,10 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
             <select
               value={businessId}
               onChange={handleBusinessChange}
-              disabled={loadingOptions.businesses || loading}
+              disabled={loadingOptions.businesses || loading || isAdmin || isDepartmentHead}
               className={`w-full rounded-md border px-2.5 py-1.5 text-sm ${selectClassName}`}
             >
-              <option value="">All Businesses</option>
+              <option value="">{(isAdmin || isDepartmentHead) ? "My Business" : "All Businesses"}</option>
               {businesses.map((b) => (
                 <option key={b.id} value={b.id}>{b.business_name || b.business_code}</option>
               ))}
@@ -268,10 +348,10 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
             <select
               value={departmentId}
               onChange={handleDepartmentChange}
-              disabled={loadingOptions.departments || loading}
+              disabled={loadingOptions.departments || loading || isDepartmentHead}
               className={`w-full rounded-md border px-2.5 py-1.5 text-sm ${selectClassName}`}
             >
-              <option value="">All Departments</option>
+              <option value="">{(isAdmin || isDepartmentHead) ? "My Department" : "All Departments"}</option>
               {departments.map((d) => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
@@ -283,10 +363,10 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
           <select
             value={categoryId}
             onChange={handleCategoryChange}
-            disabled={loadingOptions.categories || !departmentId || loading}
+            disabled={loadingOptions.categories || loading}
             className={`w-full rounded-md border px-2.5 py-1.5 text-sm ${selectClassName}`}
           >
-            <option value="">Select a department first</option>
+            <option value="">All Categories</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}

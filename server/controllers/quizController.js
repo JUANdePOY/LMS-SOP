@@ -1,7 +1,10 @@
 const quizModel = require('../models/quizModel');
 const courseModel = require('../models/courseModel');
 const quizHierarchyModel = require('../models/quizHierarchyModel');
+const enrollmentModel = require('../models/enrollmentModel');
 const { logAudit } = require('../utils/auditLogger');
+const db = require('../config/database');
+const { broadcastSystemChange } = require('../services/notificationService');
 
 const ADMIN_ROLES = ['super_admin', 'admin', 'department_head'];
 const FINAL_QUIZ_DEFAULT_ATTEMPTS = 3;
@@ -99,17 +102,102 @@ async function assertCanManageCourse(req, courseId) {
     e.statusCode = 404;
     throw e;
   }
-  const { role, department_id } = req.user || {};
+  const { role, department_id, business_id, scoped_department_ids } = req.user || {};
   if (role !== 'super_admin' && role !== 'admin' && role !== 'department_head') {
     const e = new Error('Insufficient permissions');
     e.statusCode = 403;
     throw e;
   }
-  if (role !== 'super_admin' && course.department_id && String(course.department_id) !== String(department_id)) {
-    const e = new Error('Not authorized for this course');
-    e.statusCode = 403;
+
+  if (role === 'super_admin') {
+    return;
+  }
+
+  if (role === 'admin') {
+    if (!business_id) {
+      const e = new Error('Your account has no business scope');
+      e.statusCode = 403;
+      throw e;
+    }
+    if (course.department_id) {
+      const [[dept]] = await db.query(
+        'SELECT business_id FROM departments WHERE id = ?',
+        [course.department_id]
+      );
+      if (!dept || dept.business_id !== business_id) {
+        const e = new Error('Not authorized for this course');
+        e.statusCode = 403;
+        throw e;
+      }
+    }
+    return;
+  }
+
+  if (role === 'department_head') {
+    const scopedDeptIds = scoped_department_ids || (department_id ? [department_id] : []);
+    if (!scopedDeptIds.includes(course.department_id)) {
+      const e = new Error('Not authorized for this course');
+      e.statusCode = 403;
+      throw e;
+    }
+    return;
+  }
+}
+
+async function assertCanViewCourse(req, courseId) {
+  const course = await courseModel.findById(courseId);
+  if (!course) {
+    const e = new Error('Course not found');
+    e.statusCode = 404;
     throw e;
   }
+  const { role, department_id, business_id, scoped_department_ids } = req.user || {};
+
+  if (role === 'super_admin') return;
+
+  if (role === 'admin') {
+    if (!business_id) {
+      const e = new Error('Your account has no business scope');
+      e.statusCode = 403;
+      throw e;
+    }
+    if (course.department_id) {
+      const [[dept]] = await db.query(
+        'SELECT business_id FROM departments WHERE id = ?',
+        [course.department_id]
+      );
+      if (!dept || dept.business_id !== business_id) {
+        const e = new Error('Not authorized for this course');
+        e.statusCode = 403;
+        throw e;
+      }
+    }
+    return;
+  }
+
+  if (role === 'department_head') {
+    const scopedDeptIds = scoped_department_ids || (department_id ? [department_id] : []);
+    if (!scopedDeptIds.includes(course.department_id)) {
+      const e = new Error('Not authorized for this course');
+      e.statusCode = 403;
+      throw e;
+    }
+    return;
+  }
+
+  if (role === 'employee') {
+    const enrolled = await enrollmentModel.isEnrolled(req.user.id, courseId);
+    if (!enrolled) {
+      const e = new Error('Not authorized for this course');
+      e.statusCode = 403;
+      throw e;
+    }
+    return;
+  }
+
+  const e = new Error('Not authorized');
+  e.statusCode = 403;
+  throw e;
 }
 
 function requireAdminRole(req, res, next) {
@@ -129,7 +217,9 @@ async function listQuizzes(req, res) {
   if (!courseId) return res.status(400).json({ success: false, message: 'courseId is required', code: 'VALIDATION_ERROR' });
 
   try {
-    const quizzes = await quizModel.listQuizzes(courseId, { module_id: moduleId, status, page, limit });
+    const course = await courseModel.findById(courseId);
+    const businessId = course?.department_id ? await db.query('SELECT business_id FROM departments WHERE id = ?', [course.department_id]).then(([rows]) => rows[0]?.business_id) : null;
+    const quizzes = await quizModel.listQuizzes(courseId, { module_id: moduleId, status, page, limit, business_id });
     res.json({ success: true, data: quizzes });
   } catch (err) {
     sendError(res, err, 'Failed to list quizzes');
@@ -139,12 +229,14 @@ async function listQuizzes(req, res) {
 async function listAllQuizzes(req, res) {
   const { search, status, quizType, page, limit } = req.query;
   try {
+    const businessId = req.user?.business_id || null;
     const result = await quizModel.listAllQuizzes({
       search,
       status,
       quizType,
       page,
       limit,
+      business_id: businessId,
     });
     res.json({
       success: true,
@@ -164,7 +256,14 @@ async function listAllQuizzes(req, res) {
 async function listMyQuizzes(req, res) {
   try {
     const courseId = req.query.courseId ? parseInt(req.query.courseId, 10) : null;
-    const quizzes = await quizModel.getMyQuizzes(req.user.id, req.user.role, courseId);
+    const { role, business_id, scoped_department_ids } = req.user || {};
+    const quizzes = await quizModel.getMyQuizzes(
+      req.user.id,
+      role,
+      courseId,
+      role === 'admin' ? business_id : null,
+      role === 'department_head' ? scoped_department_ids : null
+    );
     res.json({ success: true, data: quizzes });
   } catch (err) {
     sendError(res, err, 'Failed to list quizzes');
@@ -212,6 +311,16 @@ async function createQuiz(req, res) {
     });
 
     logAudit && logAudit('quiz.create', req.user.id, { quizId, courseId });
+
+    broadcastSystemChange({
+      title: 'New Quiz Created',
+      body: title,
+      type: 'info',
+      link: `/courses/${courseId}`,
+      entityType: 'quiz',
+      entityId: quizId,
+    }).catch(() => {});
+
     res.status(201).json({ success: true, data: { id: quizId }, message: 'Quiz created' });
   } catch (err) {
     sendError(res, err, 'Failed to create quiz');
@@ -265,6 +374,16 @@ async function publishQuiz(req, res) {
     await assertCanManageCourse(req, quiz.course_id);
     await quizModel.update(req.params.id, { status: 'published' });
     logAudit && logAudit('quiz.publish', req.user.id, { quizId: quiz.id });
+
+    broadcastSystemChange({
+      title: 'Quiz Published',
+      body: quiz.title,
+      type: 'success',
+      link: `/courses/${quiz.course_id}`,
+      entityType: 'quiz',
+      entityId: quiz.id,
+    }).catch(() => {});
+
     res.json({ success: true, message: 'Quiz published' });
   } catch (err) {
     sendError(res, err, 'Failed to publish quiz');
@@ -646,11 +765,17 @@ async function getLeaderboard(req, res) {
   const { limit } = req.query;
   const quizId = req.params.id;
   try {
-    let data;
-    if (quizId) {
-      data = await quizModel.getLeaderboard(quizId, limit);
-    } else {
-      return res.status(400).json({ success: false, message: 'quizId is required', code: 'VALIDATION_ERROR' });
+    const quiz = await quizModel.findById(quizId);
+    if (!quiz) return res.status(404).json({ success: false, message: 'Quiz not found', code: 'NOT_FOUND' });
+    await assertCanViewCourse(req, quiz.course_id);
+    const { role, business_id, scoped_department_ids } = req.user || {};
+    let data = await quizModel.getLeaderboard(quizId, limit, {
+      role,
+      businessId: role === 'admin' ? business_id : null,
+      scopedDepartmentIds: role === 'department_head' ? scoped_department_ids : null,
+    });
+    if (role === 'employee') {
+      data = data.filter((row) => row.user_id === req.user.id);
     }
     res.json({ success: true, data });
   } catch (err) {
@@ -687,7 +812,16 @@ async function getCourseLeaderboard(req, res) {
   const { courseId } = req.params;
   const { limit } = req.query;
   try {
-    const data = await quizModel.getCourseLeaderboard(courseId, limit);
+    await assertCanViewCourse(req, courseId);
+    const { role, business_id, scoped_department_ids } = req.user || {};
+    let data = await quizModel.getCourseLeaderboard(courseId, limit, {
+      role,
+      businessId: role === 'admin' ? business_id : null,
+      scopedDepartmentIds: role === 'department_head' ? scoped_department_ids : null,
+    });
+    if (role === 'employee') {
+      data = data.filter((row) => row.user_id === req.user.id);
+    }
     res.json({ success: true, data });
   } catch (err) {
     sendError(res, err, 'Failed to fetch leaderboard');

@@ -10,7 +10,6 @@ import FilterSidebar from "../components/FilterSidebar";
 import QuickAssignModal from "../components/QuickAssignModal";
 import { useToast } from "@/shared/components/ui/Toast";
 import { StaggerList, MotionItem } from "@/shared/motion";
-import * as session from "@/services/session";
 import { useAuth } from "@/contexts/AuthContext";
 
 const ALL_DIFFICULTIES = ["beginner", "intermediate", "advanced", "all_levels"];
@@ -124,28 +123,30 @@ export default function CourseLibraryPage() {
     });
   }, [viewMode, search, selectedDifficulties, selectedCategories, sortField, sortDirection, syncUrl]);
 
-   const { isAnyAdmin } = useAuth();
+   const { user, isSuperAdmin, isAdmin, isDepartmentHead, isEmployee, businessId } = useAuth();
 
    const queryParams = useMemo(
      () => {
-       const currentUser = session.getCurrentUser();
-       return ({
-        search,
-        difficulty: selectedDifficulties.join(","),
-        category: selectedCategories.join(","),
-        sort: sortField,
-        order: sortDirection,
-        status: "published",
-        page: 1,
-        limit: viewMode === "grid" ? 12 : 20,
-        ...(isAnyAdmin ? {} : {
-          department_id: currentUser?.department_id || "",
-          business_id: currentUser?.business_id || "",
-        }),
-      });
+       const base = {
+         search,
+         difficulty: selectedDifficulties.join(","),
+         category: selectedCategories.join(","),
+         sort: sortField,
+         order: sortDirection,
+         status: "published",
+         page: 1,
+         limit: viewMode === "grid" ? 12 : 20,
+       };
+       if (isSuperAdmin) {
+         return base;
+       }
+       if (isAdmin) {
+         return { ...base, business_id: businessId || user?.business_id || "" };
+       }
+       return { ...base, department_id: user?.department_id || "" };
      },
-     [search, selectedDifficulties, selectedCategories, sortField, sortDirection, viewMode, isAnyAdmin]
-    );
+     [search, selectedDifficulties, selectedCategories, sortField, sortDirection, viewMode, isSuperAdmin, isAdmin, businessId, user]
+   );
 
    const { courses, loading, error, pagination, refetch } = usePublishedCourses(queryParams);
 
@@ -237,13 +238,15 @@ export default function CourseLibraryPage() {
     return () => observer.disconnect();
   }, [viewMode, pagination.page, pagination.totalPages, queryParams, refetch]);
 
+  const canAssign = isSuperAdmin || isAdmin || isDepartmentHead;
+
   const renderCard = (course) => (
     <CourseLibraryCard
       key={course.id}
       course={course}
       myProgress={course.myProgress}
       onClick={() => handleCourseClick(course.id)}
-      onAssign={isAnyAdmin ? handleAssign : undefined}
+      onAssign={canAssign ? handleAssign : undefined}
     />
   );
 
@@ -253,9 +256,11 @@ export default function CourseLibraryPage() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.30),rgba(147,51,234,0.08),transparent_75%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.15),rgba(168,85,247,0.12),transparent_45%)]" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center justify-between">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">Course Library</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">
+              {isSuperAdmin ? "All Published Courses" : isAdmin ? "Business Course Library" : isDepartmentHead ? "Department Course Library" : "My Course Library"}
+            </h1>
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
-              {isAnyAdmin ? "Browse and assign published courses to employees" : "Browse available courses for your department"}
+              {isSuperAdmin ? "Browse and manage published courses across all businesses" : isAdmin ? "Browse published courses for your business" : isDepartmentHead ? "Browse published courses for your department" : "Browse available courses assigned to you"}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -361,7 +366,7 @@ export default function CourseLibraryPage() {
             </div>
           )}
 
-            {!loading && !isAnyAdmin && continueLearning.length > 0 && (
+            {!loading && isEmployee && continueLearning.length > 0 && (
               <section>
               <h2 className="mb-3 text-sm font-semibold text-neutral-700 dark:text-neutral-200">Continue Learning</h2>
               {viewMode === "grid" ? (
@@ -377,7 +382,7 @@ export default function CourseLibraryPage() {
                   courses={continueLearning}
                   onRowClick={handleCourseClick}
                   getProgress={(c) => c.myProgress}
-                  showProgress={!isAnyAdmin}
+                  showProgress={isEmployee}
                 />
               )}
             </section>
@@ -427,11 +432,13 @@ export default function CourseLibraryPage() {
               <div className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-neutral-100 dark:bg-neutral-800 mb-4">
                 <BookOpen size={24} className="text-neutral-400" />
               </div>
-              <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">No published courses found</p>
+              <p className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+                {isSuperAdmin ? "No published courses found" : isAdmin ? "No published courses in your business" : isDepartmentHead ? "No published courses in your department" : "No courses assigned to you yet"}
+              </p>
               <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
                 {hasActiveFilters
                   ? "Try adjusting your filters or clearing them to see all courses"
-                  : "No published courses are available yet"}
+                  : isSuperAdmin ? "No published courses are available yet" : isAdmin ? "Contact your super admin to publish courses" : isDepartmentHead ? "Contact your admin to publish courses" : "Check back later for new assignments"}
               </p>
               {hasActiveFilters && (
                 <button onClick={clearFilters} className="mt-3 rounded-lg border border-neutral-200 dark:border-neutral-700 px-3 py-1.5 text-sm hover:border-neutral-300">
@@ -460,7 +467,7 @@ export default function CourseLibraryPage() {
                     courses={mainCourses}
                     onRowClick={handleCourseClick}
                     getProgress={(c) => c.myProgress}
-                    showProgress={!isAnyAdmin}
+                    showProgress={isEmployee}
                   />
                 )}
               </section>
@@ -518,7 +525,7 @@ export default function CourseLibraryPage() {
         )}
       </div>
 
-      {isAnyAdmin && (
+      {canAssign && (
         <QuickAssignModal
           open={Boolean(assignCourse)}
           course={assignCourse}

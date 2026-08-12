@@ -21,7 +21,7 @@ async function authenticateToken(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     const [users] = await db.query(
-      'SELECT id, role, is_active, department_id, full_name, email, position_title, employee_id FROM users WHERE id = ?',
+      'SELECT id, role, is_active, department_id, business_id, full_name, email, position_title, employee_id FROM users WHERE id = ?',
       [decoded.userId]
     );
 
@@ -46,6 +46,7 @@ async function authenticateToken(req, res, next) {
       id: user.id,
       role: user.role,
       department_id: user.department_id,
+      business_id: user.business_id,
       full_name: user.full_name,
       email: user.email,
       position_title: user.position_title,
@@ -90,6 +91,7 @@ async function optionalAuthenticateToken(req, res, next) {
         id: users[0].id,
         role: users[0].role,
         department_id: users[0].department_id,
+        business_id: users[0].business_id,
         full_name: users[0].full_name,
         email: users[0].email,
       };
@@ -161,6 +163,31 @@ function isAdminRole(role) {
   return ['super_admin', 'admin', 'department_head'].includes(role);
 }
 
+async function resolveScope(req, res, next) {
+  if (!req.user) {
+    return next();
+  }
+
+  try {
+    const { resolveUserPermissions } = require('./scope');
+    const permissions = await resolveUserPermissions(req.user.id, req.user.role);
+    req.user.permissions = permissions;
+
+    if (req.user.role === 'department_head') {
+      const [grants] = await db.query(
+        'SELECT department_id FROM department_scope_grants WHERE user_id = ?',
+        [req.user.id]
+      );
+      req.user.scoped_department_ids = grants.map((g) => g.department_id);
+    }
+
+    next();
+  } catch (err) {
+    console.error('Scope resolution error:', err);
+    next();
+  }
+}
+
 module.exports = {
   authenticateToken,
   optionalAuthenticateToken,
@@ -169,6 +196,7 @@ module.exports = {
   requireDepartmentHead,
   authorize,
   isAdminRole,
+  resolveScope,
   JWT_SECRET,
   LMS_ROLES,
 };

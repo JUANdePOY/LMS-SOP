@@ -17,6 +17,10 @@ function normalizeUser(userData) {
   return {
     ...userData,
     role: normalizedRole,
+    permissions: Array.isArray(userData.permissions) ? userData.permissions : [],
+    scoped_department_ids: Array.isArray(userData.scoped_department_ids) ? userData.scoped_department_ids : [],
+    business_id: userData.business_id || null,
+    department_id: userData.department_id || null,
   };
 }
 
@@ -67,10 +71,10 @@ export function AuthProvider({ children }) {
       const response = await api.post('/auth/login', { email, password }, { skipAuthRedirect: true });
 
       if (response.data.status === 'success') {
-        const { token, user: userData } = response.data.data;
+        const { token, refreshToken, user: userData } = response.data.data;
         const normalizedUser = normalizeUser(userData);
 
-        session.saveCurrentSession(token, normalizedUser);
+        session.saveCurrentSession(token, normalizedUser, refreshToken);
 
         setUser(normalizedUser);
         return { success: true, user: normalizedUser };
@@ -86,7 +90,15 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const refreshToken = session.getCurrentRefreshToken();
+    if (refreshToken) {
+      try {
+        await api.post('/auth/logout', { refreshToken }, { skipAuthRedirect: true });
+      } catch {
+        // ignore logout errors
+      }
+    }
     session.clearCurrentSession();
     setUser(null);
     setError(null);
@@ -121,6 +133,15 @@ export function AuthProvider({ children }) {
   const isDepartmentHead = user?.role === 'department_head';
   const isEmployee = user?.role === 'employee';
   const isAnyAdmin = ['super_admin', 'admin', 'department_head'].includes(user?.role);
+  const permissions = user?.permissions || [];
+  const scopedDepartmentIds = user?.scoped_department_ids || [];
+  const businessId = user?.business_id || null;
+
+  const hasPermission = useCallback((permission) => {
+    if (!permission || !Array.isArray(permissions)) return false;
+    if (isSuperAdmin) return true;
+    return permissions.includes(permission);
+  }, [permissions, isSuperAdmin]);
 
   return (
     <AuthContext.Provider value={{
@@ -138,6 +159,10 @@ export function AuthProvider({ children }) {
       isDepartmentHead,
       isEmployee,
       isAnyAdmin,
+      permissions,
+      scopedDepartmentIds,
+      businessId,
+      hasPermission,
       setError,
     }}>
       {children}

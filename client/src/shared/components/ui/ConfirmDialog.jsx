@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -24,7 +25,7 @@ export function ConfirmDialog({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[10000] flex items-center justify-center p-4"
       role="dialog"
@@ -32,11 +33,9 @@ export function ConfirmDialog({
       aria-labelledby="confirm-dialog-title"
       aria-describedby="confirm-dialog-description"
     >
-      <button
-        type="button"
-        className="fixed inset-0 bg-black/55 backdrop-blur-sm"
-        aria-label="Close dialog"
-        disabled={loading}
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-xl"
+        aria-hidden="true"
         onClick={onCancel}
       />
 
@@ -94,6 +93,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

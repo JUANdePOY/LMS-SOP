@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
 import {
   BookOpen, PlayCircle, RefreshCw, Clock,
-  ArrowRight,
+  ArrowRight, UserPlus,
 } from "lucide-react";
 import EmployeeCourseCard from "../components/EmployeeCourseCard";
 import { resolveFileUrl } from "@/lib/fileUrl";
@@ -12,6 +12,7 @@ import { useEmployeeDashboard } from "../hooks/useEmployeeDashboard";
 
 import { usePageUpdates } from "@/shared/hooks/usePageUpdates";
 import UpdateNotificationBanner from "@/shared/components/ui/UpdateNotificationBanner";
+import { useNotifications } from "@/shared/stores/notificationStore.js";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -34,6 +35,15 @@ export default function EmployeeDashboard() {
   const { toast } = useToast();
 
   const { enrollments, loading, error, refetch } = useEmployeeDashboard();
+
+  const { getUnreadEnrollmentNotifications, markRead } = useNotifications();
+
+  const unreadEnrollmentNotifications = getUnreadEnrollmentNotifications();
+
+  const handleEnrollmentClick = useCallback((notification) => {
+    markRead(notification.id);
+    navigate("/my-learning");
+  }, [markRead, navigate]);
 
   const { hasUpdate, loading: refreshingUpdates, refresh: refreshUpdates, dismiss: dismissUpdates } = usePageUpdates({
     intervalMs: 30000,
@@ -101,6 +111,25 @@ export default function EmployeeDashboard() {
 
   return (
     <div className="w-full max-w-none mx-auto max-w-6xl space-y-6">
+      {unreadEnrollmentNotifications.map((notification) => (
+        <button
+          key={notification.id}
+          type="button"
+          onClick={() => handleEnrollmentClick(notification)}
+          className="w-full text-left rounded-xl border border-sky-200/80 dark:border-sky-500/40 bg-gradient-to-r from-sky-50 via-sky-50 to-blue-50 dark:from-sky-950/40 dark:via-sky-900/20 dark:to-blue-950/40 px-4 py-3 sm:px-5 sm:py-3.5 shadow-sm hover:shadow transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-600 text-white shadow-sm">
+              <UserPlus size={16} />
+            </div>
+            <p className="flex-1 min-w-0 text-xs font-medium text-sky-800 dark:text-sky-200 truncate">
+              You have been enrolled in: {notification.body || "a new course"}
+            </p>
+            <ArrowRight size={14} className="shrink-0 text-sky-500" />
+          </div>
+        </button>
+      ))}
+
       <UpdateNotificationBanner
         open={hasUpdate}
         message="New changes are available on your dashboard. Refresh to see the latest updates."

@@ -78,7 +78,7 @@ export const menuItems = [
     description: "Quizzes and assessments",
     roles: LMS_ROLES,
     children: [
-      { name: "Leaderboard", path: "/assessments/leaderboard", icon: Award },
+      { name: "Leaderboard", path: "/assessments/leaderboard", icon: Award, roles: ["super_admin", "admin", "department_head"] },
       { name: "Report", path: "/assessments/report", icon: BarChart3 },
     ],
   },

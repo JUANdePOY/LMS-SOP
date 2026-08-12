@@ -1,6 +1,8 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { authenticateToken } = require('../middleware/auth');
+const { requireSuperAdmin, requireAdmin } = require('../middleware/auth');
+const { requireBusinessScope } = require('../middleware/scope');
 const { logAudit } = require('../utils/auditLogger');
 const businessModel = require('../models/businessModel');
 const { upload } = require('../middleware/businessUpload');
@@ -12,10 +14,19 @@ router.use(authenticateToken);
 // GET /api/businesses
 router.get('/', async (req, res) => {
   try {
+    let filters = {};
+    if (req.user.role !== 'super_admin') {
+      if (!req.user.business_id) {
+        return res.status(403).json({ status: 'error', message: 'No business scope assigned', code: 'NO_BUSINESS_SCOPE' });
+      }
+      filters.business_id = req.user.business_id;
+    }
+
     const { search, status, page = 1, limit = 50 } = req.query;
     const result = await businessModel.findAll({
       search: search || undefined,
       status: status || undefined,
+      business_id: filters.business_id,
       page: parseInt(page),
       limit: parseInt(limit),
     });
@@ -40,10 +51,16 @@ router.get('/hierarchy', async (req, res) => {
 // GET /api/businesses/:id
 router.get('/:id', async (req, res) => {
   try {
-    const business = await businessModel.findById(parseInt(req.params.id));
+    const businessId = parseInt(req.params.id);
+    const business = await businessModel.findById(businessId);
     if (!business) {
       return res.status(404).json({ status: 'error', message: 'Business not found', code: 'NOT_FOUND' });
     }
+
+    if (req.user.role !== 'super_admin' && req.user.business_id !== businessId) {
+      return res.status(403).json({ status: 'error', message: 'Access denied to this business', code: 'BUSINESS_SCOPE_DENIED' });
+    }
+
     res.json({ status: 'success', data: business });
   } catch (err) {
     console.error('Business fetch error:', err);
@@ -183,12 +200,16 @@ router.post('/', [
 
     const businessId = await businessModel.create(req.body, req.user.id);
 
+    if (req.user.role === 'admin' && req.user.business_id) {
+      await db.query('UPDATE users SET business_id = ? WHERE id = ?', [businessId, req.user.id]);
+    }
+
     logAudit({
       user_id: req.user.id,
       action: 'business.created',
       entity_type: 'business',
       entity_id: businessId,
-      metadata: { business_code, business_name: req.body.business_name },
+      metadata: { business_code, business_name: req.body.business_name }
     });
 
     const created = await businessModel.findById(businessId);
@@ -226,6 +247,10 @@ router.put('/:id', [
 
     if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
       return res.status(403).json({ status: 'error', message: 'Admin access required', code: 'ADMIN_REQUIRED' });
+    }
+
+    if (req.user.role !== 'super_admin' && req.user.business_id !== businessId) {
+      return res.status(403).json({ status: 'error', message: 'Cannot update another business', code: 'BUSINESS_SCOPE_DENIED' });
     }
 
     const updates = {};

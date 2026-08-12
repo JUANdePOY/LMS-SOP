@@ -532,6 +532,15 @@ const acknowledgementController = {
       handleError(res, error);
     }
   },
+
+  async listByUser(req, res) {
+    try {
+      const result = await sopAcknowledgementService.listUserAcknowledgements(req.user.id);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
 };
 
 /**

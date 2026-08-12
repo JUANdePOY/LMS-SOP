@@ -1,40 +1,81 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
+const { requirePermission, requireBusinessScope, requireDepartmentScope } = require('../middleware/scope');
 const { sopController, moduleController, attachmentController, versionController, workflowController, auditController, shareController, assignmentController, acknowledgementController, approvalWorkflowController, exportController } = require('../controllers/sopController');
 const approvalController = require('../controllers/sopApprovalController');
 const assignmentCascadeController = require('../controllers/assignmentCascadeController');
 const { sopAttachmentUploadMiddleware } = require('../middleware/sopUpload');
+const sopModel = require('../models/sopModel');
 
 const router = express.Router();
 router.use(authenticateToken);
 
+async function requireSopReadScope(req, res, next) {
+  try {
+    const sop = await sopModel.findById(parseInt(req.params.id || req.params.sopId, 10));
+    if (!sop) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'SOP not found' } });
+    }
+    const { enforceSopScope } = require('../services/sopService');
+    await enforceSopScope(sop, req.user);
+    next();
+  } catch (err) {
+    handleSopError(res, err);
+  }
+}
+
+async function requireSopWriteScope(req, res, next) {
+  try {
+    const sop = await sopModel.findById(parseInt(req.params.id || req.params.sopId, 10));
+    if (!sop) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'SOP not found' } });
+    }
+    const { enforceSopWriteScope } = require('../services/sopService');
+    await enforceSopWriteScope(sop, req.user);
+    next();
+  } catch (err) {
+    handleSopError(res, err);
+  }
+}
+
+function handleSopError(res, error) {
+  const code = error.code || 'INTERNAL_ERROR';
+  const status = error.status || (
+    code === 'NOT_FOUND' ? 404 :
+    code === 'VALIDATION_ERROR' ? 400 :
+    code === 'FORBIDDEN' ? 403 :
+    500
+  );
+  res.status(status).json({ success: false, error: { code, message: error.message } });
+}
+
 router.route('/')
-  .get(sopController.list)
-  .post(sopController.create);
+  .get(requirePermission('manage_sops'), sopController.list)
+  .post(requirePermission('manage_sops'), sopController.create);
 
 router.route('/stats')
-  .get(sopController.getStats);
+  .get(requirePermission('view_reports'), sopController.getStats);
 
 router.route('/trashed')
-  .get(sopController.listTrashed);
+  .get(requirePermission('manage_sops'), sopController.listTrashed);
 
 router.route('/:id')
-  .get(sopController.getById)
-  .put(sopController.update)
-  .delete(sopController.remove);
+  .get(requireSopReadScope, sopController.getById)
+  .put(requireSopWriteScope, sopController.update)
+  .delete(requireSopWriteScope, sopController.remove);
 
 router.route('/:id/restore')
-  .post(sopController.restore);
+  .post(requireSopWriteScope, sopController.restore);
 
 router.route('/:id/permanent')
-  .delete(sopController.permanentDelete);
+  .delete(requireSopWriteScope, sopController.permanentDelete);
 
 router.route('/trashed/empty')
-  .delete(sopController.emptyTrash);
+  .delete(requirePermission('manage_sops'), sopController.emptyTrash);
 
 router.route('/:sopId/modules')
-  .get(moduleController.list)
-  .post(moduleController.create);
+  .get(requireSopReadScope, moduleController.list)
+  .post(requireSopWriteScope, moduleController.create);
 
 router.route('/modules/:moduleId')
   .put(moduleController.update)
@@ -47,10 +88,10 @@ router.route('/modules/:moduleId/permanent')
   .delete(moduleController.permanentDelete);
 
 router.route('/:sopId/modules/trashed')
-  .get(moduleController.listTrashed);
+  .get(requireSopReadScope, moduleController.listTrashed);
 
 router.route('/:sopId/modules/sort')
-  .put(moduleController.updateSortOrder);
+  .put(requireSopWriteScope, moduleController.updateSortOrder);
 
 router.route('/modules/:moduleId/attachments')
   .get(attachmentController.list)
@@ -72,59 +113,59 @@ router.route('/modules/:moduleId/attachments/trashed')
   .get(attachmentController.listTrashed);
 
 router.route('/:sopId/versions')
-  .get(versionController.list)
-  .post(versionController.create);
+  .get(requireSopReadScope, versionController.list)
+  .post(requireSopWriteScope, versionController.create);
 
 router.route('/:sopId/versions/:versionId')
-  .get(versionController.getById);
+  .get(requireSopReadScope, versionController.getById);
 
 router.route('/:sopId/versions/:versionId/restore')
-  .post(versionController.restore);
+  .post(requireSopWriteScope, versionController.restore);
 
 router.route('/:sopId/approvals')
-  .get(approvalController.list)
-  .post(approvalController.create);
+  .get(requireSopReadScope, approvalController.list)
+  .post(requireSopWriteScope, approvalController.create);
 
 router.route('/:sopId/approvals/:approvalId')
-  .put(approvalController.update)
-  .post(approvalController.approve);
+  .put(requireSopWriteScope, approvalController.update)
+  .post(requireSopWriteScope, approvalController.approve);
 
 router.route('/:sopId/approvals/:approvalId/reject')
-  .post(approvalController.reject);
+  .post(requireSopWriteScope, approvalController.reject);
 
 router.route('/:sopId/workflow')
-  .get(approvalWorkflowController.getInstance);
+  .get(requireSopReadScope, approvalWorkflowController.getInstance);
 
 router.route('/:sopId/workflow/start')
-  .post(approvalWorkflowController.start);
+  .post(requireSopWriteScope, approvalWorkflowController.start);
 
 router.route('/:sopId/transition')
-  .post(workflowController.transition);
+  .post(requireSopWriteScope, workflowController.transition);
 
 router.route('/:sopId/submit')
-  .post(workflowController.submit);
+  .post(requireSopWriteScope, workflowController.submit);
 
 router.route('/:sopId/approve')
-  .post(workflowController.approve);
+  .post(requirePermission('manage_sops'), requireSopWriteScope, workflowController.approve);
 
 router.route('/:sopId/reject')
-  .post(workflowController.reject);
+  .post(requirePermission('manage_sops'), requireSopWriteScope, workflowController.reject);
 
 router.route('/:sopId/publish')
-  .post(workflowController.publish);
+  .post(requirePermission('manage_sops'), requireSopWriteScope, workflowController.publish);
 
 router.route('/:sopId/audit')
-  .get(auditController.list);
+  .get(requireSopReadScope, auditController.list);
 
 router.route('/:sopId/shares')
-  .get(shareController.list)
-  .post(shareController.create);
+  .get(requireSopReadScope, shareController.list)
+  .post(requireSopWriteScope, shareController.create);
 
 router.route('/:sopId/shares/link')
-  .post(shareController.createLink);
+  .post(requireSopWriteScope, shareController.createLink);
 
 router.route('/:sopId/shares/:shareId')
-  .delete(shareController.revoke);
+  .delete(requireSopWriteScope, shareController.revoke);
 
 router.route('/assignment/departments').get(assignmentCascadeController.listDepartments);
 
@@ -133,23 +174,26 @@ router.route('/assignment/positions/:departmentId').get(assignmentCascadeControl
 router.route('/assignment/users/:departmentId').get(assignmentCascadeController.listUsers);
 
 router.route('/:sopId/assignments')
-  .get(assignmentController.list)
-  .post(assignmentController.create);
+  .get(requireSopReadScope, assignmentController.list)
+  .post(requireSopWriteScope, assignmentController.create);
 
 router.route('/:sopId/assigned')
-  .get(assignmentCascadeController.listAssigned);
+  .get(requireSopReadScope, assignmentCascadeController.listAssigned);
 
 router.route('/assignments/:id')
-  .delete(assignmentController.remove);
+  .delete(requireSopWriteScope, assignmentController.remove);
+
+router.route('/acknowledgements/my')
+  .get(authenticateToken, acknowledgementController.listByUser);
 
 router.route('/:sopId/acknowledgements')
-  .get(acknowledgementController.list)
-  .post(acknowledgementController.create);
+  .get(requireSopReadScope, acknowledgementController.list)
+  .post(requireSopWriteScope, acknowledgementController.create);
 
 router.route('/:sopId/acknowledgements/:ackId/acknowledge')
-  .post(acknowledgementController.acknowledge);
+  .post(requireSopReadScope, acknowledgementController.acknowledge);
 
 router.route('/:id/export')
-  .get(exportController.exportPdf);
+  .get(requireSopReadScope, exportController.exportPdf);
 
 module.exports = router;

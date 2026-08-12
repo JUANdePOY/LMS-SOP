@@ -1,9 +1,12 @@
 const db = require('../config/database');
 
-async function getDepartments(activeOnly = true) {
+async function getDepartments(activeOnly = true, businessId = null) {
   let sql = 'SELECT id, name, code, business_id, parent_department_id, head_user_id FROM departments';
   const params = [];
-  if (activeOnly) { sql += ' WHERE status = "active"'; }
+  const where = [];
+  if (activeOnly) { where.push('status = "active"'); }
+  if (businessId) { where.push('business_id = ?'); params.push(parseInt(businessId, 10)); }
+  if (where.length) { sql += ' WHERE ' + where.join(' AND '); }
   sql += ' ORDER BY name ASC';
   const [rows] = await db.query(sql, params);
   return rows;

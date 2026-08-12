@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Award, AlertTriangle, Rocket, Megaphone, Calendar, Bell, X } from "lucide-react";
+import { Award, AlertTriangle, Rocket, Megaphone, Calendar, Bell, BookOpen, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { notifyDismissBanner, useNotificationStore } from "@/shared/stores/notificationStore.js";
+import { notifyDismissBanner, useNotificationStore, enqueueBanner as enqueueGlobalBanner, clearEnqueuedBanners } from "@/shared/stores/notificationStore.js";
 
 const DEFAULT_BANNERS = [
   {
@@ -30,39 +30,71 @@ const DEFAULT_BANNERS = [
 
 const TYPE_CONFIG = {
   achievement: {
-    badge: "bg-amber-500 text-white border-amber-200",
-    cta: "bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-400",
+    gradient: "from-amber-500 to-amber-400",
+    gradientDark: "dark:from-amber-600 dark:to-amber-500",
+    accent: "border-l-amber-500 dark:border-l-amber-400",
+    cta: "bg-white text-amber-600 hover:bg-amber-50 hover:scale-105 hover:shadow-lg focus:ring-amber-400",
     icon: Award,
     ariaLive: "polite",
     label: "Achievement",
   },
   alert: {
-    badge: "bg-red-600 text-white border-red-200",
-    cta: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-400",
+    gradient: "from-red-600 to-red-500",
+    gradientDark: "dark:from-red-700 dark:to-red-600",
+    accent: "border-l-red-500 dark:border-l-red-400",
+    cta: "bg-white text-red-600 hover:bg-red-50 hover:scale-105 hover:shadow-lg focus:ring-red-400",
     icon: AlertTriangle,
     ariaLive: "assertive",
     label: "Alert",
   },
   onboarding: {
-    badge: "bg-sky-600 text-white border-sky-200",
-    cta: "bg-sky-600 text-white hover:bg-sky-700 focus:ring-sky-400",
+    gradient: "from-sky-600 to-sky-500",
+    gradientDark: "dark:from-sky-700 dark:to-sky-600",
+    accent: "border-l-sky-500 dark:border-l-sky-400",
+    cta: "bg-white text-sky-600 hover:bg-sky-50 hover:scale-105 hover:shadow-lg focus:ring-sky-400",
     icon: Rocket,
     ariaLive: "polite",
     label: "Onboarding",
   },
   announcement: {
-    badge: "bg-slate-700 text-white border-slate-200",
-    cta: "bg-slate-900 text-white hover:bg-slate-800 focus:ring-slate-500",
+    gradient: "from-slate-700 to-slate-600",
+    gradientDark: "dark:from-slate-800 dark:to-slate-700",
+    accent: "border-l-slate-500 dark:border-l-slate-400",
+    cta: "bg-white text-slate-700 hover:bg-slate-50 hover:scale-105 hover:shadow-lg focus:ring-slate-400",
     icon: Megaphone,
     ariaLive: "polite",
     label: "Announcement",
   },
   event: {
-    badge: "bg-slate-700 text-white border-slate-200",
-    cta: "bg-slate-900 text-white hover:bg-slate-800 focus:ring-slate-500",
+    gradient: "from-slate-700 to-slate-600",
+    gradientDark: "dark:from-slate-800 dark:to-slate-700",
+    accent: "border-l-slate-500 dark:border-l-slate-400",
+    cta: "bg-white text-slate-700 hover:bg-slate-50 hover:scale-105 hover:shadow-lg focus:ring-slate-400",
     icon: Calendar,
     ariaLive: "polite",
     label: "Event",
+  },
+  new_course: {
+    gradient: "from-sky-500 via-sky-100 to-white",
+    gradientDark: "dark:from-sky-600 dark:via-sky-900 dark:to-neutral-800",
+    accent: "border-l-sky-500 dark:border-l-sky-400",
+    cta: "bg-sky-600 text-white hover:bg-sky-700 hover:scale-105 hover:shadow-lg focus:ring-sky-400",
+    icon: BookOpen,
+    ariaLive: "polite",
+    label: "New Course",
+    textColor: "text-slate-900",
+    textMuted: "text-slate-600",
+  },
+  new_sop: {
+    gradient: "from-indigo-500 via-indigo-100 to-white",
+    gradientDark: "dark:from-indigo-600 dark:via-indigo-900 dark:to-neutral-800",
+    accent: "border-l-indigo-500 dark:border-l-indigo-400",
+    cta: "bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105 hover:shadow-lg focus:ring-indigo-400",
+    icon: FileText,
+    ariaLive: "polite",
+    label: "New SOP",
+    textColor: "text-slate-900",
+    textMuted: "text-slate-600",
   },
 };
 
@@ -70,9 +102,13 @@ const PRIORITY_ORDER = {
   alert: 3,
   onboarding: 2,
   achievement: 1,
+  new_course: 1,
+  new_sop: 1,
   announcement: 0,
   event: 0,
 };
+
+const MAX_VISIBLE = 1;
 
 function getBannerPriority(entry) {
   if (typeof entry.priority === "number") {
@@ -93,17 +129,228 @@ function isExpired(entry) {
   return Boolean(entry.expiresAt && Date.now() > entry.expiresAt);
 }
 
-export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, autoDismissMs = 5000 }) {
-  const navigate = useNavigate();
-  const { dismissed } = useNotificationStore();
-  const reducedMotion = useReducedMotion();
-  const [queue, setQueue] = useState([]);
-  const [activeBanner, setActiveBanner] = useState(null);
+function BannerCard({ banner, onDismiss, onSnooze, autoDismissMs, reducedMotion, navigate }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const timerRef = useRef(null);
   const startAtRef = useRef(null);
   const remainingRef = useRef(null);
+
+  const config = TYPE_CONFIG[banner.type] || TYPE_CONFIG.announcement;
+  const BadgeIcon = config.icon || Bell;
+  const hasCta = Boolean(banner.ctaLabel || banner.type === "onboarding");
+  const ctaLabel = banner.ctaLabel || (banner.type === "onboarding" ? "Next" : "View");
+  const showStep = banner.type === "onboarding" && banner.step?.current && banner.step?.total;
+  const hasSnooze = Boolean(banner.snoozeMs && banner.type === "alert");
+  const bannerAutoDismissMs = ["achievement", "new_course", "new_sop"].includes(banner.type) ? autoDismissMs : 0;
+  const isLightBg = ["new_course", "new_sop"].includes(banner.type);
+  const textColor = config.textColor || "text-white";
+  const textMuted = config.textMuted || "text-white/80";
+
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const scheduleAutoDismiss = useCallback(() => {
+    if (!bannerAutoDismissMs || bannerAutoDismissMs <= 0) return;
+    clearTimer();
+    if (remainingRef.current === null) {
+      remainingRef.current = bannerAutoDismissMs;
+    }
+    startAtRef.current = Date.now();
+    timerRef.current = window.setTimeout(() => {
+      onDismiss(banner.id);
+    }, remainingRef.current);
+  }, [bannerAutoDismissMs, clearTimer, onDismiss, banner.id]);
+
+  useEffect(() => {
+    remainingRef.current = null;
+    startAtRef.current = null;
+    clearTimer();
+  }, [banner.id, clearTimer]);
+
+  useEffect(() => {
+    if (!bannerAutoDismissMs || bannerAutoDismissMs <= 0) return;
+    if (isHovered || isFocused) return;
+    scheduleAutoDismiss();
+    return () => clearTimer();
+  }, [bannerAutoDismissMs, isHovered, isFocused, scheduleAutoDismiss, clearTimer]);
+
+  useEffect(() => {
+    if (!bannerAutoDismissMs || !startAtRef.current) return;
+    if (!isHovered && !isFocused) return;
+    const elapsed = Date.now() - startAtRef.current;
+    remainingRef.current = Math.max(0, (remainingRef.current ?? bannerAutoDismissMs) - elapsed);
+    clearTimer();
+  }, [isHovered, isFocused, bannerAutoDismissMs, clearTimer]);
+
+  useEffect(() => {
+    if (!banner) return;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") onDismiss(banner.id);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [banner, onDismiss]);
+
+  const remaining = remainingRef.current;
+  const progress = bannerAutoDismissMs > 0 && remaining !== null ? (remaining / bannerAutoDismissMs) * 100 : 100;
+
+  const handleCtaClick = useCallback(() => {
+    if (typeof banner.onClick === "function") {
+      banner.onClick();
+    } else if (banner.link) {
+      navigate(banner.link);
+    }
+    onDismiss(banner.id, false);
+  }, [banner, onDismiss, navigate]);
+
+  return (
+    <motion.div
+      layout
+      initial={{ x: reducedMotion ? 0 : "100%", opacity: reducedMotion ? 1 : 0, scale: reducedMotion ? 1 : 0.95 }}
+      animate={{ x: 0, opacity: 1, scale: 1 }}
+      exit={{ x: reducedMotion ? 0 : "100%", opacity: reducedMotion ? 1 : 0, scale: reducedMotion ? 1 : 0.95 }}
+      transition={{ type: "spring", stiffness: 200, damping: 12, mass: 0.8 }}
+      role={banner.type === "alert" ? "alert" : "status"}
+      aria-live={config.ariaLive}
+      aria-label={`${config.label} notification`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className={cn(
+        "pointer-events-auto",
+        "relative overflow-hidden",
+        "w-full",
+        "rounded-xl border-l-4",
+        config.accent,
+        "bg-gradient-to-r",
+        config.gradient,
+        config.gradientDark,
+        textColor,
+        "shadow-lg",
+        "before:absolute before:inset-0 before:bg-white/10 before:backdrop-blur-xl",
+        "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-white/25"
+      )}
+    >
+      <div className="relative w-full px-4 sm:px-5">
+        <div className="flex items-center gap-3 sm:gap-4 py-3" onFocus={() => setIsFocused(true)} onBlur={() => setIsFocused(false)}>
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.05, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className={cn(
+              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+              isLightBg ? "bg-sky-600 text-white" : "bg-white/20 dark:bg-white/10 text-white",
+              "backdrop-blur-md",
+              "border border-white/25 dark:border-white/15",
+              "shadow-inner"
+            )}
+          >
+            <BadgeIcon size={22} aria-hidden="true" className="drop-shadow-sm" />
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="min-w-0 flex-1"
+          >
+            {showStep && (
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.26em] text-white/70">
+                Step {banner.step.current} of {banner.step.total}
+              </p>
+            )}
+            <p className={cn("text-sm sm:text-base font-semibold tracking-tight leading-snug", isLightBg ? "text-slate-900" : "text-white")}>{banner.title}</p>
+            <p className={cn("text-xs sm:text-sm leading-relaxed", isLightBg ? "text-slate-600" : "text-white/80")}>{banner.message}</p>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.15, duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+            className="flex items-center gap-2 sm:gap-3 shrink-0"
+          >
+            {hasCta ? (
+              <button
+                type="button"
+                onClick={handleCtaClick}
+                className={cn(
+                  "inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200",
+                  "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-transparent",
+                  config.cta
+                )}
+              >
+                {ctaLabel}
+              </button>
+            ) : null}
+            {banner.type === "onboarding" ? (
+              <button
+                type="button"
+                onClick={() => onDismiss(banner.id)}
+                className={cn(
+                  "rounded-full border px-4 py-2 text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2",
+                  isLightBg
+                    ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-400"
+                    : "border-white/30 bg-white/10 text-white hover:bg-white/20 focus:ring-white/40"
+                )}
+              >
+                Skip tour
+              </button>
+            ) : null}
+            {hasSnooze ? (
+              <button
+                type="button"
+                onClick={() => onSnooze?.(banner.id)}
+                className={cn(
+                  "rounded-full border px-4 py-2 text-sm font-semibold transition-all duration-200 focus:outline-none focus:ring-2",
+                  isLightBg
+                    ? "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus:ring-slate-400"
+                    : "border-white/30 bg-white/10 text-white hover:bg-white/20 focus:ring-white/40"
+                )}
+              >
+                Remind me later
+              </button>
+            ) : null}
+            <motion.button
+              type="button"
+              onClick={() => onDismiss(banner.id)}
+              aria-label="Dismiss notification"
+              whileHover={{ rotate: 90, scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className={cn(
+                "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-200 focus:outline-none focus:ring-2",
+                isLightBg
+                  ? "text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:ring-slate-400"
+                  : "text-white/80 hover:bg-white/20 hover:text-white focus:ring-white/40"
+              )}
+            >
+              <X size={18} />
+            </motion.button>
+          </motion.div>
+        </div>
+      </div>
+
+      {bannerAutoDismissMs > 0 && (
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/10 dark:bg-white/10 overflow-hidden">
+          <motion.div
+            className="h-full bg-white/90 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+            style={{ width: `${progress}%` }}
+            transition={{ duration: 0.1, ease: "linear" }}
+          />
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, autoDismissMs = 5000 }) {
+  const navigate = useNavigate();
+  const store = useNotificationStore();
+  const { dismissed, pendingBanners = [] } = store;
+  const reducedMotion = useReducedMotion();
+  const [queue, setQueue] = useState([]);
+  const [activeBanner, setActiveBanner] = useState(null);
   const scheduledTimers = useRef(new Map());
 
   const normalizedItems = useMemo(
@@ -121,13 +368,12 @@ export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, auto
     [items]
   );
 
-  const activeConfig = TYPE_CONFIG[activeBanner?.type] || TYPE_CONFIG.announcement;
-  const BadgeIcon = activeConfig.icon || Bell;
-  const hasCta = Boolean(activeBanner?.ctaLabel || activeBanner?.type === "onboarding");
-  const ctaLabel = activeBanner?.ctaLabel || (activeBanner?.type === "onboarding" ? "Next" : "View");
-  const showStep = activeBanner?.type === "onboarding" && activeBanner?.step?.current && activeBanner?.step?.total;
-  const hasSnooze = Boolean(activeBanner?.snoozeMs && activeBanner?.type === "alert");
-  const activeAutoDismissMs = activeBanner?.type === "achievement" ? autoDismissMs : 0;
+  const allItems = useMemo(() => {
+    const itemMap = new Map();
+    normalizedItems.forEach((item) => itemMap.set(item.id, item));
+    pendingBanners.forEach((item) => itemMap.set(item.id, item));
+    return sortQueue(Array.from(itemMap.values()));
+  }, [normalizedItems, pendingBanners]);
 
   const cancelScheduled = useCallback((id) => {
     const timer = scheduledTimers.current.get(id);
@@ -169,9 +415,9 @@ export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, auto
     setQueue([]);
     setActiveBanner(null);
 
-    normalizedItems.forEach(enqueueBanner);
+    allItems.forEach(enqueueBanner);
     return () => clearAllScheduled();
-  }, [normalizedItems, dismissed, enqueueBanner, clearAllScheduled]);
+  }, [allItems, dismissed, enqueueBanner, clearAllScheduled]);
 
   useEffect(() => {
     if (activeBanner) return;
@@ -189,57 +435,16 @@ export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, auto
     }
   }, [dismissed, activeBanner]);
 
-  const clearTimer = useCallback(() => {
-    if (timerRef.current) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  }, []);
-
-  const scheduleAutoDismiss = useCallback(() => {
-    if (!activeBanner || activeAutoDismissMs <= 0) return;
-    clearTimer();
-    if (remainingRef.current === null) {
-      remainingRef.current = activeAutoDismissMs;
-    }
-    startAtRef.current = Date.now();
-    timerRef.current = window.setTimeout(() => {
-      handleDismiss({ persist: false });
-    }, remainingRef.current);
-  }, [activeBanner, activeAutoDismissMs, clearTimer]);
-
-  useEffect(() => {
-    remainingRef.current = null;
-    startAtRef.current = null;
-    clearTimer();
-  }, [activeBanner, clearTimer]);
-
-  useEffect(() => {
-    if (!activeBanner || activeAutoDismissMs <= 0) return;
-    if (isHovered || isFocused) return;
-    scheduleAutoDismiss();
-    return () => clearTimer();
-  }, [activeBanner, activeAutoDismissMs, isHovered, isFocused, scheduleAutoDismiss, clearTimer]);
-
-  useEffect(() => {
-    if (!activeBanner || !activeAutoDismissMs || !startAtRef.current) return;
-    if (!isHovered && !isFocused) return;
-    const elapsed = Date.now() - startAtRef.current;
-    remainingRef.current = Math.max(0, (remainingRef.current ?? activeAutoDismissMs) - elapsed);
-    clearTimer();
-  }, [isHovered, isFocused, activeBanner, activeAutoDismissMs, clearTimer]);
-
   const handleDismiss = useCallback(
-    ({ persist = true } = {}) => {
-      if (!activeBanner) return;
-      if (persist && activeBanner.persistDismiss && activeBanner.id) {
-        notifyDismissBanner(activeBanner.id);
+    (id, persist = true) => {
+      const banner = activeBanner;
+      if (persist && banner?.persistDismiss && banner.id) {
+        notifyDismissBanner(banner.id);
       }
-      clearTimer();
       setActiveBanner(null);
-      onDismiss?.(activeBanner.id);
+      onDismiss?.(id);
     },
-    [activeBanner, clearTimer, onDismiss]
+    [activeBanner, onDismiss]
   );
 
   const handleSnooze = useCallback(() => {
@@ -251,10 +456,9 @@ export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, auto
       showAfter: Date.now() + activeBanner.snoozeMs,
       persistDismiss: false,
     };
-    clearTimer();
     setActiveBanner(null);
     enqueueBanner(snoozed);
-  }, [activeBanner, clearTimer, enqueueBanner]);
+  }, [activeBanner, enqueueBanner]);
 
   const handleCtaClick = useCallback(() => {
     if (!activeBanner) return;
@@ -263,96 +467,24 @@ export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, auto
     } else if (activeBanner.link) {
       navigate(activeBanner.link);
     }
-    handleDismiss({ persist: false });
+    handleDismiss(activeBanner.id, false);
   }, [activeBanner, handleDismiss, navigate]);
-
-  useEffect(() => {
-    if (!activeBanner) return;
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") {
-        handleDismiss();
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [activeBanner, handleDismiss]);
 
   if (!activeBanner) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        key={activeBanner.id}
-        initial={{ opacity: 0, x: reducedMotion ? 0 : "120%" }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: reducedMotion ? 0 : "120%" }}
-        transition={{ duration: reducedMotion ? 0.24 : 0.35, ease: [0.16, 1, 0.3, 1] }}
-        role={activeBanner.type === "alert" ? "alert" : "status"}
-        aria-live={activeConfig.ariaLive}
-        aria-label={`${activeConfig.label} notification`}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        className="fixed top-0 left-0 right-0 z-50 px-3 py-3 sm:top-24 sm:left-auto sm:right-6"
-      >
-        <div className="mx-auto w-full max-w-[calc(100vw-1rem)] sm:max-w-[360px] pointer-events-auto">
-          <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_20px_65px_-35px_rgba(15,23,42,0.35)]">
-            <div className="flex flex-col gap-4 p-4 sm:p-4" onFocus={() => setIsFocused(true)} onBlur={() => setIsFocused(false)}>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-start gap-4 flex-1">
-                  <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border", activeConfig.badge)}>
-                    <BadgeIcon size={20} aria-hidden="true" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    {showStep ? (
-                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.26em] text-slate-500">
-                        Step {activeBanner.step.current} of {activeBanner.step.total}
-                      </p>
-                    ) : null}
-                    <p className="text-sm font-semibold text-slate-900 leading-5">{activeBanner.title}</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{activeBanner.message}</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleDismiss()}
-                  aria-label="Dismiss notification"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-400/60"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                  {hasCta ? (
-                    <button type="button" onClick={handleCtaClick} className={cn("inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2", activeConfig.cta)}>
-                      {ctaLabel}
-                    </button>
-                  ) : null}
-                  {activeBanner.type === "onboarding" ? (
-                    <button
-                      type="button"
-                      onClick={() => handleDismiss()}
-                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400/60"
-                    >
-                      Skip tour
-                    </button>
-                  ) : null}
-                  {hasSnooze ? (
-                    <button
-                      type="button"
-                      onClick={handleSnooze}
-                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-400/60"
-                    >
-                      Remind me later
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+    <div className="w-full mb-4">
+      <AnimatePresence>
+        <BannerCard
+          key={activeBanner.id}
+          banner={activeBanner}
+          onDismiss={handleDismiss}
+          onSnooze={handleSnooze}
+          autoDismissMs={autoDismissMs}
+          reducedMotion={reducedMotion}
+          navigate={navigate}
+        />
+      </AnimatePresence>
+    </div>
   );
 }

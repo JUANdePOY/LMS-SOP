@@ -26,22 +26,31 @@ async function searchAll(query, categories, requestingUser) {
   const results = {};
   const errors = {};
 
+  const isSuperAdmin = requestingUser?.role === 'super_admin';
+  const userBusinessId = requestingUser?.business_id || null;
+
   const tasks = [];
 
   if (categories.includes('users')) {
     tasks.push((async () => {
       try {
-        const [rows] = await db.query(
-          `SELECT u.id, u.full_name, u.email, u.employee_id, u.role, u.department_id,
-                  d.name AS department_name, b.business_name
-           FROM users u
-           LEFT JOIN departments d ON u.department_id = d.id
-           LEFT JOIN businesses b ON u.business_id = b.id
-           WHERE (u.full_name LIKE ? OR u.email LIKE ? OR u.employee_id LIKE ?)
-             AND u.is_active = TRUE
-           ORDER BY u.created_at DESC LIMIT ?`,
-          [term, term, term, PER_CATEGORY]
-        );
+        let sql = `
+          SELECT u.id, u.full_name, u.email, u.employee_id, u.role, u.department_id,
+                 d.name AS department_name, b.business_name
+          FROM users u
+          LEFT JOIN departments d ON u.department_id = d.id
+          LEFT JOIN businesses b ON u.business_id = b.id
+          WHERE (u.full_name LIKE ? OR u.email LIKE ? OR u.employee_id LIKE ?)
+            AND u.is_active = TRUE
+        `;
+        const params = [term, term, term];
+        if (!isSuperAdmin && userBusinessId) {
+          sql += ' AND u.business_id = ?';
+          params.push(userBusinessId);
+        }
+        sql += ' ORDER BY u.created_at DESC LIMIT ?';
+        params.push(PER_CATEGORY);
+        const [rows] = await db.query(sql, params);
         results.users = rows;
       } catch (err) {
         errors.users = err.message;
@@ -52,15 +61,21 @@ async function searchAll(query, categories, requestingUser) {
   if (categories.includes('courses')) {
     tasks.push((async () => {
       try {
-        const [rows] = await db.query(
-          `SELECT c.id, c.title, c.description, c.category, c.difficulty, c.status,
-                  c.thumbnail_url, u.full_name AS instructor_name
-           FROM courses c
-           LEFT JOIN users u ON c.instructor_id = u.id
-           WHERE c.is_deleted = FALSE AND (c.title LIKE ? OR c.description LIKE ?)
-           ORDER BY c.created_at DESC LIMIT ?`,
-          [term, term, PER_CATEGORY]
-        );
+        let sql = `
+          SELECT c.id, c.title, c.description, c.category, c.difficulty, c.status,
+                 c.thumbnail_url, u.full_name AS instructor_name
+          FROM courses c
+          LEFT JOIN users u ON c.instructor_id = u.id
+          WHERE c.is_deleted = FALSE AND (c.title LIKE ? OR c.description LIKE ?)
+        `;
+        const params = [term, term];
+        if (!isSuperAdmin && userBusinessId) {
+          sql += ' AND EXISTS (SELECT 1 FROM departments d WHERE d.id = c.department_id AND d.business_id = ?)';
+          params.push(userBusinessId);
+        }
+        sql += ' ORDER BY c.created_at DESC LIMIT ?';
+        params.push(PER_CATEGORY);
+        const [rows] = await db.query(sql, params);
         results.courses = rows;
       } catch (err) {
         errors.courses = err.message;
@@ -90,6 +105,10 @@ async function searchAll(query, categories, requestingUser) {
           sql += ` AND ${restriction.sql}`;
           params.push(...restriction.params);
         }
+        if (!isSuperAdmin && userBusinessId) {
+          sql += ' AND EXISTS (SELECT 1 FROM departments d WHERE d.id = s.department_id AND d.business_id = ?)';
+          params.push(userBusinessId);
+        }
         sql += ` ORDER BY s.created_at DESC LIMIT ?`;
         params.push(PER_CATEGORY);
         const [rows] = await db.query(sql, params);
@@ -103,12 +122,18 @@ async function searchAll(query, categories, requestingUser) {
   if (categories.includes('departments')) {
     tasks.push((async () => {
       try {
-        const [rows] = await db.query(
-          `SELECT id, name, code, description, status FROM departments
-           WHERE name LIKE ? OR code LIKE ?
-           ORDER BY name ASC LIMIT ?`,
-          [term, term, PER_CATEGORY]
-        );
+        let sql = `
+          SELECT id, name, code, description, status FROM departments
+          WHERE (name LIKE ? OR code LIKE ?)
+        `;
+        const params = [term, term];
+        if (!isSuperAdmin && userBusinessId) {
+          sql += ' AND business_id = ?';
+          params.push(userBusinessId);
+        }
+        sql += ' ORDER BY name ASC LIMIT ?';
+        params.push(PER_CATEGORY);
+        const [rows] = await db.query(sql, params);
         results.departments = rows;
       } catch (err) {
         errors.departments = err.message;
@@ -151,14 +176,20 @@ async function searchAll(query, categories, requestingUser) {
   if (categories.includes('quizzes')) {
     tasks.push((async () => {
       try {
-        const [rows] = await db.query(
-          `SELECT q.id, q.title, q.description, q.status, q.quiz_type, c.title AS course_title
-           FROM quizzes q
-           LEFT JOIN courses c ON q.course_id = c.id
-           WHERE q.is_deleted = FALSE AND (q.title LIKE ? OR q.description LIKE ?)
-           ORDER BY q.created_at DESC LIMIT ?`,
-          [term, term, PER_CATEGORY]
-        );
+        let sql = `
+          SELECT q.id, q.title, q.description, q.status, q.quiz_type, c.title AS course_title
+          FROM quizzes q
+          LEFT JOIN courses c ON q.course_id = c.id
+          WHERE q.is_deleted = FALSE AND (q.title LIKE ? OR q.description LIKE ?)
+        `;
+        const params = [term, term];
+        if (!isSuperAdmin && userBusinessId) {
+          sql += ' AND EXISTS (SELECT 1 FROM departments d WHERE d.id = c.department_id AND d.business_id = ?)';
+          params.push(userBusinessId);
+        }
+        sql += ' ORDER BY q.created_at DESC LIMIT ?';
+        params.push(PER_CATEGORY);
+        const [rows] = await db.query(sql, params);
         results.quizzes = rows;
       } catch (err) {
         errors.quizzes = err.message;
@@ -203,13 +234,19 @@ async function searchAll(query, categories, requestingUser) {
   if (categories.includes('businesses')) {
     tasks.push((async () => {
       try {
-        const [rows] = await db.query(
-          `SELECT id, business_code, business_name, description, status
-           FROM businesses
-           WHERE status = 'active' AND (business_name LIKE ? OR business_code LIKE ? OR description LIKE ?)
-           ORDER BY business_name ASC LIMIT ?`,
-          [term, term, term, PER_CATEGORY]
-        );
+        let sql = `
+          SELECT id, business_code, business_name, description, status
+          FROM businesses
+          WHERE status = 'active' AND (business_name LIKE ? OR business_code LIKE ? OR description LIKE ?)
+        `;
+        const params = [term, term, term];
+        if (!isSuperAdmin && userBusinessId) {
+          sql += ' AND id = ?';
+          params.push(userBusinessId);
+        }
+        sql += ' ORDER BY business_name ASC LIMIT ?';
+        params.push(PER_CATEGORY);
+        const [rows] = await db.query(sql, params);
         results.businesses = rows;
       } catch (err) {
         errors.businesses = err.message;

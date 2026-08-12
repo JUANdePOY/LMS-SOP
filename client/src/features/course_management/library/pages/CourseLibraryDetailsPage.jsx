@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Users, BarChart3, CheckCircle, Download, BookOpen, GraduationCap, Layers, PlayCircle, Video, FileText, ListChecks, Clock, ChevronRight } from "lucide-react";
+import { Users, BarChart3, CheckCircle, Download, BookOpen, GraduationCap, Layers, PlayCircle, Video, FileText, ListChecks, Clock, ChevronRight, ClipboardCheck } from "lucide-react";
 import { ActionIcons } from "@/shared/components/ui/actionIcons";
 import { useCourseLibraryDetails } from "../hooks/useCourseLibraryDetails";
 import { useCourseAnalytics } from "../hooks/useCourseAnalytics";
@@ -600,79 +600,135 @@ export default function CourseLibraryDetailsPage() {
             )}
           </>
         ) : (
-          <div className="space-y-5">
-            <OverviewSection title="About this course">
-              <div
-                className="prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300"
-                dangerouslySetInnerHTML={{ __html: courseDescription }}
-              />
-            </OverviewSection>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/** About this course — featured wide card */}
+            <div className="md:col-span-2 rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-sm">
+              <div className="h-1 w-full rounded-t-2xl bg-gradient-to-r from-[var(--color-primary)] via-[var(--color-secondary)] to-[var(--color-accent)]" />
+              <div className="p-5">
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-neutral-500 dark:text-neutral-400">About this course</h3>
+                <div
+                  className="mt-2 text-sm text-neutral-700 dark:text-neutral-300"
+                  dangerouslySetInnerHTML={{ __html: courseDescription }}
+                />
+              </div>
+            </div>
 
+            {/** What you'll learn */}
             {learningOutcomes.length > 0 && (
-              <OverviewSection title="What you'll learn" icon={GraduationCap}>
-                <StaggerList className="space-y-2.5">
-                  {learningOutcomes.map((outcome, i) => (
-                    <MotionItem key={i}>
-                      <li className="flex items-start gap-2.5 text-sm text-neutral-600 dark:text-neutral-300">
-                        <CheckCircle size={16} className="mt-0.5 text-[var(--color-primary)] dark:text-[var(--color-primary)] shrink-0" />
+              <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-sm">
+                <div className="border-b border-neutral-100 dark:border-neutral-800 px-5 py-3">
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400">
+                      <GraduationCap size={15} />
+                    </span>
+                    What you'll learn
+                  </span>
+                </div>
+                <div className="p-4">
+                  <ul className="space-y-2.5">
+                    {learningOutcomes.map((outcome, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-sm text-neutral-600 dark:text-neutral-300">
+                        <CheckCircle size={15} className="mt-0.5 text-[var(--color-primary)] dark:text-[var(--color-primary)] shrink-0" />
                         <span>{outcome}</span>
                       </li>
-                    </MotionItem>
-                  ))}
-                </StaggerList>
-              </OverviewSection>
+                    ))}
+                  </ul>
+                </div>
+              </div>
             )}
 
+            {/** Prerequisites */}
             {prerequisites.length > 0 && (
-              <OverviewSection title="Prerequisites" icon={BookOpen}>
-                <ul className="space-y-2">
-                  {prerequisites.map((pre, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-neutral-600 dark:text-neutral-300">
-                      <span className="text-amber-500 mt-0.5">•</span>
-                      <span>{pre}</span>
+              <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-sm">
+                <div className="border-b border-neutral-100 dark:border-neutral-800 px-5 py-3">
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
+                      <BookOpen size={15} />
+                    </span>
+                    Prerequisites
+                  </span>
+                </div>
+                <div className="p-4">
+                  <ul className="space-y-2">
+                    {prerequisites.map((pre, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-neutral-600 dark:text-neutral-300">
+                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-primary)] dark:bg-[var(--color-primary)]" />
+                        <span>{pre}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {/** Course Info */}
+            <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-sm">
+              <div className="border-b border-neutral-100 dark:border-neutral-800 px-5 py-3">
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-400">
+                    <ClipboardCheck size={15} />
+                  </span>
+                  Course Info
+                </span>
+              </div>
+              <div className="p-4">
+                <ul className="space-y-2.5 text-sm">
+                  {courseInfoItems.map((item) => (
+                    <li key={item.label} className="flex items-center justify-between">
+                      <span className="text-neutral-500 dark:text-neutral-400">{item.label}</span>
+                      <span className="font-medium text-neutral-900 dark:text-neutral-100">{item.value}</span>
                     </li>
                   ))}
                 </ul>
-              </OverviewSection>
-            )}
+              </div>
+            </div>
 
-            <OverviewSection title="Course Info">
-              <StaggerList className="space-y-2.5 text-sm">
-                {courseInfoItems.map((item) => (
-                  <MotionItem key={item.label}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-neutral-500 dark:text-neutral-400">{item.label}</span>
-                      <span className="text-neutral-900 dark:text-neutral-100 font-medium">{item.value}</span>
-                    </div>
-                  </MotionItem>
-                ))}
-              </StaggerList>
-            </OverviewSection>
-
-            <CourseLessonsSection
-              courseId={courseId}
-              modules={modules}
-              modulesLoading={modulesLoading}
-              onView={(payload) =>
-                isEmployee
-                  ? navigate(`/my-learning/course/${courseId}`)
-                  : trackContentView(payload)
-              }
-            />
-
+            {/** Instructor */}
             {course?.instructor_name && (
-              <OverviewSection title="Instructor">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center text-sm font-semibold text-[var(--color-primary-hover)] dark:text-[var(--color-primary)]">
-                    {course.instructor_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{course.instructor_name}</p>
-                    <p className="text-xs text-neutral-500 dark:text-neutral-400">Instructor</p>
+              <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-sm">
+                <div className="border-b border-neutral-100 dark:border-neutral-800 px-5 py-3">
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-400">
+                      <Users size={15} />
+                    </span>
+                    Instructor
+                  </span>
+                </div>
+                <div className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center text-sm font-semibold text-[var(--color-primary-hover)] dark:text-[var(--color-primary)]">
+                      {course.instructor_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{course.instructor_name}</p>
+                      <p className="text-xs text-neutral-500 dark:text-neutral-400">Instructor</p>
+                    </div>
                   </div>
                 </div>
-              </OverviewSection>
+              </div>
             )}
+
+            {/** Modules & Lessons */}
+            <div className="md:col-span-2 rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-sm">
+              <div className="border-b border-neutral-100 dark:border-neutral-800 px-5 py-3">
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400">
+                    <Layers size={15} />
+                  </span>
+                  Modules & Lessons
+                </span>
+              </div>
+              <CourseLessonsSection
+                courseId={courseId}
+                modules={modules}
+                modulesLoading={modulesLoading}
+                onView={(payload) =>
+                  isEmployee
+                    ? navigate(`/my-learning/course/${courseId}`)
+                    : trackContentView(payload)
+                }
+              />
+            </div>
           </div>
         )}
       </div>

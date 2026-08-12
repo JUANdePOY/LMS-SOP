@@ -1,4 +1,6 @@
 const certificateIssuanceService = require('../services/certificateIssuanceService');
+const { broadcastSystemChange } = require('../services/notificationService');
+const db = require('../config/database');
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
@@ -77,6 +79,17 @@ const certificateIssuanceController = {
     }
   },
 
+  async getStats(req, res) {
+    try {
+      const [totalRow] = await certificateIssuanceService.db.query('SELECT COUNT(*) AS total FROM certificate_issuances WHERE revoked_at IS NULL');
+      const [issuedRow] = await certificateIssuanceService.db.query('SELECT COUNT(*) AS issued FROM certificate_issuances WHERE status = "issued" AND revoked_at IS NULL');
+      const [revokedRow] = await certificateIssuanceService.db.query('SELECT COUNT(*) AS revoked FROM certificate_issuances WHERE revoked_at IS NOT NULL');
+      res.json({ success: true, data: { total: totalRow[0]?.total || 0, issued: issuedRow[0]?.issued || 0, revoked: revokedRow[0]?.revoked || 0 } });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
   async getByCertificateNumber(req, res) {
     try {
       const result = await certificateIssuanceService.getIssuanceByCertificateNumber(
@@ -102,9 +115,20 @@ const certificateIssuanceController = {
         },
         req.user.id
       );
+
+      const issuance = result;
+      broadcastSystemChange({
+        title: 'Certificate Issued',
+        body: issuance.template_name || 'A certificate has been issued',
+        type: 'success',
+        link: `/certificates/${issuance.id}`,
+        entityType: 'certificate',
+        entityId: issuance.id,
+      }).catch(() => {});
+
       res.status(201).json({
         success: true,
-        data: mapPublicIssuance(result),
+        data: mapPublicIssuance(issuance),
         message: 'Certificate issued successfully',
       });
     } catch (error) {
@@ -118,6 +142,16 @@ const certificateIssuanceController = {
         parseInt(req.params.id, 10),
         req.user.id
       );
+
+      broadcastSystemChange({
+        title: 'Certificate Revoked',
+        body: result.template_name || 'A certificate has been revoked',
+        type: 'error',
+        link: `/certificates/${result.id}`,
+        entityType: 'certificate',
+        entityId: result.id,
+      }).catch(() => {});
+
       res.json({ success: true, data: mapPublicIssuance(result), message: 'Certificate revoked successfully' });
     } catch (error) {
       handleError(res, error);

@@ -4,7 +4,7 @@ const departmentModel = require('./departmentModel');
 const BUSINESS_STATUSES = ['active', 'inactive'];
 
 async function findAll(filters = {}) {
-  const { search, status, page = 1, limit = 50 } = filters;
+  const { search, status, page = 1, limit = 50, business_id } = filters;
   const offset = (page - 1) * limit;
 
   let sql = `
@@ -27,6 +27,10 @@ async function findAll(filters = {}) {
     sql += ' AND b.status = ?';
     params.push(status);
   }
+  if (business_id) {
+    sql += ' AND b.id = ?';
+    params.push(parseInt(business_id, 10));
+  }
 
   sql += ' ORDER BY b.business_name ASC LIMIT ? OFFSET ?';
   params.push(limit, offset);
@@ -42,6 +46,10 @@ async function findAll(filters = {}) {
   if (status && status !== 'all') {
     countSql += ' AND b.status = ?';
     countParams.push(status);
+  }
+  if (business_id) {
+    countSql += ' AND b.id = ?';
+    countParams.push(parseInt(business_id, 10));
   }
   const [countRows] = await db.query(countSql, countParams);
 
@@ -355,5 +363,6 @@ module.exports = {
   getLogo,
   clearLogo,
   getHierarchy,
+  getDepartmentTreeForBusiness,
   BUSINESS_STATUSES,
 };

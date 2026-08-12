@@ -175,9 +175,9 @@ async function listUsers(filters = {}) {
 
 async function getStats() {
   const [total] = await db.query('SELECT COUNT(*) AS count FROM users WHERE is_active = TRUE');
-  const [active] = await db.query('SELECT COUNT(*) AS count FROM users WHERE is_active = TRUE AND role != "reservist"');
-  const [admins] = await db.query('SELECT COUNT(*) AS count FROM users WHERE role IN ("admin","admin_arsen","admin_group","admin_squadron") AND is_active = TRUE');
-  const [employees] = await db.query('SELECT COUNT(*) AS count FROM users WHERE role = "reservist" AND is_active = TRUE');
+  const [active] = await db.query('SELECT COUNT(*) AS count FROM users WHERE is_active = TRUE AND role != "super_admin"');
+  const [admins] = await db.query('SELECT COUNT(*) AS count FROM users WHERE role IN ("admin","department_head") AND is_active = TRUE');
+  const [employees] = await db.query('SELECT COUNT(*) AS count FROM users WHERE role = "employee" AND is_active = TRUE');
 
   return {
     total: total[0]?.count ?? 0,

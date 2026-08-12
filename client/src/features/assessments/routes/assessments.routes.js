@@ -13,7 +13,7 @@ const ASSESSMENTS_ROUTES = [
   { path: "/assessments/quiz/:quizId/take/:attemptId?", label: "Take Quiz", title: "Take Quiz", element: TakeQuizPage, roles: ["super_admin", "admin", "department_head", "employee"] },
   { path: "/assessments/quiz/:quizId/results", label: "Quiz Results", title: "Quiz Results", element: QuizResultsPage, roles: ["super_admin", "admin", "department_head", "employee"] },
   { path: "/assessments/quiz/:quizId/leaderboard", label: "Leaderboard", title: "Leaderboard", element: QuizLeaderboardPage, roles: ["super_admin", "admin", "department_head", "employee"] },
-  { path: "/assessments/reports/integrity", label: "Integrity Reports", title: "Integrity Reports", element: ViolationDashboardPage, roles: ["super_admin", "admin", "department_head"] },
+  { path: "/assessments/reports/integrity", label: "Integrity Reports", title: "Integrity Reports", element: ViolationDashboardPage, roles: ["super_admin"] },
 ];
 
 export { AssessmentsDashboardPage, QuizBuilderPage, TakeQuizPage, QuizResultsPage, QuizLeaderboardPage, ViolationDashboardPage, ASSESSMENTS_ROUTES };

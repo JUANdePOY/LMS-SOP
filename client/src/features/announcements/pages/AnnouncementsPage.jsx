@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Megaphone } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
@@ -7,12 +7,18 @@ import AnnouncementList from "../components/AnnouncementList";
 import AnnouncementForm from "../components/AnnouncementForm";
 import AnnouncementDetail from "../components/AnnouncementDetail";
 import { Modal } from "@/shared/components/ui/modal";
+import { useNotifications } from "@/shared/stores/notificationStore.js";
 
 export default function AnnouncementsPage() {
-  const { user } = useAuth();
-  const canManage = ['super_admin', 'admin'].includes(user?.role);
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission('manage_announcements');
   const { toast } = useToast();
+  const { markEntityTypeRead } = useNotifications();
   const { items, error, refresh, create, update, remove } = useAnnouncements({ status: "active" });
+
+  useEffect(() => {
+    markEntityTypeRead('announcement');
+  }, [markEntityTypeRead]);
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [saving, setSaving] = useState(false);

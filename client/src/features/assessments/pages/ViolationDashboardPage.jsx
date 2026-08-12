@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/sha
 import { Badge } from "@/shared/components/ui/badge";
 import { Download, Filter, AlertTriangle, Search, ShieldAlert, ChevronRight } from "lucide-react";
 import { Modal } from "@/shared/components/ui/modal";
+import { useAuth } from "@/contexts/AuthContext";
+import { Navigate } from "react-router-dom";
 
 const VIOLATION_TYPES = ["tab_switch", "copy_attempt", "screenshot_attempt", "right_click", "fullscreen_exit", "devtools_opened"];
 
@@ -76,6 +78,7 @@ function typeLabel(t) {
 }
 
 export default function ViolationDashboardPage() {
+  const { isSuperAdmin } = useAuth();
   const [filters, setFilters] = useState({});
   const [showFilters, setShowFilters] = useState(false);
   const { data: violations, loading, error, refetch } = useViolations(filters);
@@ -86,6 +89,8 @@ export default function ViolationDashboardPage() {
   const [detailViolations, setDetailViolations] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [logSearch, setLogSearch] = useState("");
+
+  if (!isSuperAdmin) return <Navigate to="/assessments" replace />;
 
   const loadFlagged = async () => {
     setFlaggedLoading(true);

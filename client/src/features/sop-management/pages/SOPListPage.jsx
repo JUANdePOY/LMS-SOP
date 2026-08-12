@@ -9,6 +9,7 @@ import SOPCreateForm from '@/features/sop-management/components/SOPCreateForm';
 import SOPEditForm from '@/features/sop-management/components/SOPEditForm';
 import TrashPanel from '@/features/sop-management/components/TrashPanel';
 import { StaggerList, MotionItem } from '@/shared/motion';
+import { useAuth } from '@/contexts/AuthContext';
 
 function StatusBadge({ status }) {
   const styles = {
@@ -47,7 +48,7 @@ function RestrictionBadge({ restrictionType }) {
   );
 }
 
-function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop }) {
+function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop, canManage }) {
 
   if (viewMode === VIEW_MODES.GRID) {
     return (
@@ -67,20 +68,22 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop }) {
             )}
           </div>
         </div>
-        <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
-          <button onClick={() => onEditStart(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
-            <ActionIcons.Edit className="h-3.5 w-3.5" />
-            Edit
-          </button>
-          <button onClick={() => onArchiveSop(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
-            {sop.status === SOP_STATUSES.ARCHIVED ? <ActionIcons.Unarchive className="h-3.5 w-3.5" /> : <ActionIcons.Archive className="h-3.5 w-3.5" />}
-            {sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}
-          </button>
-          <button onClick={() => onDeleteSop(sop.id)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">
-            <ActionIcons.Delete className="h-3.5 w-3.5" />
-            Delete
-          </button>
-        </div>
+        {canManage && (
+          <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
+            <button onClick={() => onEditStart(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
+              <ActionIcons.Edit className="h-3.5 w-3.5" />
+              Edit
+            </button>
+            <button onClick={() => onArchiveSop(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
+              {sop.status === SOP_STATUSES.ARCHIVED ? <ActionIcons.Unarchive className="h-3.5 w-3.5" /> : <ActionIcons.Archive className="h-3.5 w-3.5" />}
+              {sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}
+            </button>
+            <button onClick={() => onDeleteSop(sop.id)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">
+              <ActionIcons.Delete className="h-3.5 w-3.5" />
+              Delete
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -100,21 +103,26 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop }) {
             </span>
           )}
         </div>
-        <div className="flex gap-1 shrink-0">
-          <ActionButton action="Edit" label="Edit SOP" onClick={() => onEditStart(sop)} />
-          <ActionButton
-            action={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}
-            label={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive SOP' : 'Archive SOP'}
-            onClick={() => onArchiveSop(sop)}
-          />
-          <ActionButton action="Delete" label="Delete SOP" onClick={() => onDeleteSop(sop.id)} />
-        </div>
+        {canManage && (
+          <div className="flex gap-1 shrink-0">
+            <ActionButton action="Edit" label="Edit SOP" onClick={() => onEditStart(sop)} />
+            <ActionButton
+              action={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}
+              label={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive SOP' : 'Archive SOP'}
+              onClick={() => onArchiveSop(sop)}
+            />
+            <ActionButton action="Delete" label="Delete SOP" onClick={() => onDeleteSop(sop.id)} />
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 function SOPListPage() {
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission('manage_sops');
+
   const {
     sops, loading, search, setSearch, status, setStatus,
     archivedTab, setArchivedTab, showCreate, setShowCreate,
@@ -190,7 +198,7 @@ function SOPListPage() {
       <StaggerList className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5' : 'space-y-2'}>
         {sops.map((sop) => (
           <MotionItem key={sop.id}>
-            <SOPCard sop={sop} viewMode={viewMode} onEditStart={handleEditStart} onDeleteSop={handleDeleteSop} onArchiveSop={handleArchiveSop} />
+            <SOPCard sop={sop} viewMode={viewMode} onEditStart={handleEditStart} onDeleteSop={handleDeleteSop} onArchiveSop={handleArchiveSop} canManage={canManage} />
           </MotionItem>
         ))}
       </StaggerList>
@@ -204,7 +212,7 @@ function SOPListPage() {
           <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Files</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">Manage your standard operating procedures</p>
         </div>
-        {activeTab === 'sops' && !archivedTab && (
+        {activeTab === 'sops' && !archivedTab && canManage && (
           <button
             onClick={() => setShowCreate(true)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
