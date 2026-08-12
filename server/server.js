@@ -3,6 +3,9 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const db = require('./config/database');
+const { upgradeHandler, handleConnection } = require('./websocket/server');
+const { wss } = require('./websocket/server');
+const { getConnectedUserCount } = require('./websocket/clients');
 
 
 require('dotenv').config({ path: path.join(__dirname, '.env') });
@@ -60,6 +63,7 @@ const authRoutes = require('./routes/auth');
 const usersRoutes = require('./routes/users');
 const departmentsRoutes = require('./routes/departments');
 const dashboardRoutes = require('./routes/dashboard');
+const adminDashboardRoutes = require('./routes/adminDashboard');
 const auditLogsRoutes = require('./routes/audit-logs');
 const settingsRoutes = require('./routes/settings');
 const rolesRoutes = require('./routes/roles');
@@ -123,6 +127,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/departments', departmentsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin/dashboard', adminDashboardRoutes);
 app.use('/api/audit-logs', auditLogsRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/roles', rolesRoutes);
@@ -335,6 +340,31 @@ const server = app.listen(PORT, () => {
   console.log(`Database: ${process.env.DB_HOST}/${process.env.DB_NAME}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 });
+
+server.on('upgrade', upgradeHandler);
+
+wss.on('connection', (ws, req, userId) => {
+  handleConnection(ws, req, userId);
+});
+
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((ws) => {
+    if (!ws.isAlive) return ws.terminate();
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, 30000);
+
+server.on('close', () => {
+  clearInterval(heartbeatInterval);
+});
+
+setInterval(() => {
+  const count = getConnectedUserCount();
+  if (count > 0) {
+    console.log(`[WS] Active WebSocket connections: ${count}`);
+  }
+}, 60000);
 
 server.on('error', (err) => {
   if (err.code === 'EADDRINUSE') {

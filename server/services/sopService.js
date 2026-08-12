@@ -7,6 +7,7 @@ const { generateSopCode } = require('../utils/sopUtils');
 const { logAudit } = require('../utils/auditLogger');
 const sopAuditLogService = require('./sopAuditLogService');
 const db = require('../config/database');
+const { broadcastSystemChange } = require('./notificationService');
 
 async function listSops(filters = {}) {
   return sopModel.findAll(filters);
@@ -164,7 +165,19 @@ async function createSop(data, actorId) {
     new_values: { title, code, status: status || 'Draft', department_id, category_id },
   });
 
-  return { id, title, code, status: status || 'Draft' };
+  const sopStatus = status || 'Draft';
+  if (sopStatus !== 'Draft') {
+    broadcastSystemChange({
+      title: 'New SOP Available',
+      body: title,
+      type: 'info',
+      link: `/sops/${id}`,
+      entityType: 'sop',
+      entityId: id,
+    }).catch(() => {});
+  }
+
+  return { id, title, code, status: sopStatus };
 }
 
 async function getUser(userId) {

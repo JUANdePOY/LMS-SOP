@@ -1,6 +1,7 @@
 const eventModel = require('../models/eventModel');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
+const { broadcastSystemChange } = require('../services/notificationService');
 const calendarService = require('../services/calendarService');
 
 function propagate(eventId, action) {
@@ -97,6 +98,14 @@ function createEvent(req, res) {
     .then((row) => {
       logAudit && logAudit('event.create', userId, { eventId: row.id });
       propagate(row.id, 'update');
+      broadcastSystemChange({
+        title: 'New Event',
+        body: row.title,
+        type: 'info',
+        link: '/events',
+        entityType: 'event',
+        entityId: row.id,
+      }).catch(() => {});
       res.status(201).json({ success: true, message: 'Event created successfully', data: row });
     })
     .catch((err) => sendError(res, err, 'Failed to create event'));
@@ -129,6 +138,14 @@ function updateEvent(req, res) {
     .then((row) => {
       logAudit && logAudit('event.update', userId, { eventId: id });
       propagate(id, 'update');
+      broadcastSystemChange({
+        title: 'Event Updated',
+        body: row.title,
+        type: 'info',
+        link: '/events',
+        entityType: 'event',
+        entityId: row.id,
+      }).catch(() => {});
       res.json({ success: true, message: 'Event updated successfully', data: row });
     })
     .catch((err) => sendError(res, err, 'Failed to update event'));

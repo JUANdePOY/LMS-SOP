@@ -1,6 +1,7 @@
 const announcementModel = require('../models/announcementModel');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
+const { broadcastSystemChange } = require('../services/notificationService');
 const db = require('../config/database');
 
 function sendError(res, err, fallback = 'Request failed') {
@@ -87,6 +88,14 @@ function createAnnouncement(req, res) {
   })
     .then((row) => {
       logAudit && logAudit('announcement.create', userId, { announcementId: row.id });
+      broadcastSystemChange({
+        title: 'New Announcement',
+        body: title.trim(),
+        type: 'info',
+        link: '/announcements',
+        entityType: 'announcement',
+        entityId: row.id,
+      }).catch(() => {});
       res.status(201).json({ success: true, message: 'Announcement created successfully', data: row });
     })
     .catch((err) => sendError(res, err, 'Failed to create announcement'));
@@ -115,6 +124,14 @@ function updateAnnouncement(req, res) {
     })
     .then((row) => {
       logAudit && logAudit('announcement.update', userId, { announcementId: id });
+      broadcastSystemChange({
+        title: 'Announcement Updated',
+        body: row.title,
+        type: 'info',
+        link: '/announcements',
+        entityType: 'announcement',
+        entityId: row.id,
+      }).catch(() => {});
       res.json({ success: true, message: 'Announcement updated successfully', data: row });
     })
     .catch((err) => sendError(res, err, 'Failed to update announcement'));

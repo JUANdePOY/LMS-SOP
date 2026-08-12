@@ -83,6 +83,9 @@ issuanceRouter.get(
 // Protected routes — require auth
 issuanceRouter.use(authenticateToken);
 
+// Certificate stats (admin)
+issuanceRouter.get('/stats', certificateIssuanceController.getStats);
+
 // User's own certificates (ownership checked in controller)
 issuanceRouter.get(
   '/user/:userId',

@@ -5,6 +5,7 @@ const quizModel = require('../models/quizModel');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 const db = require('../config/database');
+const { broadcastSystemChange } = require('../services/notificationService');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -141,6 +142,15 @@ function createCourse(req, res) {
     })
       .then((id) => {
         logAudit('course.create', userId, { courseId: id, title });
+        const link = `/courses/${id}`;
+        broadcastSystemChange({
+          title: 'New Course Available',
+          body: title.trim(),
+          type: 'info',
+          link,
+          entityType: 'course',
+          entityId: id,
+        }).catch(() => {});
         return res.status(201).json({ success: true, message: 'Course created successfully', data: { id, title, status: status || 'draft' } });
       })
       .catch((err) => sendError(res, err, 'Failed to create course'));
@@ -449,6 +459,14 @@ function archiveCourse(req, res) {
       return enforceCourseScope(course, req.user).then(() => {
         return courseModel.update(courseId, { status: 'archived' }).then(() => {
           logAudit('course.archived', userId, { courseId });
+          broadcastSystemChange({
+            title: 'Course Archived',
+            body: course.title,
+            type: 'warning',
+            link: `/courses/${courseId}`,
+            entityType: 'course',
+            entityId: courseId,
+          }).catch(() => {});
           return res.json({ success: true, message: 'Course archived successfully' });
         });
       });
@@ -466,6 +484,14 @@ function publishCourse(req, res) {
       return enforceCourseScope(course, req.user).then(() => {
         return courseModel.update(courseId, { status: 'published' }).then(() => {
           logAudit('course.published', userId, { courseId });
+          broadcastSystemChange({
+            title: 'New Course Published',
+            body: course.title,
+            type: 'success',
+            link: `/courses/${courseId}`,
+            entityType: 'course',
+            entityId: courseId,
+          }).catch(() => {});
           return res.json({ success: true, message: 'Course published successfully' });
         });
       });

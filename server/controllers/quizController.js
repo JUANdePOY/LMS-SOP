@@ -4,6 +4,7 @@ const quizHierarchyModel = require('../models/quizHierarchyModel');
 const enrollmentModel = require('../models/enrollmentModel');
 const { logAudit } = require('../utils/auditLogger');
 const db = require('../config/database');
+const { broadcastSystemChange } = require('../services/notificationService');
 
 const ADMIN_ROLES = ['super_admin', 'admin', 'department_head'];
 const FINAL_QUIZ_DEFAULT_ATTEMPTS = 3;
@@ -310,6 +311,16 @@ async function createQuiz(req, res) {
     });
 
     logAudit && logAudit('quiz.create', req.user.id, { quizId, courseId });
+
+    broadcastSystemChange({
+      title: 'New Quiz Created',
+      body: title,
+      type: 'info',
+      link: `/courses/${courseId}`,
+      entityType: 'quiz',
+      entityId: quizId,
+    }).catch(() => {});
+
     res.status(201).json({ success: true, data: { id: quizId }, message: 'Quiz created' });
   } catch (err) {
     sendError(res, err, 'Failed to create quiz');
@@ -363,6 +374,16 @@ async function publishQuiz(req, res) {
     await assertCanManageCourse(req, quiz.course_id);
     await quizModel.update(req.params.id, { status: 'published' });
     logAudit && logAudit('quiz.publish', req.user.id, { quizId: quiz.id });
+
+    broadcastSystemChange({
+      title: 'Quiz Published',
+      body: quiz.title,
+      type: 'success',
+      link: `/courses/${quiz.course_id}`,
+      entityType: 'quiz',
+      entityId: quiz.id,
+    }).catch(() => {});
+
     res.json({ success: true, message: 'Quiz published' });
   } catch (err) {
     sendError(res, err, 'Failed to publish quiz');

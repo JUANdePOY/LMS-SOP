@@ -4,6 +4,7 @@ const lessonProgressModel = require('../models/lessonProgressModel');
 const departmentModel = require('../models/departmentModel');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
+const { createSystemNotification } = require('../services/notificationService');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -85,6 +86,15 @@ async function enrollStudent(req, res) {
     }
 
     logAudit('enrollment.create', userId, { enrollmentId: id, course_id, user_id });
+    createSystemNotification({
+      userId: user_id,
+      title: 'You have been enrolled in a new course',
+      body: course.title,
+      type: 'info',
+      link: '/my-learning',
+      entityType: 'enrollment',
+      entityId: id,
+    }).catch(() => {});
     return res.status(201).json({ success: true, message: 'Student enrolled successfully', data: { id } });
   } catch (err) {
     sendError(res, err, 'Failed to enroll student');
@@ -103,10 +113,24 @@ function bulkEnroll(req, res) {
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
       const enrollments = user_ids.map((uid) => ({ course_id, user_id: uid, role: role || 'learner', status: 'active' }));
-      return enrollmentModel.bulkCreate(enrollments);
+      return enrollmentModel.bulkCreate(enrollments).then((ids) => ({ ids, course }));
     })
-    .then((ids) => {
+    .then(({ ids, course }) => {
       logAudit('enrollment.bulk_create', userId, { course_id, count: ids.length });
+      ids.forEach((enrollmentId, index) => {
+        const uid = user_ids[index];
+        if (uid) {
+          createSystemNotification({
+            userId: uid,
+            title: 'You have been enrolled in a new course',
+            body: course.title,
+            type: 'info',
+            link: '/my-learning',
+            entityType: 'enrollment',
+            entityId: enrollmentId,
+          }).catch(() => {});
+        }
+      });
       return res.status(201).json({ success: true, message: `${ids.length} students enrolled successfully`, data: { ids } });
     })
     .catch((err) => sendError(res, err, 'Failed to bulk enroll students'));
@@ -144,6 +168,20 @@ async function bulkEnrollByDepartment(req, res) {
     const ids = await enrollmentModel.bulkCreate(enrollments);
 
     logAudit('enrollment.bulk_create_by_department', userId, { course_id, department_id: departmentId, count: ids.length });
+    ids.forEach((enrollmentId, index) => {
+      const uid = newUserIds[index];
+      if (uid) {
+        createSystemNotification({
+          userId: uid,
+          title: 'You have been enrolled in a new course',
+          body: course.title,
+          type: 'info',
+          link: '/my-learning',
+          entityType: 'enrollment',
+          entityId: enrollmentId,
+        }).catch(() => {});
+      }
+    });
     return res.status(201).json({ success: true, message: `${ids.length} students enrolled successfully`, data: { ids } });
   } catch (err) {
     sendError(res, err, 'Failed to bulk enroll by department');

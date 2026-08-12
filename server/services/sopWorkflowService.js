@@ -7,6 +7,7 @@ const { logAudit } = require('../utils/auditLogger');
 const db = require('../config/database');
 const sopAuditLogService = require('./sopAuditLogService');
 const sopService = require('./sopService');
+const { broadcastSystemChange } = require('./notificationService');
 
 async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
   const sop = await sopModel.findById(sopId);
@@ -96,6 +97,14 @@ async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
   let acknowledgements = null;
   if (nextStatus === 'Published') {
     acknowledgements = await sopAcknowledgementService.generateAcknowledgementsOnPublish(sopId);
+    broadcastSystemChange({
+      title: 'SOP Published',
+      body: sop.title,
+      type: 'success',
+      link: `/sops/${sopId}`,
+      entityType: 'sop',
+      entityId: sopId,
+    }).catch(() => {});
   }
 
   return { from: sop.status, to: nextStatus, acknowledgements };

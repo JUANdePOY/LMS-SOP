@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const enrollmentsController = require('../controllers/enrollmentsController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, resolveScope } = require('../middleware/auth');
 const { requirePermission, requireBusinessScope } = require('../middleware/scope');
 
 router.use(authenticateToken);
+router.use(resolveScope);
 
 router.post('/', requirePermission('manage_courses'), enrollmentsController.enrollStudent);
 router.post('/bulk', requirePermission('manage_courses'), enrollmentsController.bulkEnroll);

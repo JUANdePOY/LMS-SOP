@@ -183,6 +183,9 @@ router.route('/:sopId/assigned')
 router.route('/assignments/:id')
   .delete(requireSopWriteScope, assignmentController.remove);
 
+router.route('/acknowledgements/my')
+  .get(authenticateToken, acknowledgementController.listByUser);
+
 router.route('/:sopId/acknowledgements')
   .get(requireSopReadScope, acknowledgementController.list)
   .post(requireSopWriteScope, acknowledgementController.create);

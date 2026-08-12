@@ -110,6 +110,9 @@ router.post('/', requireAdmin, [
       if (business_id && parseInt(business_id) !== req.user.business_id) {
         return res.status(403).json({ status: 'error', message: 'Cannot create users in another business', code: 'BUSINESS_SCOPE_DENIED' });
       }
+      if (role === 'super_admin') {
+        return res.status(403).json({ status: 'error', message: 'Cannot assign super_admin role', code: 'ROLE_ASSIGN_DENIED' });
+      }
     }
 
     const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);

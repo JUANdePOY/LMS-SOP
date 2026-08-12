@@ -286,6 +286,9 @@ const MIGRATIONS = [
     INDEX idx_notifications_user (user_id),
     INDEX idx_notifications_read (is_read)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS entity_type VARCHAR(50) DEFAULT NULL AFTER type`,
+  `ALTER TABLE notifications ADD COLUMN IF NOT EXISTS entity_id INT DEFAULT NULL AFTER entity_type`,
+  `CREATE INDEX IF NOT EXISTS idx_notifications_entity ON notifications(entity_type, entity_id)`,
   `CREATE TABLE IF NOT EXISTS businesses (
     id INT AUTO_INCREMENT PRIMARY KEY,
     business_code VARCHAR(50) NOT NULL,
@@ -668,6 +671,14 @@ async function runMigrations() {
     console.log('Certificate course link migrations applied');
   } catch (err) {
     console.error('Certificate course link migration error:', err.message);
+  }
+
+  try {
+    const { runPushNotificationMigrations } = require('../migrations/pushNotifications');
+    await runPushNotificationMigrations();
+    console.log('Push notification migrations applied');
+  } catch (err) {
+    console.error('Push notification migration error:', err.message);
   }
 }
 
