@@ -185,16 +185,6 @@ export default function EventsPage() {
           open={showForm}
           onClose={() => { setShowForm(false); setEditingItem(null); }}
           title={editingItem ? "Edit Event" : "New Events"}
-          footer={
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => { setShowForm(false); setEditingItem(null); }}
-                className="rounded-lg px-3 py-1.5 text-xs border border-neutral-300 dark:border-neutral-600"
-              >
-                Cancel
-              </button>
-            </div>
-          }
         >
           <EventForm
             initialData={editingItem}
