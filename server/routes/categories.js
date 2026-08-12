@@ -1,5 +1,6 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
+const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
 const { requireAdmin } = require('../middleware/auth');
 const categoryModel = require('../models/categoryModel');
@@ -11,10 +12,24 @@ router.use(authenticateToken);
 
 router.get('/', async (req, res) => {
   try {
+    let effectiveDepartmentId = undefined;
+    if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
+      if (!req.user.business_id) {
+        return res.status(403).json({ status: 'error', message: 'No business scope assigned', code: 'NO_BUSINESS_SCOPE' });
+      }
+      const deptIds = req.user.scoped_department_ids || (req.user.department_id ? [req.user.department_id] : []);
+      if (!deptIds.length) {
+        return res.status(403).json({ status: 'error', message: 'No department scope assigned', code: 'NO_DEPT_SCOPE' });
+      }
+      effectiveDepartmentId = deptIds[0];
+    }
+
     const { search, department_id, page = 1, limit = 50 } = req.query;
+    let finalDeptId = department_id ? parseInt(department_id, 10) : effectiveDepartmentId;
+    
     const result = await categoryModel.findAll({
       search: search || undefined,
-      department_id: department_id ? parseInt(department_id, 10) : undefined,
+      department_id: finalDeptId,
       page: parseInt(page, 10),
       limit: parseInt(limit, 10),
     });
@@ -27,10 +42,19 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const category = await categoryModel.findById(parseInt(req.params.id, 10));
+    const categoryId = parseInt(req.params.id, 10);
+    const category = await categoryModel.findById(categoryId);
     if (!category) {
       return res.status(404).json({ status: 'error', message: 'Category not found', code: 'NOT_FOUND' });
     }
+
+    if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
+      const allowedDepts = req.user.scoped_department_ids || (req.user.department_id ? [req.user.department_id] : []);
+      if (!allowedDepts.includes(category.department_id)) {
+        return res.status(403).json({ status: 'error', message: 'Access denied to this category', code: 'DEPT_SCOPE_DENIED' });
+      }
+    }
+
     res.json({ status: 'success', data: category });
   } catch (err) {
     console.error('Category fetch error:', err);

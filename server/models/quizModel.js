@@ -1,7 +1,7 @@
 const db = require('../config/database');
 
 async function listQuizzes(courseId, filters = {}) {
-  const { module_id, status, page = 1, limit = 20 } = filters;
+  const { module_id, status, page = 1, limit = 20, business_id } = filters;
   const pageNum = Number(page) || 1;
   const limitNum = Number(limit) || 20;
   const offset = (pageNum - 1) * limitNum;
@@ -9,6 +9,8 @@ async function listQuizzes(courseId, filters = {}) {
   let sql = `SELECT q.*, COUNT(DISTINCT qq.id) AS question_count
     FROM quizzes q
     LEFT JOIN quiz_questions qq ON qq.quiz_id = q.id
+    LEFT JOIN courses c ON q.course_id = c.id
+    LEFT JOIN departments d ON c.department_id = d.id
     WHERE q.course_id = ? AND q.is_deleted = FALSE`;
   const params = [courseId];
 
@@ -19,6 +21,10 @@ async function listQuizzes(courseId, filters = {}) {
   if (status) {
     sql += ' AND q.status = ?';
     params.push(status);
+  }
+  if (business_id) {
+    sql += ' AND d.business_id = ?';
+    params.push(parseInt(business_id, 10));
   }
 
   sql += ' GROUP BY q.id ORDER BY q.created_at DESC LIMIT ? OFFSET ?';
@@ -47,7 +53,7 @@ async function findByIdIgnoringDelete(id) {
 }
 
 async function listAllQuizzes(filters = {}) {
-  const { search, status, quizType, page = 1, limit = 20 } = filters;
+  const { search, status, quizType, page = 1, limit = 20, business_id } = filters;
   const pageNum = Number(page) || 1;
   const limitNum = Number(limit) || 20;
   const offset = (pageNum - 1) * limitNum;
@@ -57,6 +63,7 @@ async function listAllQuizzes(filters = {}) {
   if (status) { conditions.push('q.status = ?'); cParams.push(status); }
   if (quizType) { conditions.push('q.quiz_type = ?'); cParams.push(quizType); }
   if (search) { conditions.push('(q.title LIKE ? OR c.title LIKE ?)'); cParams.push(`%${search}%`, `%${search}%`); }
+  if (business_id) { conditions.push('d.business_id = ?'); cParams.push(parseInt(business_id, 10)); }
   const whereClause = conditions.length ? ' AND ' + conditions.join(' AND ') : '';
 
   const [rows] = await db.query(
@@ -65,6 +72,7 @@ async function listAllQuizzes(filters = {}) {
             COUNT(DISTINCT qa.id) AS attempt_count
        FROM quizzes q
        LEFT JOIN courses c ON q.course_id = c.id
+       LEFT JOIN departments d ON c.department_id = d.id
        LEFT JOIN quiz_questions qq ON qq.quiz_id = q.id
        LEFT JOIN quiz_attempts qa ON qa.quiz_id = q.id AND qa.status IN ('completed', 'graded')
        WHERE q.is_deleted = FALSE ${whereClause}
@@ -78,6 +86,7 @@ async function listAllQuizzes(filters = {}) {
     `SELECT COUNT(DISTINCT q.id) AS total
        FROM quizzes q
        LEFT JOIN courses c ON q.course_id = c.id
+       LEFT JOIN departments d ON c.department_id = d.id
        WHERE q.is_deleted = FALSE ${whereClause}`,
     cParams
   );

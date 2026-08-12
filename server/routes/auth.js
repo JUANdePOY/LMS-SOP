@@ -1,12 +1,14 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const fs = require('fs/promises');
+const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const db = require('../config/database');
-const { comparePassword, generateToken, hashPassword } = require('../app/auth');
+const { comparePassword, generateToken, hashPassword, generateRefreshToken, hashRefreshToken } = require('../app/auth');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 const loginLimiter = require('../middleware/rateLimiter');
+const { resolveUserPermissions } = require('../middleware/scope');
 
 const router = express.Router();
 
@@ -132,8 +134,17 @@ router.post('/login', loginLimiter, [
     const token = generateToken({
       userId: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
+      business_id: user.business_id,
+      department_id: user.department_id,
     });
+
+    const { token: refreshToken, hash: refreshTokenHash, expiresAt } = generateRefreshToken();
+
+    await db.query(
+      'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+      [user.id, refreshTokenHash, expiresAt]
+    );
 
     await db.query(
       'UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?',
@@ -154,6 +165,7 @@ router.post('/login', loginLimiter, [
       message: 'Login successful',
       data: {
         token,
+        refreshToken,
         user: {
           id: user.id,
           full_name: user.full_name,
@@ -161,6 +173,7 @@ router.post('/login', loginLimiter, [
           role: user.role,
           department_id: user.department_id,
           department_name: user.department_name,
+          business_id: user.business_id,
           position_title: user.position_title,
           employee_id: user.employee_id,
           avatar_url: user.avatar_url,
@@ -202,6 +215,15 @@ router.post('/login', loginLimiter, [
 
 router.post('/logout', authenticateToken, (req, res) => {
   try {
+    const refreshToken = req.body?.refreshToken;
+    if (refreshToken) {
+      const hash = hashRefreshToken(refreshToken);
+      db.query(
+        'UPDATE refresh_tokens SET revoked = TRUE, replaced_by = NULL WHERE token_hash = ? AND user_id = ? AND revoked = FALSE',
+        [hash, req.user.id]
+      ).catch(() => {});
+    }
+
     logAudit({
       user_id: req.user.id,
       action: 'user.logout',
@@ -218,6 +240,108 @@ router.post('/logout', authenticateToken, (req, res) => {
       status: 'error',
       message: 'Logout failed',
       code: 'LOGOUT_ERROR'
+    });
+  }
+});
+
+router.post('/refresh-token', [
+  body('refreshToken').notEmpty().withMessage('refreshToken is required'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        errors: errors.array()
+      });
+    }
+
+    const { refreshToken } = req.body;
+    const tokenHash = hashRefreshToken(refreshToken);
+
+    const [rows] = await db.query(
+      'SELECT id, user_id, expires_at, revoked FROM refresh_tokens WHERE token_hash = ? LIMIT 1',
+      [tokenHash]
+    );
+
+    const record = rows[0];
+    if (!record || record.revoked) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Invalid or revoked refresh token',
+        code: 'INVALID_REFRESH_TOKEN'
+      });
+    }
+
+    if (new Date(record.expires_at) < new Date()) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Refresh token expired',
+        code: 'REFRESH_TOKEN_EXPIRED'
+      });
+    }
+
+    const [users] = await db.query(
+      'SELECT id, role, is_active, department_id, business_id, full_name, email, position_title, employee_id FROM users WHERE id = ?',
+      [record.user_id]
+    );
+
+    const user = users[0];
+    if (!user || !user.is_active) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'User not found or deactivated',
+        code: 'USER_NOT_FOUND'
+      });
+    }
+
+    const newAccessToken = generateToken({
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      business_id: user.business_id,
+      department_id: user.department_id,
+    });
+
+    const { token: newRefreshToken, hash: newRefreshTokenHash, expiresAt } = generateRefreshToken();
+
+    await db.query(
+      'UPDATE refresh_tokens SET revoked = TRUE, replaced_by = ? WHERE id = ?',
+      [newRefreshTokenHash, record.id]
+    );
+
+    await db.query(
+      'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES (?, ?, ?)',
+      [user.id, newRefreshTokenHash, expiresAt]
+    );
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Token refreshed',
+      data: {
+        token: newAccessToken,
+        refreshToken: newRefreshToken,
+        user: {
+          id: user.id,
+          full_name: user.full_name,
+          email: user.email,
+          role: user.role,
+          department_id: user.department_id,
+          business_id: user.business_id,
+          position_title: user.position_title,
+          employee_id: user.employee_id,
+          avatar_url: user.avatar_url,
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error',
+      code: 'SERVER_ERROR'
     });
   }
 });
@@ -322,6 +446,17 @@ router.get('/profile', authenticateToken, async (req, res) => {
     }
 
     const user = results[0];
+    const permissions = await resolveUserPermissions(req.user.id, req.user.role);
+
+    let scopedDepartmentIds = [];
+    if (req.user.role === 'department_head') {
+      const [grants] = await db.query(
+        'SELECT department_id FROM department_scope_grants WHERE user_id = ?',
+        [req.user.id]
+      );
+      scopedDepartmentIds = grants.map((g) => g.department_id);
+    }
+
     res.status(200).json({
       status: 'success',
       data: {
@@ -331,6 +466,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         role: user.role,
         department_id: user.department_id,
         department_name: user.department_name,
+        business_id: user.business_id,
         position_title: user.position_title,
         employee_id: user.employee_id,
         contact_number: user.contact_number,
@@ -341,6 +477,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
         bio: user.bio,
         cover_photo_url: user.cover_photo_url,
         avatar_url: user.avatar_url,
+        permissions,
+        scoped_department_ids: scopedDepartmentIds,
       }
     });
   } catch (error) {

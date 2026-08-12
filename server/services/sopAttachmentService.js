@@ -4,6 +4,8 @@ const sopModuleModel = require('../models/sopModuleModel');
 const sopVersionModel = require('../models/sopVersionModel');
 const { logAudit } = require('../utils/auditLogger');
 const sopAuditLogService = require('./sopAuditLogService');
+const sopService = require('./sopService');
+const db = require('../config/database');
 
 async function listAttachments(moduleId, versionId = null) {
   return sopModuleAttachmentModel.listByModule(moduleId, versionId);
@@ -127,6 +129,17 @@ async function uploadAttachment(moduleId, data, actorId, req) {
     throw error;
   }
 
+  const sop = await sopService.getSopById(module.sop_id, null);
+  if (sop) {
+    const actor = await db.query(
+      'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+      [actorId]
+    ).then(([rows]) => rows[0] || null);
+    if (actor) {
+      await sopService.enforceSopWriteScope(sop, actor);
+    }
+  }
+
   // Get the version associated with this module (if any)
   const moduleVersionId = module.sop_version_id || await sopVersionModel.getCurrentVersionId(module.sop_id);
 
@@ -173,6 +186,17 @@ async function createLink(moduleId, data, actorId) {
     throw error;
   }
 
+  const sop = await sopService.getSopById(module.sop_id, null);
+  if (sop) {
+    const actor = await db.query(
+      'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+      [actorId]
+    ).then(([rows]) => rows[0] || null);
+    if (actor) {
+      await sopService.enforceSopWriteScope(sop, actor);
+    }
+  }
+
   const moduleVersionId = module.sop_version_id || await sopVersionModel.getCurrentVersionId(module.sop_id);
 
   const validatedUrl = validateLinkUrl(link_url);
@@ -212,6 +236,17 @@ async function deleteAttachment(attachmentId, actorId) {
     throw error;
   }
 
+  const sop = await sopService.getSopById(attachment.sop_id, null);
+  if (sop) {
+    const actor = await db.query(
+      'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+      [actorId]
+    ).then(([rows]) => rows[0] || null);
+    if (actor) {
+      await sopService.enforceSopWriteScope(sop, actor);
+    }
+  }
+
   await sopModuleAttachmentModel.softDeleteAttachment(attachmentId);
 
   logAudit({
@@ -242,6 +277,17 @@ async function restoreAttachment(attachmentId, actorId) {
     throw error;
   }
 
+  const sop = await sopService.getSopById(attachment.sop_id, null);
+  if (sop) {
+    const actor = await db.query(
+      'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+      [actorId]
+    ).then(([rows]) => rows[0] || null);
+    if (actor) {
+      await sopService.enforceSopWriteScope(sop, actor);
+    }
+  }
+
   await sopModuleAttachmentModel.restoreAttachment(attachmentId);
 
   logAudit({
@@ -270,6 +316,17 @@ async function permanentDeleteAttachment(attachmentId, actorId) {
     const error = new Error('Attachment not found');
     error.code = 'NOT_FOUND';
     throw error;
+  }
+
+  const sop = await sopService.getSopById(attachment.sop_id, null);
+  if (sop) {
+    const actor = await db.query(
+      'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+      [actorId]
+    ).then(([rows]) => rows[0] || null);
+    if (actor) {
+      await sopService.enforceSopWriteScope(sop, actor);
+    }
   }
 
   await sopModuleAttachmentModel.permanentDeleteAttachment(attachmentId);

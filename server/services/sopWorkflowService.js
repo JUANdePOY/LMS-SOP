@@ -6,6 +6,7 @@ const { canTransitionTo } = require('../utils/sopUtils');
 const { logAudit } = require('../utils/auditLogger');
 const db = require('../config/database');
 const sopAuditLogService = require('./sopAuditLogService');
+const sopService = require('./sopService');
 
 async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
   const sop = await sopModel.findById(sopId);
@@ -13,6 +14,14 @@ async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
     const error = new Error('SOP not found');
     error.code = 'NOT_FOUND';
     throw error;
+  }
+
+  const actor = await db.query(
+    'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+    [actorId]
+  ).then(([rows]) => rows[0] || null);
+  if (actor) {
+    await sopService.enforceSopWriteScope(sop, actor);
   }
 
   if (!canTransitionTo(sop.status, nextStatus)) {

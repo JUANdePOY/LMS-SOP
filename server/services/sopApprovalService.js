@@ -4,6 +4,7 @@ const sopModel = require('../models/sopModel');
 const sopVersionModel = require('../models/sopVersionModel');
 const { logAudit } = require('../utils/auditLogger');
 const sopAuditLogService = require('./sopAuditLogService');
+const sopService = require('./sopService');
 
 const APPROVER_ROLES = ['admin', 'super_admin'];
 
@@ -27,6 +28,14 @@ async function createApproval(sopId, data, actorId) {
     const error = new Error('SOP not found');
     error.code = 'NOT_FOUND';
     throw error;
+  }
+
+  const actor = await db.query(
+    'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+    [actorId]
+  ).then(([rows]) => rows[0] || null);
+  if (actor) {
+    await sopService.enforceSopWriteScope(sop, actor);
   }
 
   const version = await sopVersionModel.getCurrentVersion(sopId);
@@ -64,6 +73,14 @@ async function createSopApprovals(sopId, actorId) {
     const error = new Error('SOP not found');
     error.code = 'NOT_FOUND';
     throw error;
+  }
+
+  const actor = await db.query(
+    'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+    [actorId]
+  ).then(([rows]) => rows[0] || null);
+  if (actor) {
+    await sopService.enforceSopWriteScope(sop, actor);
   }
 
   const existing = await sopApprovalModel.getApprovals(sopId);
@@ -116,6 +133,17 @@ async function updateApproval(approvalId, data, actorId) {
     throw error;
   }
 
+  const sop = await sopModel.findById(existing.sop_id);
+  if (sop) {
+    const actor = await db.query(
+      'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+      [actorId]
+    ).then(([rows]) => rows[0] || null);
+    if (actor) {
+      await sopService.enforceSopWriteScope(sop, actor);
+    }
+  }
+
   await sopApprovalModel.updateApproval(approvalId, {
     status: data.status,
     comments: data.comments,
@@ -155,7 +183,6 @@ async function approveApproval(approvalId, actorId, comments) {
     throw error;
   }
 
-  // Any admin/super_admin can approve, not just the assigned user
   const [userRows] = await db.query(
     'SELECT role FROM users WHERE id = ? AND is_active = TRUE',
     [actorId]
@@ -165,6 +192,17 @@ async function approveApproval(approvalId, actorId, comments) {
     const error = new Error('Only admin or super_admin can approve');
     error.code = 'UNAUTHORIZED';
     throw error;
+  }
+
+  const sop = await sopModel.findById(existing.sop_id);
+  if (sop) {
+    const actor = await db.query(
+      'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+      [actorId]
+    ).then(([rows]) => rows[0] || null);
+    if (actor) {
+      await sopService.enforceSopWriteScope(sop, actor);
+    }
   }
 
   await sopApprovalModel.updateApproval(approvalId, {
@@ -208,7 +246,6 @@ async function rejectApproval(approvalId, actorId, comments) {
     throw error;
   }
 
-  // Any admin/super_admin can reject, not just the assigned user
   const [userRows] = await db.query(
     'SELECT role FROM users WHERE id = ? AND is_active = TRUE',
     [actorId]
@@ -224,6 +261,17 @@ async function rejectApproval(approvalId, actorId, comments) {
     const error = new Error('Rejection requires a comment');
     error.code = 'VALIDATION_ERROR';
     throw error;
+  }
+
+  const sop = await sopModel.findById(existing.sop_id);
+  if (sop) {
+    const actor = await db.query(
+      'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+      [actorId]
+    ).then(([rows]) => rows[0] || null);
+    if (actor) {
+      await sopService.enforceSopWriteScope(sop, actor);
+    }
   }
 
   await sopApprovalModel.updateApproval(approvalId, {

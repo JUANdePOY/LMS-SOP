@@ -1,6 +1,39 @@
 const complianceModel = require('../models/sopComplianceModel');
 const sopModel = require('../models/sopModel');
 const assignmentService = require('./sopAssignmentService');
+const sopService = require('./sopService');
+const db = require('../config/database');
+
+async function enforceSopReadScope(sop, actorId) {
+  if (!sop) return;
+  const actor = await db.query(
+    'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+    [actorId]
+  ).then(([rows]) => rows[0] || null);
+  if (!actor) return;
+  const role = actor.role || '';
+  if (role === 'super_admin') return;
+  if (sop.business_id && sop.business_id !== actor.business_id) {
+    const error = new Error('Access denied: SOP is outside your business scope');
+    error.code = 'FORBIDDEN';
+    throw error;
+  }
+}
+
+async function enforceAcknowledgementWriteScope(sop, actorId) {
+  const actor = await db.query(
+    'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+    [actorId]
+  ).then(([rows]) => rows[0] || null);
+  if (!actor) return;
+  const role = actor.role || '';
+  if (role === 'super_admin') return;
+  if (sop.business_id && sop.business_id !== actor.business_id) {
+    const error = new Error('Access denied: SOP is outside your business scope');
+    error.code = 'FORBIDDEN';
+    throw error;
+  }
+}
 
 async function listAcknowledgements(sopId, filters = {}) {
   const sop = await sopModel.findById(sopId);
@@ -38,6 +71,14 @@ async function createAcknowledgement(sopId, userId, status = 'Pending') {
     throw error;
   }
 
+  const actor = await db.query(
+    'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+    [userId]
+  ).then(([rows]) => rows[0] || null);
+  if (actor) {
+    await enforceAcknowledgementWriteScope(sop, actor.id);
+  }
+
   const existing = await complianceModel.findAcknowledgementBySopAndUser(sopId, userId);
   if (existing) {
     const error = new Error('Acknowledgement already exists for this user');
@@ -51,6 +92,21 @@ async function createAcknowledgement(sopId, userId, status = 'Pending') {
 }
 
 async function acknowledgeSop(sopId, userId) {
+  const sop = await sopModel.findById(sopId);
+  if (!sop) {
+    const error = new Error('SOP not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+
+  const actor = await db.query(
+    'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+    [userId]
+  ).then(([rows]) => rows[0] || null);
+  if (actor) {
+    await enforceAcknowledgementWriteScope(sop, actor.id);
+  }
+
   const existing = await complianceModel.findAcknowledgementBySopAndUser(sopId, userId);
   if (!existing) {
     const error = new Error('No acknowledgement record found for this SOP');

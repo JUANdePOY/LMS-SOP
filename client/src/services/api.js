@@ -8,6 +8,18 @@ const api = axios.create({
   timeout: 20000,
 });
 
+let isRefreshing = false;
+let refreshSubscribers = [];
+
+function onRefreshed(newToken, newRefreshToken) {
+  refreshSubscribers.forEach((cb) => cb(newToken, newRefreshToken));
+  refreshSubscribers = [];
+}
+
+function subscribeTokenRefresh(cb) {
+  refreshSubscribers.push(cb);
+}
+
 api.interceptors.request.use((config) => {
   const token = session.getCurrentToken();
   if (token) {
@@ -18,10 +30,56 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error.response?.status;
     const code = error.response?.data?.code;
-    if ((status === 401 || status === 403) && code && ['NO_TOKEN', 'TOKEN_EXPIRED', 'INVALID_TOKEN', 'ACCOUNT_DEACTIVATED', 'USER_NOT_FOUND'].includes(code) && !error.config?.skipAuthRedirect) {
+    const originalRequest = error.config;
+
+    if (status === 401 && code === 'INVALID_TOKEN' && !originalRequest?.skipAuthRedirect && !originalRequest?._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          subscribeTokenRefresh(async (newToken, newRefreshToken) => {
+            try {
+              originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              const response = await axios(originalRequest);
+              resolve(response);
+            } catch (err) {
+              reject(err);
+            }
+          });
+        });
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      const refreshToken = session.getCurrentRefreshToken();
+      if (!refreshToken) {
+        session.clearCurrentSession();
+        window.location.href = '/login';
+        return Promise.reject(error);
+      }
+
+      try {
+        const response = await api.post('/auth/refresh-token', { refreshToken }, { skipAuthRedirect: true });
+        const { token, refreshToken: newRefreshToken, user } = response.data.data;
+
+        session.saveCurrentSession(token, user, newRefreshToken);
+
+        onRefreshed(token, newRefreshToken);
+
+        originalRequest.headers.Authorization = `Bearer ${token}`;
+        return axios(originalRequest);
+      } catch (refreshError) {
+        session.clearCurrentSession();
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    if ((status === 401 || status === 403) && code && ['NO_TOKEN', 'TOKEN_EXPIRED', 'ACCOUNT_DEACTIVATED', 'USER_NOT_FOUND'].includes(code) && !originalRequest?.skipAuthRedirect) {
       session.clearCurrentSession();
       window.location.href = '/login';
     }

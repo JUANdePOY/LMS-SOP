@@ -87,12 +87,13 @@ function setActiveSessionId(tabId) {
 }
 
 // Persist a freshly authenticated session for the current tab.
-export function saveCurrentSession(token, user) {
+export function saveCurrentSession(token, user, refreshToken) {
   const tabId = getTabId();
   const session = {
     tabId,
     token,
     user,
+    refreshToken: refreshToken || null,
     createdAt: Date.now(),
   };
   writeSession(tabId, session);
@@ -120,6 +121,10 @@ export function getCurrentSession() {
 
 export function getCurrentToken() {
   return getCurrentSession()?.token || null;
+}
+
+export function getCurrentRefreshToken() {
+  return getCurrentSession()?.refreshToken || null;
 }
 
 export function getCurrentUser() {

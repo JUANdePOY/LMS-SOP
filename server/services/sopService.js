@@ -6,6 +6,7 @@ const sopShareService = require('./sopShareService');
 const { generateSopCode } = require('../utils/sopUtils');
 const { logAudit } = require('../utils/auditLogger');
 const sopAuditLogService = require('./sopAuditLogService');
+const db = require('../config/database');
 
 async function listSops(filters = {}) {
   return sopModel.findAll(filters);
@@ -18,6 +19,8 @@ async function getSopById(id, user) {
     error.code = 'NOT_FOUND';
     throw error;
   }
+
+  await enforceSopScope(sop, user);
 
   if (user) {
     const cols = await sopModel.getSopsColumns();
@@ -32,6 +35,83 @@ async function getSopById(id, user) {
   return sop;
 }
 
+async function enforceSopScope(sop, user) {
+  if (!sop || !user) return;
+  const role = user.role || '';
+  if (role === 'super_admin') return;
+
+  const cols = await sopModel.getSopsColumns();
+  if (!cols.hasDepartment || !sop.department_id) return;
+
+  if (role === 'admin') {
+    if (!user.business_id) {
+      const error = new Error('Your account has no business scope');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+    const [[dept]] = await db.query(
+      'SELECT business_id FROM departments WHERE id = ?',
+      [sop.department_id]
+    );
+    if (!dept || dept.business_id !== user.business_id) {
+      const error = new Error('Access denied: SOP is outside your business scope');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+    return;
+  }
+
+  if (role === 'department_head') {
+    const scopedDeptIds = user.scoped_department_ids || (user.department_id ? [user.department_id] : []);
+    if (!scopedDeptIds.includes(sop.department_id)) {
+      const error = new Error('Access denied: SOP is outside your department scope');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+    return;
+  }
+}
+
+async function enforceSopWriteScope(sopOrDeptId, user) {
+  if (!user) return;
+  const role = user.role || '';
+  if (role === 'super_admin') return;
+
+  const deptId = typeof sopOrDeptId === 'object' ? sopOrDeptId.department_id : sopOrDeptId;
+  if (!deptId) return;
+
+  const cols = await sopModel.getSopsColumns();
+  if (!cols.hasDepartment) return;
+
+  if (role === 'admin') {
+    if (!user.business_id) {
+      const error = new Error('Your account has no business scope');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+    const [[dept]] = await db.query(
+      'SELECT business_id FROM departments WHERE id = ?',
+      [deptId]
+    );
+    if (!dept || dept.business_id !== user.business_id) {
+      const error = new Error('Cannot modify SOPs outside your business scope');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+    return;
+  }
+
+  if (role === 'department_head') {
+    const scopedDeptIds = user.scoped_department_ids || (user.department_id ? [user.department_id] : []);
+    if (!scopedDeptIds.includes(deptId)) {
+      const error = new Error('Cannot modify SOPs outside your department scope');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+    return;
+  }
+}
+
 async function createSop(data, actorId) {
   const { title, description, department_id, category_id, status, restriction_type, is_default_onboarding } = data;
   const code = data.code || generateSopCode(title);
@@ -41,6 +121,11 @@ async function createSop(data, actorId) {
     const error = new Error('SOP code already exists');
     error.code = 'CODE_EXISTS';
     throw error;
+  }
+
+  const actor = await getUser(actorId);
+  if (actor) {
+    await enforceSopWriteScope({ department_id: department_id || null }, actor);
   }
 
   const id = await sopModel.create({
@@ -82,12 +167,30 @@ async function createSop(data, actorId) {
   return { id, title, code, status: status || 'Draft' };
 }
 
+async function getUser(userId) {
+  const [rows] = await db.query(
+    'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+    [userId]
+  );
+  return rows[0] || null;
+}
+
 async function updateSop(id, data, actorId) {
   const existing = await sopModel.findById(id);
   if (!existing) {
     const error = new Error('SOP not found');
     error.code = 'NOT_FOUND';
     throw error;
+  }
+
+  const actor = await getUser(actorId);
+  if (actor) {
+    await enforceSopScope(existing, actor);
+    if (data.department_id !== undefined) {
+      await enforceSopWriteScope({ department_id: data.department_id }, actor);
+    } else {
+      await enforceSopWriteScope(existing, actor);
+    }
   }
 
   const updates = {};
@@ -131,6 +234,11 @@ async function deleteSop(id, actorId) {
     throw error;
   }
 
+  const actor = await getUser(actorId);
+  if (actor) {
+    await enforceSopScope(existing, actor);
+  }
+
   await sopModel.softDelete(id);
 
   logAudit({
@@ -159,6 +267,11 @@ async function restoreSop(id, actorId) {
     const error = new Error('SOP not found');
     error.code = 'NOT_FOUND';
     throw error;
+  }
+
+  const actor = await getUser(actorId);
+  if (actor) {
+    await enforceSopScope(existing, actor);
   }
 
   await sopModel.restore(id);
@@ -191,6 +304,11 @@ async function permanentDeleteSop(id, actorId) {
     throw error;
   }
 
+  const actor = await getUser(actorId);
+  if (actor) {
+    await enforceSopScope(existing, actor);
+  }
+
   await sopModel.permanentDelete(id);
 
   logAudit({
@@ -218,9 +336,13 @@ async function listTrashedSops(filters = {}) {
 
 async function emptyTrash(actorId) {
   const trashed = await sopModel.listTrashed({ limit: 1000 });
-  const ids = trashed.rows.map((row) => row.id);
+  const actor = await getUser(actorId);
+  const ids = [];
 
   for (const row of trashed.rows) {
+    if (actor) {
+      await enforceSopScope(row, actor);
+    }
     await sopModel.permanentDelete(row.id);
     logAudit({
       user_id: actorId,
@@ -238,6 +360,7 @@ async function emptyTrash(actorId) {
       metadata: { trashed: true },
       new_values: { permanently_deleted: true },
     });
+    ids.push(row.id);
   }
 
   return { deletedCount: ids.length };

@@ -23,12 +23,12 @@ function listEnrollments(req, res) {
   const pageNum = parseInt(page || '1', 10);
   const limitNum = parseInt(limit || '20', 10);
 
-  // Students can only see their own enrollments unless they are admin/instructor
   const isAdmin = ['super_admin', 'admin', 'department_head'].includes(req.user?.role);
+  const effectiveBusinessId = isAdmin ? req.user?.business_id : null;
 
   Promise.all([
-    enrollmentModel.listEnrollments({ course_id, user_id: isAdmin ? user_id : req.user?.id, status, role, page: pageNum, limit: limitNum }),
-    enrollmentModel.listEnrollments({ course_id, user_id: isAdmin ? user_id : req.user?.id, status, role }),
+    enrollmentModel.listEnrollments({ course_id, user_id: isAdmin ? user_id : req.user?.id, status, role, page: pageNum, limit: limitNum, business_id: effectiveBusinessId }),
+    enrollmentModel.listEnrollments({ course_id, user_id: isAdmin ? user_id : req.user?.id, status, role, business_id: effectiveBusinessId }),
   ])
     .then(([data, allData]) => {
       res.json({

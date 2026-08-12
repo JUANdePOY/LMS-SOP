@@ -4,6 +4,7 @@ const courseContentModel = require('../models/courseContentModel');
 const quizModel = require('../models/quizModel');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
+const db = require('../config/database');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -20,14 +21,56 @@ function sendError(res, err, fallback = 'Request failed') {
   return res.status(code).json(body);
 }
 
+async function enforceCourseScope(course, user) {
+  if (!course || !user) return;
+  const role = user.role || '';
+  if (role === 'super_admin') return;
+
+  const deptId = course.department_id;
+  if (!deptId) return;
+
+  if (role === 'admin') {
+    if (!user.business_id) {
+      const error = new Error('Your account has no business scope');
+      error.statusCode = 403;
+      throw error;
+    }
+    const [[dept]] = await db.query(
+      'SELECT business_id FROM departments WHERE id = ?',
+      [deptId]
+    );
+    if (!dept || dept.business_id !== user.business_id) {
+      const error = new Error('Access denied: course is outside your business scope');
+      error.statusCode = 403;
+      throw error;
+    }
+    return;
+  }
+
+  if (role === 'department_head') {
+    const scopedDeptIds = user.scoped_department_ids || (user.department_id ? [user.department_id] : []);
+    if (!scopedDeptIds.includes(deptId)) {
+      const error = new Error('Access denied: course is outside your department scope');
+      error.statusCode = 403;
+      throw error;
+    }
+    return;
+  }
+}
+
 function listCourses(req, res) {
   const { search, status, category, difficulty, instructor_id, page, limit, department_id, business_id } = req.query;
   const pageNum = parseInt(page || '1', 10);
   const limitNum = parseInt(limit || '20', 10);
 
+  let effectiveBusinessId = business_id ? parseInt(business_id, 10) : undefined;
+  if (req.user && req.user.role !== 'super_admin') {
+    effectiveBusinessId = req.user.business_id;
+  }
+
   Promise.all([
-    courseModel.listCourses({ search, status, category, difficulty, instructor_id, page: pageNum, limit: limitNum, department_id, business_id }),
-    courseModel.countCourses({ search, status, category, difficulty, instructor_id, department_id, business_id }),
+    courseModel.listCourses({ search, status, category, difficulty, instructor_id, page: pageNum, limit: limitNum, department_id, business_id: effectiveBusinessId }),
+    courseModel.countCourses({ search, status, category, difficulty, instructor_id, department_id, business_id: effectiveBusinessId }),
   ])
     .then(([data, total]) => {
       res.json({
@@ -60,35 +103,56 @@ function createCourse(req, res) {
     return res.status(401).json({ success: false, message: 'Authentication required' });
   }
 
-  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status } = req.body;
+  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id } = req.body;
 
   if (!title || !title.trim()) {
     return res.status(400).json({ success: false, message: 'Course title is required', code: 'VALIDATION_ERROR' });
   }
 
-  courseModel.create({
-    title: title.trim(),
-    description,
-    category,
-    category_id: category_id ? parseInt(category_id, 10) : null,
-    difficulty,
-    instructor_id: userId,
-    thumbnail_url,
-    prerequisites,
-    learning_outcomes,
-    max_enrollments: max_enrollments ? parseInt(max_enrollments, 10) : null,
-    start_date,
-    end_date,
-    grading_scale,
-    allow_self_enrollment,
-    send_completion_certificates: send_completion_certificates === undefined ? true : send_completion_certificates,
-    status: status || 'draft',
-  })
-    .then((id) => {
-      logAudit('course.create', userId, { courseId: id, title });
-      return res.status(201).json({ success: true, message: 'Course created successfully', data: { id, title, status: status || 'draft' } });
+  const doCreate = () => {
+    courseModel.create({
+      title: title.trim(),
+      description,
+      category,
+      category_id: category_id ? parseInt(category_id, 10) : null,
+      difficulty,
+      instructor_id: userId,
+      thumbnail_url,
+      prerequisites,
+      learning_outcomes,
+      max_enrollments: max_enrollments ? parseInt(max_enrollments, 10) : null,
+      start_date,
+      end_date,
+      grading_scale,
+      allow_self_enrollment,
+      send_completion_certificates: send_completion_certificates === undefined ? true : send_completion_certificates,
+      status: status || 'draft',
     })
-    .catch((err) => sendError(res, err, 'Failed to create course'));
+      .then((id) => {
+        logAudit('course.create', userId, { courseId: id, title });
+        return res.status(201).json({ success: true, message: 'Course created successfully', data: { id, title, status: status || 'draft' } });
+      })
+      .catch((err) => sendError(res, err, 'Failed to create course'));
+  };
+
+  if (req.user.role !== 'super_admin') {
+    if (!req.user.business_id) {
+      return res.status(403).json({ success: false, message: 'No business scope assigned', code: 'NO_BUSINESS_SCOPE' });
+    }
+    if (department_id) {
+      const deptId = parseInt(department_id, 10);
+      return db.query('SELECT business_id FROM departments WHERE id = ?', [deptId])
+        .then(([dept]) => {
+          if (!dept || dept.business_id !== req.user.business_id) {
+            return res.status(403).json({ success: false, message: 'Cannot create courses in another business', code: 'BUSINESS_SCOPE_DENIED' });
+          }
+          doCreate();
+        })
+        .catch((err) => sendError(res, err, 'Failed to validate department'));
+    }
+  }
+
+  doCreate();
 }
 
 function updateCourse(req, res) {
@@ -98,29 +162,32 @@ function updateCourse(req, res) {
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-
-      const allowed = [
-        'title', 'description', 'category', 'category_id', 'difficulty', 'thumbnail_url',
-        'prerequisites', 'learning_outcomes', 'max_enrollments', 'start_date',
-        'end_date', 'grading_scale', 'allow_self_enrollment', 'send_completion_certificates', 'status', 'instructor_id'
-      ];
-      const updates = {};
-      for (const key of allowed) {
-        if (Object.prototype.hasOwnProperty.call(req.body, key)) {
-          updates[key] = key === 'category_id' ? (req.body[key] ? parseInt(req.body[key], 10) : null) : req.body[key];
-        }
-      }
-
-      if (Object.keys(updates).length === 0) {
-        return res.status(400).json({ success: false, message: 'No changes provided', code: 'VALIDATION_ERROR' });
-      }
-
-      return courseModel.update(courseId, updates).then(() => {
-        logAudit('course.update', userId, { courseId, updates });
-        return res.json({ success: true, message: 'Course updated successfully', data: { id: courseId } });
-      });
+      return enforceCourseScope(course, req.user).then(() => applyCourseUpdate(req, courseId, userId, course));
     })
     .catch((err) => sendError(res, err, 'Failed to update course'));
+}
+
+function applyCourseUpdate(req, courseId, userId, course) {
+  const allowed = [
+    'title', 'description', 'category', 'category_id', 'difficulty', 'thumbnail_url',
+    'prerequisites', 'learning_outcomes', 'max_enrollments', 'start_date',
+    'end_date', 'grading_scale', 'allow_self_enrollment', 'send_completion_certificates', 'status', 'instructor_id'
+  ];
+  const updates = {};
+  for (const key of allowed) {
+    if (Object.prototype.hasOwnProperty.call(req.body, key)) {
+      updates[key] = key === 'category_id' ? (req.body[key] ? parseInt(req.body[key], 10) : null) : req.body[key];
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ success: false, message: 'No changes provided', code: 'VALIDATION_ERROR' });
+  }
+
+  return courseModel.update(courseId, updates).then(() => {
+    logAudit('course.update', userId, { courseId, updates });
+    return res.json({ success: true, message: 'Course updated successfully', data: { id: courseId } });
+  });
 }
 
 function deleteCourse(req, res) {
@@ -130,10 +197,12 @@ function deleteCourse(req, res) {
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return courseModel.softDelete(courseId).then(() => {
-        return quizModel.softDeleteByCourse(courseId).then(() => {
-          logAudit('course.delete', userId, { courseId, title: course.title });
-          return res.json({ success: true, message: 'Course deleted successfully' });
+      return enforceCourseScope(course, req.user).then(() => {
+        return courseModel.softDelete(courseId).then(() => {
+          return quizModel.softDeleteByCourse(courseId).then(() => {
+            logAudit('course.delete', userId, { courseId, title: course.title });
+            return res.json({ success: true, message: 'Course deleted successfully' });
+          });
         });
       });
     })
@@ -311,9 +380,11 @@ function archiveCourse(req, res) {
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return courseModel.update(courseId, { status: 'archived' }).then(() => {
-        logAudit('course.archived', userId, { courseId });
-        return res.json({ success: true, message: 'Course archived successfully' });
+      return enforceCourseScope(course, req.user).then(() => {
+        return courseModel.update(courseId, { status: 'archived' }).then(() => {
+          logAudit('course.archived', userId, { courseId });
+          return res.json({ success: true, message: 'Course archived successfully' });
+        });
       });
     })
     .catch((err) => sendError(res, err, 'Failed to archive course'));
@@ -326,9 +397,11 @@ function publishCourse(req, res) {
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return courseModel.update(courseId, { status: 'published' }).then(() => {
-        logAudit('course.published', userId, { courseId });
-        return res.json({ success: true, message: 'Course published successfully' });
+      return enforceCourseScope(course, req.user).then(() => {
+        return courseModel.update(courseId, { status: 'published' }).then(() => {
+          logAudit('course.published', userId, { courseId });
+          return res.json({ success: true, message: 'Course published successfully' });
+        });
       });
     })
     .catch((err) => sendError(res, err, 'Failed to publish course'));
@@ -339,25 +412,27 @@ function exportCourseCSV(req, res) {
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return courseModel.getCourseEnrollments(courseId)
-        .then((enrollments) => {
-          const rows = [
-            ['Employee ID', 'Name', 'Email', 'Status', 'Progress (%)', 'Enrolled At', 'Completed At'],
-            ...(enrollments || []).map((e) => [
-              e.user_id || '',
-              e.user_name || '',
-              e.user_email || '',
-              e.status || '',
-              e.progress_percentage ?? 0,
-              e.enrolled_at || e.created_at || '',
-              e.completed_at || '',
-            ]),
-          ];
-          const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-          res.setHeader('Content-Type', 'text/csv');
-          res.setHeader('Content-Disposition', `attachment; filename="course-${courseId}-enrollments.csv"`);
-          res.send(csv);
-        });
+      return enforceCourseScope(course, req.user).then(() => {
+        return courseModel.getCourseEnrollments(courseId)
+          .then((enrollments) => {
+            const rows = [
+              ['Employee ID', 'Name', 'Email', 'Status', 'Progress (%)', 'Enrolled At', 'Completed At'],
+              ...(enrollments || []).map((e) => [
+                e.user_id || '',
+                e.user_name || '',
+                e.user_email || '',
+                e.status || '',
+                e.progress_percentage ?? 0,
+                e.enrolled_at || e.created_at || '',
+                e.completed_at || '',
+              ]),
+            ];
+            const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+            res.setHeader('Content-Type', 'text/csv');
+            res.setHeader('Content-Disposition', `attachment; filename="course-${courseId}-enrollments.csv"`);
+            res.send(csv);
+          });
+      });
     })
     .catch((err) => sendError(res, err, 'Failed to export CSV'));
 }
@@ -367,25 +442,27 @@ function exportCourseExcel(req, res) {
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return courseModel.getCourseEnrollments(courseId)
-        .then((enrollments) => {
-          const rows = [
-            ['Employee ID', 'Name', 'Email', 'Status', 'Progress (%)', 'Enrolled At', 'Completed At'],
-            ...(enrollments || []).map((e) => [
-              e.user_id || '',
-              e.user_name || '',
-              e.user_email || '',
-              e.status || '',
-              e.progress_percentage ?? 0,
-              e.enrolled_at || e.created_at || '',
-              e.completed_at || '',
-            ]),
-          ];
-          const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-          res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-          res.setHeader('Content-Disposition', `attachment; filename="course-${courseId}-enrollments.xlsx"`);
-          res.send(csv);
-        });
+      return enforceCourseScope(course, req.user).then(() => {
+        return courseModel.getCourseEnrollments(courseId)
+          .then((enrollments) => {
+            const rows = [
+              ['Employee ID', 'Name', 'Email', 'Status', 'Progress (%)', 'Enrolled At', 'Completed At'],
+              ...(enrollments || []).map((e) => [
+                e.user_id || '',
+                e.user_name || '',
+                e.user_email || '',
+                e.status || '',
+                e.progress_percentage ?? 0,
+                e.enrolled_at || e.created_at || '',
+                e.completed_at || '',
+              ]),
+            ];
+            const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename="course-${courseId}-enrollments.xlsx"`);
+            res.send(csv);
+          });
+      });
     })
     .catch((err) => sendError(res, err, 'Failed to export Excel'));
 }
@@ -395,25 +472,27 @@ function exportCoursePDF(req, res) {
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      return courseModel.getCourseEnrollments(courseId)
-        .then((enrollments) => {
-          const rows = [
-            ['Employee ID', 'Name', 'Email', 'Status', 'Progress (%)', 'Enrolled At', 'Completed At'],
-            ...(enrollments || []).map((e) => [
-              e.user_id || '',
-              e.user_name || '',
-              e.user_email || '',
-              e.status || '',
-              e.progress_percentage ?? 0,
-              e.enrolled_at || e.created_at || '',
-              e.completed_at || '',
-            ]),
-          ];
-          const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-          res.setHeader('Content-Type', 'application/pdf');
-          res.setHeader('Content-Disposition', `attachment; filename="course-${courseId}-enrollments.pdf"`);
-          res.send(csv);
-        });
+      return enforceCourseScope(course, req.user).then(() => {
+        return courseModel.getCourseEnrollments(courseId)
+          .then((enrollments) => {
+            const rows = [
+              ['Employee ID', 'Name', 'Email', 'Status', 'Progress (%)', 'Enrolled At', 'Completed At'],
+              ...(enrollments || []).map((e) => [
+                e.user_id || '',
+                e.user_name || '',
+                e.user_email || '',
+                e.status || '',
+                e.progress_percentage ?? 0,
+                e.enrolled_at || e.created_at || '',
+                e.completed_at || '',
+              ]),
+            ];
+            const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="course-${courseId}-enrollments.pdf"`);
+            res.send(csv);
+          });
+      });
     })
     .catch((err) => sendError(res, err, 'Failed to export PDF'));
 }

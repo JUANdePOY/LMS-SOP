@@ -1,6 +1,8 @@
 const sopShareModel = require('../models/sopShareModel');
 const sopModel = require('../models/sopModel');
 const { logAudit } = require('../utils/auditLogger');
+const sopService = require('./sopService');
+const db = require('../config/database');
 
 async function listShares(sopId) {
   return sopShareModel.listShares(sopId);
@@ -12,6 +14,14 @@ async function createShare(sopId, data, actorId) {
     const error = new Error('SOP not found');
     error.code = 'NOT_FOUND';
     throw error;
+  }
+
+  const actor = await db.query(
+    'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+    [actorId]
+  ).then(([rows]) => rows[0] || null);
+  if (actor) {
+    await sopService.enforceSopWriteScope(sop, actor);
   }
 
   const id = await sopShareModel.createShare({
@@ -41,10 +51,12 @@ async function createShareLink(sopId, data, user) {
     throw error;
   }
 
-  if (!(await sopModel.canAccessSop(sop, user))) {
-    const error = new Error('You do not have permission to share this SOP');
-    error.code = 'FORBIDDEN';
-    throw error;
+  const actor = await db.query(
+    'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+    [user.id]
+  ).then(([rows]) => rows[0] || null);
+  if (actor) {
+    await sopService.enforceSopWriteScope(sop, actor);
   }
 
   const { share_type, permissions, expires_at } = data;
@@ -95,6 +107,24 @@ async function getSharedSop(token, user) {
 }
 
 async function revokeShare(id, actorId) {
+  const sop = await sopShareModel.findById(id);
+  if (!sop) {
+    const error = new Error('Share not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+
+  const sopRecord = await sopModel.findById(sop.sop_id);
+  if (sopRecord) {
+    const actor = await db.query(
+      'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
+      [actorId]
+    ).then(([rows]) => rows[0] || null);
+    if (actor) {
+      await sopService.enforceSopWriteScope(sopRecord, actor);
+    }
+  }
+
   await sopShareModel.revokeShare(id);
   logAudit({
     user_id: actorId,

@@ -4,7 +4,7 @@ const ENROLLMENT_STATUSES = ['pending', 'active', 'completed', 'dropped', 'suspe
 const COURSE_ROLES = ['instructor', 'teaching_assistant', 'learner', 'guest'];
 
 async function listEnrollments(filters = {}) {
-  const { course_id, user_id, status, role, page = 1, limit = 20 } = filters;
+  const { course_id, user_id, status, role, page = 1, limit = 20, business_id } = filters;
   const offset = (page - 1) * limit;
 
   let sql = `
@@ -16,6 +16,7 @@ async function listEnrollments(filters = {}) {
     FROM course_enrollments e
     JOIN users u ON e.user_id = u.id
     JOIN courses c ON e.course_id = c.id AND c.is_deleted = FALSE
+    LEFT JOIN departments d ON c.department_id = d.id
     WHERE e.is_deleted = FALSE
   `;
   const params = [];
@@ -35,6 +36,10 @@ async function listEnrollments(filters = {}) {
   if (role) {
     sql += ' AND e.role = ?';
     params.push(role);
+  }
+  if (business_id) {
+    sql += ' AND d.business_id = ?';
+    params.push(parseInt(business_id, 10));
   }
 
   sql += ' ORDER BY e.enrolled_at DESC LIMIT ? OFFSET ?';

@@ -2,7 +2,22 @@ const db = require('../config/database');
 const sopAcknowledgementService = require('./sopAcknowledgementService');
 const { logAudit } = require('../utils/auditLogger');
 
-async function getDefaultOnboardingSops() {
+async function getDefaultOnboardingSops(actorId) {
+  let businessFilter = '';
+  const params = [];
+
+  if (actorId) {
+    const [userRows] = await db.query(
+      'SELECT business_id FROM users WHERE id = ? AND is_active = TRUE',
+      [actorId]
+    );
+    const user = userRows[0];
+    if (user && user.business_id) {
+      businessFilter = 'AND s.business_id = ?';
+      params.push(user.business_id);
+    }
+  }
+
   const [rows] = await db.query(`
     SELECT s.id AS sop_id, s.sop_code, s.title, s.status,
            v.id AS version_id, v.version
@@ -12,13 +27,14 @@ async function getDefaultOnboardingSops() {
       AND s.deleted_at IS NULL
       AND s.status = 'Published'
       AND v.status = 'Published'
+      ${businessFilter}
     ORDER BY s.title ASC
-  `);
+  `, params);
   return rows;
 }
 
-async function assignOnboardingSopsToUser(userId) {
-  const defaultSops = await getDefaultOnboardingSops();
+async function assignOnboardingSopsToUser(userId, actorId) {
+  const defaultSops = await getDefaultOnboardingSops(actorId);
   if (defaultSops.length === 0) return { assigned: 0 };
 
   const values = defaultSops.map(sop => [sop.version_id, userId, 'Pending']);
@@ -30,7 +46,7 @@ async function assignOnboardingSopsToUser(userId) {
 
   if (result.affectedRows > 0) {
     logAudit({
-      user_id: userId,
+      user_id: actorId || userId,
       action: 'onboarding.sops_assigned',
       entity_type: 'user',
       entity_id: userId,
@@ -41,7 +57,22 @@ async function assignOnboardingSopsToUser(userId) {
   return { assigned: result.affectedRows };
 }
 
-async function getPendingOnboardingSops(userId) {
+async function getPendingOnboardingSops(userId, actorId) {
+  let businessFilter = '';
+  const params = [userId];
+
+  if (actorId) {
+    const [userRows] = await db.query(
+      'SELECT business_id FROM users WHERE id = ? AND is_active = TRUE',
+      [actorId]
+    );
+    const actor = userRows[0];
+    if (actor && actor.business_id) {
+      businessFilter = 'AND s.business_id = ?';
+      params.push(actor.business_id);
+    }
+  }
+
   const [rows] = await db.query(`
     SELECT a.id AS acknowledgement_id,
            s.id AS sop_id,
@@ -64,8 +95,9 @@ async function getPendingOnboardingSops(userId) {
     WHERE a.user_id = ?
       AND a.status = 'Pending'
       AND s.deleted_at IS NULL
+      ${businessFilter}
     ORDER BY a.created_at ASC, m.sort_order ASC, m.id ASC
-  `, [userId]);
+  `, params);
 
   // Group modules by SOP
   const sopsMap = new Map();

@@ -551,6 +551,54 @@ const MIGRATIONS = [
       updated_by INT DEFAULT NULL,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    // =========================================================================
+    // RBAC Scope & Fine-Grained Permissions
+    // =========================================================================
+    // department_scope_grants: explicit mapping of department_head users to
+    // the departments they are scoped to manage.
+    `CREATE TABLE IF NOT EXISTS department_scope_grants (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      department_id INT NOT NULL,
+      granted_by INT DEFAULT NULL,
+      granted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE,
+      FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
+      UNIQUE KEY uk_dept_scope (user_id, department_id),
+      INDEX idx_dept_scope_dept (department_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    // user_permission_overrides: per-user permission grants/denies that
+    // override the role defaults.
+    `CREATE TABLE IF NOT EXISTS user_permission_overrides (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      permission_name VARCHAR(100) NOT NULL,
+      granted BOOLEAN NOT NULL DEFAULT TRUE,
+      granted_by INT DEFAULT NULL,
+      granted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
+      UNIQUE KEY uk_user_perm (user_id, permission_name),
+      INDEX idx_user_perm_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    // Composite index to speed up scoped user lookups
+    `CREATE INDEX IF NOT EXISTS idx_users_business_role ON users(business_id, role, is_active)`,
+    `CREATE INDEX IF NOT EXISTS idx_departments_business_status ON departments(business_id, status)`,
+    // Refresh tokens for token rotation
+    `CREATE TABLE IF NOT EXISTS refresh_tokens (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      token_hash VARCHAR(255) NOT NULL,
+      expires_at DATETIME NOT NULL,
+      revoked BOOLEAN NOT NULL DEFAULT FALSE,
+      replaced_by VARCHAR(255) DEFAULT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      INDEX idx_refresh_tokens_user (user_id),
+      INDEX idx_refresh_tokens_token (token_hash),
+      INDEX idx_refresh_tokens_expires (expires_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   ];
 
 async function runMigrations() {
