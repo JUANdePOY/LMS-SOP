@@ -15,13 +15,6 @@ export const updateCertificateTemplate = (id, formData) =>
 export const deleteCertificateTemplate = (id) =>
   api.delete(`/certificate-templates/${id}`);
 
-export const downloadTemplatePdf = async (id) => {
-  const response = await api.get(`/certificate-templates/${id}/download`, {
-    responseType: 'blob',
-  });
-  return response.data;
-};
-
 export const getCertificateTemplateStats = () =>
   api.get('/certificate-templates/stats');
 

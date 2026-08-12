@@ -57,7 +57,7 @@ async function autoIssueOnCompletion(courseId, userId, enrollmentId, actorId, ov
 
   const defaultOverrides = {
     recipient_name: overrides.recipient_name || undefined,
-    date: overrides.date || new Date().toISOString().split('T')[0],
+    date: overrides.date || new Date().toLocaleDateString('en-CA'),
   };
 
   const issuance = await certificateIssuanceService.issueCertificate(

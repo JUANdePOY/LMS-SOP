@@ -15,7 +15,7 @@ export default function IssueCertificateModal({ open, onClose, onSuccess }) {
   const [templateId, setTemplateId] = useState('');
   const [userId, setUserId] = useState('');
   const [recipientName, setRecipientName] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(new Date().toLocaleDateString('en-CA'));
   const [verificationCode, setVerificationCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
@@ -68,7 +68,7 @@ export default function IssueCertificateModal({ open, onClose, onSuccess }) {
     setTemplateId('');
     setUserId('');
     setRecipientName('');
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(new Date().toLocaleDateString('en-CA'));
     setVerificationCode('');
     onClose();
   };

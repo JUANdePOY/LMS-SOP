@@ -35,9 +35,6 @@ templateRouter.route('/:id')
 templateRouter.route('/:id/frame')
   .get(certificateTemplateController.getFrame);
 
-templateRouter.route('/:id/download')
-  .get(certificateTemplateController.download);
-
 // Public frame route — certificate frame images are decorative and safe
 // to expose publicly so that issued certificates can render previews
 // without requiring admin authentication.

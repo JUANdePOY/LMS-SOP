@@ -41,6 +41,7 @@ const CertificatePreviewCanvas = forwardRef(function CertificatePreviewCanvas({
    widthPx,
   heightPx,
   onSectionPatch,
+  bare = false,
 }, ref) {
   const { toast } = useToast();
 
@@ -143,6 +144,8 @@ const CertificatePreviewCanvas = forwardRef(function CertificatePreviewCanvas({
     [sections.signatures_seal?.items]
   );
 
+  const signatureItemsKey = signatureItems.join(',');
+
   const [signatureImageUrls, setSignatureImageUrls] = useState({});
   const signatureImageUrlsRef = useRef({});
 
@@ -176,7 +179,7 @@ const CertificatePreviewCanvas = forwardRef(function CertificatePreviewCanvas({
           );
         });
     });
-  }, [signatureItems.join(',')]);
+  }, [signatureItemsKey, toast]);
 
   useEffect(() => {
     return () => {
@@ -236,11 +239,15 @@ const CertificatePreviewCanvas = forwardRef(function CertificatePreviewCanvas({
   if (!framePreview) {
     return (
       <div className="space-y-2">
-        <div className="flex justify-end">{ZoomControls}</div>
+        {!bare && <div className="flex justify-end">{ZoomControls}</div>}
         <div
           ref={outerRef}
-          style={{ height: `${VIEWPORT_MAX_HEIGHT_VH}vh` }}
-          className="flex items-center justify-center overflow-auto rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800"
+          style={bare ? undefined : { height: `${VIEWPORT_MAX_HEIGHT_VH}vh` }}
+          className={
+            bare
+              ? 'flex h-full w-full items-center justify-center'
+              : 'flex items-center justify-center overflow-auto rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800'
+          }
         >
           <p className="text-sm text-gray-400">Upload a frame image to see preview</p>
         </div>
@@ -254,19 +261,28 @@ const CertificatePreviewCanvas = forwardRef(function CertificatePreviewCanvas({
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400">
-          Actual size: {safeWidth} × {safeHeight}px
-        </span>
-        {ZoomControls}
-      </div>
+    <div className={bare ? '' : 'space-y-2'}>
+      {!bare && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-gray-400">
+            Actual size: {safeWidth} × {safeHeight}px
+          </span>
+          {ZoomControls}
+        </div>
+      )}
 
-      {/* Viewport: fixed height, scrolls when the scaled page overflows it */}
+      {/* Viewport: fixed height, scrolls when the scaled page overflows it.
+          In bare mode there's no toolbar and no forced scroll box — the
+          page is just scaled to fit its parent's width so the certificate
+          reads as the only thing on screen. */}
       <div
         ref={outerRef}
-        style={{ height: `${VIEWPORT_MAX_HEIGHT_VH}vh` }}
-        className="overflow-auto rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-900"
+        style={bare ? undefined : { height: `${VIEWPORT_MAX_HEIGHT_VH}vh` }}
+        className={
+          bare
+            ? 'flex h-full w-full items-center justify-center'
+            : 'overflow-auto rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-900'
+        }
       >
         {/* Spacer: reserves the true scaled footprint so scrollbars appear
             correctly — a CSS transform on its own does not affect layout

@@ -27,14 +27,14 @@ function parseExcelDate(value) {
   if (typeof value === 'number') {
     const date = new Date((value - 25569) * 86400 * 1000);
     if (isNaN(date.getTime())) return null;
-    return date.toISOString().split('T')[0];
+    return date.toLocaleDateString('en-CA');
   }
   // String date - try to parse
   const str = String(value).trim();
   if (!str) return null;
   const date = new Date(str);
   if (isNaN(date.getTime())) return null;
-  return date.toISOString().split('T')[0];
+  return date.toLocaleDateString('en-CA');
 }
 
 // Helper: Parse fullname format "LTC JENNY LYN T NALUPA O-160092 PAF(RES)"

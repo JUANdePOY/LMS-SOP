@@ -2,7 +2,6 @@ const crypto = require('crypto');
 const fs = require('fs/promises');
 const path = require('path');
 const certificateTemplateModel = require('../models/certificateTemplateModel');
-const certificateSignatureModel = require('../models/certificateSignatureModel');
 const { normalizeSections } = require('../shared/certificateSections');
 const { logAudit } = require('../utils/auditLogger');
 const { validateTemplatePayload, validateSectionsPayload } = require('../validators/certificateTemplateValidator');
@@ -11,7 +10,6 @@ const {
   certificateTemplateDir,
   absolutePathFromRelative,
 } = require('../config/uploads');
-const { renderCertificate } = require('./renderCertificate');
 const storage = require('../config/storage');
 
 async function ensureUploadRoot() {
@@ -277,32 +275,6 @@ async function getTemplateStats() {
   return certificateTemplateModel.getStats();
 }
 
-async function renderTemplatePdf(identifier) {
-  const template = await getTemplate(identifier);
-  if (!template) {
-    const error = new Error('Certificate template not found');
-    error.code = 'NOT_FOUND';
-    throw error;
-  }
-
-  const sections = typeof template.sections === 'string'
-    ? JSON.parse(template.sections)
-    : template.sections;
-
-  const signatureIds = sections.signatures_seal?.items?.map(item => item.signature_id).filter(Boolean) || [];
-  const allSignatures = await certificateSignatureModel.findAll({});
-  const matchedSignatures = allSignatures.filter(s => signatureIds.includes(s.id));
-
-  const renderResult = await renderCertificate({
-    template,
-    resolvedSections: sections,
-    signatures: matchedSignatures,
-    isPreview: true, // ← added: this is an unresolved template, not an issued certificate
-  });
-
-  return renderResult;
-}
-
 module.exports = {
   ensureUploadRoot,
   saveFrameFile,
@@ -314,5 +286,4 @@ module.exports = {
   updateTemplate,
   deleteTemplate,
   getTemplateStats,
-  renderTemplatePdf,
 };

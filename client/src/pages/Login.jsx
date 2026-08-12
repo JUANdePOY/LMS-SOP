@@ -73,7 +73,7 @@ export default function Login() {
         <div className="login-card">
           <div className="login-card-header">
             <img
-              src="/UseThisLogo-v1.png"
+              src="/UseThisLogo.v.1.2.png"
               alt="SOP Training Platform"
               className="login-logo"
             />

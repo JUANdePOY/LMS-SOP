@@ -14,7 +14,6 @@ import { StaggerList, MotionItem } from "@/shared/motion";
 import { CERTIFICATE_STATUSES, ISSUANCE_STATUSES } from '@/features/certificate-management/constants/certificateSections';
 import { useCertificates } from '@/features/certificate-management/hooks/useCertificates';
 import { useSignatures } from '@/features/certificate-management/hooks/useSignatures';
-import { downloadTemplatePdf } from '@/features/certificate-management/services/certificateService';
 
 const TABS = [
   { key: 'templates', label: 'Templates' },
@@ -82,23 +81,6 @@ export default function CertificatesPage() {
   const handleLocalDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this template?')) return;
     await handleDelete(id);
-  };
-
-  const handleDownload = async (template) => {
-    try {
-      const blob = await downloadTemplatePdf(template.id);
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${template.name || 'certificate'}-${template.public_id || template.id}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success('Certificate downloaded');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to download certificate');
-    }
   };
 
   const handleEdit = (template) => {
@@ -190,14 +172,6 @@ export default function CertificatesPage() {
                     Edit
                   </Button>
                   <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => { e.stopPropagation(); handleDownload(template); }}
-                    title="Download frame"
-                  >
-                    Download
-                  </Button>
-                    <Button
                     variant="outline"
                     size="sm"
                     onClick={(e) => { e.stopPropagation(); handleLocalDelete(template.id); }}

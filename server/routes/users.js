@@ -366,11 +366,11 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
 
     const formatDate = (val) => {
       if (!val) return null;
-      if (val instanceof Date && !isNaN(val)) return val.toISOString().split('T')[0];
+      if (val instanceof Date && !isNaN(val)) return val.toLocaleDateString('en-CA');
       const s = String(val).trim();
       if (!s) return null;
       const d = new Date(s);
-      if (!isNaN(d)) return d.toISOString().split('T')[0];
+      if (!isNaN(d)) return d.toLocaleDateString('en-CA');
       return s;
     };
 

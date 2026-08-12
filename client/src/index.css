@@ -423,6 +423,20 @@ select option {
   .border-brand-soft { border-color: rgba(242, 92, 5, 0.25); }
   .ring-brand { --tw-ring-color: var(--color-primary); }
 
+  @keyframes certificateGlow {
+    0%, 100% {
+      box-shadow: 0 0 5px rgba(242, 92, 5, 0.3), 0 0 20px rgba(242, 92, 5, 0.1);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(242, 92, 5, 0.6), 0 0 40px rgba(242, 92, 5, 0.3);
+    }
+  }
+
+  .animate-certificate-glow {
+    animation: certificateGlow 2s ease-in-out infinite;
+    opacity: 1;
+  }
+
   /* ── Facebook-style social surfaces ───────────────────────────── */
   .fb-card {
     background-color: var(--bg-surface);

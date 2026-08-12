@@ -8,7 +8,7 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { useIssuances } from '@/features/certificate-management/hooks/useIssuances';
 import { ISSUANCE_STATUSES } from '@/features/certificate-management/constants/certificateSections';
 import * as session from '@/services/session';
-import { Download, Award, Image } from 'lucide-react';
+import { Award, Image } from 'lucide-react';
 import CertificatePreviewCanvas from '@/features/certificate-management/components/CertificatePreviewCanvas';
 import { StaggerList, MotionItem } from "@/shared/motion";
 
@@ -32,12 +32,6 @@ export default function MyCertificatesPage() {
   const handleCardClick = (issuance) => {
     setSelectedIssuance(issuance);
     setIsModalOpen(true);
-  };
-
-  const handleViewPdf = (pdfPath) => {
-    if (pdfPath) {
-      window.open(`/uploads/${pdfPath}`, '_blank');
-    }
   };
 
   const handleDownloadImage = async () => {
@@ -111,24 +105,15 @@ export default function MyCertificatesPage() {
         </StaggerList>
       )}
 
-      <Modal open={isModalOpen} onClose={handleCloseModal} title="Certificate Preview" size="xl" footer={selectedIssuance && selectedIssuance.pdf_storage_path ? (
+      <Modal open={isModalOpen} onClose={handleCloseModal} title="Certificate Preview" size="xl" footer={selectedIssuance ? (
         <div className="flex w-full justify-end gap-3">
           <Button
             size="sm"
-            variant="outline"
             onClick={handleDownloadImage}
             className="flex items-center gap-1"
           >
             <Image size={14} />
             Download Image
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => handleViewPdf(selectedIssuance.pdf_storage_path)}
-            className="flex items-center gap-1"
-          >
-            <Download size={14} />
-            Download PDF
           </Button>
         </div>
       ) : null}>
