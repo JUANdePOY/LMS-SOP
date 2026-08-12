@@ -527,4 +527,5 @@ module.exports = {
   getSopsColumns,
   restrictionWhere,
   canAccessSop,
+  normalizeSopRow,
 };

@@ -1,6 +1,6 @@
 import { useState, useMemo, memo } from 'react';
-import { MessageCircle, Reply, Send, X, Clock } from 'lucide-react';
-import { MAX_COMMENT_LENGTH } from '../constants/taskConstants';
+import { MessageCircle, Reply, Clock } from 'lucide-react';
+import CommentInput from './CommentInput';
 
 function getInitials(name) {
   if (!name) return '?';
@@ -9,6 +9,25 @@ function getInitials(name) {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
   }
   return name.slice(0, 2).toUpperCase();
+}
+
+// Deterministic accent color per person so avatars aren't all identical.
+const AVATAR_COLORS = [
+  'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/15 dark:text-violet-100 dark:border-violet-500/30',
+  'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-100 dark:border-emerald-500/30',
+  'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-100 dark:border-amber-500/30',
+  'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-500/15 dark:text-pink-100 dark:border-pink-500/30',
+  'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-500/15 dark:text-cyan-100 dark:border-cyan-500/30',
+];
+
+function avatarColor(userId, isAdmin) {
+  if (isAdmin) {
+    return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-100 dark:border-blue-500/30';
+  }
+  const key = String(userId ?? '0');
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
 }
 
 function formatTime(dateStr) {
@@ -26,26 +45,23 @@ function formatTime(dateStr) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function CommentItem({ comment, replies, currentUser, isAdmin, onReply, replyingTo, replyText, onReplyTextChange, onReplySubmit, onCancelReply }) {
+function CommentItem({ comment, replies, currentUser, isReplyTarget, onReply }) {
   const isOwn = currentUser && comment.user_id === currentUser.id;
   const commenterIsAdmin = comment.user_role && ['super_admin', 'admin', 'department_head'].includes(comment.user_role);
 
   return (
     <div className={`flex gap-2.5 ${isOwn ? 'flex-row-reverse' : ''}`}>
       <div
-        className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border ${
+        className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border ${avatarColor(
+          comment.user_id,
           commenterIsAdmin
-            ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-100 dark:border-blue-500/30'
-            : 'bg-neutral-100 text-neutral-700 border-neutral-200 dark:bg-neutral-800 dark:text-neutral-200 dark:border-neutral-700'
-        }`}
+        )}`}
       >
         {getInitials(comment.user_name)}
       </div>
       <div className={`flex-1 min-w-0 ${isOwn ? 'text-right' : ''}`}>
         <div className={`flex items-center gap-2 mb-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
-          <span className="text-sm font-medium text-[var(--text-primary)] truncate">
-            {comment.user_name}
-          </span>
+          <span className="text-sm font-medium text-[var(--text-primary)] truncate">{comment.user_name}</span>
           {commenterIsAdmin && (
             <span className="inline-flex items-center rounded-full border border-transparent px-1.5 py-0.5 text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-100">
               Admin
@@ -56,60 +72,26 @@ function CommentItem({ comment, replies, currentUser, isAdmin, onReply, replying
             {formatTime(comment.created_at)}
           </span>
         </div>
+
         <div
-          className={`inline-block max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm ${
+          className={`inline-block max-w-[85%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed shadow-sm transition-shadow ${
             isOwn
               ? 'bg-blue-600 text-white rounded-tr-md'
               : 'bg-[var(--bg-page)] border border-[var(--border)] text-[var(--text-secondary)] rounded-tl-md'
-          }`}
+          } ${isReplyTarget ? 'ring-2 ring-blue-400/60 ring-offset-1 ring-offset-[var(--bg-page)]' : ''}`}
         >
           {comment.comment}
         </div>
 
-        {!replyingTo && (
-          <button
-            type="button"
-            onClick={() => onReply(comment.id)}
-            className={`mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-[var(--text-muted)] hover:text-blue-600 transition-colors ${
-              isOwn ? 'mr-1' : 'ml-1'
-            }`}
-          >
-            <Reply size={12} /> Reply
-          </button>
-        )}
-
-        {replyingTo && (
-          <div className={`mt-2 ${isOwn ? 'text-left' : ''}`}>
-            <div className="flex items-center gap-2 bg-[var(--bg-page)] border border-[var(--border)] rounded-full px-3 py-1.5 focus-within:border-blue-500 transition-colors">
-              <Reply size={14} className="text-[var(--text-muted)] shrink-0" />
-              <input
-                type="text"
-                value={replyText}
-                onChange={(e) => onReplyTextChange(e.target.value)}
-                placeholder={`Reply to ${comment.user_name}...`}
-                className="flex-1 bg-transparent text-sm outline-none placeholder:text-[var(--text-muted)]"
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={onReplySubmit}
-                disabled={!replyText.trim()}
-                className="shrink-0 p-1.5 rounded-full bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                aria-label="Send reply"
-              >
-                <Send size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={onCancelReply}
-                className="shrink-0 p-1.5 rounded-full text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
-                aria-label="Cancel reply"
-              >
-                <X size={13} />
-              </button>
-            </div>
-          </div>
-        )}
+        <button
+          type="button"
+          onClick={() => onReply(comment)}
+          className={`mt-1 inline-flex items-center gap-1 text-[11px] font-medium transition-colors ${
+            isReplyTarget ? 'text-blue-600' : 'text-[var(--text-muted)] hover:text-blue-600'
+          } ${isOwn ? 'mr-1' : 'ml-1'}`}
+        >
+          <Reply size={12} /> {isReplyTarget ? 'Replying…' : 'Reply'}
+        </button>
 
         {replies && replies.length > 0 && (
           <div className="mt-3 space-y-3 pl-4 border-l-2 border-[var(--border)]">
@@ -119,13 +101,8 @@ function CommentItem({ comment, replies, currentUser, isAdmin, onReply, replying
                 comment={reply}
                 replies={[]}
                 currentUser={currentUser}
-                isAdmin={isAdmin}
+                isReplyTarget={isReplyTarget && false /* replies are never nested reply-targets here, parent id drives it */}
                 onReply={onReply}
-                replyingTo={replyingTo}
-                replyText={replyText}
-                onReplyTextChange={onReplyTextChange}
-                onReplySubmit={onReplySubmit}
-                onCancelReply={onCancelReply}
               />
             ))}
           </div>
@@ -142,10 +119,7 @@ const CommentSection = memo(function CommentSection({
   onAddComment,
   canReply = true,
 }) {
-  const [replyingTo, setReplyingTo] = useState(null);
-  const [replyText, setReplyText] = useState('');
-  const [replyError, setReplyError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null); // full comment object, or null
 
   const grouped = useMemo(() => {
     const topLevel = [];
@@ -155,9 +129,7 @@ const CommentSection = memo(function CommentSection({
       if (!c.parent_id) {
         topLevel.push(c);
       } else {
-        if (!repliesMap[c.parent_id]) {
-          repliesMap[c.parent_id] = [];
-        }
+        if (!repliesMap[c.parent_id]) repliesMap[c.parent_id] = [];
         repliesMap[c.parent_id].push(c);
       }
     }
@@ -170,29 +142,29 @@ const CommentSection = memo(function CommentSection({
     return { topLevel, repliesMap };
   }, [comments]);
 
-  const handleReply = async () => {
-    const trimmed = replyText.trim();
-    if (!trimmed) return;
-    if (trimmed.length > MAX_COMMENT_LENGTH) {
-      setReplyError(`Reply must not exceed ${MAX_COMMENT_LENGTH} characters`);
-      return;
+  // Every comment (top-level or reply) can be replied to; replies are still filed
+  // under the same top-level thread since repliesMap keys off parent_id.
+  const allById = useMemo(() => {
+    const map = {};
+    for (const c of comments) map[c.id] = c;
+    return map;
+  }, [comments]);
+
+  const handleReply = (comment) => setReplyingTo(comment);
+  const handleCancelReply = () => setReplyingTo(null);
+
+  const handleAdd = async (text, parentId) => {
+    // If replying, comments should thread under the top-level ancestor.
+    let effectiveParentId = parentId;
+    if (parentId && allById[parentId]?.parent_id) {
+      effectiveParentId = allById[parentId].parent_id;
     }
-    setReplyError('');
-    setSubmitting(true);
-    try {
-      await onAddComment(trimmed, replyingTo);
-      setReplyText('');
-      setReplyingTo(null);
-    } catch {
-      // handled by parent
-    } finally {
-      setSubmitting(false);
-    }
+    await onAddComment(text, effectiveParentId);
   };
 
   return (
     <div className="flex flex-col h-full min-h-0">
-      <div className="flex-1 overflow-y-auto space-y-4 pr-1" style={{ scrollbarGutter: 'stable' }}>
+      <div className="flex-1 overflow-y-auto space-y-4 pr-1 pb-3" style={{ scrollbarGutter: 'stable' }}>
         {grouped.topLevel.length === 0 && (
           <div className="flex flex-col items-center justify-center py-10 text-center">
             <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-hover)]">
@@ -209,16 +181,22 @@ const CommentSection = memo(function CommentSection({
             comment={comment}
             replies={grouped.repliesMap[comment.id] || []}
             currentUser={currentUser}
-            isAdmin={isAdmin}
-            onReply={(commentId) => { setReplyingTo(commentId); setReplyText(''); setReplyError(''); }}
-            replyingTo={replyingTo}
-            replyText={replyText}
-            onReplyTextChange={(text) => { setReplyText(text); if (replyError) setReplyError(''); }}
-            onReplySubmit={handleReply}
-            onCancelReply={() => { setReplyingTo(null); setReplyText(''); setReplyError(''); }}
+            isReplyTarget={replyingTo?.id === comment.id}
+            onReply={handleReply}
           />
         ))}
       </div>
+
+      {canReply && (
+        <div className="pt-2 border-t border-[var(--border)]">
+          <CommentInput
+            onAddComment={handleAdd}
+            canComment={canReply}
+            replyingTo={replyingTo}
+            onCancelReply={handleCancelReply}
+          />
+        </div>
+      )}
     </div>
   );
 });

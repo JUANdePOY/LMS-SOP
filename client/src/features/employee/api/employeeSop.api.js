@@ -35,3 +35,18 @@ export async function getEmployeeSop(sopId) {
   const res = await fetch(`${API_BASE}/sops/${sopId}`, { headers: authHeaders() });
   return handle(res);
 }
+
+export async function getEmployeeSops(params = {}) {
+  const query = new URLSearchParams();
+  const allowedKeys = ['search', 'page', 'limit', 'sort'];
+  allowedKeys.forEach((key) => {
+    const value = params[key];
+    if (value !== undefined && value !== null && value !== '') {
+      query.set(key, value);
+    }
+  });
+  const queryString = query.toString();
+  const url = queryString ? `${API_BASE}/sops?${queryString}` : `${API_BASE}/sops`;
+  const res = await fetch(url, { headers: authHeaders() });
+  return handle(res);
+}

@@ -17,6 +17,7 @@ import {
   User,
    ChevronDown,
    Building2,
+   FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
@@ -37,6 +38,7 @@ const EMPLOYEE_MENU_ITEMS = [
     items: [
       { name: "My Learning", path: "/my-learning", icon: Home },
       { name: "Course Library", path: "/courses/library", icon: Library },
+      { name: "SOP Library", path: "/my-learning/sops", icon: FileText },
       { name: "My Certificates", path: "/certificates/my-certificates", icon: Award },
     ],
   },
