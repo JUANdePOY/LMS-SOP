@@ -73,6 +73,7 @@ const calendarModel = {
     const encRefresh = refreshToken ? encrypt(refreshToken) : null;
     console.log('[Calendar] saveToken start userId=', userId, 'provider=', provider, 'email=', googleEmail, 'hasAccess=', !!accessToken, 'hasRefresh=', !!refreshToken, 'encAccessLen=', encAccess && encAccess.length, 'encRefreshLen=', encRefresh && encRefresh.length);
     await purgeUndecryptableRows(userId, provider);
+    let inserted = false;
     try {
       await db.query(
         `INSERT INTO user_calendar_tokens (user_id, provider, google_email, access_token, refresh_token, expiry_date)
@@ -85,17 +86,25 @@ const calendarModel = {
            updated_at = CURRENT_TIMESTAMP`,
         [userId, provider, googleEmail || null, encAccess, encRefresh, expiryDate || null]
       );
+      inserted = true;
     } catch (err) {
-      if (err && err.code === 'ER_DUP_ENTRY') {
+      console.warn('[Calendar] saveToken insert fallback userId=', userId, 'err=', err && err.message, 'code=', err && err.code);
+      try {
         await db.query(
           `UPDATE user_calendar_tokens
            SET google_email = ?, access_token = ?, refresh_token = ?, expiry_date = ?, updated_at = CURRENT_TIMESTAMP
            WHERE user_id = ? AND provider = ?`,
           [googleEmail || null, encAccess, encRefresh, expiryDate || null, userId, provider]
         );
-      } else {
-        throw err;
+        inserted = true;
+      } catch (updateErr) {
+        console.error('[Calendar] saveToken update also failed userId=', userId, 'err=', updateErr && updateErr.message, 'code=', updateErr && updateErr.code);
+        throw updateErr || err;
       }
+    }
+    if (!inserted) {
+      console.error('[Calendar] saveToken neither insert nor update succeeded userId=', userId);
+      throw new Error('Failed to persist calendar token');
     }
     console.log('[Calendar] saveToken persisted userId=', userId);
     const result = await this.getToken(userId, provider);
