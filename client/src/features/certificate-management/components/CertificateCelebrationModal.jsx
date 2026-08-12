@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { Button } from '@/shared/components/ui/button';
-import { Download, X } from 'lucide-react';
+import { Download, Award, X } from 'lucide-react';
 import CertificatePreviewCanvas from './CertificatePreviewCanvas';
 
 const CONFETTI_DURATION = 3000;
@@ -55,7 +55,6 @@ export default function CertificateCelebrationModal({
         fireConfetti(confettiRef);
       }, 200);
 
-      // Fade in right away — no delay needed for a simple opacity transition
       const contentTimer = setTimeout(() => {
         setShowContent(true);
       }, 50);
@@ -93,7 +92,7 @@ export default function CertificateCelebrationModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6, ease: 'easeOut' }}
-            className="relative w-full h-full flex flex-col items-center justify-center gap-6 p-4 sm:p-8"
+            className="relative w-full h-full flex flex-col items-center justify-center gap-4 p-4 sm:p-8"
           >
             <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
               {sections && (
@@ -122,7 +121,7 @@ export default function CertificateCelebrationModal({
             </div>
 
             {sections ? (
-              <div className="w-full max-w-5xl max-h-[50vh] overflow-auto rounded-lg">
+              <div className="w-full flex-1 min-h-0 rounded-lg">
                 <CertificatePreviewCanvas
                   ref={canvasRef}
                   sections={sections}
