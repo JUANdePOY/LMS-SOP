@@ -50,6 +50,7 @@ function getAuthUrl(req, res) {
 
 // Step 2: OAuth callback. Verifies state, exchanges code, stores tokens.
 function handleCallback(req, res) {
+  console.log('[Calendar] >>> handleCallback ENTRY query=', JSON.stringify(req.query));
   const { code, state, error, error_description } = req.query;
   try {
     if (error) {
