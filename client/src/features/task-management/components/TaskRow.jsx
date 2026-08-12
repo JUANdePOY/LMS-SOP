@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect, memo } from 'react';
-import { Link } from 'react-router-dom';
 import { MoreVertical, Pencil, Trash2, ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -222,7 +221,7 @@ const AssignedCell = memo(function AssignedCell({ assignments, onSave }) {
   );
 });
 
-const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, onInlineUpdate, canManage }) {
+const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, onInlineUpdate, onViewTask, canManage }) {
   const assignments = task.assignments || [];
   const saveField = (changes) => {
     if (!canManage) return;
@@ -238,16 +237,16 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
         <StatusMenu status={task.status} onStatusChange={(newStatus) => onStatusChange?.(task, newStatus)} />
       </span>
 
-      <div className="min-w-0 flex items-center gap-1.5">
-        <Link
-          to={`/tasks/${task.id}`}
-          onClick={(e) => e.stopPropagation()}
-          className="shrink-0 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-blue-400 transition-opacity"
-          aria-label="Open task details"
-          title="Open details"
-        >
-          <ArrowUpRight size={14} />
-        </Link>
+       <div className="min-w-0 flex items-center gap-1.5">
+         <button
+           type="button"
+           onClick={(e) => { e.stopPropagation(); onViewTask?.(task); }}
+           className="shrink-0 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-blue-400 transition-opacity"
+           aria-label="Open task details"
+           title="Open details"
+         >
+           <ArrowUpRight size={14} />
+         </button>
         {canManage ? (
           <PriorityDot priority={task.priority} onSave={saveField} />
         ) : (

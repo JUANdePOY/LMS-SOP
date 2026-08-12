@@ -8,6 +8,7 @@ import { useTasks } from '../hooks/useTasks';
 import { getTask, updateProgress } from '../services/taskService';
 import { TASK_PRIORITIES, TASK_STATUSES } from '../constants/taskConstants';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
+import TaskDetailsModal from '../components/TaskDetailsModal';
 import TaskListTable from '../components/TaskListTable';
 import TaskListTableSkeleton from '../components/TaskListTableSkeleton';
 import TaskForm from '../components/TaskForm';
@@ -26,6 +27,7 @@ export default function TasksPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [viewingTaskId, setViewingTaskId] = useState(null);
 
   useEffect(() => {
     if (!isAnyAdmin) {
@@ -244,6 +246,7 @@ const confirmDelete = async () => {
           onStatusChange={handleStatusChange}
           onInlineUpdate={handleInlineUpdate}
           onCreateTask={create}
+          onViewTask={(task) => setViewingTaskId(task.id)}
           canManage
         />
       )}
@@ -264,6 +267,12 @@ const confirmDelete = async () => {
         message="Are you sure you want to delete this task? This action cannot be undone."
         confirmText="Delete"
         variant="destructive"
+      />
+
+      <TaskDetailsModal
+        taskId={viewingTaskId}
+        open={viewingTaskId !== null}
+        onClose={() => setViewingTaskId(null)}
       />
     </div>
   );

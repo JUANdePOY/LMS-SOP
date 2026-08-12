@@ -42,6 +42,7 @@ function TaskListTable({
   onStatusChange,
   onInlineUpdate,
   onCreateTask,
+  onViewTask,
   canManage,
 }) {
   const [isCreating, setIsCreating] = useState(false);
@@ -146,6 +147,7 @@ function TaskListTable({
     onDelete,
     onStatusChange,
     onInlineUpdate,
+    onViewTask,
     canManage,
   };
 
