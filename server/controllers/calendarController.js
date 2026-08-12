@@ -88,20 +88,6 @@ function handleCallback(req, res) {
 }
 
 function renderCallbackHtml(success, message) {
-  const postMessageScript = success ? `
-    <script>
-      try {
-        if (window.opener) {
-          window.opener.postMessage({ type: 'google-calendar-connected' }, window.location.origin);
-        }
-      } catch (e) {
-        // Cross-Origin-Opener-Policy or cross-origin restrictions may block
-        // cross-window messaging in some hosting/proxy setups. The SPA polls
-        // /api/calendar/status as a fallback and will pick up the connection.
-      }
-    </script>
-  ` : '';
-
   const notifyButton = success ? `
     <p style="margin-top:12px;font-size:12px;color:#555">Connected successfully. Return to the app and refresh the calendar modal if needed.</p>
   ` : '';
@@ -112,7 +98,6 @@ function renderCallbackHtml(success, message) {
   <h3 style="margin:0 0 8px;color:${success ? '#16a34a' : '#dc2626'}">${success ? 'Connected' : 'Error'}</h3>
   <p style="margin:0;color:#555">${message}</p>
   ${notifyButton}
-  ${postMessageScript}
   <p style="margin:12px 0 0;font-size:12px;color:#999">You can close this window.</p>
 </div></body></html>`;
 }
