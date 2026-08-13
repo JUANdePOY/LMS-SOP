@@ -9,12 +9,17 @@ import { createCategory } from '../api/category.api';
 import { quickCreateSop } from '../services/sopQuickCreate.service';
 import { generateDepartmentCode } from '../utils/generateDepartmentCode';
 import { useToast } from '@/shared/components/ui/Toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
 
 function HierarchyOverviewPageInner() {
   const navigate = useNavigate();
   const { hierarchy, loading, error, refresh } = useHierarchy();
   const { toast } = useToast();
+  const { isDepartmentHead } = useAuth();
+  // Department heads get a view-only overview: they can see the structure but
+  // must not create/edit businesses, departments, categories, or SOPs here.
+  const readOnly = isDepartmentHead;
   const {
     creatingDepartmentFor,
     cancelCreateDepartment,
@@ -115,6 +120,7 @@ function HierarchyOverviewPageInner() {
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
+          {!readOnly && (
           <button
             onClick={() => navigate('/admin/organization/businesses')}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
@@ -122,6 +128,7 @@ function HierarchyOverviewPageInner() {
             <Plus className="h-4 w-4" />
             Manage Businesses
           </button>
+          )}
         </div>
       </div>
 
@@ -167,6 +174,7 @@ function HierarchyOverviewPageInner() {
             hierarchy={hierarchy}
             searchQuery={safeQuery}
             creating={submitting}
+            readOnly={readOnly}
             creatingDepartmentFor={creatingDepartmentFor}
             onInlineCreateDepartment={handleInlineCreateDepartment}
             onInlineCreateCategory={handleInlineCreateCategory}

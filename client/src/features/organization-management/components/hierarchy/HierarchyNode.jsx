@@ -26,7 +26,7 @@ function StatBadge({ node }) {
   );
 }
 
-export default function HierarchyNode({ node, depth = 0, creating = false, onInlineCreateCategory, onInlineCreateSop }) {
+export default function HierarchyNode({ node, depth = 0, creating = false, readOnly = false, onInlineCreateCategory, onInlineCreateSop }) {
   const {
     expandedDeptIds,
     toggleDepartment,
@@ -133,6 +133,7 @@ export default function HierarchyNode({ node, depth = 0, creating = false, onInl
             </span>
           )}
 
+          {!readOnly && (
           <button
             type="button"
             onClick={(e) => {
@@ -151,6 +152,7 @@ export default function HierarchyNode({ node, depth = 0, creating = false, onInl
           >
             <Plus className="h-3.5 w-3.5" />
           </button>
+          )}
         </div>
       </div>
 
@@ -160,13 +162,14 @@ export default function HierarchyNode({ node, depth = 0, creating = false, onInl
             <div className="relative ml-[28px] mt-1.5 border-l-2 border-[var(--border)] pl-4 space-y-1">
                {node.children.map((child, idx) => (
                  <TreeConnector key={child.id} isLast={idx === node.children.length - 1} stubTop={19}>
-                  <HierarchyNode
-                      node={child}
-                      depth={depth + 1}
-                      creating={creating}
-                      onInlineCreateCategory={onInlineCreateCategory}
-                      onInlineCreateSop={onInlineCreateSop}
-                    />
+                   <HierarchyNode
+                       node={child}
+                       depth={depth + 1}
+                       creating={creating}
+                       readOnly={readOnly}
+                       onInlineCreateCategory={onInlineCreateCategory}
+                       onInlineCreateSop={onInlineCreateSop}
+                     />
                  </TreeConnector>
                ))}
             </div>
@@ -198,12 +201,13 @@ export default function HierarchyNode({ node, depth = 0, creating = false, onInl
                     isLast={idx === (node.categories?.length || 0) - 1}
                     stubTop={18}
                   >
-                    <CategoryNode
-                      category={category}
-                      departmentId={node.id}
-                      creating={creating}
-                      onInlineCreateSop={onInlineCreateSop}
-                    />
+                     <CategoryNode
+                       category={category}
+                       departmentId={node.id}
+                       creating={creating}
+                       readOnly={readOnly}
+                       onInlineCreateSop={onInlineCreateSop}
+                     />
                   </TreeConnector>
                 ))}
               </div>
@@ -216,6 +220,7 @@ export default function HierarchyNode({ node, depth = 0, creating = false, onInl
                 <p className="text-xs font-semibold tracking-wide text-[var(--text-muted)]">
                   {node.name} SOPs {sops ? `(${sops.length})` : ''}
                 </p>
+                {!readOnly && (
                 <button
                   type="button"
                   onClick={() => {
@@ -230,6 +235,7 @@ export default function HierarchyNode({ node, depth = 0, creating = false, onInl
                   <Plus className="h-3.5 w-3.5" />
                   <span>SOP</span>
                 </button>
+                )}
               </div>
 
               {isCreatingLeafSop ? (

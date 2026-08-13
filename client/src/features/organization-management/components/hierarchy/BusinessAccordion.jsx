@@ -63,6 +63,7 @@ export default function BusinessAccordion({
   departments = [],
   searchActive = false,
   creating = false,
+  readOnly = false,
   creatingDepartmentFor,
   onInlineCreateDepartment,
   onInlineCreateCategory,
@@ -82,7 +83,7 @@ export default function BusinessAccordion({
     startCreateDepartment(business.id);
   };
 
-  const departmentCreateRow = isCreatingDept ? (
+  const departmentCreateRow = !readOnly && isCreatingDept ? (
     <div className="py-1 first:pt-0 last:pb-0">
             <InlineCreateRow
             icon={Folder}
@@ -134,6 +135,7 @@ export default function BusinessAccordion({
             </div>
           </button>
 
+          {!readOnly && (
           <button
             type="button"
             onClick={handleCreateDepartmentClick}
@@ -144,6 +146,7 @@ export default function BusinessAccordion({
           >
             <Plus size={14} />
           </button>
+          )}
         </div>
       </div>
 
@@ -158,6 +161,7 @@ export default function BusinessAccordion({
                     node={dept}
                     depth={0}
                     creating={creating}
+                    readOnly={readOnly}
                     onInlineCreateCategory={onInlineCreateCategory}
                     onInlineCreateSop={onInlineCreateSop}
                   />

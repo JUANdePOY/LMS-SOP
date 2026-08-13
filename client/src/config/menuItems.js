@@ -17,29 +17,44 @@ import {
 
 export const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
+// Recursively keep only the parts of a menu item visible to `userRole`.
+// Handles both shapes used across the app:
+//   - config `menuItems`: groups use `children`
+//   - Sidebar `MENU_ITEMS`: groups use `items`, items may use `sub`
+function filterMenuItem(item, userRole) {
+  const roleAllowed = !item.roles || item.roles.includes(userRole);
+  if (!roleAllowed) return null;
+
+  if (Array.isArray(item.items)) {
+    const visibleItems = item.items
+      .map((sub) => filterMenuItem(sub, userRole))
+      .filter(Boolean);
+    if (visibleItems.length === 0) return null;
+    return { ...item, items: visibleItems };
+  }
+
+  if (Array.isArray(item.children)) {
+    const visibleChildren = item.children
+      .map((child) => filterMenuItem(child, userRole))
+      .filter(Boolean);
+    if (visibleChildren.length === 0) return null;
+    return { ...item, children: visibleChildren };
+  }
+
+  if (Array.isArray(item.sub)) {
+    const visibleSub = item.sub.filter(
+      (subItem) => typeof subItem === "string" || !subItem.roles || subItem.roles.includes(userRole)
+    );
+    return { ...item, sub: visibleSub };
+  }
+
+  return item;
+}
+
 export function filterMenuByRole(items, userRole) {
   if (!userRole) return items;
-  return items
-    .filter((item) => {
-      if (!item.roles || item.roles.includes(userRole)) {
-        if (item.children) {
-          const visibleChildren = item.children.filter((c) => !c.roles || c.roles.includes(userRole));
-          return visibleChildren.length > 0;
-        }
-        return true;
-      }
-      return false;
-    })
-    .map((item) => {
-      if (item.children) {
-        return {
-          ...item,
-          children: item.children.filter((c) => !c.roles || c.roles.includes(userRole)),
-        };
-      }
-      return item;
-    });
-  }
+  return items.map((item) => filterMenuItem(item, userRole)).filter(Boolean);
+}
 
 export const menuItems = [
   {

@@ -11,6 +11,7 @@ export default function CategoryNode({
   departmentId,
   searchQuery = '',
   creating = false,
+  readOnly = false,
   onInlineCreateSop,
 }) {
   const { expandedCategoryIds, toggleCategory, startCreateSop, cancelCreateSop, creatingSopFor } =
@@ -101,6 +102,7 @@ export default function CategoryNode({
           {category.sop_count ?? 0}
         </span>
 
+        {!readOnly && (
         <button
           type="button"
           onClick={(e) => {
@@ -120,6 +122,7 @@ export default function CategoryNode({
           <Plus className="h-3 w-3" />
           SOP
         </button>
+        )}
       </div>
 
       {isExpanded && (
