@@ -13,11 +13,11 @@ import { Modal } from "@/shared/components/ui/modal";
 import { useNotifications } from "@/shared/stores/notificationStore.js";
 
 export default function EventsPage() {
-  const { hasPermission, role, department_id } = useAuth();
-  const canManage = hasPermission('manage_events');
+  const { isSuperAdmin } = useAuth();
+  const canManage = isSuperAdmin;
   const { toast } = useToast();
   const { markEntityTypeRead } = useNotifications();
-  const { items, error, refresh, create, update, remove } = useEvents({ status: "active", target_role: role, target_department: department_id });
+  const { items, error, refresh, create, update, remove } = useEvents({ status: "active" });
   const calendar = useGoogleCalendar();
 
   useEffect(() => {

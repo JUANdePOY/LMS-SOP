@@ -13,15 +13,6 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 console.log('LMS-SOP Server starting...');
 
-const lockOk = ensureStartupLock();
-if (!lockOk) {
-  // A live peer already holds the startup lock. Refusing to start prevents a
-  // second process from opening its own connection pool, which multiplies the
-  // per-hour MySQL connect count and trips max_connections_per_hour.
-  console.error('Startup lock indicates another live instance is already running. Exiting to avoid a duplicate connection pool.');
-  process.exit(1);
-}
-
 const app = express();
 
 const defaultOrigins = [
@@ -394,8 +385,28 @@ function listenWithRetry(port, retries) {
   });
 }
 
-// Bounded retry (~30s) to tolerate a deploy overlap, then exit rather than
-// leaving a duplicate instance alive.
-listenWithRetry(PORT, 30);
+// Single-instance guard + listener boot. Only run when executed directly
+// (e.g. `node server/server.js` on Hostinger). When required by another module
+// (e.g. a serverless handler like api/index.js), we must not run the lock or
+// call .listen(), or every cold start would try to bind a port.
+if (require.main === module) {
+  // Bounded retry (~30s) to tolerate a deploy overlap, then exit rather than
+  // leaving a duplicate instance alive.
+  ensureStartupLock()
+    .then((lockOk) => {
+      if (!lockOk) {
+        // A genuine instance is already serving on this port. Stand down with a
+        // success code so the process manager does not treat this duplicate as
+        // a crash and respawn it in a loop.
+        console.error('Startup lock indicates another live instance is already running on this port. Exiting to avoid a duplicate connection pool.');
+        process.exit(0);
+      }
+      listenWithRetry(PORT, 30);
+    })
+    .catch((err) => {
+      console.error('Startup lock check failed:', err);
+      process.exit(1);
+    });
+}
 
 module.exports = app;

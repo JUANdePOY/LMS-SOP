@@ -107,7 +107,7 @@ export const menuItems = [
     path: "/events",
     icon: Calendar,
     description: "Company calendar",
-    roles: LMS_ROLES,
+    roles: ['super_admin'],
   },
   {
     name: "Tasks & Projects",

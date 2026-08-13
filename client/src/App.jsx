@@ -24,6 +24,7 @@ const EmployeeSOPLibrary = lazy(() => import("@/features/employee/pages/Employee
 const EmployeeOnboardingPage = lazy(() => import("@/features/employee/pages/EmployeeOnboardingPage"));
 const Profile       = lazy(() => import("@/pages/Profile"));
 const UserProfilePage = lazy(() => import("@/features/profile/pages/UserProfilePage"));
+const DigitalIDPage = lazy(() => import("@/features/digital-id/pages/DigitalIDPage"));
 const Login         = lazy(() => import("@/pages/Login"));
 const Settings      = lazy(() => import("@/pages/Settings"));
 const AuditLogs     = lazy(() => import("@/pages/AuditLogs"));
@@ -171,6 +172,7 @@ const router = createBrowserRouter([
       { path: "my-learning/sops/:id", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeSOPView /></OnboardingGuard>), handle: { title: "SOP" } },
       { path: "profile", element: LMSProtectedWrapper(Profile), handle: { title: "Profile" } },
       { path: "profile/:userId", element: LMSProtectedWrapper(UserProfilePage), handle: { title: "Profile" } },
+      { path: "digital-id/:userId?", element: LMSProtectedWrapper(DigitalIDPage), handle: { title: "Digital ID" } },
       { path: "course-library", element: <Navigate to="/courses/library" replace /> },
       { path: "settings", element: SuperAdminProtectedWrapper(Settings), handle: { title: "Settings" } },
       { path: "settings/users", element: SuperAdminProtectedWrapper(UsersPanel), handle: { title: "Users" } },
@@ -208,7 +210,7 @@ const router = createBrowserRouter([
       { path: "assessments/quiz/:quizId/take/:attemptId?", element: LMSProtectedWrapper(TakeQuizPage), handle: { title: "Take Quiz" } },
       { path: "assessments/quiz/:quizId", element: AdminProtectedWrapper(QuizBuilderPage), handle: { title: "Quiz Builder" } },
       { path: "announcements", element: LMSProtectedWrapper(AnnouncementsPage), handle: { title: "Announcements" } },
-      { path: "events", element: LMSProtectedWrapper(EventsPage), handle: { title: "Events" } },
+      { path: "events", element: SuperAdminProtectedWrapper(EventsPage), handle: { title: "Events" } },
       { path: "messaging", element: LMSProtectedWrapper(MessagingPage), handle: { title: "Messaging" } },
       { path: "people", element: LMSProtectedWrapper(EmployeeDirectoryPage), handle: { title: "People" } },
       { path: "tasks", element: LMSProtectedWrapper(TasksPage), handle: { title: "Tasks & Projects" } },
