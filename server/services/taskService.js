@@ -764,9 +764,6 @@ async function getBusinessScopedTaskIdsForAdmin(userId) {
            SELECT d.id FROM departments d WHERE d.business_id = ?
          )
        )
-     )
-     AND t.id NOT IN (
-       SELECT id FROM tasks WHERE status IN ('Completed', 'Cancelled')
      )`,
     [businessId, businessId]
   );

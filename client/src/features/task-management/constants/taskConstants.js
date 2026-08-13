@@ -49,10 +49,12 @@ export const ALLOWED_ATTACHMENT_MIME_TYPES = [
 /* Table layout & display constants */
 
 /** CSS grid template columns for the task table. */
-export const TASK_TABLE_GRID_COLS = '40px minmax(220px,1fr) 210px 180px 150px 150px 80px';
+export const TASK_TABLE_GRID_COLS = '40px minmax(220px,1.5fr) 210px 180px 150px 150px minmax(180px,1fr) 100px';
 
 /** Status display order in the task table. */
 export const TASK_STATUS_ORDER = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled'];
+
+export const UNKNOWN_STATUS_KEY = '__unknown__';
 
 /** Human-readable labels for each status. */
 export const TASK_STATUS_LABELS = {
@@ -61,6 +63,7 @@ export const TASK_STATUS_LABELS = {
   Completed: 'Completed',
   Overdue: 'Overdue',
   Cancelled: 'Cancelled',
+  [UNKNOWN_STATUS_KEY]: 'Other',
 };
 
 /** Dot colors for priority indicators. */

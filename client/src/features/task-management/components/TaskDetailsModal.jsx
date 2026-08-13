@@ -187,7 +187,6 @@ export default function TaskDetailsModal({ taskId, open, onClose }) {
         <div className="flex items-start justify-between gap-4 p-5 sm:p-6 border-b border-[var(--border)] shrink-0">
           <div className="min-w-0 flex-1">
             <h1 className="text-lg font-semibold text-[var(--text-primary)] truncate">{task?.title}</h1>
-            {task?.description && <p className="mt-1 text-sm text-[var(--text-muted)] line-clamp-2">{task.description}</p>}
             {task && (
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <span className={cn('inline-flex items-center rounded-full border border-transparent px-2.5 py-0.5 text-xs font-medium', PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.Medium)}>

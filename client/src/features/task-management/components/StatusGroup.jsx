@@ -14,6 +14,8 @@ import { TASK_STATUS_LABELS, TASK_TABLE_GRID_COLS } from '../constants/taskConst
 import { StatusMenu } from './TaskInlineControls';
 import { TaskRow } from './TaskRow';
 import AssignmentInput from './AssignmentInput';
+import DescriptionModal from './DescriptionModal';
+import CreateAssignmentModal from './CreateAssignmentModal';
 
 function StatusGroup({
   status,
@@ -21,6 +23,12 @@ function StatusGroup({
   isCreating,
   createTitle,
   setCreateTitle,
+  createDescription,
+  setCreateDescription,
+  createDescriptionOpen,
+  setCreateDescriptionOpen,
+  createAssignmentOpen,
+  setCreateAssignmentOpen,
   createInputRef,
   handleCreateSubmit,
   setIsCreating,
@@ -51,6 +59,18 @@ function StatusGroup({
       submittingRef.current = false;
       enterPressedRef.current = false;
     }
+  };
+
+  const resetCreateState = () => {
+    setCreateTitle('');
+    setCreateDescription('');
+    setCreateDescriptionOpen(false);
+    setCreateAssignments([]);
+    setCreateAssignmentOpen(false);
+    setIsCreating(false);
+    setCreateStart('');
+    setCreateEnd('');
+    setCreateError(null);
   };
 
   return (
@@ -95,12 +115,7 @@ function StatusGroup({
               <span className="flex h-[30px] items-center" onClick={(e) => e.stopPropagation()}>
                 <StatusMenu status="Pending" onStatusChange={(newStatus) => {
                   if (newStatus !== 'Pending') {
-                    setIsCreating(false);
-                    setCreateTitle('');
-                    setCreateAssignments([]);
-                    setCreateStart('');
-                    setCreateEnd('');
-                    setCreateError(null);
+                    resetCreateState();
                   }
                 }} />
               </span>
@@ -122,12 +137,7 @@ function StatusGroup({
                         localHandleSubmit();
                       }
                       if (e.key === 'Escape') {
-                        setCreateTitle('');
-                        setIsCreating(false);
-                        setCreateAssignments([]);
-                        setCreateStart('');
-                        setCreateEnd('');
-                        setCreateError(null);
+                        resetCreateState();
                       }
                     }}
                     placeholder="What needs to be done?"
@@ -145,33 +155,24 @@ function StatusGroup({
               </div>
 
               <div className="min-w-0">
-                <div className="space-y-2">
-                  {(createAssignments || []).map((a, idx) => (
-                    <AssignmentInput
-                      key={idx}
-                      assignment={a}
-                      onUpdate={(updated) => {
-                        setCreateAssignments((prev) => prev.map((item, i) => (i === idx ? { ...item, ...updated } : item)));
-                        if (createError?.field === 'assignments') setCreateError(null);
-                      }}
-                      onRemove={() => {
-                        setCreateAssignments((prev) => prev.filter((_, i) => i !== idx));
-                      }}
-                      canRemove
-                    />
-                  ))}
-                </div>
                 <button
                   type="button"
-                  onClick={() => setCreateAssignments((prev) => [...prev, { assignment_type: 'User', reference_id: '', reference_name: '' }])}
-                  className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700"
+                  onClick={(e) => { e.stopPropagation(); setCreateAssignmentOpen(true); }}
+                  className="min-w-0 w-full truncate rounded-md px-1.5 py-0.5 -mx-1.5 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-page)]"
+                  title="Click to edit assignments"
                 >
-                  + Add assignment
+                  {createAssignments.length > 0
+                    ? createAssignments.map((a) => a.reference_name || a.reference_id).join(', ')
+                    : <span className="text-[var(--text-muted)]">Click to add assignments</span>}
                 </button>
-                {createError?.field === 'assignments' && (
-                  <p className="mt-1 text-xs text-red-600">{createError.message}</p>
-                )}
               </div>
+
+              <CreateAssignmentModal
+                open={createAssignmentOpen}
+                onClose={() => setCreateAssignmentOpen(false)}
+                onSubmit={(assignments) => setCreateAssignments(assignments)}
+                initialAssignments={createAssignments}
+              />
 
               <div className="min-w-0">
                 <span className="text-sm text-[var(--text-muted)]">&nbsp;</span>
@@ -238,6 +239,24 @@ function StatusGroup({
                 )}
               </div>
 
+              <div className="min-w-0">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setCreateDescriptionOpen(true); }}
+                  className="min-w-0 w-full truncate rounded-md px-1.5 py-0.5 -mx-1.5 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-page)]"
+                  title="Click to add description"
+                >
+                  {createDescription || <span className="text-[var(--text-muted)]">Click to add description</span>}
+                </button>
+              </div>
+
+              <DescriptionModal
+                open={createDescriptionOpen}
+                onClose={() => setCreateDescriptionOpen(false)}
+                onSubmit={(description) => setCreateDescription(description)}
+                initialDescription={createDescription}
+              />
+
               <span className="flex h-[30px] items-center gap-1.5 shrink-0 opacity-100">
                 {isSubmitting ? (
                   <span className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
@@ -258,12 +277,7 @@ function StatusGroup({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setCreateTitle('');
-                        setIsCreating(false);
-                        setCreateAssignments([]);
-                        setCreateStart('');
-                        setCreateEnd('');
-                        setCreateError(null);
+                        resetCreateState();
                       }}
                       className="p-1.5 rounded-lg bg-red-500/10 text-red-600 hover:bg-red-500/20 dark:text-red-400 transition-colors"
                       aria-label="Cancel"
