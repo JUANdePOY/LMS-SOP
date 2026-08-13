@@ -151,7 +151,7 @@ function ensureStartupLock() {
       const pid = parseInt(fs.readFileSync(lockFile, 'utf8'), 10);
       try {
         process.kill(pid, 0);
-        console.warn(`Another Node process (pid ${pid}) appears to already be running. Waiting for it to exit...`);
+        console.warn(`Another Node process (pid ${pid}) appears to already be running. Continuing anyway; listen() will retry if the port is still in use.`);
         return false;
       } catch {
         fs.unlinkSync(lockFile);
@@ -172,22 +172,6 @@ function registerLockCleanup(lockFile) {
   process.on('exit', cleanup);
   process.on('SIGTERM', () => { cleanup(); process.exit(0); });
   process.on('SIGINT', () => { cleanup(); process.exit(0); });
-}
-
-function waitForLock(maxMs = 30000) {
-  const start = Date.now();
-  return new Promise((resolve) => {
-    function tick() {
-      const ok = ensureStartupLock();
-      if (ok) return resolve(true);
-      if (Date.now() - start >= maxMs) {
-        console.error(`Timed out after ${maxMs}ms waiting for another instance to exit. Exiting.`);
-        return resolve(false);
-      }
-      setTimeout(tick, 1000);
-    }
-    tick();
-  });
 }
 
 const MIGRATIONS = [
@@ -730,11 +714,6 @@ async function runMigrations() {
 async function initDatabase() {
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    const shouldInit = await waitForLock();
-    if (!shouldInit) {
-      console.warn('Skipping duplicate DB init. Server will continue with existing pool.');
-      return;
-    }
     const db = getPool();
     try {
       await db.query('SELECT 1 as test');
@@ -773,4 +752,3 @@ initDatabase().catch((err) => {
 
 module.exports = db;
 module.exports.ensureStartupLock = ensureStartupLock;
-module.exports.waitForLock = waitForLock;
