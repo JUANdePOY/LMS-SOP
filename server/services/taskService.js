@@ -91,6 +91,15 @@ async function listTasks(filters = {}, actorId) {
       users.forEach((u) => { userMap[u.id] = u.full_name; });
     }
 
+        const userAvatarMap = {};
+    if (userIds.length > 0) {
+      const [usersWithAvatar] = await db.query(
+        'SELECT id, avatar_url FROM users WHERE id IN (?)',
+        [userIds]
+      );
+      usersWithAvatar.forEach((u) => { userAvatarMap[u.id] = u.avatar_url; });
+    }
+
     const deptMap = {};
     if (deptIds.length > 0) {
       const [depts] = await db.query(
@@ -100,13 +109,19 @@ async function listTasks(filters = {}, actorId) {
       depts.forEach((d) => { deptMap[d.id] = d.name; });
     }
 
-    assignmentRows.forEach((a) => {
+        assignmentRows.forEach((a) => {
       if (!assignmentsMap[a.task_id]) assignmentsMap[a.task_id] = [];
       let referenceName = null;
-      if (a.assignment_type === 'User') referenceName = userMap[a.reference_id] || null;
-      else if (a.assignment_type === 'Department') referenceName = deptMap[a.reference_id] || null;
-      else if (a.assignment_type === 'Position') referenceName = a.reference_id;
-      assignmentsMap[a.task_id].push({ ...a, reference_name: referenceName });
+      let avatarUrl = null;
+      if (a.assignment_type === 'User') {
+        referenceName = userMap[a.reference_id] || null;
+        avatarUrl = userAvatarMap[a.reference_id] || null;
+      } else if (a.assignment_type === 'Department') {
+        referenceName = deptMap[a.reference_id] || null;
+      } else if (a.assignment_type === 'Position') {
+        referenceName = a.reference_id;
+      }
+      assignmentsMap[a.task_id].push({ ...a, reference_name: referenceName, avatar_url: avatarUrl });
     });
   }
 
@@ -152,11 +167,12 @@ async function getTask(id, actorId) {
   const enrichedAssignments = await Promise.all(assignments.map(async (assignment) => {
     if (assignment.assignment_type === 'User') {
       const [users] = await db.query(
-        'SELECT id, full_name, email FROM users WHERE id = ? LIMIT 1',
+        'SELECT id, full_name, email, avatar_url FROM users WHERE id = ? LIMIT 1',
         [assignment.reference_id]
       );
-      return { ...assignment, reference_name: users[0]?.full_name || null };
+      return { ...assignment, reference_name: users[0]?.full_name || null, avatar_url: users[0]?.avatar_url || null };
     }
+
     if (assignment.assignment_type === 'Department') {
       const [depts] = await db.query(
         'SELECT id, name, code FROM departments WHERE id = ? LIMIT 1',
@@ -222,7 +238,7 @@ async function createTask(payload, actorId) {
     throw error;
   }
 
-  for (const assignment of assignments) {
+    for (const assignment of assignments) {
     const assignmentValidation = validateAssignmentPayload({ ...assignment, task_id: 0 });
     if (!assignmentValidation.valid) {
       const error = new Error('Invalid assignment');
@@ -230,7 +246,7 @@ async function createTask(payload, actorId) {
       error.details = assignmentValidation.errors;
       throw error;
     }
-    if (assignmentValidation.value.assignment_type === 'Department' && actor && actor.business_id) {
+        if (assignmentValidation.value.assignment_type === 'Department' && actor && actor.business_id && actor.role !== 'super_admin') {
       const [[dept]] = await db.query(
         'SELECT business_id FROM departments WHERE id = ?',
         [assignmentValidation.value.reference_id]
@@ -727,15 +743,12 @@ async function getAssignedTaskIdsForUser(userId) {
   const [rows] = await db.query(
     `SELECT DISTINCT ta.task_id
      FROM task_assignments ta
-     WHERE ta.task_id NOT IN (
-       SELECT id FROM tasks WHERE status IN ('Completed', 'Cancelled')
-     )
-     AND (
+     WHERE (
        ta.assignment_type = 'User' AND ta.reference_id = ?
        OR ta.assignment_type = 'Department' AND ta.reference_id = ?
        OR ta.assignment_type = 'Position' AND ta.reference_id = ?
      )`,
-    [userId, user.department_id, user.position_title]
+     [userId, user.department_id, user.position_title]
   );
 
   return rows.map(r => r.task_id);
@@ -786,17 +799,16 @@ async function getMyTaskCount(userId) {
          FROM tasks t
          LEFT JOIN users u ON t.created_by = u.id
          LEFT JOIN task_assignments ta ON ta.task_id = t.id
-         WHERE t.status NOT IN ('Completed', 'Cancelled')
-           AND (u.business_id = ?
-             OR (ta.assignment_type = 'Department'
-               AND ta.reference_id IN (SELECT d.id FROM departments d WHERE d.business_id = ?)))`,
-        [user.business_id, user.business_id]
+         WHERE (u.business_id = ?
+           OR (ta.assignment_type = 'Department'
+             AND ta.reference_id IN (SELECT d.id FROM departments d WHERE d.business_id = ?)))`,
+         [user.business_id, user.business_id]
       );
       return countRow[0]?.total ?? 0;
     }
 
     const [countRow] = await db.query(
-      "SELECT COUNT(*) AS total FROM tasks WHERE status NOT IN ('Completed', 'Cancelled')"
+        "SELECT COUNT(*) AS total FROM tasks"
     );
     return countRow[0]?.total ?? 0;
   }
@@ -805,18 +817,15 @@ async function getMyTaskCount(userId) {
   if (!users || users.length === 0) return 0;
 
   const user = users[0];
-  const [countRow] = await db.query(
+    const [countRow] = await db.query(
     `SELECT COUNT(DISTINCT ta.task_id) AS total
      FROM task_assignments ta
-     WHERE ta.task_id NOT IN (
-       SELECT id FROM tasks WHERE status IN ('Completed', 'Cancelled')
-     )
-     AND (
+     WHERE (
        ta.assignment_type = 'User' AND ta.reference_id = ?
        OR ta.assignment_type = 'Department' AND ta.reference_id = ?
        OR ta.assignment_type = 'Position' AND ta.reference_id = ?
      )`,
-    [userId, user.department_id, user.position_title]
+     [userId, user.department_id, user.position_title]
   );
 
   return countRow[0]?.total ?? 0;

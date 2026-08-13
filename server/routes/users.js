@@ -16,14 +16,22 @@ router.get('/', async (req, res) => {
     const { search, role, department_id, business_id, employment_status, page = 1, limit = 50 } = req.query;
 
     let effectiveBusinessId = business_id ? parseInt(business_id) : undefined;
-    if (req.user.role !== 'super_admin') {
+    let effectiveDepartmentId = department_id ? parseInt(department_id) : undefined;
+
+    if (req.user.role === 'department_head') {
+      if (!req.user.department_id) {
+        return res.status(403).json({ status: 'error', message: 'No department assigned', code: 'NO_DEPARTMENT_SCOPE' });
+      }
+      effectiveDepartmentId = req.user.department_id;
+      effectiveBusinessId = req.user.business_id;
+    } else if (req.user.role !== 'super_admin') {
       effectiveBusinessId = req.user.business_id;
     }
 
     const result = await authModel.listUsers({
       search: search || undefined,
       role: role || undefined,
-      department_id: department_id ? parseInt(department_id) : undefined,
+      department_id: effectiveDepartmentId,
       business_id: effectiveBusinessId,
       employment_status: employment_status || undefined,
       page: parseInt(page),

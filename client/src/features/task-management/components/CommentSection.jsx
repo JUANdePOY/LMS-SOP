@@ -1,34 +1,8 @@
 import { useState, useMemo, memo } from 'react';
 import { MessageCircle, Reply, Clock } from 'lucide-react';
 import CommentInput from './CommentInput';
+import UserAvatar from "@/shared/components/ui/Avatar"
 
-function getInitials(name) {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
-}
-
-// Deterministic accent color per person so avatars aren't all identical.
-const AVATAR_COLORS = [
-  'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/15 dark:text-violet-100 dark:border-violet-500/30',
-  'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-100 dark:border-emerald-500/30',
-  'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-100 dark:border-amber-500/30',
-  'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-500/15 dark:text-pink-100 dark:border-pink-500/30',
-  'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-500/15 dark:text-cyan-100 dark:border-cyan-500/30',
-];
-
-function avatarColor(userId, isAdmin) {
-  if (isAdmin) {
-    return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-100 dark:border-blue-500/30';
-  }
-  const key = String(userId ?? '0');
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
-}
 
 function formatTime(dateStr) {
   if (!dateStr) return '';
@@ -51,14 +25,14 @@ function CommentItem({ comment, replies, currentUser, isReplyTarget, onReply }) 
 
   return (
     <div className={`flex gap-2.5 ${isOwn ? 'flex-row-reverse' : ''}`}>
-      <div
-        className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border ${avatarColor(
-          comment.user_id,
-          commenterIsAdmin
-        )}`}
-      >
-        {getInitials(comment.user_name)}
-      </div>
+      <UserAvatar
+        user={{
+          full_name: comment.user_name,
+          avatar_url: comment.user_avatar_url || comment.avatar_url,
+        }}
+        size="sm"
+        className="shrink-0"
+      />
       <div className={`flex-1 min-w-0 ${isOwn ? 'text-right' : ''}`}>
         <div className={`flex items-center gap-2 mb-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
           <span className="text-sm font-medium text-[var(--text-primary)] truncate">{comment.user_name}</span>

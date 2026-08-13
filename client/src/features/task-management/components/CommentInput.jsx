@@ -88,8 +88,8 @@ const CommentInput = memo(function CommentInput({
 
       {commentError && <p className="text-xs text-red-500 mb-1.5">{commentError}</p>}
 
-      <div className="flex gap-2 items-end">
-        <div className="flex-1 relative">
+      <div className="flex gap-2 items-center">
+         <div className="flex-1 relative overflow-hidden">
           <textarea
             ref={textareaRef}
             value={commentText}
@@ -107,7 +107,7 @@ const CommentInput = memo(function CommentInput({
             rows={1}
             disabled={!canComment || submitting}
             onKeyDown={handleKeyDown}
-            className="w-full min-h-10 rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3.5 py-2.5 pr-11 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 placeholder:text-[var(--text-muted)] disabled:opacity-60 disabled:cursor-not-allowed resize-none transition-colors"
+            className="w-full min-h-10 rounded-xl border border-[var(--border)] bg-[var(--bg-page)] px-3.5 py-2.5 pr-11 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 placeholder:text-[var(--text-muted)] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
           />
           {canComment && commentText.length > 0 && (
             <span

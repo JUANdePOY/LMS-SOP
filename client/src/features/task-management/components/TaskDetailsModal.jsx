@@ -216,7 +216,7 @@ export default function TaskDetailsModal({ taskId, open, onClose }) {
         
 
         {/* Tabs */}
-        <div className="flex gap-1 border-b border-[var(--border)] overflow-x-hidden px-2 sm:px-3">
+        <div className="flex gap-1 border-b border-[var(--border)] px-2 sm:px-3">
           {TABS.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;

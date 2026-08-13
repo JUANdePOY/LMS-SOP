@@ -7,6 +7,8 @@ import { StatusMenu, PriorityDot, InlineEditableText, EditableDateTime } from '.
 import { formatDateTime } from '../utils/taskDateUtils';
 import AssignmentInput from './AssignmentInput';
 import DescriptionModal from './DescriptionModal';
+import UserAvatar from '@/shared/components/ui/Avatar';
+
 
 function AssigneeStack({ items }) {
   if (!items || items.length === 0) {
@@ -24,13 +26,12 @@ function AssigneeStack({ items }) {
     <div className="flex items-center gap-2 min-w-0">
       <div className="flex -space-x-2 shrink-0">
         {shownUsers.map((item, i) => (
-          <div
+          <UserAvatar
             key={`user-${i}`}
-            title={item.name}
-            className="h-6 w-6 rounded-full border-2 border-[var(--bg-surface)] bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-[10px] font-semibold text-neutral-600 dark:text-neutral-300"
-          >
-            {item.name.charAt(0).toUpperCase()}
-          </div>
+            user={{ full_name: item.name, avatar_url: item.avatar_url }}
+            size="xs"
+            className="h-6 w-6 border-2 border-[var(--bg-surface)]"
+          />
         ))}
       </div>
       {shownDepartments.map((dept, i) => (
@@ -246,7 +247,7 @@ const AssignedCell = memo(function AssignedCell({ assignments, onSave }) {
 
   const items = assignments
     .filter((a) => (a.assignment_type === 'User' || a.assignment_type === 'Department') && a.reference_name)
-    .map((a) => ({ name: a.reference_name, type: a.assignment_type }));
+    .map((a) => ({ name: a.reference_name, type: a.assignment_type, avatar_url: a.avatar_url }));
 
   return (
     <div className="relative min-w-0">
