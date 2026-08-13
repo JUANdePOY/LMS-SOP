@@ -1,22 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Settings as SettingsIcon, Users, Shield, Plus, Pencil, Save, X, Search, Building2, Bell, Trash2 } from "lucide-react";
+import { Settings as SettingsIcon, Users, Plus, Pencil, Save, X, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/shared/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getSettings, updateSetting, createSetting,
-  getUsers,
   getProfile, updateProfile,
 } from "@/services/api";
-import { useNavigate } from "react-router-dom";
+import UsersPanel from "@/pages/management/userspanel";
 import { usePushNotifications } from "@/features/notifications/hooks/usePushNotifications";
-
-const ROLE_META = {
-  super_admin: { label: "Super Admin", icon: Shield, color: "text-red-600 dark:text-red-400", bg: "bg-red-50 dark:bg-red-500/10", border: "border-red-200 dark:border-red-500/30", desc: "Full system access" },
-  admin: { label: "Admin", icon: Shield, color: "text-[var(--color-primary)] dark:text-[var(--color-primary)]", bg: "bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)]", border: "border-[rgba(242,92,5,0.25)] dark:border-[rgba(242,92,5,0.30)]", desc: "Admin with scope management" },
-  department_head: { label: "Department Head", icon: Building2, color: "text-[var(--color-secondary)] dark:text-[var(--color-secondary)]", bg: "bg-[rgba(19,47,69,0.08)] dark:bg-[rgba(19,47,69,0.18)]", border: "border-[rgba(19,47,69,0.25)] dark:border-[rgba(19,47,69,0.30)]", desc: "Department-level manager" },
-  employee: { label: "Employee", icon: Users, color: "text-[var(--color-success)] dark:text-[var(--color-success)]", bg: "bg-success-soft dark:bg-success-soft", border: "border-[rgba(32,87,51,0.25)] dark:border-[rgba(32,87,51,0.30)]", desc: "Standard user / learner" },
-};
 
 const TABS = [
   { key: "users", label: "User Management", icon: Users },
@@ -26,9 +18,7 @@ const TABS = [
 export default function Settings() {
   const toast = useToast();
   const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("users");
-  const [users, setUsers] = useState([]);
   const [settings, setSettings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddSetting, setShowAddSetting] = useState(false);
@@ -37,24 +27,12 @@ export default function Settings() {
   const [settingKey, setSettingKey] = useState("");
   const [settingValue, setSettingValue] = useState("");
   const [settingDesc, setSettingDesc] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
   const [profile, setProfile] = useState(null);
   const [email, setEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
   const fetchingRef = useRef(false);
-
-  const fetchUsers = useCallback(async () => {
-    if (!isAuthenticated) return;
-    try {
-      const res = await getUsers({ limit: 100 });
-      if (res.data?.status === 'success') {
-        const data = res.data.data;
-        setUsers(data?.rows || data || []);
-      }
-    } catch { toast.error("Failed to load users"); }
-  }, [toast, isAuthenticated]);
 
   const fetchSettings = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -85,7 +63,7 @@ export default function Settings() {
       fetchingRef.current = true;
       setLoading(true);
       try {
-        await Promise.all([fetchUsers(), fetchSettings(), fetchProfile()]);
+        await Promise.all([fetchSettings(), fetchProfile()]);
       } finally {
         setLoading(false);
         fetchingRef.current = false;
@@ -163,18 +141,6 @@ export default function Settings() {
     }
   };
 
-  const getScopeLabel = (user) => {
-    return user.department_name || null;
-  };
-
-  const filteredUsers = users.filter((u) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (u.full_name || "").toLowerCase().includes(q) ||
-      (u.email || "").toLowerCase().includes(q) ||
-      (u.employee_id || "").toLowerCase().includes(q);
-  });
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -209,102 +175,7 @@ export default function Settings() {
 
       {/* User Management Tab */}
       {activeTab === "users" && (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-neutral-500">{users.length} users</p>
-            <button
-               onClick={() => navigate('/settings')}
-               className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-secondary-hover)] transition-colors"
-             >
-               <Plus size={13} /> Add User
-            </button>
-          </div>
-
-          <div className="relative">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search users…"
-              className="w-full rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-[rgba(19,47,69,0.40)]"
-            />
-          </div>
-
-          <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-neutral-100 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50">
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-400">User</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Role</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Department</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Status</th>
-                  <th className="px-4 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-neutral-400">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                {filteredUsers.map((user) => {
-                  const RoleIcon = ROLE_META[user.role]?.icon || Users;
-                  return (
-                    <tr key={user.id} className="hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col">
-                          <span className="text-[13px] font-medium text-neutral-800 dark:text-neutral-200">
-                            {user.full_name || '—'}
-                          </span>
-                          <span className="text-[10px] text-neutral-400 font-mono">{user.email}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={cn(
-                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                          ROLE_META[user.role]?.bg || '',
-                          ROLE_META[user.role]?.color || ''
-                        )}>
-                          <RoleIcon size={12} />
-                          {ROLE_META[user.role]?.label || user.role}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-neutral-500">
-                        {getScopeLabel(user) || '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={cn(
-                          "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                          user.is_active
-                            ? "bg-success-soft text-success dark:bg-success-soft dark:text-[var(--color-success)]"
-                            : "bg-neutral-100 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
-                        )}>
-                          {user.is_active ? "Active" : "Inactive"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={() => navigate('/settings')}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-[var(--color-secondary)] hover:bg-[rgba(19,47,69,0.08)] dark:hover:bg-[rgba(19,47,69,0.08)]0/10 transition-colors"
-                            title="Edit user"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                          {user.role !== 'super_admin' && (
-                            <button
-                              onClick={() => navigate('/settings')}
-                              className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
-                              title="Deactivate user"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <UsersPanel />
       )}
 
       {/* General Settings Tab */}

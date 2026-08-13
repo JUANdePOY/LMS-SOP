@@ -8,6 +8,7 @@ const db = require('../config/database');
 const sopAuditLogService = require('./sopAuditLogService');
 const sopService = require('./sopService');
 const { broadcastSystemChange } = require('./notificationService');
+const { getLeadershipTargetUserIds } = require('./notificationTargetService');
 
 async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
   const sop = await sopModel.findById(sopId);
@@ -97,14 +98,30 @@ async function transitionSop(sopId, nextStatus, actorId, metadata = {}) {
   let acknowledgements = null;
   if (nextStatus === 'Published') {
     acknowledgements = await sopAcknowledgementService.generateAcknowledgementsOnPublish(sopId);
-    broadcastSystemChange({
-      title: 'SOP Published',
-      body: sop.title,
-      type: 'success',
-      link: `/sops/${sopId}`,
-      entityType: 'sop',
-      entityId: sopId,
-    }).catch(() => {});
+    const deptId = sop.department_id || null;
+    let businessId = null;
+    if (deptId) {
+      const [[dept]] = await db.query(
+        'SELECT business_id FROM departments WHERE id = ?',
+        [deptId]
+      );
+      businessId = dept ? dept.business_id : null;
+    }
+    getLeadershipTargetUserIds(businessId, deptId, actorId)
+      .then((targetUserIds) => {
+        if (targetUserIds.length > 0) {
+          broadcastSystemChange({
+            title: 'SOP Published',
+            body: sop.title,
+            type: 'success',
+            link: `/sops/${sopId}`,
+            entityType: 'sop',
+            entityId: sopId,
+            targetUserIds,
+          }).catch(() => {});
+        }
+      })
+      .catch(() => {});
   }
 
   return { from: sop.status, to: nextStatus, acknowledgements };

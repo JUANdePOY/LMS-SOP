@@ -5,6 +5,7 @@ const enrollmentModel = require('../models/enrollmentModel');
 const { logAudit } = require('../utils/auditLogger');
 const db = require('../config/database');
 const { broadcastSystemChange } = require('../services/notificationService');
+const { getLeadershipTargetUserIds } = require('../services/notificationTargetService');
 
 const ADMIN_ROLES = ['super_admin', 'admin', 'department_head'];
 const FINAL_QUIZ_DEFAULT_ATTEMPTS = 3;
@@ -219,7 +220,7 @@ async function listQuizzes(req, res) {
   try {
     const course = await courseModel.findById(courseId);
     const businessId = course?.department_id ? await db.query('SELECT business_id FROM departments WHERE id = ?', [course.department_id]).then(([rows]) => rows[0]?.business_id) : null;
-    const quizzes = await quizModel.listQuizzes(courseId, { module_id: moduleId, status, page, limit, business_id });
+    const quizzes = await quizModel.listQuizzes(courseId, { module_id: moduleId, status, page, limit, business_id: businessId });
     res.json({ success: true, data: quizzes });
   } catch (err) {
     sendError(res, err, 'Failed to list quizzes');
@@ -312,14 +313,31 @@ async function createQuiz(req, res) {
 
     logAudit && logAudit('quiz.create', req.user.id, { quizId, courseId });
 
-    broadcastSystemChange({
-      title: 'New Quiz Created',
-      body: title,
-      type: 'info',
-      link: `/courses/${courseId}`,
-      entityType: 'quiz',
-      entityId: quizId,
-    }).catch(() => {});
+    const [[scope]] = await db.query(
+      `SELECT c.department_id, d.business_id
+       FROM courses c
+       LEFT JOIN departments d ON c.department_id = d.id
+       WHERE c.id = ?`,
+      [courseId]
+    );
+    const courseDepartmentId = scope?.department_id || null;
+    const courseBusinessId = scope?.business_id || null;
+
+    getLeadershipTargetUserIds(courseBusinessId, courseDepartmentId, req.user.id)
+      .then((targetUserIds) => {
+        if (targetUserIds.length > 0) {
+          broadcastSystemChange({
+            title: 'New Quiz Created',
+            body: title,
+            type: 'info',
+            link: `/courses/${courseId}`,
+            entityType: 'quiz',
+            entityId: quizId,
+            targetUserIds,
+          }).catch(() => {});
+        }
+      })
+      .catch(() => {});
 
     res.status(201).json({ success: true, data: { id: quizId }, message: 'Quiz created' });
   } catch (err) {
@@ -375,14 +393,31 @@ async function publishQuiz(req, res) {
     await quizModel.update(req.params.id, { status: 'published' });
     logAudit && logAudit('quiz.publish', req.user.id, { quizId: quiz.id });
 
-    broadcastSystemChange({
-      title: 'Quiz Published',
-      body: quiz.title,
-      type: 'success',
-      link: `/courses/${quiz.course_id}`,
-      entityType: 'quiz',
-      entityId: quiz.id,
-    }).catch(() => {});
+    const [[scope]] = await db.query(
+      `SELECT c.department_id, d.business_id
+       FROM courses c
+       LEFT JOIN departments d ON c.department_id = d.id
+       WHERE c.id = ?`,
+      [quiz.course_id]
+    );
+    const courseDepartmentId = scope?.department_id || null;
+    const courseBusinessId = scope?.business_id || null;
+
+    getLeadershipTargetUserIds(courseBusinessId, courseDepartmentId, req.user.id)
+      .then((targetUserIds) => {
+        if (targetUserIds.length > 0) {
+          broadcastSystemChange({
+            title: 'Quiz Published',
+            body: quiz.title,
+            type: 'success',
+            link: `/courses/${quiz.course_id}`,
+            entityType: 'quiz',
+            entityId: quiz.id,
+            targetUserIds,
+          }).catch(() => {});
+        }
+      })
+      .catch(() => {});
 
     res.json({ success: true, message: 'Quiz published' });
   } catch (err) {

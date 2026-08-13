@@ -10,11 +10,11 @@ import { Modal } from "@/shared/components/ui/modal";
 import { useNotifications } from "@/shared/stores/notificationStore.js";
 
 export default function AnnouncementsPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, role, department_id } = useAuth();
   const canManage = hasPermission('manage_announcements');
   const { toast } = useToast();
   const { markEntityTypeRead } = useNotifications();
-  const { items, error, refresh, create, update, remove } = useAnnouncements({ status: "active" });
+  const { items, error, refresh, create, update, remove } = useAnnouncements({ status: "active", target_role: role, target_department: department_id });
 
   useEffect(() => {
     markEntityTypeRead('announcement');

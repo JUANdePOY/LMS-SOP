@@ -46,7 +46,7 @@ const DIFFICULTIES = ["beginner", "intermediate", "advanced", "all_levels"];
 export default function Courses({ departments = [] }) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { hasPermission, isSuperAdmin, isAdmin, isDepartmentHead } = useAuth();
+  const { hasPermission, isSuperAdmin, isAdmin, isDepartmentHead, isEmployee } = useAuth();
   const canManageCourses = hasPermission('manage_courses');
   const [courses, setCourses] = useState([]);
   const [stats, setStats] = useState(null);
@@ -215,16 +215,18 @@ export default function Courses({ departments = [] }) {
         const res = await publishCourse(course.id);
         if (res?.success) {
           toast.success("Course published");
-          enqueueBanner({
-            id: `new-course-${course.id}`,
-            type: "new_course",
-            title: "New Course Published",
-            message: course.title || "A new course is now available.",
-            link: `/courses/library/${course.id}`,
-            ctaLabel: "Check course",
-            priority: 1,
-            persistDismiss: true,
-          });
+          if (!isEmployee) {
+            enqueueBanner({
+              id: `new-course-${course.id}`,
+              type: "new_course",
+              title: "New Course Published",
+              message: course.title || "A new course is now available.",
+              link: `/courses/library/${course.id}`,
+              ctaLabel: "Check course",
+              priority: 1,
+              persistDismiss: true,
+            });
+          }
         }
       } else if (action === "archive") {
         const res = await archiveCourse(course.id);

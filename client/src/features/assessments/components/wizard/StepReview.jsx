@@ -5,7 +5,7 @@ export default function StepReview({ settings, courseTitle, questions, openBuild
     ["Course", courseTitle || "—"],
     ["Title", settings.title || "—"],
     ["Type", settings.quiz_type === "final" ? "Final" : "Practice"],
-    ["Time Limit", settings.time_limit ? `${settings.time_limit}s` : "None"],
+    ["Time Limit", settings.time_limit ? `${settings.time_limit} min` : "None"],
     ["Passing Score", settings.passing_score ? `${settings.passing_score}%` : "—"],
     ["Max Score", settings.max_score || "—"],
     ["Questions", questions.length],

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getUsers, createUser, updateUser, deleteUser, getUserStats, getBusinesses, getDepartments, getDepartmentHierarchy } from '@/services/api';
+import { getUsers, createUser, updateUser, deleteUser, getUserStats, getBusinesses, getDepartments } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/shared/components/ui/button';
 import { Input } from '@/shared/components/ui/input';
@@ -63,7 +63,6 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [departments, setDepartments] = useState(initialDepartments);
-  const [departmentTree, setDepartmentTree] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
@@ -83,6 +82,19 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   const [pageSize, setPageSize] = useState(10);
   const [sortField, setSortField] = useState('full_name');
   const [sortDirection, setSortDirection] = useState('asc');
+  const [modalDepartments, setModalDepartments] = useState([]);
+
+  useEffect(() => {
+    if (formData.business_id) {
+      const filtered = departments.filter((d) => String(d.business_id) === String(formData.business_id));
+      setModalDepartments(filtered);
+      if (formData.department_id && !filtered.some((d) => String(d.id) === String(formData.department_id))) {
+        setFormData((prev) => ({ ...prev, department_id: '' }));
+      }
+    } else {
+      setModalDepartments(departments);
+    }
+  }, [formData.business_id, departments, formData.department_id]);
 
   const fetchUsers = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -119,31 +131,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
         setDepartments(res.data.data?.rows || []);
       }
     } catch { /* ignore */ }
-    try {
-      const hRes = await getDepartmentHierarchy();
-      if (hRes.data?.status === 'success') {
-        setDepartmentTree(Array.isArray(hRes.data.data) ? hRes.data.data : []);
-      }
-    } catch { /* ignore */ }
   }, [isAuthenticated]);
-
-  // Flatten the nested department tree into an indented option list so the
-  // parent → child hierarchy is visible when picking a department.
-  const departmentOptions = (() => {
-    const out = [];
-    const walk = (nodes, depth) => {
-      for (const node of nodes || []) {
-        out.push({
-          id: node.id,
-          name: depth > 0 ? `${'  '.repeat(depth)}${node.name}` : node.name,
-          depth,
-        });
-        if (node.children && node.children.length) walk(node.children, depth + 1);
-      }
-    };
-    walk(departmentTree, 0);
-    return out;
-  })();
 
   const fetchBusinesses = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -625,41 +613,43 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
               <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Password <span className="text-red-500">*</span></label>
               <Input type="password" value={formData.password || ''} onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))} placeholder="Min 8 characters" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role <span className="text-red-500">*</span></label>
-                <Select value={formData.role || ''} onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                  <option value="">Select role…</option>
-                  {Object.entries(ROLE_META).map(([key, meta]) => {
-                    if (key === 'super_admin' && user?.role !== 'super_admin') return null;
-                    return <option key={key} value={key}>{meta.label}</option>;
-                  })}
-                </Select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
-                <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                  <option value="">Select department…</option>
-                  {departmentOptions.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
-                <Select value={formData.business_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                  <option value="">Select business…</option>
-                  {businesses.map((b) => (
-                    <option key={b.id} value={b.id}>{b.business_name}</option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Position Title</label>
-                <Input value={formData.position_title || ''} onChange={(e) => setFormData(prev => ({ ...prev, position_title: e.target.value }))} placeholder="e.g. Manager" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
-              </div>
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+               <div>
+                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
+                 <Select value={formData.business_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                   <option value="">Select business…</option>
+                   {businesses.map((b) => (
+                     <option key={b.id} value={b.id}>{b.business_name}</option>
+                   ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
+                  <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} disabled={!formData.business_id} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                    <option value="">Select department…</option>
+                    {modalDepartments.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </Select>
+                </div>
+               </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role <span className="text-red-500">*</span></label>
+                   <Select value={formData.role || ''} onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                    <option value="">Select role…</option>
+                    {Object.entries(ROLE_META).map(([key, meta]) => {
+                      if (user?.role === 'admin' && !['department_head', 'employee'].includes(key)) return null;
+                      return <option key={key} value={key}>{meta.label}</option>;
+                    })}
+                  </Select>
+               </div>
+             </div>
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+               <div>
+                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Position Title</label>
+                 <Input value={formData.position_title || ''} onChange={(e) => setFormData(prev => ({ ...prev, position_title: e.target.value }))} placeholder="e.g. Manager" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
+               </div>
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Employee ID</label>
                 <Input value={formData.employee_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, employee_id: e.target.value }))} placeholder="Optional" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
@@ -718,39 +708,29 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                 <Input type="email" value={formData.email || ''} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                <div>
-                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role</label>
-                 <Select value={formData.role || ''} onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                   <option value="">Select role…</option>
-                   {Object.entries(ROLE_META).map(([key, meta]) => {
-                     if (key === 'super_admin' && user?.role !== 'super_admin') return null;
-                     return <option key={key} value={key}>{meta.label}</option>;
-                   })}
-                 </Select>
-               </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
-                <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                  <option value="">Select department…</option>
-                  {departmentOptions.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
-                  ))}
-                </Select>
+                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
+                 <Select value={formData.business_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                   <option value="">Select business…</option>
+                   {businesses.map((b) => (
+                     <option key={b.id} value={b.id}>{b.business_name}</option>
+                   ))}
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
+                  <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} disabled={!formData.business_id} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                    <option value="">Select department…</option>
+                    {modalDepartments.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </Select>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
-                <Select value={formData.business_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                  <option value="">Select business…</option>
-                  {businesses.map((b) => (
-                    <option key={b.id} value={b.id}>{b.business_name}</option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Position Title</label>
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+               <div>
+                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Position Title</label>
                 <Input value={formData.position_title || ''} onChange={(e) => setFormData(prev => ({ ...prev, position_title: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
               <div>

@@ -46,11 +46,16 @@ async function listCourses(filters = {}) {
     params.push(status);
   }
   if (department_id) {
-    sql += ' AND c.department_id = ?';
+    // A course with a NULL department is assigned to "all departments" and is
+    // visible to every department within scope.
+    sql += ' AND (c.department_id = ? OR c.department_id IS NULL)';
     params.push(parseInt(department_id, 10));
   }
   if (business_id) {
-    sql += ' AND d.business_id = ?';
+    // A course with a NULL business AND NULL department is assigned to
+    // "all businesses" and is visible to everyone. A NULL business with a
+    // specific department must NOT leak across businesses.
+    sql += ' AND (d.business_id = ? OR (d.business_id IS NULL AND c.department_id IS NULL))';
     params.push(parseInt(business_id, 10));
   }
   if (categories.length > 0) {
@@ -95,11 +100,11 @@ async function countCourses(filters = {}) {
     params.push(status);
   }
   if (department_id) {
-    sql += ' AND c.department_id = ?';
+    sql += ' AND (c.department_id = ? OR c.department_id IS NULL)';
     params.push(parseInt(department_id, 10));
   }
   if (business_id) {
-    sql += ' AND EXISTS (SELECT 1 FROM departments d WHERE d.id = c.department_id AND d.business_id = ?)';
+    sql += ' AND (EXISTS (SELECT 1 FROM departments d WHERE d.id = c.department_id AND d.business_id = ?) OR (NOT EXISTS (SELECT 1 FROM departments d WHERE d.id = c.department_id) AND c.department_id IS NULL))';
     params.push(parseInt(business_id, 10));
   }
   if (categories.length > 0) {

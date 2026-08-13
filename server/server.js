@@ -15,7 +15,11 @@ console.log('LMS-SOP Server starting...');
 
 const lockOk = ensureStartupLock();
 if (!lockOk) {
-  console.warn('Startup lock indicates another instance may already be running. Will attempt to bind anyway.');
+  // A live peer already holds the startup lock. Refusing to start prevents a
+  // second process from opening its own connection pool, which multiplies the
+  // per-hour MySQL connect count and trips max_connections_per_hour.
+  console.error('Startup lock indicates another live instance is already running. Exiting to avoid a duplicate connection pool.');
+  process.exit(1);
 }
 
 const app = express();
@@ -374,11 +378,14 @@ function listenWithRetry(port, retries) {
 
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-      console.error(`Port ${port} is already in use (attempt ${retries}). Retrying...`);
+      // Another instance already holds the port. Retry briefly to bridge a
+      // deploy overlap (old instance still shutting down), but give up and exit
+      // so we never keep a duplicate process — and its connection pool — alive.
       if (retries > 0) {
+        console.error(`Port ${port} is already in use (attempt ${retries}). Retrying briefly; will exit if it stays busy.`);
         setTimeout(() => listenWithRetry(port, retries - 1), 1000);
       } else {
-        console.error('Could not bind to port after retries. Exiting.');
+        console.error(`Port ${port} still in use after retries. Another instance is running. Exiting to avoid a duplicate process.`);
         process.exit(1);
       }
     } else {
@@ -387,6 +394,8 @@ function listenWithRetry(port, retries) {
   });
 }
 
-listenWithRetry(PORT, 5);
+// Bounded retry (~30s) to tolerate a deploy overlap, then exit rather than
+// leaving a duplicate instance alive.
+listenWithRetry(PORT, 30);
 
 module.exports = app;

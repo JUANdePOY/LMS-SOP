@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichTextEditor";
 import { useAuth } from "@/contexts/AuthContext";
+import { getBusinesses } from "@/features/organization-management/api/business.api";
+import { getDepartments } from "@/features/organization-management/api/department.api";
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -33,13 +35,76 @@ const STATUS_OPTIONS = [
 
 export default function AnnouncementForm({ initialData, onSubmit, onCancel, saving }) {
   const { user } = useAuth();
+  const role = user?.role || "";
+  const isSuperAdmin = role === "super_admin";
+  const scopedBusinessId = user?.business_id || null;
+
   const [title, setTitle] = useState(initialData?.title || "");
   const [body, setBody] = useState(initialData?.body || "");
   const [type, setType] = useState(initialData?.type || "General");
   const [priority, setPriority] = useState(initialData?.priority || "medium");
   const [status, setStatus] = useState(initialData?.status || "active");
-  const [targetRoles, setTargetRoles] = useState(() => parseJsonField(initialData?.target_roles, []));
-  const [targetDepartments, setTargetDepartments] = useState(() => parseJsonField(initialData?.target_departments, []));
+
+  const [businessId, setBusinessId] = useState(() => initialData?.business_id || scopedBusinessId || "");
+  const [targetDepartmentCode, setTargetDepartmentCode] = useState(() => {
+    if (!initialData?.target_departments) return "";
+    const codes = Array.isArray(initialData.target_departments) ? initialData.target_departments : [];
+    return codes.length === 1 ? codes[0] : "";
+  });
+  const [businesses, setBusinesses] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [loadingOptions, setLoadingOptions] = useState({ businesses: false, departments: false });
+
+  const fetchBusinesses = useCallback(async () => {
+    setLoadingOptions((p) => ({ ...p, businesses: true }));
+    try {
+      const params = { status: "active", limit: 100 };
+      if (!isSuperAdmin && scopedBusinessId) {
+        params.business_id = String(scopedBusinessId);
+      }
+      const res = await getBusinesses(params);
+      setBusinesses(res?.data?.data?.rows || []);
+    } catch {
+      setBusinesses([]);
+    } finally {
+      setLoadingOptions((p) => ({ ...p, businesses: false }));
+    }
+  }, [isSuperAdmin, scopedBusinessId]);
+
+  const fetchDepartments = useCallback(async (busId) => {
+    setLoadingOptions((p) => ({ ...p, departments: true }));
+    try {
+      const params = { status: "active", limit: 200 };
+      if (!isSuperAdmin && scopedBusinessId) {
+        params.business_id = String(scopedBusinessId);
+      } else if (busId) {
+        params.business_id = String(busId);
+      }
+      const res = await getDepartments(params);
+      let rows = res?.data?.data?.rows || [];
+      if (!isSuperAdmin && scopedBusinessId) {
+        rows = rows.filter((d) => String(d.business_id) === String(scopedBusinessId));
+      }
+      setDepartments(rows);
+    } catch {
+      setDepartments([]);
+    } finally {
+      setLoadingOptions((p) => ({ ...p, departments: false }));
+    }
+  }, [isSuperAdmin, scopedBusinessId]);
+
+  useEffect(() => {
+    fetchBusinesses();
+  }, [fetchBusinesses]);
+
+  useEffect(() => {
+    if (businessId) {
+      fetchDepartments(businessId);
+    } else {
+      setDepartments([]);
+    }
+    setTargetDepartmentCode("");
+  }, [businessId, fetchDepartments]);
 
   useEffect(() => {
     if (initialData) {
@@ -48,24 +113,36 @@ export default function AnnouncementForm({ initialData, onSubmit, onCancel, savi
       setType(initialData.type || "General");
       setPriority(initialData.priority || "medium");
       setStatus(initialData.status || "active");
-      setTargetRoles(parseJsonField(initialData.target_roles, []));
-      setTargetDepartments(parseJsonField(initialData.target_departments, []));
+      const initBusinessId = initialData.business_id || scopedBusinessId || "";
+      setBusinessId(initBusinessId);
+      if (initialData.target_departments) {
+        const codes = Array.isArray(initialData.target_departments) ? initialData.target_departments : [];
+        setTargetDepartmentCode(codes.length === 1 ? codes[0] : "");
+      } else {
+        setTargetDepartmentCode("");
+      }
     }
-  }, [initialData]);
+  }, [initialData, scopedBusinessId]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!title.trim() || !body.trim()) return;
+    const targetDepartments = targetDepartmentCode ? [targetDepartmentCode] : null;
     onSubmit({
       title: title.trim(),
       body: body.trim(),
       type,
       priority,
       status,
-      target_roles: targetRoles,
+      business_id: businessId ? Number(businessId) : null,
       target_departments: targetDepartments,
     });
   };
+
+  const filteredDepartments = departments.filter((d) => {
+    if (!businessId) return false;
+    return String(d.business_id) === String(businessId);
+  });
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -132,26 +209,35 @@ export default function AnnouncementForm({ initialData, onSubmit, onCancel, savi
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-neutral-700 mb-1">Target Roles (optional)</label>
-          <input
-            type="text"
-            value={targetRoles.join(", ")}
-            onChange={(e) => setTargetRoles(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
-            placeholder="e.g. employee, department_head"
-          />
-          <p className="text-[10px] text-neutral-400 mt-1">Comma-separated. Leave blank for all roles.</p>
+          <label className="block text-xs font-medium text-neutral-700 mb-1">Business</label>
+          <select
+            value={businessId}
+            onChange={(e) => setBusinessId(e.target.value)}
+            disabled={loadingOptions.businesses || !isSuperAdmin}
+            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <option value="">{isSuperAdmin ? "All Businesses" : "My Business"}</option>
+            {businesses.map((b) => (
+              <option key={b.id} value={b.id}>{b.business_name || b.business_code}</option>
+            ))}
+          </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-neutral-700 mb-1">Target Departments (optional)</label>
-          <input
-            type="text"
-            value={targetDepartments.join(", ")}
-            onChange={(e) => setTargetDepartments(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
-            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
-            placeholder="e.g. OPS, IT"
-          />
-          <p className="text-[10px] text-neutral-400 mt-1">Comma-separated department codes. Leave blank for all departments.</p>
+          <label className="block text-xs font-medium text-neutral-700 mb-1">Target Department</label>
+          <select
+            value={targetDepartmentCode}
+            onChange={(e) => setTargetDepartmentCode(e.target.value)}
+            disabled={loadingOptions.departments || !businessId}
+            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <option value="">All Departments</option>
+            {filteredDepartments.map((d) => (
+              <option key={d.id} value={d.code}>{d.name}</option>
+            ))}
+          </select>
+          {!businessId && (
+            <p className="text-[10px] text-neutral-400 mt-1">Select a business first.</p>
+          )}
         </div>
       </div>
       <div className="flex justify-end gap-2 pt-2">
@@ -164,15 +250,4 @@ export default function AnnouncementForm({ initialData, onSubmit, onCancel, savi
       </div>
     </form>
   );
-}
-
-function parseJsonField(value, fallback) {
-  if (Array.isArray(value)) return value;
-  if (!value) return fallback;
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : fallback;
-  } catch {
-    return fallback;
-  }
 }

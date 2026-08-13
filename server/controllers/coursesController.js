@@ -6,6 +6,7 @@ const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 const db = require('../config/database');
 const { broadcastSystemChange } = require('../services/notificationService');
+const { getLeadershipTargetUserIds } = require('../services/notificationTargetService');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -72,13 +73,17 @@ function listCourses(req, res) {
   const limitNum = parseInt(limit || '20', 10);
 
   let effectiveBusinessId = business_id ? parseInt(business_id, 10) : undefined;
+  let effectiveDepartmentId = department_id ? parseInt(department_id, 10) : undefined;
   if (req.user && req.user.role !== 'super_admin') {
     effectiveBusinessId = req.user.business_id;
+    if (req.user.role === 'department_head' || req.user.role === 'employee') {
+      effectiveDepartmentId = req.user.department_id;
+    }
   }
 
   Promise.all([
-    courseModel.listCourses({ search, status, category, difficulty, instructor_id, page: pageNum, limit: limitNum, department_id, business_id: effectiveBusinessId }),
-    courseModel.countCourses({ search, status, category, difficulty, instructor_id, department_id, business_id: effectiveBusinessId }),
+    courseModel.listCourses({ search, status, category, difficulty, instructor_id, page: pageNum, limit: limitNum, department_id: effectiveDepartmentId, business_id: effectiveBusinessId }),
+    courseModel.countCourses({ search, status, category, difficulty, instructor_id, department_id: effectiveDepartmentId, business_id: effectiveBusinessId }),
   ])
     .then(([data, total]) => {
       res.json({
@@ -143,14 +148,21 @@ function createCourse(req, res) {
       .then((id) => {
         logAudit('course.create', userId, { courseId: id, title });
         const link = `/courses/${id}`;
-        broadcastSystemChange({
-          title: 'New Course Available',
-          body: title.trim(),
-          type: 'info',
-          link,
-          entityType: 'course',
-          entityId: id,
-        }).catch(() => {});
+        getLeadershipTargetUserIds(effectiveBusinessId, effectiveDepartmentId, userId)
+          .then((targetUserIds) => {
+            if (targetUserIds.length > 0) {
+              broadcastSystemChange({
+                title: 'New Course Available',
+                body: title.trim(),
+                type: 'info',
+                link,
+                entityType: 'course',
+                entityId: id,
+                targetUserIds,
+              }).catch(() => {});
+            }
+          })
+          .catch(() => {});
         return res.status(201).json({ success: true, message: 'Course created successfully', data: { id, title, status: status || 'draft' } });
       })
       .catch((err) => sendError(res, err, 'Failed to create course'));
@@ -457,17 +469,22 @@ function archiveCourse(req, res) {
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
       return enforceCourseScope(course, req.user).then(() => {
-        return courseModel.update(courseId, { status: 'archived' }).then(() => {
-          logAudit('course.archived', userId, { courseId });
-          broadcastSystemChange({
-            title: 'Course Archived',
-            body: course.title,
-            type: 'warning',
-            link: `/courses/${courseId}`,
-            entityType: 'course',
-            entityId: courseId,
-          }).catch(() => {});
-          return res.json({ success: true, message: 'Course archived successfully' });
+        return getLeadershipTargetUserIds(course.business_id, course.department_id, userId).then((targetUserIds) => {
+          return courseModel.update(courseId, { status: 'archived' }).then(() => {
+            logAudit('course.archived', userId, { courseId });
+            if (targetUserIds.length > 0) {
+              broadcastSystemChange({
+                title: 'Course Archived',
+                body: course.title,
+                type: 'warning',
+                link: `/courses/${courseId}`,
+                entityType: 'course',
+                entityId: courseId,
+                targetUserIds,
+              }).catch(() => {});
+            }
+            return res.json({ success: true, message: 'Course archived successfully' });
+          });
         });
       });
     })
@@ -482,17 +499,22 @@ function publishCourse(req, res) {
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
       return enforceCourseScope(course, req.user).then(() => {
-        return courseModel.update(courseId, { status: 'published' }).then(() => {
-          logAudit('course.published', userId, { courseId });
-          broadcastSystemChange({
-            title: 'New Course Published',
-            body: course.title,
-            type: 'success',
-            link: `/courses/${courseId}`,
-            entityType: 'course',
-            entityId: courseId,
-          }).catch(() => {});
-          return res.json({ success: true, message: 'Course published successfully' });
+        return getLeadershipTargetUserIds(course.business_id, course.department_id, userId).then((targetUserIds) => {
+          return courseModel.update(courseId, { status: 'published' }).then(() => {
+            logAudit('course.published', userId, { courseId });
+            if (targetUserIds.length > 0) {
+              broadcastSystemChange({
+                title: 'New Course Published',
+                body: course.title,
+                type: 'success',
+                link: `/courses/${courseId}`,
+                entityType: 'course',
+                entityId: courseId,
+                targetUserIds,
+              }).catch(() => {});
+            }
+            return res.json({ success: true, message: 'Course published successfully' });
+          });
         });
       });
     })

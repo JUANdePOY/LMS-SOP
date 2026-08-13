@@ -17,7 +17,7 @@ export default function EventsPage() {
   const canManage = isSuperAdmin;
   const { toast } = useToast();
   const { markEntityTypeRead } = useNotifications();
-  const { items, error, refresh, create, update, remove } = useEvents({ status: "active" });
+  const { items, error, refresh, create, update, remove } = useEvents({ status: "active", target_role: role, target_department: department_id });
   const calendar = useGoogleCalendar();
 
   useEffect(() => {

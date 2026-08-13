@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useParams } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { useQuizzes } from "../hooks/useQuizzes";
 import QuizTable from "../components/tables/QuizTable";
 import QuizCard from "../components/cards/QuizCard";
@@ -10,7 +11,8 @@ import { Plus, RefreshCw, AlertCircle, LayoutList, Grid as GridIcon } from "luci
 
 export default function QuizManagePage() {
   const { courseId } = useParams();
-  const { data: quizzes, loading, error, refetch, createQuiz } = useQuizzes(courseId);
+  const { isSuperAdmin, isAdmin } = useAuth();
+  const { data: quizzes, loading, error, refetch, createQuiz, updateQuizStatus, showAll } = useQuizzes(courseId, {}, { isSuperAdmin, isAdmin });
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState("table");
   const [busy, setBusy] = useState(null);
@@ -41,11 +43,16 @@ export default function QuizManagePage() {
     console.log("View:", quiz);
   };
 
-  const handleTogglePublish = (q) => {
+  const handleTogglePublish = async (q) => {
     setBusy(q.id);
-    // Publish/unpublish logic would go here
-    console.log("Toggle publish:", q);
-    setTimeout(() => setBusy(null), 1000);
+    try {
+      const action = q.status === "published" ? "archive" : "publish";
+      await updateQuizStatus(q.id, action);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
@@ -53,7 +60,9 @@ export default function QuizManagePage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">Quizzes</h1>
-          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">Manage quizzes for this course</p>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
+            {showAll ? "Manage all quizzes across courses" : "Manage quizzes for this course"}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={() => setOpen(true)} size="sm">

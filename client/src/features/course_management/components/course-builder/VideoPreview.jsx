@@ -37,6 +37,7 @@ export default function VideoPreview({ url, onPickChapter, activeChapterStart })
   const badgeColor = {
     youtube: "bg-red-50 text-red-600",
     vimeo: "bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)]",
+    bunny: "bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)]",
     file: "bg-neutral-100 text-neutral-600",
   }[parsed.provider];
 
@@ -54,6 +55,53 @@ export default function VideoPreview({ url, onPickChapter, activeChapterStart })
         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${badgeColor}`}>
           <CheckCircle2 size={12} /> {PROVIDER_LABEL[parsed.provider]}
         </span>
+      </div>
+    );
+  }
+
+  if (parsed.provider === "bunny") {
+    return (
+      <div className="space-y-3">
+        <div className="overflow-hidden rounded-xl border border-neutral-200 bg-black">
+          {showEmbed ? (
+            <iframe
+              key={parsed.embedUrl}
+              src={parsed.embedUrl}
+              title="Video preview"
+              className="aspect-video w-full"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowEmbed(true)}
+              className="group relative flex aspect-video w-full items-center justify-center bg-neutral-900"
+              aria-label="Play video preview"
+            >
+              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 shadow-lg transition group-hover:scale-105">
+                <PlayCircle size={36} className="text-neutral-900" />
+              </span>
+              <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
+                {PROVIDER_LABEL[parsed.provider]}
+              </span>
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${badgeColor}`}>
+            <CheckCircle2 size={12} /> {PROVIDER_LABEL[parsed.provider]} link detected
+          </span>
+          <a
+            href={parsed.url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]"
+          >
+            Open original <ExternalLink size={12} />
+          </a>
+        </div>
       </div>
     );
   }
