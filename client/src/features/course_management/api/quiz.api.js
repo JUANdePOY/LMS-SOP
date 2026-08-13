@@ -2,10 +2,11 @@ const API_BASE = "/api/quiz";
 
 export async function getQuizzes(courseId, params = {}) {
   const qs = new URLSearchParams();
+  qs.append("courseId", courseId);
   Object.entries(params).forEach(([key, val]) => {
     if (val !== undefined && val !== null && val !== "") qs.append(key, val);
   });
-  const res = await fetch(`${API_BASE}?courseId=${courseId}&${qs.toString()}`);
+  const res = await fetch(`${API_BASE}?${qs.toString()}`);
   if (!res.ok) throw new Error("Failed to fetch quizzes");
   return res.json();
 }
@@ -33,6 +34,18 @@ export async function updateQuiz(id, payload) {
     body: JSON.stringify(payload),
   });
   if (!res.ok) throw new Error("Failed to update quiz");
+  return res.json();
+}
+
+export async function publishQuiz(id) {
+  const res = await fetch(`${API_BASE}/${id}/publish`, { method: "PATCH" });
+  if (!res.ok) throw new Error("Failed to publish quiz");
+  return res.json();
+}
+
+export async function archiveQuiz(id) {
+  const res = await fetch(`${API_BASE}/${id}/archive`, { method: "PATCH" });
+  if (!res.ok) throw new Error("Failed to archive quiz");
   return res.json();
 }
 

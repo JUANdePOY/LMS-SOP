@@ -30,8 +30,22 @@ export function useQuizzes(courseId, filters = {}) {
     try {
       const { createQuiz: apiCreateQuiz } = await import("../api/quiz.api");
       const result = await apiCreateQuiz({ ...payload, courseId: courseIdRef.current });
-      setData(prev => [...prev, result.data || result]);
+      await fetchQuizzes();
       return result;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    }
+  }, [fetchQuizzes]);
+
+  const updateQuizStatus = useCallback(async (id, action) => {
+    try {
+      const { publishQuiz: apiPublish, archiveQuiz: apiArchive, updateQuiz: apiUpdate } = await import("../api/quiz.api");
+      if (action === "publish") await apiPublish(id);
+      else if (action === "archive") await apiArchive(id);
+      else if (action) await apiUpdate(id, action);
+      setData(prev => prev.map(q => q.id === id ? { ...q, status: action === "publish" ? "published" : "archived" } : q));
+      return true;
     } catch (err) {
       setError(err.message);
       throw err;
@@ -43,5 +57,5 @@ export function useQuizzes(courseId, filters = {}) {
     return () => { cancelRef.current = true; };
   }, [fetchQuizzes]);
 
-  return { data, loading, error, refetch: fetchQuizzes, createQuiz, setData };
+  return { data, loading, error, refetch: fetchQuizzes, createQuiz, updateQuizStatus, setData };
 }

@@ -10,7 +10,7 @@ import { Plus, RefreshCw, AlertCircle, LayoutList, Grid as GridIcon } from "luci
 
 export default function QuizManagePage() {
   const { courseId } = useParams();
-  const { data: quizzes, loading, error, refetch, createQuiz } = useQuizzes(courseId);
+  const { data: quizzes, loading, error, refetch, createQuiz, updateQuizStatus } = useQuizzes(courseId);
   const [open, setOpen] = useState(false);
   const [viewMode, setViewMode] = useState("table");
   const [busy, setBusy] = useState(null);
@@ -41,11 +41,16 @@ export default function QuizManagePage() {
     console.log("View:", quiz);
   };
 
-  const handleTogglePublish = (q) => {
+  const handleTogglePublish = async (q) => {
     setBusy(q.id);
-    // Publish/unpublish logic would go here
-    console.log("Toggle publish:", q);
-    setTimeout(() => setBusy(null), 1000);
+    try {
+      const action = q.status === "published" ? "archive" : "publish";
+      await updateQuizStatus(q.id, action);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (

@@ -73,13 +73,17 @@ function listCourses(req, res) {
   const limitNum = parseInt(limit || '20', 10);
 
   let effectiveBusinessId = business_id ? parseInt(business_id, 10) : undefined;
+  let effectiveDepartmentId = department_id ? parseInt(department_id, 10) : undefined;
   if (req.user && req.user.role !== 'super_admin') {
     effectiveBusinessId = req.user.business_id;
+    if (req.user.role === 'department_head' || req.user.role === 'employee') {
+      effectiveDepartmentId = req.user.department_id;
+    }
   }
 
   Promise.all([
-    courseModel.listCourses({ search, status, category, difficulty, instructor_id, page: pageNum, limit: limitNum, department_id, business_id: effectiveBusinessId }),
-    courseModel.countCourses({ search, status, category, difficulty, instructor_id, department_id, business_id: effectiveBusinessId }),
+    courseModel.listCourses({ search, status, category, difficulty, instructor_id, page: pageNum, limit: limitNum, department_id: effectiveDepartmentId, business_id: effectiveBusinessId }),
+    courseModel.countCourses({ search, status, category, difficulty, instructor_id, department_id: effectiveDepartmentId, business_id: effectiveBusinessId }),
   ])
     .then(([data, total]) => {
       res.json({
