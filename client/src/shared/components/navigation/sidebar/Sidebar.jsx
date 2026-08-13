@@ -7,6 +7,7 @@ import {
   Library,
   ClipboardCheck,
   Award,
+  Users,
   MessageSquare,
   Megaphone,
   Calendar,
@@ -61,6 +62,7 @@ const EMPLOYEE_MENU_ITEMS = [
     group: true,
     items: [
       { name: "Profile", path: "/profile", icon: User },
+      { name: "Settings", path: "/employee/settings", icon: Settings },
     ],
   },
 ];
@@ -70,7 +72,7 @@ const MENU_ITEMS = [
     name: "Dashboard",
     path: "/",
     icon: LayoutDashboard,
-    roles: LMS_ROLES.filter(r => r !== 'employee'),
+    roles: ['super_admin', 'admin', 'department_head'],
   },
   {
     name: "CORE MODULES",
@@ -80,13 +82,29 @@ const MENU_ITEMS = [
         name: "SOP Management",
         path: "/admin/organization",
         icon: Building2,
-        sub: ["Dashboard", "Businesses", "Departments", "Categories", "Files"],
-        roles: ['super_admin', 'admin'],
+        sub: [
+          { name: "Dashboard", roles: ['super_admin', 'admin', 'department_head'] },
+          { name: "Files", roles: ['super_admin', 'admin', 'department_head'] },
+          { name: "Businesses", roles: ['super_admin'] },
+          { name: "Departments", roles: ['super_admin', 'admin'] },
+          { name: "Categories", roles: ['super_admin'] },
+        ],
+        roles: ['super_admin', 'admin', 'department_head'],
       },
-       { name: "Course Management", path: "/courses", icon: BookOpen, roles: ['super_admin', 'admin', 'department_head'] },
-       { name: "Course Library", path: "/courses/library", icon: Library, roles: LMS_ROLES },
-        { name: "Quizzes", path: "/assessments", icon: ClipboardCheck, sub: [{name:"Manage", roles:['super_admin','admin','department_head']}, {name:"Leaderboard", roles:['super_admin','admin','department_head']}, {name:"Integrity", roles:['super_admin']}], roles: ['super_admin', 'admin', 'department_head'] },
-       { name: "Certificates", path: "/certificates", icon: Award, roles: ['super_admin', 'admin'] },
+      { name: "Course Management", path: "/courses", icon: BookOpen, roles: ['super_admin', 'admin', 'department_head'] },
+      { name: "Course Library", path: "/courses/library", icon: Library, roles: LMS_ROLES },
+      {
+        name: "Quizzes",
+        path: "/assessments",
+        icon: ClipboardCheck,
+        sub: [
+          { name: "Manage", roles: ['super_admin', 'admin', 'department_head'] },
+          { name: "Leaderboard", roles: ['super_admin', 'admin', 'department_head'] },
+          { name: "Integrity", roles: ['super_admin'] },
+        ],
+        roles: ['super_admin', 'admin', 'department_head'],
+      },
+      { name: "Certificates", path: "/certificates", icon: Award, roles: ['super_admin', 'admin'] },
     ],
   },
   {
@@ -99,7 +117,7 @@ const MENU_ITEMS = [
     ],
   },
   {
-    name: "INTERNAL OPERATIONS",
+    name: "WORKFLOW",
     group: true,
     items: [
       { name: "Tasks & Projects", path: "/tasks", icon: CheckSquare, roles: ['super_admin', 'admin'] },

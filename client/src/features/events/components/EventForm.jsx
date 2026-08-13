@@ -22,6 +22,17 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
+function parseJsonField(value, fallback) {
+  if (Array.isArray(value)) return value;
+  if (!value) return fallback;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export default function EventForm({ initialData, onSubmit, onCancel, saving }) {
   const [title, setTitle] = useState(initialData?.title || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -31,6 +42,8 @@ export default function EventForm({ initialData, onSubmit, onCancel, saving }) {
   const [eventDate, setEventDate] = useState(initialData?.event_date ? initialData.event_date.slice(0, 16) : "");
   const [endDate, setEndDate] = useState(initialData?.end_date ? initialData.end_date.slice(0, 16) : "");
   const [location, setLocation] = useState(initialData?.location || "");
+  const [targetRoles, setTargetRoles] = useState(() => parseJsonField(initialData?.target_roles, []));
+  const [targetDepartments, setTargetDepartments] = useState(() => parseJsonField(initialData?.target_departments, []));
 
   useEffect(() => {
     if (initialData) {
@@ -42,6 +55,8 @@ export default function EventForm({ initialData, onSubmit, onCancel, saving }) {
       setEventDate(initialData.event_date ? initialData.event_date.slice(0, 16) : "");
       setEndDate(initialData.end_date ? initialData.end_date.slice(0, 16) : "");
       setLocation(initialData.location || "");
+      setTargetRoles(parseJsonField(initialData.target_roles, []));
+      setTargetDepartments(parseJsonField(initialData.target_departments, []));
     }
   }, [initialData]);
 
@@ -57,6 +72,8 @@ export default function EventForm({ initialData, onSubmit, onCancel, saving }) {
       event_date: eventDate,
       end_date: endDate || null,
       location: location || null,
+      target_roles: targetRoles,
+      target_departments: targetDepartments,
     });
   };
 
@@ -153,6 +170,30 @@ export default function EventForm({ initialData, onSubmit, onCancel, saving }) {
               <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
           </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-neutral-700 mb-1">Target Roles (optional)</label>
+          <input
+            type="text"
+            value={targetRoles.join(", ")}
+            onChange={(e) => setTargetRoles(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
+            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
+            placeholder="e.g. employee, department_head"
+          />
+          <p className="text-[10px] text-neutral-400 mt-1">Comma-separated. Leave blank for all roles.</p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-neutral-700 mb-1">Target Departments (optional)</label>
+          <input
+            type="text"
+            value={targetDepartments.join(", ")}
+            onChange={(e) => setTargetDepartments(e.target.value.split(",").map((s) => s.trim()).filter(Boolean))}
+            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
+            placeholder="e.g. OPS, IT"
+          />
+          <p className="text-[10px] text-neutral-400 mt-1">Comma-separated department codes. Leave blank for all departments.</p>
         </div>
       </div>
       <div className="flex justify-end gap-2 pt-2">

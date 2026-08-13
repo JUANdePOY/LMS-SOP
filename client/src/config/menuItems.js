@@ -5,7 +5,6 @@ import {
   Library,
   ClipboardCheck,
   Award,
-  Users,
   MessageSquare,
   Megaphone,
   Calendar,
@@ -87,13 +86,6 @@ export const menuItems = [
     path: "/certificates",
     icon: Award,
     description: "Certificate management",
-    roles: LMS_ROLES,
-  },
-  {
-    name: "Users & Departments",
-    path: "/settings/users",
-    icon: Users,
-    description: "Manage users and departments",
     roles: LMS_ROLES,
   },
   {

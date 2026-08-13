@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Award, AlertTriangle, Rocket, Megaphone, Calendar, Bell, BookOpen, FileText, X } from "lucide-react";
+import { Award, AlertTriangle, Rocket, Megaphone, Calendar, Bell, BookOpen, FileText, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { notifyDismissBanner, useNotificationStore, enqueueBanner as enqueueGlobalBanner, clearEnqueuedBanners } from "@/shared/stores/notificationStore.js";
 
@@ -344,14 +344,17 @@ function BannerCard({ banner, onDismiss, onSnooze, autoDismissMs, reducedMotion,
   );
 }
 
-export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, autoDismissMs = 5000 }) {
+export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, autoDismissMs = 5000, carousel = false, autoPlayInterval = 4000 }) {
   const navigate = useNavigate();
   const store = useNotificationStore();
   const { dismissed, pendingBanners = [] } = store;
   const reducedMotion = useReducedMotion();
   const [queue, setQueue] = useState([]);
   const [activeBanner, setActiveBanner] = useState(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const scheduledTimers = useRef(new Map());
+  const autoPlayTimerRef = useRef(null);
+  const containerRef = useRef(null);
 
   const normalizedItems = useMemo(
     () =>
@@ -375,6 +378,12 @@ export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, auto
     return sortQueue(Array.from(itemMap.values()));
   }, [normalizedItems, pendingBanners]);
 
+  const visibleBanners = useMemo(() => {
+    const notDismissed = allItems.filter((item) => !dismissed.includes(item.id));
+    if (carousel) return notDismissed;
+    return notDismissed;
+  }, [allItems, dismissed, carousel]);
+
   const cancelScheduled = useCallback((id) => {
     const timer = scheduledTimers.current.get(id);
     if (timer) {
@@ -387,6 +396,21 @@ export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, auto
     scheduledTimers.current.forEach((timer) => window.clearTimeout(timer));
     scheduledTimers.current.clear();
   }, []);
+
+  const clearAutoPlay = useCallback(() => {
+    if (autoPlayTimerRef.current) {
+      window.clearTimeout(autoPlayTimerRef.current);
+      autoPlayTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleNext = useCallback(() => {
+    if (!carousel || visibleBanners.length <= 1) return;
+    clearAutoPlay();
+    autoPlayTimerRef.current = window.setTimeout(() => {
+      setCurrentIndex((prev) => (prev + 1) % visibleBanners.length);
+    }, autoPlayInterval);
+  }, [carousel, clearAutoPlay, autoPlayInterval, visibleBanners.length]);
 
   const enqueueBanner = useCallback(
     (entry) => {
@@ -435,6 +459,28 @@ export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, auto
     }
   }, [dismissed, activeBanner]);
 
+  useEffect(() => {
+    if (!carousel) return;
+    if (visibleBanners.length === 0) return;
+    setCurrentIndex((prev) => Math.min(prev, visibleBanners.length - 1));
+    scheduleNext();
+    return clearAutoPlay;
+  }, [carousel, visibleBanners.length, scheduleNext, clearAutoPlay]);
+
+  const showNext = useCallback(() => {
+    if (visibleBanners.length <= 1) return;
+    clearAutoPlay();
+    setCurrentIndex((prev) => (prev + 1) % visibleBanners.length);
+    scheduleNext();
+  }, [clearAutoPlay, scheduleNext, visibleBanners.length]);
+
+  const showPrev = useCallback(() => {
+    if (visibleBanners.length <= 1) return;
+    clearAutoPlay();
+    setCurrentIndex((prev) => (prev - 1 + visibleBanners.length) % visibleBanners.length);
+    scheduleNext();
+  }, [clearAutoPlay, scheduleNext, visibleBanners.length]);
+
   const handleDismiss = useCallback(
     (id, persist = true) => {
       const banner = activeBanner;
@@ -470,21 +516,68 @@ export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, auto
     handleDismiss(activeBanner.id, false);
   }, [activeBanner, handleDismiss, navigate]);
 
-  if (!activeBanner) return null;
+  const currentBanner = carousel ? visibleBanners[currentIndex] : activeBanner;
+
+  if (!currentBanner && !carousel) return null;
+  if (!currentBanner && carousel && visibleBanners.length === 0) return null;
 
   return (
-    <div className="w-full mb-4">
-      <AnimatePresence>
-        <BannerCard
-          key={activeBanner.id}
-          banner={activeBanner}
-          onDismiss={handleDismiss}
-          onSnooze={handleSnooze}
-          autoDismissMs={autoDismissMs}
-          reducedMotion={reducedMotion}
-          navigate={navigate}
-        />
-      </AnimatePresence>
+    <div ref={containerRef} className="w-full mb-4">
+      <div className="relative">
+        <AnimatePresence mode="wait">
+          <BannerCard
+            key={currentBanner.id}
+            banner={currentBanner}
+            onDismiss={handleDismiss}
+            onSnooze={handleSnooze}
+            autoDismissMs={carousel ? 0 : autoDismissMs}
+            reducedMotion={reducedMotion}
+            navigate={navigate}
+          />
+        </AnimatePresence>
+
+        {carousel && visibleBanners.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={showPrev}
+              aria-label="Previous banner"
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 dark:bg-neutral-900/90 text-neutral-700 dark:text-neutral-200 shadow-md border border-neutral-200 dark:border-neutral-700 hover:bg-white dark:hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              type="button"
+              onClick={showNext}
+              aria-label="Next banner"
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 dark:bg-neutral-900/90 text-neutral-700 dark:text-neutral-200 shadow-md border border-neutral-200 dark:border-neutral-700 hover:bg-white dark:hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+            >
+              <ChevronRight size={18} />
+            </button>
+
+            <div className="flex items-center justify-center gap-1.5 mt-2">
+              {visibleBanners.map((banner, index) => (
+                <button
+                  key={banner.id}
+                  type="button"
+                  onClick={() => {
+                    clearAutoPlay();
+                    setCurrentIndex(index);
+                    scheduleNext();
+                  }}
+                  aria-label={`Show banner ${index + 1}`}
+                  className={cn(
+                    "h-1.5 rounded-full transition-all duration-200 focus:outline-none",
+                    index === currentIndex
+                      ? "w-4 bg-blue-600 dark:bg-blue-400"
+                      : "w-2 bg-neutral-300 dark:bg-neutral-600 hover:bg-neutral-400 dark:hover:bg-neutral-500"
+                  )}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

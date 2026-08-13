@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { NotificationStore } from '@/shared/stores/notificationStore.js';
+import { playNotificationSound } from '@/shared/utils/notificationSound.js';
 
 const WS_URL = (import.meta.env.VITE_WS_URL || '').replace(/^http/, 'ws');
 
@@ -46,6 +47,7 @@ export function useWebSocket() {
       try {
         const msg = JSON.parse(event.data);
         if (msg.type === 'notification' && (msg.action === 'created' || msg.action === 'updated')) {
+          playNotificationSound();
           refresh();
         }
       } catch {

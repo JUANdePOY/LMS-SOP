@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Settings as SettingsIcon, Users, Shield, Plus, Pencil, Save, X, Search, Building2, Bell } from "lucide-react";
+import { Settings as SettingsIcon, Users, Shield, Plus, Pencil, Save, X, Search, Building2, Bell, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/shared/components/Toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -213,10 +213,10 @@ export default function Settings() {
           <div className="flex items-center justify-between">
             <p className="text-xs text-neutral-500">{users.length} users</p>
             <button
-              onClick={() => navigate('/settings/users')}
-              className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-secondary-hover)] transition-colors"
-            >
-              <Plus size={13} /> Add User
+               onClick={() => navigate('/settings')}
+               className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[var(--color-secondary-hover)] transition-colors"
+             >
+               <Plus size={13} /> Add User
             </button>
           </div>
 
@@ -281,7 +281,7 @@ export default function Settings() {
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => navigate('/settings/users')}
+                            onClick={() => navigate('/settings')}
                             className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-[var(--color-secondary)] hover:bg-[rgba(19,47,69,0.08)] dark:hover:bg-[rgba(19,47,69,0.08)]0/10 transition-colors"
                             title="Edit user"
                           >
@@ -289,7 +289,7 @@ export default function Settings() {
                           </button>
                           {user.role !== 'super_admin' && (
                             <button
-                              onClick={() => navigate('/settings/users')}
+                              onClick={() => navigate('/settings')}
                               className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors"
                               title="Deactivate user"
                             >
@@ -410,7 +410,8 @@ export default function Settings() {
 }
 
 function PushNotificationsSection() {
-  const { permission, loading, requestPermission, unsubscribe, isSupported } = usePushNotifications();
+  const toast = useToast();
+  const { permission, loading, requestPermission, unsubscribe, isSupported, error } = usePushNotifications();
 
   if (!isSupported) {
     return (
@@ -431,11 +432,26 @@ function PushNotificationsSection() {
               ? 'Receive notifications even when the app is closed.'
               : 'Get alerts on your device even when the app is closed.'}
           </p>
+          {error && (
+            <p className="text-xs text-red-500 mt-1">
+              {error}
+              {'permission' in Notification && Notification.permission === 'denied'
+                ? ' Open your browser site settings for this page and reset notifications to "Ask" or "Allow", then try again.'
+                : ''}
+            </p>
+          )}
         </div>
         <div>
           {permission === 'granted' ? (
             <button
-              onClick={unsubscribe}
+              onClick={async () => {
+                try {
+                  await unsubscribe();
+                  toast.success('Push notifications disabled');
+                } catch {
+                  toast.error('Failed to disable push notifications');
+                }
+              }}
               disabled={loading}
               className="flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-neutral-700 px-4 py-2 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-40 transition-colors"
             >
@@ -443,7 +459,14 @@ function PushNotificationsSection() {
             </button>
           ) : (
             <button
-              onClick={requestPermission}
+              onClick={async () => {
+                try {
+                  await requestPermission();
+                  toast.success('Push notifications enabled');
+                } catch {
+                  toast.error('Failed to enable push notifications');
+                }
+              }}
               disabled={loading}
               className="flex items-center gap-2 rounded-lg bg-[var(--color-secondary)] px-4 py-2 text-xs font-semibold text-white hover:bg-[var(--color-secondary-hover)] disabled:opacity-40 transition-colors"
             >

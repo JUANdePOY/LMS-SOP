@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Users, UserCheck, FileText, BookOpen,
   ClipboardCheck, Award, TrendingUp,
@@ -11,7 +11,9 @@ import {
 import { Card } from '@/shared/components/ui/card';
 import { cn } from '@/lib/utils';
 import { StaggerList, MotionItem } from '@/shared/motion';
+import BannerSection from '@/shared/components/ui/BannerSection';
 import useAdminDashboard from './hooks/useAdminDashboard';
+import { useNotifications } from '@/shared/stores/notificationStore.js';
 
 const SOP_BY_CATEGORY_DATA = [
   { name: 'Operations', value: 45, count: 19, color: '#F25C05' },
@@ -20,6 +22,14 @@ const SOP_BY_CATEGORY_DATA = [
   { name: 'Finance', value: 9, count: 4, color: '#1D3067' },
   { name: 'IT', value: 5, count: 2, color: '#32667F' },
 ];
+
+const CARD_COLORS = {
+  blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', darkBg: 'dark:bg-blue-500/10', darkBorder: 'dark:border-blue-500/30', darkText: 'dark:text-blue-300' },
+  emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', darkBg: 'dark:bg-emerald-500/10', darkBorder: 'dark:border-emerald-500/30', darkText: 'dark:text-emerald-300' },
+  amber: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', darkBg: 'dark:bg-amber-500/10', darkBorder: 'dark:border-amber-500/30', darkText: 'dark:text-amber-300' },
+  purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', darkBg: 'dark:bg-purple-500/10', darkBorder: 'dark:border-purple-500/30', darkText: 'dark:text-purple-300' },
+  rose: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', darkBg: 'dark:bg-rose-500/10', darkBorder: 'dark:border-rose-500/30', darkText: 'dark:text-rose-300' },
+};
 
 function buildTrainingCompletionData(avgProgress) {
   const base = Number(avgProgress) || 0;
@@ -43,6 +53,7 @@ function formatEventDate(dateStr) {
 
 export default function Dashboard() {
   const { data, loading, error, refetch } = useAdminDashboard();
+  const { notifications, unreadServerCount, fetch: fetchNotifications } = useNotifications();
   const [period, setPeriod] = useState('month');
 
   const trainingCompletionData = data
@@ -63,6 +74,85 @@ export default function Dashboard() {
   const messages = data?.messages || [];
   const departments = data?.departments?.performance || [];
   const taskStats = data?.tasks || {};
+
+  const dashboardBanners = useMemo(() => {
+    const banners = [];
+
+    const unreadNotifications = (notifications || []).filter((n) => !n.is_read);
+    unreadNotifications.forEach((notification) => {
+      const entityType = notification.entity_type || 'notification';
+      banners.push({
+        id: `notification-${notification.id}`,
+        type: entityType === 'enrollment' ? 'new_course' : entityType === 'sop' ? 'new_sop' : entityType === 'task' ? 'alert' : 'announcement',
+        title: notification.title,
+        message: notification.body || '',
+        link: notification.link || '/notifications',
+        ctaLabel: 'View',
+        priority: 5,
+      });
+    });
+
+    if (announcements.length > 0) {
+      banners.push({
+        id: 'dashboard-announcement',
+        type: 'announcement',
+        title: announcements[0].title || 'New Announcement',
+        message: announcements[0].body || announcements[0].description || 'Check the latest announcement.',
+        link: '/announcements',
+        ctaLabel: 'View announcement',
+        priority: 2,
+      });
+    }
+    if (events.length > 0) {
+      banners.push({
+        id: 'dashboard-event',
+        type: 'event',
+        title: events[0].title || 'Upcoming Event',
+        message: `Event on ${events[0].event_date || events[0].start_date || 'soon'}`,
+        link: '/events',
+        ctaLabel: 'View event',
+        priority: 2,
+      });
+    }
+    if (messages.length > 0) {
+      banners.push({
+        id: 'dashboard-message',
+        type: 'new_course',
+        title: 'New Message',
+        message: messages[0].subject || 'You have an unread message.',
+        link: '/messaging',
+        ctaLabel: 'Open message',
+        priority: 3,
+      });
+    }
+    if (taskStats?.overdue > 0) {
+      banners.push({
+        id: 'dashboard-overdue',
+        type: 'alert',
+        title: 'Overdue Tasks',
+        message: `${taskStats.overdue} task${taskStats.overdue !== 1 ? 's' : ''} are currently overdue.`,
+        link: '/tasks',
+        ctaLabel: 'View tasks',
+        priority: 4,
+      });
+    }
+    if (data?.training?.avg_progress >= 80) {
+      banners.push({
+        id: 'dashboard-progress',
+        type: 'achievement',
+        title: 'Training Progress',
+        message: `Average completion is ${data.training.avg_progress}%. Great work!`,
+        link: '/reports',
+        ctaLabel: 'View reports',
+        priority: 1,
+      });
+    }
+    return banners.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+  }, [data, announcements, events, messages, taskStats, notifications]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   if (loading) {
     return (
@@ -110,24 +200,30 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {dashboardBanners.length > 0 && (
+        <BannerSection items={dashboardBanners} carousel autoPlayInterval={5000} />
+      )}
+
       {/* Stat Cards - fluid grid */}
       <StaggerList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
         {statCards.map((card) => {
           const Icon = card.icon;
+          const colors = CARD_COLORS[card.color] || CARD_COLORS.blue;
           return (
             <MotionItem key={card.label}>
-              <div className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-3 sm:p-4 shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700">
+              <div className={cn(
+                "group relative overflow-hidden rounded-xl border bg-white p-3 sm:p-4 shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md dark:bg-neutral-900",
+                colors.border, colors.darkBorder
+              )}>
+                <div className={cn("absolute left-0 top-0 h-full w-1 opacity-80 transition-all duration-300 group-hover:w-1.5", colors.bg, colors.darkBg)} />
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-neutral-800/50" />
                 
                 <div className="relative">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                       <div className={cn(
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-sm transition-transform duration-300 group-hover:scale-110",
-                        card.color === 'blue' ? 'bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]' :
-                        card.color === 'emerald' ? 'bg-success-soft text-[var(--color-success)] dark:bg-success-soft dark:text-[var(--color-success)]' :
-                        card.color === 'amber' ? 'bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft0/10 dark:text-[var(--color-warning)]' :
-                        'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-sm transition-all duration-300 group-hover:scale-110",
+                        colors.bg, colors.text, colors.darkBg, colors.darkText
                       )}>
                         <Icon size={18} />
                       </div>
@@ -149,8 +245,8 @@ export default function Dashboard() {
       </StaggerList>
 
       {/* Training Completion Overview */}
-      <Card className="p-3 sm:p-4 lg:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-4">
+      <Card className="overflow-hidden p-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 p-4 sm:p-5 lg:p-6 pb-0">
           <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Training Completion Overview</h2>
           <select
             value={period}
@@ -162,7 +258,7 @@ export default function Dashboard() {
             <option value="quarter">This Quarter</option>
           </select>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6 p-4 sm:p-5 lg:p-6 pt-3">
           <div className="lg:col-span-3 min-h-[250px] sm:min-h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trainingCompletionData}>

@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Bell, Info, AlertCircle, Check, BookOpen, FileText, HelpCircle, Award, BookMarked } from 'lucide-react';
-import { getNotifications, markNotificationsRead, markAllNotificationsRead } from '@/services/api';
+import { Bell, Info, AlertCircle, Check, BookOpen, FileText, HelpCircle, Award, BookMarked, Trash2 } from 'lucide-react';
+import { getNotifications, markNotificationsRead, markAllNotificationsRead, deleteNotification, deleteNotifications } from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
 import { cn } from '@/lib/utils';
+import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 
 const TYPE_ICON = {
   info: Info,
@@ -72,6 +73,8 @@ export default function Notifications() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [selectedIds, setSelectedIds] = useState([]);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
@@ -123,6 +126,48 @@ export default function Notifications() {
     }
   };
 
+  const handleDelete = async (id) => {
+    try {
+      await deleteNotification(id);
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setSelectedIds((prev) => prev.filter((x) => x !== id));
+      addToast('Notification deleted', 'success');
+    } catch {
+      addToast('Failed to delete notification', 'error');
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    setDeleting(true);
+    try {
+      await deleteNotifications(selectedIds);
+      setNotifications((prev) => prev.filter((n) => !selectedIds.includes(n.id)));
+      setSelectedIds([]);
+      addToast('Selected notifications deleted', 'success');
+    } catch {
+      addToast('Failed to delete selected notifications', 'error');
+    } finally {
+      setDeleting(false);
+      setDeleteAllOpen(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    setDeleting(true);
+    try {
+      await deleteNotifications([]);
+      setNotifications([]);
+      setSelectedIds([]);
+      addToast('All notifications deleted', 'success');
+    } catch {
+      addToast('Failed to delete all notifications', 'error');
+    } finally {
+      setDeleting(false);
+      setDeleteAllOpen(false);
+    }
+  };
+
   const filtered = filter === 'all' ? notifications : notifications.filter((n) => n.entity_type === filter);
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
@@ -135,15 +180,26 @@ export default function Notifications() {
             {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount !== 1 ? 's' : ''}` : 'All caught up'}
           </p>
         </div>
-        {unreadCount > 0 && (
-          <button
-            type="button"
-            onClick={handleMarkAllRead}
-            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
-          >
-            Mark all read
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {notifications.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setDeleteAllOpen(true)}
+              className="text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors"
+            >
+              Delete all
+            </button>
+          )}
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={handleMarkAllRead}
+              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+            >
+              Mark all read
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-1">
@@ -220,11 +276,33 @@ export default function Notifications() {
                   onClick={(e) => e.stopPropagation()}
                   className="mt-1 h-4 w-4 rounded border-neutral-300 text-blue-600 focus:ring-blue-500"
                 />
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(notification.id);
+                  }}
+                  className="mt-1 p-1 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  aria-label="Delete notification"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             );
           })}
         </div>
       )}
+      <ConfirmationDialog
+        open={deleteAllOpen}
+        title="Delete all notifications"
+        description="This will permanently delete all your notifications. This action cannot be undone."
+        confirmLabel="Delete all"
+        cancelLabel="Cancel"
+        onConfirm={handleDeleteAll}
+        onCancel={() => setDeleteAllOpen(false)}
+        loading={deleting}
+        variant="destructive"
+      />
     </div>
   );
 }

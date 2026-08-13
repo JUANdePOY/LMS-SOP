@@ -33,7 +33,6 @@ import { useWebSocket } from "@/features/notifications/hooks/useWebSocket";
 const MOBILE_BOTTOM_NAV_ADMIN = [
   { name: "Home", path: "/", icon: BookOpen },
   { name: "Courses", path: "/courses", icon: BookOpen },
-  { name: "Users", path: "/settings/users", icon: Users },
 ];
 
 const MOBILE_BOTTOM_NAV_EMPLOYEE = [
@@ -57,8 +56,8 @@ const PATH_TITLE_MAP = {
   "/sops": "SOP Library",
   "/profile": "Profile",
   "/settings": "Settings",
-  "/settings/users": "User Management",
   "/settings/roles": "Roles & Permissions",
+  "/employee/settings": "Settings",
   "/audit-logs": "Audit Logs",
   "/courses": "Courses",
   "/courses/:id": "Course Details",
@@ -72,7 +71,6 @@ const PATH_TITLE_MAP = {
   "/admin/organization": "Organization",
   "/admin/organization/hierarchy": "Hierarchy Overview",
   "/admin/organization/businesses": "Businesses",
-  "/admin/organization/departments": "Departments",
   "/admin/organization/categories": "Categories",
   "/admin/organization/sop-management": "SOP Management",
   "/tasks": "Tasks & Projects",
