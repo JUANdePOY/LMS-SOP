@@ -25,7 +25,7 @@ function listEnrollments(req, res) {
   const limitNum = parseInt(limit || '20', 10);
 
   const isAdmin = ['super_admin', 'admin', 'department_head'].includes(req.user?.role);
-  const effectiveBusinessId = isAdmin ? req.user?.business_id : null;
+  const effectiveBusinessId = ['admin', 'department_head'].includes(req.user?.role) ? req.user?.business_id : null;
 
   Promise.all([
     enrollmentModel.listEnrollments({ course_id, user_id: isAdmin ? user_id : req.user?.id, status, role, page: pageNum, limit: limitNum, business_id: effectiveBusinessId }),

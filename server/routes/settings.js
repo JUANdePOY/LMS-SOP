@@ -2,7 +2,7 @@ const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken } = require('../middleware/auth');
-const { requireSuperAdmin } = require('../middleware/auth');
+const { requireSuperAdmin, requireAdmin } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 const {
   canManageUser,
@@ -18,7 +18,7 @@ const {
 const router = express.Router();
 
 // ─── Settings system endpoints - require super admin ─────────────────────
-router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
+router.get('/', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const [rows] = await db.query(
       'SELECT `key`, `value`, description, updated_by, updated_at FROM system_settings ORDER BY `key`'
@@ -43,7 +43,7 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
   }
 });
 
-router.put('/:key', authenticateToken, requireSuperAdmin, [
+router.put('/:key', authenticateToken, requireAdmin, [
   body('value').exists().withMessage('Value is required'),
 ], async (req, res) => {
   const errors = validationResult(req);
@@ -83,7 +83,7 @@ router.put('/:key', authenticateToken, requireSuperAdmin, [
   }
 });
 
-router.post('/', authenticateToken, requireSuperAdmin, [
+router.post('/', authenticateToken, requireAdmin, [
   body('key').isString().trim().notEmpty().withMessage('Key is required'),
   body('value').exists().withMessage('Value is required'),
 ], async (req, res) => {

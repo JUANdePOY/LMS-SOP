@@ -13,15 +13,11 @@ function safeDecrypt(value) {
   if (!value) return null;
   try {
     return decrypt(value);
-  } catch (err) {
-    console.error('[Calendar] Failed to decrypt token field, treating as invalid:', err.message);
+  } catch {
     return null;
   }
 }
 
-// Purge undecryptable (e.g. rotated-key) token rows for a user. Called from
-// getToken so a stale row can never mask a good one and make status report
-// "not connected" forever. The good row is preserved.
 async function purgeUndecryptableRows(userId, provider = 'google') {
   try {
     const [rows] = await db.query(
@@ -33,10 +29,9 @@ async function purgeUndecryptableRows(userId, provider = 'google') {
       .map((r) => r.id);
     if (badIds.length) {
       await db.query('DELETE FROM user_calendar_tokens WHERE id IN (?)', [badIds]);
-      console.warn('[Calendar] Purged', badIds.length, 'undecryptable token row(s) for user', userId, 'provider', provider);
     }
-  } catch (err) {
-    console.error('[Calendar] purgeUndecryptableRows failed:', err.message);
+  } catch {
+    // silent cleanup
   }
 }
 
@@ -47,13 +42,6 @@ const calendarModel = {
       [userId, provider]
     );
     if (!rows.length) return null;
-    console.log('[Calendar] getToken userId=', userId, 'rows=', rows.length, 'columns=', Object.keys(rows[0] || {}), 'firstUpdated=', rows[0]?.updated_at);
-    for (const row of rows) {
-      console.log('[Calendar] getToken row id=', row.id, 'accessLen=', row.access_token && row.access_token.length, 'refreshLen=', row.refresh_token && row.refresh_token.length);
-    }
-    // Find the first decryptable row. If a stale undecryptable row exists
-    // alongside a good one (e.g. duplicate rows when the unique index is
-    // missing), prefer the good one and clean up the bad ones.
     for (const row of rows) {
       const access_token = safeDecrypt(row.access_token);
       const refresh_token = safeDecrypt(row.refresh_token);
@@ -62,16 +50,13 @@ const calendarModel = {
         return { ...row, access_token, refresh_token };
       }
     }
-    // No decryptable row found: clean up the stale ones and report disconnected.
     await purgeUndecryptableRows(userId, provider);
-    console.warn('[Calendar] Undecryptable token row for user', userId, 'provider', provider, '- reconnect to replace it');
     return null;
   },
 
   async saveToken({ userId, provider = 'google', googleEmail, accessToken, refreshToken, expiryDate }) {
     const encAccess = encrypt(accessToken);
     const encRefresh = refreshToken ? encrypt(refreshToken) : null;
-    console.log('[Calendar] saveToken start userId=', userId, 'provider=', provider, 'email=', googleEmail, 'hasAccess=', !!accessToken, 'hasRefresh=', !!refreshToken, 'encAccessLen=', encAccess && encAccess.length, 'encRefreshLen=', encRefresh && encRefresh.length);
     await purgeUndecryptableRows(userId, provider);
 
     const values = [userId, provider, googleEmail || null, encAccess, encRefresh, expiryDate || null];
@@ -90,9 +75,7 @@ const calendarModel = {
         values
       );
       inserted = true;
-      console.log('[Calendar] saveToken insert/upsert result affectedRows=', result && result.affectedRows, 'insertId=', result && result.insertId);
-    } catch (err) {
-      console.warn('[Calendar] saveToken insert failed userId=', userId, 'err=', err && err.message, 'code=', err && err.code);
+    } catch {
       try {
         const [updateResult] = await db.query(
           `UPDATE user_calendar_tokens
@@ -100,17 +83,15 @@ const calendarModel = {
            WHERE user_id = ? AND provider = ?`,
           [googleEmail || null, encAccess, encRefresh, expiryDate || null, userId, provider]
         );
-        console.log('[Calendar] saveToken update result affectedRows=', updateResult && updateResult.affectedRows);
         if (updateResult && updateResult.affectedRows > 0) {
           inserted = true;
         }
-      } catch (updateErr) {
-        console.error('[Calendar] saveToken update also failed userId=', userId, 'err=', updateErr && updateErr.message, 'code=', updateErr && updateErr.code);
+      } catch {
+        // silent fallback
       }
     }
 
     if (!inserted) {
-      console.warn('[Calendar] saveToken insert+update missed userId=', userId, '- attempting explicit-id INSERT');
       try {
         const [maxRows] = await db.query('SELECT MAX(id) AS max_id FROM user_calendar_tokens');
         const nextId = (maxRows && maxRows[0] && maxRows[0].max_id) ? Number(maxRows[0].max_id) + 1 : 1;
@@ -119,21 +100,17 @@ const calendarModel = {
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [nextId, userId, provider, googleEmail || null, encAccess, encRefresh, expiryDate || null]
         );
-        console.log('[Calendar] saveToken explicit-id INSERT result affectedRows=', explicitResult && explicitResult.affectedRows, 'insertId=', explicitResult && explicitResult.insertId);
         inserted = true;
-      } catch (explicitErr) {
-        console.error('[Calendar] saveToken explicit-id INSERT failed userId=', userId, 'err=', explicitErr && explicitErr.message, 'code=', explicitErr && explicitErr.code);
+      } catch {
+        // silent fallback
       }
     }
 
     if (!inserted) {
-      console.error('[Calendar] saveToken failed to persist userId=', userId);
       throw new Error('Failed to persist calendar token');
     }
 
-    console.log('[Calendar] saveToken persisted userId=', userId);
     const result = await this.getToken(userId, provider);
-    console.log('[Calendar] saveToken re-read userId=', userId, 'found=', !!result, 'email=', result?.google_email);
     return result;
   },
 

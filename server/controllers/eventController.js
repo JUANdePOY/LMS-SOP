@@ -3,11 +3,10 @@ const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 const { broadcastSystemChange } = require('../services/notificationService');
 const calendarService = require('../services/calendarService');
+const db = require('../config/database');
 
 function propagate(eventId, action) {
-  calendarService.propagateEventChange(eventId, action).catch((err) => {
-    console.error('[Calendar] propagate error', action, eventId, err.message);
-  });
+  calendarService.propagateEventChange(eventId, action).catch(() => {});
 }
 
 function sendError(res, err, fallback = 'Request failed') {
@@ -29,7 +28,7 @@ function getEventBusinessFilter(user) {
   }
   const businessId = user?.business_id;
   if (!businessId) {
-    return { business_id: null };
+    return { business_id: null, denied: true };
   }
   return { business_id: businessId };
 }
@@ -38,7 +37,16 @@ function listEvents(req, res) {
   const { event_type, priority, status, page = 1, limit = 20 } = req.query;
   const pageNum = parseInt(page, 10);
   const limitNum = parseInt(limit, 10);
-  const { business_id } = getEventBusinessFilter(req.user);
+  const { business_id, denied } = getEventBusinessFilter(req.user);
+
+  if (denied) {
+    return res.json({
+      success: true,
+      message: 'OK',
+      data: [],
+      pagination: { page: pageNum, limit: limitNum, total: 0, totalPages: 0 },
+    });
+  }
 
   eventModel.findAll({ business_id, event_type, priority, status, page: pageNum, limit: limitNum })
     .then((rows) => {
@@ -62,8 +70,13 @@ function getEvent(req, res) {
   eventModel.findById(id)
     .then((row) => {
       if (!row) return res.status(404).json({ success: false, message: 'Event not found', code: 'NOT_FOUND' });
-      if (req.user?.role !== 'super_admin' && row.business_id && row.business_id !== req.user?.business_id) {
-        return res.status(403).json({ success: false, message: 'Access denied: event is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+      if (req.user?.role !== 'super_admin') {
+        if (row.business_id && row.business_id !== req.user?.business_id) {
+          return res.status(403).json({ success: false, message: 'Access denied: event is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+        }
+        if (!row.business_id && !req.user?.business_id) {
+          return res.status(403).json({ success: false, message: 'Access denied: event is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+        }
       }
       res.json({ success: true, message: 'OK', data: row });
     })
@@ -72,7 +85,7 @@ function getEvent(req, res) {
 
 function createEvent(req, res) {
   const userId = req.user?.id;
-  const { title, description, event_type, priority, status, event_date, end_date, location } = req.body;
+  const { title, description, event_type, priority, status, event_date, end_date, location, target_roles, target_departments } = req.body;
 
   if (!title || !title.trim()) {
     return res.status(400).json({ success: false, message: 'Title is required', code: 'VALIDATION_ERROR' });
@@ -82,6 +95,8 @@ function createEvent(req, res) {
   }
 
   const businessId = req.user?.business_id || null;
+  const parsedTargetRoles = Array.isArray(target_roles) ? target_roles : null;
+  const parsedTargetDepartments = Array.isArray(target_departments) ? target_departments.map(String) : null;
 
   eventModel.create({
     title: title.trim(),
@@ -94,6 +109,8 @@ function createEvent(req, res) {
     location: location || null,
     organizer: req.user?.full_name || 'System',
     business_id: businessId,
+    target_roles: parsedTargetRoles,
+    target_departments: parsedTargetDepartments,
   })
     .then((row) => {
       logAudit && logAudit('event.create', userId, { eventId: row.id });
@@ -105,6 +122,7 @@ function createEvent(req, res) {
         link: '/events',
         entityType: 'event',
         entityId: row.id,
+        targetUserIds: getBusinessUserIds(businessId),
       }).catch(() => {});
       res.status(201).json({ success: true, message: 'Event created successfully', data: row });
     })
@@ -114,7 +132,7 @@ function createEvent(req, res) {
 function updateEvent(req, res) {
   const { id } = req.params;
   const userId = req.user?.id;
-  const { title, description, event_type, priority, status, event_date, end_date, location } = req.body;
+  const { title, description, event_type, priority, status, event_date, end_date, location, target_roles, target_departments } = req.body;
 
   eventModel.findById(id)
     .then((row) => {
@@ -122,6 +140,8 @@ function updateEvent(req, res) {
       if (req.user?.role !== 'super_admin' && row.business_id && row.business_id !== req.user?.business_id) {
         return res.status(403).json({ success: false, message: 'Access denied: event is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
       }
+      const parsedTargetRoles = Array.isArray(target_roles) ? target_roles : row.target_roles;
+      const parsedTargetDepartments = Array.isArray(target_departments) ? target_departments.map(String) : row.target_departments;
       return eventModel.update(id, {
         title: title?.trim() || row.title,
         description: description?.trim() || row.description,
@@ -133,6 +153,8 @@ function updateEvent(req, res) {
         location: location ?? row.location,
         organizer: row.organizer,
         business_id: row.business_id,
+        target_roles: parsedTargetRoles,
+        target_departments: parsedTargetDepartments,
       });
     })
     .then((row) => {
@@ -145,6 +167,7 @@ function updateEvent(req, res) {
         link: '/events',
         entityType: 'event',
         entityId: row.id,
+        targetUserIds: getBusinessUserIds(row.business_id),
       }).catch(() => {});
       res.json({ success: true, message: 'Event updated successfully', data: row });
     })
@@ -169,6 +192,15 @@ function deleteEvent(req, res) {
       res.json({ success: true, message: 'Event deleted successfully' });
     })
     .catch((err) => sendError(res, err, 'Failed to delete event'));
+}
+
+async function getBusinessUserIds(businessId) {
+  if (!businessId) return null;
+  const [rows] = await db.query(
+    'SELECT id FROM users WHERE business_id = ? AND role NOT IN (\'super_admin\') AND is_active = 1',
+    [businessId]
+  );
+  return rows.map((u) => u.id);
 }
 
 module.exports = {

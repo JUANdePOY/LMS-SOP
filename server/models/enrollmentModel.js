@@ -38,7 +38,7 @@ async function listEnrollments(filters = {}) {
     params.push(role);
   }
   if (business_id) {
-    sql += ' AND d.business_id = ?';
+    sql += ' AND EXISTS (SELECT 1 FROM departments d WHERE d.id = c.department_id AND d.business_id = ?)';
     params.push(parseInt(business_id, 10));
   }
 
@@ -190,8 +190,8 @@ async function softDelete(id) {
 }
 
 async function getClassProgress(courseId) {
-  const [rows] = await db.query(
-    `SELECT 
+  const [rows] = await db.query(`
+    SELECT 
       user_id,
       COUNT(DISTINCT cp.content_id) AS completed_items,
       COUNT(DISTINCT mc.id) AS total_items,
@@ -207,6 +207,25 @@ async function getClassProgress(courseId) {
   return rows;
 }
 
+async function getCourseParticipantIds(courseId) {
+  const [instructorRow] = await db.query(
+    `SELECT instructor_id FROM courses WHERE id = ? AND is_deleted = FALSE`,
+    [courseId]
+  );
+  const instructorId = instructorRow[0]?.instructor_id || null;
+
+  const [enrollmentRows] = await db.query(
+    `SELECT user_id FROM course_enrollments WHERE course_id = ? AND status = 'active' AND is_deleted = FALSE`,
+    [courseId]
+  );
+  const enrolledIds = enrollmentRows.map((r) => r.user_id);
+
+  const ids = new Set();
+  if (instructorId) ids.add(instructorId);
+  for (const id of enrolledIds) ids.add(id);
+  return Array.from(ids);
+}
+
 module.exports = {
   listEnrollments,
   findById,
@@ -218,6 +237,7 @@ module.exports = {
   update,
   softDelete,
   getClassProgress,
+  getCourseParticipantIds,
   ENROLLMENT_STATUSES,
   COURSE_ROLES,
 };

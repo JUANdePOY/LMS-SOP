@@ -192,12 +192,8 @@ async function deleteEventForUser(userId, eventId) {
         calendarId: existing.google_calendar_id,
         eventId: existing.google_event_id,
       });
-    } catch (err) {
+    } catch {
       // If already gone on Google, treat as success for our mapping.
-      if (err.code !== 404 && err.response?.status !== 404) {
-        // Surface real failures but still clear our mapping to avoid orphans.
-        console.error('[Calendar] delete failed for user', userId, eventId, err.message);
-      }
     }
   }
   await calendarModel.deleteMap(userId, eventId);
@@ -213,8 +209,7 @@ async function propagateEventChange(eventId, action) {
       } else {
         await upsertEventForUser(map.user_id, eventId);
       }
-    } catch (err) {
-      console.error('[Calendar] propagate failed', action, map.user_id, eventId, err.message);
+    } catch {
       try {
         await calendarModel.updateMapStatus(map.user_id, eventId, 'failed');
       } catch { /* best effort */ }
@@ -246,16 +241,11 @@ async function handleCallback(code, userId) {
     provider: PROVIDER,
   });
 
-  // Push existing LMS events to the freshly connected calendar so the user
-  // sees their current schedule immediately. We pass the live OAuth `client`
-  // obtained above rather than re-reading the stored token, so the sync can
-  // never race with (or be blocked by) token persistence / decryption.
   let syncedEvents = 0;
   try {
     syncedEvents = await syncAllEventsForUser(userId, client);
-    console.log('[Calendar] Initial bulk sync complete for user', userId, '-', syncedEvents, 'event(s) pushed to Google Calendar');
-  } catch (syncErr) {
-    console.error('[Calendar] initial bulk sync failed for user', userId, syncErr.message);
+  } catch {
+    // silent fallback
   }
 
   return { ...result, syncedEvents };
@@ -272,8 +262,7 @@ async function handleCallback(code, userId) {
       try {
         await upsertEventForUser(userId, event.id, authClient);
         synced += 1;
-      } catch (err) {
-        console.error('[Calendar] bulk sync failed for user', userId, event.id, err.message);
+      } catch {
         try {
           await calendarModel.updateMapStatus(userId, event.id, 'failed');
         } catch { /* best effort */ }

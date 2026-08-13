@@ -29,9 +29,13 @@ async function seed() {
     { name: 'manage_sops', display_name: 'Manage SOPs', category: 'sops' },
     { name: 'manage_courses', display_name: 'Manage Courses', category: 'courses' },
     { name: 'manage_assessments', display_name: 'Manage Assessments', category: 'assessments' },
+    { name: 'manage_announcements', display_name: 'Manage Announcements', category: 'announcements' },
+    { name: 'manage_events', display_name: 'Manage Events', category: 'events' },
     { name: 'view_reports', display_name: 'View Reports', category: 'reports' },
     { name: 'manage_settings', display_name: 'Manage Settings', category: 'settings' },
     { name: 'view_audit_logs', display_name: 'View Audit Logs', category: 'audit' },
+    { name: 'notifications.send', display_name: 'Send Notifications', category: 'notifications' },
+    { name: 'notifications.broadcast', display_name: 'Broadcast Notifications', category: 'notifications' },
   ];
 
   for (const perm of permissions) {
@@ -53,6 +57,10 @@ async function seed() {
     ['super_admin', 'view_reports'],
     ['super_admin', 'manage_settings'],
     ['super_admin', 'view_audit_logs'],
+    ['super_admin', 'manage_announcements'],
+    ['super_admin', 'manage_events'],
+    ['super_admin', 'notifications.send'],
+    ['super_admin', 'notifications.broadcast'],
     ['admin', 'view_dashboard'],
     ['admin', 'manage_users'],
     ['admin', 'manage_departments'],
@@ -60,11 +68,19 @@ async function seed() {
     ['admin', 'manage_courses'],
     ['admin', 'manage_assessments'],
     ['admin', 'view_reports'],
+    ['admin', 'manage_announcements'],
+    ['admin', 'manage_events'],
+    ['admin', 'notifications.send'],
+    ['admin', 'notifications.broadcast'],
     ['department_head', 'view_dashboard'],
     ['department_head', 'manage_sops'],
     ['department_head', 'manage_courses'],
     ['department_head', 'manage_assessments'],
     ['department_head', 'view_reports'],
+    ['department_head', 'manage_announcements'],
+    ['department_head', 'manage_events'],
+    ['department_head', 'notifications.send'],
+    ['department_head', 'notifications.broadcast'],
     ['employee', 'view_dashboard'],
     ['employee', 'view_reports'],
   ];
@@ -78,6 +94,25 @@ async function seed() {
     );
   }
 
+  const businesses = [
+    { business_name: 'Default Organization', business_code: 'ORG-001', description: 'Default organization for demo data' },
+  ];
+
+  for (const biz of businesses) {
+    await db.query(
+      `INSERT INTO businesses (business_name, business_code, description)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE description = VALUES(description)`,
+      [biz.business_name, biz.business_code, biz.description]
+    );
+  }
+
+  const [defaultBusiness] = await db.query(
+    'SELECT id FROM businesses WHERE business_code = ? LIMIT 1',
+    ['ORG-001']
+  );
+  const defaultBusinessId = defaultBusiness?.[0]?.id || null;
+
   const departments = [
     { name: 'Operations', code: 'OPS', description: 'Operations department' },
     { name: 'HR & Admin', code: 'HR', description: 'Human Resources & Administration' },
@@ -88,32 +123,32 @@ async function seed() {
 
   for (const dept of departments) {
     await db.query(
-      `INSERT INTO departments (name, code, description)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE description = VALUES(description)`,
-      [dept.name, dept.code, dept.description]
+      `INSERT INTO departments (name, code, description, business_id)
+       VALUES (?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE description = VALUES(description), business_id = VALUES(business_id)`,
+      [dept.name, dept.code, dept.description, defaultBusinessId]
     );
   }
 
   const hashedPassword = await bcrypt.hash('password123', SALT_ROUNDS);
 
   const users = [
-    { full_name: 'John D.', email: 'john.d@organization.com', role: 'super_admin', department_id: 1, position_title: 'System Administrator', employee_id: 'EMP-001', contact_number: '+1-555-0101', employment_status: 'Regular', date_hired: '2020-01-15', birthdate: '1985-03-10', address: '123 Main St' },
-    { full_name: 'Jane S.', email: 'jane.s@organization.com', role: 'admin', department_id: 2, position_title: 'HR Manager', employee_id: 'EMP-002', contact_number: '+1-555-0102', employment_status: 'Regular', date_hired: '2021-06-01', birthdate: '1990-07-22', address: '456 Oak Ave' },
-    { full_name: 'Mike R.', email: 'mike.r@organization.com', role: 'department_head', department_id: 1, position_title: 'Operations Lead', employee_id: 'EMP-003', contact_number: '+1-555-0103', employment_status: 'Regular', date_hired: '2019-03-15', birthdate: '1988-11-05', address: '789 Pine Rd' },
-    { full_name: 'Sarah M.', email: 'sarah.m@organization.com', role: 'employee', department_id: 3, position_title: 'Sales Representative', employee_id: 'EMP-004', contact_number: '+1-555-0104', employment_status: 'Regular', date_hired: '2022-09-01', birthdate: '1995-01-18', address: '321 Elm St' },
-    { full_name: 'Tom K.', email: 'tom.k@organization.com', role: 'employee', department_id: 5, position_title: 'IT Specialist', employee_id: 'EMP-005', contact_number: '+1-555-0105', employment_status: 'Regular', date_hired: '2021-02-10', birthdate: '1992-06-30', address: '654 Maple Dr' },
-    { full_name: 'Lisa W.', email: 'lisa.w@organization.com', role: 'employee', department_id: 4, position_title: 'Financial Analyst', employee_id: 'EMP-006', contact_number: '+1-555-0106', employment_status: 'Regular', date_hired: '2023-01-15', birthdate: '1993-09-14', address: '987 Cedar Ln' },
-    { full_name: 'David P.', email: 'david.p@organization.com', role: 'employee', department_id: 1, position_title: 'Operations Coordinator', employee_id: 'EMP-007', contact_number: '+1-555-0107', employment_status: 'Probationary', date_hired: '2024-04-01', birthdate: '1998-04-25', address: '147 Birch Way' },
-    { full_name: 'Emma L.', email: 'emma.l@organization.com', role: 'employee', department_id: 2, position_title: 'HR Assistant', employee_id: 'EMP-008', contact_number: '+1-555-0108', employment_status: 'Regular', date_hired: '2023-08-15', birthdate: '1996-12-08', address: '258 Spruce Ct' },
+    { full_name: 'John D.', email: 'john.d@organization.com', role: 'super_admin', department_id: 1, business_id: defaultBusinessId, position_title: 'System Administrator', employee_id: 'EMP-001', contact_number: '+1-555-0101', employment_status: 'Regular', date_hired: '2020-01-15', birthdate: '1985-03-10', address: '123 Main St' },
+    { full_name: 'Jane S.', email: 'jane.s@organization.com', role: 'admin', department_id: 2, business_id: defaultBusinessId, position_title: 'HR Manager', employee_id: 'EMP-002', contact_number: '+1-555-0102', employment_status: 'Regular', date_hired: '2021-06-01', birthdate: '1990-07-22', address: '456 Oak Ave' },
+    { full_name: 'Mike R.', email: 'mike.r@organization.com', role: 'department_head', department_id: 1, business_id: defaultBusinessId, position_title: 'Operations Lead', employee_id: 'EMP-003', contact_number: '+1-555-0103', employment_status: 'Regular', date_hired: '2019-03-15', birthdate: '1988-11-05', address: '789 Pine Rd' },
+    { full_name: 'Sarah M.', email: 'sarah.m@organization.com', role: 'employee', department_id: 3, business_id: defaultBusinessId, position_title: 'Sales Representative', employee_id: 'EMP-004', contact_number: '+1-555-0104', employment_status: 'Regular', date_hired: '2022-09-01', birthdate: '1995-01-18', address: '321 Elm St' },
+    { full_name: 'Tom K.', email: 'tom.k@organization.com', role: 'employee', department_id: 5, business_id: defaultBusinessId, position_title: 'IT Specialist', employee_id: 'EMP-005', contact_number: '+1-555-0105', employment_status: 'Regular', date_hired: '2021-02-10', birthdate: '1992-06-30', address: '654 Maple Dr' },
+    { full_name: 'Lisa W.', email: 'lisa.w@organization.com', role: 'employee', department_id: 4, business_id: defaultBusinessId, position_title: 'Financial Analyst', employee_id: 'EMP-006', contact_number: '+1-555-0106', employment_status: 'Regular', date_hired: '2023-01-15', birthdate: '1993-09-14', address: '987 Cedar Ln' },
+    { full_name: 'David P.', email: 'david.p@organization.com', role: 'employee', department_id: 1, business_id: defaultBusinessId, position_title: 'Operations Coordinator', employee_id: 'EMP-007', contact_number: '+1-555-0107', employment_status: 'Probationary', date_hired: '2024-04-01', birthdate: '1998-04-25', address: '147 Birch Way' },
+    { full_name: 'Emma L.', email: 'emma.l@organization.com', role: 'employee', department_id: 2, business_id: defaultBusinessId, position_title: 'HR Assistant', employee_id: 'EMP-008', contact_number: '+1-555-0108', employment_status: 'Regular', date_hired: '2023-08-15', birthdate: '1996-12-08', address: '258 Spruce Ct' },
   ];
 
   for (const user of users) {
     await db.query(
-      `INSERT INTO users (full_name, email, password_hash, role, department_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
-       ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), role = VALUES(role), department_id = VALUES(department_id), position_title = VALUES(position_title), employee_id = VALUES(employee_id), contact_number = VALUES(contact_number), employment_status = VALUES(employment_status), date_hired = VALUES(date_hired), birthdate = VALUES(birthdate), address = VALUES(address), is_active = TRUE`,
-      [user.full_name, user.email, hashedPassword, user.role, user.department_id, user.position_title, user.employee_id, user.contact_number, user.employment_status, user.date_hired, user.birthdate, user.address]
+      `INSERT INTO users (full_name, email, password_hash, role, department_id, business_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+       ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), role = VALUES(role), department_id = VALUES(department_id), business_id = VALUES(business_id), position_title = VALUES(position_title), employee_id = VALUES(employee_id), contact_number = VALUES(contact_number), employment_status = VALUES(employment_status), date_hired = VALUES(date_hired), birthdate = VALUES(birthdate), address = VALUES(address), is_active = TRUE`,
+      [user.full_name, user.email, hashedPassword, user.role, user.department_id, user.business_id, user.position_title, user.employee_id, user.contact_number, user.employment_status, user.date_hired, user.birthdate, user.address]
     );
   }
 
@@ -123,30 +158,40 @@ async function seed() {
   const quizModel = require('./models/quizModel');
   const courseModel = require('./models/courseModel');
 
-  // Demo course — "Security Awareness Fundamentals" (instructor: Mike R., id 3)
-  const existingCourse = (await db.query(
-    'SELECT id FROM courses WHERE title = ? LIMIT 1',
-    ['Security Awareness Fundamentals']
-  ))[0];
-  const demoCourseId = existingCourse
-    ? existingCourse.id
-    : await courseModel.create({
-      title: 'Security Awareness Fundamentals',
-      description: 'Foundational security and SOP navigation training.',
-      difficulty: 'beginner',
-      status: 'published',
-      instructor_id: 3,
-      allow_self_enrollment: true,
-      send_completion_certificates: true,
-    });
+  let demoCourseId = null;
+  try {
+    const existingCourse = (await db.query(
+      'SELECT id FROM courses WHERE title = ? LIMIT 1',
+      ['Security Awareness Fundamentals']
+    ))[0];
+    demoCourseId = existingCourse
+      ? existingCourse.id
+      : await courseModel.create({
+          title: 'Security Awareness Fundamentals',
+          description: 'Foundational security and SOP navigation training.',
+          difficulty: 'beginner',
+          status: 'published',
+          instructor_id: 3,
+          allow_self_enrollment: true,
+          send_completion_certificates: true,
+          business_id: defaultBusinessId,
+        });
+    console.log('demoCourseId', demoCourseId, 'type', typeof demoCourseId);
+  } catch (courseErr) {
+    console.error('Course creation failed:', courseErr.message);
+  }
 
   // Enroll Sarah (user 4) as a learner on the demo course
-  await db.query(
-    `INSERT INTO course_enrollments (course_id, user_id, role, status)
-     SELECT ?, 4, 'student', 'active'
-     WHERE NOT EXISTS (SELECT 1 FROM course_enrollments WHERE course_id = ? AND user_id = 4 LIMIT 1)`,
-    [demoCourseId, demoCourseId]
-  );
+  if (!demoCourseId) {
+    console.warn('Skipping course enrollment because demo course could not be created');
+  } else {
+    await db.query(
+      `INSERT INTO course_enrollments (course_id, user_id, role, status)
+       SELECT ?, 4, 'student', 'active'
+       WHERE NOT EXISTS (SELECT 1 FROM course_enrollments WHERE course_id = ? AND user_id = 4 LIMIT 1)`,
+      [demoCourseId, demoCourseId]
+    );
+  }
 
   // Practice quiz: SOP Navigation Basics
   const practiceQuiz = (await db.query(

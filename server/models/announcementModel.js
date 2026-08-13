@@ -10,6 +10,8 @@ const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS announcements (
   author VARCHAR(100) NOT NULL DEFAULT 'CO Admin',
   body TEXT NOT NULL,
   business_id INT DEFAULT NULL,
+  target_roles JSON DEFAULT NULL,
+  target_departments JSON DEFAULT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -32,7 +34,7 @@ ensureTable();
 
 const announcementModel = {
   async findAll(filters = {}) {
-    const { business_id, type, priority, status, page = 1, limit = 20 } = filters;
+    const { business_id, type, priority, status, target_role, target_department, page = 1, limit = 20 } = filters;
     const offset = (page - 1) * limit;
     const params = [];
     const where = [];
@@ -53,6 +55,14 @@ const announcementModel = {
       where.push('status = ?');
       params.push(status);
     }
+    if (target_role) {
+      where.push('(target_roles IS NULL OR JSON_CONTAINS(target_roles, ?) OR JSON_LENGTH(target_roles) = 0)');
+      params.push(JSON.stringify([target_role]));
+    }
+    if (target_department) {
+      where.push('(target_departments IS NULL OR JSON_CONTAINS(target_departments, ?) OR JSON_LENGTH(target_departments) = 0)');
+      params.push(JSON.stringify([String(target_department)]));
+    }
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const [rows] = await db.query(
@@ -68,20 +78,20 @@ const announcementModel = {
   },
 
   async create(announcement) {
-    const { title, type, priority, status, author, body, business_id } = announcement;
+    const { title, type, priority, status, author, body, business_id, target_roles, target_departments } = announcement;
     const id = crypto.randomUUID();
     await db.query(
-      'INSERT INTO announcements (id, title, type, priority, status, author, body, business_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, title, type || 'General', priority || 'medium', status || 'active', author || 'CO Admin', body, business_id || null]
+      'INSERT INTO announcements (id, title, type, priority, status, author, body, business_id, target_roles, target_departments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, title, type || 'General', priority || 'medium', status || 'active', author || 'CO Admin', body, business_id || null, target_roles || null, target_departments || null]
     );
     return this.findById(id);
   },
 
   async update(id, announcement) {
-    const { title, type, priority, status, author, body, business_id } = announcement;
+    const { title, type, priority, status, author, body, business_id, target_roles, target_departments } = announcement;
     await db.query(
-      'UPDATE announcements SET title = ?, type = ?, priority = ?, status = ?, author = ?, body = ?, business_id = ? WHERE id = ?',
-      [title, type, priority, status, author, body, business_id, id]
+      'UPDATE announcements SET title = ?, type = ?, priority = ?, status = ?, author = ?, body = ?, business_id = ?, target_roles = ?, target_departments = ? WHERE id = ?',
+      [title, type, priority, status, author, body, business_id, target_roles, target_departments, id]
     );
     return this.findById(id);
   },

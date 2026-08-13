@@ -13,6 +13,8 @@ const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS events (
   location VARCHAR(255) DEFAULT NULL,
   organizer VARCHAR(100) NOT NULL DEFAULT 'CO Admin',
   business_id INT DEFAULT NULL,
+  target_roles JSON DEFAULT NULL,
+  target_departments JSON DEFAULT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -35,7 +37,7 @@ ensureTable();
 
 const eventModel = {
   async findAll(filters = {}) {
-    const { business_id, event_type, priority, status, page = 1, limit = 20 } = filters;
+    const { business_id, event_type, priority, status, target_role, target_department, page = 1, limit = 20 } = filters;
     const offset = (page - 1) * limit;
     const params = [];
     const where = [];
@@ -56,6 +58,14 @@ const eventModel = {
       where.push('status = ?');
       params.push(status);
     }
+    if (target_role) {
+      where.push('(target_roles IS NULL OR JSON_CONTAINS(target_roles, ?) OR JSON_LENGTH(target_roles) = 0)');
+      params.push(JSON.stringify([target_role]));
+    }
+    if (target_department) {
+      where.push('(target_departments IS NULL OR JSON_CONTAINS(target_departments, ?) OR JSON_LENGTH(target_departments) = 0)');
+      params.push(JSON.stringify([String(target_department)]));
+    }
 
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const [rows] = await db.query(
@@ -71,20 +81,20 @@ const eventModel = {
   },
 
   async create(event) {
-    const { title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id } = event;
+    const { title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id, target_roles, target_departments } = event;
     const id = crypto.randomUUID();
     await db.query(
-      'INSERT INTO events (id, title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, title, description, event_type || 'Training', priority || 'medium', status || 'active', event_date, end_date, location, organizer || 'CO Admin', business_id || null]
+      'INSERT INTO events (id, title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id, target_roles, target_departments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, title, description, event_type || 'Training', priority || 'medium', status || 'active', event_date, end_date, location, organizer || 'CO Admin', business_id || null, target_roles || null, target_departments || null]
     );
     return this.findById(id);
   },
 
   async update(id, event) {
-    const { title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id } = event;
+    const { title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id, target_roles, target_departments } = event;
     await db.query(
-      'UPDATE events SET title = ?, description = ?, event_type = ?, priority = ?, status = ?, event_date = ?, end_date = ?, location = ?, organizer = ?, business_id = ? WHERE id = ?',
-      [title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id, id]
+      'UPDATE events SET title = ?, description = ?, event_type = ?, priority = ?, status = ?, event_date = ?, end_date = ?, location = ?, organizer = ?, business_id = ?, target_roles = ?, target_departments = ? WHERE id = ?',
+      [title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id, target_roles, target_departments, id]
     );
     return this.findById(id);
   },

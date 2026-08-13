@@ -1,6 +1,7 @@
 const messageModel = require('../models/messageModel');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
+const { createNotification } = require('../services/notificationService');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -59,8 +60,6 @@ async function createConversation(req, res) {
     }
   }
 
-  // For a 1:1 conversation, reuse the existing thread between the two users
-  // instead of creating a duplicate.
   if (!isGroupForum && participants.length === 1) {
     const existing = await messageModel.findDirectConversation(userId, participants[0]);
     if (existing) {
@@ -70,6 +69,23 @@ async function createConversation(req, res) {
         body: body.trim(),
       });
       logAudit && logAudit('message.conversation.reuse', userId, { conversationId: existing.id });
+
+      const recipientIds = (await messageModel.getParticipants(existing.id))
+        .filter((p) => p.id !== userId)
+        .map((p) => p.id);
+      const sender = await messageModel.getParticipants(existing.id).then((ps) => ps.find((p) => p.id === userId));
+      for (const recipientId of recipientIds) {
+        createNotification({
+          userId: recipientId,
+          title: 'New Message',
+          body: `${sender?.full_name || 'Someone'}: ${body.trim().slice(0, 120)}`,
+          type: 'info',
+          link: `/messaging`,
+          entityType: 'message',
+          entityId: existing.id,
+        }).catch(() => {});
+      }
+
       return res.status(201).json({
         success: true,
         message: 'Conversation created',
@@ -83,15 +99,31 @@ async function createConversation(req, res) {
     createdBy: userId,
     participantIds: participantIds || [],
   })
-    .then((conversation) => {
-      return messageModel.addMessage({
+    .then(async (conversation) => {
+      const message = await messageModel.addMessage({
         conversationId: conversation.id,
         senderId: userId,
         body: body.trim(),
-      }).then((message) => {
-        logAudit && logAudit('message.conversation.create', userId, { conversationId: conversation.id });
-        res.status(201).json({ success: true, message: 'Conversation created', data: { ...conversation, messages: [message] } });
       });
+      logAudit && logAudit('message.conversation.create', userId, { conversationId: conversation.id });
+
+      const recipientIds = conversation.participants
+        .filter((p) => p.id !== userId)
+        .map((p) => p.id);
+      const sender = conversation.participants.find((p) => p.id === userId);
+      for (const recipientId of recipientIds) {
+        createNotification({
+          userId: recipientId,
+          title: 'New Conversation',
+          body: `${sender?.full_name || 'Someone'}: ${body.trim().slice(0, 120)}`,
+          type: 'info',
+          link: `/messaging`,
+          entityType: 'message',
+          entityId: conversation.id,
+        }).catch(() => {});
+      }
+
+      res.status(201).json({ success: true, message: 'Conversation created', data: { ...conversation, messages: [message] } });
     })
     .catch((err) => sendError(res, err, 'Failed to create conversation'));
 }
@@ -106,12 +138,27 @@ function sendMessage(req, res) {
   }
 
   messageModel.getConversation(conversationId)
-    .then((conversation) => {
+    .then(async (conversation) => {
       if (!conversation) return res.status(404).json({ success: false, message: 'Conversation not found', code: 'NOT_FOUND' });
-      return messageModel.addMessage({ conversationId, senderId: userId, body: body.trim() });
-    })
-    .then((message) => {
+      const message = await messageModel.addMessage({ conversationId, senderId: userId, body: body.trim() });
       logAudit && logAudit('message.send', userId, { conversationId, messageId: message.id });
+
+      const recipientIds = conversation.participants
+        .filter((p) => p.id !== userId)
+        .map((p) => p.id);
+      const sender = conversation.participants.find((p) => p.id === userId);
+      for (const recipientId of recipientIds) {
+        createNotification({
+          userId: recipientId,
+          title: 'New Message',
+          body: `${sender?.full_name || 'Someone'}: ${body.trim().slice(0, 120)}`,
+          type: 'info',
+          link: `/messaging`,
+          entityType: 'message',
+          entityId: conversation.id,
+        }).catch(() => {});
+      }
+
       res.status(201).json({ success: true, message: 'Message sent', data: message });
     })
     .catch((err) => sendError(res, err, 'Failed to send message'));

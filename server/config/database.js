@@ -606,10 +606,14 @@ const MIGRATIONS = [
     `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS business_id INT DEFAULT NULL AFTER id`,
     `ALTER TABLE announcements ADD CONSTRAINT fk_announcements_business FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE SET NULL`,
     `CREATE INDEX IF NOT EXISTS idx_announcements_business ON announcements(business_id)`,
+    `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS target_roles JSON DEFAULT NULL AFTER business_id`,
+    `ALTER TABLE announcements ADD COLUMN IF NOT EXISTS target_departments JSON DEFAULT NULL AFTER target_roles`,
     // Add business_id scoping to events
     `ALTER TABLE events ADD COLUMN IF NOT EXISTS business_id INT DEFAULT NULL AFTER id`,
     `ALTER TABLE events ADD CONSTRAINT fk_events_business FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE SET NULL`,
     `CREATE INDEX IF NOT EXISTS idx_events_business ON events(business_id)`,
+    `ALTER TABLE events ADD COLUMN IF NOT EXISTS target_roles JSON DEFAULT NULL AFTER business_id`,
+    `ALTER TABLE events ADD COLUMN IF NOT EXISTS target_departments JSON DEFAULT NULL AFTER target_roles`,
     // Add business_id scoping to courses
     `ALTER TABLE courses ADD COLUMN business_id INT DEFAULT NULL AFTER id`,
     `ALTER TABLE courses ADD CONSTRAINT fk_courses_business FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE SET NULL`,
@@ -679,10 +683,23 @@ async function runMigrations() {
     console.log('Push notification migrations applied');
   } catch (err) {
     console.error('Push notification migration error:', err.message);
+  }
+
+  try {
+    const { runNotificationMigrations } = require('../migrations/notifications');
+    await runNotificationMigrations();
+    console.log('Notification migrations applied');
+  } catch (err) {
+    console.error('Notification migration error:', err.message);
+  }
+
+  try {
     const { runTaskMigrations } = require('../migrations/taskManagement');
     await runTaskMigrations();
     console.log('Task management migrations applied');
-  } 
+  } catch (err) {
+    console.error('Task management migration error:', err.message);
+  }
 }
 
 async function initDatabase() {

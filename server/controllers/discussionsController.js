@@ -1,7 +1,9 @@
 const discussionModel = require('../models/discussionModel');
 const courseModel = require('../models/courseModel');
+const enrollmentModel = require('../models/enrollmentModel');
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
+const { createNotification } = require('../services/notificationService');
 const db = require('../config/database');
 
 function sendError(res, err, fallback = 'Request failed') {
@@ -84,7 +86,7 @@ function createDiscussion(req, res) {
     .then(async (course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
       await enforceDiscussionScope(courseId, req.user);
-      return discussionModel.create({
+      const discussionId = await discussionModel.create({
         course_id: courseId,
         module_id,
         title: title.trim(),
@@ -92,10 +94,23 @@ function createDiscussion(req, res) {
         created_by: userId,
         is_pinned,
       });
-    })
-    .then((id) => {
-      logAudit('discussion.create', userId, { discussionId: id, courseId });
-      return res.status(201).json({ success: true, message: 'Discussion created successfully', data: { id } });
+      logAudit('discussion.create', userId, { discussionId, courseId });
+
+      const participantIds = await enrollmentModel.getCourseParticipantIds(courseId);
+      for (const participantId of participantIds) {
+        if (participantId === userId) continue;
+        createNotification({
+          userId: participantId,
+          title: 'New Discussion',
+          body: title.trim().slice(0, 120),
+          type: 'info',
+          link: `/courses/${courseId}`,
+          entityType: 'discussion',
+          entityId: discussionId,
+        }).catch(() => {});
+      }
+
+      res.status(201).json({ success: true, message: 'Discussion created successfully', data: { id: discussionId } });
     })
     .catch((err) => {
       if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message, code: 'BUSINESS_SCOPE_DENIED' });
@@ -167,7 +182,7 @@ function createReply(req, res) {
         return res.status(400).json({ success: false, message: 'Discussion is closed', code: 'DISCUSSION_CLOSED' });
       }
       await enforceDiscussionScope(discussion.course_id, req.user);
-      return discussionModel.createReply({
+      const replyId = await discussionModel.createReply({
         discussion_id: discussionId,
         parent_reply_id,
         user_id: userId,
@@ -175,11 +190,22 @@ function createReply(req, res) {
         is_instructor,
         is_pinned,
       });
-    })
-    .then((replyId) => {
       discussionModel.incrementReplyCount(discussionId);
       logAudit('discussion.reply', userId, { discussionId, replyId });
-      return res.status(201).json({ success: true, message: 'Reply created successfully', data: { id: replyId } });
+
+      if (discussion.created_by !== userId) {
+        createNotification({
+          userId: discussion.created_by,
+          title: 'New Reply',
+          body: reply_text.trim().slice(0, 120),
+          type: 'info',
+          link: `/courses/${discussion.course_id}`,
+          entityType: 'discussion',
+          entityId: discussionId,
+        }).catch(() => {});
+      }
+
+      res.status(201).json({ success: true, message: 'Reply created successfully', data: { id: replyId } });
     })
     .catch((err) => {
       if (err.statusCode === 403) return res.status(403).json({ success: false, message: err.message, code: 'BUSINESS_SCOPE_DENIED' });

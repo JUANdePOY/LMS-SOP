@@ -159,6 +159,8 @@ router.post('/login', loginLimiter, [
       new_values: { email: user.email, role: user.role }
     });
 
+    const permissions = await resolveUserPermissions(user.id, user.role);
+
     clearTimeout(loginTimer);
     return res.status(200).json({
       status: 'success',
@@ -177,6 +179,7 @@ router.post('/login', loginLimiter, [
           position_title: user.position_title,
           employee_id: user.employee_id,
           avatar_url: user.avatar_url,
+          permissions,
         }
       }
     });
@@ -297,6 +300,8 @@ router.post('/refresh-token', [
       });
     }
 
+    const permissions = await resolveUserPermissions(user.id, user.role);
+
     const newAccessToken = generateToken({
       userId: user.id,
       email: user.email,
@@ -333,6 +338,7 @@ router.post('/refresh-token', [
           position_title: user.position_title,
           employee_id: user.employee_id,
           avatar_url: user.avatar_url,
+          permissions,
         }
       }
     });

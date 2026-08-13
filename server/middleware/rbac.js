@@ -75,7 +75,7 @@ const requireAdmin = (req, res, next) => {
  * Authorize super admin only (full system access)
  */
 const requireSuperAdmin = (req, res, next) => {
-  if (req.user?.role !== 'admin') {
+  if (req.user?.role !== 'super_admin') {
     return res.status(403).json({
       status: 'error',
       message: 'System administrator access required',

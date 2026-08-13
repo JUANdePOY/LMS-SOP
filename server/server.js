@@ -246,7 +246,6 @@ app.get('/api/admin/calendar/key-source', async (req, res) => {
     const source = await getKeySource();
     res.json({ source });
   } catch (err) {
-    console.error('Failed to determine calendar key source:', err.message);
     res.status(500).json({ error: 'Failed to determine key source' });
   }
 });
@@ -304,18 +303,18 @@ const PORT = process.env.PORT || 5000;
 (function validateCalendarKey() {
   const raw = process.env.CALENDAR_TOKEN_ENCRYPTION_KEY;
   if (!raw) {
-    console.error(
-      '[Calendar] WARNING: CALENDAR_TOKEN_ENCRYPTION_KEY is not set. Google Calendar ' +
-      'tokens cannot be decrypted across restarts — users will be forced to reconnect ' +
-      'after every deploy. Set a stable 64-char hex key in the environment.'
-    );
     return;
   }
   if (!/^[0-9a-fA-F]{64}$/.test(raw)) {
-    console.error(
-      '[Calendar] WARNING: CALENDAR_TOKEN_ENCRYPTION_KEY is not a valid 64-char hex ' +
-      'string (32 bytes). Tokens encrypted with it may fail to decrypt. Fix the key value.'
-    );
+    return;
+  }
+})();
+
+(function validateVapidKeys() {
+  const publicKey = process.env.FCM_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.FCM_VAPID_PRIVATE_KEY || process.env.VAPID_PRIVATE_KEY;
+  if (!publicKey || !privateKey) {
+    // Push notifications are disabled until VAPID keys are configured.
   }
 })();
 

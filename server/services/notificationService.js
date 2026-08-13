@@ -32,9 +32,7 @@ async function createNotification({ userId, title, body, type = 'info', link, en
 
     const sent = broadcastToUser(userId, payload);
 
-    if (sent === 0) {
-      triggerDevicePush(userId, payload.data).catch(() => {});
-    }
+    triggerDevicePush(userId, payload.data).catch(() => {});
   }
 
   return notificationId;
@@ -73,17 +71,22 @@ async function deduplicatedCreate({ userId, title, body, type, link, entityType,
   return createNotification({ userId, title, body, type, link, entityType, entityId });
 }
 
-async function broadcastSystemChange({ title, body, type = 'info', link, entityType, entityId, excludeUserId = null }) {
+async function broadcastSystemChange({ title, body, type = 'info', link, entityType, entityId, excludeUserId = null, targetUserIds = null }) {
   if (!title || !entityType || !entityId) return [];
 
   try {
-    const [userRows] = await db.query(
-      `SELECT id FROM users WHERE is_active = 1 AND role NOT IN ('super_admin') ${excludeUserId ? 'AND id <> ?' : ''}`,
-      excludeUserId ? [excludeUserId] : []
-    );
+    let userIds = targetUserIds;
+    if (!userIds) {
+      const [userRows] = await db.query(
+        `SELECT id FROM users WHERE is_active = 1 AND role NOT IN ('super_admin') ${excludeUserId ? 'AND id <> ?' : ''}`,
+        excludeUserId ? [excludeUserId] : []
+      );
+      userIds = userRows.map((u) => u.id);
+    } else if (excludeUserId) {
+      userIds = userIds.filter((id) => id !== excludeUserId);
+    }
 
-    const promises = userRows
-      .map((u) => u.id)
+    const promises = userIds
       .filter((id) => Number.isInteger(id) && id > 0)
       .map((id) =>
         deduplicatedCreate({
@@ -116,10 +119,8 @@ async function broadcastSystemChange({ title, body, type = 'info', link, entityT
       };
 
       for (const id of createdIds) {
-        const row = userRows.find((u) => u.id === id);
-        if (row) {
-          broadcastToUser(row.id, payload).catch(() => {});
-        }
+        broadcastToUser(id, payload).catch(() => {});
+        triggerDevicePush(id, payload.data).catch(() => {});
       }
     }
 
