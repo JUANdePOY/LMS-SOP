@@ -33,7 +33,7 @@ function getOnboardingService() {
   if (onboardingServiceResolved) return cachedOnboardingService;
   onboardingServiceResolved = true;
   try {
-    cachedOnboardingService = require('./services/sopOnboardingService');
+    cachedOnboardingService = require('../services/sopOnboardingService');
   } catch (err) {
     console.warn('[User Creating] sopOnboardingService not found; skipping onboarding assignment:', err.message);
     cachedOnboardingService = null;
