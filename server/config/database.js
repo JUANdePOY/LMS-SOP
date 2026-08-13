@@ -159,10 +159,33 @@ function ensureStartupLock() {
       }
     }
     fs.writeFileSync(lockFile, String(process.pid));
+    registerLockCleanup(lockFile);
     return true;
   } catch {
     return true;
   }
+}
+
+function registerLockCleanup(lockFile) {
+  const cleanup = () => {
+    try { if (fs.existsSync(lockFile)) fs.unlinkSync(lockFile); } catch { /* ignore */ }
+  };
+  process.on('exit', cleanup);
+  process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+  process.on('SIGINT', () => { cleanup(); process.exit(0); });
+}
+
+function waitForLock(maxMs = 2000) {
+  const start = Date.now();
+  return new Promise((resolve) => {
+    function tick() {
+      const ok = ensureStartupLock();
+      if (ok) return resolve(true);
+      if (Date.now() - start >= maxMs) return resolve(false);
+      setTimeout(tick, 500);
+    }
+    tick();
+  });
 }
 
 const MIGRATIONS = [
@@ -705,7 +728,7 @@ async function runMigrations() {
 async function initDatabase() {
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    const shouldInit = ensureStartupLock();
+    const shouldInit = await waitForLock();
     if (!shouldInit) {
       console.warn('Skipping duplicate DB init. Server will continue with existing pool.');
       return;

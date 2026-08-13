@@ -292,7 +292,29 @@ app.use((req, res) => {
   });
 });
 
+const net = require('net');
+
 const PORT = process.env.PORT || 5000;
+
+async function ensurePortAvailable(port) {
+  return new Promise((resolve) => {
+    const tester = net.createServer();
+    tester.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${port} is already in use. Another instance may already be running.`);
+        console.error('If you see multiple "LMS-SOP Server starting..." lines, stop the duplicate process.');
+        setTimeout(() => process.exit(0), 100);
+        resolve(false);
+      } else {
+        resolve(true);
+      }
+    });
+    tester.once('listening', () => {
+      tester.close(() => resolve(true));
+    });
+    tester.listen(port);
+  });
+}
 
 // Validate the Google Calendar token encryption key at boot. If it is missing
 // or malformed, calendar tokens cannot be decrypted on the next request and the
@@ -334,45 +356,48 @@ if (storage.isS3()) {
   }
 }
 
-const server = app.listen(PORT, () => {
-  console.log(`LMS-SOP Server running on port ${PORT}`);
-  console.log(`Database: ${process.env.DB_HOST}/${process.env.DB_NAME}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
-
-server.on('upgrade', upgradeHandler);
-
-wss.on('connection', (ws, req, userId) => {
-  handleConnection(ws, req, userId);
-});
-
-const heartbeatInterval = setInterval(() => {
-  wss.clients.forEach((ws) => {
-    if (!ws.isAlive) return ws.terminate();
-    ws.isAlive = false;
-    ws.ping();
+ensurePortAvailable(PORT).then((ok) => {
+  if (!ok) return;
+  const server = app.listen(PORT, () => {
+    console.log(`LMS-SOP Server running on port ${PORT}`);
+    console.log(`Database: ${process.env.DB_HOST}/${process.env.DB_NAME}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   });
-}, 30000);
 
-server.on('close', () => {
-  clearInterval(heartbeatInterval);
-});
+  server.on('upgrade', upgradeHandler);
 
-setInterval(() => {
-  const count = getConnectedUserCount();
-  if (count > 0) {
-    console.log(`[WS] Active WebSocket connections: ${count}`);
-  }
-}, 60000);
+  wss.on('connection', (ws, req, userId) => {
+    handleConnection(ws, req, userId);
+  });
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use. Another instance may already be running.`);
-    console.error('If you see multiple "LMS-SOP Server starting..." lines, stop the duplicate process.');
-    setTimeout(() => process.exit(0), 100);
-  } else {
-    console.error('Server error:', err);
-  }
+  const heartbeatInterval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+      if (!ws.isAlive) return ws.terminate();
+      ws.isAlive = false;
+      ws.ping();
+    });
+  }, 30000);
+
+  server.on('close', () => {
+    clearInterval(heartbeatInterval);
+  });
+
+  setInterval(() => {
+    const count = getConnectedUserCount();
+    if (count > 0) {
+      console.log(`[WS] Active WebSocket connections: ${count}`);
+    }
+  }, 60000);
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use. Another instance may already be running.`);
+      console.error('If you see multiple "LMS-SOP Server starting..." lines, stop the duplicate process.');
+      setTimeout(() => process.exit(0), 100);
+    } else {
+      console.error('Server error:', err);
+    }
+  });
 });
 
 module.exports = app;
