@@ -238,7 +238,7 @@ const CertificatePreviewCanvas = forwardRef(function CertificatePreviewCanvas({
 
   if (!framePreview) {
     return (
-      <div className="space-y-2">
+      <div className={bare ? 'h-full' : 'space-y-2'}>
         {!bare && <div className="flex justify-end">{ZoomControls}</div>}
         <div
           ref={outerRef}
@@ -261,7 +261,7 @@ const CertificatePreviewCanvas = forwardRef(function CertificatePreviewCanvas({
   };
 
   return (
-    <div className={bare ? '' : 'space-y-2'}>
+    <div className={bare ? 'h-full' : 'space-y-2'}>
       {!bare && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-400">

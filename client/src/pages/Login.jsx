@@ -77,7 +77,6 @@ export default function Login() {
               alt="SOP Training Platform"
               className="login-logo"
             />
-            <h1 className="login-card-title">SOP TRAINING PLATFORM</h1>
             <p className="login-card-subtitle">
               Learning Management System for Standard Operating Procedures
             </p>

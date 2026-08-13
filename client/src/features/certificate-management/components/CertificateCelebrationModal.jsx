@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { Button } from '@/shared/components/ui/button';
-import { Download, Award, X } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 import CertificatePreviewCanvas from './CertificatePreviewCanvas';
 
 const CONFETTI_DURATION = 3000;
@@ -46,10 +47,12 @@ export default function CertificateCelebrationModal({
   const [showContent, setShowContent] = useState(false);
   const canvasRef = useRef(null);
   const confettiRef = useRef(null);
+  const [canvasKey, setCanvasKey] = useState(0);
 
   useEffect(() => {
     if (open) {
       setShowContent(false);
+      setCanvasKey((k) => k + 1);
 
       const confettiTimer = setTimeout(() => {
         fireConfetti(confettiRef);
@@ -67,7 +70,7 @@ export default function CertificateCelebrationModal({
         }
       };
     }
-  }, [open]);
+  }, [open, certificate]);
 
   const handleDownload = useCallback(async () => {
     if (!canvasRef.current) return;
@@ -83,7 +86,7 @@ export default function CertificateCelebrationModal({
       : certificate.resolved_sections
     : null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm">
       <AnimatePresence>
         {showContent && (
@@ -121,7 +124,10 @@ export default function CertificateCelebrationModal({
             </div>
 
             {sections ? (
-              <div className="w-full flex-1 min-h-0 rounded-lg">
+              <div
+                className="w-full max-w-5xl h-[60vh] max-h-[60vh] overflow-hidden rounded-lg"
+                key={canvasKey}
+              >
                 <CertificatePreviewCanvas
                   ref={canvasRef}
                   sections={sections}
@@ -136,10 +142,15 @@ export default function CertificateCelebrationModal({
                   bare
                 />
               </div>
-            ) : null}
+            ) : (
+              <div className="text-center text-white/70">
+                <p>Certificate will be available soon.</p>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </div>,
+    document.body
   );
 }

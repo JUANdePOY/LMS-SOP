@@ -401,4 +401,6 @@ module.exports = {
   listTrashedSops,
   emptyTrash,
   getSopStats,
+  enforceSopScope,
+  enforceSopWriteScope,
 };
