@@ -14,6 +14,7 @@ import { getIssuancesByUser } from "@/features/certificate-management/services/c
 import SOP_CONTENT_STYLES from "@/features/sop-management/utils/sopContentStyles";
 import PublicModuleCard from "@/features/sop-management/components/SOPEditor/PublicModuleCard";
 import { getEmployeeSop } from "@/features/employee/api/employeeSop.api";
+import CertificateCelebrationModal from "@/features/certificate-management/components/CertificateCelebrationModal";
 
 function formatDate(dateStr) {
   if (!dateStr) return null;
@@ -39,7 +40,8 @@ export default function LessonPage() {
   const [certificateLoading, setCertificateLoading] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [lightboxAlt, setLightboxAlt] = useState("");
-
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationCertificate, setCelebrationCertificate] = useState(null);
 
   const [ sop, setSop ] = useState(null);
   const [ sopLoading, setSopLoading ] = useState(false);
@@ -132,6 +134,11 @@ export default function LessonPage() {
       setMessage(result.message || "Lesson completed");
       setMessageType("success");
       refetch();
+
+      if (result?.data?.certificateIssued && result?.data?.certificate) {
+        setCelebrationCertificate(result.data.certificate);
+        setShowCelebration(true);
+      }
     } catch (err) {
       setMessage(err.message || "Failed to mark lesson as complete");
       setMessageType("error");
@@ -574,6 +581,15 @@ export default function LessonPage() {
         </div>
         <ImageLightbox src={lightboxSrc} alt={lightboxAlt} onClose={() => setLightboxSrc(null)} />
       </div>
+
+      <CertificateCelebrationModal
+        open={showCelebration}
+        onClose={() => setShowCelebration(false)}
+        certificate={celebrationCertificate}
+        title="Course Completed!"
+        description={`Congratulations on completing: ${currentLesson?.title || 'this course'}`}
+        variant="fullscreen"
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="md:col-span-2">

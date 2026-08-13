@@ -411,6 +411,12 @@ function SOPWorkspacePage() {
           message={confirmConfig?.message || 'Are you sure?'}
           variant={confirmConfig?.variant || 'default'}
         />
+        <CreateModuleModal
+          open={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSave={handleCreateModule}
+          loading={creatingModule}
+        />
       </div>
     );
   }

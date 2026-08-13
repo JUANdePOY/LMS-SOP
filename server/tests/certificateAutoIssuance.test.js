@@ -370,6 +370,6 @@ describe('Certificate Auto-Issuance on Course Completion', () => {
 
     expect(result.issued).toBe(true);
     expect(result.issuance.resolved_sections.recipient_name.text).toBe('Sarah M.');
-    expect(result.issuance.resolved_sections.date.text).toBe(new Date().toISOString().split('T')[0]);
+    expect(result.issuance.resolved_sections.date.text).toBe(new Date().toLocaleDateString('en-CA'));
   });
 });

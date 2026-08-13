@@ -7,7 +7,7 @@
  */
 export const formatDateForInput = (date) => {
   if (!(date instanceof Date) || isNaN(date)) return '';
-  return date.toISOString().split('T')[0];
+  return date.toLocaleDateString('en-CA');
 };
 
 /**

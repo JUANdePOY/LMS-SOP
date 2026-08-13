@@ -8,7 +8,6 @@ import { formatDate, formatDateTime } from '../utils/taskDateUtils';
 import AssignmentSection from '../components/AssignmentSection';
 import AttachmentSection from '../components/AttachmentSection';
 import CommentSection from '../components/CommentSection';
-import CommentInput from '../components/CommentInput';
 import ProgressModal from '../components/ProgressModal';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import { PRIORITY_STYLES, STATUS_STYLES } from '../constants/taskConstants';
@@ -362,21 +361,13 @@ export default function TaskDetailsModal({ taskId, open, onClose }) {
 
               {activeTab === 'comments' && (
                 <div className="flex flex-col h-full min-h-0">
-                  <div className="flex-1 overflow-y-auto min-h-0">
-                    <CommentSection
-                      comments={task.comments}
-                      currentUser={currentUser}
-                      isAdmin={isAnyAdmin}
-                      onAddComment={(comment, parentId) => addComment(task.id, comment, parentId)}
-                      canReply
-                    />
-                  </div>
-                  <div className="shrink-0 border-t border-[var(--border)] bg-[var(--bg-surface)] px-5 sm:px-6 py-3">
-                    <CommentInput
-                      onAddComment={(comment, parentId) => addComment(task.id, comment, parentId)}
-                      canComment
-                    />
-                  </div>
+                  <CommentSection
+                    comments={task.comments}
+                    currentUser={currentUser}
+                    isAdmin={isAnyAdmin}
+                    onAddComment={(comment, parentId) => addComment(task.id, comment, parentId)}
+                    canReply
+                  />
                 </div>
               )}
 

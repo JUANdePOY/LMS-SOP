@@ -73,11 +73,10 @@ export default function Login() {
         <div className="login-card">
           <div className="login-card-header">
             <img
-              src="/UseThisLogo-v1.png"
+              src="/UseThisLogo.v.1.2.png"
               alt="SOP Training Platform"
               className="login-logo"
             />
-            <h1 className="login-card-title">SOP TRAINING PLATFORM</h1>
             <p className="login-card-subtitle">
               Learning Management System for Standard Operating Procedures
             </p>

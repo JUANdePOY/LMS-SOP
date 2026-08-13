@@ -191,12 +191,96 @@ async function isAssignedToUser(sopId, userId) {
   return rows.length > 0;
 }
 
+async function listAccessibleSops(userId, filters = {}) {
+  const cols = await sopModel.getSopsColumns();
+  const { search, page = 1, limit = 20, sort = 'created_at' } = filters;
+  const offset = (page - 1) * limit;
+
+  const codeCol = cols.code;
+  const orderBy = sort === 'title' ? 's.title' : 's.created_at';
+  const orderDir = sort === 'title' ? 'ASC' : 'DESC';
+
+  const sql = `
+    SELECT s.*, d.name AS department_name, c.name AS category_name, u.full_name AS owner_name
+    FROM sops s
+    LEFT JOIN departments d ON s.department_id = d.id
+    LEFT JOIN categories c ON s.category_id = c.id
+    LEFT JOIN users u ON s.${cols.owner} = u.id
+    WHERE s.status = 'Published'
+      AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
+      AND (
+        EXISTS (
+          SELECT 1 FROM sop_versions sv
+          JOIN sop_assignments sa ON sa.sop_version_id = sv.id AND sa.is_deleted = FALSE
+          JOIN assignment_users au ON au.assignment_id = sa.id AND au.user_id = ?
+          WHERE sv.sop_id = s.id AND sv.is_current = TRUE AND sv.deleted_at IS NULL
+        )
+        OR EXISTS (
+          SELECT 1 FROM module_content mc
+          JOIN course_modules cm ON cm.id = mc.module_id AND cm.is_deleted = FALSE
+          JOIN course_enrollments ce ON ce.course_id = cm.course_id AND ce.user_id = ? AND ce.status IN ('active', 'completed') AND ce.is_deleted = FALSE
+          WHERE mc.type = 'sop' AND mc.url = CAST(s.id AS CHAR) AND mc.is_deleted = FALSE
+        )
+      )
+  `;
+  const params = [userId, userId];
+
+  let finalSql = sql;
+  if (search) {
+    finalSql += ' AND (s.title LIKE ? OR s.' + codeCol + ' LIKE ? OR s.description LIKE ?)';
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+
+  finalSql += ` ORDER BY ${orderBy} ${orderDir} LIMIT ? OFFSET ?`;
+  params.push(limit, offset);
+
+  const [rows] = await db.query(finalSql, params);
+  const normalizedRows = rows.map((r) => sopModel.normalizeSopRow(r, cols));
+
+  const countSql = `
+    SELECT COUNT(*) AS total FROM sops s
+    WHERE s.status = 'Published'
+      AND (s.is_deleted = 0 OR s.is_deleted IS NULL)
+      AND (
+        EXISTS (
+          SELECT 1 FROM sop_versions sv
+          JOIN sop_assignments sa ON sa.sop_version_id = sv.id AND sa.is_deleted = FALSE
+          JOIN assignment_users au ON au.assignment_id = sa.id AND au.user_id = ?
+          WHERE sv.sop_id = s.id AND sv.is_current = TRUE AND sv.deleted_at IS NULL
+        )
+        OR EXISTS (
+          SELECT 1 FROM module_content mc
+          JOIN course_modules cm ON cm.id = mc.module_id AND cm.is_deleted = FALSE
+          JOIN course_enrollments ce ON ce.course_id = cm.course_id AND ce.user_id = ? AND ce.status IN ('active', 'completed') AND ce.is_deleted = FALSE
+          WHERE mc.type = 'sop' AND mc.url = CAST(s.id AS CHAR) AND mc.is_deleted = FALSE
+        )
+      )
+  `;
+  const countParams = [userId, userId];
+  if (search) {
+    countSql += ' AND (s.title LIKE ? OR s.' + codeCol + ' LIKE ? OR s.description LIKE ?)';
+    countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+
+  const [countRows] = await db.query(countSql, countParams);
+  const total = countRows[0]?.total ?? 0;
+
+  return {
+    rows: normalizedRows,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
+}
+
 module.exports = {
   listAssignments,
   createAssignment,
   deleteAssignment,
   resolveAssignedUserIds,
   isAssignedToUser,
+  listAccessibleSops,
   getAssignmentDropdowns: assignmentCascadeService.getDepartments,
   getPositionsFromDepartment: assignmentCascadeService.getPositionsForDepartment,
   getUsersFromDepartment: assignmentCascadeService.getUsersFromDepartment,

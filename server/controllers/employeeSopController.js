@@ -19,6 +19,36 @@ function sendError(res, err, fallback = 'Request failed') {
 
 const ALLOWED_EMPLOYEE_SOP_STATUSES = ['Published'];
 
+async function list(req, res) {
+  try {
+    const userId = req.user.id;
+    const search = (req.query.search || '').trim();
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.max(parseInt(req.query.limit, 10) || 20, 1);
+    const sort = req.query.sort === 'title' ? 'title' : 'created_at';
+
+    const result = await sopAssignmentService.listAccessibleSops(userId, {
+      search,
+      page,
+      limit,
+      sort,
+    });
+
+    res.json({
+      success: true,
+      data: result.rows,
+      pagination: {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages,
+      },
+    });
+  } catch (error) {
+    sendError(res, error, 'Failed to load SOPs');
+  }
+}
+
 async function getEmployeeSop(req, res) {
   try {
     const userId = req.user.id;
@@ -94,6 +124,7 @@ async function getEmployeeSop(req, res) {
 }
 
 const employeeSopController = {
+  list,
   getSop: getEmployeeSop,
 };
 

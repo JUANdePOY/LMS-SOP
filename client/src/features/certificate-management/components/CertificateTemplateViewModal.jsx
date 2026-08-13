@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useCallback, useState } from 'react';
-import { Download, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useCallback, useState, useRef } from 'react';
+import { RefreshCw, Image } from 'lucide-react';
 import { Modal } from '@/shared/components/ui/modal';
 import { Button } from '@/shared/components/ui/button';
 import { Badge } from '@/shared/components/ui/badge';
@@ -9,7 +9,6 @@ import { useToast } from '@/shared/components/ui/Toast';
 import CertificatePreviewCanvas from '@/features/certificate-management/components/CertificatePreviewCanvas';
 import {
   getCertificateTemplate,
-  downloadTemplatePdf,
 } from '@/features/certificate-management/services/certificateService';
 import {
   CERTIFICATE_SECTIONS,
@@ -180,7 +179,7 @@ export default function CertificateTemplateViewModal({ open, onClose, templateId
   const [error, setError] = useState(null);
   const [framePreview, setFramePreview] = useState(null);
   const [frameError, setFrameError] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const canvasRef = useRef(null);
 
   // ─── Template fetch ──────────────────────────────────────────────
   const doFetch = useCallback(() => {
@@ -278,25 +277,11 @@ export default function CertificateTemplateViewModal({ open, onClose, templateId
   // ─── Actions ─────────────────────────────────────────────────────
   const handleRetry = () => doFetch();
 
-  const handleDownload = async () => {
-    if (!template) return;
-    setDownloading(true);
-    try {
-      const blob = await downloadTemplatePdf(template.id);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${template.name || 'certificate'}-${template.public_id || template.id}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      toast.success('Certificate template PDF downloaded');
-    } catch (err) {
-      toast.error(err.response?.data?.error?.message || 'Failed to download PDF');
-    } finally {
-      setDownloading(false);
-    }
+  const handleDownloadImage = async () => {
+    if (!template || !canvasRef.current) return;
+    const name = template.name || 'certificate';
+    const publicId = template.public_id || template.id;
+    await canvasRef.current.downloadAsImage(`${name}-${publicId}.png`);
   };
 
   const footerContent = template ? (
@@ -304,13 +289,9 @@ export default function CertificateTemplateViewModal({ open, onClose, templateId
       <Button variant="outline" size="sm" onClick={onClose}>
         Close
       </Button>
-      <Button variant="default" size="sm" onClick={handleDownload} disabled={downloading}>
-        {downloading ? 'Downloading…' : (
-          <>
-            <Download className="h-4 w-4 mr-2" />
-            Download PDF
-          </>
-        )}
+      <Button variant="default" size="sm" onClick={handleDownloadImage}>
+        <Image className="h-4 w-4 mr-2" />
+        Download Image
       </Button>
     </div>
   ) : null;
@@ -370,15 +351,16 @@ export default function CertificateTemplateViewModal({ open, onClose, templateId
                 </Badge>
               )}
             </div>
-            <div className="rounded border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <CertificatePreviewCanvas
-                sections={template.sections || {}}
-                framePreview={framePreview}
-                orientation={template.orientation}
-                widthPx={template.width_px}
-                heightPx={template.height_px}
-              />
-            </div>
+             <div className="rounded border border-gray-200 dark:border-gray-700 overflow-hidden">
+               <CertificatePreviewCanvas
+                 ref={canvasRef}
+                 sections={template.sections || {}}
+                 framePreview={framePreview}
+                 orientation={template.orientation}
+                 widthPx={template.width_px}
+                 heightPx={template.height_px}
+               />
+             </div>
           </div>
         </div>
       ) : (

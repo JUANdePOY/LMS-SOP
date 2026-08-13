@@ -13,6 +13,7 @@ router.post('/onboarding/:ackId/acknowledge', employeeOnboardingController.ackno
 
 // Employee SOP access - gated by onboarding completion
 router.use(requireOnboardingComplete);
+router.get('/sops', employeeSopController.list);
 router.get('/sops/:id',employeeSopController.getSop);
 
 module.exports = router;

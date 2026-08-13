@@ -283,19 +283,19 @@ export default function CourseBuilderPage() {
     };
   }, [courseId, navigate, toast]);
 
-  useEffect(() => {
-    if (!courseId) return;
-    listCourseCertificates(courseId)
-      .then((res) => {
-        const data = res?.data || res || [];
-        setCourseCertificates(Array.isArray(data) ? data : []);
-        courseCertificatesRef.current = Array.isArray(data) ? data : [];
-      })
-      .catch(() => {
-        setCourseCertificates([]);
-        courseCertificatesRef.current = [];
-      });
-  }, [courseId]);
+   useEffect(() => {
+     if (!courseId) return;
+     listCourseCertificates(courseId)
+       .then((res) => {
+         const data = res?.data?.data || res?.data || res || [];
+         setCourseCertificates(Array.isArray(data) ? data : []);
+         courseCertificatesRef.current = Array.isArray(data) ? data : [];
+       })
+       .catch(() => {
+         setCourseCertificates([]);
+         courseCertificatesRef.current = [];
+       });
+   }, [courseId]);
 
   const refreshCourse = useCallback(() => {
     if (!courseId) return Promise.resolve();
@@ -347,7 +347,17 @@ export default function CourseBuilderPage() {
         setSelectedModuleId(newModuleId);
         setSelectedLessonId(newLessonId);
       })
-      .then(() => listCourseCertificates(courseId))
+      .then(async () => {
+        try {
+          const certRes = await listCourseCertificates(courseId);
+          const certData = certRes?.data?.data || certRes?.data || certRes || [];
+          const certs = Array.isArray(certData) ? certData : [];
+          setCourseCertificates(certs);
+          courseCertificatesRef.current = certs;
+        } catch {
+          // certificates refresh failed, keep existing state
+        }
+      })
       .catch((err) => {
         toast.error(err.message || "Failed to refresh course");
       });

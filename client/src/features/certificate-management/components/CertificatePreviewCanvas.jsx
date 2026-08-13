@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { toPng } from 'html-to-image';
 import api from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
 import { CERTIFICATE_SECTIONS } from '@/features/certificate-management/constants/certificateSections';
@@ -33,14 +34,15 @@ const VIEWPORT_MAX_HEIGHT_VH = 70;
  * does not change font size. Font size is adjusted via the accordion's
  * Size input.
  */
-export default function CertificatePreviewCanvas({
+const CertificatePreviewCanvas = forwardRef(function CertificatePreviewCanvas({
   sections,
   framePreview,
   orientation,
    widthPx,
   heightPx,
   onSectionPatch,
-}) {
+  bare = false,
+}, ref) {
   const { toast } = useToast();
 
   // font_size values are authored against the template's native
@@ -97,6 +99,43 @@ export default function CertificatePreviewCanvas({
   const zoomToActualSize = () => setManualZoom(1);
   const zoomToFit = () => setZoomMode('fit');
 
+  useImperativeHandle(ref, () => ({
+    downloadAsImage(filename = 'certificate.png') {
+      const node = containerRef.current;
+      if (!node) {
+        toast.error('Certificate preview is not ready yet');
+        return;
+      }
+
+      const originalTransform = node.style.transform;
+      node.style.transform = 'scale(1)';
+
+      return toPng(node, {
+        width: safeWidth,
+        height: safeHeight,
+        pixelRatio: 1,
+        cacheBust: false,
+        skipFonts: true,
+      })
+        .then((dataUrl) => {
+          const link = document.createElement('a');
+          link.download = filename;
+          link.href = dataUrl;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          toast.success('Certificate image downloaded');
+        })
+        .catch((error) => {
+          console.error('Failed to export certificate image:', error);
+          toast.error(error.message || 'Failed to export certificate image');
+        })
+        .finally(() => {
+          node.style.transform = originalTransform;
+        });
+    },
+  }));
+
   const recipientSection = CERTIFICATE_SECTIONS.find((s) => s.key === 'recipient_name');
   const recipientYPercent = sections.recipient_name?.y_percent ?? recipientSection?.yPercent ?? 47;
 
@@ -104,6 +143,8 @@ export default function CertificatePreviewCanvas({
     () => (sections.signatures_seal?.items || []).map((item) => item.signature_id).filter(Boolean),
     [sections.signatures_seal?.items]
   );
+
+  const signatureItemsKey = signatureItems.join(',');
 
   const [signatureImageUrls, setSignatureImageUrls] = useState({});
   const signatureImageUrlsRef = useRef({});
@@ -138,7 +179,7 @@ export default function CertificatePreviewCanvas({
           );
         });
     });
-  }, [signatureItems.join(',')]);
+  }, [signatureItemsKey, toast]);
 
   useEffect(() => {
     return () => {
@@ -197,12 +238,16 @@ export default function CertificatePreviewCanvas({
 
   if (!framePreview) {
     return (
-      <div className="space-y-2">
-        <div className="flex justify-end">{ZoomControls}</div>
+      <div className={bare ? 'h-full' : 'space-y-2'}>
+        {!bare && <div className="flex justify-end">{ZoomControls}</div>}
         <div
           ref={outerRef}
-          style={{ height: `${VIEWPORT_MAX_HEIGHT_VH}vh` }}
-          className="flex items-center justify-center overflow-auto rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800"
+          style={bare ? undefined : { height: `${VIEWPORT_MAX_HEIGHT_VH}vh` }}
+          className={
+            bare
+              ? 'flex h-full w-full items-center justify-center'
+              : 'flex items-center justify-center overflow-auto rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-800'
+          }
         >
           <p className="text-sm text-gray-400">Upload a frame image to see preview</p>
         </div>
@@ -216,19 +261,28 @@ export default function CertificatePreviewCanvas({
   };
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400">
-          Actual size: {safeWidth} × {safeHeight}px
-        </span>
-        {ZoomControls}
-      </div>
+    <div className={bare ? 'h-full' : 'space-y-2'}>
+      {!bare && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-gray-400">
+            Actual size: {safeWidth} × {safeHeight}px
+          </span>
+          {ZoomControls}
+        </div>
+      )}
 
-      {/* Viewport: fixed height, scrolls when the scaled page overflows it */}
+      {/* Viewport: fixed height, scrolls when the scaled page overflows it.
+          In bare mode there's no toolbar and no forced scroll box — the
+          page is just scaled to fit its parent's width so the certificate
+          reads as the only thing on screen. */}
       <div
         ref={outerRef}
-        style={{ height: `${VIEWPORT_MAX_HEIGHT_VH}vh` }}
-        className="overflow-auto rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-900"
+        style={bare ? undefined : { height: `${VIEWPORT_MAX_HEIGHT_VH}vh` }}
+        className={
+          bare
+            ? 'flex h-full w-full items-center justify-center'
+            : 'overflow-auto rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-700 dark:bg-gray-900'
+        }
       >
         {/* Spacer: reserves the true scaled footprint so scrollbars appear
             correctly — a CSS transform on its own does not affect layout
@@ -532,4 +586,6 @@ export default function CertificatePreviewCanvas({
       </div>
     </div>
   );
-}
+});
+
+export default CertificatePreviewCanvas;

@@ -423,6 +423,20 @@ select option {
   .border-brand-soft { border-color: rgba(242, 92, 5, 0.25); }
   .ring-brand { --tw-ring-color: var(--color-primary); }
 
+  @keyframes certificateGlow {
+    0%, 100% {
+      box-shadow: 0 0 5px rgba(242, 92, 5, 0.3), 0 0 20px rgba(242, 92, 5, 0.1);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(242, 92, 5, 0.6), 0 0 40px rgba(242, 92, 5, 0.3);
+    }
+  }
+
+  .animate-certificate-glow {
+    animation: certificateGlow 2s ease-in-out infinite;
+    opacity: 1;
+  }
+
   /* ── Facebook-style social surfaces ───────────────────────────── */
   .fb-card {
     background-color: var(--bg-surface);
@@ -514,14 +528,11 @@ select option {
     gap: 0.875rem;
   }
 
-  /* Logo image — circular, with a subtle gold ring that echoes the ARCEN seal */
+  /* Logo image */
   .login-logo {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
+    width: 180px;
+    height: 120px;
     object-fit: contain;
-    border: 2.5px solid var(--accent-gold);
-    box-shadow: 0 0 0 4px rgba(217, 163, 0, 0.18);
     background-color: transparent;
   }
 
