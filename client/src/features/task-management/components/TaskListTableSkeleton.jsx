@@ -5,7 +5,7 @@ const TaskListTableSkeleton = memo(function TaskListTableSkeleton({ count = 5 })
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <div className="min-w-[1000px]">
+        <div className="min-w-[1400px]">
           <div
             className="grid items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-page)] px-4 py-2.5"
               style={{ gridTemplateColumns: TASK_TABLE_GRID_COLS }}
@@ -13,9 +13,10 @@ const TaskListTableSkeleton = memo(function TaskListTableSkeleton({ count = 5 })
             <span />
             <div className="h-3 w-20 bg-neutral-200 dark:bg-neutral-700 rounded" />
             <div className="h-3 w-16 bg-neutral-200 dark:bg-neutral-700 rounded" />
-            <div className="h-3 w-14 bg-neutral-200 dark:bg-neutral-700 rounded" />
+            <div className="h-1.5 w-14 rounded-full bg-neutral-200 dark:bg-neutral-700" />
             <div className="h-3 w-12 bg-neutral-200 dark:bg-neutral-700 rounded" />
             <div className="h-3 w-14 bg-neutral-200 dark:bg-neutral-700 rounded" />
+            <div className="h-3 w-20 bg-neutral-200 dark:bg-neutral-700 rounded" />
             <span />
           </div>
 
@@ -36,6 +37,7 @@ const TaskListTableSkeleton = memo(function TaskListTableSkeleton({ count = 5 })
                   <div className="h-4 bg-neutral-200 dark:bg-neutral-700 rounded w-1/2" />
                   <div className="h-6 w-6 rounded-full bg-neutral-200 dark:bg-neutral-700" />
                   <div className="h-1.5 w-14 rounded-full bg-neutral-200 dark:bg-neutral-700" />
+                  <div className="h-3 w-20 bg-neutral-200 dark:bg-neutral-700 rounded" />
                   <div className="h-3 w-20 bg-neutral-200 dark:bg-neutral-700 rounded" />
                   <div className="h-3 w-20 bg-neutral-200 dark:bg-neutral-700 rounded" />
                   <span />

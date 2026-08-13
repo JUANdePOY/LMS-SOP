@@ -3,7 +3,7 @@ const db = require('../config/database');
 const DEPARTMENT_STATUSES = ['active', 'inactive', 'archived'];
 
 async function findAll(filters = {}) {
-  const { search, status, business_id, page = 1, limit = 50 } = filters;
+  const { search, status, business_id, department_id, page = 1, limit = 50 } = filters;
   const offset = (page - 1) * limit;
 
   let sql = `
@@ -30,6 +30,10 @@ async function findAll(filters = {}) {
     sql += ' AND d.business_id = ?';
     params.push(business_id);
   }
+  if (department_id) {
+    sql += ' AND d.id = ?';
+    params.push(department_id);
+  }
 
   sql += ' ORDER BY d.name ASC LIMIT ? OFFSET ?';
   params.push(limit, offset);
@@ -49,6 +53,10 @@ async function findAll(filters = {}) {
   if (business_id) {
     countSql += ' AND d.business_id = ?';
     countParams.push(business_id);
+  }
+  if (department_id) {
+    countSql += ' AND d.id = ?';
+    countParams.push(department_id);
   }
   const [countRows] = await db.query(countSql, countParams);
 

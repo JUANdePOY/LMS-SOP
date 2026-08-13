@@ -74,9 +74,7 @@ function validateAssignmentPayload(body) {
   const errors = [];
   const value = {};
 
-  if (!body.task_id) {
-    errors.push('task_id is required');
-  } else {
+  if (body.task_id !== undefined && body.task_id !== null && body.task_id !== '' && body.task_id !== 0) {
     const taskId = parseInt(body.task_id, 10);
     if (!Number.isFinite(taskId) || taskId <= 0) {
       errors.push('task_id must be a positive integer');

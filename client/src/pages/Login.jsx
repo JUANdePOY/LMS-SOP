@@ -1,15 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { AlertCircle, Loader, Mail, Lock, Eye, EyeOff, Shield, User, Users } from 'lucide-react';
+import { AlertCircle, Loader, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
-
-const QUICK_LOGINS = [
-  { label: 'Super Admin', email: 'john.d@organization.com', password: 'password123', icon: Shield },
-  { label: 'Admin', email: 'jane.s@organization.com', password: 'password123', icon: Users },
-  { label: 'Employee', email: 'sarah.m@organization.com', password: 'password123', icon: User },
-];
 
 export default function Login() {
   const navigate = useNavigate();
@@ -50,23 +44,6 @@ export default function Login() {
     }
   };
 
-  const handleQuickLogin = async (quickEmail, quickPassword) => {
-    setEmail(quickEmail);
-    setPassword(quickPassword);
-    setError('');
-    setLoading(true);
-
-    const result = await login(quickEmail, quickPassword);
-
-    if (result.success) {
-      const redirectPath = LMS_ROLES.includes(result.user?.role) ? '/' : '/profile';
-      navigate(redirectPath, { replace: true });
-    } else {
-      setError(result.error || 'Quick login failed. Please try again.');
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="login-page">
       <div className="login-container">
@@ -77,9 +54,7 @@ export default function Login() {
               alt="SOP Training Platform"
               className="login-logo"
             />
-            <p className="login-card-subtitle">
-              Learning Management System for Standard Operating Procedures
-            </p>
+              <h1 className="login-card-title">SOP LMS PLATFORM</h1>
           </div>
 
           <div className="login-card-body">
@@ -152,24 +127,6 @@ export default function Login() {
                 )}
               </button>
             </form>
-
-            <div className="login-quick-section">
-              <p className="login-quick-label">Quick Login (Dev / Demo)</p>
-              <div className="login-quick-buttons">
-                {QUICK_LOGINS.map(({ label, email: qEmail, password: qPassword, icon: Icon }) => (
-                  <button
-                    key={label}
-                    type="button"
-                    disabled={loading}
-                    className="login-quick-btn"
-                    onClick={() => handleQuickLogin(qEmail, qPassword)}
-                  >
-                    <Icon size={14} />
-                    <span>{label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
           <div className="login-card-footer">

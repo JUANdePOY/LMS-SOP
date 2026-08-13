@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import { useToast } from '@/shared/components/ui/Toast';
-import { DEFAULT_DUE_DATE_OFFSET_MS, TASK_TABLE_GRID_COLS, TASK_STATUS_ORDER } from '../constants/taskConstants';
+import { DEFAULT_DUE_DATE_OFFSET_MS, TASK_TABLE_GRID_COLS, TASK_STATUS_ORDER, UNKNOWN_STATUS_KEY } from '../constants/taskConstants';
 import { StatusGroup } from './StatusGroup';
 import { validateTaskPayload } from '../utils/taskValidation';
 
@@ -48,7 +48,10 @@ function TaskListTable({
 }) {
   const [isCreating, setIsCreating] = useState(false);
   const [createTitle, setCreateTitle] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
+  const [createDescriptionOpen, setCreateDescriptionOpen] = useState(false);
   const [createAssignments, setCreateAssignments] = useState([]);
+  const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false);
   const [createStart, setCreateStart] = useState('');
   const [createEnd, setCreateEnd] = useState('');
   const [createError, setCreateError] = useState(null);
@@ -58,8 +61,8 @@ function TaskListTable({
   const { toast } = useToast();
 
   const isFormDirty = useMemo(() => {
-    return Boolean(createTitle.trim() || createAssignments.some((a) => a.reference_id || a.reference_name) || createStart || createEnd);
-  }, [createTitle, createAssignments, createStart, createEnd]);
+    return Boolean(createTitle.trim() || createDescription.trim() || createAssignments.some((a) => a.reference_id || a.reference_name) || createStart || createEnd);
+  }, [createTitle, createDescription, createAssignments, createStart, createEnd]);
 
   useEffect(() => {
     if (isCreating) {
@@ -70,6 +73,9 @@ function TaskListTable({
       const end = new Date(now.getTime() + DEFAULT_DUE_DATE_OFFSET_MS - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
       setCreateStart(start);
       setCreateEnd(end);
+      setCreateDescription('');
+      setCreateDescriptionOpen(false);
+      setCreateAssignmentOpen(false);
     }
   }, [isCreating]);
 
@@ -86,10 +92,10 @@ function TaskListTable({
     setIsSubmitting(true);
     try {
       const assignments = createAssignments
-        .filter((a) => a.reference_id || a.reference_name)
+        .filter((a) => a.reference_id && String(a.reference_id).trim() !== '')
         .map((a) => ({
           assignment_type: a.assignment_type || 'User',
-          reference_id: String(a.reference_id || a.reference_name),
+          reference_id: String(a.reference_id),
           reference_name: a.reference_name || '',
         }));
       await onCreateTask?.({
@@ -100,10 +106,11 @@ function TaskListTable({
         deadline_datetime: createEnd,
         estimated_hours: 1,
         category: '',
-        description: '',
+        description: createDescription.trim(),
         assignments,
       });
       setCreateTitle('');
+      setCreateDescription('');
       setCreateAssignments([]);
       setCreateStart('');
       setCreateEnd('');
@@ -115,7 +122,7 @@ function TaskListTable({
     } finally {
       setIsSubmitting(false);
     }
-  }, [createTitle, createAssignments, createStart, createEnd, onCreateTask, toast]);
+  }, [createTitle, createDescription, createAssignments, createStart, createEnd, onCreateTask, toast]);
 
   useEffect(() => {
     if (!isCreating) return;
@@ -135,11 +142,23 @@ function TaskListTable({
   const grouped = useMemo(() => {
     const map = {};
     TASK_STATUS_ORDER.forEach((s) => { map[s] = []; });
-    tasks.forEach((task) => {
+    const unknownStatuses = new Set();
+
+     tasks.forEach((task) => {
       const status = task.status || 'Pending';
-      if (!map[status]) map[status] = [];
-      map[status].push(task);
+      if (!Object.prototype.hasOwnProperty.call(map, status)) {
+        unknownStatuses.add(status);
+        map[UNKNOWN_STATUS_KEY] = map[UNKNOWN_STATUS_KEY] || [];
+        map[UNKNOWN_STATUS_KEY].push(task);
+      } else {
+        map[status].push(task);
+      }
     });
+
+    if (unknownStatuses.size > 0 && import.meta.env.DEV) {
+      console.warn('[TaskListTable] Detected tasks with unexpected status values:', [...unknownStatuses]);
+    }
+
     return map;
   }, [tasks]);
 
@@ -156,7 +175,7 @@ function TaskListTable({
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-sm overflow-hidden">
       <div className="overflow-x-auto">
-        <div className="min-w-[1000px]">
+        <div className="min-w-[1400px]">
           <div
             className="grid items-center gap-3 border-b border-[var(--border)] bg-[var(--bg-page)] px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]"
             style={{ gridTemplateColumns: TASK_TABLE_GRID_COLS }}
@@ -167,6 +186,7 @@ function TaskListTable({
             <span>Progress</span>
             <span>Start</span>
             <span>Deadline</span>
+            <span>Description</span>
             <div className="flex justify-end pr-5">
               {canManage && (
                 <button
@@ -182,7 +202,7 @@ function TaskListTable({
             </div>
           </div>
 
-          {TASK_STATUS_ORDER.map((status) => (
+                    {TASK_STATUS_ORDER.map((status) => (
             <StatusGroup
               key={status}
               status={status}
@@ -190,11 +210,17 @@ function TaskListTable({
               isCreating={isCreating}
               createTitle={createTitle}
               setCreateTitle={setCreateTitle}
+              createDescription={createDescription}
+              setCreateDescription={setCreateDescription}
+              createDescriptionOpen={createDescriptionOpen}
+              setCreateDescriptionOpen={setCreateDescriptionOpen}
               createInputRef={createInputRef}
               handleCreateSubmit={handleCreateSubmit}
               setIsCreating={setIsCreating}
               createAssignments={createAssignments}
               setCreateAssignments={setCreateAssignments}
+              createAssignmentOpen={createAssignmentOpen}
+              setCreateAssignmentOpen={setCreateAssignmentOpen}
               createStart={createStart}
               setCreateStart={setCreateStart}
               createEnd={createEnd}
@@ -207,6 +233,37 @@ function TaskListTable({
               {...statusGroupProps}
             />
           ))}
+
+          {(grouped[UNKNOWN_STATUS_KEY] || []).length > 0 && (
+            <StatusGroup
+              status={UNKNOWN_STATUS_KEY}
+              tasks={grouped[UNKNOWN_STATUS_KEY] || []}
+              isCreating={isCreating}
+              createTitle={createTitle}
+              setCreateTitle={setCreateTitle}
+              createDescription={createDescription}
+              setCreateDescription={setCreateDescription}
+              createDescriptionOpen={createDescriptionOpen}
+              setCreateDescriptionOpen={setCreateDescriptionOpen}
+              createInputRef={createInputRef}
+              handleCreateSubmit={handleCreateSubmit}
+              setIsCreating={setIsCreating}
+              createAssignments={createAssignments}
+              setCreateAssignments={setCreateAssignments}
+              createAssignmentOpen={createAssignmentOpen}
+              setCreateAssignmentOpen={setCreateAssignmentOpen}
+              createStart={createStart}
+              setCreateStart={setCreateStart}
+              createEnd={createEnd}
+              setCreateEnd={setCreateEnd}
+              createError={createError}
+              setCreateError={setCreateError}
+              isSubmitting={isSubmitting}
+              createRowRef={createRowRef}
+              canManage={canManage}
+              {...statusGroupProps}
+            />
+          )}
         </div>
       </div>
     </div>

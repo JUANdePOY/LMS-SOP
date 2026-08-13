@@ -13,7 +13,7 @@ async function create(data) {
 
 async function findByTaskId(taskId) {
   const [rows] = await db.query(
-    `SELECT tc.*, u.full_name AS user_name, u.role AS user_role
+    `SELECT tc.*, u.full_name AS user_name, u.role AS user_role, u.avatar_url AS user_avatar_url
      FROM task_comments tc
      LEFT JOIN users u ON tc.user_id = u.id
      WHERE tc.task_id = ?
@@ -25,7 +25,7 @@ async function findByTaskId(taskId) {
 
 async function findById(id) {
   const [rows] = await db.query(
-    `SELECT tc.*, u.full_name AS user_name, u.role AS user_role
+    `SELECT tc.*, u.full_name AS user_name, u.role AS user_role, u.avatar_url AS user_avatar_url
      FROM task_comments tc
      LEFT JOIN users u ON tc.user_id = u.id
      WHERE tc.id = ?

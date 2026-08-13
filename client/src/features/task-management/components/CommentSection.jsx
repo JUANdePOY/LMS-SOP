@@ -1,34 +1,8 @@
 import { useState, useMemo, memo } from 'react';
 import { MessageCircle, Reply, Clock } from 'lucide-react';
 import CommentInput from './CommentInput';
+import UserAvatar from "@/shared/components/ui/Avatar"
 
-function getInitials(name) {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length >= 2) {
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }
-  return name.slice(0, 2).toUpperCase();
-}
-
-// Deterministic accent color per person so avatars aren't all identical.
-const AVATAR_COLORS = [
-  'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/15 dark:text-violet-100 dark:border-violet-500/30',
-  'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-100 dark:border-emerald-500/30',
-  'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-100 dark:border-amber-500/30',
-  'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-500/15 dark:text-pink-100 dark:border-pink-500/30',
-  'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-500/15 dark:text-cyan-100 dark:border-cyan-500/30',
-];
-
-function avatarColor(userId, isAdmin) {
-  if (isAdmin) {
-    return 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-100 dark:border-blue-500/30';
-  }
-  const key = String(userId ?? '0');
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
-  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
-}
 
 function formatTime(dateStr) {
   if (!dateStr) return '';
@@ -45,20 +19,20 @@ function formatTime(dateStr) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function CommentItem({ comment, replies, currentUser, isReplyTarget, onReply }) {
+function CommentItem({ comment, currentUser, isReplyTarget, onReply, depth = 0 }) {
   const isOwn = currentUser && comment.user_id === currentUser.id;
   const commenterIsAdmin = comment.user_role && ['super_admin', 'admin', 'department_head'].includes(comment.user_role);
 
   return (
-    <div className={`flex gap-2.5 ${isOwn ? 'flex-row-reverse' : ''}`}>
-      <div
-        className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold border ${avatarColor(
-          comment.user_id,
-          commenterIsAdmin
-        )}`}
-      >
-        {getInitials(comment.user_name)}
-      </div>
+    <div className={`flex gap-2.5 ${isOwn ? 'flex-row-reverse' : ''}`} style={{ marginLeft: depth > 0 ? 24 : 0 }}>
+      <UserAvatar
+        user={{
+          full_name: comment.user_name,
+          avatar_url: comment.user_avatar_url || comment.avatar_url,
+        }}
+        size="sm"
+        className="shrink-0 mt-0.5"
+      />
       <div className={`flex-1 min-w-0 ${isOwn ? 'text-right' : ''}`}>
         <div className={`flex items-center gap-2 mb-1 ${isOwn ? 'flex-row-reverse' : ''}`}>
           <span className="text-sm font-medium text-[var(--text-primary)] truncate">{comment.user_name}</span>
@@ -92,21 +66,6 @@ function CommentItem({ comment, replies, currentUser, isReplyTarget, onReply }) 
         >
           <Reply size={12} /> {isReplyTarget ? 'Replying…' : 'Reply'}
         </button>
-
-        {replies && replies.length > 0 && (
-          <div className="mt-3 space-y-3 pl-4 border-l-2 border-[var(--border)]">
-            {replies.map((reply) => (
-              <CommentItem
-                key={reply.id}
-                comment={reply}
-                replies={[]}
-                currentUser={currentUser}
-                isReplyTarget={isReplyTarget && false /* replies are never nested reply-targets here, parent id drives it */}
-                onReply={onReply}
-              />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );
@@ -167,24 +126,42 @@ const CommentSection = memo(function CommentSection({
       <div className="flex-1 overflow-y-auto space-y-4 pr-1 pb-3" style={{ scrollbarGutter: 'stable' }}>
         {grouped.topLevel.length === 0 && (
           <div className="flex flex-col items-center justify-center py-10 text-center">
-            <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-hover)]">
-              <MessageCircle size={18} className="text-[var(--text-muted)] opacity-70" />
-            </div>
-            <p className="text-sm text-[var(--text-muted)]">No comments yet.</p>
-            <p className="text-xs text-[var(--text-muted)] opacity-70 mt-0.5">Start the conversation below.</p>
-          </div>
-        )}
+             <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--bg-hover)]">
+               <MessageCircle size={18} className="text-[var(--text-muted)] opacity-70" />
+             </div>
+             <p className="text-sm text-[var(--text-muted)]">No comments yet.</p>
+             <p className="text-xs text-[var(--text-muted)] opacity-70 mt-0.5">Start the conversation below.</p>
+           </div>
+         )}
 
-        {grouped.topLevel.map((comment) => (
-          <CommentItem
-            key={comment.id}
-            comment={comment}
-            replies={grouped.repliesMap[comment.id] || []}
-            currentUser={currentUser}
-            isReplyTarget={replyingTo?.id === comment.id}
-            onReply={handleReply}
-          />
-        ))}
+        {grouped.topLevel.map((comment) => {
+          const replies = grouped.repliesMap[comment.id] || [];
+          return (
+            <div key={comment.id}>
+              <CommentItem
+                comment={comment}
+                currentUser={currentUser}
+                isReplyTarget={replyingTo?.id === comment.id}
+                onReply={handleReply}
+                depth={0}
+              />
+              {replies.length > 0 && (
+                <div className="mt-3 space-y-3 pl-4 border-l-2 border-[var(--border)]">
+                  {replies.map((reply) => (
+                    <CommentItem
+                      key={reply.id}
+                      comment={reply}
+                      currentUser={currentUser}
+                      isReplyTarget={replyingTo?.id === reply.id}
+                      onReply={handleReply}
+                      depth={1}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {canReply && (

@@ -6,6 +6,9 @@ import { TASK_PRIORITY_DOT, TASK_TABLE_GRID_COLS } from '../constants/taskConsta
 import { StatusMenu, PriorityDot, InlineEditableText, EditableDateTime } from './TaskInlineControls';
 import { formatDateTime } from '../utils/taskDateUtils';
 import AssignmentInput from './AssignmentInput';
+import DescriptionModal from './DescriptionModal';
+import UserAvatar from '@/shared/components/ui/Avatar';
+
 
 function AssigneeStack({ items }) {
   if (!items || items.length === 0) {
@@ -23,13 +26,12 @@ function AssigneeStack({ items }) {
     <div className="flex items-center gap-2 min-w-0">
       <div className="flex -space-x-2 shrink-0">
         {shownUsers.map((item, i) => (
-          <div
+          <UserAvatar
             key={`user-${i}`}
-            title={item.name}
-            className="h-6 w-6 rounded-full border-2 border-[var(--bg-surface)] bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-[10px] font-semibold text-neutral-600 dark:text-neutral-300"
-          >
-            {item.name.charAt(0).toUpperCase()}
-          </div>
+            user={{ full_name: item.name, avatar_url: item.avatar_url }}
+            size="xs"
+            className="h-6 w-6 border-2 border-[var(--bg-surface)]"
+          />
         ))}
       </div>
       {shownDepartments.map((dept, i) => (
@@ -245,7 +247,7 @@ const AssignedCell = memo(function AssignedCell({ assignments, onSave }) {
 
   const items = assignments
     .filter((a) => (a.assignment_type === 'User' || a.assignment_type === 'Department') && a.reference_name)
-    .map((a) => ({ name: a.reference_name, type: a.assignment_type }));
+    .map((a) => ({ name: a.reference_name, type: a.assignment_type, avatar_url: a.avatar_url }));
 
   return (
     <div className="relative min-w-0">
@@ -275,6 +277,8 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
     onInlineUpdate?.(task, changes);
   };
 
+  const [descriptionOpen, setDescriptionOpen] = useState(false);
+
   return (
     <div
       className="group grid items-center gap-3 border-b border-[var(--border)] px-4 py-2.5 last:border-b-0 hover:bg-[var(--bg-hover)] transition-colors"
@@ -285,74 +289,96 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
       </span>
 
        <div className="min-w-0 flex items-center gap-1.5">
-         <button
-           type="button"
-           onClick={(e) => { e.stopPropagation(); onViewTask?.(task); }}
-           className="shrink-0 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-blue-400 transition-opacity"
-           aria-label="Open task details"
-           title="Open details"
-         >
-           <ArrowUpRight size={14} />
-         </button>
-        {canManage ? (
-          <PriorityDot priority={task.priority} onSave={saveField} />
-        ) : (
-          <span className={cn('h-2 w-2 rounded-full shrink-0', TASK_PRIORITY_DOT[task.priority] || TASK_PRIORITY_DOT.Medium)} title={`${task.priority} priority`} />
-        )}
-        {canManage ? (
-          <InlineEditableText
-            value={task.title}
-            onSave={(title) => saveField({ title })}
-            className="min-w-0 truncate rounded-md px-1.5 py-0.5 -mx-1.5 text-left text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-page)]"
-          />
-        ) : (
-          <span className="min-w-0 truncate text-sm font-medium text-[var(--text-primary)]">{task.title}</span>
-        )}
-        {task.category && (
-          <span className="hidden md:inline shrink-0 text-xs text-[var(--text-muted)] bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full">
-            {task.category}
-          </span>
-        )}
-      </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onViewTask?.(task); }}
+            className="shrink-0 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-blue-400 transition-opacity"
+            aria-label="Open task details"
+            title="Open details"
+          >
+            <ArrowUpRight size={14} />
+          </button>
+         {canManage ? (
+           <PriorityDot priority={task.priority} onSave={saveField} />
+         ) : (
+           <span className={cn('h-2 w-2 rounded-full shrink-0', TASK_PRIORITY_DOT[task.priority] || TASK_PRIORITY_DOT.Medium)} title={`${task.priority} priority`} />
+         )}
+         {canManage ? (
+           <InlineEditableText
+             value={task.title}
+             onSave={(title) => saveField({ title })}
+             className="min-w-0 truncate rounded-md px-1.5 py-0.5 -mx-1.5 text-left text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-page)]"
+           />
+         ) : (
+           <span className="min-w-0 truncate text-sm font-medium text-[var(--text-primary)]">{task.title}</span>
+         )}
+         {task.category && (
+           <span className="hidden md:inline shrink-0 text-xs text-[var(--text-muted)] bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full">
+             {task.category}
+           </span>
+         )}
+       </div>
 
-      <div className="min-w-0">
-        {canManage ? (
-          <AssignedCell assignments={assignments} onSave={saveField} />
-        ) : (
-          <AssigneeStack
-            items={assignments
-              .filter((a) => (a.assignment_type === 'User' || a.assignment_type === 'Department') && a.reference_name)
-              .map((a) => ({ name: a.reference_name, type: a.assignment_type }))}
-          />
-        )}
-      </div>
+       <div className="min-w-0">
+         {canManage ? (
+           <AssignedCell assignments={assignments} onSave={saveField} />
+         ) : (
+           <AssigneeStack
+             items={assignments
+               .filter((a) => (a.assignment_type === 'User' || a.assignment_type === 'Department') && a.reference_name)
+               .map((a) => ({ name: a.reference_name, type: a.assignment_type }))}
+           />
+         )}
+       </div>
 
-      <div className="min-w-0">
-        <ProgressBar rate={task.progress_rate} taskId={task.id} onProgressChange={onProgressChange} />
-      </div>
+       <div className="min-w-0">
+         <ProgressBar rate={task.progress_rate} taskId={task.id} onProgressChange={onProgressChange} />
+       </div>
 
-      <div className="min-w-0">
-        {canManage ? (
-          <EditableDateTime value={task.start_datetime} field="start_datetime" onSave={saveField} />
-        ) : (
-          <span className="text-sm text-[var(--text-secondary)] truncate">{formatDateTime(task.start_datetime)}</span>
-        )}
-      </div>
+       <div className="min-w-0">
+         {canManage ? (
+           <EditableDateTime value={task.start_datetime} field="start_datetime" onSave={saveField} />
+         ) : (
+           <span className="text-sm text-[var(--text-secondary)] truncate">{formatDateTime(task.start_datetime)}</span>
+         )}
+       </div>
 
-      <div className="min-w-0">
-        {canManage ? (
-          <EditableDateTime value={task.deadline_datetime} field="deadline_datetime" onSave={saveField} />
-        ) : (
-          <span className="text-sm text-[var(--text-secondary)] truncate">{formatDateTime(task.deadline_datetime)}</span>
-        )}
-      </div>
+       <div className="min-w-0">
+         {canManage ? (
+           <EditableDateTime value={task.deadline_datetime} field="deadline_datetime" onSave={saveField} />
+         ) : (
+           <span className="text-sm text-[var(--text-secondary)] truncate">{formatDateTime(task.deadline_datetime)}</span>
+         )}
+       </div>
 
-      <RowActionMenu
-        onEdit={() => onEdit?.(task)}
-        onDelete={() => onDelete?.(task.id)}
-        canManage={canManage}
-      />
-    </div>
+        <div className="min-w-0 overflow-hidden">
+          {canManage ? (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setDescriptionOpen(true); }}
+              className="min-w-0 w-full truncate rounded-md px-1.5 py-0.5 -mx-1.5 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-page)]"
+              title="Click to edit description"
+            >
+              {task.description || <span className="text-[var(--text-muted)]">Click to add description</span>}
+            </button>
+          ) : (
+            <span className="min-w-0 w-full block truncate text-sm text-[var(--text-secondary)]">{task.description || '—'}</span>
+          )}
+        </div>
+
+       <DescriptionModal
+         open={descriptionOpen}
+         onClose={() => setDescriptionOpen(false)}
+         onSubmit={(description) => saveField({ description })}
+         initialDescription={task.description}
+       />
+
+       <RowActionMenu
+         onEdit={() => onEdit?.(task)}
+         onDelete={() => onDelete?.(task.id)}
+         canManage={canManage}
+       />
+     </div>
   );
 });
 

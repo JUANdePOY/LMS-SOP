@@ -86,10 +86,10 @@ const MENU_ITEMS = [
         icon: Building2,
         sub: [
           { name: "Dashboard", roles: ['super_admin', 'admin', 'department_head'] },
-          { name: "Files", roles: ['super_admin', 'admin', 'department_head'] },
           { name: "Businesses", roles: ['super_admin'] },
           { name: "Departments", roles: ['super_admin', 'admin'] },
           { name: "Categories", roles: ['super_admin'] },
+          { name: "Files", roles: ['super_admin', 'admin', 'department_head'] },
         ],
         roles: ['super_admin', 'admin', 'department_head'],
       },
@@ -245,23 +245,13 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
             collapsed && "justify-center"
           )}
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg">
-            <img
-              src="/UseThisLogo.png"
-              alt="SOP Training"
-              className="h-6 w-6 object-contain"
-            />
+           <div className={cn("flex items-center justify-center rounded-lg", collapsed ? "h-10 w-10" : "h-11 w-auto max-w-[180px]")}>
+             <img
+               src={collapsed ? "/UseThisLogo.png" : "/UseThisLogo.v.1.2.png"}
+               alt="The Roldan Group"
+               className={cn("object-contain", collapsed ? "h-8 w-8" : "h-11 w-auto")}
+             />
           </div>
-          {!collapsed && (
-            <div className="flex flex-col leading-tight overflow-hidden">
-              <span className="text-[13px] font-black tracking-[0.08em] text-white leading-none">
-                SOP TRAINING
-              </span>
-              <span className="mt-[2px] text-[9px] font-medium tracking-[0.06em] uppercase text-white/70 leading-none">
-                PLATFORM
-              </span>
-            </div>
-          )}
         </Link>
       </div>
 

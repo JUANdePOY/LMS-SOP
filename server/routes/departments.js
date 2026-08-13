@@ -14,7 +14,14 @@ router.use(authenticateToken);
 router.get('/', async (req, res) => {
   try {
     let effectiveBusinessId = undefined;
-    if (req.user.role !== 'super_admin') {
+    let effectiveDepartmentId = undefined;
+
+    if (req.user.role === 'department_head') {
+      if (!req.user.department_id) {
+        return res.status(403).json({ status: 'error', message: 'No department assigned', code: 'NO_DEPARTMENT_SCOPE' });
+      }
+      effectiveDepartmentId = req.user.department_id;
+    } else if (req.user.role !== 'super_admin') {
       if (!req.user.business_id) {
         return res.status(403).json({ status: 'error', message: 'No business scope assigned', code: 'NO_BUSINESS_SCOPE' });
       }
@@ -26,6 +33,7 @@ router.get('/', async (req, res) => {
       search: search || undefined,
       status: status || undefined,
       business_id: effectiveBusinessId,
+      department_id: effectiveDepartmentId,
       page: parseInt(page),
       limit: parseInt(limit),
     });
