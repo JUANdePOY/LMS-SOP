@@ -151,8 +151,7 @@ function ensureStartupLock() {
       const pid = parseInt(fs.readFileSync(lockFile, 'utf8'), 10);
       try {
         process.kill(pid, 0);
-        console.warn(`Another Node process (pid ${pid}) appears to already be running. Exiting duplicate instance.`);
-        setTimeout(() => process.exit(0), 100);
+        console.warn(`Another Node process (pid ${pid}) appears to already be running. Waiting for it to exit...`);
         return false;
       } catch {
         fs.unlinkSync(lockFile);
@@ -175,14 +174,17 @@ function registerLockCleanup(lockFile) {
   process.on('SIGINT', () => { cleanup(); process.exit(0); });
 }
 
-function waitForLock(maxMs = 2000) {
+function waitForLock(maxMs = 30000) {
   const start = Date.now();
   return new Promise((resolve) => {
     function tick() {
       const ok = ensureStartupLock();
       if (ok) return resolve(true);
-      if (Date.now() - start >= maxMs) return resolve(false);
-      setTimeout(tick, 500);
+      if (Date.now() - start >= maxMs) {
+        console.error(`Timed out after ${maxMs}ms waiting for another instance to exit. Exiting.`);
+        return resolve(false);
+      }
+      setTimeout(tick, 1000);
     }
     tick();
   });
