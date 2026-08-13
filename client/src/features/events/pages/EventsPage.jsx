@@ -13,8 +13,8 @@ import { Modal } from "@/shared/components/ui/modal";
 import { useNotifications } from "@/shared/stores/notificationStore.js";
 
 export default function EventsPage() {
-  const { hasPermission } = useAuth();
-  const canManage = hasPermission('manage_events');
+  const { isSuperAdmin } = useAuth();
+  const canManage = isSuperAdmin;
   const { toast } = useToast();
   const { markEntityTypeRead } = useNotifications();
   const { items, error, refresh, create, update, remove } = useEvents({ status: "active" });

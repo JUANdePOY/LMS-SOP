@@ -254,25 +254,14 @@ export default function AppLayout() {
               </nav>
             </div>
 
-            <div className="flex-1 max-w-xl mx-auto hidden md:block px-2">
+            <div className="flex-1 max-w-xl mx-auto px-2">
               <GlobalSearch />
             </div>
 
             <div className="flex items-center gap-0.5 sm:gap-1 px-3 sm:px-4 shrink-0">
-              <button
-                onClick={() => setShowSearchMobile((v) => !v)}
-                aria-label="Search"
-                className={cn(
-                  "md:hidden flex h-9 w-9 items-center justify-center rounded-xl text-white",
-                  "hover:text-white hover:bg-white/15 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-white/30"
-                )}
-              >
-                <Search size={18} />
-              </button>
-
               <NotificationDropdown showBadge={true} count={systemBadgeCount} />
 
-              <div className="flex items-center gap-0.5">
+              <div className="hidden md:flex items-center gap-0.5">
                 {HEADER_QUICK_ACCESS.map((item) => {
                   const Icon = item.icon;
                   const active = location.pathname === item.path || location.pathname.startsWith(item.path);

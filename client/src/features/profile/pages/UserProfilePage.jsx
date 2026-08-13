@@ -118,23 +118,41 @@ export default function UserProfilePage() {
               </p>
             </div>
 
-            <div className="pb-1">
+             <div className="pb-1 flex flex-wrap gap-2">
               {isSelf ? (
-                <Link
-                  to="/profile"
-                  className="inline-flex items-center gap-1.5 rounded-md bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 text-sm font-semibold text-neutral-800 dark:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
-                >
-                  <UserIcon size={14} />
-                  View my profile
-                </Link>
+                <>
+                  <Link
+                    to="/profile"
+                    className="inline-flex items-center gap-1.5 rounded-md bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 text-sm font-semibold text-neutral-800 dark:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                  >
+                    <UserIcon size={14} />
+                    View my profile
+                  </Link>
+                  <Link
+                    to={`/digital-id/${profile.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 text-sm font-semibold text-neutral-800 dark:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                  >
+                    <UserIcon size={14} />
+                    My Digital ID
+                  </Link>
+                </>
               ) : (
-                <Link
-                  to={`/messaging?to=${profile.id}`}
-                  className="inline-flex items-center gap-1.5 rounded-md btn-primary px-3 py-1.5 text-sm font-semibold text-white"
-                >
-                  <MessageSquare size={14} />
-                  Message
-                </Link>
+                <>
+                  <Link
+                    to={`/messaging?to=${profile.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-md btn-primary px-3 py-1.5 text-sm font-semibold text-white"
+                  >
+                    <MessageSquare size={14} />
+                    Message
+                  </Link>
+                  <Link
+                    to={`/digital-id/${profile.id}`}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-neutral-100 dark:bg-neutral-800 px-3 py-1.5 text-sm font-semibold text-neutral-800 dark:text-neutral-100 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                  >
+                    <UserIcon size={14} />
+                    View Digital ID
+                  </Link>
+                </>
               )}
             </div>
           </div>

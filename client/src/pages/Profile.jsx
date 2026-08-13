@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import ProfileCover from '@/features/profile/components/ProfileCover';
 import IntroCard from '@/features/profile/components/IntroCard';
 import EditProfileSheet from '@/features/profile/components/EditProfileSheet';
+import { Link } from 'react-router-dom';
 
 const FORM_FIELDS = [
   { key: 'full_name', label: 'Full Name', type: 'text' },
@@ -181,6 +182,12 @@ export default function Profile() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 space-y-4">
+          <Link
+            to={`/digital-id/${profile.id}`}
+            className="flex items-center justify-center gap-2 w-full rounded-lg bg-neutral-800 hover:bg-neutral-900 text-white font-semibold text-sm px-4 py-2 transition-colors"
+          >
+            My Digital ID
+          </Link>
           <IntroCard profile={profile} />
         </div>
 

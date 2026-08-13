@@ -829,3 +829,45 @@ select option {
     color: rgba(19, 47, 69, 0.65) !important;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DIGITAL ID FLIP CARD
+   Matches the sample ProfileCard flip behavior.
+   Uses perspective + rotateY for the 3D flip effect.
+   Card size scales fluidly via aspect-[3/5] and max-width clamp.
+   Dark mode handled via CSS custom properties.
+   ───────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  .card-flip-container {
+    perspective: 1600px;
+    -webkit-perspective: 1600px;
+  }
+
+  .card-flip-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    -webkit-transform-style: preserve-3d;
+    transition: transform 0.5s ease, -webkit-transform 0.5s ease;
+    transform: rotateY(0deg);
+    -webkit-transform: rotateY(0deg);
+  }
+
+  .card-flip-inner.is-flipped {
+    transform: rotateY(180deg);
+    -webkit-transform: rotateY(180deg);
+  }
+
+  .card-flip-face {
+    position: absolute;
+    inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+
+  .card-flip-face--back {
+    transform: rotateY(180deg);
+    -webkit-transform: rotateY(180deg);
+  }
+}

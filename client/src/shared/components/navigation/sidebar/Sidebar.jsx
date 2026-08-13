@@ -49,7 +49,6 @@ const EMPLOYEE_MENU_ITEMS = [
     items: [
       { name: "Messaging", path: "/messaging", icon: MessageSquare },
       { name: "Announcements", path: "/announcements", icon: Megaphone },
-      { name: "Events", path: "/events", icon: Calendar },
     ],
   },
   {
@@ -115,7 +114,7 @@ const MENU_ITEMS = [
     items: [
       { name: "Messaging", path: "/messaging", icon: MessageSquare, roles: LMS_ROLES },
       { name: "Announcements", path: "/announcements", icon: Megaphone, roles: LMS_ROLES },
-      { name: "Events", path: "/events", icon: Calendar, roles: LMS_ROLES },
+      { name: "Events", path: "/events", icon: Calendar, roles: ['super_admin'] },
     ],
   },
   {
