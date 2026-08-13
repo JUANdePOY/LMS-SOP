@@ -220,7 +220,7 @@ async function listQuizzes(req, res) {
   try {
     const course = await courseModel.findById(courseId);
     const businessId = course?.department_id ? await db.query('SELECT business_id FROM departments WHERE id = ?', [course.department_id]).then(([rows]) => rows[0]?.business_id) : null;
-    const quizzes = await quizModel.listQuizzes(courseId, { module_id: moduleId, status, page, limit, business_id });
+    const quizzes = await quizModel.listQuizzes(courseId, { module_id: moduleId, status, page, limit, business_id: businessId });
     res.json({ success: true, data: quizzes });
   } catch (err) {
     sendError(res, err, 'Failed to list quizzes');

@@ -75,15 +75,23 @@ export default function StepBasics({ settings, setField, errors, courses, loadin
               <option value="final">Final (limited attempts)</option>
             </select>
           </Field>
-          <Field label="Time Limit (seconds)" error={errors.time_limit}>
-            <input
-              type="number"
-              min={0}
+          <Field label="Time Limit" error={errors.time_limit}>
+            <select
               value={settings.time_limit}
               onChange={(e) => setField("time_limit", e.target.value)}
               className={fieldClass}
-              placeholder="Leave blank for none"
-            />
+            >
+              <option value="">No limit</option>
+              <option value="5">5 minutes</option>
+              <option value="10">10 minutes</option>
+              <option value="15">15 minutes</option>
+              <option value="20">20 minutes</option>
+              <option value="30">30 minutes</option>
+              <option value="45">45 minutes</option>
+              <option value="60">1 hour</option>
+              <option value="90">1 hour 30 minutes</option>
+              <option value="120">2 hours</option>
+            </select>
           </Field>
           <Field label="Passing Score (%)" error={errors.passing_score}>
             <input

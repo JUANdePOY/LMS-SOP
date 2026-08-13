@@ -33,6 +33,19 @@ import {
 import QuestionTypeTabs from "../components/QuestionTypeTabs";
 import AnswerKeyList from "../components/AnswerKeyList";
 
+const TIME_LIMIT_OPTIONS = [
+  { value: "", label: "No limit" },
+  { value: 5, label: "5 minutes" },
+  { value: 10, label: "10 minutes" },
+  { value: 15, label: "15 minutes" },
+  { value: 20, label: "20 minutes" },
+  { value: 30, label: "30 minutes" },
+  { value: 45, label: "45 minutes" },
+  { value: 60, label: "1 hour" },
+  { value: 90, label: "1 hour 30 minutes" },
+  { value: 120, label: "2 hours" },
+];
+
 const fieldClass =
   "w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 outline-none";
 
@@ -399,37 +412,17 @@ export default function QuizBuilderPage() {
                   </select>
                 </Field>
                 <Field label="Time Limit">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap gap-1.5">
-                      {[5, 10, 15, 20, 30, 45, 60, 90, 120].map((mins) => {
-                        const active = settings?.time_limit === mins;
-                        return (
-                          <button
-                            key={mins}
-                            type="button"
-                            onClick={() => handleSetting("time_limit", mins)}
-                            className={`inline-flex items-center rounded-md border px-2 py-1 text-xs font-medium transition-colors ${
-                              active
-                                ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                                : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300"
-                            }`}
-                          >
-                            {mins} min
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="number"
-                        className={fieldClass}
-                        value={settings?.time_limit ?? ""}
-                        placeholder="Custom minutes"
-                        min="0"
-                        onChange={(e) => handleSetting("time_limit", e.target.value ? Number(e.target.value) : null)}
-                      />
-                    </div>
-                  </div>
+                  <select
+                    className={fieldClass}
+                    value={settings?.time_limit ?? ""}
+                    onChange={(e) => handleSetting("time_limit", e.target.value ? Number(e.target.value) : null)}
+                  >
+                    {TIME_LIMIT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </Field>
                 <Field label="Passing Score (%)">
                   <input type="number" min={0} max={100} className={fieldClass} value={settings?.passing_score ?? ""} onChange={(e) => handleSetting("passing_score", e.target.value ? Number(e.target.value) : null)} />

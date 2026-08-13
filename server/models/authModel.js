@@ -24,6 +24,23 @@ async function findByEmployeeId(employeeId) {
   return rows[0] || null;
 }
 
+// Lazy, cached resolution of the optional onboarding service. If the module is
+// missing we warn exactly once and skip onboarding, instead of throwing and
+// breaking user creation on every call.
+let cachedOnboardingService;
+let onboardingServiceResolved = false;
+function getOnboardingService() {
+  if (onboardingServiceResolved) return cachedOnboardingService;
+  onboardingServiceResolved = true;
+  try {
+    cachedOnboardingService = require('./services/sopOnboardingService');
+  } catch (err) {
+    console.warn('[User Creating] sopOnboardingService not found; skipping onboarding assignment:', err.message);
+    cachedOnboardingService = null;
+  }
+  return cachedOnboardingService;
+}
+
 async function create(userData) {
   const { full_name, email, password_hash, role, department_id, business_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address } = userData;
   const [result] = await db.query(
@@ -32,11 +49,13 @@ async function create(userData) {
     [full_name, email, password_hash, role, department_id ?? null, business_id ?? null, position_title ?? null, employee_id ?? null, contact_number ?? null, employment_status ?? 'Regular', date_hired ?? null, birthdate ?? null, address ?? null]
   );
   // Assign default onboarding SOPs to the new user
-  try {
-    const onboardingService = require('./services/sopOnboardingService');
-    await onboardingService.assignOnboardingSopsToUser(result.insertId);
-  } catch (onboardingErr) {
-    console.error('[User Creating] Onboarding assignment failed:', onboardingErr);
+  const onboardingService = getOnboardingService();
+  if (onboardingService && typeof onboardingService.assignOnboardingSopsToUser === 'function') {
+    try {
+      await onboardingService.assignOnboardingSopsToUser(result.insertId);
+    } catch (onboardingErr) {
+      console.error('[User Creating] Onboarding assignment failed:', onboardingErr);
+    }
   }
   
   return result.insertId;

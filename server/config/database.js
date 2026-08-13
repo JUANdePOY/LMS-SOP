@@ -10,8 +10,18 @@ const dbConfig = {
   database: process.env.DB_NAME || 'pafr',
   port: parseInt(process.env.DB_PORT, 10) || 3306,
   waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 10,
+  // Lower limit: Hostinger shared MySQL caps the per-user hourly connection
+  // *attempt* count (max_connections_per_hour). A single instance only needs a
+  // handful of concurrent connections; keeping this small directly caps how
+  // many connects each process performs (instances × limit must stay well
+  // under the hourly quota).
+  connectionLimit: 5,
+  // Queue requests instead of erroring when all connections are busy.
+  queueLimit: 0,
+  // Reclaim idle connections so the pool does not hold the maximum open against
+  // the server indefinitely, reducing persistent connection pressure.
+  maxIdle: 2,
+  idleTimeout: 60000,
   connectTimeout: 30000,
   timezone: '+00:00',
   multipleStatements: true,
@@ -19,6 +29,37 @@ const dbConfig = {
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000
 };
+
+// Once the per-user hourly connection quota is hit, every subsequent connect()
+// attempt is doomed AND still counts against the quota. To avoid burning the
+// remaining (and resetting) quota with guaranteed-failing connects, we open a
+// cooldown circuit breaker: while blocked, queries fail fast without touching
+// MySQL, and we let the provider's hourly counter reset.
+const QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 60 minutes
+let quotaBlockedUntil = 0;
+
+function isQuotaBlocked() {
+  return Date.now() < quotaBlockedUntil;
+}
+
+function blockQuotaForCooldown() {
+  const now = Date.now();
+  // Only extend, never shorten an existing block.
+  if (now >= quotaBlockedUntil) {
+    quotaBlockedUntil = now + QUOTA_COOLDOWN_MS;
+    console.error(
+      `MySQL user connection quota reached. Blocking new DB connections for ${QUOTA_COOLDOWN_MS / 60000} min to let the hourly counter reset.`
+    );
+  }
+}
+
+class QuotaExceededError extends Error {
+  constructor() {
+    super('MySQL user connection quota exceeded; circuit breaker open until cooldown expires');
+    this.name = 'QuotaExceededError';
+    this.code = 'ER_USER_LIMIT_REACHED';
+  }
+}
 
 const MAX_RETRIES = 5;
 const RETRY_DELAY = 800;
@@ -52,14 +93,21 @@ function isTransientError(err) {
 }
 
 async function withRetry(fn, label = 'query') {
+  // Circuit breaker: while the hourly connection quota is exhausted, do not
+  // even attempt a connect() — it would fail and still count against the quota.
+  if (isQuotaBlocked()) {
+    throw new QuotaExceededError();
+  }
   let lastErr;
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
       return await fn();
     } catch (err) {
       lastErr = err;
-      // Fail fast on quota/limit errors — retrying cannot help until reset.
+      // Fail fast on quota/limit errors — retrying cannot help until reset,
+      // and each failed connect still burns the (already exhausted) quota.
       if (isQuotaOrLimitError(err)) {
+        blockQuotaForCooldown();
         throw err;
       }
       const transient = isTransientError(err);
@@ -140,6 +188,20 @@ function getPool() {
   return dbInstance;
 }
 
+function registerLockCleanup(lockFile) {
+  const cleanup = () => {
+    try { if (fs.existsSync(lockFile)) fs.unlinkSync(lockFile); } catch { /* ignore */ }
+    // Release DB connections so the next boot does not inherit orphans and
+    // does not have to reconnect (which would burn the hourly quota).
+    if (pool) {
+      try { pool.end(); } catch { /* ignore */ }
+    }
+  };
+  process.on('exit', cleanup);
+  process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+  process.on('SIGINT', () => { cleanup(); process.exit(0); });
+}
+
 function ensureStartupLock() {
   try {
     const lockDir = path.join(__dirname, '..', '.tmp');
@@ -149,13 +211,23 @@ function ensureStartupLock() {
     const lockFile = path.join(lockDir, 'db-init.lock');
     if (fs.existsSync(lockFile)) {
       const pid = parseInt(fs.readFileSync(lockFile, 'utf8'), 10);
-      try {
-        process.kill(pid, 0);
-        console.warn(`Another Node process (pid ${pid}) appears to already be running. Continuing anyway; listen() will retry if the port is still in use.`);
+      const peerAlive = (() => {
+        try {
+          process.kill(pid, 0);
+          return true;
+        } catch {
+          return false;
+        }
+      })();
+      if (peerAlive) {
+        // A live peer holds the lock: report it so the caller (server.js) can
+        // refuse to start a second instance and avoid a second connection pool
+        // multiplying the per-hour MySQL connect quota.
+        console.warn(`Another Node process (pid ${pid}) appears to already be running. Refusing to start a duplicate instance.`);
         return false;
-      } catch {
-        fs.unlinkSync(lockFile);
       }
+      // Stale lock from a crashed/removed process — clear it and take ownership.
+      fs.unlinkSync(lockFile);
     }
     fs.writeFileSync(lockFile, String(process.pid));
     registerLockCleanup(lockFile);
@@ -163,15 +235,6 @@ function ensureStartupLock() {
   } catch {
     return true;
   }
-}
-
-function registerLockCleanup(lockFile) {
-  const cleanup = () => {
-    try { if (fs.existsSync(lockFile)) fs.unlinkSync(lockFile); } catch { /* ignore */ }
-  };
-  process.on('exit', cleanup);
-  process.on('SIGTERM', () => { cleanup(); process.exit(0); });
-  process.on('SIGINT', () => { cleanup(); process.exit(0); });
 }
 
 const MIGRATIONS = [
@@ -714,6 +777,12 @@ async function runMigrations() {
 async function initDatabase() {
   if (initPromise) return initPromise;
   initPromise = (async () => {
+    // If we already know the hourly quota is exhausted, don't poke MySQL at
+    // boot — that connect would fail and still count against the quota.
+    if (isQuotaBlocked()) {
+      console.error('Skipping DB init probe: connection quota circuit breaker is open. Will recover after cooldown.');
+      return;
+    }
     const db = getPool();
     try {
       await db.query('SELECT 1 as test');

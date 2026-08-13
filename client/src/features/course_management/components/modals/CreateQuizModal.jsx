@@ -2,6 +2,19 @@ import { useState } from "react";
 import { Button } from "@/shared/components/ui/button";
 import { Plus, Loader2, X } from "lucide-react";
 
+const TIME_LIMIT_OPTIONS = [
+  { value: 0, label: "No limit" },
+  { value: 5, label: "5 minutes" },
+  { value: 10, label: "10 minutes" },
+  { value: 15, label: "15 minutes" },
+  { value: 20, label: "20 minutes" },
+  { value: 30, label: "30 minutes" },
+  { value: 45, label: "45 minutes" },
+  { value: 60, label: "1 hour" },
+  { value: 90, label: "1 hour 30 minutes" },
+  { value: 120, label: "2 hours" },
+];
+
 export default function CreateQuizModal({ open, onClose, onSubmit }) {
   const [loading, setLoading] = useState(false);
 
@@ -64,16 +77,19 @@ export default function CreateQuizModal({ open, onClose, onSubmit }) {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1.5" htmlFor="timeLimit">Time Limit (minutes)</label>
-            <input
+            <label className="block text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-1.5" htmlFor="timeLimit">Time Limit</label>
+            <select
               id="timeLimit"
               name="timeLimit"
-              type="number"
-              placeholder="0 for no limit"
-              min="0"
               defaultValue="0"
               className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-[var(--color-primary)] dark:focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] dark:focus:ring-blue-400/20 outline-none"
-            />
+            >
+              {TIME_LIMIT_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex justify-end gap-3 pt-2 border-t border-neutral-200 dark:border-neutral-800">

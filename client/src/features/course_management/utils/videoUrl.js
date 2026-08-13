@@ -74,6 +74,28 @@ export function parseVideoUrl(rawUrl) {
       };
     }
 
+    // Bunny Stream
+    // Embed form:  https://iframe.mediadelivery.net/embed/<libraryId>/<videoId>
+    // Player form: https://video.bunnycdn.com/<libraryId>/<videoId> | /embed/<libraryId>/<videoId>
+    if (
+      host === "iframe.mediadelivery.net" ||
+      host === "video.bunnycdn.com" ||
+      host === "bunnycdn.com"
+    ) {
+      const pathMatch = parsed.pathname.match(/\/(embed\/)?([^/?]+)\/([^/?]+)/);
+      const libraryId = pathMatch ? pathMatch[2] : null;
+      const videoId = pathMatch ? pathMatch[3] : null;
+      if (!libraryId || !videoId) return null;
+      return {
+        provider: "bunny",
+        url,
+        libraryId,
+        videoId,
+        embedUrl: `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}`,
+        isValid: true,
+      };
+    }
+
     return null;
   } catch {
     return null;
@@ -105,5 +127,6 @@ export function parseTimestamp(input) {
 export const PROVIDER_LABEL = {
   youtube: "YouTube",
   vimeo: "Vimeo",
+  bunny: "Bunny Stream",
   file: "Video File",
 };
