@@ -1,4 +1,3 @@
-import { User, Briefcase, Building2 } from "lucide-react"
 import UserAvatar from "@/shared/components/ui/Avatar"
 import { resolveFileUrl } from "@/lib/fileUrl"
 
@@ -46,12 +45,12 @@ export default function DigitalIDCardFront({ profile = {} }) {
           {fullName.toUpperCase()}
         </h2>
         <p className="text-center text-[clamp(0.75rem,2.8vw,0.9rem)] text-neutral-500 flex items-center gap-1.5 mt-1">
-          <Briefcase size={14} className="text-[var(--color-primary)]" />
-          {positionTitle}
+          <span className="inline-flex items-center rounded-full px-3 py-1" style={{ backgroundColor: 'rgba(242, 92, 5, 0.1)' }}>
+            {positionTitle}
+          </span>
         </p>
         {businessName && (
-          <p className="text-center text-[clamp(0.75rem,2.8vw,0.9rem)] text-neutral-500 flex items-center gap-1.5 mt-1">
-            <Building2 size={14} className="text-[var(--color-primary)]" />
+          <p className="text-center text-[clamp(0.75rem,2.8vw,0.9rem)] text-neutral-500 flex items-center gap-1.5 mt-1 font-medium">
             {businessName}
           </p>
         )}

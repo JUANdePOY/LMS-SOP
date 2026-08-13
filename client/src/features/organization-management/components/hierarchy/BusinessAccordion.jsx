@@ -138,7 +138,7 @@ export default function BusinessAccordion({
             type="button"
             onClick={handleCreateDepartmentClick}
             disabled={creating}
-            className="inline-flex items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] w-8 h-8 text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0 disabled:opacity-50"
+            className="inline-flex items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] w-8 h-8 text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors shrink-0 disabled:opacity-50 mr-2"
             aria-label="Create Department"
             title="Create Department"
           >
