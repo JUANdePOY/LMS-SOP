@@ -1,5 +1,6 @@
 const certificateIssuanceService = require('../services/certificateIssuanceService');
 const { broadcastSystemChange } = require('../services/notificationService');
+const { getLeadershipTargetUserIds } = require('../services/notificationTargetService');
 const db = require('../config/database');
 
 function handleError(res, error) {
@@ -117,14 +118,48 @@ const certificateIssuanceController = {
       );
 
       const issuance = result;
-      broadcastSystemChange({
-        title: 'Certificate Issued',
-        body: issuance.template_name || 'A certificate has been issued',
-        type: 'success',
-        link: `/certificates/${issuance.id}`,
-        entityType: 'certificate',
-        entityId: issuance.id,
-      }).catch(() => {});
+      let businessId = null;
+      let departmentId = null;
+
+      if (issuance.course_id) {
+        const [[scope]] = await db.query(
+          'SELECT c.department_id, d.business_id FROM courses c LEFT JOIN departments d ON c.department_id = d.id WHERE c.id = ?',
+          [issuance.course_id]
+        );
+        departmentId = scope?.department_id || null;
+        businessId = scope?.business_id || null;
+      }
+
+      if (!businessId && issuance.template_id) {
+        const [[templateScope]] = await db.query(
+          'SELECT department_id FROM certificate_templates WHERE id = ?',
+          [issuance.template_id]
+        );
+        departmentId = templateScope?.department_id || departmentId;
+        if (departmentId) {
+          const [[dept]] = await db.query(
+            'SELECT business_id FROM departments WHERE id = ?',
+            [departmentId]
+          );
+          businessId = dept ? dept.business_id : null;
+        }
+      }
+
+      getLeadershipTargetUserIds(businessId, departmentId, req.user.id)
+        .then((targetUserIds) => {
+          if (targetUserIds.length > 0) {
+            broadcastSystemChange({
+              title: 'Certificate Issued',
+              body: issuance.template_name || 'A certificate has been issued',
+              type: 'success',
+              link: `/certificates/${issuance.id}`,
+              entityType: 'certificate',
+              entityId: issuance.id,
+              targetUserIds,
+            }).catch(() => {});
+          }
+        })
+        .catch(() => {});
 
       res.status(201).json({
         success: true,
@@ -143,14 +178,48 @@ const certificateIssuanceController = {
         req.user.id
       );
 
-      broadcastSystemChange({
-        title: 'Certificate Revoked',
-        body: result.template_name || 'A certificate has been revoked',
-        type: 'error',
-        link: `/certificates/${result.id}`,
-        entityType: 'certificate',
-        entityId: result.id,
-      }).catch(() => {});
+      let businessId = null;
+      let departmentId = null;
+
+      if (result.course_id) {
+        const [[scope]] = await db.query(
+          'SELECT c.department_id, d.business_id FROM courses c LEFT JOIN departments d ON c.department_id = d.id WHERE c.id = ?',
+          [result.course_id]
+        );
+        departmentId = scope?.department_id || null;
+        businessId = scope?.business_id || null;
+      }
+
+      if (!businessId && result.template_id) {
+        const [[templateScope]] = await db.query(
+          'SELECT department_id FROM certificate_templates WHERE id = ?',
+          [result.template_id]
+        );
+        departmentId = templateScope?.department_id || departmentId;
+        if (departmentId) {
+          const [[dept]] = await db.query(
+            'SELECT business_id FROM departments WHERE id = ?',
+            [departmentId]
+          );
+          businessId = dept ? dept.business_id : null;
+        }
+      }
+
+      getLeadershipTargetUserIds(businessId, departmentId, req.user.id)
+        .then((targetUserIds) => {
+          if (targetUserIds.length > 0) {
+            broadcastSystemChange({
+              title: 'Certificate Revoked',
+              body: result.template_name || 'A certificate has been revoked',
+              type: 'error',
+              link: `/certificates/${result.id}`,
+              entityType: 'certificate',
+              entityId: result.id,
+              targetUserIds,
+            }).catch(() => {});
+          }
+        })
+        .catch(() => {});
 
       res.json({ success: true, data: mapPublicIssuance(result), message: 'Certificate revoked successfully' });
     } catch (error) {

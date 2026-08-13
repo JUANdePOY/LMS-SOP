@@ -11,6 +11,7 @@ import { builderGet, builderUpdate, publishCourse } from "../api/course.api";
 import { listCourseCertificates, linkCertificateToCourse, unlinkCertificateFromCourse } from "../api/certificateCourseLink.api";
 import { enqueueBanner } from "@/shared/stores/notificationStore.js";
 import * as session from "@/services/session";
+import { useAuth } from "@/contexts/AuthContext";
 
 function authHeaders() {
   const token = session.getCurrentToken();
@@ -175,6 +176,7 @@ export default function CourseBuilderPage() {
   const { id: courseId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isEmployee } = useAuth();
   const [saving, setSaving] = useState(false);
   const [course, setCourse] = useState(null);
   const [modules, setModules] = useState([]);
@@ -489,22 +491,24 @@ export default function CourseBuilderPage() {
       await saveNow(payload);
       await publishCourse(courseId);
       toast.success("Course published");
-      enqueueBanner({
-        id: `new-course-${courseId}`,
-        type: "new_course",
-        title: "New Course Published",
-        message: title.trim() || "A new course is now available.",
-        link: `/courses/library/${courseId}`,
-        ctaLabel: "Check course",
-        priority: 1,
-        persistDismiss: true,
-      });
+      if (!isEmployee) {
+        enqueueBanner({
+          id: `new-course-${courseId}`,
+          type: "new_course",
+          title: "New Course Published",
+          message: title.trim() || "A new course is now available.",
+          link: `/courses/library/${courseId}`,
+          ctaLabel: "Check course",
+          priority: 1,
+          persistDismiss: true,
+        });
+      }
       setHasUnsavedChanges(false);
       navigate("/courses/library");
     } catch {
       // error already shown in toast
     }
-  }, [buildPayload, modules, courseId, saveNow, toast, navigate]);
+  }, [buildPayload, modules, courseId, saveNow, toast, navigate, isEmployee]);
 
   const addModule = () => {
     const newModule = { id: "new-" + Date.now(), title: "", type: "chapter", order_index: modules.length + 1, lessons: [], isNew: true };

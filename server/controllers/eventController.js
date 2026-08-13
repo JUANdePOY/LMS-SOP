@@ -34,7 +34,7 @@ function getEventBusinessFilter(user) {
 }
 
 function listEvents(req, res) {
-  const { event_type, priority, status, page = 1, limit = 20 } = req.query;
+  const { event_type, priority, status, page = 1, limit = 20, target_role, target_department } = req.query;
   const pageNum = parseInt(page, 10);
   const limitNum = parseInt(limit, 10);
   const { business_id, denied } = getEventBusinessFilter(req.user);
@@ -48,7 +48,7 @@ function listEvents(req, res) {
     });
   }
 
-  eventModel.findAll({ business_id, event_type, priority, status, page: pageNum, limit: limitNum })
+  eventModel.findAll({ business_id, event_type, priority, status, target_role, target_department, page: pageNum, limit: limitNum })
     .then((rows) => {
       res.json({
         success: true,

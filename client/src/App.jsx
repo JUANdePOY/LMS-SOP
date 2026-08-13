@@ -173,6 +173,7 @@ const router = createBrowserRouter([
       { path: "profile/:userId", element: LMSProtectedWrapper(UserProfilePage), handle: { title: "Profile" } },
       { path: "course-library", element: <Navigate to="/courses/library" replace /> },
       { path: "settings", element: SuperAdminProtectedWrapper(Settings), handle: { title: "Settings" } },
+      { path: "settings/users", element: SuperAdminProtectedWrapper(UsersPanel), handle: { title: "Users" } },
       { path: "settings/roles", element: SuperAdminProtectedWrapper(RolesPanel), handle: { title: "Roles & Permissions" } },
       { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
       { path: "notifications", element: LMSProtectedWrapper(NotificationsPage), handle: { title: "Notifications" } },

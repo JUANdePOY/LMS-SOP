@@ -8,6 +8,7 @@ import AttachmentUploader from '@/features/sop-management/components/SOPEditor/A
 import SOPActionBar from '@/features/sop-management/components/SOPActionBar';
 import SOPSidebar from '@/features/sop-management/components/SOPSidebar';
 import { useToast } from '@/shared/components/ui/Toast';
+import { useAuth } from '@/contexts/AuthContext';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import { useModules } from '@/features/sop-management/hooks/useModules';
 import { useAttachments } from '@/features/sop-management/hooks/useAttachments';
@@ -30,6 +31,7 @@ function SOPWorkspacePage() {
   const { id } = useParams();
   const sopId = id;
   const { toast } = useToast();
+  const { isEmployee } = useAuth();
   const [selectedModule, setSelectedModule] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creatingModule, setCreatingModule] = useState(false);
@@ -118,16 +120,18 @@ function SOPWorkspacePage() {
       await fetchAuditLogs();
       toast.success(`SOP ${actionLabels[action] || 'updated'} successfully`);
       if (action === 'publish' && sop?.id) {
-        enqueueBanner({
-          id: `new-sop-${sop.id}`,
-          type: 'new_sop',
-          title: 'New SOP Published',
-          message: sop.title || 'A new SOP is now available.',
-          link: `/sops/${sop.id}`,
-          ctaLabel: 'View SOP',
-          priority: 1,
-          persistDismiss: true,
-        });
+        if (!isEmployee) {
+          enqueueBanner({
+            id: `new-sop-${sop.id}`,
+            type: 'new_sop',
+            title: 'New SOP Published',
+            message: sop.title || 'A new SOP is now available.',
+            link: `/sops/${sop.id}`,
+            ctaLabel: 'View SOP',
+            priority: 1,
+            persistDismiss: true,
+          });
+        }
       }
     } catch (err) {
       const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || `${action} failed`;
