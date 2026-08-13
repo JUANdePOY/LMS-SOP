@@ -3,15 +3,8 @@ import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichT
 import { useAuth } from "@/contexts/AuthContext";
 import { getBusinesses } from "@/features/organization-management/api/business.api";
 import { getDepartments } from "@/features/organization-management/api/department.api";
-
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
+import { resolveFileUrl, resolveBodyImages } from "@/lib/fileUrl";
+import api from "@/services/api";
 
 const PRIORITY_OPTIONS = [
   { value: "low", label: "Low" },
@@ -160,12 +153,14 @@ export default function AnnouncementForm({ initialData, onSubmit, onCancel, savi
       <div>
         <label className="block text-xs font-medium text-neutral-700 mb-1">Content</label>
         <RichTextEditor
-          value={body}
+          value={resolveBodyImages(body)}
           onChange={(html) => setBody(html)}
           placeholder="Enter announcement content..."
           onImageUpload={async (file) => {
-            const dataUrl = await fileToDataUrl(file);
-            return dataUrl;
+            const formData = new FormData();
+            formData.append('file', file);
+            const res = await api.post('/announcements/upload-image', formData);
+            return resolveFileUrl(res.data.url);
           }}
         />
       </div>

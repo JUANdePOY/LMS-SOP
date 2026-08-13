@@ -17,6 +17,8 @@ router.get('/overrides', authorize('super_admin', 'admin', 'department_head'), q
 router.delete('/overrides/:id', authorize('super_admin', 'admin', 'department_head'), quizAttemptController.revokeOverride);
 router.get('/violations', authorize('super_admin', 'admin', 'department_head'), quizAttemptController.getViolations);
 router.get('/violations/flagged', authorize('super_admin', 'admin', 'department_head'), quizAttemptController.getFlaggedAttempts);
+router.get('/violations/by-user', authorize('super_admin', 'admin', 'department_head'), quizAttemptController.getViolationsByUser);
+router.get('/violations/user/:userId', authorize('super_admin', 'admin', 'department_head'), quizAttemptController.getViolationsForUser);
 
 // Attempt-specific routes (registered after exact paths above)
 router.get('/:id/results', quizAttemptController.getAttemptResults);

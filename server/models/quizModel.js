@@ -443,10 +443,11 @@ async function logViolation(violationData) {
 async function getViolations(filters = {}) {
   const { user_id, quiz_id, course_id, type, date_from, date_to, page = 1, limit = 50 } = filters;
   const offset = (page - 1) * limit;
-  let sql = `SELECT v.*, u.full_name AS user_name, u.email AS user_email, q.title AS quiz_title, a.attempt_number
+  let sql = `SELECT v.*, u.full_name AS user_name, u.email AS user_email, q.title AS quiz_title, q.course_id, c.title AS course_title, a.attempt_number
              FROM quiz_violations v
              JOIN users u ON v.user_id = u.id
              LEFT JOIN quizzes q ON v.quiz_id = q.id
+             LEFT JOIN courses c ON q.course_id = c.id
              LEFT JOIN quiz_attempts a ON v.attempt_id = a.id`;
   const params = [];
   const conditions = [];
@@ -479,6 +480,90 @@ async function getViolations(filters = {}) {
   if (conditions.length) sql += ' WHERE ' + conditions.join(' AND ');
   sql += ` ORDER BY v.timestamp DESC LIMIT ? OFFSET ?`;
   params.push(limit, offset);
+
+  const [rows] = await db.query(sql, params);
+  return rows;
+}
+
+async function getViolationsByUser(filters = {}) {
+  const { quiz_id, course_id, type, date_from, date_to } = filters;
+  let whereSql = '';
+  const params = [];
+  const conditions = [];
+
+  if (quiz_id) {
+    conditions.push('v.quiz_id = ?');
+    params.push(quiz_id);
+  }
+  if (course_id) {
+    conditions.push('q.course_id = ?');
+    params.push(course_id);
+  }
+  if (type) {
+    conditions.push('v.type = ?');
+    params.push(type);
+  }
+  if (date_from) {
+    conditions.push('v.timestamp >= ?');
+    params.push(date_from);
+  }
+  if (date_to) {
+    conditions.push('v.timestamp <= ?');
+    params.push(date_to);
+  }
+  if (conditions.length) whereSql = ' WHERE ' + conditions.join(' AND ');
+
+  const [users] = await db.query(
+    `SELECT u.id AS user_id, u.full_name AS user_name, u.email AS user_email,
+            COUNT(v.id) AS violation_count,
+            SUM(CASE WHEN v.type = 'devtools_opened' OR v.type = 'screenshot_attempt' THEN 1 ELSE 0 END) AS high_count,
+            SUM(CASE WHEN v.type = 'copy_attempt' OR v.type = 'fullscreen_exit' OR v.type = 'tab_switch' THEN 1 ELSE 0 END) AS medium_count,
+            SUM(CASE WHEN v.type = 'right_click' THEN 1 ELSE 0 END) AS low_count,
+            MAX(v.timestamp) AS last_violation_at
+     FROM users u
+     JOIN quiz_violations v ON v.user_id = u.id
+     LEFT JOIN quizzes q ON v.quiz_id = q.id
+     ${whereSql}
+     GROUP BY u.id, u.full_name, u.email
+     HAVING COUNT(v.id) > 0
+     ORDER BY violation_count DESC, u.full_name ASC`,
+    params
+  );
+  return users;
+}
+
+async function getViolationsForUser(userId, filters = {}) {
+  const { quiz_id, course_id, type, date_from, date_to } = filters;
+  let sql = `SELECT v.*, u.full_name AS user_name, u.email AS user_email, q.title AS quiz_title, q.course_id, c.title AS course_title, a.attempt_number
+             FROM quiz_violations v
+             JOIN users u ON v.user_id = u.id
+             LEFT JOIN quizzes q ON v.quiz_id = q.id
+             LEFT JOIN courses c ON q.course_id = c.id
+             LEFT JOIN quiz_attempts a ON v.attempt_id = a.id
+             WHERE v.user_id = ?`;
+  const params = [userId];
+
+  if (quiz_id) {
+    sql += ' AND v.quiz_id = ?';
+    params.push(quiz_id);
+  }
+  if (course_id) {
+    sql += ' AND q.course_id = ?';
+    params.push(course_id);
+  }
+  if (type) {
+    sql += ' AND v.type = ?';
+    params.push(type);
+  }
+  if (date_from) {
+    sql += ' AND v.timestamp >= ?';
+    params.push(date_from);
+  }
+  if (date_to) {
+    sql += ' AND v.timestamp <= ?';
+    params.push(date_to);
+  }
+  sql += ' ORDER BY v.timestamp DESC';
 
   const [rows] = await db.query(sql, params);
   return rows;
@@ -825,6 +910,8 @@ module.exports = {
   getQuizResultsForUser,
   logViolation,
   getViolations,
+  getViolationsByUser,
+  getViolationsForUser,
   countViolations,
   incrementAttemptViolationCount,
   getLeaderboard,

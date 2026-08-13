@@ -24,4 +24,19 @@ export function resolveFileUrl(storedUrl, { authenticated = true } = {}) {
   return storedUrl;
 }
 
+/**
+ * Rewrite every /uploads/... image source inside an HTML string to a
+ * browser-loadable URL. Required when storage is the DB blob driver, where the
+ * raw /uploads/... path 404s and inline images must be served through the
+ * authenticated /api/files/stream route instead.
+ */
+export function resolveBodyImages(html) {
+  if (!html || typeof html !== "string") return html;
+  return html.replace(/<img([^>]+)src="(\/uploads\/[^"]+)"/gi, (match, attrs, src) => {
+    const resolved = resolveFileUrl(src);
+    if (!resolved || resolved === src) return match;
+    return match.replace(src, resolved);
+  });
+}
+
 export default resolveFileUrl;

@@ -1,6 +1,20 @@
 const crypto = require('crypto');
 const db = require('../config/database');
 
+// JSON columns must receive a JSON-encoded string (or NULL), never a raw JS
+// array — mysql2 would serialize an empty array as an empty SQL value and
+// produce a syntax error. Accepts arrays/objects/strings and falls back to NULL.
+function toJsonColumn(value) {
+  if (value == null) return null;
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value.length === 0) return null;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
 const CREATE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS announcements (
   id VARCHAR(36) NOT NULL DEFAULT (UUID()),
   title VARCHAR(255) NOT NULL,
@@ -82,7 +96,7 @@ const announcementModel = {
     const id = crypto.randomUUID();
     await db.query(
       'INSERT INTO announcements (id, title, type, priority, status, author, body, business_id, target_roles, target_departments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, title, type || 'General', priority || 'medium', status || 'active', author || 'CO Admin', body, business_id || null, target_roles || null, target_departments || null]
+      [id, title, type || 'General', priority || 'medium', status || 'active', author || 'CO Admin', body, business_id || null, toJsonColumn(target_roles), toJsonColumn(target_departments)]
     );
     return this.findById(id);
   },
@@ -91,7 +105,7 @@ const announcementModel = {
     const { title, type, priority, status, author, body, business_id, target_roles, target_departments } = announcement;
     await db.query(
       'UPDATE announcements SET title = ?, type = ?, priority = ?, status = ?, author = ?, body = ?, business_id = ?, target_roles = ?, target_departments = ? WHERE id = ?',
-      [title, type, priority, status, author, body, business_id, target_roles, target_departments, id]
+      [title, type, priority, status, author, body, business_id, toJsonColumn(target_roles), toJsonColumn(target_departments), id]
     );
     return this.findById(id);
   },

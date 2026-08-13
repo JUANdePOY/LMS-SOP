@@ -362,6 +362,38 @@ async function getFlaggedAttempts(req, res) {
   }
 }
 
+async function getViolationsByUser(req, res) {
+  const { quizId, courseId, type, dateFrom, dateTo } = req.query;
+  try {
+    const users = await quizModel.getViolationsByUser({
+      quiz_id: quizId,
+      course_id: courseId,
+      type,
+      date_from: dateFrom,
+      date_to: dateTo,
+    });
+    res.json({ success: true, data: users });
+  } catch (err) {
+    sendError(res, err, 'Failed to fetch violations by user');
+  }
+}
+
+async function getViolationsForUser(req, res) {
+  const { quizId, courseId, type, dateFrom, dateTo } = req.query;
+  try {
+    const violations = await quizModel.getViolationsForUser(req.params.userId, {
+      quiz_id: quizId,
+      course_id: courseId,
+      type,
+      date_from: dateFrom,
+      date_to: dateTo,
+    });
+    res.json({ success: true, data: violations });
+  } catch (err) {
+    sendError(res, err, 'Failed to fetch user violations');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Admin attempt overrides
 // ---------------------------------------------------------------------------
@@ -417,6 +449,8 @@ module.exports = {
   logViolation,
   getViolations,
   getFlaggedAttempts,
+  getViolationsByUser,
+  getViolationsForUser,
   grantOverride,
   listOverrides,
   revokeOverride,
