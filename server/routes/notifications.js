@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const db = require('../config/database');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, resolveScope } = require('../middleware/auth');
+const { requirePermission } = require('../middleware/scope');
 const { broadcastSystemChange, createSystemNotification } = require('../services/notificationService');
 const { subscribe, unsubscribe } = require('../services/pushNotificationService');
 
@@ -38,17 +39,31 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', requireAdmin, async (req, res) => {
+router.post('/', resolveScope, requirePermission('notifications.send'), async (req, res) => {
   try {
-    const userId = req.user.id;
+    let targetUserId = req.body.user_id ? Number(req.body.user_id) : req.user.id;
     const { title, body, type = 'info', link, entity_type, entity_id } = req.body;
 
     if (!title) {
       return sendError(res, 400, 'VALIDATION_ERROR', 'Title is required');
     }
 
+    if (targetUserId !== req.user.id) {
+      const role = req.user?.role;
+      if (role === 'department_head') {
+        const scopedDeptIds = req.user.scoped_department_ids || [];
+        const [[targetUser]] = await db.query(
+          'SELECT department_id FROM users WHERE id = ? AND is_active = 1',
+          [targetUserId]
+        );
+        if (!targetUser || !scopedDeptIds.includes(targetUser.department_id)) {
+          return sendError(res, 403, 'SCOPE_ERROR', 'Target user is outside your department scope');
+        }
+      }
+    }
+
     const notificationId = await createSystemNotification({
-      userId,
+      userId: targetUserId,
       title,
       body,
       type,
@@ -68,12 +83,27 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 });
 
-router.post('/broadcast', requireAdmin, async (req, res) => {
+router.post('/broadcast', resolveScope, requirePermission('notifications.broadcast'), async (req, res) => {
   try {
     const { title, body, type = 'info', link, entity_type, entity_id } = req.body;
 
     if (!title || !entity_type || !entity_id) {
       return sendError(res, 400, 'VALIDATION_ERROR', 'Title, entity_type, and entity_id are required');
+    }
+
+    let targetUserIds = null;
+    const role = req.user?.role;
+
+    if (role === 'department_head') {
+      const scopedDeptIds = req.user.scoped_department_ids || [];
+      if (scopedDeptIds.length === 0) {
+        return sendError(res, 403, 'SCOPE_ERROR', 'No department scope assigned');
+      }
+      const [rows] = await db.query(
+        'SELECT id FROM users WHERE is_active = 1 AND role NOT IN (\'super_admin\') AND department_id IN (?)',
+        [scopedDeptIds]
+      );
+      targetUserIds = rows.map((u) => u.id);
     }
 
     const ids = await broadcastSystemChange({
@@ -83,6 +113,8 @@ router.post('/broadcast', requireAdmin, async (req, res) => {
       link,
       entityType: entity_type,
       entityId: Number(entity_id),
+      excludeUserId: req.user.id,
+      targetUserIds,
     });
 
     res.status(201).json({ success: true, data: { count: ids.length } });
@@ -133,10 +165,62 @@ router.patch('/read-all', async (req, res) => {
   }
 });
 
+router.delete('/:id', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const [result] = await db.query(
+      'DELETE FROM notifications WHERE id = ? AND user_id = ?',
+      [id, userId]
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ success: false, code: 'NOT_FOUND', message: 'Notification not found' });
+    }
+    const [unreadResult] = await db.query(
+      'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE',
+      [userId]
+    );
+    res.json({ success: true, unread_count: unreadResult[0].count });
+  } catch (err) {
+    console.error('Delete notification error:', err);
+    res.status(500).json({ code: 'DELETE_ERROR', message: 'Failed to delete notification' });
+  }
+});
+
+router.delete('/', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      await db.query('DELETE FROM notifications WHERE user_id = ?', [userId]);
+    } else {
+      const placeholders = ids.map(() => '?').join(',');
+      await db.query(
+        `DELETE FROM notifications WHERE user_id = ? AND id IN (${placeholders})`,
+        [userId, ...ids]
+      );
+    }
+    const [unreadResult] = await db.query(
+      'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE',
+      [userId]
+    );
+    res.json({ success: true, unread_count: unreadResult[0].count });
+  } catch (err) {
+    console.error('Delete notifications error:', err);
+    res.status(500).json({ code: 'DELETE_ERROR', message: 'Failed to delete notifications' });
+  }
+});
+
 router.post('/push/subscribe', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    await subscribe(userId, req.body);
+    const userAgent = req.get('user-agent') || req.body.user_agent || null;
+    console.log(`[push] Subscribe request for user ${userId}`, {
+      hasEndpoint: !!req.body?.endpoint,
+      hasKeys: !!(req.body?.keys?.p256dh && req.body?.keys?.auth),
+    });
+    await subscribe(userId, req.body, userAgent);
+    console.log(`[push] Subscribed user ${userId}`);
     res.json({ success: true });
   } catch (err) {
     console.error('Push subscribe error:', err);
@@ -157,10 +241,10 @@ router.post('/push/unsubscribe', authenticateToken, async (req, res) => {
 });
 
 router.get('/push/check', authenticateToken, (req, res) => {
+  const vapidPublicKey = process.env.FCM_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY;
+  const vapidPrivateKey = process.env.FCM_VAPID_PRIVATE_KEY || process.env.VAPID_PRIVATE_KEY;
   res.json({
-    supported: typeof window !== 'undefined'
-      ? 'serviceWorker' in navigator && 'PushManager' in window
-      : false,
+    supported: !!(vapidPublicKey && vapidPrivateKey),
   });
 });
 

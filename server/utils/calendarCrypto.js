@@ -9,9 +9,7 @@ const { resolveKey, getCachedKey } = require('./calendarKey');
 const ALGO = 'aes-256-gcm';
 
 // Start resolving the key eagerly so it's ready before the first token op.
-resolveKey().catch((err) => {
-  console.error('[Calendar] Encryption key resolution failed:', err.message);
-});
+resolveKey().catch(() => {});
 
 function envKeyBuffer() {
   const raw = process.env.CALENDAR_TOKEN_ENCRYPTION_KEY;
@@ -32,7 +30,6 @@ function getKey() {
     throw err;
   }
   const fingerprint = crypto.createHash('sha256').update(key).digest('hex').slice(0, 12);
-  console.log('[Calendar] getKey fingerprint=', fingerprint, 'len=', key.length, 'source=', envKeyBuffer() ? 'env' : 'cached');
   return key;
 }
 

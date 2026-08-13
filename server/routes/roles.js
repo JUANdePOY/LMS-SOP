@@ -82,7 +82,7 @@ router.put('/users/:userId/permissions', authenticateToken, requireSuperAdmin, [
 });
 
 // GET /api/roles
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT id, name, display_name, description, is_active, created_at FROM roles ORDER BY id');
     const enriched = await Promise.all(
@@ -99,7 +99,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/roles/permissions
-router.get('/permissions', async (req, res) => {
+router.get('/permissions', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT id, name, display_name, description, category, is_active FROM permissions ORDER BY category, name');
     res.json({ status: 'success', data: rows });
@@ -150,7 +150,7 @@ router.put('/permissions/:roleName', authenticateToken, requireSuperAdmin, [
 });
 
 // GET /api/roles/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {

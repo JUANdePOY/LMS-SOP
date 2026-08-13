@@ -182,7 +182,7 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
       getEnrollments({ course_id: course.id, limit: 500 })
         .then((res) => {
           if (cancel) return;
-          const rows = Array.isArray(res?.data?.data) ? res.data.data : Array.isArray(res?.data) ? res.data : [];
+          const rows = Array.isArray(res?.data) ? res.data : [];
           const map = {};
           const ids = [];
           rows.forEach((e) => {
@@ -199,7 +199,12 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
           setEnrolledMap(map);
           setSelected(ids);
         })
-        .catch(() => {});
+        .catch((err) => {
+          if (cancel) return;
+          console.error('Failed to load enrollments:', err);
+          setEnrolledMap({});
+          setSelected([]);
+        });
     }
 
     loadUsers("", "", "");

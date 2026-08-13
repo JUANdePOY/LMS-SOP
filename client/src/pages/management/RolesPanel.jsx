@@ -6,10 +6,11 @@ import { Select } from '@/shared/components/ui/select';
 import { Card } from '@/shared/components/ui/card';
 import { Modal } from '@/shared/components/ui/modal';
 import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
-import { Search, Plus, Edit2, Trash2, Shield, Users, Briefcase, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Shield, Users, Briefcase, Loader2, ChevronDown, ChevronRight, Lock } from 'lucide-react';
 import { useToast } from '@/shared/components/ui/Toast';
 import { cn } from '@/lib/utils';
 import { StaggerList, MotionItem } from "@/shared/motion";
+import { useAuth } from "@/contexts/AuthContext";
 
 const CATEGORY_LABELS = {
   dashboard: 'Dashboard',
@@ -49,6 +50,7 @@ function getAvatarColor(name) {
 
 export default function RolesPanel({ activeTab = 'roles' }) {
   const { toast } = useToast();
+  const { isSuperAdmin } = useAuth();
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -66,6 +68,20 @@ export default function RolesPanel({ activeTab = 'roles' }) {
   const [roleUsers, setRoleUsers] = useState([]);
   const [loadingRoleUsers, setLoadingRoleUsers] = useState(false);
   const [roleUserSearch, setRoleUserSearch] = useState('');
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
+        <div className="h-16 w-16 rounded-2xl bg-red-50 dark:bg-red-500/10 flex items-center justify-center">
+          <Lock size={32} className="text-red-500" />
+        </div>
+        <div className="text-center">
+          <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">Access Restricted</h2>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">Only super administrators can manage roles and permissions.</p>
+        </div>
+      </div>
+    );
+  }
 
   const fetchRoles = useCallback(async () => {
     try {

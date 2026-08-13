@@ -149,7 +149,7 @@ async function create(courseData) {
     department_id, business_id, category_id
   } = courseData;
 
-  const [result] = await db.query(
+  const queryResult = await db.query(
     `INSERT INTO courses (
       title, description, category, category_id, difficulty, status, instructor_id, thumbnail_url,
       prerequisites, learning_outcomes, max_enrollments, start_date, end_date,
@@ -177,7 +177,9 @@ async function create(courseData) {
       business_id ? parseInt(business_id, 10) : null,
     ]
   );
-  return result.insertId;
+  const result = Array.isArray(queryResult) ? queryResult[0] : queryResult;
+  console.log('courseModel.create result', result);
+  return result?.insertId;
 }
 
 async function update(id, updates) {

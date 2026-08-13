@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,8 @@ import DonutChart from "../components/dashboard/DonutChart";
 import TrainingLineChart from "../components/dashboard/TrainingLineChart";
 import LeaderboardPodium from "../components/dashboard/LeaderboardPodium";
 import useEmployeeTrainingDashboard from "../hooks/useEmployeeTrainingDashboard";
+import { useNotifications } from "@/shared/stores/notificationStore.js";
+import BannerSection from "@/shared/components/ui/BannerSection";
 
 const LEADERBOARD = [
   { rank: 1, name: "Jane D.", points: 145 },
@@ -53,12 +55,57 @@ export default function EmployeeTrainingDashboard() {
   const { user, isAnyAdmin } = useAuth();
   const navigate = useNavigate();
   const dashboard = useEmployeeTrainingDashboard();
+  const { notifications, fetch: fetchNotifications } = useNotifications();
 
   const [trainingPeriod, setTrainingPeriod] = useState("month");
   const [leaderboardPeriod, setLeaderboardPeriod] = useState("month");
 
   const firstName = user?.full_name?.split(" ")[0] || "Learner";
   const department = user?.department || "My Department";
+
+  const dashboardBanners = useMemo(() => {
+    const banners = [];
+    const unreadNotifications = (notifications || []).filter((n) => !n.is_read);
+    unreadNotifications.forEach((notification) => {
+      const entityType = notification.entity_type || 'notification';
+      banners.push({
+        id: `notification-${notification.id}`,
+        type: entityType === 'enrollment' ? 'new_course' : entityType === 'sop' ? 'new_sop' : entityType === 'task' ? 'alert' : 'announcement',
+        title: notification.title,
+        message: notification.body || '',
+        link: notification.link || '/notifications',
+        ctaLabel: 'View',
+        priority: 5,
+      });
+    });
+    if (dashboard.announcements.length > 0) {
+      banners.push({
+        id: 'training-announcement',
+        type: 'announcement',
+        title: dashboard.announcements[0].title || 'New Announcement',
+        message: dashboard.announcements[0].body || dashboard.announcements[0].description || 'Check the latest announcement.',
+        link: '/announcements',
+        ctaLabel: 'View announcement',
+        priority: 2,
+      });
+    }
+    if (dashboard.taskCounts?.overdue > 0) {
+      banners.push({
+        id: 'training-overdue',
+        type: 'alert',
+        title: 'Overdue Tasks',
+        message: `${dashboard.taskCounts.overdue} task${dashboard.taskCounts.overdue !== 1 ? 's' : ''} are currently overdue.`,
+        link: '/tasks/my',
+        ctaLabel: 'View tasks',
+        priority: 4,
+      });
+    }
+    return banners.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+  }, [notifications, dashboard.announcements, dashboard.taskCounts]);
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   if (dashboard.loading) {
     return (
@@ -96,6 +143,10 @@ export default function EmployeeTrainingDashboard() {
         <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 sm:text-[28px]">Dashboard</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-neutral-400">Welcome back, {firstName}!</p>
       </div>
+
+      {dashboardBanners.length > 0 && (
+        <BannerSection items={dashboardBanners} carousel autoPlayInterval={5000} />
+      )}
 
       {/* Stat Cards Row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

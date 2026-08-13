@@ -23,18 +23,27 @@ function getAnnouncementBusinessFilter(user) {
   }
   const businessId = user?.business_id;
   if (!businessId) {
-    return { business_id: null };
+    return { business_id: null, denied: true };
   }
   return { business_id: businessId };
 }
 
 function listAnnouncements(req, res) {
-  const { type, priority, status, page = 1, limit = 20 } = req.query;
+  const { type, priority, status, page = 1, limit = 20, target_role, target_department } = req.query;
   const pageNum = parseInt(page, 10);
   const limitNum = parseInt(limit, 10);
-  const { business_id } = getAnnouncementBusinessFilter(req.user);
+  const { business_id, denied } = getAnnouncementBusinessFilter(req.user);
 
-  announcementModel.findAll({ business_id, type, priority, status, page: pageNum, limit: limitNum })
+  if (denied) {
+    return res.json({
+      success: true,
+      message: 'OK',
+      data: [],
+      pagination: { page: pageNum, limit: limitNum, total: 0, totalPages: 0 },
+    });
+  }
+
+  announcementModel.findAll({ business_id, type, priority, status, target_role, target_department, page: pageNum, limit: limitNum })
     .then((rows) => {
       res.json({
         success: true,
@@ -56,8 +65,13 @@ function getAnnouncement(req, res) {
   announcementModel.findById(id)
     .then((row) => {
       if (!row) return res.status(404).json({ success: false, message: 'Announcement not found', code: 'NOT_FOUND' });
-      if (req.user?.role !== 'super_admin' && row.business_id && row.business_id !== req.user?.business_id) {
-        return res.status(403).json({ success: false, message: 'Access denied: announcement is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+      if (req.user?.role !== 'super_admin') {
+        if (row.business_id && row.business_id !== req.user?.business_id) {
+          return res.status(403).json({ success: false, message: 'Access denied: announcement is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+        }
+        if (!row.business_id && !req.user?.business_id) {
+          return res.status(403).json({ success: false, message: 'Access denied: announcement is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+        }
       }
       res.json({ success: true, message: 'OK', data: row });
     })
@@ -66,7 +80,7 @@ function getAnnouncement(req, res) {
 
 function createAnnouncement(req, res) {
   const userId = req.user?.id;
-  const { title, type, priority, status, body } = req.body;
+  const { title, type, priority, status, body, target_roles, target_departments } = req.body;
 
   if (!title || !title.trim()) {
     return res.status(400).json({ success: false, message: 'Title is required', code: 'VALIDATION_ERROR' });
@@ -77,6 +91,9 @@ function createAnnouncement(req, res) {
 
   const businessId = req.user?.business_id || null;
 
+  const parsedTargetRoles = Array.isArray(target_roles) ? target_roles : null;
+  const parsedTargetDepartments = Array.isArray(target_departments) ? target_departments.map(String) : null;
+
   announcementModel.create({
     title: title.trim(),
     type: type || 'General',
@@ -85,6 +102,8 @@ function createAnnouncement(req, res) {
     author: req.user?.full_name || 'System',
     body: body.trim(),
     business_id: businessId,
+    target_roles: parsedTargetRoles,
+    target_departments: parsedTargetDepartments,
   })
     .then((row) => {
       logAudit && logAudit('announcement.create', userId, { announcementId: row.id });
@@ -95,6 +114,7 @@ function createAnnouncement(req, res) {
         link: '/announcements',
         entityType: 'announcement',
         entityId: row.id,
+        targetUserIds: getBusinessUserIds(businessId),
       }).catch(() => {});
       res.status(201).json({ success: true, message: 'Announcement created successfully', data: row });
     })
@@ -104,7 +124,7 @@ function createAnnouncement(req, res) {
 function updateAnnouncement(req, res) {
   const { id } = req.params;
   const userId = req.user?.id;
-  const { title, type, priority, status, body } = req.body;
+  const { title, type, priority, status, body, target_roles, target_departments } = req.body;
 
   announcementModel.findById(id)
     .then((row) => {
@@ -112,6 +132,8 @@ function updateAnnouncement(req, res) {
       if (req.user?.role !== 'super_admin' && row.business_id && row.business_id !== req.user?.business_id) {
         return res.status(403).json({ success: false, message: 'Access denied: announcement is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
       }
+      const parsedTargetRoles = Array.isArray(target_roles) ? target_roles : row.target_roles;
+      const parsedTargetDepartments = Array.isArray(target_departments) ? target_departments.map(String) : row.target_departments;
       return announcementModel.update(id, {
         title: title?.trim() || row.title,
         type: type || row.type,
@@ -120,6 +142,8 @@ function updateAnnouncement(req, res) {
         author: row.author,
         body: body?.trim() || row.body,
         business_id: row.business_id,
+        target_roles: parsedTargetRoles,
+        target_departments: parsedTargetDepartments,
       });
     })
     .then((row) => {
@@ -131,6 +155,7 @@ function updateAnnouncement(req, res) {
         link: '/announcements',
         entityType: 'announcement',
         entityId: row.id,
+        targetUserIds: getBusinessUserIds(row.business_id),
       }).catch(() => {});
       res.json({ success: true, message: 'Announcement updated successfully', data: row });
     })
@@ -154,6 +179,15 @@ function deleteAnnouncement(req, res) {
       res.json({ success: true, message: 'Announcement deleted successfully' });
     })
     .catch((err) => sendError(res, err, 'Failed to delete announcement'));
+}
+
+async function getBusinessUserIds(businessId) {
+  if (!businessId) return null;
+  const [rows] = await db.query(
+    'SELECT id FROM users WHERE business_id = ? AND role NOT IN (\'super_admin\') AND is_active = 1',
+    [businessId]
+  );
+  return rows.map((u) => u.id);
 }
 
 module.exports = {

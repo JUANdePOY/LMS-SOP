@@ -7,6 +7,8 @@ const authModel = require('../models/authModel');
 const departmentModel = require('../models/departmentModel');
 const enrollmentModel = require('../models/enrollmentModel');
 const messageModel = require('../models/messageModel');
+const announcementModel = require('../models/announcementModel');
+const eventModel = require('../models/eventModel');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -36,12 +38,16 @@ router.get('/', authenticateToken, async (req, res) => {
       departmentRows,
       recentEnrollments,
       recentMessages,
+      announcements,
+      events,
     ] = await Promise.all([
       authModel.getStats(),
       taskService.getTaskStats({}, req.user.id).catch(() => ({ total: 0, pending: 0, in_progress: 0, completed: 0, overdue: 0 })),
       departmentModel.findAll({ business_id: businessId, status: 'active', limit: 100 }).catch(() => ({ rows: [] })),
       enrollmentModel.listEnrollments({ business_id: businessId, limit: 100, page: 1 }).catch(() => []),
       messageModel.listConversations(req.user.id).catch(() => []),
+      announcementModel.findAll({ business_id: businessId || undefined, status: 'active', limit: 5 }).catch(() => []),
+      eventModel.findAll({ business_id: businessId || undefined, status: 'active', limit: 5 }).catch(() => []),
     ]);
 
     const departments = departmentRows.rows || departmentRows || [];
@@ -72,8 +78,29 @@ router.get('/', authenticateToken, async (req, res) => {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const recentMessagesList = (recentMessages || [])
       .filter((m) => new Date(m.last_message_at || m.updated_at || m.created_at) >= thirtyDaysAgo)
-      .sort((a, b) => new Date(b.last_message_at || b.updated_at || b.created_at) - new Date(a.last_message_at || a.updated_at || a.created_at))
+      .sort((a, b) => new Date(b.last_message_at || m.updated_at || m.created_at) - new Date(a.last_message_at || m.updated_at || m.created_at))
       .slice(0, 5);
+
+    const normalizedAnnouncements = (Array.isArray(announcements) ? announcements : []).map((item) => ({
+      id: item.id,
+      title: item.title,
+      body: item.body,
+      type: item.type,
+      priority: item.priority,
+      status: item.status,
+      created_at: item.created_at,
+    }));
+
+    const normalizedEvents = (Array.isArray(events) ? events : []).map((item) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      event_type: item.event_type,
+      priority: item.priority,
+      status: item.status,
+      event_date: item.event_date,
+      created_at: item.created_at,
+    }));
 
     res.json({
       success: true,
@@ -110,8 +137,8 @@ router.get('/', authenticateToken, async (req, res) => {
           last_message_body: m.last_message_body || '',
           participant_count: m.participant_count || 0,
         })),
-        announcements: [],
-        events: [],
+        announcements: normalizedAnnouncements,
+        events: normalizedEvents,
       },
     });
   } catch (error) {

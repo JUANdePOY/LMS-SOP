@@ -17,11 +17,6 @@
  *   9. Change logs (audit trail entries)
  */
 
-const path = require('path');
-const fs = require('fs');
-const lockFile = path.join(__dirname, '.tmp', 'db-init.lock');
-try { if (fs.existsSync(lockFile)) fs.unlinkSync(lockFile); } catch (e) { /* ignore */ }
-
 const db = require('./config/database');
 const { generateSopCode } = require('./utils/sopUtils');
 

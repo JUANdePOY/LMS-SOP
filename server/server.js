@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const db = require('./config/database');
+const { ensureStartupLock } = require('./config/database');
 const { upgradeHandler, handleConnection } = require('./websocket/server');
 const { wss } = require('./websocket/server');
 const { getConnectedUserCount } = require('./websocket/clients');
@@ -11,6 +12,11 @@ const { getConnectedUserCount } = require('./websocket/clients');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 console.log('LMS-SOP Server starting...');
+
+const lockOk = ensureStartupLock();
+if (!lockOk) {
+  console.warn('Startup lock indicates another instance may already be running. Will attempt to bind anyway.');
+}
 
 const app = express();
 
@@ -246,7 +252,6 @@ app.get('/api/admin/calendar/key-source', async (req, res) => {
     const source = await getKeySource();
     res.json({ source });
   } catch (err) {
-    console.error('Failed to determine calendar key source:', err.message);
     res.status(500).json({ error: 'Failed to determine key source' });
   }
 });
@@ -304,18 +309,18 @@ const PORT = process.env.PORT || 5000;
 (function validateCalendarKey() {
   const raw = process.env.CALENDAR_TOKEN_ENCRYPTION_KEY;
   if (!raw) {
-    console.error(
-      '[Calendar] WARNING: CALENDAR_TOKEN_ENCRYPTION_KEY is not set. Google Calendar ' +
-      'tokens cannot be decrypted across restarts — users will be forced to reconnect ' +
-      'after every deploy. Set a stable 64-char hex key in the environment.'
-    );
     return;
   }
   if (!/^[0-9a-fA-F]{64}$/.test(raw)) {
-    console.error(
-      '[Calendar] WARNING: CALENDAR_TOKEN_ENCRYPTION_KEY is not a valid 64-char hex ' +
-      'string (32 bytes). Tokens encrypted with it may fail to decrypt. Fix the key value.'
-    );
+    return;
+  }
+})();
+
+(function validateVapidKeys() {
+  const publicKey = process.env.FCM_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY;
+  const privateKey = process.env.FCM_VAPID_PRIVATE_KEY || process.env.VAPID_PRIVATE_KEY;
+  if (!publicKey || !privateKey) {
+    // Push notifications are disabled until VAPID keys are configured.
   }
 })();
 
@@ -335,46 +340,53 @@ if (storage.isS3()) {
   }
 }
 
-const server = app.listen(PORT, () => {
-  console.log(`LMS-SOP Server running on port ${PORT}`);
-  console.log(`Database: ${process.env.DB_HOST}/${process.env.DB_NAME}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
-
-server.on('upgrade', upgradeHandler);
-
-wss.on('connection', (ws, req, userId) => {
-  handleConnection(ws, req, userId);
-});
-
-const heartbeatInterval = setInterval(() => {
-  wss.clients.forEach((ws) => {
-    if (!ws.isAlive) return ws.terminate();
-    ws.isAlive = false;
-    ws.ping();
+function listenWithRetry(port, retries) {
+  const server = app.listen(port, () => {
+    console.log(`LMS-SOP Server running on port ${PORT}`);
+    console.log(`Database: ${process.env.DB_HOST}/${process.env.DB_NAME}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   });
-}, 30000);
 
-server.on('close', () => {
-  clearInterval(heartbeatInterval);
-});
+  server.on('upgrade', upgradeHandler);
 
-setInterval(() => {
-  const count = getConnectedUserCount();
-  if (count > 0) {
-    console.log(`[WS] Active WebSocket connections: ${count}`);
-  }
-}, 60000);
+  wss.on('connection', (ws, req, userId) => {
+    handleConnection(ws, req, userId);
+  });
 
-server.on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    console.error(`Port ${PORT} is already in use. Another instance may already be running.`);
-    console.error('If you see multiple "LMS-SOP Server starting..." lines, stop the duplicate process.');
-    setTimeout(() => process.exit(0), 100);
-  } else {
-    console.error('Server error:', err);
-  }
-});
+  const heartbeatInterval = setInterval(() => {
+    wss.clients.forEach((ws) => {
+      if (!ws.isAlive) return ws.terminate();
+      ws.isAlive = false;
+      ws.ping();
+    });
+  }, 30000);
+
+  server.on('close', () => {
+    clearInterval(heartbeatInterval);
+  });
+
+  setInterval(() => {
+    const count = getConnectedUserCount();
+    if (count > 0) {
+      console.log(`[WS] Active WebSocket connections: ${count}`);
+    }
+  }, 60000);
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${port} is already in use (attempt ${retries}). Retrying...`);
+      if (retries > 0) {
+        setTimeout(() => listenWithRetry(port, retries - 1), 1000);
+      } else {
+        console.error('Could not bind to port after retries. Exiting.');
+        process.exit(1);
+      }
+    } else {
+      console.error('Server error:', err);
+    }
+  });
+}
+
+listenWithRetry(PORT, 5);
 
 module.exports = app;
-

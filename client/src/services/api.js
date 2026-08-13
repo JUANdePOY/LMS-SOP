@@ -86,6 +86,9 @@ api.interceptors.response.use(
     if (error.code === 'ECONNABORTED') {
       error.message = 'Request timed out. Please check your connection.';
     }
+    if (error.code === 'ECONNECTION_REFUSED' || !error.response) {
+      error.message = 'Cannot reach the server. Please check your connection or try again later.';
+    }
     return Promise.reject(error);
   }
 );
@@ -151,6 +154,8 @@ export const globalSearch = (params = {}) => api.get('/search', { params });
 export const getNotifications = (params = {}) => api.get('/notifications', { params });
 export const markNotificationsRead = (ids) => api.patch('/notifications/read', { ids });
 export const markAllNotificationsRead = () => api.patch('/notifications/read-all');
+export const deleteNotification = (id) => api.delete(`/notifications/${id}`);
+export const deleteNotifications = (ids) => api.delete('/notifications', { data: { ids } });
 
 export const getCourses = (params = {}) => api.get('/courses', { params });
 export const getCourse = (id) => api.get(`/courses/${id}`);

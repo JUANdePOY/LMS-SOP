@@ -56,16 +56,16 @@ async function resolveKey() {
         cachedKey = Buffer.from(stored, 'hex');
         return cachedKey;
       }
-    } catch (err) {
-      console.error('[Calendar] Failed to read encryption key from settings:', err.message);
+    } catch {
+      // silent fallback
     }
 
     // No key anywhere yet — generate one and persist it for future boots.
     const generated = crypto.randomBytes(32).toString('hex');
     try {
       await persistToSettings(generated);
-    } catch (err) {
-      console.error('[Calendar] Failed to persist generated encryption key:', err.message);
+    } catch {
+      // silent fallback
     }
     cachedKey = Buffer.from(generated, 'hex');
     return cachedKey;

@@ -192,12 +192,15 @@ User notification system.
 | `type` | ENUM | NO | 'info' | `info`, `warning`, `success`, `error` |
 | `is_read` | BOOLEAN | NO | FALSE | Read status |
 | `link` | VARCHAR(500) | YES | NULL | Link URL |
+| `entity_type` | VARCHAR(100) | YES | NULL | Entity type |
+| `entity_id` | INT | YES | NULL | Entity ID |
 | `created_at` | DATETIME | NO | CURRENT_TIMESTAMP | |
 
 **Indexes:**
 - `PRIMARY KEY (id)`
 - `INDEX idx_notifications_user (user_id)`
 - `INDEX idx_notifications_read (is_read)`
+- `INDEX idx_notifications_entity (entity_type, entity_id)`
 
 ---
 

@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { Bell, Info, AlertCircle, Check, BookOpen, FileText, HelpCircle, Award, BookMarked, UserPlus } from "lucide-react";
+import { Bell, Info, AlertCircle, Check, BookOpen, FileText, HelpCircle, Award, BookMarked, UserPlus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import ConfirmationDialog from "@/shared/components/ui/ConfirmationDialog";
 import NotificationBadge from "@/shared/components/ui/NotificationBadge";
 import { useNotifications } from "@/shared/stores/notificationStore.js";
+import { deleteNotifications } from "@/services/api.js";
 
 const TYPE_ICON = {
   info: Info,
@@ -64,9 +66,24 @@ function formatTime(timestamp) {
 
 export default function NotificationDropdown({ showBadge = true, onFetch, count }) {
   const [open, setOpen] = useState(false);
+  const [deleteAllOpen, setDeleteAllOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const dropdownRef = useRef(null);
   const { unreadCount, notifications, loading, fetched, fetch, markRead, markAllRead } = useNotifications();
   const navigate = useNavigate();
+
+  const handleDeleteAll = async () => {
+    setDeleting(true);
+    try {
+      await deleteNotifications([]);
+      markAllRead();
+    } catch {
+      /* error silently ignored; store retains data on failure */
+    } finally {
+      setDeleting(false);
+      setDeleteAllOpen(false);
+    }
+  };
 
   useEffect(() => {
     if (open && !loading && !fetched) {
@@ -130,13 +147,22 @@ export default function NotificationDropdown({ showBadge = true, onFetch, count 
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-neutral-200 dark:border-neutral-800">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Notifications</h3>
             {hasUnread && (
-              <button
-                type="button"
-                onClick={markAllRead}
-                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500/30 rounded"
-              >
-                Mark all read
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteAllOpen(true)}
+                  className="text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors focus:outline-none focus:ring-1 focus:ring-red-500/30 rounded"
+                >
+                  Delete all
+                </button>
+                <button
+                  type="button"
+                  onClick={markAllRead}
+                  className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors focus:outline-none focus:ring-1 focus:ring-blue-500/30 rounded"
+                >
+                  Mark all read
+                </button>
+              </div>
             )}
           </div>
 
@@ -249,6 +275,18 @@ export default function NotificationDropdown({ showBadge = true, onFetch, count 
           )}
         </div>
       )}
+
+      <ConfirmationDialog
+        open={deleteAllOpen}
+        title="Delete all notifications"
+        description="This will permanently delete all your notifications. This action cannot be undone."
+        confirmLabel="Delete all"
+        cancelLabel="Cancel"
+        onConfirm={handleDeleteAll}
+        onCancel={() => setDeleteAllOpen(false)}
+        loading={deleting}
+        variant="destructive"
+      />
     </div>
   );
 }

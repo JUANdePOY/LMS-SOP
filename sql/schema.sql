@@ -156,10 +156,13 @@ CREATE TABLE IF NOT EXISTS notifications (
   type ENUM('info','warning','success','error') NOT NULL DEFAULT 'info',
   is_read BOOLEAN NOT NULL DEFAULT FALSE,
   link VARCHAR(500) DEFAULT NULL,
+  entity_type VARCHAR(100) DEFAULT NULL,
+  entity_id INT DEFAULT NULL,
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   INDEX idx_notifications_user (user_id),
-  INDEX idx_notifications_read (is_read)
+  INDEX idx_notifications_read (is_read),
+  INDEX idx_notifications_entity (entity_type, entity_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

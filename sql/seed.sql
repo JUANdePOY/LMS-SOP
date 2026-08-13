@@ -25,9 +25,13 @@ INSERT INTO permissions (name, display_name, category) VALUES
   ('manage_sops', 'Manage SOPs', 'sops'),
   ('manage_courses', 'Manage Courses', 'courses'),
   ('manage_assessments', 'Manage Assessments', 'assessments'),
+  ('manage_announcements', 'Manage Announcements', 'announcements'),
+  ('manage_events', 'Manage Events', 'events'),
   ('view_reports', 'View Reports', 'reports'),
   ('manage_settings', 'Manage Settings', 'settings'),
-  ('view_audit_logs', 'View Audit Logs', 'audit')
+  ('view_audit_logs', 'View Audit Logs', 'audit'),
+  ('notifications.send', 'Send Notifications', 'notifications'),
+  ('notifications.broadcast', 'Broadcast Notifications', 'notifications')
 ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
 -- ============================================================
@@ -43,6 +47,10 @@ INSERT INTO role_permissions (role_name, permission_name) VALUES
   ('super_admin', 'view_reports'),
   ('super_admin', 'manage_settings'),
   ('super_admin', 'view_audit_logs'),
+  ('super_admin', 'manage_announcements'),
+  ('super_admin', 'manage_events'),
+  ('super_admin', 'notifications.send'),
+  ('super_admin', 'notifications.broadcast'),
   ('admin', 'view_dashboard'),
   ('admin', 'manage_users'),
   ('admin', 'manage_departments'),
@@ -50,11 +58,19 @@ INSERT INTO role_permissions (role_name, permission_name) VALUES
   ('admin', 'manage_courses'),
   ('admin', 'manage_assessments'),
   ('admin', 'view_reports'),
+  ('admin', 'manage_announcements'),
+  ('admin', 'manage_events'),
+  ('admin', 'notifications.send'),
+  ('admin', 'notifications.broadcast'),
   ('department_head', 'view_dashboard'),
   ('department_head', 'manage_sops'),
   ('department_head', 'manage_courses'),
   ('department_head', 'manage_assessments'),
   ('department_head', 'view_reports'),
+  ('department_head', 'manage_announcements'),
+  ('department_head', 'manage_events'),
+  ('department_head', 'notifications.send'),
+  ('department_head', 'notifications.broadcast'),
   ('employee', 'view_dashboard'),
   ('employee', 'view_reports')
 ON DUPLICATE KEY UPDATE role_name = role_name;

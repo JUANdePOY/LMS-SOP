@@ -68,6 +68,7 @@ const EmployeeDirectoryPage = lazy(() => import("@/features/employee-directory/p
 const TasksPage = lazy(() => import("@/features/task-management/pages/TasksPage"));
 const TaskDetailsPage = lazy(() => import("@/features/task-management/pages/TaskDetailsPage"));
 const MyTasksPage = lazy(() => import("@/features/task-management/pages/MyTasksPage"));
+const EmployeeSettingsPage = lazy(() => import("@/features/employee/pages/EmployeeSettings"));
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
@@ -101,9 +102,9 @@ function LMSProtectedWrapper(Component) {
   );
 }
 
-function AdminProtectedWrapper(Component) {
+function SuperAdminProtectedWrapper(Component) {
   return (
-    <ProtectedRoute allowedRoles={['super_admin', 'admin']}>
+    <ProtectedRoute allowedRoles={['super_admin']}>
       <Suspense fallback={<PageLoader />}>
         <Component />
       </Suspense>
@@ -111,9 +112,9 @@ function AdminProtectedWrapper(Component) {
   );
 }
 
-function SuperAdminProtectedWrapper(Component) {
+function AdminProtectedWrapper(Component) {
   return (
-    <ProtectedRoute allowedRoles={['super_admin']}>
+    <ProtectedRoute allowedRoles={['super_admin', 'admin']}>
       <Suspense fallback={<PageLoader />}>
         <Component />
       </Suspense>
@@ -170,12 +171,10 @@ const router = createBrowserRouter([
       { path: "my-learning/sops/:id", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeSOPView /></OnboardingGuard>), handle: { title: "SOP" } },
       { path: "profile", element: LMSProtectedWrapper(Profile), handle: { title: "Profile" } },
       { path: "profile/:userId", element: LMSProtectedWrapper(UserProfilePage), handle: { title: "Profile" } },
-      { path: "users", element: <Navigate to="/settings/users" replace /> },
       { path: "course-library", element: <Navigate to="/courses/library" replace /> },
-      { path: "settings", element: AdminProtectedWrapper(Settings), handle: { title: "Settings" } },
-      { path: "settings/users", element: AdminProtectedWrapper(UsersPanel), handle: { title: "User Management" } },
-      { path: "settings/roles", element: AdminProtectedWrapper(RolesPanel), handle: { title: "Roles & Permissions" } },
-      { path: "audit-logs", element: AdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
+      { path: "settings", element: SuperAdminProtectedWrapper(Settings), handle: { title: "Settings" } },
+      { path: "settings/roles", element: SuperAdminProtectedWrapper(RolesPanel), handle: { title: "Roles & Permissions" } },
+      { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
       { path: "notifications", element: LMSProtectedWrapper(NotificationsPage), handle: { title: "Notifications" } },
       { path: "sops", element: AdminProtectedWrapper(SOPListPage), handle: { title: "SOP Library" } },
       { path: "courses", element: LMSProtectedWrapper(Courses), handle: { title: "Course Catalog" } },
@@ -214,6 +213,7 @@ const router = createBrowserRouter([
       { path: "tasks", element: LMSProtectedWrapper(TasksPage), handle: { title: "Tasks & Projects" } },
       { path: "tasks/:id", element: LMSProtectedWrapper(TaskDetailsPage), handle: { title: "Task Details" } },
       { path: "tasks/my", element: LMSProtectedWrapper(MyTasksPage), handle: { title: "My Tasks" } },
+      { path: "employee/settings", element: EmployeeProtectedWrapper(EmployeeSettingsPage), handle: { title: "Settings" } },
     ],
   },
   {

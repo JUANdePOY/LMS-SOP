@@ -1,6 +1,7 @@
 import { useSyncExternalStore, useState, useCallback, useEffect } from "react";
 import { getNotifications, markNotificationsRead, markAllNotificationsRead } from "@/services/api.js";
 import { getConversations } from "@/features/messaging/api/message.api";
+import { playNotificationSound } from "@/shared/utils/notificationSound.js";
 
 const POLL_INTERVAL_MS = 25000;
 
@@ -40,6 +41,8 @@ let serverNotifications = [];
 let unreadServerCount = 0;
 let unreadMessageCount = 0;
 let pendingBanners = [];
+let previousUnreadServerCount = 0;
+let previousUnreadMessageCount = 0;
 
 let cachedSnapshot = null;
 
@@ -111,6 +114,10 @@ export const NotificationStore = {
       }
       serverNotifications = Array.isArray(notifications) ? notifications : prevNotifications;
       unreadServerCount = data.unread_count || 0;
+      if (unreadServerCount > previousUnreadServerCount) {
+        playNotificationSound();
+      }
+      previousUnreadServerCount = unreadServerCount;
       emitChange();
       return serverNotifications;
     } catch {
@@ -128,6 +135,10 @@ export const NotificationStore = {
       const res = await getConversations();
       const rows = Array.isArray(res?.data?.data) ? res.data.data : [];
       unreadMessageCount = rows.reduce((sum, c) => sum + (Number(c.unread_count) || 0), 0);
+      if (unreadMessageCount > previousUnreadMessageCount) {
+        playNotificationSound();
+      }
+      previousUnreadMessageCount = unreadMessageCount;
       emitChange();
     } catch {
       unreadMessageCount = prev;

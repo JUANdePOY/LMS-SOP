@@ -99,6 +99,28 @@ export function AuthProvider({ children }) {
         // ignore logout errors
       }
     }
+
+    try {
+      const reg = await navigator.serviceWorker?.ready;
+      const sub = await reg?.pushManager?.getSubscription();
+      if (sub?.endpoint) {
+      const token = session.getCurrentToken();
+      if (token) {
+        await fetch('/api/notifications/push/unsubscribe', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        });
+      }
+        await sub.unsubscribe();
+      }
+    } catch {
+      // ignore push cleanup errors during logout
+    }
+
     session.clearCurrentSession();
     setUser(null);
     setError(null);
