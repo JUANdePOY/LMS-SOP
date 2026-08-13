@@ -11,9 +11,13 @@ export async function getQuizzes(courseId, params = {}) {
   return res.json();
 }
 
-export async function getQuizById(id) {
-  const res = await fetch(`${API_BASE}/${id}`);
-  if (!res.ok) throw new Error("Failed to fetch quiz");
+export async function getAllQuizzes(params = {}) {
+  const qs = new URLSearchParams();
+  Object.entries(params).forEach(([key, val]) => {
+    if (val !== undefined && val !== null && val !== "") qs.append(key, val);
+  });
+  const res = await fetch(`${API_BASE}/all?${qs.toString()}`);
+  if (!res.ok) throw new Error("Failed to fetch quizzes");
   return res.json();
 }
 
