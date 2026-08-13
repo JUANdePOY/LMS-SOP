@@ -537,9 +537,11 @@ select option {
   }
 
   .login-card-title {
-    font-size: 1.25rem;
+    font-family: var(--font-sans);
+    font-size: 1.75rem;
     font-weight: 700;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.02em;
+    line-height: 1.2;
     color: #ffffff;
     margin: 0;
   }
@@ -716,67 +718,7 @@ select option {
     color: var(--bg-sidebar);
     font-weight: 600;
   }
-
-  .login-quick-section {
-    margin-top: 0.5rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 0.625rem;
-  }
-
-  .login-quick-label {
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    text-align: center;
-  }
-
-  .login-quick-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-  }
-
-  .login-quick-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.5rem 1rem;
-    border-radius: 0.375rem;
-    border: 1px solid var(--border);
-    background-color: var(--bg-subtle);
-    font-size: 0.8125rem;
-    font-weight: 500;
-    color: var(--text-primary);
-    cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
-  }
-
-  .login-quick-btn:hover:not(:disabled) {
-    background-color: var(--bg-surface);
-    border-color: var(--bg-sidebar);
-    transform: translateY(-1px);
-  }
-
-  .login-quick-btn:active:not(:disabled) {
-    transform: translateY(0);
-  }
-
-  .login-quick-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  .login-quick-btn svg {
-    flex-shrink: 0;
-  }
-
+  
   /* ── Page footer (below card) ── */
   .login-page-footer {
     margin-top: 1.25rem;

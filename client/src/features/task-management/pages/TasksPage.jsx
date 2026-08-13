@@ -172,7 +172,7 @@ const handleDelete = (id) => {
         </div>
         <button
           onClick={() => { setEditingTask(null); setShowForm(true); }}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-3 py-1.5 text-xs font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 transition-colors"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-active)] transition-colors shadow-sm"
         >
           <Plus size={14} />
           New Task
