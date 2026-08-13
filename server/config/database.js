@@ -770,3 +770,4 @@ initDatabase().catch((err) => {
 });
 
 module.exports = db;
+module.exports.ensureStartupLock = ensureStartupLock;
