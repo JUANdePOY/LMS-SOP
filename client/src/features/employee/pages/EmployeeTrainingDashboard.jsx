@@ -275,7 +275,7 @@ export default function EmployeeTrainingDashboard() {
 
         <PanelCard
           title={`My SOP Highlights (${department})`}
-          action={<ViewAllLink onClick={() => navigate("/sops")} />}
+          action={<ViewAllLink onClick={() => navigate(isAnyAdmin ? "/sops" : "/my-learning/sops")} />}
         >
           {dashboard.sopHighlights.length > 0 ? (
             <FadeIn>
@@ -310,7 +310,7 @@ export default function EmployeeTrainingDashboard() {
             <p className="text-xs text-neutral-400 dark:text-neutral-500">No SOPs assigned yet.</p>
           )}
           <div className="mt-4 text-center">
-            <a href="/sops" className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">View all SOPs</a>
+             <button onClick={() => navigate(isAnyAdmin ? "/sops" : "/my-learning/sops")} className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">View all SOPs</button>
           </div>
         </PanelCard>
       </div>
@@ -427,7 +427,7 @@ export default function EmployeeTrainingDashboard() {
           </div>
         </div>
         <button
-          onClick={() => navigate("/sops")}
+          onClick={() => navigate(isAnyAdmin ? "/sops" : "/my-learning/sops")}
           className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
         >
           Browse My SOPs
