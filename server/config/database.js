@@ -2,6 +2,7 @@ require('dotenv').config();
 const mysql = require('mysql2');
 const fs = require('fs');
 const path = require('path');
+const net = require('net');
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
@@ -202,7 +203,41 @@ function registerLockCleanup(lockFile) {
   process.on('SIGINT', () => { cleanup(); process.exit(0); });
 }
 
-function ensureStartupLock() {
+// Probe whether a process is actually listening on the configured port. A live
+// pid recorded in the lock file does NOT by itself prove a serving instance
+// exists: the peer may have crashed before binding, be stuck mid-boot, or the
+// lock may be a leftover from a previous deploy. Refusing to start on a
+// stale-but-alive lock would crash-loop the process manager (every restart
+// exits 1 and is immediately respawned), which is exactly the symptom seen in
+// production. We only treat the lock as "owned by a live peer" when something
+// is genuinely answering on the port.
+function probePortListening(port, host = '127.0.0.1', timeoutMs = 800) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ port, host });
+    let settled = false;
+    const settle = (listening) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(listening);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => settle(true));
+    socket.once('error', () => settle(false));
+    socket.once('timeout', () => settle(false));
+  });
+}
+
+function claimStartupLock(lockFile) {
+  fs.writeFileSync(lockFile, String(process.pid));
+  registerLockCleanup(lockFile);
+  return true;
+}
+
+// Returns true if THIS process should proceed to serve, or false if a genuine
+// live instance is already serving on the port (in which case the caller should
+// stand down). Async because it probes the port.
+async function ensureStartupLock() {
   try {
     const lockDir = path.join(__dirname, '..', '.tmp');
     if (!fs.existsSync(lockDir)) {
@@ -219,20 +254,31 @@ function ensureStartupLock() {
           return false;
         }
       })();
+
       if (peerAlive) {
-        // A live peer holds the lock: report it so the caller (server.js) can
-        // refuse to start a second instance and avoid a second connection pool
-        // multiplying the per-hour MySQL connect quota.
-        console.warn(`Another Node process (pid ${pid}) appears to already be running. Refusing to start a duplicate instance.`);
-        return false;
+        const port = parseInt(process.env.PORT, 10) || 5000;
+        const listening = await probePortListening(port);
+        if (listening) {
+          // A genuine instance is serving on the port. Refuse to start a second
+          // instance (avoids a second connection pool multiplying the per-hour
+          // MySQL connect quota) and let the caller stand down quietly.
+          console.warn(`Another live instance (pid ${pid}) is already serving on port ${port}. This duplicate process will exit.`);
+          return false;
+        }
+        // Stale lock: the recorded pid is alive but nothing is listening, so the
+        // peer cannot actually be serving. Clear it and take ownership so the
+        // app can serve again instead of being blocked forever.
+        console.warn(`Startup lock references pid ${pid}, which is alive but not serving on port ${port}. Clearing stale lock and taking over.`);
+        fs.unlinkSync(lockFile);
+      } else {
+        // Stale lock from a dead process — clear it and take ownership.
+        fs.unlinkSync(lockFile);
       }
-      // Stale lock from a crashed/removed process — clear it and take ownership.
-      fs.unlinkSync(lockFile);
     }
-    fs.writeFileSync(lockFile, String(process.pid));
-    registerLockCleanup(lockFile);
-    return true;
+    return claimStartupLock(lockFile);
   } catch {
+    // If we cannot determine lock state, prefer starting (fail open) rather
+    // than blocking every restart and crash-looping the process manager.
     return true;
   }
 }

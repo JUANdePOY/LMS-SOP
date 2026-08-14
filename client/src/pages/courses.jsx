@@ -10,6 +10,7 @@ import { StaggerList, MotionItem } from "@/shared/motion";
 import { resolveFileUrl } from "@/lib/fileUrl";
 import { ActionButton } from "@/shared/components/ui/actionIcons";
 import { useAuth } from "@/contexts/AuthContext";
+import ConfirmationDialog from "@/shared/components/ui/ConfirmationDialog";
 
 const STATUS_META = {
   published: {
@@ -527,24 +528,16 @@ export default function Courses({ departments = [] }) {
         onSuccess={handleEditSuccess}
       />
 
-      {modals.delete && deletingCourse && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl bg-white dark:bg-neutral-900 shadow-2xl p-6 space-y-4">
-            <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Delete Course</h2>
-            <p className="text-sm text-neutral-600 dark:text-neutral-300">
-               Are you sure you want to delete "{deletingCourse.title || "this course"}"? This will move the course and its modules to the trash.
-            </p>
-            <div className="flex justify-end gap-2 pt-2">
-              <button onClick={closeModals} className="rounded-lg px-4 py-2 text-sm border border-neutral-200 dark:border-neutral-700 hover:border-neutral-300 transition-all">
-                Cancel
-              </button>
-              <button onClick={handleDelete} disabled={saving} className="rounded-lg px-4 py-2 text-sm bg-red-600 text-white hover:bg-red-700 transition-all disabled:opacity-50">
-                {saving ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationDialog
+        isOpen={modals.delete && !!deletingCourse}
+        onClose={closeModals}
+        onConfirm={handleDelete}
+        title="Delete Course"
+        message={`Are you sure you want to delete "${deletingCourse?.title || "this course"}"? This will move the course and its modules to the trash.`}
+        confirmText="Delete"
+        processingText="Deleting..."
+        variant="destructive"
+      />
     </div>
   );
 }

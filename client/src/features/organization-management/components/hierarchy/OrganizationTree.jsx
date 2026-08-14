@@ -26,6 +26,7 @@ export default function OrganizationTree({
   hierarchy = [],
   searchQuery = '',
   creating = false,
+  readOnly = false,
   creatingDepartmentFor = null,
   onInlineCreateDepartment,
   onInlineCreateCategory,
@@ -53,6 +54,7 @@ export default function OrganizationTree({
             departments={filteredDepartments}
             searchActive={Boolean(searchQuery)}
             creating={creating}
+            readOnly={readOnly}
             creatingDepartmentFor={creatingDepartmentFor}
             onInlineCreateDepartment={onInlineCreateDepartment}
             onInlineCreateCategory={onInlineCreateCategory}

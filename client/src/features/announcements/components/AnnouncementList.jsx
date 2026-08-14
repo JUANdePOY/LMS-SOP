@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Megaphone, Edit, Trash2, Plus, Eye } from "lucide-react";
+import ConfirmationDialog from "@/shared/components/ui/ConfirmationDialog";
 
 const PRIORITY_COLORS = {
   low: "bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-100 border-slate-200 dark:border-slate-500/30",
   medium: "bg-[rgba(242,92,5,0.08)] text-[var(--color-primary-hover)] dark:bg-[rgba(242,92,5,0.08)]0/15 dark:text-[var(--color-primary)] border-[rgba(242,92,5,0.25)] dark:border-[rgba(242,92,5,0.30)]",
   high: "bg-warning-soft text-[var(--color-warning)] dark:bg-warning-soft dark:text-[var(--color-warning)] border-[rgba(217,163,0,0.25)] dark:border-[rgba(217,163,0,0.30)]",
-  critical: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-100 border-red-200 dark:border-red-500/30",
+  critical: "bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-100 ",
 };
 
 function stripHtml(html) {
@@ -13,15 +14,15 @@ function stripHtml(html) {
 }
 
 export default function AnnouncementList({ items, onEdit, onDelete, onCreate, canManage, onView }) {
-  const [deleteId, setDeleteId] = useState(null);
+  const [deleteItem, setDeleteItem] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
   const handleDelete = async () => {
-    if (!deleteId) return;
+    if (!deleteItem) return;
     setDeleteLoading(true);
     try {
-      await onDelete(deleteId);
-      setDeleteId(null);
+      await onDelete(deleteItem.id);
+      setDeleteItem(null);
     } finally {
       setDeleteLoading(false);
     }
@@ -72,16 +73,25 @@ export default function AnnouncementList({ items, onEdit, onDelete, onCreate, ca
               </div>
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 {!canManage && onView && (
-                  <button onClick={() => onView(item)} className="p-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onView(item); }}
+                    className="p-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300"
+                  >
                     <Eye size={14} />
                   </button>
                 )}
                 {canManage && (
                   <>
-                    <button onClick={() => onEdit(item)} className="p-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onEdit(item); }}
+                      className="p-1.5 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300"
+                    >
                       <Edit size={14} />
                     </button>
-                    <button onClick={() => setDeleteId(item.id)} className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setDeleteItem(item); }}
+                      className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600"
+                    >
                       <Trash2 size={14} />
                     </button>
                   </>
@@ -92,20 +102,16 @@ export default function AnnouncementList({ items, onEdit, onDelete, onCreate, ca
         </div>
       )}
 
-      {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl bg-white dark:bg-neutral-900 shadow-2xl p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Delete Announcement</h3>
-            <p className="text-xs text-neutral-600 dark:text-neutral-400">Are you sure you want to delete this announcement? This action cannot be undone.</p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setDeleteId(null)} className="rounded-lg px-3 py-1.5 text-xs border border-neutral-300 dark:border-neutral-600">Cancel</button>
-              <button onClick={handleDelete} disabled={deleteLoading} className="rounded-lg px-3 py-1.5 text-xs bg-red-600 text-white disabled:opacity-50">
-                {deleteLoading ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationDialog
+        isOpen={!!deleteItem}
+        variant="destructive"
+        title="Delete Announcement"
+        message="Are you sure you want to delete this announcement? This action cannot be undone."
+        confirmText={deleteLoading ? "Deleting..." : "Delete"}
+        cancelText="Cancel"
+        onConfirm={handleDelete}
+        onClose={() => !deleteLoading && setDeleteItem(null)}
+      />
     </div>
   );
 }

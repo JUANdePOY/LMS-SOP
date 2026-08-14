@@ -871,3 +871,18 @@ select option {
     -webkit-transform: rotateY(180deg);
   }
 }
+
+/* Rich (HTML) banner messages: banners show text only, so images/figures are
+   stripped. Keep links readable and trim spacing. */
+.banner-rich-message a {
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.banner-rich-message p {
+  margin: 0;
+}
+
+.banner-rich-message p + p {
+  margin-top: 0.25rem;
+}

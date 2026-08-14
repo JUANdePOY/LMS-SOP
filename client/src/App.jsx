@@ -123,6 +123,19 @@ function AdminProtectedWrapper(Component) {
   );
 }
 
+// Allows super_admin, admin, and department_head. Used for pages a department
+// head may access (SOP dashboard view-only, department-scoped SOP/Files
+// management, and department-scoped quiz management).
+function DeptHeadProtectedWrapper(Component) {
+  return (
+    <ProtectedRoute allowedRoles={['super_admin', 'admin', 'department_head']}>
+      <Suspense fallback={<PageLoader />}>
+        <Component />
+      </Suspense>
+    </ProtectedRoute>
+  );
+}
+
 function EmployeeProtectedWrapper(Component) {
   return (
     <ProtectedRoute allowedRoles={['employee']}>
@@ -179,7 +192,7 @@ const router = createBrowserRouter([
       { path: "settings/roles", element: SuperAdminProtectedWrapper(RolesPanel), handle: { title: "Roles & Permissions" } },
       { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
       { path: "notifications", element: LMSProtectedWrapper(NotificationsPage), handle: { title: "Notifications" } },
-      { path: "sops", element: AdminProtectedWrapper(SOPListPage), handle: { title: "SOP Library" } },
+      { path: "sops", element: DeptHeadProtectedWrapper(SOPListPage), handle: { title: "SOP Library" } },
       { path: "courses", element: LMSProtectedWrapper(Courses), handle: { title: "Course Catalog" } },
       { path: "courses/:id", element: LMSProtectedWrapper(CourseDetailsPage), handle: { title: "Course Details" } },
       { path: "courses/:id/builder", element: LMSProtectedWrapper(CourseBuilderPage), handle: { title: "Course Builder" } },
@@ -187,28 +200,28 @@ const router = createBrowserRouter([
       { path: "courses/view/:id/lesson/:lessonId", element: LMSProtectedWrapper(LessonPage), handle: { title: "Lesson" } },
       { path: "courses/library", element: LMSProtectedWrapper(CourseLibraryPage), handle: { title: "Course Library" } },
       { path: "courses/library/:id", element: LMSProtectedWrapper(CourseLibraryDetailsPage), handle: { title: "Course Details" } },
-      { path: "sops/:id", element: AdminProtectedWrapper(SOPWorkspacePage), handle: { title: "SOP Workspace" } },
-      { path: "sops/:id/versions/:versionId", element: AdminProtectedWrapper(SOPVersionPage), handle: { title: "SOP Version" } },
+      { path: "sops/:id", element: DeptHeadProtectedWrapper(SOPWorkspacePage), handle: { title: "SOP Workspace" } },
+      { path: "sops/:id/versions/:versionId", element: DeptHeadProtectedWrapper(SOPVersionPage), handle: { title: "SOP Version" } },
       { path: "trash", element: AdminProtectedWrapper(SOPListPage), handle: { title: "Trash" } },
       { path: "certificates", element: LMSProtectedWrapper(CertificateTemplatesPage), handle: { title: "Certificates" } },
        { path: "certificates/my-certificates/:userId?", element: LMSProtectedWrapper(MyCertificatesPage), handle: { title: "My Certificates" } },
       { path: "certificates/verify/:certificateNumber", element: LMSProtectedWrapper(VerifyCertificatePage), handle: { title: "Verify Certificate" } },
 
       // Organization Management routes
-      { path: "admin/organization", element: AdminProtectedWrapper(OrgHierarchyPage), handle: { title: "SOP Management" } },
-      { path: "admin/organization/hierarchy", element: AdminProtectedWrapper(OrgHierarchyPage), handle: { title: "Hierarchy Overview" } },
+      { path: "admin/organization", element: DeptHeadProtectedWrapper(OrgHierarchyPage), handle: { title: "SOP Management" } },
+      { path: "admin/organization/hierarchy", element: DeptHeadProtectedWrapper(OrgHierarchyPage), handle: { title: "Hierarchy Overview" } },
       { path: "admin/organization/businesses", element: AdminProtectedWrapper(OrgBusinessPage), handle: { title: "Businesses" } },
       { path: "admin/organization/departments", element: AdminProtectedWrapper(OrgDepartmentPage), handle: { title: "Departments" } },
       { path: "admin/organization/categories", element: AdminProtectedWrapper(OrgCategoryPage), handle: { title: "Categories" } },
       { path: "admin/organization/sop-management", element: AdminProtectedWrapper(RedirectToSOP), handle: { title: "SOP Management" } },
       { path: "assessments", element: LMSProtectedWrapper(AssessmentsDashboardPage), handle: { title: "My Quizzes" } },
-      { path: "assessments/manage", element: AdminProtectedWrapper(QuizzesPanel), handle: { title: "Manage Quizzes" } },
+      { path: "assessments/manage", element: DeptHeadProtectedWrapper(QuizzesPanel), handle: { title: "Manage Quizzes" } },
       { path: "assessments/leaderboard", element: LMSProtectedWrapper(QuizLeaderboardPage), handle: { title: "Leaderboard" } },
       { path: "assessments/integrity", element: SuperAdminProtectedWrapper(ViolationDashboardPage), handle: { title: "Integrity Reports" } },
-      { path: "assessments/quiz/:quizId/results", element: AdminProtectedWrapper(QuizResultsPage), handle: { title: "Quiz Results" } },
+      { path: "assessments/quiz/:quizId/results", element: DeptHeadProtectedWrapper(QuizResultsPage), handle: { title: "Quiz Results" } },
       { path: "assessments/quiz/:quizId/leaderboard", element: LMSProtectedWrapper(QuizLeaderboardPage), handle: { title: "Leaderboard" } },
       { path: "assessments/quiz/:quizId/take/:attemptId?", element: LMSProtectedWrapper(TakeQuizPage), handle: { title: "Take Quiz" } },
-      { path: "assessments/quiz/:quizId", element: AdminProtectedWrapper(QuizBuilderPage), handle: { title: "Quiz Builder" } },
+      { path: "assessments/quiz/:quizId", element: DeptHeadProtectedWrapper(QuizBuilderPage), handle: { title: "Quiz Builder" } },
       { path: "announcements", element: LMSProtectedWrapper(AnnouncementsPage), handle: { title: "Announcements" } },
       { path: "events", element: SuperAdminProtectedWrapper(EventsPage), handle: { title: "Events" } },
       { path: "messaging", element: LMSProtectedWrapper(MessagingPage), handle: { title: "Messaging" } },

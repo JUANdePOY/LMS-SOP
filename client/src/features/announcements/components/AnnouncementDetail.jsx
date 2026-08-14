@@ -1,4 +1,5 @@
 import { Megaphone, Calendar, User, Tag } from "lucide-react";
+import { resolveBodyImages } from "@/lib/fileUrl";
 
 const PRIORITY_COLORS = {
   low: "bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-100 border-slate-200 dark:border-slate-500/30",
@@ -28,7 +29,7 @@ export default function AnnouncementDetail({ item }) {
 
       <div
         className="prose dark:prose-invert prose-sm max-w-none"
-        dangerouslySetInnerHTML={{ __html: item.body || "" }}
+        dangerouslySetInnerHTML={{ __html: resolveBodyImages(item.body) }}
       />
 
       <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400 pt-2 border-t border-neutral-200 dark:border-neutral-700">

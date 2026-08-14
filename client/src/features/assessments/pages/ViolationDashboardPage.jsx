@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useViolations } from "../hooks/useViolations";
-import { getFlaggedAttempts, getViolations } from "../api/attempt.api";
+import { getFlaggedAttempts, getViolationsByUser, getViolationsForUser } from "../api/attempt.api";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/components/ui/card";
 import { Badge } from "@/shared/components/ui/badge";
@@ -53,11 +53,12 @@ function csvEscape(value) {
 }
 
 function downloadCsv(data, filename) {
-  const headers = ["id", "timestamp", "student", "quiz", "attempt", "type"];
+  const headers = ["id", "timestamp", "student", "course", "quiz", "attempt", "type"];
   const rows = data.map((v) => [
     csvEscape(v.id),
     csvEscape(v.timestamp),
     csvEscape(v.user_name || v.user_email),
+    csvEscape(v.course_title || ""),
     csvEscape(v.quiz_title || v.quiz_id),
     csvEscape(v.attempt_number),
     csvEscape(v.type),
@@ -81,16 +82,16 @@ export default function ViolationDashboardPage() {
   const { isSuperAdmin } = useAuth();
   const [filters, setFilters] = useState({});
   const [showFilters, setShowFilters] = useState(false);
-  const { data: violations, loading, error, refetch } = useViolations(filters);
+  const { data: violations, error, refetch } = useViolations(filters);
   const [flagged, setFlagged] = useState([]);
   const [flaggedLoading, setFlaggedLoading] = useState(false);
-  const [selectedAttempt, setSelectedAttempt] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailViolations, setDetailViolations] = useState([]);
   const [detailLoading, setDetailLoading] = useState(false);
   const [logSearch, setLogSearch] = useState("");
-
-  if (!isSuperAdmin) return <Navigate to="/assessments" replace />;
 
   const loadFlagged = async () => {
     setFlaggedLoading(true);
@@ -104,12 +105,29 @@ export default function ViolationDashboardPage() {
     }
   };
 
-  const openDetailModal = async (attempt) => {
-    setSelectedAttempt(attempt);
+  const loadUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const res = await getViolationsByUser(filters);
+      setUsers(res.data || []);
+    } catch {
+      setUsers([]);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(filters)]);
+
+  const openDetailModal = async (user) => {
+    setSelectedUser(user);
     setShowDetailModal(true);
     setDetailLoading(true);
     try {
-      const res = await getViolations({ attemptId: attempt.id });
+      const res = await getViolationsForUser(user.user_id, filters);
       setDetailViolations(res.data || []);
     } catch {
       setDetailViolations([]);
@@ -122,18 +140,27 @@ export default function ViolationDashboardPage() {
     setFilters((f) => ({ ...f, [field]: value || undefined }));
   };
 
-  const apply = () => refetch();
-  const clear = () => setFilters({});
+  const apply = () => {
+    refetch();
+    loadUsers();
+  };
+  const clear = () => {
+    setFilters({});
+    refetch();
+    loadUsers();
+  };
 
-  const filteredViolations = useMemo(() => {
-    if (!logSearch.trim()) return violations;
+  const filteredUsers = useMemo(() => {
+    if (!logSearch.trim()) return users;
     const q = logSearch.toLowerCase();
-    return violations.filter((v) =>
-      [v.user_name, v.user_email, v.user_id, v.quiz_title, v.quiz_id, v.type, formatMetadata(v.metadata)]
+    return users.filter((u) =>
+      [u.user_name, u.user_email, u.user_id]
         .filter(Boolean)
         .some((field) => String(field).toLowerCase().includes(q))
     );
-  }, [violations, logSearch]);
+  }, [users, logSearch]);
+
+  if (!isSuperAdmin) return <Navigate to="/assessments" replace />;
 
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -194,7 +221,7 @@ export default function ViolationDashboardPage() {
                   <tr
                     key={f.id}
                     className="border-b cursor-pointer hover:bg-amber-100/60 dark:hover:bg-amber-900/20 transition-colors"
-                    onClick={() => openDetailModal(f)}
+                    onClick={() => openDetailModal({ user_id: f.user_id, user_name: f.user_name, user_email: f.user_email })}
                   >
                     <td className="p-2">#{f.attempt_number} (id {f.id})</td>
                     <td className="p-2">{f.user_name || f.user_email}</td>
@@ -211,15 +238,18 @@ export default function ViolationDashboardPage() {
       <Card>
         <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle>Violation Log ({violations.length})</CardTitle>
-            <CardDescription>{error && <span className="text-red-500">{error}</span>}</CardDescription>
+            <CardTitle>Violations by User ({filteredUsers.length})</CardTitle>
+            <CardDescription>
+              {error && <span className="text-red-500">{error}</span>}
+              {!error && !logSearch && "One row per user. Click a row to view all integrity violations."}
+            </CardDescription>
           </div>
           <div className="relative w-full sm:w-64">
             <Search size={15} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
               value={logSearch}
               onChange={(e) => setLogSearch(e.target.value)}
-              placeholder="Search log…"
+              placeholder="Search user…"
               className="w-full rounded-lg border border-neutral-300 py-1.5 pl-8 pr-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
@@ -229,61 +259,59 @@ export default function ViolationDashboardPage() {
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10 bg-neutral-50 dark:bg-neutral-800/80 backdrop-blur">
                 <tr className="text-left text-xs text-neutral-500 border-b">
-                  <th className="p-3 font-medium">Timestamp</th>
-                  <th className="p-3 font-medium">Student</th>
-                  <th className="p-3 font-medium">Quiz</th>
-                  <th className="p-3 font-medium">Attempt #</th>
-                  <th className="p-3 font-medium">Type</th>
+                  <th className="p-3 font-medium">User</th>
+                  <th className="p-3 font-medium">Total</th>
+                  <th className="p-3 font-medium">High</th>
+                  <th className="p-3 font-medium">Medium</th>
+                  <th className="p-3 font-medium">Low</th>
+                  <th className="p-3 font-medium">Last Violation</th>
                   <th className="p-3" />
                 </tr>
               </thead>
               <tbody>
-                {loading ? (
+                {usersLoading ? (
                   Array.from({ length: 6 }).map((_, i) => (
                      <tr key={i} className="border-b animate-pulse">
-                       <td className="p-3" colSpan="6">
+                       <td className="p-3" colSpan="7">
                          <div className="h-4 w-full rounded bg-neutral-100 dark:bg-neutral-800" />
                        </td>
                      </tr>
                   ))
-                ) : filteredViolations.length === 0 ? (
+                ) : filteredUsers.length === 0 ? (
                    <tr>
-                     <td colSpan="6" className="p-10 text-center">
+                     <td colSpan="7" className="p-10 text-center">
                       <div className="flex flex-col items-center gap-2 text-neutral-400">
                         <ShieldAlert size={28} />
-                        <p className="text-sm">{logSearch ? "No matching violations." : "No violations found."}</p>
+                        <p className="text-sm">{logSearch ? "No matching users." : "No users with violations found."}</p>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  filteredViolations.map((v) => {
-                    const isFlagged = v.violation_count !== undefined && v.violation_count >= 3;
-                    const severity = TYPE_SEVERITY[v.type] || "low";
-                    const attemptRef = v.attempt_id || v.attempt_number;
+                  filteredUsers.map((u) => {
+                    const isFlagged = Number(u.violation_count) >= 3;
                     return (
                       <tr
-                        key={v.id}
-                        onClick={() => {
-                          if (attemptRef) openDetailModal({ id: v.attempt_id, attempt_number: v.attempt_number });
-                        }}
+                        key={u.user_id}
+                        onClick={() => openDetailModal(u)}
                         className={
-                          "border-b transition-colors group " +
+                          "border-b transition-colors group cursor-pointer " +
                           (isFlagged
                             ? "bg-amber-50/60 hover:bg-amber-100/70 dark:bg-amber-900/10 dark:hover:bg-amber-900/20"
-                            : "hover:bg-neutral-50 dark:hover:bg-neutral-800/50") +
-                          (attemptRef ? " cursor-pointer" : "")
+                            : "hover:bg-neutral-50 dark:hover:bg-neutral-800/50")
                         }
                       >
-                        <td className="p-3 whitespace-nowrap text-neutral-600 dark:text-neutral-300">
-                          {v.timestamp ? new Date(v.timestamp).toLocaleString() : "—"}
-                        </td>
-                        <td className="p-3">{v.user_name || v.user_email || v.user_id}</td>
-                        <td className="p-3">{v.quiz_title || v.quiz_id}</td>
-                        <td className="p-3">{v.attempt_number ?? v.attempt_id}</td>
                         <td className="p-3">
-                          <span className={"inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium " + SEVERITY_STYLES[severity]}>
-                            {typeLabel(v.type)}
-                          </span>
+                          <div className="font-medium">{u.user_name || "—"}</div>
+                          <div className="text-xs text-neutral-500">{u.user_email}</div>
+                        </td>
+                        <td className="p-3">
+                          <span className="font-semibold">{u.violation_count}</span>
+                        </td>
+                        <td className="p-3">{u.high_count || 0}</td>
+                        <td className="p-3">{u.medium_count || 0}</td>
+                        <td className="p-3">{u.low_count || 0}</td>
+                        <td className="p-3 whitespace-nowrap text-neutral-600 dark:text-neutral-300">
+                          {u.last_violation_at ? new Date(u.last_violation_at).toLocaleString() : "—"}
                         </td>
                         <td className="p-3 text-right">
                           {isFlagged && (
@@ -291,9 +319,7 @@ export default function ViolationDashboardPage() {
                               <AlertTriangle size={11} className="mr-1" /> Flagged
                             </Badge>
                           )}
-                          {attemptRef && (
-                            <ChevronRight size={16} className="inline text-neutral-300 group-hover:text-neutral-500 transition-colors" />
-                          )}
+                          <ChevronRight size={16} className="inline text-neutral-300 group-hover:text-neutral-500 transition-colors" />
                         </td>
                       </tr>
                     );
@@ -309,7 +335,7 @@ export default function ViolationDashboardPage() {
         open={showDetailModal}
         onClose={() => setShowDetailModal(false)}
         size="2xl"
-        title={selectedAttempt ? `Violations for Attempt #${selectedAttempt.attempt_number}` : "Violation Details"}
+        title={selectedUser ? `Violations for ${selectedUser.user_name || selectedUser.user_email}` : "Violation Details"}
         footer={
           <Button variant="outline" size="sm" onClick={() => setShowDetailModal(false)}>
             Close
@@ -319,9 +345,9 @@ export default function ViolationDashboardPage() {
         {detailLoading ? (
           <div className="py-8 text-center text-neutral-500">Loading violations…</div>
         ) : detailViolations.length === 0 ? (
-          <div className="py-8 text-center text-neutral-500">No violations found for this attempt.</div>
+          <div className="py-8 text-center text-neutral-500">No violations found for this user.</div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {detailViolations.map((v) => {
               const severity = TYPE_SEVERITY[v.type] || "low";
               return (
@@ -333,6 +359,11 @@ export default function ViolationDashboardPage() {
                     <span className="text-xs text-gray-500">
                       {v.timestamp ? new Date(v.timestamp).toLocaleString() : "—"}
                     </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-600 dark:text-neutral-300">
+                    <span><span className="font-medium">Course:</span> {v.course_title || "—"}</span>
+                    <span><span className="font-medium">Quiz:</span> {v.quiz_title || v.quiz_id || "—"}</span>
+                    <span><span className="font-medium">Attempt #:</span> {v.attempt_number ?? v.attempt_id}</span>
                   </div>
                   <p className="mt-2 text-xs text-gray-500">
                     {formatMetadata(v.metadata)}

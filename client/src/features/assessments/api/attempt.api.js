@@ -50,6 +50,14 @@ export async function getFlaggedAttempts(filters = {}) {
   return request(`${API_BASE}/violations/flagged?${toQuery(filters)}`);
 }
 
+export async function getViolationsByUser(filters = {}) {
+  return request(`${API_BASE}/violations/by-user?${toQuery(filters)}`);
+}
+
+export async function getViolationsForUser(userId, filters = {}) {
+  return request(`${API_BASE}/violations/user/${userId}?${toQuery(filters)}`);
+}
+
 export async function grantOverride(payload) {
   return request(`${API_BASE}/overrides`, { method: "POST", body: JSON.stringify(payload) });
 }

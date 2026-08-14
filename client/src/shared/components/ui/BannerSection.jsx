@@ -5,6 +5,55 @@ import { Award, AlertTriangle, Rocket, Megaphone, Calendar, Bell, BookOpen, File
 import { cn } from "@/lib/utils";
 import { notifyDismissBanner, useNotificationStore, enqueueBanner as enqueueGlobalBanner, clearEnqueuedBanners } from "@/shared/stores/notificationStore.js";
 
+const ALLOWED_TAGS = new Set([
+  "A", "B", "STRONG", "I", "EM", "U", "BR", "P", "SPAN", "DIV",
+  "UL", "OL", "LI", "H1", "H2", "H3", "H4", "SMALL",
+]);
+
+/**
+ * Sanitize untrusted HTML (e.g. an announcement body) for rendering inside a
+ * banner. Strips scripts, event handlers, javascript: URLs and any media
+ * (images/figures) — banners show text only. Keeps safe inline formatting and
+ * links so the message stays readable in the compact layout.
+ */
+function sanitizeRichText(html) {
+  if (!html || typeof html !== "string") return "";
+  let doc;
+  try {
+    doc = new DOMParser().parseFromString(html, "text/html");
+  } catch {
+    return "";
+  }
+
+  doc.querySelectorAll("script, style, iframe, object, embed, link, meta, img, figure").forEach((el) => el.remove());
+
+  const walk = (node) => {
+    Array.from(node.children).forEach((child) => {
+      if (!ALLOWED_TAGS.has(child.tagName)) {
+        child.replaceWith(...Array.from(child.childNodes));
+        return;
+      }
+      Array.from(child.attributes).forEach((attr) => {
+        const name = attr.name.toLowerCase();
+        if (name.startsWith("on")) {
+          child.removeAttribute(attr.name);
+        } else if (name === "href") {
+          const value = attr.value.trim();
+          if (/^\s*javascript:/i.test(value)) {
+            child.removeAttribute(attr.name);
+          }
+        } else if (name !== "href") {
+          child.removeAttribute(attr.name);
+        }
+      });
+      walk(child);
+    });
+  };
+  walk(doc.body);
+
+  return doc.body.innerHTML.trim();
+}
+
 const DEFAULT_BANNERS = [
   {
     id: "1",
@@ -30,71 +79,67 @@ const DEFAULT_BANNERS = [
 
 const TYPE_CONFIG = {
   achievement: {
-    gradient: "from-amber-500 to-amber-400",
-    gradientDark: "dark:from-amber-600 dark:to-amber-500",
-    accent: "border-l-amber-500 dark:border-l-amber-400",
-    cta: "bg-white text-amber-600 hover:bg-amber-50 hover:scale-105 hover:shadow-lg focus:ring-amber-400",
+    gradient: "from-blue-600 to-blue-500",
+    gradientDark: "dark:from-blue-700 dark:to-blue-600",
+    accent: "border-l-blue-500 dark:border-l-blue-400",
+    cta: "bg-white text-blue-600 hover:bg-blue-50 hover:scale-105 hover:shadow-lg focus:ring-blue-400",
     icon: Award,
     ariaLive: "polite",
     label: "Achievement",
   },
   alert: {
-    gradient: "from-red-600 to-red-500",
-    gradientDark: "dark:from-red-700 dark:to-red-600",
-    accent: "border-l-red-500 dark:border-l-red-400",
-    cta: "bg-white text-red-600 hover:bg-red-50 hover:scale-105 hover:shadow-lg focus:ring-red-400",
+    gradient: "from-blue-600 to-blue-500",
+    gradientDark: "dark:from-blue-700 dark:to-blue-600",
+    accent: "border-l-blue-500 dark:border-l-blue-400",
+    cta: "bg-white text-blue-600 hover:bg-blue-50 hover:scale-105 hover:shadow-lg focus:ring-blue-400",
     icon: AlertTriangle,
     ariaLive: "assertive",
     label: "Alert",
   },
   onboarding: {
-    gradient: "from-sky-600 to-sky-500",
-    gradientDark: "dark:from-sky-700 dark:to-sky-600",
-    accent: "border-l-sky-500 dark:border-l-sky-400",
-    cta: "bg-white text-sky-600 hover:bg-sky-50 hover:scale-105 hover:shadow-lg focus:ring-sky-400",
+    gradient: "from-blue-600 to-blue-500",
+    gradientDark: "dark:from-blue-700 dark:to-blue-600",
+    accent: "border-l-blue-500 dark:border-l-blue-400",
+    cta: "bg-white text-blue-600 hover:bg-blue-50 hover:scale-105 hover:shadow-lg focus:ring-blue-400",
     icon: Rocket,
     ariaLive: "polite",
     label: "Onboarding",
   },
   announcement: {
-    gradient: "from-slate-700 to-slate-600",
-    gradientDark: "dark:from-slate-800 dark:to-slate-700",
-    accent: "border-l-slate-500 dark:border-l-slate-400",
-    cta: "bg-white text-slate-700 hover:bg-slate-50 hover:scale-105 hover:shadow-lg focus:ring-slate-400",
+    gradient: "from-blue-600 to-blue-500",
+    gradientDark: "dark:from-blue-700 dark:to-blue-600",
+    accent: "border-l-blue-500 dark:border-l-blue-400",
+    cta: "bg-white text-blue-600 hover:bg-blue-50 hover:scale-105 hover:shadow-lg focus:ring-blue-400",
     icon: Megaphone,
     ariaLive: "polite",
     label: "Announcement",
   },
   event: {
-    gradient: "from-slate-700 to-slate-600",
-    gradientDark: "dark:from-slate-800 dark:to-slate-700",
-    accent: "border-l-slate-500 dark:border-l-slate-400",
-    cta: "bg-white text-slate-700 hover:bg-slate-50 hover:scale-105 hover:shadow-lg focus:ring-slate-400",
+    gradient: "from-blue-600 to-blue-500",
+    gradientDark: "dark:from-blue-700 dark:to-blue-600",
+    accent: "border-l-blue-500 dark:border-l-blue-400",
+    cta: "bg-white text-blue-600 hover:bg-blue-50 hover:scale-105 hover:shadow-lg focus:ring-blue-400",
     icon: Calendar,
     ariaLive: "polite",
     label: "Event",
   },
   new_course: {
-    gradient: "from-sky-500 via-sky-100 to-white",
-    gradientDark: "dark:from-sky-600 dark:via-sky-900 dark:to-neutral-800",
-    accent: "border-l-sky-500 dark:border-l-sky-400",
-    cta: "bg-sky-600 text-white hover:bg-sky-700 hover:scale-105 hover:shadow-lg focus:ring-sky-400",
+    gradient: "from-blue-600 to-blue-500",
+    gradientDark: "dark:from-blue-700 dark:to-blue-600",
+    accent: "border-l-blue-500 dark:border-l-blue-400",
+    cta: "bg-white text-blue-600 hover:bg-blue-50 hover:scale-105 hover:shadow-lg focus:ring-blue-400",
     icon: BookOpen,
     ariaLive: "polite",
     label: "New Course",
-    textColor: "text-slate-900",
-    textMuted: "text-slate-600",
   },
   new_sop: {
-    gradient: "from-indigo-500 via-indigo-100 to-white",
-    gradientDark: "dark:from-indigo-600 dark:via-indigo-900 dark:to-neutral-800",
-    accent: "border-l-indigo-500 dark:border-l-indigo-400",
-    cta: "bg-indigo-600 text-white hover:bg-indigo-700 hover:scale-105 hover:shadow-lg focus:ring-indigo-400",
+    gradient: "from-blue-600 to-blue-500",
+    gradientDark: "dark:from-blue-700 dark:to-blue-600",
+    accent: "border-l-blue-500 dark:border-l-blue-400",
+    cta: "bg-white text-blue-600 hover:bg-blue-50 hover:scale-105 hover:shadow-lg focus:ring-blue-400",
     icon: FileText,
     ariaLive: "polite",
     label: "New SOP",
-    textColor: "text-slate-900",
-    textMuted: "text-slate-600",
   },
 };
 
@@ -129,6 +174,18 @@ function isExpired(entry) {
   return Boolean(entry.expiresAt && Date.now() > entry.expiresAt);
 }
 
+// Renders a banner message. If the message is plain text we show it directly;
+// if it contains markup (e.g. an announcement body with an embedded image) we
+// sanitize and render it as HTML so images display instead of showing raw tags.
+function BannerMessage({ message, light }) {
+  const isRich = typeof message === "string" && /<[a-z][\s\S]*>/i.test(message);
+  const className = cn("text-xs sm:text-sm leading-relaxed banner-rich-message line-clamp-3", light ? "text-slate-600" : "text-white/80");
+  if (!isRich) {
+    return <p className={className}>{message}</p>;
+  }
+  return <div className={className} dangerouslySetInnerHTML={{ __html: sanitizeRichText(message) }} />;
+}
+
 function BannerCard({ banner, onDismiss, onSnooze, autoDismissMs, reducedMotion, navigate }) {
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -143,9 +200,8 @@ function BannerCard({ banner, onDismiss, onSnooze, autoDismissMs, reducedMotion,
   const showStep = banner.type === "onboarding" && banner.step?.current && banner.step?.total;
   const hasSnooze = Boolean(banner.snoozeMs && banner.type === "alert");
   const bannerAutoDismissMs = ["achievement", "new_course", "new_sop"].includes(banner.type) ? autoDismissMs : 0;
-  const isLightBg = ["new_course", "new_sop"].includes(banner.type);
-  const textColor = config.textColor || "text-white";
-  const textMuted = config.textMuted || "text-white/80";
+  const isLightBg = false;
+  const textColor = "text-white";
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) {
@@ -231,8 +287,8 @@ function BannerCard({ banner, onDismiss, onSnooze, autoDismissMs, reducedMotion,
         config.gradientDark,
         textColor,
         "shadow-lg",
-        "before:absolute before:inset-0 before:bg-white/10 before:backdrop-blur-xl",
-        "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-white/25"
+        "before:pointer-events-none before:absolute before:inset-0 before:bg-white/10 before:backdrop-blur-xl",
+        "after:pointer-events-none after:absolute after:bottom-0 after:left-0 after:right-0 after:h-px after:bg-white/25"
       )}
     >
       <div className="relative w-full px-4 sm:px-5">
@@ -263,7 +319,7 @@ function BannerCard({ banner, onDismiss, onSnooze, autoDismissMs, reducedMotion,
               </p>
             )}
             <p className={cn("text-sm sm:text-base font-semibold tracking-tight leading-snug", isLightBg ? "text-slate-900" : "text-white")}>{banner.title}</p>
-            <p className={cn("text-xs sm:text-sm leading-relaxed", isLightBg ? "text-slate-600" : "text-white/80")}>{banner.message}</p>
+            <BannerMessage message={banner.message} light={isLightBg} />
           </motion.div>
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -506,20 +562,10 @@ export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, auto
     enqueueBanner(snoozed);
   }, [activeBanner, enqueueBanner]);
 
-  const handleCtaClick = useCallback(() => {
-    if (!activeBanner) return;
-    if (typeof activeBanner.onClick === "function") {
-      activeBanner.onClick();
-    } else if (activeBanner.link) {
-      navigate(activeBanner.link);
-    }
-    handleDismiss(activeBanner.id, false);
-  }, [activeBanner, handleDismiss, navigate]);
+  const safeIndex = carousel ? Math.min(Math.max(currentIndex, 0), Math.max(0, visibleBanners.length - 1)) : 0;
+  const currentBanner = carousel ? visibleBanners[safeIndex] : activeBanner;
 
-  const currentBanner = carousel ? visibleBanners[currentIndex] : activeBanner;
-
-  if (!currentBanner && !carousel) return null;
-  if (!currentBanner && carousel && visibleBanners.length === 0) return null;
+  if (!currentBanner) return null;
 
   return (
     <div ref={containerRef} className="w-full mb-4">

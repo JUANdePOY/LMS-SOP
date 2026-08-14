@@ -178,7 +178,15 @@ async function resolveScope(req, res, next) {
         'SELECT department_id FROM department_scope_grants WHERE user_id = ?',
         [req.user.id]
       );
-      req.user.scoped_department_ids = grants.map((g) => g.department_id);
+      const scoped = new Set(grants.map((g) => g.department_id));
+      // Always include the head's own department so scope checks have a
+      // non-empty base even when no explicit extra grants exist. Without this,
+      // scoped_department_ids would be [] and the `|| [department_id]` fallback
+      // inside enforceSopScope / businessScopeWhere would never trigger.
+      if (req.user.department_id != null) {
+        scoped.add(req.user.department_id);
+      }
+      req.user.scoped_department_ids = [...scoped];
     }
 
     next();

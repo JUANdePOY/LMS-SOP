@@ -188,11 +188,10 @@ export default function ManageDigitalIDSheet({ open, onClose, links, onSave, onA
 
   return (
     <Modal open={open} onClose={handleClose} title="Manage Digital ID" size="lg">
-      {/* flex-col + min-h-0 lets the middle section own the scrolling
-          while the footer stays pinned outside of it, never covered
-          by content or a scrollbar. */}
-      <div className="flex flex-col max-h-[75vh] min-h-0">
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pr-1 space-y-6">
+      {/* Content scrolls via the Modal's own overflow handling — no
+          nested scroll container here, so there's only one scrollbar. */}
+      <div className="flex flex-col">
+        <div className="space-y-6">
           <ProfileContextCard />
 
           <div className="space-y-4">
@@ -232,7 +231,7 @@ export default function ManageDigitalIDSheet({ open, onClose, links, onSave, onA
           </div>
         </div>
 
-        <footer className="shrink-0 flex items-center justify-end gap-3 pt-4 mt-4 border-t border-[var(--border)]">
+        <footer className="sticky bottom-0 flex items-center justify-end gap-3 pt-4 mt-6 border-t border-[var(--border)] bg-white dark:bg-neutral-900">
           <button
             onClick={handleClose}
             className={cn(

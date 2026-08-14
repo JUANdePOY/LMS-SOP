@@ -2,11 +2,14 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const quizController = require('../controllers/quizController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, resolveScope } = require('../middleware/auth');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 router.use(authenticateToken);
+// Resolve permissions + department scope so department_head quiz creation is
+// correctly restricted to the head's own department.
+router.use(resolveScope);
 
 // Exact-path routes must be registered before parametric routes
 router.get('/', quizController.listQuizzes);

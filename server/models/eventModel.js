@@ -35,6 +35,20 @@ async function ensureTable() {
 
 ensureTable();
 
+// JSON columns must receive a JSON-encoded string (or NULL), never a raw JS
+// array — mysql2 would serialize an empty array as an empty SQL value and
+// produce a syntax error. Accepts arrays/objects/strings and falls back to NULL.
+function toJsonColumn(value) {
+  if (value == null) return null;
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value.length === 0) return null;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return null;
+  }
+}
+
 const eventModel = {
   async findAll(filters = {}) {
     const { business_id, event_type, priority, status, target_role, target_department, page = 1, limit = 20 } = filters;
@@ -85,7 +99,7 @@ const eventModel = {
     const id = crypto.randomUUID();
     await db.query(
       'INSERT INTO events (id, title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id, target_roles, target_departments) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [id, title, description, event_type || 'Training', priority || 'medium', status || 'active', event_date, end_date, location, organizer || 'CO Admin', business_id || null, target_roles || null, target_departments || null]
+      [id, title, description, event_type || 'Training', priority || 'medium', status || 'active', event_date, end_date, location, organizer || 'CO Admin', business_id || null, toJsonColumn(target_roles), toJsonColumn(target_departments)]
     );
     return this.findById(id);
   },
@@ -94,7 +108,7 @@ const eventModel = {
     const { title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id, target_roles, target_departments } = event;
     await db.query(
       'UPDATE events SET title = ?, description = ?, event_type = ?, priority = ?, status = ?, event_date = ?, end_date = ?, location = ?, organizer = ?, business_id = ?, target_roles = ?, target_departments = ? WHERE id = ?',
-      [title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id, target_roles, target_departments, id]
+      [title, description, event_type, priority, status, event_date, end_date, location, organizer, business_id, toJsonColumn(target_roles), toJsonColumn(target_departments), id]
     );
     return this.findById(id);
   },

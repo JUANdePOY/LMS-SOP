@@ -49,6 +49,7 @@ const EMPLOYEE_MENU_ITEMS = [
     items: [
       { name: "Messaging", path: "/messaging", icon: MessageSquare },
       { name: "Announcements", path: "/announcements", icon: Megaphone },
+      { name: "Events", path: "/events", icon: Calendar },
     ],
   },
   {
@@ -90,7 +91,6 @@ const MENU_ITEMS = [
           { name: "Categories", roles: ['super_admin'] },
           { name: "Files", roles: ['super_admin', 'admin', 'department_head'] },
         ],
-        roles: ['super_admin', 'admin', 'department_head'],
       },
       { name: "Course Management", path: "/courses", icon: BookOpen, roles: ['super_admin', 'admin', 'department_head'] },
       { name: "Course Library", path: "/courses/library", icon: Library, roles: LMS_ROLES },
@@ -103,9 +103,8 @@ const MENU_ITEMS = [
           { name: "Leaderboard", roles: ['super_admin', 'admin', 'department_head'] },
           { name: "Integrity", roles: ['super_admin'] },
         ],
-        roles: ['super_admin', 'admin', 'department_head'],
       },
-      { name: "Certificates", path: "/certificates", icon: Award, roles: ['super_admin', 'admin'] },
+      { name: "Certificates", path: "/certificates", icon: Award, roles: ['super_admin', 'admin', 'department_head'] },
     ],
   },
   {
@@ -114,14 +113,14 @@ const MENU_ITEMS = [
     items: [
       { name: "Messaging", path: "/messaging", icon: MessageSquare, roles: LMS_ROLES },
       { name: "Announcements", path: "/announcements", icon: Megaphone, roles: LMS_ROLES },
-      { name: "Events", path: "/events", icon: Calendar, roles: ['super_admin'] },
+      { name: "Events", path: "/events", icon: Calendar, roles: ['super_admin', 'admin'] },
     ],
   },
   {
     name: "WORKFLOW",
     group: true,
     items: [
-      { name: "Tasks & Projects", path: "/tasks", icon: CheckSquare, roles: ['super_admin', 'admin'] },
+      { name: "Tasks & Projects", path: "/tasks", icon: CheckSquare, roles: ['super_admin', 'admin', 'department_head'] },
     ],
   },
   {
@@ -149,6 +148,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
   const navigate = useNavigate();
   const roleLabel = typeof user?.role === 'string' ? user.role.replace('_', ' ') : '';
   const isEmployee = user?.role === 'employee';
+  const isDepartmentHead = user?.role === 'department_head';
   const baseMenuItems = isEmployee ? EMPLOYEE_MENU_ITEMS : MENU_ITEMS;
   const activeMenuItems = filterMenuByRole(baseMenuItems, user?.role);
   const notificationStore = useNotificationStore();
@@ -426,7 +426,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                   <User size={14} /> Profile
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); setProfileMenuOpen(false); navigate('/settings'); }}
+                  onClick={(e) => { e.stopPropagation(); setProfileMenuOpen(false); navigate(isDepartmentHead ? '/employee/settings' : '/settings'); }}
                   className="flex w-full items-center gap-3 px-3 py-2 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
                 >
                   <Settings size={14} /> Settings

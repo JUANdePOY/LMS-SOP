@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, resolveScope } = require('../middleware/auth');
 const { requirePermission, requireBusinessScope, requireDepartmentScope } = require('../middleware/scope');
 const { sopController, moduleController, attachmentController, versionController, workflowController, auditController, shareController, assignmentController, acknowledgementController, approvalWorkflowController, exportController } = require('../controllers/sopController');
 const approvalController = require('../controllers/sopApprovalController');
@@ -9,6 +9,9 @@ const sopModel = require('../models/sopModel');
 
 const router = express.Router();
 router.use(authenticateToken);
+// Resolve permissions + department scope so role/permission checks and
+// department-scoped SOP queries work for department_head on this router.
+router.use(resolveScope);
 
 async function requireSopReadScope(req, res, next) {
   try {
