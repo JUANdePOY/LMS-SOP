@@ -15,6 +15,7 @@ import {
   Megaphone,
   Calendar,
   User,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -34,11 +35,14 @@ import { useTabNotificationBadge } from "@/hooks/useTabNotificationBadge";
 const MOBILE_BOTTOM_NAV_ADMIN = [
   { name: "Home", path: "/", icon: BookOpen },
   { name: "Courses", path: "/courses", icon: BookOpen },
+  { name: "SOP", path: "/sops", icon: FileText },
+  { name: "Profile", path: "/profile", icon: User },
 ];
 
 const MOBILE_BOTTOM_NAV_EMPLOYEE = [
   { name: "Home", path: "/", icon: BookOpen },
   { name: "Library", path: "/courses/library", icon: BookOpen },
+  { name: "SOP", path: "/my-learning/sops", icon: FileText },
   { name: "Profile", path: "/profile", icon: User },
 ];
 
