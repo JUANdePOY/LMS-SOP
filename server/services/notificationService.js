@@ -78,7 +78,7 @@ async function broadcastSystemChange({ title, body, type = 'info', link, entityT
     let userIds = targetUserIds;
     if (!userIds) {
       const [userRows] = await db.query(
-        `SELECT id FROM users WHERE is_active = 1 AND role NOT IN ('super_admin') ${excludeUserId ? 'AND id <> ?' : ''}`,
+        `SELECT id FROM users WHERE is_active = 1 ${excludeUserId ? 'AND id <> ?' : ''}`,
         excludeUserId ? [excludeUserId] : []
       );
       userIds = userRows.map((u) => u.id);

@@ -114,7 +114,7 @@ export default function AppLayout() {
   const eventBadgeCount = notificationData.getUnreadCountByEntityType('event') || 0;
   const announcementBadgeCount = notificationData.getUnreadCountByEntityType('announcement') || 0;
   const systemBadgeCount = notificationData.getSystemNotificationCount() || 0;
-  useTabNotificationBadge(systemBadgeCount);
+  useTabNotificationBadge(messageBadgeCount + systemBadgeCount);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
