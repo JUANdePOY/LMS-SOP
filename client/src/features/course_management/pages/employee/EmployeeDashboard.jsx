@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getCourseList } from "@/features/course_management/api/course.api";
 import { getEnrollments } from "@/features/course_management/api/enrollment.api";
-import { Search, BookOpen, Clock, PlayCircle, TrendingUp, CheckCircle2 } from "lucide-react";
+import { getUserLeaderboard } from "@/features/course_management/api/userLeaderboard.api";
+import { Search, BookOpen, Clock, PlayCircle, TrendingUp, CheckCircle2, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StaggerList, MotionItem } from "@/shared/motion";
 import { resolveFileUrl } from "@/lib/fileUrl";
@@ -146,6 +147,10 @@ export default function EmployeeDashboard() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState('all');
+
   const fetchMyCourses = useCallback(async () => {
     try {
       const res = await getEnrollments({ limit: 100 });
@@ -175,6 +180,27 @@ export default function EmployeeDashboard() {
       console.error("Failed to load courses:", err);
     }
   }, [user]);
+
+  const fetchLeaderboard = useCallback(async () => {
+    setLeaderboardLoading(true);
+    try {
+      const res = await getUserLeaderboard(leaderboardPeriod);
+      if (res?.data) {
+        setLeaderboard(Array.isArray(res.data) ? res.data : []);
+      } else {
+        setLeaderboard([]);
+      }
+    } catch (err) {
+      console.error("Failed to load leaderboard:", err);
+      setLeaderboard([]);
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  }, [leaderboardPeriod]);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
 
   useEffect(() => {
     const load = async () => {
@@ -235,7 +261,81 @@ export default function EmployeeDashboard() {
             <StatCard title="Completed" value={completedCount} icon={CheckCircle2} color="emerald" />
             <StatCard title="Avg. Progress" value={`${myCourses.length > 0 ? Math.round(myCourses.reduce((sum, e) => sum + (e.progress_percentage || 0), 0) / myCourses.length) : 0}%`} icon={TrendingUp} color="purple" />
           </div>
+      </div>
+      </div>
+
+      {/* Employee Leaderboard */}
+      <div className="rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <Trophy size={18} className="text-[var(--color-primary)]" />
+            <h2 className="text-base sm:text-lg font-semibold text-neutral-900 dark:text-neutral-100">Employee Leaderboard</h2>
+          </div>
+          <div className="flex items-center gap-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 p-0.5">
+            {[
+              { key: 'all', label: 'All Time' },
+              { key: 'month', label: 'This Month' },
+              { key: 'week', label: 'This Week' },
+            ].map((p) => (
+              <button
+                key={p.key}
+                onClick={() => setLeaderboardPeriod(p.key)}
+                className={cn(
+                  "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                  leaderboardPeriod === p.key
+                    ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
+                    : "text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-300"
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
         </div>
+
+        {leaderboardLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-primary)] dark:border-[var(--color-primary)] border-t-transparent" />
+          </div>
+        ) : leaderboard.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-neutral-500 dark:text-neutral-400">No leaderboard data available yet.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {leaderboard.map((entry, index) => {
+              const points = entry.points != null ? Number(entry.points) : 0;
+              const displayPoints = Number.isFinite(points) ? points.toFixed(1) : '0.0';
+              const medalColors = index === 0
+                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                : index === 1
+                ? "bg-gray-100 text-gray-600 dark:bg-gray-700/50 dark:text-gray-300"
+                : index === 2
+                ? "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
+                : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500 dark:text-neutral-400";
+
+              return (
+                <div key={entry.id} className="flex items-center gap-3 sm:gap-4 p-3 rounded-xl bg-neutral-50/60 dark:bg-neutral-800/40">
+                  <div className={cn("flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold", medalColors)}>
+                    {index + 1}
+                  </div>
+                  <div className={cn("flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold", getAvatarColor(entry.full_name))}>
+                    {getInitials(entry.full_name)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{entry.full_name}</h4>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                      {entry.quizzes_completed != null ? `${entry.quizzes_completed} quiz${entry.quizzes_completed !== 1 ? 'zes' : 'y'} completed` : ''}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{displayPoints} pts</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {myCourses.length > 0 && (

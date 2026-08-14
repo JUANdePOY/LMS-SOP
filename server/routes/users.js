@@ -54,6 +54,47 @@ router.get('/stats', async (req, res) => {
   }
 });
 
+// GET /api/users/leaderboard
+router.get('/leaderboard', async (req, res) => {
+  try {
+    const { period = 'all' } = req.query;
+    const validPeriods = ['all', 'week', 'month'];
+
+    if (!validPeriods.includes(period)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid period. Use: all, week, month',
+        code: 'VALIDATION_ERROR'
+      });
+    }
+
+    let effectiveBusinessId = undefined;
+    let effectiveDepartmentId = undefined;
+
+    if (req.user.role === 'department_head') {
+      if (!req.user.department_id) {
+        return res.status(403).json({ status: 'error', message: 'No department assigned', code: 'NO_DEPARTMENT_SCOPE' });
+      }
+      effectiveDepartmentId = req.user.department_id;
+      effectiveBusinessId = req.user.business_id;
+    } else if (req.user.role !== 'super_admin') {
+      effectiveBusinessId = req.user.business_id;
+    }
+
+    const data = await authModel.getUserLeaderboard({
+      period,
+      business_id: effectiveBusinessId,
+      department_id: effectiveDepartmentId,
+      limit: 20,
+    });
+
+    res.json({ status: 'success', data, period });
+  } catch (err) {
+    console.error('User leaderboard error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch leaderboard', code: 'DB_ERROR' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   try {
     const userId = parseInt(req.params.id);

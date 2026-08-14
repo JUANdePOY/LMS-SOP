@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { getUserLeaderboard } from "@/features/course_management/api/userLeaderboard.api";
 import { cn } from "@/lib/utils";
 import {
   BookOpen, GraduationCap, ClipboardCheck, Award,
@@ -16,14 +17,6 @@ import LeaderboardPodium from "../components/dashboard/LeaderboardPodium";
 import useEmployeeTrainingDashboard from "../hooks/useEmployeeTrainingDashboard";
 import { useNotifications } from "@/shared/stores/notificationStore.js";
 import BannerSection from "@/shared/components/ui/BannerSection";
-
-const LEADERBOARD = [
-  { rank: 1, name: "Jane D.", points: 145 },
-  { rank: 2, name: "Mark T.", points: 120 },
-  { rank: 3, name: "Maria S.", points: 110 },
-  { rank: 4, name: "John R.", points: 95 },
-  { rank: 5, name: "Lisa M.", points: 90 },
-];
 
 function FilterSelect({ value, onChange, children }) {
   return (
@@ -59,6 +52,36 @@ export default function EmployeeTrainingDashboard() {
 
   const [trainingPeriod, setTrainingPeriod] = useState("month");
   const [leaderboardPeriod, setLeaderboardPeriod] = useState("month");
+
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+
+  const fetchLeaderboard = useCallback(async () => {
+    setLeaderboardLoading(true);
+    try {
+      const res = await getUserLeaderboard(leaderboardPeriod);
+      if (res?.data) {
+        const apiData = Array.isArray(res.data) ? res.data : [];
+        const transformed = apiData.map((entry, index) => ({
+          rank: index + 1,
+          name: entry.full_name,
+          points: entry.points != null ? Number(entry.points) : 0,
+        }));
+        setLeaderboard(transformed);
+      } else {
+        setLeaderboard([]);
+      }
+    } catch (err) {
+      console.error("Failed to load leaderboard:", err);
+      setLeaderboard([]);
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  }, [leaderboardPeriod]);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, [fetchLeaderboard]);
 
   const firstName = user?.full_name?.split(" ")[0] || "Learner";
   const department = user?.department || "My Department";
@@ -282,21 +305,31 @@ export default function EmployeeTrainingDashboard() {
             </FilterSelect>
           }
         >
-          <LeaderboardPodium entries={LEADERBOARD} />
-          <ul className="mt-4 divide-y divide-slate-100 dark:divide-neutral-800">
-            {LEADERBOARD.slice(3).map((user) => (
-              <li key={user.rank} className="flex items-center gap-3 py-2.5">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 dark:bg-neutral-800">
-                  {user.rank}
-                </span>
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white">
-                  {user.name.split(" ").map((p) => p[0]).join("")}
-                </div>
-                <span className="flex-1 text-sm font-medium text-neutral-900 dark:text-neutral-100">{user.name}</span>
-                <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{user.points} pts</span>
-              </li>
-            ))}
-          </ul>
+          {leaderboardLoading ? (
+            <div className="flex justify-center py-4">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent" />
+            </div>
+          ) : leaderboard.length === 0 ? (
+            <p className="text-xs text-neutral-400 dark:text-neutral-500 text-center py-4">No leaderboard data available yet.</p>
+          ) : (
+            <>
+              <LeaderboardPodium entries={leaderboard} />
+              <ul className="mt-4 divide-y divide-slate-100 dark:divide-neutral-800">
+                {leaderboard.slice(3).map((user) => (
+                  <li key={user.rank} className="flex items-center gap-3 py-2.5">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 dark:bg-neutral-800">
+                      {user.rank}
+                    </span>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white">
+                      {user.name.split(" ").map((p) => p[0]).join("")}
+                    </div>
+                    <span className="flex-1 text-sm font-medium text-neutral-900 dark:text-neutral-100">{user.name}</span>
+                    <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{user.points} pts</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <div className="mt-3 text-center">
             {!isAnyAdmin && (
               <button onClick={() => navigate("/assessments/leaderboard")} className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
