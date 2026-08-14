@@ -252,22 +252,22 @@ export default function EmployeeTrainingDashboard() {
         <PanelCard title="Announcements" action={<ViewAllLink onClick={() => navigate("/announcements")} />}>
           {dashboard.announcements.length > 0 ? (
             <FadeIn>
-            <ul className="space-y-3">
-              {dashboard.announcements.map((item, i) => (
-                <li key={item.id || i} className="group flex items-start gap-3 rounded-lg p-2 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-neutral-800/50">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-blue-500/10 dark:text-blue-400">
-                    <Megaphone size={16} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{item.title}</p>
-                    <p className="mt-0.5 text-xs text-slate-400 dark:text-neutral-500">
-                      {item.created_at ? new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''} &middot; {item.author || 'Admin'}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </FadeIn>
+              <ul className="space-y-3">
+                {dashboard.announcements.map((item, i) => (
+                  <li key={item.id || i} className="group flex items-start gap-3 rounded-lg p-2 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-neutral-800/50">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-blue-500/10 dark:text-blue-400">
+                      <Megaphone size={16} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{item.title}</p>
+                      <p className="mt-0.5 text-xs text-slate-400 dark:text-neutral-500">
+                        {item.created_at ? new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''} &middot; {item.author || 'Admin'}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </FadeIn>
           ) : (
             <p className="text-xs text-neutral-400 dark:text-neutral-500">No announcements at this time.</p>
           )}
@@ -279,33 +279,33 @@ export default function EmployeeTrainingDashboard() {
         >
           {dashboard.sopHighlights.length > 0 ? (
             <FadeIn>
-            <ul className="space-y-4">
-              {dashboard.sopHighlights.map((sop, i) => (
-                <li key={i} className="group">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{sop.title}</p>
-                    <span
-                      className={
-                        "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition-transform duration-300 group-hover:scale-105 " +
-                        (sop.status === "Completed"
-                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
-                          : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300")
-                      }
-                    >
-                      {sop.status}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center gap-3">
-                    <ProgressBar value={sop.progress} color={sop.status === "Completed" ? "emerald" : "amber"} />
-                    <span className="shrink-0 text-xs font-semibold text-neutral-900 dark:text-neutral-100">{sop.progress}%</span>
-                  </div>
-                  {sop.updated && (
-                    <p className="mt-1 text-xs text-slate-400 dark:text-neutral-500">Last updated: {sop.updated}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </FadeIn>
+              <ul className="space-y-4">
+                {dashboard.sopHighlights.map((sop, i) => (
+                  <li key={i} className="group">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{sop.title}</p>
+                      <span
+                        className={
+                          "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition-transform duration-300 group-hover:scale-105 " +
+                          (sop.status === "Completed"
+                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                            : "bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300")
+                        }
+                      >
+                        {sop.status}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center gap-3">
+                      <ProgressBar value={sop.progress} color={sop.status === "Completed" ? "emerald" : "amber"} />
+                      <span className="shrink-0 text-xs font-semibold text-neutral-900 dark:text-neutral-100">{sop.progress}%</span>
+                    </div>
+                    {sop.updated && (
+                      <p className="mt-1 text-xs text-slate-400 dark:text-neutral-500">Last updated: {sop.updated}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </FadeIn>
           ) : (
             <p className="text-xs text-neutral-400 dark:text-neutral-500">No SOPs assigned yet.</p>
           )}
@@ -326,23 +326,31 @@ export default function EmployeeTrainingDashboard() {
             </FilterSelect>
           }
         >
-          <LeaderboardPodium entries={LEADERBOARD} />
-          <FadeIn>
-          <ul className="mt-4 divide-y divide-slate-100 dark:divide-neutral-800">
-            {LEADERBOARD.slice(3).map((user) => (
-              <li key={user.rank} className="flex items-center gap-3 py-2.5">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 dark:bg-neutral-800">
-                  {user.rank}
-                </span>
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white">
-                  {user.name.split(" ").map((p) => p[0]).join("")}
-                </div>
-                <span className="flex-1 text-sm font-medium text-neutral-900 dark:text-neutral-100">{user.name}</span>
-                <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{user.points} pts</span>
-              </li>
-            ))}
-          </ul>
-          </FadeIn>
+          {leaderboardLoading ? (
+            <div className="flex justify-center py-4">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent" />
+            </div>
+          ) : leaderboard.length === 0 ? (
+            <p className="text-xs text-neutral-400 dark:text-neutral-500 text-center py-4">No leaderboard data available yet.</p>
+          ) : (
+            <>
+              <LeaderboardPodium entries={leaderboard} />
+              <ul className="mt-4 divide-y divide-slate-100 dark:divide-neutral-800">
+                {leaderboard.slice(3).map((user) => (
+                  <li key={user.rank} className="flex items-center gap-3 py-2.5">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 dark:bg-neutral-800">
+                      {user.rank}
+                    </span>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white">
+                      {user.name.split(" ").map((p) => p[0]).join("")}
+                    </div>
+                    <span className="flex-1 text-sm font-medium text-neutral-900 dark:text-neutral-100">{user.name}</span>
+                    <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{user.points} pts</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <div className="mt-3 text-center">
             {!isAnyAdmin && (
               <button onClick={() => navigate("/assessments/leaderboard")} className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
@@ -387,23 +395,23 @@ export default function EmployeeTrainingDashboard() {
       {/* Upcoming Events */}
       <PanelCard title="Upcoming Events" action={<ViewAllLink onClick={() => navigate("/events")} label="View Calendar" />}>
         {dashboard.events.length > 0 ? (
-            <FadeIn>
+          <FadeIn>
             <ul className="space-y-2">
-            {dashboard.events.map((event, i) => (
-              <li key={i} className="group flex items-center gap-3 rounded-lg p-2 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-neutral-800/50">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-blue-500/10 dark:text-blue-400">
-                  <Calendar size={16} />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{event.title}</p>
-                  <p className="text-xs text-slate-400 dark:text-neutral-500">{event.date} &middot; {event.time}</p>
-                </div>
-              </li>
-            ))}
+              {dashboard.events.map((event, i) => (
+                <li key={i} className="group flex items-center gap-3 rounded-lg p-2 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-neutral-800/50">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-blue-500/10 dark:text-blue-400">
+                    <Calendar size={16} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{event.title}</p>
+                    <p className="text-xs text-slate-400 dark:text-neutral-500">{event.date} &middot; {event.time}</p>
+                  </div>
+                </li>
+              ))}
             </ul>
           </FadeIn>
-          ) : (
-            <p className="text-xs text-neutral-400 dark:text-neutral-500">No upcoming events.</p>
+        ) : (
+          <p className="text-xs text-neutral-400 dark:text-neutral-500">No upcoming events.</p>
         )}
       </PanelCard>
 
