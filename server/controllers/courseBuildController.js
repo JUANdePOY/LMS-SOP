@@ -112,18 +112,18 @@ async function listCourses(req, res) {
 
   try {
     const [rows] = await db.query(
-      `SELECT c.*, u.full_name AS instructor_name, d.name AS department_name
+       `SELECT c.*, u.full_name AS instructor_name, d.name AS department_name
        FROM courses c
        LEFT JOIN users u ON c.instructor_id = u.id
        LEFT JOIN departments d ON c.department_id = d.id
-       WHERE ${where} AND c.is_deleted = FALSE
+       WHERE (${where}) AND c.is_deleted = FALSE
        ORDER BY c.created_at DESC
        LIMIT ? OFFSET ?`,
       [...params, limitNum, offset]
     );
 
     const [[totalRow]] = await db.query(
-      `SELECT COUNT(*) AS total FROM courses c WHERE ${where} AND c.is_deleted = FALSE`,
+       `SELECT COUNT(*) AS total FROM courses c WHERE (${where}) AND c.is_deleted = FALSE`,
       params
     );
 

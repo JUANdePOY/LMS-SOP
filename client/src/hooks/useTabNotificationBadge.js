@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-const BADGE_COLOR = "#ef4444";
+const BADGE_COLOR = "#b91c1c";
 const CANVAS_SIZE = 64;
 
 /**
@@ -59,13 +59,6 @@ export function useTabNotificationBadge(count) {
       ctx.lineWidth = 3;
       ctx.strokeStyle = "#ffffff";
       ctx.stroke();
-
-      const label = unread > 99 ? "99+" : String(unread);
-      ctx.fillStyle = "#ffffff";
-      ctx.font = `bold ${label.length > 2 ? 15 : 20}px -apple-system, Segoe UI, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(label, cx, cy + 1);
 
       link.href = canvas.toDataURL("image/png");
     };
