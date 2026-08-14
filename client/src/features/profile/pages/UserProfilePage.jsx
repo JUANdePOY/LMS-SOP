@@ -96,8 +96,9 @@ export default function UserProfilePage() {
           )}
           style={coverStyle}
         >
-          <div className="absolute inset-0 bg-black/10" />
-        </div>
+        <div className="absolute inset-0 bg-black/10" />
+        <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
+      </div>
 
         <div className="px-4 sm:px-6 pb-5">
           <div className="-mt-14 sm:-mt-16 flex flex-col sm:flex-row sm:items-end gap-4">
