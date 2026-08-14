@@ -6,6 +6,7 @@ import { BookOpen, CheckCircle2, ArrowRight, FileText, ChevronLeft, ChevronRight
 import { useEmployeeOnboarding } from "../hooks/useEmployeeOnboarding";
 import EDITOR_CONTENT_STYLES from "@/features/sop-management/utils/sopContentStyles";
 import ImageLightbox from "@/shared/components/ui/ImageLightbox";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 export default function EmployeeOnboardingPage() {
   const { user } = useAuth();
@@ -89,7 +90,7 @@ export default function EmployeeOnboardingPage() {
         </p>
       </div>
 
-      <div className="space-y-4">
+      <StaggerList className="space-y-4">
         {data?.items?.map((sop) => {
           const currentIdx = currentModuleIndex[sop.acknowledgement_id] || 0;
           const hasModules = Array.isArray(sop.modules) && sop.modules.length > 0;
@@ -98,7 +99,7 @@ export default function EmployeeOnboardingPage() {
           const isLastModule = currentIdx === (sop.modules?.length || 0) - 1;
 
           return (
-            <div key={sop.acknowledgement_id} className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900 overflow-hidden">
+            <MotionItem key={sop.acknowledgement_id} className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-700 dark:bg-neutral-900 overflow-hidden">
               <div className="p-5">
                 <div className="flex items-start gap-4">
                   <div className="mt-0.5 rounded-lg bg-blue-50 p-2 dark:bg-blue-500/10">
@@ -206,10 +207,10 @@ export default function EmployeeOnboardingPage() {
                   </div>
                 )}
               </div>
-            </div>
+            </MotionItem>
           );
         })}
-      </div>
+      </StaggerList>
 
       {data?.items?.length === 0 && !isComplete && (
         <div className="rounded-xl border border-neutral-200 bg-white p-8 text-center dark:border-neutral-700 dark:bg-neutral-900">

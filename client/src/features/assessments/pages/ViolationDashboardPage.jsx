@@ -8,6 +8,7 @@ import { Download, Filter, AlertTriangle, Search, ShieldAlert, ChevronRight } fr
 import { Modal } from "@/shared/components/ui/modal";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
+import { StaggerList, MotionItem, FadeIn } from "@/shared/motion";
 
 const VIOLATION_TYPES = ["tab_switch", "copy_attempt", "screenshot_attempt", "right_click", "fullscreen_exit", "devtools_opened"];
 
@@ -203,8 +204,9 @@ export default function ViolationDashboardPage() {
       )}
 
       {flagged.length > 0 && (
-        <Card className="border-amber-200">
-          <CardHeader>
+        <FadeIn>
+          <Card className="border-amber-200">
+            <CardHeader>
             <CardTitle className="flex items-center gap-2 text-amber-800">
               <AlertTriangle className="h-5 w-5" /> Auto-flagged Attempts (≥3 violations)
             </CardTitle>
@@ -230,13 +232,15 @@ export default function ViolationDashboardPage() {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </CardContent>
-        </Card>
+              </table>
+            </CardContent>
+          </Card>
+        </FadeIn>
       )}
 
-      <Card>
-        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <FadeIn>
+        <Card>
+          <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Violations by User ({filteredUsers.length})</CardTitle>
             <CardDescription>
@@ -329,7 +333,8 @@ export default function ViolationDashboardPage() {
             </table>
           </div>
         </CardContent>
-      </Card>
+        </Card>
+      </FadeIn>
 
       <Modal
         open={showDetailModal}
@@ -347,11 +352,11 @@ export default function ViolationDashboardPage() {
         ) : detailViolations.length === 0 ? (
           <div className="py-8 text-center text-neutral-500">No violations found for this user.</div>
         ) : (
-          <div className="space-y-4">
+          <StaggerList className="space-y-4">
             {detailViolations.map((v) => {
               const severity = TYPE_SEVERITY[v.type] || "low";
               return (
-                <div key={v.id} className="rounded-md border border-gray-200 p-3 dark:border-gray-700">
+                <MotionItem key={v.id} className="rounded-md border border-gray-200 p-3 dark:border-gray-700">
                   <div className="flex items-center justify-between gap-3">
                     <span className={"inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium " + SEVERITY_STYLES[severity]}>
                       {typeLabel(v.type)}
@@ -368,10 +373,10 @@ export default function ViolationDashboardPage() {
                   <p className="mt-2 text-xs text-gray-500">
                     {formatMetadata(v.metadata)}
                   </p>
-                </div>
+                </MotionItem>
               );
             })}
-          </div>
+          </StaggerList>
         )}
       </Modal>
     </div>

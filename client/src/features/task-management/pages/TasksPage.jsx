@@ -12,6 +12,7 @@ import TaskDetailsModal from '../components/TaskDetailsModal';
 import TaskListTable from '../components/TaskListTable';
 import TaskListTableSkeleton from '../components/TaskListTableSkeleton';
 import TaskForm from '../components/TaskForm';
+import { StaggerList, MotionItem, FadeIn } from "@/shared/motion";
 
 export default function TasksPage() {
   const { isAnyAdmin } = useAuth();
@@ -181,17 +182,17 @@ const handleDelete = (id) => {
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <StaggerList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
           {statItems.map((stat) => (
-            <div key={stat.label} className={cn("rounded-lg border border-[var(--border)] px-3 py-2.5", stat.bg)}>
+            <MotionItem key={stat.label} className={cn("rounded-lg border border-[var(--border)] px-3 py-2.5", stat.bg)}>
               <div className="flex items-center gap-2">
                 <stat.icon size={14} className={stat.color} />
                 <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400">{stat.label}</p>
               </div>
               <p className="text-lg font-bold text-neutral-900 dark:text-neutral-100 mt-1">{stat.value}</p>
-            </div>
+            </MotionItem>
           ))}
-        </div>
+        </StaggerList>
       )}
 
       {/* Filters */}
@@ -250,17 +251,19 @@ const handleDelete = (id) => {
           )}
         </div>
       ) : (
-        <TaskListTable
-          tasks={tasks}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          onStatusChange={handleStatusChange}
-          onInlineUpdate={handleInlineUpdate}
-          onCreateTask={create}
-          onViewTask={(task) => setViewingTaskId(task.id)}
-          onProgressChange={handleProgressChange}
-          canManage
-        />
+        <FadeIn>
+          <TaskListTable
+            tasks={tasks}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+            onStatusChange={handleStatusChange}
+            onInlineUpdate={handleInlineUpdate}
+            onCreateTask={create}
+            onViewTask={(task) => setViewingTaskId(task.id)}
+            onProgressChange={handleProgressChange}
+            canManage
+          />
+        </FadeIn>
       )}
 
       <TaskForm

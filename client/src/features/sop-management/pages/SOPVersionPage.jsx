@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '@/lib/api';
+import { StaggerList, MotionItem, FadeIn } from '@/shared/motion';
 
 function SOPVersionPage() {
   const { id, versionId } = useParams();
@@ -62,14 +63,14 @@ function SOPVersionPage() {
         </p>
       </div>
       <h2 className="font-medium mb-2">Modules</h2>
-      <div className="space-y-2">
+      <StaggerList className="space-y-2">
         {modules.map((mod) => (
-          <div key={mod.id} className="border rounded p-3">
+          <MotionItem key={mod.id} className="border rounded p-3">
             <h3 className="font-medium">{mod.title}</h3>
             <p className="text-sm text-gray-600">{mod.content?.replace(/<[^>]*>/g, '')?.substring(0, 200)}</p>
-          </div>
+          </MotionItem>
         ))}
-      </div>
+      </StaggerList>
       <div className="mt-6">
         <button
           onClick={handleRestore}

@@ -1,5 +1,7 @@
+import { useState, useRef, useCallback } from "react";
 import { Megaphone, Calendar, User, Tag } from "lucide-react";
 import { resolveBodyImages } from "@/lib/fileUrl";
+import ImageLightbox from "@/shared/components/ui/ImageLightbox";
 
 const PRIORITY_COLORS = {
   low: "bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-100 border-slate-200 dark:border-slate-500/30",
@@ -9,6 +11,20 @@ const PRIORITY_COLORS = {
 };
 
 export default function AnnouncementDetail({ item }) {
+  const [lightboxSrc, setLightboxSrc] = useState(null);
+  const bodyRef = useRef(null);
+
+  const handleBodyClick = useCallback((event) => {
+    const target = event.target;
+    if (target && target.tagName === "IMG") {
+      const src = target.currentSrc || target.src;
+      if (src) {
+        event.preventDefault();
+        setLightboxSrc(src);
+      }
+    }
+  }, []);
+
   if (!item) return null;
 
   return (
@@ -28,9 +44,13 @@ export default function AnnouncementDetail({ item }) {
       </div>
 
       <div
-        className="prose dark:prose-invert prose-sm max-w-none"
+        ref={bodyRef}
+        onClick={handleBodyClick}
+        className="prose dark:prose-invert prose-sm max-w-none [&_img]:cursor-zoom-in"
         dangerouslySetInnerHTML={{ __html: resolveBodyImages(item.body) }}
       />
+
+      <ImageLightbox src={lightboxSrc} alt={item.title} onClose={() => setLightboxSrc(null)} />
 
       <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-500 dark:text-neutral-400 pt-2 border-t border-neutral-200 dark:border-neutral-700">
         <span className="inline-flex items-center gap-1">

@@ -12,6 +12,7 @@ import { listCourseCertificates, linkCertificateToCourse, unlinkCertificateFromC
 import { enqueueBanner } from "@/shared/stores/notificationStore.js";
 import * as session from "@/services/session";
 import { useAuth } from "@/contexts/AuthContext";
+import { FadeIn } from "@/shared/motion";
 
 function authHeaders() {
   const token = session.getCurrentToken();
@@ -865,7 +866,7 @@ export default function CourseBuilderPage() {
           </div>
         </aside>
 
-        <main className="flex-1 min-w-0">
+        <FadeIn as="main" className="flex-1 min-w-0">
           {selectedLesson ? (
             <LessonEditor
               lesson={selectedLesson}
@@ -931,7 +932,7 @@ export default function CourseBuilderPage() {
               }}
             />
           )}
-        </main>
+        </FadeIn>
 
         <aside
           className={`

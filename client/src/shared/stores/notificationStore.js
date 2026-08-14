@@ -340,6 +340,12 @@ export function notifyDismissBanner(id) {
   NotificationStore.dismiss(id);
 }
 
+export function notifyHideBanner(id) {
+  if (dismissed.includes(id)) return;
+  dismissed = [...dismissed, id];
+  emitChange();
+}
+
 export function notifyDismissAllBanners(ids) {
   NotificationStore.dismissAll(ids);
 }

@@ -7,6 +7,7 @@ import { useToast } from "@/shared/components/ui/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { resolveFileUrl } from "@/lib/fileUrl";
 import { cn } from "@/lib/utils";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 function ProfileRow({ icon: Icon, label, value }) {
   if (!value) return null;
@@ -169,11 +170,13 @@ export default function UserProfilePage() {
             {rows.length === 0 ? (
               <p className="text-sm text-neutral-500 dark:text-neutral-400">No intro details yet.</p>
             ) : (
-              <div className="space-y-3">
+              <StaggerList className="space-y-3">
                 {rows.map((row) => (
-                  <ProfileRow key={row.label} {...row} />
+                  <MotionItem key={row.label}>
+                    <ProfileRow {...row} />
+                  </MotionItem>
                 ))}
-              </div>
+              </StaggerList>
             )}
           </div>
         </div>

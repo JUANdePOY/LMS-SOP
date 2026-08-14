@@ -49,7 +49,6 @@ const EMPLOYEE_MENU_ITEMS = [
     items: [
       { name: "Messaging", path: "/messaging", icon: MessageSquare },
       { name: "Announcements", path: "/announcements", icon: Megaphone },
-      { name: "Events", path: "/events", icon: Calendar },
     ],
   },
   {
@@ -426,7 +425,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
                   <User size={14} /> Profile
                 </button>
                 <button
-                  onClick={(e) => { e.stopPropagation(); setProfileMenuOpen(false); navigate(isDepartmentHead ? '/employee/settings' : '/settings'); }}
+                  onClick={(e) => { e.stopPropagation(); setProfileMenuOpen(false); navigate(isEmployee ? '/employee/settings' : '/settings'); }}
                   className="flex w-full items-center gap-3 px-3 py-2 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
                 >
                   <Settings size={14} /> Settings

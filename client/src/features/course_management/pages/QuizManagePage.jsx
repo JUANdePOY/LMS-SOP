@@ -8,6 +8,7 @@ import CreateQuizModal from "../components/modals/CreateQuizModal";
 import { Card } from "@/shared/components/ui/card";
 import { Button } from "@/shared/components/ui/button";
 import { Plus, RefreshCw, AlertCircle, LayoutList, Grid as GridIcon } from "lucide-react";
+import { StaggerList, MotionItem, FadeIn } from "@/shared/motion";
 
 export default function QuizManagePage() {
   const { courseId } = useParams();
@@ -118,21 +119,25 @@ export default function QuizManagePage() {
       )}
 
       {viewMode === "table" ? (
-        <QuizTable quizzes={quizzes} loading={loading} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} onTogglePublish={handleTogglePublish} busy={busy} />
+        <FadeIn>
+          <QuizTable quizzes={quizzes} loading={loading} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} onTogglePublish={handleTogglePublish} busy={busy} />
+        </FadeIn>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <StaggerList className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {loading ? (
             <>
               {[...6].map((_, i) => (
-                <div key={i} className="h-44 bg-neutral-200 dark:bg-neutral-700 rounded-xl animate-pulse" />
+                <MotionItem key={i} className="h-44 bg-neutral-200 dark:bg-neutral-700 rounded-xl animate-pulse" />
               ))}
             </>
           ) : (
             quizzes?.map((quiz) => (
-              <QuizCard key={quiz.id} quiz={quiz} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} onTogglePublish={handleTogglePublish} busy={busy} />
+              <MotionItem key={quiz.id}>
+                <QuizCard quiz={quiz} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} onTogglePublish={handleTogglePublish} busy={busy} />
+              </MotionItem>
             ))
           )}
-        </div>
+        </StaggerList>
       )}
 
       <CreateQuizModal open={open} onClose={() => setOpen(false)} onSubmit={handleCreateQuiz} />

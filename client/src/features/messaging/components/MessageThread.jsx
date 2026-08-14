@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, Loader2, Check, CheckCheck, Users, Trash2 } from "lucide-react";
+import { Send, Loader2, Check, CheckCheck, Users, Trash2, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/shared/components/ui/Avatar";
 import {
@@ -29,7 +29,7 @@ function dayLabel(dateStr) {
   return d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
 
-function Header({ conversation }) {
+function Header({ conversation, onBack }) {
   const [confirming, setConfirming] = useState(false);
   const isGroup = conversation?.type === "group_forum";
   const name = getConversationDisplayName(conversation, conversation?.current_user_id);
@@ -40,8 +40,17 @@ function Header({ conversation }) {
     : (other?.role ? other.role.replace("_", " ") : "Member");
 
   return (
-    <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-4 py-2.5">
-      <div className="flex items-center gap-3 min-w-0">
+    <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-700 px-3 py-2.5 sm:px-4">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+        {onBack && (
+          <button
+            onClick={onBack}
+            aria-label="Back to conversations"
+            className="md:hidden flex h-9 w-9 shrink-0 items-center justify-center -ml-1 rounded-full text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+          >
+            <ChevronLeft size={20} />
+          </button>
+        )}
         <div className="relative shrink-0">
           {isGroup ? (
             <span
@@ -107,7 +116,7 @@ function Header({ conversation }) {
   );
 }
 
-export default function MessageThread({ conversation, onSend, loading, onMarkAllRead, onDelete }) {
+export default function MessageThread({ conversation, onSend, loading, onMarkAllRead, onDelete, onBack }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
@@ -157,7 +166,7 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
 
   return (
     <div className="flex h-full flex-col">
-      <Header conversation={enriched} />
+      <Header conversation={enriched} onBack={onBack} />
 
       {hasUnread && onMarkAllRead && (
         <div className="flex justify-center pt-2">
@@ -236,7 +245,7 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSend} className="border-t border-neutral-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-900">
+      <form onSubmit={handleSend} className="border-t border-neutral-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-900 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <div className="flex items-center gap-2">
           <input
             type="text"

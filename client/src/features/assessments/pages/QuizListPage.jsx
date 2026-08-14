@@ -9,7 +9,7 @@ import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/card";
 import CreateQuizModal from "../components/modals/CreateQuizModal";
-import { StaggerList, MotionItem } from "@/shared/motion";
+import { StaggerList, MotionItem, FadeIn } from "@/shared/motion";
 import {
   Grid as GridIcon,
   List,
@@ -370,7 +370,9 @@ export default function QuizListPage() {
           ))}
         </StaggerList>
       ) : (
-        <QuizTable quizzes={quizzes} onTogglePublish={handleTogglePublish} onDelete={requestDelete} busy={busy} />
+        <FadeIn>
+          <QuizTable quizzes={quizzes} onTogglePublish={handleTogglePublish} onDelete={requestDelete} busy={busy} />
+        </FadeIn>
       )}
 
       {pagination && pagination.totalPages > 1 && (

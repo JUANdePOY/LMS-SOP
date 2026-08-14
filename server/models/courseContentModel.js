@@ -31,34 +31,44 @@ async function findById(id) {
   return rows[0] || null;
 }
 
+function buildBunnyUrl(bunnyLibraryId, bunnyVideoId) {
+  if (!bunnyLibraryId || !bunnyVideoId) return null;
+  return `https://iframe.mediadelivery.net/embed/${bunnyLibraryId}/${bunnyVideoId}`;
+}
+
 async function create(contentData) {
   const {
     module_id, title, type, description, order_index, url, duration, is_required, allow_access_after, quiz_id, certificate_template_id,
+    bunny_library_id, bunny_video_id,
   } = contentData;
+
+  const resolvedUrl = url ?? buildBunnyUrl(bunny_library_id, bunny_video_id);
 
   const [result] = await db.query(
     `INSERT INTO module_content (
-      module_id, title, type, description, order_index, url, duration, is_required, allow_access_after, quiz_id, certificate_template_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      module_id, title, type, description, order_index, url, duration, is_required, allow_access_after, quiz_id, certificate_template_id, bunny_library_id, bunny_video_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       module_id,
       title,
       type || 'reading',
       description ?? null,
       order_index ?? 0,
-      url ?? null,
+      resolvedUrl ?? null,
       duration ?? null,
       is_required ?? true,
       allow_access_after ?? null,
       quiz_id ? parseInt(quiz_id, 10) : null,
       certificate_template_id ? parseInt(certificate_template_id, 10) : null,
+      bunny_library_id ?? null,
+      bunny_video_id ?? null,
     ]
   );
   return result.insertId;
 }
 
 async function update(id, updates) {
-  const allowed = ['title', 'type', 'description', 'order_index', 'url', 'duration', 'is_required', 'allow_access_after', 'quiz_id', 'certificate_template_id'];
+  const allowed = ['title', 'type', 'description', 'order_index', 'url', 'duration', 'is_required', 'allow_access_after', 'quiz_id', 'certificate_template_id', 'bunny_library_id', 'bunny_video_id'];
   const sets = [];
   const params = [];
 
@@ -67,6 +77,18 @@ async function update(id, updates) {
       sets.push(`${key} = ?`);
       params.push(updates[key]);
     }
+  }
+
+  const hasBunnyLibrary = Object.prototype.hasOwnProperty.call(updates, 'bunny_library_id');
+  const hasBunnyVideo = Object.prototype.hasOwnProperty.call(updates, 'bunny_video_id');
+  const hasExplicitUrl = Object.prototype.hasOwnProperty.call(updates, 'url');
+  if ((hasBunnyLibrary || hasBunnyVideo) && !hasExplicitUrl) {
+    const derivedUrl = buildBunnyUrl(
+      hasBunnyLibrary ? updates.bunny_library_id : null,
+      hasBunnyVideo ? updates.bunny_video_id : null
+    );
+    sets.push('url = ?');
+    params.push(derivedUrl);
   }
 
   if (!sets.length) return 0;

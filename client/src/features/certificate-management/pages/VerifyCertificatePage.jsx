@@ -8,6 +8,7 @@ import { Label } from '@/shared/components/ui/label';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useVerifyCertificate } from '@/features/certificate-management/hooks/useIssuances';
 import { ISSUANCE_STATUSES } from '@/features/certificate-management/constants/certificateSections';
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 export default function VerifyCertificatePage() {
   const { certificateNumber } = useParams();
@@ -83,16 +84,16 @@ export default function VerifyCertificatePage() {
           {certificate.resolved_sections && (
             <div className="mt-4">
               <p className="text-sm font-medium">Certificate Details:</p>
-              <div className="mt-2 rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-800">
+              <StaggerList className="mt-2 rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-800">
                 {Object.entries(certificate.resolved_sections).map(([key, data]) => (
                   data.text && (
-                    <div key={key} className="mb-1">
+                    <MotionItem key={key} className="mb-1">
                       <span className="font-medium capitalize">{key.replace(/_/g, ' ')}:</span>{' '}
                       {data.text}
-                    </div>
+                    </MotionItem>
                   )
                 ))}
-              </div>
+              </StaggerList>
             </div>
           )}
           {certificate.pdf_storage_path && (

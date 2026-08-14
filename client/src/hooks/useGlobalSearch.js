@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useDebounce } from '@/hooks/useDebounce';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { globalSearch } from '@/services/api';
 
 export function useGlobalSearch() {
@@ -9,7 +9,6 @@ export function useGlobalSearch() {
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const location = useLocation();
   const navigate = useNavigate();
 
   const debouncedQuery = useDebounce(query, 350);

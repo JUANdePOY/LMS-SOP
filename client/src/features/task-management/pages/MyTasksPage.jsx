@@ -8,6 +8,7 @@ import { TASK_STATUSES } from '../constants/taskConstants';
 import TaskListTable from '../components/TaskListTable';
 import TaskListTableSkeleton from '../components/TaskListTableSkeleton';
 import TaskDetailsModal from '../components/TaskDetailsModal';
+import { FadeIn } from "@/shared/motion";
 
 export default function MyTasksPage() {
   const { isAnyAdmin } = useAuth();
@@ -100,13 +101,15 @@ export default function MyTasksPage() {
           <p className="text-sm text-[var(--text-muted)] mb-1">No tasks assigned to you.</p>
         </div>
       ) : (
-        <TaskListTable
-          tasks={tasks}
-          onStatusChange={handleStatusChange}
-          onViewTask={(task) => setViewingTaskId(task.id)}
-          onProgressChange={handleProgressChange}
-          canManage={false}
-        />
+        <FadeIn>
+          <TaskListTable
+            tasks={tasks}
+            onStatusChange={handleStatusChange}
+            onViewTask={(task) => setViewingTaskId(task.id)}
+            onProgressChange={handleProgressChange}
+            canManage={false}
+          />
+        </FadeIn>
       )}
 
       <TaskDetailsModal

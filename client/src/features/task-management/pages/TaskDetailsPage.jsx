@@ -13,6 +13,7 @@ import CommentSection from '../components/CommentSection';
 import CommentInput from '../components/CommentInput';
 import ProgressModal from '../components/ProgressModal';
 import { PRIORITY_STYLES, STATUS_STYLES } from '../constants/taskConstants';
+import { FadeIn } from "@/shared/motion";
 
 const TABS = [
   { id: 'info', label: 'Info', icon: BarChart3 },
@@ -100,6 +101,7 @@ export default function TaskDetailsPage() {
         </Link>
       </div>
 
+      <FadeIn>
       <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-5 shadow-sm mb-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -223,6 +225,7 @@ export default function TaskDetailsPage() {
           )}
         </div>
       </div>
+      </FadeIn>
 
       <ProgressModal open={showProgress} onClose={() => setShowProgress(false)} onSubmit={updateProgress} saving={saving} taskId={task?.id} initialProgress={task?.progress?.[0]} />
 

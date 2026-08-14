@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 const STATUS_STYLES = {
   Draft: "bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300",
@@ -213,9 +214,9 @@ export default function EmployeeSOPView() {
                 <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-1">This SOP has no published modules.</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <StaggerList className="space-y-4">
                 {modules.map((mod, idx) => (
-                  <div key={mod.id} className="rounded-xl border border-neutral-200 dark:border-neutral-700 p-5">
+                  <MotionItem key={mod.id} className="rounded-xl border border-neutral-200 dark:border-neutral-700 p-5">
                     <div className="flex items-center gap-2 mb-3">
                       <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-bold">
                         {idx + 1}
@@ -223,11 +224,11 @@ export default function EmployeeSOPView() {
                       <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">{mod.title}</h3>
                     </div>
                      {mod.content && (
-                       <div className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed ml-8" dangerouslySetInnerHTML={{ __html: mod.content }} />
-                     )}
-                  </div>
+                        <div className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed ml-8" dangerouslySetInnerHTML={{ __html: mod.content }} />
+                      )}
+                  </MotionItem>
                 ))}
-              </div>
+              </StaggerList>
             )}
           </div>
         </div>

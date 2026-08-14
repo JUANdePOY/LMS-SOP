@@ -30,6 +30,7 @@ import UserAvatar from "@/shared/components/ui/Avatar";
 import { resolveFileUrl } from "@/lib/fileUrl";
 import { cn } from "@/lib/utils";
 import AppearanceSettings from "@/features/employee/components/AppearanceSettings";
+import { StaggerList, MotionItem, FadeIn } from "@/shared/motion";
 
 const PASSWORD_MIN_LENGTH = 8;
 
@@ -154,11 +155,11 @@ function PasswordStrengthIndicator({ password }) {
           style={{ width: `${pct}%` }}
         />
       </div>
-      <div className="space-y-1">
+      <StaggerList className="space-y-1">
         {PASSWORD_RULES.map((rule) => {
           const ok = rule.test(password);
           return (
-            <div
+            <MotionItem
               key={rule.label}
               className="flex items-center gap-1.5 text-xs"
             >
@@ -172,10 +173,10 @@ function PasswordStrengthIndicator({ password }) {
               >
                 {rule.label}
               </span>
-            </div>
+            </MotionItem>
           );
         })}
-      </div>
+      </StaggerList>
       {allValid && (
         <p className="text-xs text-green-600 flex items-center gap-1">
           <Info size={12} />
@@ -382,6 +383,7 @@ export default function EmployeeSettings() {
   }
 
   return (
+    <FadeIn>
     <div className="flex flex-col gap-6">
       {/* Profile + Avatar */}
       <Card>
@@ -616,5 +618,6 @@ export default function EmployeeSettings() {
         </Card>
       )}
     </div>
+    </FadeIn>
   );
 }

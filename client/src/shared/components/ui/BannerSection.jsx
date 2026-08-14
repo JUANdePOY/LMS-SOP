@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Award, AlertTriangle, Rocket, Megaphone, Calendar, Bell, BookOpen, FileText, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { notifyDismissBanner, useNotificationStore, enqueueBanner as enqueueGlobalBanner, clearEnqueuedBanners } from "@/shared/stores/notificationStore.js";
+import { notifyDismissBanner, notifyHideBanner, useNotificationStore, enqueueBanner as enqueueGlobalBanner, clearEnqueuedBanners } from "@/shared/stores/notificationStore.js";
 
 const ALLOWED_TAGS = new Set([
   "A", "B", "STRONG", "I", "EM", "U", "BR", "P", "SPAN", "DIV",
@@ -539,14 +539,17 @@ export default function BannerSection({ items = DEFAULT_BANNERS, onDismiss, auto
 
   const handleDismiss = useCallback(
     (id, persist = true) => {
-      const banner = activeBanner;
-      if (persist && banner?.persistDismiss && banner.id) {
-        notifyDismissBanner(banner.id);
+      if (!id) return;
+      const banner = activeBanner && activeBanner.id === id ? activeBanner : visibleBanners.find((b) => b.id === id);
+      if (banner?.persistDismiss && persist) {
+        notifyDismissBanner(id);
+      } else {
+        notifyHideBanner(id);
       }
       setActiveBanner(null);
       onDismiss?.(id);
     },
-    [activeBanner, onDismiss]
+    [activeBanner, visibleBanners, onDismiss]
   );
 
   const handleSnooze = useCallback(() => {

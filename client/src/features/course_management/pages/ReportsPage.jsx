@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useCourseReport } from "../hooks/useCourseReport";
+import { FadeIn } from "@/shared/motion";
 
 export default function ReportsPage() {
   const { courseId } = "reports";
@@ -14,9 +15,9 @@ export default function ReportsPage() {
         <option value="enrollment">Enrollment</option>
         <option value="grades">Grades</option>
       </select>
-      <div className="rounded-xl border border-[var(--border)] bg-white dark:bg-neutral-900 p-4">
+      <FadeIn className="rounded-xl border border-[var(--border)] bg-white dark:bg-neutral-900 p-4">
         <pre className="text-xs text-neutral-600 whitespace-pre-wrap">{JSON.stringify(data, null, 2)}</pre>
-      </div>
+      </FadeIn>
     </div>
   );
 }

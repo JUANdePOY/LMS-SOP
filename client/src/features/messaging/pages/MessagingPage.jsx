@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { MessageSquare } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
 import { useConversations, useMessages } from "../hooks/useMessages";
@@ -11,6 +12,7 @@ import ConversationList from "../components/ConversationList";
 import MessageThread from "../components/MessageThread";
 import NewConversationModal from "../components/NewConversationModal";
 import MessengerHeader from "../components/MessengerHeader";
+import { FadeIn } from "@/shared/motion";
 
 const FILTER = {
   ALL: "all",
@@ -181,8 +183,11 @@ export default function MessagingPage() {
         <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Communicate with your team members</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100vh-180px)]">
-        <div className="md:col-span-1 overflow-hidden fb-card flex flex-col">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100dvh-180px)] md:h-[calc(100vh-180px)]">
+        <div className={cn(
+          "md:col-span-1 overflow-hidden fb-card flex flex-col",
+          selectedConversation ? "hidden md:flex" : "flex"
+        )}>
           <MessengerHeader
             filters={filters}
             filter={filter}
@@ -197,21 +202,27 @@ export default function MessagingPage() {
                 Loading conversations...
               </div>
             ) : (
-              <ConversationList
-                conversations={filteredConversations}
-                onSelect={handleSelectConversation}
-                selectedId={selectedConversation?.id}
-                currentUserId={user?.id}
-                onDelete={handleDeleteConversation}
-              />
+              <FadeIn>
+                <ConversationList
+                  conversations={filteredConversations}
+                  onSelect={handleSelectConversation}
+                  selectedId={selectedConversation?.id}
+                  currentUserId={user?.id}
+                  onDelete={handleDeleteConversation}
+                />
+              </FadeIn>
             )}
           </div>
         </div>
-        <div className="md:col-span-2 overflow-hidden fb-card">
+        <div className={cn(
+          "md:col-span-2 overflow-hidden fb-card",
+          selectedConversation ? "flex" : "hidden md:flex"
+        )}>
           <MessageThread
             conversation={{ ...selectedConversation, messages, current_user_id: user?.id }}
             onSend={handleSend}
             loading={msgLoading}
+            onBack={() => setSelectedConversation(null)}
             onMarkAllRead={() => {
               markAllAsRead(user?.id).then(() => refreshConversations()).catch(() => {});
             }}

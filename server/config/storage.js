@@ -303,6 +303,7 @@ module.exports = {
   isS3,
   isExternalUrl,
   saveFile,
+  dbSave,
   deleteFile,
   readFile,
   streamFile,

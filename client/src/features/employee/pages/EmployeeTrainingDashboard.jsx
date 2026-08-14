@@ -17,6 +17,15 @@ import LeaderboardPodium from "../components/dashboard/LeaderboardPodium";
 import useEmployeeTrainingDashboard from "../hooks/useEmployeeTrainingDashboard";
 import { useNotifications } from "@/shared/stores/notificationStore.js";
 import BannerSection from "@/shared/components/ui/BannerSection";
+import { StaggerList, MotionItem, FadeIn } from "@/shared/motion";
+
+const LEADERBOARD = [
+  { rank: 1, name: "Jane D.", points: 145 },
+  { rank: 2, name: "Mark T.", points: 120 },
+  { rank: 3, name: "Maria S.", points: 110 },
+  { rank: 4, name: "John R.", points: 95 },
+  { rank: 5, name: "Lisa M.", points: 90 },
+];
 
 function FilterSelect({ value, onChange, children }) {
   return (
@@ -172,42 +181,50 @@ export default function EmployeeTrainingDashboard() {
       )}
 
       {/* Stat Cards Row */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <DashboardStatCard
-          label="SOPs Assigned"
-          value={`${dashboard.stats.sopsAssigned} SOPs`}
-          icon={BookOpen}
-          color="blue"
-          caption={dashboard.stats.sopsAssigned > 0 ? `${dashboard.sopHighlights.filter(s => s.status === 'Completed').length} completed` : 'No SOPs assigned yet'}
-          progress={dashboard.stats.sopsAssigned > 0 ? Math.round((dashboard.sopHighlights.filter(s => s.status === 'Completed').length / dashboard.stats.sopsAssigned) * 100) : 0}
-          trend="up"
-        />
-        <DashboardStatCard
-          label="Training Progress"
-          value={`${dashboard.stats.trainingProgress}%`}
-          icon={GraduationCap}
-          color="emerald"
-          caption="Keep learning!"
-          progress={dashboard.stats.trainingProgress}
-          trend="up"
-        />
-        <DashboardStatCard
-          label="Assessments Passed"
-          value={dashboard.stats.assessmentsPassed}
-          icon={ClipboardCheck}
-          color="purple"
-          progress={92}
-          trend="up"
-        />
-        <DashboardStatCard
-          label="Certificates Earned"
-          value={dashboard.stats.certificatesEarned}
-          icon={Award}
-          color="amber"
-          link={{ label: "View all certificates", href: "/certificates/my-certificates" }}
-          trend="up"
-        />
-      </div>
+      <StaggerList className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MotionItem>
+          <DashboardStatCard
+            label="SOPs Assigned"
+            value={`${dashboard.stats.sopsAssigned} SOPs`}
+            icon={BookOpen}
+            color="blue"
+            caption={dashboard.stats.sopsAssigned > 0 ? `${dashboard.sopHighlights.filter(s => s.status === 'Completed').length} completed` : 'No SOPs assigned yet'}
+            progress={dashboard.stats.sopsAssigned > 0 ? Math.round((dashboard.sopHighlights.filter(s => s.status === 'Completed').length / dashboard.stats.sopsAssigned) * 100) : 0}
+            trend="up"
+          />
+        </MotionItem>
+        <MotionItem>
+          <DashboardStatCard
+            label="Training Progress"
+            value={`${dashboard.stats.trainingProgress}%`}
+            icon={GraduationCap}
+            color="emerald"
+            caption="Keep learning!"
+            progress={dashboard.stats.trainingProgress}
+            trend="up"
+          />
+        </MotionItem>
+        <MotionItem>
+          <DashboardStatCard
+            label="Assessments Passed"
+            value={dashboard.stats.assessmentsPassed}
+            icon={ClipboardCheck}
+            color="purple"
+            progress={92}
+            trend="up"
+          />
+        </MotionItem>
+        <MotionItem>
+          <DashboardStatCard
+            label="Certificates Earned"
+            value={dashboard.stats.certificatesEarned}
+            icon={Award}
+            color="amber"
+            link={{ label: "View all certificates", href: "/certificates/my-certificates" }}
+            trend="up"
+          />
+        </MotionItem>
+      </StaggerList>
 
       {/* Training Progress + SOPs by Status */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -234,6 +251,7 @@ export default function EmployeeTrainingDashboard() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <PanelCard title="Announcements" action={<ViewAllLink onClick={() => navigate("/announcements")} />}>
           {dashboard.announcements.length > 0 ? (
+            <FadeIn>
             <ul className="space-y-3">
               {dashboard.announcements.map((item, i) => (
                 <li key={item.id || i} className="group flex items-start gap-3 rounded-lg p-2 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-neutral-800/50">
@@ -249,6 +267,7 @@ export default function EmployeeTrainingDashboard() {
                 </li>
               ))}
             </ul>
+          </FadeIn>
           ) : (
             <p className="text-xs text-neutral-400 dark:text-neutral-500">No announcements at this time.</p>
           )}
@@ -259,6 +278,7 @@ export default function EmployeeTrainingDashboard() {
           action={<ViewAllLink onClick={() => navigate("/sops")} />}
         >
           {dashboard.sopHighlights.length > 0 ? (
+            <FadeIn>
             <ul className="space-y-4">
               {dashboard.sopHighlights.map((sop, i) => (
                 <li key={i} className="group">
@@ -285,6 +305,7 @@ export default function EmployeeTrainingDashboard() {
                 </li>
               ))}
             </ul>
+          </FadeIn>
           ) : (
             <p className="text-xs text-neutral-400 dark:text-neutral-500">No SOPs assigned yet.</p>
           )}
@@ -305,31 +326,23 @@ export default function EmployeeTrainingDashboard() {
             </FilterSelect>
           }
         >
-          {leaderboardLoading ? (
-            <div className="flex justify-center py-4">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent" />
-            </div>
-          ) : leaderboard.length === 0 ? (
-            <p className="text-xs text-neutral-400 dark:text-neutral-500 text-center py-4">No leaderboard data available yet.</p>
-          ) : (
-            <>
-              <LeaderboardPodium entries={leaderboard} />
-              <ul className="mt-4 divide-y divide-slate-100 dark:divide-neutral-800">
-                {leaderboard.slice(3).map((user) => (
-                  <li key={user.rank} className="flex items-center gap-3 py-2.5">
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 dark:bg-neutral-800">
-                      {user.rank}
-                    </span>
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white">
-                      {user.name.split(" ").map((p) => p[0]).join("")}
-                    </div>
-                    <span className="flex-1 text-sm font-medium text-neutral-900 dark:text-neutral-100">{user.name}</span>
-                    <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{user.points} pts</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+          <LeaderboardPodium entries={LEADERBOARD} />
+          <FadeIn>
+          <ul className="mt-4 divide-y divide-slate-100 dark:divide-neutral-800">
+            {LEADERBOARD.slice(3).map((user) => (
+              <li key={user.rank} className="flex items-center gap-3 py-2.5">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 dark:bg-neutral-800">
+                  {user.rank}
+                </span>
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-bold text-white">
+                  {user.name.split(" ").map((p) => p[0]).join("")}
+                </div>
+                <span className="flex-1 text-sm font-medium text-neutral-900 dark:text-neutral-100">{user.name}</span>
+                <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{user.points} pts</span>
+              </li>
+            ))}
+          </ul>
+          </FadeIn>
           <div className="mt-3 text-center">
             {!isAnyAdmin && (
               <button onClick={() => navigate("/assessments/leaderboard")} className="text-xs font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400">
@@ -340,7 +353,7 @@ export default function EmployeeTrainingDashboard() {
         </PanelCard>
 
         <PanelCard title="My Tasks" action={<ViewAllLink onClick={() => navigate("/tasks/my")} label="View All" />}>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StaggerList className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
               { label: "To Do", value: dashboard.taskCounts.todo, icon: BookOpen, color: "blue" },
               { label: "In Progress", value: dashboard.taskCounts.in_progress, icon: GraduationCap, color: "amber" },
@@ -349,7 +362,7 @@ export default function EmployeeTrainingDashboard() {
             ].map((task) => {
               const Icon = task.icon;
               return (
-                <div key={task.label} className="group relative overflow-hidden rounded-xl border border-slate-100 bg-slate-50/50 p-3 text-center transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-800/30 dark:hover:border-neutral-700">
+                <MotionItem key={task.label} className="group relative overflow-hidden rounded-xl border border-slate-100 bg-slate-50/50 p-3 text-center transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-800/30 dark:hover:border-neutral-700">
                   <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-neutral-800/50" />
                   <div className="relative">
                     <div className={cn(
@@ -364,17 +377,18 @@ export default function EmployeeTrainingDashboard() {
                     <p className="mt-2 text-xl font-bold text-neutral-900 dark:text-neutral-100">{task.value}</p>
                     <p className="text-[11px] text-slate-500 dark:text-neutral-400">{task.label}</p>
                   </div>
-                </div>
+                </MotionItem>
               );
             })}
-          </div>
+          </StaggerList>
         </PanelCard>
       </div>
 
       {/* Upcoming Events */}
       <PanelCard title="Upcoming Events" action={<ViewAllLink onClick={() => navigate("/events")} label="View Calendar" />}>
         {dashboard.events.length > 0 ? (
-          <ul className="space-y-2">
+            <FadeIn>
+            <ul className="space-y-2">
             {dashboard.events.map((event, i) => (
               <li key={i} className="group flex items-center gap-3 rounded-lg p-2 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-neutral-800/50">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-blue-500/10 dark:text-blue-400">
@@ -386,9 +400,10 @@ export default function EmployeeTrainingDashboard() {
                 </div>
               </li>
             ))}
-          </ul>
-        ) : (
-          <p className="text-xs text-neutral-400 dark:text-neutral-500">No upcoming events.</p>
+            </ul>
+          </FadeIn>
+          ) : (
+            <p className="text-xs text-neutral-400 dark:text-neutral-500">No upcoming events.</p>
         )}
       </PanelCard>
 

@@ -255,13 +255,21 @@ export default function EmployeeDashboard() {
             <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-tight">My Learning Dashboard</h1>
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">Track your enrolled courses and progress</p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard title="Enrolled Courses" value={myCourses.length} icon={BookOpen} color="blue" />
-            <StatCard title="In Progress" value={inProgressCount} icon={Clock} color="amber" />
-            <StatCard title="Completed" value={completedCount} icon={CheckCircle2} color="emerald" />
-            <StatCard title="Avg. Progress" value={`${myCourses.length > 0 ? Math.round(myCourses.reduce((sum, e) => sum + (e.progress_percentage || 0), 0) / myCourses.length) : 0}%`} icon={TrendingUp} color="purple" />
-          </div>
-      </div>
+          <StaggerList className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <MotionItem>
+              <StatCard title="Enrolled Courses" value={myCourses.length} icon={BookOpen} color="blue" />
+            </MotionItem>
+            <MotionItem>
+              <StatCard title="In Progress" value={inProgressCount} icon={Clock} color="amber" />
+            </MotionItem>
+            <MotionItem>
+              <StatCard title="Completed" value={completedCount} icon={CheckCircle2} color="emerald" />
+            </MotionItem>
+            <MotionItem>
+              <StatCard title="Avg. Progress" value={`${myCourses.length > 0 ? Math.round(myCourses.reduce((sum, e) => sum + (e.progress_percentage || 0), 0) / myCourses.length) : 0}%`} icon={TrendingUp} color="purple" />
+            </MotionItem>
+          </StaggerList>
+        </div>
       </div>
 
       {/* Employee Leaderboard */}
@@ -401,15 +409,16 @@ export default function EmployeeDashboard() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredLibrary.slice(0, 8).map((course) => (
-              <CourseCard
-                key={course.id}
-                course={course}
-                onClick={() => handleCourseClick(course.id)}
-              />
+              <MotionItem key={course.id}>
+                <CourseCard
+                  course={course}
+                  onClick={() => handleCourseClick(course.id)}
+                />
+              </MotionItem>
             ))}
-          </div>
+          </StaggerList>
         )}
       </div>
     </div>

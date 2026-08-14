@@ -161,6 +161,8 @@ export default function LessonEditor({
   const [linkTitle, setLinkTitle] = useState("");
   const [chapters, setChapters] = useState([]);
   const [thumbnailUrl, setThumbnailUrl] = useState(null);
+  const [bunnyLibraryId, setBunnyLibraryId] = useState("");
+  const [bunnyVideoId, setBunnyVideoId] = useState("");
   const [lastSavedAt, setLastSavedAt] = useState(null);
   const [hasChanges, setHasChanges] = useState(false);
   const [saveError, setSaveError] = useState(null);
@@ -198,6 +200,8 @@ export default function LessonEditor({
     setLinkTitle(lesson.linkTitle || "");
     setChapters(Array.isArray(lesson.chapters) ? lesson.chapters : []);
     setThumbnailUrl(lesson.thumbnail_url || lesson.thumbnailUrl || null);
+    setBunnyLibraryId(lesson.bunnyLibraryId || lesson.bunny_library_id || "");
+    setBunnyVideoId(lesson.bunnyVideoId || lesson.bunny_video_id || "");
     setHasChanges(false);
     setSaveError(null);
   }, [lesson?.id]);
@@ -348,7 +352,6 @@ export default function LessonEditor({
     onSave?.({
       title: title.trim(),
       type,
-      url: type === "reading" ? description : url,
       description: type === "reading" ? description : description,
       duration: duration ? parseInt(duration, 10) : null,
       requiresQuizPass: isQuiz ? requiresQuizPass : false,
@@ -359,6 +362,11 @@ export default function LessonEditor({
       documentFile: type === "document" ? documentFile : null,
       chapters: type === "video" ? chapters : [],
       thumbnail_url: thumbnailUrl || null,
+      bunnyLibraryId: type === "video" ? bunnyLibraryId || null : null,
+      bunnyVideoId: type === "video" ? bunnyVideoId || null : null,
+      url: type === "video" && bunnyLibraryId && bunnyVideoId
+        ? `https://iframe.mediadelivery.net/embed/${bunnyLibraryId}/${bunnyVideoId}`
+        : (type === "reading" ? description : url),
     });
     setHasChanges(false);
     setLastSavedAt(new Date());
@@ -764,18 +772,25 @@ export default function LessonEditor({
                         </div>
                       ) : type === "video" ? (
                         <div className="space-y-5">
-                          <VideoPreview url={url} />
+                          <VideoPreview
+                            url={bunnyLibraryId && bunnyVideoId ? `https://iframe.mediadelivery.net/embed/${bunnyLibraryId}/${bunnyVideoId}` : url}
+                            thumbnailUrl={thumbnailUrl}
+                          />
 
                           <div>
                             <label htmlFor="lesson-url" className="block text-sm font-medium text-neutral-700 mb-2">
-                              Video URL
+                              Video URL <span className="font-normal text-neutral-400">(YouTube, Vimeo, or direct file)</span>
                             </label>
                             <input
                               id="lesson-url"
                               value={url}
                               onChange={(e) => {
                                 setUrl(e.target.value);
-                                emitPatch({ url: e.target.value, content: e.target.value });
+                                if (e.target.value) {
+                                  setBunnyLibraryId("");
+                                  setBunnyVideoId("");
+                                }
+                                emitPatch({ url: e.target.value, content: e.target.value, bunnyLibraryId: "", bunnyVideoId: "" });
                               }}
                               placeholder="https://youtube.com/watch?v=..."
                               aria-invalid={!!url && !parseVideoUrl(url)}
@@ -784,6 +799,52 @@ export default function LessonEditor({
                             {url && parseVideoUrl(url) && (
                               <p className="mt-1.5 text-xs text-neutral-500">
                                 Source: {PROVIDER_LABEL[parseVideoUrl(url).provider]}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="rounded-md border border-neutral-200 bg-neutral-50/60 px-3 py-3">
+                            <p className="text-sm font-medium text-neutral-700 mb-2">Bunny Stream</p>
+                            <p className="text-xs text-neutral-500 mb-3">
+                              Alternatively, embed a Bunny Stream video by its Library ID and Video ID. This takes priority over the URL above when both are set.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div>
+                                <label htmlFor="bunny-library" className="block text-xs font-medium text-neutral-600 mb-1">
+                                  Library ID
+                                </label>
+                                <input
+                                  id="bunny-library"
+                                  value={bunnyLibraryId}
+                                  onChange={(e) => {
+                                    setBunnyLibraryId(e.target.value);
+                                    if (e.target.value) setUrl("");
+                                    emitPatch({ bunnyLibraryId: e.target.value, url: e.target.value ? "" : url });
+                                  }}
+                                  placeholder="e.g. 123456"
+                                  className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
+                                />
+                              </div>
+                              <div>
+                                <label htmlFor="bunny-video" className="block text-xs font-medium text-neutral-600 mb-1">
+                                  Video ID
+                                </label>
+                                <input
+                                  id="bunny-video"
+                                  value={bunnyVideoId}
+                                  onChange={(e) => {
+                                    setBunnyVideoId(e.target.value);
+                                    if (e.target.value) setUrl("");
+                                    emitPatch({ bunnyVideoId: e.target.value, url: e.target.value ? "" : url });
+                                  }}
+                                  placeholder="e.g. abcd1234-5678-90ef"
+                                  className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
+                                />
+                              </div>
+                            </div>
+                            {bunnyLibraryId && bunnyVideoId && (
+                              <p className="mt-2 text-xs text-neutral-500">
+                                Source: Bunny Stream
                               </p>
                             )}
                           </div>

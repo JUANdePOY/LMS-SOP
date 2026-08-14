@@ -415,7 +415,7 @@ function updateContent(req, res) {
             .then((course) => {
               if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
               return enforceCourseScope(course, req.user).then(() => {
-                const allowed = ['title', 'type', 'description', 'order_index', 'url', 'duration', 'is_required', 'allow_access_after', 'chapters', 'thumbnail_url'];
+                const allowed = ['title', 'type', 'description', 'order_index', 'url', 'duration', 'is_required', 'allow_access_after', 'chapters', 'thumbnail_url', 'bunny_library_id', 'bunny_video_id'];
                 const updates = {};
                 for (const key of allowed) {
                   if (Object.prototype.hasOwnProperty.call(req.body, key)) {

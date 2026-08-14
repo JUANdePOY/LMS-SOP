@@ -17,37 +17,18 @@ const CATEGORY_META = {
   categories: { label: 'Categories', icon: Tag, color: 'bg-danger-soft text-[var(--color-danger)] dark:bg-danger-soft dark:text-[var(--color-danger)]' },
 };
 
-const CATEGORY_PATHS = {
-  users: (item) => `/profile/${item.id}`,
-  courses: (item) => `/courses/${item.id}`,
-  sops: (item) => `/sops/${item.id}`,
-  departments: () => '/admin/organization/departments',
-  announcements: () => '/announcements',
-  events: () => '/events',
-  quizzes: (item) => `/assessments/quiz/${item.id}`,
-  tasks: (item) => `/tasks/${item.id}`,
-  certificates: () => '/certificates',
-  businesses: () => '/admin/organization/businesses',
-  categories: () => '/admin/organization/categories',
-};
-
 function ResultRow({ category, item, onClick }) {
   const meta = CATEGORY_META[category];
   const Icon = meta.icon;
   const title = item.title || item.full_name || item.name || item.business_name || item.code || 'Untitled';
   const subtitle = item.department_name || item.course_title || item.business_code || item.subtitle || item.description || '';
-  const href = CATEGORY_PATHS[category]?.(item) || '#';
 
   return (
-    <a
-      href={href}
-      onClick={(e) => {
-        if (e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
-          e.preventDefault();
-          onClick(category, item);
-        }
-      }}
-      className="flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-[rgba(242,92,5,0.30)]"
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => onClick(category, item)}
+      className="flex w-full items-start gap-3 touch-manipulation rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-neutral-100 active:bg-neutral-100 dark:hover:bg-neutral-800 dark:active:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-[rgba(242,92,5,0.30)] sm:py-2"
     >
       <span className={cn("mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg", meta.color)}>
         <Icon size={13} />
@@ -63,7 +44,7 @@ function ResultRow({ category, item, onClick }) {
       <span className="mt-0.5 text-xs font-medium text-neutral-400 dark:text-neutral-500">
         {meta.label}
       </span>
-    </a>
+    </button>
   );
 }
 
@@ -135,7 +116,7 @@ export default function GlobalSearch() {
           className={cn(
             "peer h-10 w-full rounded-xl",
             "border border-[var(--header-border)] bg-[var(--header-bg-input)]",
-            "pl-10 pr-12 py-2 text-sm text-[var(--header-input-text)]",
+            "pl-10 pr-12 py-2 text-base text-[var(--header-input-text)] sm:text-sm",
             "placeholder:text-[var(--header-input-placeholder)]",
             "outline-none transition-all duration-200",
             "shadow-sm",
@@ -161,8 +142,15 @@ export default function GlobalSearch() {
 
       {open && query && (
         <div
+          className="fixed inset-0 z-40 bg-black/20 sm:hidden"
+          onClick={() => setOpen(false)}
+        />
+      )}
+
+      {open && query && (
+        <div
           className={cn(
-            "absolute top-full z-50 mt-1 w-full max-w-[16rem] sm:max-w-lg",
+            "fixed inset-x-0 top-14 z-50 mt-0 w-auto sm:absolute sm:inset-x-auto sm:top-full sm:mt-1 sm:w-full sm:max-w-lg",
             "rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900",
             "shadow-2xl shadow-neutral-200/80 dark:shadow-neutral-950/60",
             "ring-1 ring-neutral-200 dark:ring-neutral-800",
@@ -194,7 +182,7 @@ export default function GlobalSearch() {
           )}
 
           {!isLoading && hasResults && (
-            <div className="max-h-96 overflow-y-auto py-1">
+            <div className="max-h-[70vh] overflow-y-auto py-1 sm:max-h-96">
               {visibleResults.map(([category, items]) => {
                 const meta = CATEGORY_META[category];
                 const Icon = meta.icon;

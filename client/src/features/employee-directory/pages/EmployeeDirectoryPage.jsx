@@ -5,6 +5,7 @@ import { useEmployeeDirectory } from "../hooks/useEmployeeDirectory";
 import EmployeeCard from "../components/EmployeeCard";
 import EmployeeProfileDrawer from "../components/EmployeeProfileDrawer";
 import { getDepartments } from "@/services/api";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 export default function EmployeeDirectoryPage() {
   const navigate = useNavigate();
@@ -97,16 +98,17 @@ export default function EmployeeDirectoryPage() {
           <p className="text-xs text-neutral-400">Try a different name or department.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {employees.map((emp) => (
-            <EmployeeCard
-              key={emp.id}
-              employee={emp}
-              onView={setSelected}
-              onMessage={handleMessage}
-            />
+            <MotionItem key={emp.id}>
+              <EmployeeCard
+                employee={emp}
+                onView={setSelected}
+                onMessage={handleMessage}
+              />
+            </MotionItem>
           ))}
-        </div>
+        </StaggerList>
       )}
 
       {totalPages > 1 && (

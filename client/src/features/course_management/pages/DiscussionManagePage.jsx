@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useDiscussions } from "../hooks/useDiscussions";
 import DiscussionTable from "../components/tables/DiscussionTable";
+import { FadeIn } from "@/shared/motion";
 
 export default function DiscussionManagePage() {
   const { courseId } = useParams();
@@ -14,7 +15,9 @@ export default function DiscussionManagePage() {
         <h1 className="text-xl font-bold">Discussions</h1>
         <button onClick={() => setOpen(true)} className="rounded-lg px-3 py-1.5 text-sm btn-primary">New Discussion</button>
       </div>
-      <DiscussionTable discussions={discussions} onToggle={() => {}} />
+      <FadeIn>
+        <DiscussionTable discussions={discussions} onToggle={() => {}} />
+      </FadeIn>
     </div>
   );
 }

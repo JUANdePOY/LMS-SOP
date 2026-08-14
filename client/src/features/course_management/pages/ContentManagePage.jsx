@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useContentList } from "../hooks/useContentList";
 import ContentTable from "../components/tables/ContentTable";
 import AddContentModal from "../components/modals/AddContentModal";
+import { FadeIn } from "@/shared/motion";
 
 export default function ContentManagePage() {
   const { courseId, moduleId } = useParams();
@@ -15,7 +16,9 @@ export default function ContentManagePage() {
       <div className="flex justify-end">
         <button onClick={() => setOpen(true)} className="rounded-lg px-3 py-1.5 text-sm btn-primary">Add Content</button>
       </div>
-      <ContentTable contents={contents} onEdit={() => {}} onDelete={() => refetch?.()} />
+      <FadeIn>
+        <ContentTable contents={contents} onEdit={() => {}} onDelete={() => refetch?.()} />
+      </FadeIn>
       <AddContentModal open={open} onClose={() => setOpen(false)} onSubmit={() => refetch?.()} />
     </div>
   );
