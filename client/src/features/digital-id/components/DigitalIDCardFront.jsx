@@ -45,7 +45,7 @@ export default function DigitalIDCardFront({ profile = {} }) {
           {fullName.toUpperCase()}
         </h2>
         <p className="text-center text-[clamp(0.75rem,2.8vw,0.9rem)] text-neutral-500 flex items-center gap-1.5 mt-1">
-          <span className="inline-flex items-center rounded-full px-3 py-1" style={{ backgroundColor: 'rgba(242, 92, 5, 0.1)' }}>
+          <span className="inline-flex items-center rounded-full px-3 py-1 text-white font-medium" style={{ backgroundColor: 'rgb(255, 115, 0)' }}>
             {positionTitle}
           </span>
         </p>

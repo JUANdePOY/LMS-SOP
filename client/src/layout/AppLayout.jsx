@@ -105,7 +105,6 @@ export default function AppLayout() {
   const isEmployee = user?.role === 'employee';
   const mobileNav = isEmployee ? MOBILE_BOTTOM_NAV_EMPLOYEE : MOBILE_BOTTOM_NAV_ADMIN;
   const breadcrumbs = getBreadcrumbs(location.pathname);
-  const currentTitle = breadcrumbs.length ? breadcrumbs[breadcrumbs.length - 1].title : "Learning";
   const themeToggleLabel = isDark ? "Switch to light theme" : "Switch to dark theme";
   useNotificationStore();
   useNotificationPoller();
@@ -207,7 +206,7 @@ export default function AppLayout() {
               <button
                 onClick={() => setCollapsed((v) => !v)}
                 aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                className=                "hidden lg:flex h-9 w-9 items-center justify-center rounded-xl text-white hover:text-white hover:bg-white/15 dark:hover:bg-white/10 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-white/30"
+                className="hidden lg:flex h-9 w-9 items-center justify-center rounded-xl text-white hover:text-white hover:bg-white/15 dark:hover:bg-white/10 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-white/30"
               >
                 {collapsed ? (
                   <PanelRightClose size={20} />
@@ -216,7 +215,7 @@ export default function AppLayout() {
                 )}
               </button>
 
-              <span className="sm:hidden min-w-0 truncate text-sm font-semibold text-white">{currentTitle}</span>
+
 
               <nav
                 aria-label={breadcrumbs.length > 0 ? "Breadcrumb" : "Page title"}

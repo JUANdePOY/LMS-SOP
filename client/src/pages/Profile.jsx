@@ -1,6 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, Lock } from 'lucide-react';
-import { getProfile, updateProfile, changePassword, uploadAvatar, deleteAvatar } from '@/services/api';
+import { Loader2, Lock, Camera } from 'lucide-react';
+import {
+  getProfile,
+  updateProfile,
+  changePassword,
+  uploadAvatar,
+  deleteAvatar,
+  uploadCoverPhoto,
+  deleteCoverPhoto,
+} from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -34,6 +42,10 @@ export default function Profile() {
   const [error, setError] = useState(null);
   const [avatarFile, setAvatarFile] = useState(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [coverFile, setCoverFile] = useState(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [coverUrl, setCoverUrl] = useState(null);
+  const [previewCover, setPreviewCover] = useState(null);
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -41,7 +53,9 @@ export default function Profile() {
     try {
       const res = await getProfile();
       if (res.data?.status === 'success') {
-        setProfile(res.data.data);
+        const profileData = res.data.data;
+        setProfile(profileData);
+        setCoverUrl(profileData?.cover_photo_url || profileData?.cover_url || null);
       }
     } catch (err) {
       const message = err.response?.data?.message || 'Failed to load profile data';
@@ -79,7 +93,64 @@ export default function Profile() {
       const message = err.response?.data?.message || err.message || 'Failed to update profile';
       addToast(message, 'error');
     } finally {
-      setSaving(false);
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handlePickCover = useCallback((file) => {
+    setCoverFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => setPreviewCover(e.target.result);
+      reader.readAsDataURL(file);
+    } else {
+      setPreviewCover(null);
+    }
+  }, []);
+
+  const handleUploadCover = async () => {
+    if (!coverFile) return;
+    setUploadingCover(true);
+    const formData = new FormData();
+    formData.append('cover_photo', coverFile);
+    try {
+      const res = await uploadCoverPhoto(formData);
+      if (res.data?.status === 'success') {
+        addToast('Cover photo updated successfully', 'success');
+        const newCoverUrl = res.data.data.cover_photo_url;
+        setCoverUrl(newCoverUrl);
+        setProfile((prev) => ({ ...prev, cover_photo_url: newCoverUrl }));
+        updateUser({ cover_photo_url: newCoverUrl });
+        setCoverFile(null);
+        setPreviewCover(null);
+      } else {
+        throw new Error(res.data?.message || 'Failed to upload cover photo');
+      }
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Failed to upload cover photo';
+      addToast(message, 'error');
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
+  const handleRemoveCover = async () => {
+    setUploadingCover(true);
+    try {
+      const res = await deleteCoverPhoto();
+      if (res.data?.status === 'success') {
+        addToast('Cover photo removed', 'success');
+        setCoverUrl(null);
+        setProfile((prev) => ({ ...prev, cover_photo_url: null }));
+        updateUser({ cover_photo_url: null });
+      } else {
+        throw new Error(res.data?.message || 'Failed to remove cover photo');
+      }
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Failed to remove cover photo';
+      addToast(message, 'error');
+    } finally {
+      setUploadingCover(false);
     }
   };
 
@@ -172,12 +243,19 @@ export default function Profile() {
     <div className="max-w-5xl mx-auto space-y-4">
       <ProfileCover
         profile={profile}
+        coverUrl={coverUrl}
+        previewCover={previewCover}
         onEditProfile={() => setEditOpen(true)}
         onPickAvatar={setAvatarFile}
         avatarFile={avatarFile}
         onUploadAvatar={handleAvatarUpload}
         uploadingAvatar={uploadingAvatar}
         onRemoveAvatar={handleAvatarDelete}
+        onPickCover={handlePickCover}
+        coverFile={coverFile}
+        onUploadCover={handleUploadCover}
+        uploadingCover={uploadingCover}
+        onRemoveCover={handleRemoveCover}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

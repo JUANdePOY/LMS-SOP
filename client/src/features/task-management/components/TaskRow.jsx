@@ -323,11 +323,11 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
          {canManage ? (
            <AssignedCell assignments={assignments} onSave={saveField} />
          ) : (
-           <AssigneeStack
-             items={assignments
-               .filter((a) => (a.assignment_type === 'User' || a.assignment_type === 'Department') && a.reference_name)
-               .map((a) => ({ name: a.reference_name, type: a.assignment_type }))}
-           />
+            <AssigneeStack
+              items={assignments
+                .filter((a) => (a.assignment_type === 'User' || a.assignment_type === 'Department') && a.reference_name)
+                .map((a) => ({ name: a.reference_name, type: a.assignment_type, avatar_url: a.avatar_url }))}
+            />
          )}
        </div>
 
