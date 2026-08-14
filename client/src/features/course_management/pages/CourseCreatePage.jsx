@@ -1,6 +1,7 @@
 import { useState } from "react";
 import CourseCreateForm from "../components/forms/CourseCreateForm";
 import { useCreateCourse } from "../hooks/useCreateCourse";
+import { FadeIn } from "@/shared/motion";
 
 export default function CourseCreatePage() {
   const { create, loading } = useCreateCourse();
@@ -12,7 +13,7 @@ export default function CourseCreatePage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <FadeIn className="max-w-2xl mx-auto space-y-4">
       <h1 className="text-xl font-bold">Create New Course</h1>
       {created ? (
         <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-sm">
@@ -21,6 +22,6 @@ export default function CourseCreatePage() {
       ) : (
         <CourseCreateForm onSubmit={handleSubmit} onCancel={() => history.back()} />
       )}
-    </div>
+    </FadeIn>
   );
 }

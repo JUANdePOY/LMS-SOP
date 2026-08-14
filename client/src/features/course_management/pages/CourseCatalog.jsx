@@ -11,6 +11,7 @@ import { Search, Plus } from "lucide-react";
 import CourseTable from "../components/tables/CourseTable";
 import CreateCourseModal from "../components/modals/CreateCourseModal";
 import { useCreateCourse } from "../hooks/useCreateCourse";
+import { FadeIn } from "@/shared/motion";
 
 export default function CourseCatalog() {
   const navigate = useNavigate();
@@ -69,7 +70,7 @@ export default function CourseCatalog() {
   });
 
   return (
-    <div className="w-full max-w-none space-y-5 sm:space-y-6">
+    <FadeIn className="w-full max-w-none space-y-5 sm:space-y-6">
       <div className="relative overflow-hidden rounded-2xl border border-neutral-200/80 dark:border-neutral-700/80 bg-gradient-to-br from-white via-neutral-50/80 to-neutral-100/80 dark:from-neutral-900 dark:via-neutral-800 dark:to-neutral-700 p-5 sm:p-6 shadow-sm dark:shadow-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.30),rgba(147,51,234,0.08),transparent_75%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(96,165,250,0.15),rgba(168,85,247,0.12),transparent_45%)]" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center justify-between">
@@ -133,6 +134,6 @@ export default function CourseCatalog() {
         onConfirm={confirmArchive}
         onCancel={() => setPendingArchive(null)}
       />
-    </div>
+    </FadeIn>
   );
 }

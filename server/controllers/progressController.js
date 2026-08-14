@@ -64,6 +64,7 @@ async function getCourseProgress(req, res) {
         duration: lp.duration,
         url: lp.url,
         description: lp.description,
+        thumbnailUrl: lp.thumbnail_url ?? null,
         quizId: lp.quiz_id ?? null,
         certificateTemplateId: lp.certificate_template_id ?? null,
         isFirst: idx === 0,

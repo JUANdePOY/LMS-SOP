@@ -14,6 +14,7 @@ import { usePageUpdates } from "@/shared/hooks/usePageUpdates";
 import UpdateNotificationBanner from "@/shared/components/ui/UpdateNotificationBanner";
 import { useNotifications } from "@/shared/stores/notificationStore.js";
 import BannerSection from "@/shared/components/ui/BannerSection";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -244,18 +245,19 @@ export default function EmployeeDashboard() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <StaggerList className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {myCourses.slice(0, 8).map(({ enrollment, course }) => (
-              <EmployeeCourseCard
-                key={enrollment.id}
-                course={course}
-                onClick={() => handleCourseClick(course.id)}
-                showProgress={true}
-                progress={enrollment.progress_percentage || 0}
-                enrollmentStatus={enrollment.status}
-              />
+              <MotionItem key={enrollment.id}>
+                <EmployeeCourseCard
+                  course={course}
+                  onClick={() => handleCourseClick(course.id)}
+                  showProgress={true}
+                  progress={enrollment.progress_percentage || 0}
+                  enrollmentStatus={enrollment.status}
+                />
+              </MotionItem>
             ))}
-          </div>
+          </StaggerList>
         </div>
       )}
     </div>

@@ -1,15 +1,17 @@
 import { useState } from "react";
 import { PlayCircle, AlertTriangle, Film, CheckCircle2, ExternalLink } from "lucide-react";
 import { parseVideoUrl, PROVIDER_LABEL } from "@/features/course_management/utils/videoUrl";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 /**
  * Live, validated preview for a video lesson URL.
  * Renders an embed for recognized providers, a native player for direct
  * files, and clear error states for invalid input.
  */
-export default function VideoPreview({ url, onPickChapter, activeChapterStart }) {
+export default function VideoPreview({ url, thumbnailUrl, onPickChapter, activeChapterStart }) {
   const [showEmbed, setShowEmbed] = useState(false);
   const parsed = parseVideoUrl(url);
+  const resolvedThumbnail = thumbnailUrl ? resolveFileUrl(thumbnailUrl) : null;
 
   if (!url || !url.trim()) {
     return (
@@ -72,14 +74,16 @@ export default function VideoPreview({ url, onPickChapter, activeChapterStart })
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen
             />
-          ) : (
+           ) : (
             <button
               type="button"
               onClick={() => setShowEmbed(true)}
-              className="group relative flex aspect-video w-full items-center justify-center bg-neutral-900"
+              className="group relative flex aspect-video w-full items-center justify-center bg-neutral-900 bg-cover bg-center"
+              style={resolvedThumbnail ? { backgroundImage: `url("${resolvedThumbnail}")` } : undefined}
               aria-label="Play video preview"
             >
-              <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 shadow-lg transition group-hover:scale-105">
+              <span className="absolute inset-0 bg-black/40" />
+              <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white/90 shadow-lg transition group-hover:scale-105">
                 <PlayCircle size={36} className="text-neutral-900" />
               </span>
               <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
@@ -118,14 +122,16 @@ export default function VideoPreview({ url, onPickChapter, activeChapterStart })
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
-        ) : (
+         ) : (
           <button
             type="button"
             onClick={() => setShowEmbed(true)}
-            className="group relative flex aspect-video w-full items-center justify-center bg-neutral-900"
+            className="group relative flex aspect-video w-full items-center justify-center bg-neutral-900 bg-cover bg-center"
+            style={resolvedThumbnail ? { backgroundImage: `url("${resolvedThumbnail}")` } : undefined}
             aria-label="Play video preview"
           >
-            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 shadow-lg transition group-hover:scale-105">
+            <span className="absolute inset-0 bg-black/40" />
+            <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white/90 shadow-lg transition group-hover:scale-105">
               <PlayCircle size={36} className="text-neutral-900" />
             </span>
             <span className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white">

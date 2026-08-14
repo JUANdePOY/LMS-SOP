@@ -4,6 +4,7 @@ import { useLessonProgress } from "../hooks/useLessonProgress";
 import { useAuth } from "@/contexts/AuthContext";
 import LessonProgressBar from "../components/LessonProgressBar";
 import LessonList from "../components/LessonList";
+import { FadeIn } from "@/shared/motion";
 
 export default function CourseLearnerView() {
   const { id: courseId } = useParams();
@@ -28,7 +29,7 @@ export default function CourseLearnerView() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4">
+    <FadeIn className="max-w-3xl mx-auto space-y-4">
       <h1 className="text-xl font-bold">{course?.title ?? "Course"}</h1>
       <p className="text-sm text-neutral-600">{course?.description}</p>
 
@@ -41,6 +42,6 @@ export default function CourseLearnerView() {
         <h2 className="text-sm font-semibold mb-2">Lessons</h2>
         <LessonList lessons={lessons} modules={data?.modules} onLessonClick={(lesson) => navigate(`/courses/view/${courseId}/lesson/${lesson.id}`)} courseId={courseId} />
       </div>
-    </div>
+    </FadeIn>
   );
 }

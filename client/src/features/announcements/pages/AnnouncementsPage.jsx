@@ -8,6 +8,7 @@ import AnnouncementForm from "../components/AnnouncementForm";
 import AnnouncementDetail from "../components/AnnouncementDetail";
 import { Modal } from "@/shared/components/ui/modal";
 import { useNotifications } from "@/shared/stores/notificationStore.js";
+import { FadeIn } from "@/shared/motion";
 
 export default function AnnouncementsPage() {
   const { hasPermission, role, department_id } = useAuth();
@@ -78,14 +79,16 @@ export default function AnnouncementsPage() {
         <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Stay updated with company-wide announcements</p>
       </div>
 
-      <AnnouncementList
-        items={items}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        onCreate={handleCreate}
-        canManage={canManage}
-        onView={(item) => setDetailItem(item)}
-      />
+      <FadeIn>
+        <AnnouncementList
+          items={items}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onCreate={handleCreate}
+          canManage={canManage}
+          onView={(item) => setDetailItem(item)}
+        />
+      </FadeIn>
 
       <Modal
         open={!!detailItem}

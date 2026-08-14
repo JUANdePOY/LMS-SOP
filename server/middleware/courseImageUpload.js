@@ -25,14 +25,14 @@ const upload = multer({
 function saveCourseImage(courseId, file) {
   const ext = safeExtFromOriginal(file.originalname) || '.bin';
   const base = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
-  // Stored through the storage abstraction so it is served via the
-  // authenticated /api/files/stream route instead of express.static.
-  return storage.saveFile({
-    buffer: file.buffer,
-    dir: `course-images/${courseId}`,
-    filename: base,
-    contentType: file.mimetype,
-  });
+  // Always persisted to the file_blobs table (independent of STORAGE_DRIVER)
+  // so course/lesson thumbnails are served via the authenticated
+  // /api/files/stream route rather than the local filesystem.
+  return storage.dbSave(
+    file.buffer,
+    `course-images/${courseId}/${base}`,
+    file.mimetype
+  );
 }
 
 module.exports = { upload, saveCourseImage };

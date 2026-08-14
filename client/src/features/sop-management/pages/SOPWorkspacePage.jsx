@@ -15,6 +15,7 @@ import { useAttachments } from '@/features/sop-management/hooks/useAttachments';
 import { useVersions } from '@/features/sop-management/hooks/useVersions';
 import { getSop, getWorkflow, getAuditLogs, submitSop, approveSop, rejectSop, publishSop, transitionSop } from '@/features/sop-management/services/sopService';
 import { enqueueBanner } from '@/shared/stores/notificationStore.js';
+import { StaggerList, MotionItem, FadeIn } from '@/shared/motion';
 
 function SidebarCard({ title, children, className }) {
   return (
@@ -484,12 +485,12 @@ function SOPWorkspacePage() {
               </div>
             </div>
           )}
-          <div className="hidden lg:block bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-sm overflow-hidden">
+          <FadeIn className="hidden lg:block bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50/50 dark:bg-neutral-800/50 flex items-center justify-between">
               <h2 className="font-semibold text-neutral-900 dark:text-neutral-100 text-sm">Modules</h2>
             </div>
             <div className="p-2 max-h-[calc(100vh-140px)] overflow-y-auto"><ModuleList modules={modules} loading={modulesLoading} error={modulesError} onAdd={handleAddModule} onEdit={handleModuleEdit} onDelete={handleModuleDelete} onReorder={reorderModules} /></div>
-          </div>
+          </FadeIn>
         </aside>
 
         <main className="flex-1 min-w-0">
@@ -528,9 +529,9 @@ function SOPWorkspacePage() {
               </div>
             </div>
           )}
-          <div className="hidden lg:flex lg:flex-col gap-4 max-h-[calc(100vh-140px)] overflow-y-auto">
+          <FadeIn className="hidden lg:flex lg:flex-col gap-4 max-h-[calc(100vh-140px)] overflow-y-auto">
             <SOPSidebar sopId={sopId} sop={sop} workflow={workflow} setWorkflow={setWorkflow} auditLogs={auditLogs} versions={versions} versionsLoading={versionsLoading} versionsError={versionsError} workflowLoading={workflowLoading} auditLogsLoading={auditLogsLoading} onVersionRestore={handleVersionRestore} onAuditRefresh={fetchAuditLogs} onSopRefresh={fetchSop} refetchVersions={refetchVersions} />
-          </div>
+          </FadeIn>
         </aside>
       </div>
 

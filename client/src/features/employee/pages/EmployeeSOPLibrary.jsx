@@ -345,16 +345,17 @@ export default function EmployeeSOPLibrary() {
                   ))}
                 </StaggerList>
               ) : (
-                <div className="space-y-2">
+                <StaggerList className="space-y-2">
                   {sops.map((sop) => (
-                    <EmployeeSOPCard
-                      key={sop.id}
-                      sop={sop}
-                      viewMode="list"
-                      onClick={handleSopClick}
-                    />
+                    <MotionItem key={sop.id}>
+                      <EmployeeSOPCard
+                        sop={sop}
+                        viewMode="list"
+                        onClick={handleSopClick}
+                      />
+                    </MotionItem>
                   ))}
-                </div>
+                </StaggerList>
               )}
 
               {viewMode === "grid" ? (

@@ -19,6 +19,7 @@ import {
   Share2,
   Loader2,
 } from "lucide-react";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 const STATUS_STYLES = {
   Draft: "bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300",
@@ -357,9 +358,13 @@ export default function PublicSOPPage() {
               }
             }}
             >
-              {modules.map((module, idx) => (
-                <PublicModuleCard key={module.id} module={module} index={idx} />
-              ))}
+              <StaggerList>
+                {modules.map((module, idx) => (
+                  <MotionItem key={module.id}>
+                    <PublicModuleCard module={module} index={idx} />
+                  </MotionItem>
+                ))}
+              </StaggerList>
             </div>
           )}
            <ImageLightbox src={lightboxSrc} alt={lightboxAlt} onClose={() => setLightboxSrc(null)} />

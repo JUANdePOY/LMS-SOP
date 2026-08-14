@@ -29,6 +29,7 @@ import NotificationBadge from "@/shared/components/ui/NotificationBadge";
 import { useNotificationStore, useNotificationPoller, useNotifications } from "@/shared/stores/notificationStore.js";
 import { PageTransition } from "@/shared/motion";
 import { useWebSocket } from "@/features/notifications/hooks/useWebSocket";
+import { useTabNotificationBadge } from "@/hooks/useTabNotificationBadge";
 
 const MOBILE_BOTTOM_NAV_ADMIN = [
   { name: "Home", path: "/", icon: BookOpen },
@@ -44,7 +45,7 @@ const MOBILE_BOTTOM_NAV_EMPLOYEE = [
 const HEADER_QUICK_ACCESS = [
   { name: "Messaging", path: "/messaging", icon: MessageSquare },
   { name: "Announcements", path: "/announcements", icon: Megaphone },
-  { name: "Events", path: "/events", icon: Calendar },
+  { name: "Events", path: "/events", icon: Calendar, roles: ["super_admin"] },
 ];
 
 const PATH_TITLE_MAP = {
@@ -114,6 +115,7 @@ export default function AppLayout() {
   const eventBadgeCount = notificationData.getUnreadCountByEntityType('event') || 0;
   const announcementBadgeCount = notificationData.getUnreadCountByEntityType('announcement') || 0;
   const systemBadgeCount = notificationData.getSystemNotificationCount() || 0;
+  useTabNotificationBadge(systemBadgeCount);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -262,7 +264,9 @@ export default function AppLayout() {
               <NotificationDropdown showBadge={true} count={systemBadgeCount} />
 
               <div className="hidden md:flex items-center gap-0.5">
-                {HEADER_QUICK_ACCESS.map((item) => {
+                {HEADER_QUICK_ACCESS
+                  .filter((item) => !item.roles || item.roles.includes(user?.role))
+                  .map((item) => {
                   const Icon = item.icon;
                   const active = location.pathname === item.path || location.pathname.startsWith(item.path);
                   const badgeCount = item.path === "/messaging"

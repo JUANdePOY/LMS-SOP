@@ -4,7 +4,7 @@ import { useLeaderboard } from "../hooks/useLeaderboard";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/shared/components/ui/card";
 import { Trophy, Medal, Award, Clock, TrendingUp, Users, BarChart3, Crown, Star } from "lucide-react";
-import { StaggerList, MotionItem } from "@/shared/motion";
+import { StaggerList, MotionItem, FadeIn } from "@/shared/motion";
 
 const RANK_ICONS = { 1: Crown, 2: Medal, 3: Award };
 
@@ -118,7 +118,8 @@ export default function QuizLeaderboardPage() {
         )}
 
         {!myQuizzesLoading && !myQuizzesError && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <FadeIn>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {(myQuizzes || []).map((q) => (
               <Link
                 key={q.id}
@@ -144,6 +145,7 @@ export default function QuizLeaderboardPage() {
               </Card>
             )}
           </div>
+          </FadeIn>
         )}
       </div>
     );
@@ -199,7 +201,8 @@ export default function QuizLeaderboardPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-sm overflow-hidden">
+        <FadeIn>
+          <Card className="border border-neutral-200/80 dark:border-neutral-700/80 bg-white dark:bg-neutral-900 shadow-sm overflow-hidden">
           <div className="h-1 bg-gradient-to-r from-blue-500 to-indigo-500" />
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
@@ -274,6 +277,7 @@ export default function QuizLeaderboardPage() {
             </div>
           </CardContent>
         </Card>
+        </FadeIn>
       )}
     </div>
   );

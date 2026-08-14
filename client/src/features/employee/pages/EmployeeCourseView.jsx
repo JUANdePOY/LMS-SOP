@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft, BookOpen, Clock, Users, PlayCircle,
   CheckCircle2, GraduationCap, BarChart3, RefreshCw,
@@ -8,6 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import LessonList from "@/features/course_management/components/LessonList";
 import LessonProgressBar from "@/features/course_management/components/LessonProgressBar";
+import CourseReviewPanel from "../components/CourseReviewPanel";
 import * as session from "@/services/session";
 import { resolveFileUrl } from "@/lib/fileUrl";
 import { useCourseCompletionCertificates } from "@/features/certificate-management/hooks/useCourseCompletionCertificates";
@@ -16,6 +17,7 @@ import { useCourseCompletionCertificates } from "@/features/certificate-manageme
   getEmployeeCourseProgress,
   getEmployeeEnrollmentStatus,
 } from "../api/employee.api";
+import { StaggerList, MotionItem, FadeIn } from "@/shared/motion";
 
 const DIFFICULTY_META = {
   beginner: { label: "Beginner", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
@@ -27,6 +29,8 @@ const DIFFICULTY_META = {
 export default function EmployeeCourseView() {
   const { id: courseId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const openReviewPanel = searchParams.get("reviewPanel") === "1";
   const [course, setCourse] = useState(null);
   const [progressData, setProgressData] = useState(null);
   const [enrollmentStatus, setEnrollmentStatus] = useState(null);
@@ -34,6 +38,7 @@ export default function EmployeeCourseView() {
   const [progressLoading, setProgressLoading] = useState(false);
   const [progressError, setProgressError] = useState(null);
   const [error, setError] = useState(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const { fetchByUser, getCertificateForCourse, issuances } = useCourseCompletionCertificates();
   const currentUser = session.getCurrentUser();
   const userId = currentUser?.id;
@@ -124,6 +129,15 @@ export default function EmployeeCourseView() {
     }
   };
 
+  const handleReviewCourse = () => {
+    setReviewOpen(true);
+  };
+
+  const handleReviewSelect = (lesson) => {
+    setReviewOpen(false);
+    navigate(`/courses/view/${courseId}/lesson/${lesson.id}?review=1`);
+  };
+
   const learningOutcomes = parseJSONField(course?.learning_outcomes);
   const prerequisites = parseJSONField(course?.prerequisites);
   const modules = progressData?.modules || [];
@@ -135,6 +149,12 @@ export default function EmployeeCourseView() {
   const difficulty = DIFFICULTY_META[course?.difficulty] || DIFFICULTY_META.all_levels;
 
   useEffect(() => {
+    if (openReviewPanel && isEnrolled && lessons.length > 0) {
+      setReviewOpen(true);
+    }
+  }, [openReviewPanel, isEnrolled, lessons.length]);
+
+  useEffect(() => {
     if (isCompleted && userId && courseId) {
       fetchByUser(userId, 'active');
     }
@@ -144,8 +164,8 @@ export default function EmployeeCourseView() {
     return (
       <div className="flex h-96 items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent" />
+          <div className="h-10 w-10 rounded-xl bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.10)] flex items-center justify-center">
+            <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-primary)] dark:border-[var(--color-primary)] border-t-transparent" />
           </div>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">Loading course...</p>
         </div>
@@ -179,7 +199,7 @@ export default function EmployeeCourseView() {
         </button>
 
         <div className="group relative rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm overflow-hidden">
-          <div className="relative h-48 sm:h-56 bg-gradient-to-br from-blue-600 via-indigo-700 to-purple-700 dark:from-blue-900 dark:via-indigo-950 dark:to-purple-950">
+          <div className="relative h-48 sm:h-56 bg-gradient-to-br from-[var(--color-primary)] via-[#d9760f] to-[#b8540a] dark:from-[#7a3d05] dark:via-[#5e2f04] dark:to-[#3f2003]">
             {course?.thumbnail_url && (
               <img
                 src={resolveFileUrl(course.thumbnail_url)}
@@ -188,8 +208,8 @@ export default function EmployeeCourseView() {
               />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(120,200,255,0.12),transparent_70%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(167,157,255,0.08),transparent_60%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(242,92,5,0.14),transparent_70%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(255,160,80,0.10),transparent_60%)]" />
           </div>
 
           <div className="relative px-5 sm:px-6 py-6 -mt-14 sm:-mt-16 space-y-5">
@@ -246,16 +266,16 @@ export default function EmployeeCourseView() {
                 <>
                   {isCompleted ? (
                     <button
-                      onClick={handleContinueLearning}
+                      onClick={handleReviewCourse}
                       className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-emerald-700 transition-colors"
                     >
-                      <CheckCircle2 size={16} />
-                      Review Course
+                      <BookOpen size={16} />
+                      Review
                     </button>
                   ) : summary.completionPct > 0 ? (
                     <button
                       onClick={handleContinueLearning}
-                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                      className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)] transition-colors"
                     >
                       <PlayCircle size={16} />
                       Continue Learning
@@ -263,7 +283,7 @@ export default function EmployeeCourseView() {
                   ) : (
                     <button
                       onClick={handleContinueLearning}
-                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+                      className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-5 py-2.5 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)] transition-colors"
                     >
                       <PlayCircle size={16} />
                       Start Learning
@@ -370,17 +390,19 @@ export default function EmployeeCourseView() {
             {learningOutcomes.length > 0 && (
               <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3 flex items-center gap-2">
-                  <GraduationCap size={16} className="text-blue-600 dark:text-blue-400" />
+                  <GraduationCap size={16} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
                   What you'll learn
                 </h3>
+                <FadeIn>
                 <ul className="space-y-2.5">
                   {learningOutcomes.map((outcome, i) => (
                     <li key={i} className="flex items-start gap-2.5 text-sm text-neutral-600 dark:text-neutral-300">
-                      <CheckCircle2 size={16} className="mt-0.5 text-blue-600 dark:text-blue-400 shrink-0" />
+                       <CheckCircle2 size={16} className="mt-0.5 text-[var(--color-primary)] dark:text-[var(--color-primary)] shrink-0" />
                       <span>{outcome}</span>
                     </li>
                   ))}
                 </ul>
+                </FadeIn>
               </div>
             )}
 
@@ -390,6 +412,7 @@ export default function EmployeeCourseView() {
                   <BookOpen size={16} className="text-amber-600 dark:text-amber-400" />
                   Prerequisites
                 </h3>
+                <FadeIn>
                 <ul className="space-y-2">
                   {prerequisites.map((pre, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-neutral-600 dark:text-neutral-300">
@@ -398,15 +421,16 @@ export default function EmployeeCourseView() {
                     </li>
                   ))}
                 </ul>
+                </FadeIn>
               </div>
             )}
 
             <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-5 shadow-sm">
               <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3 flex items-center gap-2">
-                <BarChart3 size={16} className="text-indigo-600 dark:text-indigo-400" />
+                <BarChart3 size={16} className="text-[var(--color-primary)] dark:text-[var(--color-primary)]" />
                 Course Info
               </h3>
-              <div className="space-y-2.5 text-sm">
+              <StaggerList className="space-y-2.5 text-sm">
                 {[
                   { label: "Difficulty", value: difficulty.label },
                   { label: "Duration", value: `${course?.duration_hours || 0} hours` },
@@ -414,19 +438,19 @@ export default function EmployeeCourseView() {
                   { label: "Students", value: String(course?.enrollment_count || 0) },
                   { label: "Language", value: "English" },
                 ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between">
+                  <MotionItem key={item.label} className="flex items-center justify-between">
                     <span className="text-neutral-500 dark:text-neutral-400">{item.label}</span>
                     <span className="text-neutral-900 dark:text-neutral-100 font-medium">{item.value}</span>
-                  </div>
+                  </MotionItem>
                 ))}
-              </div>
+              </StaggerList>
             </div>
 
             {course?.instructor_name && (
               <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-5 shadow-sm">
                 <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 mb-3">Instructor</h3>
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 flex items-center justify-center text-sm font-semibold text-blue-700 dark:text-blue-300">
+                  <div className="h-10 w-10 rounded-full bg-gradient-to-br from-[rgba(242,92,5,0.15)] to-[#ffd9b3] dark:from-[rgba(242,92,5,0.25)] dark:to-[#7a3d05] flex items-center justify-center text-sm font-semibold text-[var(--color-primary)] dark:text-[var(--color-primary)]">
                     {course.instructor_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                   </div>
                   <div>
@@ -439,6 +463,15 @@ export default function EmployeeCourseView() {
           </div>
         </div>
       </div>
+
+      <CourseReviewPanel
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        courseId={courseId}
+        modules={modules}
+        lessons={lessons}
+        onSelectLesson={handleReviewSelect}
+      />
     </div>
   );
 }

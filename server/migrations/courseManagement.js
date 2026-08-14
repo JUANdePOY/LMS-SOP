@@ -274,6 +274,10 @@ const COURSE_MANAGEMENT_MIGRATIONS = [
   `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS thumbnail_url VARCHAR(500) DEFAULT NULL`,
   `ALTER TABLE module_content MODIFY COLUMN type ENUM('video','reading','document','quiz','assignment','link','presentation','downloadable','live_session','interactive','sop','certificate') NOT NULL DEFAULT 'reading'`,
 
+  `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS bunny_library_id VARCHAR(80) DEFAULT NULL`,
+  `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS bunny_video_id VARCHAR(120) DEFAULT NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_module_content_bunny ON module_content (bunny_library_id, bunny_video_id)`,
+
   `CREATE TABLE IF NOT EXISTS lesson_progress (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,

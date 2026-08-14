@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { FileText, Download, ExternalLink, HelpCircle, ListChecks, Award, Clock, CheckCircle2, RefreshCw, PlayCircle, AlertCircle, Loader2, ArrowRight } from "lucide-react";
 import { useLessonProgress } from "../hooks/useLessonProgress";
 import { useMarkLessonComplete } from "../hooks/useMarkLessonComplete";
@@ -15,6 +15,7 @@ import SOP_CONTENT_STYLES from "@/features/sop-management/utils/sopContentStyles
 import PublicModuleCard from "@/features/sop-management/components/SOPEditor/PublicModuleCard";
 import { getEmployeeSop } from "@/features/employee/api/employeeSop.api";
 import CertificateCelebrationModal from "@/features/certificate-management/components/CertificateCelebrationModal";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 function formatDate(dateStr) {
   if (!dateStr) return null;
@@ -29,6 +30,8 @@ function formatDate(dateStr) {
 export default function LessonPage() {
   const { id: courseId, lessonId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isReviewMode = searchParams.get("review") === "1" || searchParams.get("mode") === "review";
   const { data, loading, error, refetch } = useLessonProgress(courseId);
   const { complete, loading: marking } = useMarkLessonComplete();
   const [message, setMessage] = useState(null);
@@ -193,9 +196,28 @@ export default function LessonPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">{currentLesson.title}</h1>
-        <span className="text-xs text-neutral-400 uppercase tracking-wide">{currentLesson.type}</span>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <h1 className="text-xl font-bold truncate">{currentLesson.title}</h1>
+          {isReviewMode && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 dark:bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 shrink-0">
+              <RefreshCw size={12} />
+              Review Mode
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {isReviewMode && (
+            <button
+              onClick={() => navigate(`/courses/view/${courseId}?reviewPanel=1`)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium text-neutral-600 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+            >
+              <ListChecks size={14} />
+              Review List
+            </button>
+          )}
+          <span className="text-xs text-neutral-400 uppercase tracking-wide">{currentLesson.type}</span>
+        </div>
       </div>
 
       <div className="rounded-xl border border-[var(--border)] bg-white dark:bg-neutral-900 p-4">
@@ -592,15 +614,15 @@ export default function LessonPage() {
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="md:col-span-2">
+        <StaggerList className="md:col-span-2">
           <h3 className="text-sm font-semibold mb-2">Up Next</h3>
           {lessons.filter((l) => l.order > currentLesson.order).slice(0, 3).map((next) => (
-            <div key={next.id} className="rounded-lg border border-[var(--border)] bg-white dark:bg-neutral-900 p-3 text-sm">
+            <MotionItem key={next.id} className="rounded-lg border border-[var(--border)] bg-white dark:bg-neutral-900 p-3 text-sm">
               <p className="font-medium">{next.title}</p>
               <p className="text-xs text-neutral-500 mt-1">{next.status === 'locked' ? 'Locked' : 'Ready'}</p>
-            </div>
+            </MotionItem>
           ))}
-        </div>
+        </StaggerList>
         <div>
           <h3 className="text-sm font-semibold mb-2">Course Outline</h3>
           <LessonList lessons={lessons} modules={modules} courseId={courseId} />

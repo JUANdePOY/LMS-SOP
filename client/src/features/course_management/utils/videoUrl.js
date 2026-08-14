@@ -92,6 +92,7 @@ export function parseVideoUrl(rawUrl) {
         libraryId,
         videoId,
         embedUrl: `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}`,
+        playUrl: `https://${libraryId}.mediadelivery.net/${videoId}.mp4`,
         isValid: true,
       };
     }

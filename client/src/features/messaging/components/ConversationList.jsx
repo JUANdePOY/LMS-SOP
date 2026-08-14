@@ -110,11 +110,11 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
               <button
                 onClick={() => onDelete && onDelete(conv.id)}
                 title="Delete conversation"
-                className="shrink-0 hidden group-hover:flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
+                className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 max-md:flex md:hidden group-hover:md:flex"
               >
                 <Trash2 size={15} />
               </button>
-              <ChevronRight size={14} className="text-neutral-300 dark:text-neutral-600 shrink-0 hidden group-hover:block" />
+              <ChevronRight size={14} className="text-neutral-300 dark:text-neutral-600 shrink-0 block max-md:block md:hidden group-hover:md:block" />
             </div>
           );
         })

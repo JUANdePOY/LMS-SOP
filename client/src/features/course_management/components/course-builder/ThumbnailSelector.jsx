@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Image as ImageIcon, Upload, X, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useVideoUpload } from "@/features/course_management/hooks/useVideoUpload";
 import { uploadContent } from "@/features/course_management/api/content.api";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 /**
  * Thumbnail selector for video (and other) lessons.
@@ -38,7 +39,7 @@ export default function ThumbnailSelector({ courseId, moduleId, value, onChange 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <div className="flex h-28 w-48 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
           {value ? (
-            <img src={value} alt="Lesson thumbnail" className="h-full w-full object-cover" />
+            <img src={resolveFileUrl(value)} alt="Lesson thumbnail" className="h-full w-full object-cover" />
           ) : (
             <div className="space-y-1 text-center">
               <ImageIcon size={22} className="mx-auto text-neutral-300" />

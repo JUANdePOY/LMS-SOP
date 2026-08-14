@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 import QuestionTypeTabs from "../components/QuestionTypeTabs";
 import AnswerKeyList from "../components/AnswerKeyList";
+import { FadeIn } from "@/shared/motion";
 
 const TIME_LIMIT_OPTIONS = [
   { value: "", label: "No limit" },
@@ -524,15 +525,17 @@ export default function QuizBuilderPage() {
               </CardContent>
             </Card>
           ) : (
-            <QuestionTypeTabs
-              questions={filteredQuestions}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              onEdit={(question) => setEditing(question)}
-              onDelete={requestDeleteQuestion}
-              onReorder={handleReorder}
-              searchQuery={searchQuery}
-            />
+            <FadeIn>
+              <QuestionTypeTabs
+                questions={filteredQuestions}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onEdit={(question) => setEditing(question)}
+                onDelete={requestDeleteQuestion}
+                onReorder={handleReorder}
+                searchQuery={searchQuery}
+              />
+            </FadeIn>
           )}
 
           {questions.length > 0 && (

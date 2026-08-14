@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ChevronDown, ChevronRight, FileText, Video, HelpCircle, ClipboardCheck, ExternalLink, File, Clock, Award } from "lucide-react";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 const LESSON_TYPE_META = {
   reading: { label: "Reading", icon: FileText, color: "text-[var(--color-primary)]" },
@@ -152,24 +153,32 @@ export default function LessonList({ lessons, modules, onLessonClick, courseId }
                           : "hover:bg-neutral-50 dark:hover:bg-neutral-800"
                       }`}
                     >
-                      <span className="flex items-center gap-2.5">
-                        <span
-                          className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs ${
-                            isCompleted
-                              ? "border-green-500 text-green-600 bg-green-50 dark:bg-green-500/10"
-                              : isInProgress
-                              ? "border-[var(--color-primary)] text-[var(--color-primary)] bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)]"
-                              : isLocked
-                              ? "border-neutral-300 text-neutral-400"
-                              : "border-neutral-300 text-neutral-500"
-                          }`}
-                        >
-                          {isCompleted ? "✓" : <LessonIcon size={10} className={lessonMeta.color} />}
-                        </span>
-                        <span className={isLocked ? "line-through opacity-60" : ""}>
-                          {lesson.title}
-                        </span>
-                      </span>
+                       <span className="flex items-center gap-2.5">
+                         {lesson.thumbnailUrl ? (
+                           <img
+                             src={resolveFileUrl(lesson.thumbnailUrl)}
+                             alt={lesson.title}
+                             className="h-8 w-11 shrink-0 rounded object-cover"
+                           />
+                         ) : (
+                           <span
+                             className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-xs ${
+                              isCompleted
+                                ? "border-green-500 text-green-600 bg-green-50 dark:bg-green-500/10"
+                                : isInProgress
+                                ? "border-[var(--color-primary)] text-[var(--color-primary)] bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)]"
+                                : isLocked
+                                ? "border-neutral-300 text-neutral-400"
+                                : "border-neutral-300 text-neutral-500"
+                            }`}
+                           >
+                             {isCompleted ? "✓" : <LessonIcon size={10} className={lessonMeta.color} />}
+                           </span>
+                         )}
+                         <span className={isLocked ? "line-through opacity-60" : ""}>
+                           {lesson.title}
+                         </span>
+                       </span>
                       <span className="flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500">
                         <LessonIcon size={10} className={lessonMeta.color} />
                         <span>{lessonMeta.label}</span>

@@ -4,6 +4,7 @@ import { useEnrollmentList } from "../hooks/useEnrollmentList";
 import EnrollmentTable from "../components/tables/EnrollmentTable";
 import EnrollStudentsModal from "../components/modals/EnrollStudentsModal";
 import { useAuth } from "@/contexts/AuthContext";
+import { FadeIn } from "@/shared/motion";
 
 export default function EnrollmentManagePage() {
   const { courseId } = useParams();
@@ -29,7 +30,9 @@ export default function EnrollmentManagePage() {
         <h1 className="text-xl font-bold">Enrollments</h1>
         <button onClick={() => setOpen(true)} className="rounded-lg px-3 py-1.5 text-sm btn-primary">Enroll Students</button>
       </div>
-      <EnrollmentTable enrollments={enrollments} onUnenroll={() => refetch?.()} />
+      <FadeIn>
+        <EnrollmentTable enrollments={enrollments} onUnenroll={() => refetch?.()} />
+      </FadeIn>
       <EnrollStudentsModal open={open} onClose={() => setOpen(false)} onSubmit={() => refetch?.()} />
     </div>
   );

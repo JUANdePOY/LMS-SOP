@@ -30,6 +30,7 @@ import CreateAssignmentModal from "../components/modals/CreateAssignmentModal";
 import EnrollStudentsModal from "../components/modals/EnrollStudentsModal";
 import GradeSubmissionModal from "../components/modals/GradeSubmissionModal";
 import EditCourseModal from "../components/modals/EditCourseModal";
+import { StaggerList, MotionItem } from "@/shared/motion";
 
 const TABS = [
   { key: "overview", label: "Overview" },
@@ -140,21 +141,17 @@ export default function CourseDetailsPage() {
           </div>
         </div>
       </div>
-      <div className="flex gap-1 border-b border-neutral-200 dark:border-neutral-700 overflow-x-auto">
+      <StaggerList className="flex gap-1 border-b border-neutral-200 dark:border-neutral-700 overflow-x-auto">
         {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+          <MotionItem as="button" key={t.key} onClick={() => setTab(t.key)} className={`px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
               tab === t.key
                 ? "border-[var(--color-primary)] text-[var(--color-primary)] dark:border-[var(--color-primary)] dark:text-[var(--color-primary)]"
                 : "border-transparent text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
-            }`}
-          >
+            }`}>
             {t.label}
-          </button>
+          </MotionItem>
         ))}
-      </div>
+      </StaggerList>
       <div>
         {tab === "overview" && <OverviewTab course={course} />}
         {tab === "modules" && <ModulesTab modules={modules} onAdd={() => toggleModal("module")} onEdit={(m) => {}} onDelete={() => {}} />}
