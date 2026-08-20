@@ -12,6 +12,7 @@ import TaskDetailsModal from '../components/TaskDetailsModal';
 import TaskListTable from '../components/TaskListTable';
 import TaskListTableSkeleton from '../components/TaskListTableSkeleton';
 import TaskForm from '../components/TaskForm';
+import ClientsPage from './ClientsPage';
 import { StaggerList, MotionItem, FadeIn } from "@/shared/motion";
 
 export default function TasksPage() {
@@ -29,6 +30,7 @@ export default function TasksPage() {
   const [editingTask, setEditingTask] = useState(null);
   const [saving, setSaving] = useState(false);
   const [viewingTaskId, setViewingTaskId] = useState(null);
+  const [tab, setTab] = useState('tasks');
 
   useEffect(() => {
     if (!isAnyAdmin) {
@@ -162,6 +164,30 @@ const handleDelete = (id) => {
 
   return (
     <div className="max-w-6xl mx-auto">
+      <div className="flex items-center gap-1 mb-6 border-b border-[var(--border)]">
+        {[
+          { key: 'tasks', label: 'Tasks' },
+          { key: 'clients', label: 'Clients' },
+        ].map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              tab === t.key
+                ? 'border-blue-500 text-[var(--text-primary)]'
+                : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'clients' ? (
+        <ClientsPage />
+      ) : (
+        <>
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
@@ -289,6 +315,8 @@ const handleDelete = (id) => {
         open={viewingTaskId !== null}
         onClose={() => setViewingTaskId(null)}
       />
+      </>
+      )}
     </div>
   );
 }

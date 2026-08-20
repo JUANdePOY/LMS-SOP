@@ -818,6 +818,14 @@ async function runMigrations() {
   } catch (err) {
     console.error('Task management migration error:', err.message);
   }
+
+  try {
+    const { runClientMigrations } = require('../migrations/clientManagement');
+    await runClientMigrations();
+    console.log('Client management migrations applied');
+  } catch (err) {
+    console.error('Client management migration error:', err.message);
+  }
 }
 
 async function initDatabase() {

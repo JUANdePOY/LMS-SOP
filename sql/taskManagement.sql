@@ -96,3 +96,48 @@ CREATE TABLE IF NOT EXISTS task_comments (
   INDEX idx_task_comments_task (task_id),
   INDEX idx_task_comments_user (user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Table: clients
+-- ============================================================
+CREATE TABLE IF NOT EXISTS clients (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  client_name VARCHAR(255) NOT NULL,
+  created_by INT DEFAULT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_clients_name (client_name),
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_clients_name (client_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Table: client_businesses
+-- ============================================================
+CREATE TABLE IF NOT EXISTS client_businesses (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  client_id INT NOT NULL,
+  business_name VARCHAR(255) NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
+  UNIQUE KEY uk_client_business (client_id, business_name),
+  INDEX idx_client_businesses_client (client_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================
+-- Task hierarchy + client/business links
+-- ============================================================
+ALTER TABLE tasks ADD COLUMN parent_task_id INT DEFAULT NULL;
+ALTER TABLE tasks ADD COLUMN client_id INT DEFAULT NULL;
+ALTER TABLE tasks ADD COLUMN client_business_id INT DEFAULT NULL;
+ALTER TABLE tasks ADD COLUMN business_id INT DEFAULT NULL;
+
+ALTER TABLE tasks ADD CONSTRAINT fk_tasks_parent FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE;
+ALTER TABLE tasks ADD CONSTRAINT fk_tasks_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL;
+ALTER TABLE tasks ADD CONSTRAINT fk_tasks_client_business FOREIGN KEY (client_business_id) REFERENCES client_businesses(id) ON DELETE SET NULL;
+ALTER TABLE tasks ADD CONSTRAINT fk_tasks_business FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE SET NULL;
+
+ALTER TABLE tasks ADD INDEX idx_tasks_parent (parent_task_id);
+ALTER TABLE tasks ADD INDEX idx_tasks_client (client_id);
+ALTER TABLE tasks ADD INDEX idx_tasks_business (business_id);

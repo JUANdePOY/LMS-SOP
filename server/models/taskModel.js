@@ -6,14 +6,16 @@ const TASK_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancel
 async function create(data) {
   const {
     title, description, priority, status, start_datetime, deadline_datetime,
-    estimated_hours, category, created_by
+    estimated_hours, category, created_by, parent_task_id, client_id,
+    client_business_id, business_id
   } = data;
 
   const [result] = await db.query(
     `INSERT INTO tasks (
        title, description, priority, status, start_datetime, deadline_datetime,
-       estimated_hours, category, created_by
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       estimated_hours, category, created_by, parent_task_id, client_id,
+       client_business_id, business_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       title,
       description || null,
@@ -24,6 +26,10 @@ async function create(data) {
       estimated_hours || null,
       category || null,
       created_by,
+      parent_task_id ?? null,
+      client_id ?? null,
+      client_business_id ?? null,
+      business_id ?? null,
     ]
   );
   return result.insertId;
@@ -31,9 +37,15 @@ async function create(data) {
 
 async function findById(id) {
   const [rows] = await db.query(
-    `SELECT t.*, u.full_name AS created_by_name
+    `SELECT t.*, u.full_name AS created_by_name,
+            cl.client_name,
+            cb.business_name AS client_business_name,
+            b.business_name AS business_name, b.business_code AS business_code
      FROM tasks t
      LEFT JOIN users u ON t.created_by = u.id
+     LEFT JOIN clients cl ON t.client_id = cl.id
+     LEFT JOIN client_businesses cb ON t.client_business_id = cb.id
+     LEFT JOIN businesses b ON t.business_id = b.id
      WHERE t.id = ?
      LIMIT 1`,
     [id]
@@ -48,9 +60,15 @@ async function findAll(filters = {}) {
   const offset = (page - 1) * limit;
 
   let sql = `
-    SELECT t.*, u.full_name AS created_by_name
+    SELECT t.*, u.full_name AS created_by_name,
+           cl.client_name,
+           cb.business_name AS client_business_name,
+           b.business_name AS business_name, b.business_code AS business_code
     FROM tasks t
     LEFT JOIN users u ON t.created_by = u.id
+    LEFT JOIN clients cl ON t.client_id = cl.id
+    LEFT JOIN client_businesses cb ON t.client_business_id = cb.id
+    LEFT JOIN businesses b ON t.business_id = b.id
     WHERE 1 = 1
   `;
   const params = [];
@@ -126,7 +144,8 @@ async function findAll(filters = {}) {
 async function update(id, updates) {
   const allowed = [
     'title', 'description', 'priority', 'status',
-    'start_datetime', 'deadline_datetime', 'estimated_hours', 'category'
+    'start_datetime', 'deadline_datetime', 'estimated_hours', 'category',
+    'parent_task_id', 'client_id', 'client_business_id', 'business_id'
   ];
   const sets = [];
   const params = [];

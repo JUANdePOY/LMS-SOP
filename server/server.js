@@ -87,6 +87,7 @@ const eventsRoutes = require('./routes/events');
 const calendarRoutes = require('./routes/calendar');
 const messagesRoutes = require('./routes/messages');
 const tasksRoutes = require('./routes/tasks');
+const clientsRoutes = require('./routes/clients');
 const taskAttachmentPublicFile = require('./services/taskAttachmentPublicFile');
 const employeeRoutes = require('./routes/employee');
 const notificationsRoutes = require('./routes/notifications');
@@ -157,6 +158,7 @@ app.use('/api/calendar', calendarRoutes);
 app.use('/api/messages', messagesRoutes);
 app.use('/api/tasks/attachments', taskAttachmentPublicFile.router);
 app.use('/api/tasks', tasksRoutes);
+app.use('/api/clients', clientsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 
 const searchRoutes = require('./routes/search');

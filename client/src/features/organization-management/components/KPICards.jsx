@@ -1,6 +1,6 @@
-import { Building2, Layers } from 'lucide-react';
+import { Building2, Layers, Users } from 'lucide-react';
 
-const iconMap = { Building2, Layers };
+const iconMap = { Building2, Layers, Users };
 
 const colorMap = {
   blue:    'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
@@ -9,7 +9,7 @@ const colorMap = {
 };
 
 function KPICard({ label, value, sub, color }) {
-  const Icon = iconMap[sub.icon];
+  const Icon = iconMap[sub?.icon] || Building2;
   const c = colorMap[color];
 
   return (

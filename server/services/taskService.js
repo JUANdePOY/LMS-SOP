@@ -132,6 +132,30 @@ async function listTasks(filters = {}, actorId) {
     assignments: assignmentsMap[task.id] || [],
   }));
 
+  // Build the parent -> direct children hierarchy and compute each parent's
+  // auto progress rate as the average of its direct sub-tasks' progress.
+  const childrenMap = {};
+  for (const task of rows) {
+    if (task.parent_task_id != null) {
+      if (!childrenMap[task.parent_task_id]) childrenMap[task.parent_task_id] = [];
+      childrenMap[task.parent_task_id].push(task);
+    }
+  }
+
+  for (const task of rows) {
+    const children = childrenMap[task.id];
+    if (children && children.length > 0) {
+      const rates = children.map((c) => Number(c.progress_rate ?? 0));
+      const avg = Math.round(rates.reduce((sum, r) => sum + r, 0) / rates.length);
+      task.progress_rate = avg;
+      task.is_parent = true;
+      task.subtasks = children;
+    } else {
+      task.is_parent = false;
+      task.subtasks = [];
+    }
+  }
+
   return { ...result, rows };
 }
 
@@ -222,7 +246,10 @@ async function createTask(payload, actorId) {
     throw error;
   }
 
-  const { title, description, priority, status, start_datetime, deadline_datetime, estimated_hours, category } = validation.value;
+  const {
+    title, description, priority, status, start_datetime, deadline_datetime,
+    estimated_hours, category, parent_task_id, client_id, client_business_id, business_id
+  } = validation.value;
 
   if (new Date(deadline_datetime) <= new Date(start_datetime)) {
     const error = new Error('Deadline must be after start date and time');
@@ -268,6 +295,10 @@ async function createTask(payload, actorId) {
     deadline_datetime,
     estimated_hours,
     category,
+    parent_task_id: parent_task_id ?? null,
+    client_id: client_id ?? null,
+    client_business_id: client_business_id ?? null,
+    business_id: business_id ?? null,
     created_by: actorId,
   });
 

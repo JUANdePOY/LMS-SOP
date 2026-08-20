@@ -67,6 +67,32 @@ function validateTaskPayload(body, requireAll = true) {
     value.category = body.category ? String(body.category).trim() : null;
   }
 
+  const hasParent = body.parent_task_id !== undefined && body.parent_task_id !== null && body.parent_task_id !== '';
+
+  for (const key of ['parent_task_id', 'client_id', 'client_business_id', 'business_id']) {
+    if (body[key] !== undefined) {
+      if (body[key] === null || body[key] === '') {
+        value[key] = null;
+      } else {
+        const intVal = parseInt(body[key], 10);
+        if (!Number.isFinite(intVal) || intVal <= 0) {
+          errors.push(`${key.replace(/_/g, ' ')} must be a positive integer`);
+        } else {
+          value[key] = intVal;
+        }
+      }
+    }
+  }
+
+  // Main tasks (no parent) must be linked to a Business, Client, and Client Business.
+  if (requireAll && !hasParent && !value.parent_task_id) {
+    for (const key of ['business_id', 'client_id', 'client_business_id']) {
+      if (value[key] === undefined || value[key] === null) {
+        errors.push(`${key.replace(/_/g, ' ')} is required`);
+      }
+    }
+  }
+
   return { valid: errors.length === 0, value, errors };
 }
 
