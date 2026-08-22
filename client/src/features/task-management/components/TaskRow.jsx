@@ -365,9 +365,6 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
               task.status === 'Completed' || task.status === 'Cancelled' ? undefined : onProgressChange
             }
           />
-          {task.is_parent && (
-            <span className="text-[10px] text-[var(--text-muted)]">auto</span>
-          )}
         </div>
 
        <div className="min-w-0">
