@@ -96,7 +96,7 @@ export default function TaskDetailsPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-4">
-        <Link to="/tasks" className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700">
+        <Link to="/tasks" className="inline-flex items-center gap-1 text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">
           <ArrowLeft size={16} /> Back to Tasks
         </Link>
       </div>
@@ -113,7 +113,7 @@ export default function TaskDetailsPage() {
               {task.category && <span className="text-xs text-[var(--text-muted)]">{task.category}</span>}
             </div>
           </div>
-          <button onClick={() => setShowProgress(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors shadow-sm">
+          <button onClick={() => setShowProgress(true)} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-active)] transition-colors shadow-sm">
             Update Progress
           </button>
         </div>
@@ -131,7 +131,7 @@ export default function TaskDetailsPage() {
           {TABS.map((tab) => {
             const Icon = tab.icon;
             return (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab.id ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
+               <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors ${activeTab === tab.id ? 'border-b-2 border-[var(--color-primary)] text-[var(--color-primary)] dark:text-[var(--color-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'}`}>
                 <Icon size={14} /> {tab.label}
               </button>
             );
@@ -178,7 +178,7 @@ export default function TaskDetailsPage() {
                     {p.attachments?.length > 0 && (
                       <div className="mt-2 space-y-1">
                         {p.attachments.map((att) => (
-                          <a key={att.id} href={att.view_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                          <a key={att.id} href={att.view_url} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--color-primary)] hover:underline flex items-center gap-1">
                             <Paperclip size={10} /> {att.original_name || att.file_name}
                           </a>
                         ))}

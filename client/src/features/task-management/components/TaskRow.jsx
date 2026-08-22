@@ -227,13 +227,13 @@ function AssigneePopover({ assignments, onSave, onClose }) {
         ))}
       </div>
       <div className="mt-2 flex items-center justify-between">
-        <button type="button" onClick={add} className="text-xs font-medium text-blue-600 hover:text-blue-700">
+        <button type="button" onClick={add}             className="text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">
           + Add assignment
         </button>
         <button
           type="button"
           onClick={handleDone}
-          className="rounded-lg bg-neutral-900 dark:bg-neutral-100 px-3 py-1 text-xs font-medium text-white dark:text-neutral-900 hover:bg-neutral-800"
+          className="rounded-lg bg-[var(--color-primary)] px-3 py-1 text-xs font-medium text-white hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-active)]"
         >
           Done
         </button>
@@ -308,7 +308,7 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onAddSubtask(task); }}
-              className="shrink-0 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-blue-400 transition-opacity"
+              className="shrink-0 text-[var(--text-muted)] hover:text-[var(--color-primary)] dark:hover:text-[var(--color-primary)] transition-opacity"
               aria-label="Add sub-task"
               title="Add sub-task"
             >
@@ -318,7 +318,7 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onViewTask?.(task); }}
-            className="shrink-0 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-blue-400 transition-opacity"
+            className="shrink-0 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--color-primary)] dark:hover:text-[var(--color-primary)] transition-opacity"
             aria-label="Open task details"
             title="Open details"
           >

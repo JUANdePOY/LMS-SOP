@@ -193,7 +193,7 @@ export default function SubtaskInlineRow({ parentTask, onSave, onCancel, canMana
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); handleSave(); }}
-              className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400 transition-colors"
+              className="p-1.5 rounded-lg bg-[var(--color-primary)]/10 text-[var(--color-primary)] hover:bg-[var(--color-primary)]/20 dark:text-[var(--color-primary)] transition-colors"
               aria-label="Save sub-task"
               title="Save (Enter)"
             >

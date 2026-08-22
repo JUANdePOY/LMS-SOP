@@ -311,7 +311,7 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
               <button
                 type="button"
                 onClick={addAssignment}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                className="text-xs text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] font-medium"
               >
                 + Add Assignment
               </button>
@@ -342,7 +342,7 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
             type="button"
             onClick={handleSubmit}
             disabled={saving}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-active)] transition-colors disabled:opacity-50"
           >
             {saving ? 'Saving...' : initialData ? 'Update' : 'Create'}
           </button>

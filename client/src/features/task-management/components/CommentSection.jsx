@@ -61,7 +61,7 @@ function CommentItem({ comment, currentUser, isReplyTarget, onReply, depth = 0 }
           type="button"
           onClick={() => onReply(comment)}
           className={`mt-1 inline-flex items-center gap-1 text-[11px] font-medium transition-colors ${
-            isReplyTarget ? 'text-blue-600' : 'text-[var(--text-muted)] hover:text-blue-600'
+            isReplyTarget ? 'text-[var(--color-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--color-primary)]'
           } ${isOwn ? 'mr-1' : 'ml-1'}`}
         >
           <Reply size={12} /> {isReplyTarget ? 'Replying…' : 'Reply'}

@@ -39,7 +39,7 @@ const CreateAssignmentModal = memo(function CreateAssignmentModal({ open, onClos
       <div className="relative z-10 w-full max-w-lg rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 sm:px-6 py-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] dark:bg-[var(--color-primary)]/15 dark:text-[var(--color-primary)]">
               <Users size={15} />
             </div>
             <h2 className="text-base font-semibold text-[var(--text-primary)]">Assignments</h2>
@@ -59,7 +59,7 @@ const CreateAssignmentModal = memo(function CreateAssignmentModal({ open, onClos
               <AssignmentInput key={idx} assignment={a} onUpdate={(u) => update(idx, u)} onRemove={() => remove(idx)} canRemove />
             ))}
           </div>
-          <button type="button" onClick={add} className="mt-2 text-xs font-medium text-blue-600 hover:text-blue-700">
+          <button type="button" onClick={add} className="mt-2 text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">
             + Add assignment
           </button>
         </div>
@@ -72,7 +72,7 @@ const CreateAssignmentModal = memo(function CreateAssignmentModal({ open, onClos
           </button>
           <button
             onClick={handleDone}
-            className="rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-xs font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
+            className="rounded-lg bg-[var(--color-primary)] px-4 py-2 text-xs font-medium text-white hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-active)] transition-colors"
           >
             Done
           </button>
