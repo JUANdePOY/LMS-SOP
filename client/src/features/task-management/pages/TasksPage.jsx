@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Filter, X, RefreshCw, AlertTriangle, ClipboardList, Clock, XCircle, CheckCircle } from 'lucide-react';
+import { Search, Plus, X, RefreshCw, AlertTriangle, ClipboardList, Clock, XCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/components/ui/Toast';
 import { cn } from '@/lib/utils';
@@ -122,6 +122,11 @@ const handleDelete = (id) => {
   };
 
   const handleProgressChange = useCallback(async (taskId, rate) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (task && (task.status === 'Completed' || task.status === 'Cancelled')) {
+      toast.error('Update the Status Before editing the progress rate');
+      return;
+    }
     try {
       const payload = { task_id: taskId, completion_rate: rate };
       if (rate === 100) {
@@ -132,7 +137,7 @@ const handleDelete = (id) => {
     } catch (err) {
       toast.error(err.message || 'Failed to update progress');
     }
-  }, [refresh, toast]);
+  }, [refresh, toast, tasks]);
 
   const handleInlineUpdate = async (task, changes) => {
     const payload = {
@@ -191,8 +196,7 @@ const handleDelete = (id) => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
-            <Filter size={20} className="text-neutral-400" />
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">
             Tasks & Projects
           </h1>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Create, assign, and monitor tasks</p>

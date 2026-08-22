@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { TASK_STATUS_LABELS } from '../constants/taskConstants';
 import { TaskRow } from './TaskRow';
 import SubtaskInlineRow from './SubtaskInlineRow';
+import TaskTreeConnector from './TaskTreeConnector';
 
 function StatusGroup({
   status,
@@ -33,6 +34,8 @@ function StatusGroup({
   const taskRows = (tasks || []).map((task) => {
     const isCollapsed = collapsedParents.has(task.id);
     const subtasks = isCollapsed ? [] : (task.subtasks || []);
+    const showInline = !isCollapsed && creatingParentId === task.id;
+    const hasChildrenBlock = subtasks.length > 0 || showInline;
     return (
       <Fragment key={task.id}>
         <TaskRow
@@ -53,30 +56,41 @@ function StatusGroup({
           }
           canManage={canManage}
         />
-        {subtasks.map((sub) => (
-          <TaskRow
-            key={sub.id}
-            task={sub}
-            depth={1}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onStatusChange={onStatusChange}
-            onInlineUpdate={onInlineUpdate}
-            onViewTask={onViewTask}
-            onProgressChange={onProgressChange}
-            canManage={canManage}
-          />
-        ))}
-        {!isCollapsed && creatingParentId === task.id && (
-          <SubtaskInlineRow
-            parentTask={task}
-            canManage={canManage}
-            onSave={async (payload) => {
-              await onCreateSubtask?.(payload);
-              setCreatingParentId(null);
-            }}
-            onCancel={() => setCreatingParentId(null)}
-          />
+        {hasChildrenBlock && (
+          <div className="relative border-l-2 border-[var(--border)] ml-[22px] pl-3">
+            {subtasks.map((sub, idx) => (
+              <TaskTreeConnector
+                key={sub.id}
+                isLast={idx === subtasks.length - 1 && !showInline}
+                stubTop={18}
+              >
+                <TaskRow
+                  task={sub}
+                  depth={1}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onStatusChange={onStatusChange}
+                  onInlineUpdate={onInlineUpdate}
+                  onViewTask={onViewTask}
+                  onProgressChange={onProgressChange}
+                  canManage={canManage}
+                />
+              </TaskTreeConnector>
+            ))}
+            {showInline && (
+              <TaskTreeConnector isLast stubTop={18}>
+                <SubtaskInlineRow
+                  parentTask={task}
+                  canManage={canManage}
+                  onSave={async (payload) => {
+                    await onCreateSubtask?.(payload);
+                    setCreatingParentId(null);
+                  }}
+                  onCancel={() => setCreatingParentId(null)}
+                />
+              </TaskTreeConnector>
+            )}
+          </div>
         )}
       </Fragment>
     );

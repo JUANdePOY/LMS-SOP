@@ -282,11 +282,15 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
   return (
     <div
       className="group grid items-center gap-3 border-b border-[var(--border)] px-4 py-2.5 last:border-b-0 hover:bg-[var(--bg-hover)] transition-colors"
-      style={{ gridTemplateColumns: TASK_TABLE_GRID_COLS, paddingLeft: 16 + depth * 28 }}
+      style={{ gridTemplateColumns: TASK_TABLE_GRID_COLS, paddingLeft: 16 }}
     >
-      <span onClick={(e) => e.stopPropagation()}>
-        <StatusMenu status={task.status} onStatusChange={(newStatus) => onStatusChange?.(task, newStatus)} />
-      </span>
+      {depth > 0 ? (
+        <span aria-hidden="true" />
+      ) : (
+        <span onClick={(e) => e.stopPropagation()}>
+          <StatusMenu status={task.status} onStatusChange={(newStatus) => onStatusChange?.(task, newStatus)} />
+        </span>
+      )}
 
         <div className="min-w-0 flex items-center gap-1.5">
           {onToggleCollapse && (
@@ -354,7 +358,13 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
        </div>
 
         <div className="min-w-0">
-          <ProgressBar rate={task.progress_rate} taskId={task.id} onProgressChange={onProgressChange} />
+          <ProgressBar
+            rate={task.progress_rate}
+            taskId={task.id}
+            onProgressChange={
+              task.status === 'Completed' || task.status === 'Cancelled' ? undefined : onProgressChange
+            }
+          />
           {task.is_parent && (
             <span className="text-[10px] text-[var(--text-muted)]">auto</span>
           )}

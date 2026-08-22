@@ -82,7 +82,7 @@ export default function SubtaskInlineRow({ parentTask, onSave, onCancel, canMana
   return (
     <div
       onClick={(e) => { if (e.target === e.currentTarget) inputRef.current?.focus(); }}
-      className="group relative grid items-start gap-3 border-b border-l-2 border-l-blue-500 border-[var(--border)] pl-[34px] pr-4 py-3 last:border-b-0 cursor-text bg-blue-50/40 dark:bg-blue-500/[0.06] ring-1 ring-inset ring-blue-500/10 transition-colors"
+      className="group relative grid items-start gap-3 border-b border-[var(--border)] pl-[34px] pr-4 py-3 last:border-b-0 cursor-text bg-blue-50/40 dark:bg-blue-500/[0.06] ring-1 ring-inset ring-blue-500/10 transition-colors"
       style={{ gridTemplateColumns: TASK_TABLE_GRID_COLS }}
     >
       <span className="flex h-[30px] items-center" onClick={(e) => e.stopPropagation()}>

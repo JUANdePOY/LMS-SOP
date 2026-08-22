@@ -53,6 +53,14 @@ async function findById(id) {
   return rows[0] || null;
 }
 
+async function findByParentId(parentId) {
+  const [rows] = await db.query(
+    `SELECT t.* FROM tasks t WHERE t.parent_task_id = ?`,
+    [parentId]
+  );
+  return rows;
+}
+
 async function findAll(filters = {}) {
   const {
     status, priority, category, search, created_by, task_ids, page = 1, limit = 20
@@ -175,7 +183,10 @@ async function remove(id) {
 async function getStats(filters = {}) {
   const { created_by } = filters;
 
-  let whereClause = 'WHERE 1 = 1';
+  // Only count top-level tasks so the KPI card matches the task table, which
+  // renders only tasks without a parent (subtasks are nested under parents
+  // and therefore excluded from the row list).
+  let whereClause = 'WHERE parent_task_id IS NULL';
   const params = [];
 
   if (created_by) {
@@ -193,8 +204,16 @@ async function getStats(filters = {}) {
     params
   );
 
+  // A "Pending" task whose deadline has already passed is effectively Overdue, so
+  // it counts as Overdue (not Pending). Both counts are parent-scoped by the
+  // whereClause above, keeping the KPI card consistent with the task table.
   const [overdueRows] = await db.query(
-    `SELECT COUNT(*) AS count FROM tasks ${whereClause} AND status != 'Completed' AND deadline_datetime < NOW()`,
+    `SELECT COUNT(*) AS count FROM tasks ${whereClause} AND (status = 'Overdue' OR (status = 'Pending' AND deadline_datetime < NOW()))`,
+    params
+  );
+
+  const [pendingRows] = await db.query(
+    `SELECT COUNT(*) AS count FROM tasks ${whereClause} AND status = 'Pending' AND deadline_datetime >= NOW()`,
     params
   );
 
@@ -218,6 +237,7 @@ async function getStats(filters = {}) {
     stats.by_priority[row.priority.toLowerCase()] = Number(row.count);
   }
 
+  stats.pending = Number(pendingRows[0]?.count || 0);
   stats.overdue = Number(overdueRows[0]?.count || 0);
 
   return stats;
@@ -228,6 +248,7 @@ module.exports = {
   TASK_STATUSES,
   create,
   findById,
+  findByParentId,
   findAll,
   update,
   remove,
