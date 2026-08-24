@@ -44,7 +44,12 @@ function SOPWorkspacePage() {
   const [auditLogsLoading, setAuditLogsLoading] = useState(false);
   const [sop, setSop] = useState(null);
   const [actionLoading, setActionLoading] = useState({});
-  const [showLeftSidebar, setShowLeftSidebar] = useState(false);
+  // The module (left) panel is open by default on desktop, where it renders as
+  // a persistent sidebar. On small screens it becomes an overlay drawer, so we
+  // keep it closed by default there to avoid covering content on load.
+  const [showLeftSidebar, setShowLeftSidebar] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= 1024
+  );
   const [showRightSidebar, setShowRightSidebar] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
 

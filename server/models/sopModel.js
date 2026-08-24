@@ -208,7 +208,11 @@ async function canAccessSop(sop, user) {
 // department owns the SOP" from "this SOP was assigned here."
 async function findAll(filters = {}) {
   const cols = await getSopsColumns();
-  const { search, status, department_id, category_id, exclude_status, page = 1, limit = 20, user } = filters;
+  const { search, status, department_id, category_id, exclude_categorized, exclude_status, page = 1, limit = 20, user } = filters;
+  // `exclude_categorized=true` returns only SOPs with no category (used by the
+  // hierarchy "Uncategorized SOPs" section). The value may arrive as a string
+  // from query params, so normalize both boolean and "true" string.
+  const excludeCategorized = exclude_categorized === true || exclude_categorized === 'true';
   const offset = (page - 1) * limit;
 
   // is_assigned_department is purely about the sop_assignments /
@@ -279,6 +283,9 @@ async function findAll(filters = {}) {
     sql += ' AND s.category_id = ?';
     params.push(category_id);
   }
+  if (excludeCategorized && cols.hasCategory) {
+    sql += ' AND s.category_id IS NULL';
+  }
 
   const restrictionSql = restrictionWhere(user, cols, 's');
   if (restrictionSql) {
@@ -332,6 +339,9 @@ async function findAll(filters = {}) {
   if (category_id && cols.hasCategory) {
     countSql += ' AND s.category_id = ?';
     countParams.push(category_id);
+  }
+  if (excludeCategorized && cols.hasCategory) {
+    countSql += ' AND s.category_id IS NULL';
   }
 
   const countRestrictionSql = restrictionWhere(user, cols, 's');

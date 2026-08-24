@@ -58,9 +58,10 @@ async function findById(id) {
   return rows[0] || null;
 }
 
-async function findByName(name, departmentId = null) {
-  let sql = 'SELECT * FROM categories WHERE name = ? AND deleted_at IS NULL';
+async function findByName(name, departmentId = null, { includeDeleted = false } = {}) {
+  let sql = 'SELECT * FROM categories WHERE name = ?';
   const params = [name];
+  if (!includeDeleted) sql += ' AND deleted_at IS NULL';
   if (departmentId) {
     sql += ' AND department_id = ?';
     params.push(departmentId);
@@ -71,12 +72,24 @@ async function findByName(name, departmentId = null) {
 
 async function create(data) {
   const { name, department_id, description, created_by } = data;
-  const [result] = await db.query(
-    `INSERT INTO categories (public_id, name, department_id, description, is_active, created_by, created_at, updated_at)
-     VALUES (UUID(), ?, ?, ?, TRUE, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-    [name, department_id, description, created_by]
-  );
-  return result.insertId;
+  try {
+    const [result] = await db.query(
+      `INSERT INTO categories (public_id, name, department_id, description, is_active, created_by, created_at, updated_at)
+       VALUES (UUID(), ?, ?, ?, TRUE, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+      [name, department_id, description, created_by]
+    );
+    return result.insertId;
+  } catch (err) {
+    // The unique key uq_categories_dept_name covers soft-deleted rows too, so a
+    // name that was previously trashed still blocks a new insert. Surface it as a
+    // clean conflict instead of leaking the raw ER_DUP_ENTRY to the client.
+    if (err.code === 'ER_DUP_ENTRY') {
+      const dup = new Error(`A category named "${name}" already exists in this department`);
+      dup.code = 'CODE_EXISTS';
+      throw dup;
+    }
+    throw err;
+  }
 }
 
 async function update(id, data) {

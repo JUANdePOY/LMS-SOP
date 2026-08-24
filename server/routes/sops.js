@@ -29,7 +29,10 @@ async function requireSopReadScope(req, res, next) {
 
 async function requireSopWriteScope(req, res, next) {
   try {
-    const sop = await sopModel.findById(parseInt(req.params.id || req.params.sopId, 10));
+    // Include trashed SOPs: restore/permanent-delete act on SOPs that are
+    // already in the trash, so findById (which excludes deleted rows) would
+    // wrongly 404 before the operation runs.
+    const sop = await sopModel.findByIdIncludingDeleted(parseInt(req.params.id || req.params.sopId, 10));
     if (!sop) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'SOP not found' } });
     }

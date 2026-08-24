@@ -41,8 +41,9 @@ export default function HierarchyNode({ node, depth = 0, creating = false, readO
   const isExpanded = expandedDeptIds.has(node.id);
   const isCreatingCategory = creatingCategoryFor === node.id;
   // Inline "new file" mode for this department's own (uncategorized) SOPs.
-  const isCreatingLeafSop =
-    !hasChildren &&
+  // Available for any department, not just leaf ones — SOPs that don't belong
+  // to any category still live under their parent department.
+  const isCreatingDeptSop =
     creatingSopFor?.departmentId === node.id &&
     creatingSopFor?.categoryId == null;
 
@@ -52,7 +53,7 @@ export default function HierarchyNode({ node, depth = 0, creating = false, readO
   const [sopError, setSopError] = useState(null);
 
   useEffect(() => {
-    if (hasChildren || !isExpanded || sops !== null) return;
+    if (!isExpanded || sops !== null) return;
 
     let cancelled = false;
     setLoadingSops(true);
@@ -76,7 +77,7 @@ export default function HierarchyNode({ node, depth = 0, creating = false, readO
     return () => {
       cancelled = true;
     };
-  }, [hasChildren, isExpanded, sops, node.id]);
+  }, [isExpanded, sops, node.id]);
 
   const handleRowClick = () => {
     toggleDepartment(node.id);
@@ -214,17 +215,17 @@ export default function HierarchyNode({ node, depth = 0, creating = false, readO
             </div>
           ) : null}
 
-          {!hasChildren && (
+          {isExpanded && (
             <div className="ml-[28px] mt-2 mb-1 border-t border-[var(--border)] pt-3">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-xs font-semibold tracking-wide text-[var(--text-muted)]">
-                  {node.name} SOPs {sops ? `(${sops.length})` : ''}
+                  Uncategorized SOPs {sops ? `(${sops.length})` : ''}
                 </p>
                 {!readOnly && (
                 <button
                   type="button"
                   onClick={() => {
-                    if (isCreatingLeafSop) cancelCreateSop();
+                    if (isCreatingDeptSop) cancelCreateSop();
                     else startCreateSop(node.id, null);
                   }}
                   disabled={creating}
@@ -238,7 +239,7 @@ export default function HierarchyNode({ node, depth = 0, creating = false, readO
                 )}
               </div>
 
-              {isCreatingLeafSop ? (
+              {isCreatingDeptSop ? (
                 <div className="mb-2">
                   <InlineCreateRow
                     icon={FileText}

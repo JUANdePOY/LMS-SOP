@@ -3,9 +3,11 @@ import { TrashIcon, Undo2 } from 'lucide-react';
 import { useTrashSops } from '@/features/sop-management/hooks/useTrashSops';
 import { TRASH_TABS } from '@/features/sop-management/constants/sopConstants';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
+import { useToast } from '@/shared/components/ui/Toast';
 
 function TrashPanel() {
   const sopTrash = useTrashSops();
+  const { toast } = useToast();
 
   const [trashTab, setTrashTab] = useState(TRASH_TABS.SOPS);
   const [confirmDialog, setConfirmDialog] = useState({
@@ -61,6 +63,12 @@ function TrashPanel() {
     if (!confirmDialog || !confirmDialog.isOpen) return;
     const { type, id } = confirmDialog;
 
+    const successMessages = {
+      restore: 'Item restored successfully',
+      permanent: 'Item permanently deleted',
+      empty: 'Trash emptied successfully',
+    };
+
     try {
       if (type === 'restore') {
         await sopTrash.restore(id);
@@ -69,11 +77,19 @@ function TrashPanel() {
       } else if (type === 'empty') {
         await sopTrash.emptyAll();
       }
+      await sopTrash.refetch();
+      toast.success(successMessages[type] || 'Action completed');
     } catch (err) {
-      console.error('Action failed:', err);
+      const message =
+        err?.response?.data?.error?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Action failed. Please try again.';
+      console.error('Trash action failed:', err);
+      toast.error(message);
+    } finally {
+      setConfirmDialog({ isOpen: false, type: 'restore', entityType: TRASH_TABS.SOPS, id: undefined, title: '', message: '', variant: 'default' });
     }
-
-    setConfirmDialog({ isOpen: false, type: 'restore', entityType: TRASH_TABS.SOPS, id: undefined, title: '', message: '', variant: 'default' });
   };
 
   const renderSopTrashItems = () => {

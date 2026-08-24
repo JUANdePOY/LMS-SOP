@@ -72,9 +72,21 @@ router.post('/', requireAdmin, [
       return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
     }
 
-    const existing = await categoryModel.findByName(req.body.name, req.body.department_id);
-    if (existing) {
-      return res.status(409).json({ status: 'error', message: 'Category already exists in this department', code: 'CODE_EXISTS' });
+    // A single lookup that also considers soft-deleted rows: the unique key
+    // still reserves the (department_id, name) pair for trashed categories, so
+    // detecting them here lets us return a clear, actionable conflict instead of
+    // a raw database error.
+    const duplicate = await categoryModel.findByName(
+      req.body.name,
+      req.body.department_id,
+      { includeDeleted: true }
+    );
+    if (duplicate) {
+      const inTrash = duplicate.deleted_at != null;
+      const message = inTrash
+        ? `A category named "${req.body.name}" already exists in this department (it may be in the trash). Restore it or use a different name.`
+        : `A category named "${req.body.name}" already exists in this department.`;
+      return res.status(409).json({ status: 'error', message, code: 'CODE_EXISTS' });
     }
 
     const categoryData = {
@@ -96,6 +108,16 @@ router.post('/', requireAdmin, [
 
     res.status(201).json({ status: 'success', message: 'Category created successfully', data: { id, ...categoryData } });
   } catch (err) {
+    // Defense-in-depth: if a concurrent insert or a missed pre-check slips a
+    // duplicate through, never leak the raw database error — return a clean
+    // conflict. (mysql2 sets err.code = 'ER_DUP_ENTRY'.)
+    if (err.code === 'ER_DUP_ENTRY' || err.code === 'CODE_EXISTS') {
+      return res.status(409).json({
+        status: 'error',
+        message: `A category named "${req.body?.name || 'this name'}" already exists in this department.`,
+        code: 'CODE_EXISTS',
+      });
+    }
     console.error('Category create error:', err);
     res.status(500).json({ status: 'error', message: 'Failed to create category', code: 'DB_ERROR' });
   }

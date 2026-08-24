@@ -11,22 +11,30 @@ const dbConfig = {
   database: process.env.DB_NAME || 'pafr',
   port: parseInt(process.env.DB_PORT, 10) || 3306,
   waitForConnections: true,
-  // Lower limit: Hostinger shared MySQL caps the per-user hourly connection
-  // *attempt* count (max_connections_per_hour). A single instance only needs a
-  // handful of concurrent connections; keeping this small directly caps how
-  // many connects each process performs (instances × limit must stay well
-  // under the hourly quota).
-  connectionLimit: 5,
-  // Queue requests instead of erroring when all connections are busy.
+  // Hostinger shared MySQL enforces `max_connections_per_hour` (500). That
+  // limit counts *connection attempts* — not concurrent connections — so the
+  // cheapest way to stay under it is to open very few connections and keep
+  // them alive. We cap the pool small and give idle connections a long life so
+  // the same few connections are reused across the whole hour instead of being
+  // closed and re-opened every minute (the behavior that was burning the quota
+  // fastest on a low/moderate-traffic site).
+  connectionLimit: 3,
+  // Queue requests instead of erroring or spawning extra connections when all
+  // are busy. queueLimit 0 = unbounded queue (no new connection attempts).
   queueLimit: 0,
-  // Reclaim idle connections so the pool does not hold the maximum open against
-  // the server indefinitely, reducing persistent connection pressure.
-  maxIdle: 2,
-  idleTimeout: 60000,
+  // Keep as many idle connections as the limit so the pool never trims idle
+  // connections and re-opens them during quiet periods.
+  maxIdle: 3,
+  // Hold idle connections open for an hour so they are reused across the
+  // billing window instead of being recycled every 60s.
+  idleTimeout: 3600000,
   connectTimeout: 30000,
   timezone: '+00:00',
   multipleStatements: true,
   charset: 'utf8mb4',
+  // Keep TCP keepalive on so the remote MySQL proxy (srv2101.hstgr.io) does not
+  // silently drop our idle connection, which would force a reconnect (another
+  // counted attempt) on the next query.
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000
 };
@@ -36,8 +44,41 @@ const dbConfig = {
 // remaining (and resetting) quota with guaranteed-failing connects, we open a
 // cooldown circuit breaker: while blocked, queries fail fast without touching
 // MySQL, and we let the provider's hourly counter reset.
+//
+// The breaker MUST survive process restarts. The original in-memory flag
+// started every launch at 0, so a platform that launches the app multiple times
+// (deploy, crash-recovery, multiple workers) would re-attempt the doomed
+// connect on every launch and re-exhaust the 500/hr budget before the hour ever
+// elapsed. We persist the block timestamp to disk so every launch — including
+// duplicate/platform launches — reads the same cooldown and skips connecting
+// until the quota truly resets. Stale timestamps are harmless: any value in the
+// past simply means "not blocked" again.
 const QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 60 minutes
-let quotaBlockedUntil = 0;
+const COOLDOWN_FILE = path.join(__dirname, '..', '.tmp', 'quota_cooldown_until');
+
+function loadCooldown() {
+  try {
+    if (fs.existsSync(COOLDOWN_FILE)) {
+      const ts = parseInt(fs.readFileSync(COOLDOWN_FILE, 'utf8'), 10);
+      if (!Number.isNaN(ts)) return ts;
+    }
+  } catch {
+    /* ignore unreadable/missing file */
+  }
+  return 0;
+}
+
+function persistCooldown(ts) {
+  try {
+    const dir = path.dirname(COOLDOWN_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(COOLDOWN_FILE, String(ts));
+  } catch {
+    /* ignore — the in-memory flag still protects this process */
+  }
+}
+
+let quotaBlockedUntil = loadCooldown();
 
 function isQuotaBlocked() {
   return Date.now() < quotaBlockedUntil;
@@ -48,6 +89,7 @@ function blockQuotaForCooldown() {
   // Only extend, never shorten an existing block.
   if (now >= quotaBlockedUntil) {
     quotaBlockedUntil = now + QUOTA_COOLDOWN_MS;
+    persistCooldown(quotaBlockedUntil);
     console.error(
       `MySQL user connection quota reached. Blocking new DB connections for ${QUOTA_COOLDOWN_MS / 60000} min to let the hourly counter reset.`
     );
