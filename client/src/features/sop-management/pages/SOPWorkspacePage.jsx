@@ -13,6 +13,7 @@ import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import { useModules } from '@/features/sop-management/hooks/useModules';
 import { useAttachments } from '@/features/sop-management/hooks/useAttachments';
 import { useVersions } from '@/features/sop-management/hooks/useVersions';
+import { useResizablePanel } from '@/shared/hooks/useResizablePanel';
 import { getSop, getWorkflow, getAuditLogs, submitSop, approveSop, rejectSop, publishSop, transitionSop } from '@/features/sop-management/services/sopService';
 import { enqueueBanner } from '@/shared/stores/notificationStore.js';
 import { StaggerList, MotionItem, FadeIn } from '@/shared/motion';
@@ -52,6 +53,11 @@ function SOPWorkspacePage() {
   );
   const [showRightSidebar, setShowRightSidebar] = useState(false);
   const [confirmAction, setConfirmAction] = useState(null);
+
+  // Resizable Modules (left) panel. Width persists per browser so a user's
+  // preferred size survives reloads. The handle is only shown at lg+ because
+  // below that the panel becomes a full-screen overlay drawer.
+  const leftPanel = useResizablePanel({ initialWidth: 320, storageKey: 'sop:left-panel-width' });
 
   // Derive the current version ID: prefer SOP's own current_version_id,
   // fall back to workflow's sop_version if SOP's is not yet set
@@ -325,12 +331,14 @@ function SOPWorkspacePage() {
         <div className="flex-1 overflow-y-auto">
           <div className="flex flex-col lg:flex-row gap-6">
             <aside
+              ref={leftPanel.panelRef}
+              style={showLeftSidebar ? { width: leftPanel.width } : undefined}
               className={`
                 fixed inset-0 z-50 lg:static lg:inset-auto lg:z-auto lg:bg-transparent lg:dark:bg-transparent
-                transition-all duration-200 ease-in-out
+                ${leftPanel.isDragging ? 'transition-none' : 'transition-all duration-200 ease-in-out'}
                 ${showLeftSidebar ? 'block' : 'hidden'}
                 lg:block
-                ${showLeftSidebar ? 'lg:w-80 lg:opacity-100' : 'lg:w-0 lg:overflow-hidden lg:opacity-0'}
+                ${showLeftSidebar ? 'lg:opacity-100' : 'lg:w-0 lg:overflow-hidden lg:opacity-0'}
               `}
             >
               {showLeftSidebar && (
@@ -352,6 +360,18 @@ function SOPWorkspacePage() {
                 <div className="p-2 max-h-[calc(100vh-140px)] overflow-y-auto"><ModuleList modules={modules} loading={modulesLoading} error={modulesError} onAdd={handleAddModule} onEdit={handleModuleEdit} onDelete={handleModuleDelete} onReorder={reorderModules} /></div>
               </div>
             </aside>
+
+            {showLeftSidebar && (
+              <div
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize modules panel"
+                onPointerDown={leftPanel.onPointerDown}
+                className="hidden lg:block w-1.5 shrink-0 -mx-1.5 cursor-col-resize group relative z-10"
+              >
+                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-neutral-200 dark:bg-neutral-700 group-hover:bg-indigo-500 transition-colors" />
+              </div>
+            )}
 
             <main className="flex-1 min-w-0">
               <div className="px-4 sm:px-6 py-8">
@@ -470,12 +490,14 @@ function SOPWorkspacePage() {
 
       <div className="flex flex-col lg:flex-row gap-6">
         <aside
+          ref={leftPanel.panelRef}
+          style={showLeftSidebar ? { width: leftPanel.width } : undefined}
           className={`
             fixed inset-0 z-50 lg:static lg:inset-auto lg:z-auto lg:bg-transparent lg:dark:bg-transparent
-            transition-all duration-200 ease-in-out
+            ${leftPanel.isDragging ? 'transition-none' : 'transition-all duration-200 ease-in-out'}
             ${showLeftSidebar ? 'block' : 'hidden'}
             lg:block
-            ${showLeftSidebar ? 'lg:w-80 lg:opacity-100' : 'lg:w-0 lg:overflow-hidden lg:opacity-0'}
+            ${showLeftSidebar ? 'lg:opacity-100' : 'lg:w-0 lg:overflow-hidden lg:opacity-0'}
           `}
         >
           {showLeftSidebar && (
@@ -497,6 +519,18 @@ function SOPWorkspacePage() {
             <div className="p-2 max-h-[calc(100vh-140px)] overflow-y-auto"><ModuleList modules={modules} loading={modulesLoading} error={modulesError} onAdd={handleAddModule} onEdit={handleModuleEdit} onDelete={handleModuleDelete} onReorder={reorderModules} /></div>
           </FadeIn>
         </aside>
+
+        {showLeftSidebar && (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize modules panel"
+            onPointerDown={leftPanel.onPointerDown}
+            className="hidden lg:block w-1.5 shrink-0 -mx-1.5 cursor-col-resize group relative z-10"
+          >
+            <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-neutral-200 dark:bg-neutral-700 group-hover:bg-indigo-500 transition-colors" />
+          </div>
+        )}
 
         <main className="flex-1 min-w-0">
           {modulesLoading ? (
