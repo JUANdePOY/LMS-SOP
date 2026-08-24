@@ -7,6 +7,7 @@ router.use(authenticateToken);
 
 router.post('/', quizAttemptController.startAttempt);
 router.get('/', quizAttemptController.listMyAttempts);
+router.get('/summary', quizAttemptController.getMySummary);
 
 // Integrity event logging (student, during an active attempt)
 router.post('/violations', quizAttemptController.logViolation);

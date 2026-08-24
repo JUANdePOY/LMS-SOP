@@ -34,6 +34,10 @@ export async function listAttempts(filters = {}) {
   return request(`${API_BASE}?${toQuery(filters)}`);
 }
 
+export async function getMyAssessmentSummary() {
+  return request(`${API_BASE}/summary`);
+}
+
 export async function getAttemptResults(id) {
   return request(`${API_BASE}/${id}/results`);
 }

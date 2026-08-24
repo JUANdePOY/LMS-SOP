@@ -7,6 +7,7 @@ import {
   getUserCertificates,
 } from '@/services/api';
 import { getEmployeeEnrollmentsWithCourses } from '../api/employee.api';
+import { getMyAssessmentSummary } from '@/features/assessments/api/attempt.api';
 import { useAuth } from '@/contexts/AuthContext';
 
 function unwrap(res) {
@@ -31,19 +32,21 @@ export default function useEmployeeTrainingDashboard() {
   const [sopAcknowledgements, setSopAcknowledgements] = useState([]);
   const [enrollments, setEnrollments] = useState([]);
   const [certificates, setCertificates] = useState([]);
+  const [assessmentSummary, setAssessmentSummary] = useState({ passed: 0, total: 0 });
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const userId = user?.id;
-      const [announcementsRes, eventsRes, myTasksRes, acksRes, enrollmentsRes, certificatesRes] = await Promise.all([
+      const [announcementsRes, eventsRes, myTasksRes, acksRes, enrollmentsRes, certificatesRes, assessmentSummaryRes] = await Promise.all([
         getAnnouncements({ limit: 10 }),
         getEvents({ limit: 10 }),
         getMyTasks({ limit: 50 }),
         getMySopAcknowledgements().catch(() => null),
         getEmployeeEnrollmentsWithCourses({ limit: 100 }).catch(() => null),
         userId ? getUserCertificates(userId).catch(() => ({ data: { rows: [] } })) : Promise.resolve({ data: { rows: [] } }),
+        getMyAssessmentSummary().catch(() => ({ data: { passed: 0, total: 0 } })),
       ]);
 
       const announcementsData = ensureArray(unwrap(announcementsRes), []);
@@ -60,6 +63,8 @@ export default function useEmployeeTrainingDashboard() {
       const certificatesList = certificatesData && typeof certificatesData === 'object' && !Array.isArray(certificatesData)
         ? (certificatesData.rows || certificatesData.data || [])
         : ensureArray(certificatesData, []);
+
+      setAssessmentSummary(unwrap(assessmentSummaryRes) || { passed: 0, total: 0 });
 
       setAnnouncements(announcementsData.slice(0, 4));
       setEvents(eventsData.slice(0, 4));
@@ -94,6 +99,8 @@ export default function useEmployeeTrainingDashboard() {
   const pendingSops = totalSops - acknowledgedSops;
 
   const certificatesEarned = certificates.length;
+  const assessmentsPassed = Number(assessmentSummary.passed) || 0;
+  const assessmentsTotal = Number(assessmentSummary.total) || 0;
 
   const sopHighlights = sopAcknowledgements.slice(0, 4).map((ack) => {
     const sopTitle = ack.sop_title || ack.title || 'Untitled SOP';
@@ -131,7 +138,8 @@ export default function useEmployeeTrainingDashboard() {
     stats: {
       sopsAssigned: totalSops,
       trainingProgress,
-      assessmentsPassed: '92%',
+      assessmentsPassed: String(assessmentsPassed),
+      assessmentsTotal,
       certificatesEarned: String(certificatesEarned),
     },
     announcements: announcements.slice(0, 4),

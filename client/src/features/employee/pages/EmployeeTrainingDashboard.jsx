@@ -19,14 +19,6 @@ import { useNotifications } from "@/shared/stores/notificationStore.js";
 import BannerSection from "@/shared/components/ui/BannerSection";
 import { StaggerList, MotionItem, FadeIn } from "@/shared/motion";
 
-const LEADERBOARD = [
-  { rank: 1, name: "Jane D.", points: 145 },
-  { rank: 2, name: "Mark T.", points: 120 },
-  { rank: 3, name: "Maria S.", points: 110 },
-  { rank: 4, name: "John R.", points: 95 },
-  { rank: 5, name: "Lisa M.", points: 90 },
-];
-
 function FilterSelect({ value, onChange, children }) {
   return (
     <div className="relative">
@@ -210,7 +202,8 @@ export default function EmployeeTrainingDashboard() {
             value={dashboard.stats.assessmentsPassed}
             icon={ClipboardCheck}
             color="purple"
-            progress={92}
+            caption={dashboard.stats.assessmentsTotal > 0 ? `${Math.round((Number(dashboard.stats.assessmentsPassed) / dashboard.stats.assessmentsTotal) * 100)}% pass rate` : 'No assessments yet'}
+            progress={dashboard.stats.assessmentsTotal > 0 ? Math.round((Number(dashboard.stats.assessmentsPassed) / dashboard.stats.assessmentsTotal) * 100) : 0}
             trend="up"
           />
         </MotionItem>

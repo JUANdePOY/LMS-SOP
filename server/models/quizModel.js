@@ -928,4 +928,22 @@ module.exports = {
   getQuizResults,
   getQuizAttempts,
   getMyQuizzes,
+  getAssessmentSummary,
 };
+
+// Counts distinct assessments the user has attempted and how many they passed.
+async function getAssessmentSummary(userId) {
+  const [rows] = await db.query(
+    `SELECT
+       COUNT(DISTINCT r.quiz_id) AS total,
+       COUNT(DISTINCT CASE WHEN r.passed = 1 THEN r.quiz_id END) AS passed
+     FROM quiz_results r
+     WHERE r.user_id = ?`,
+    [userId]
+  );
+  const row = rows[0] || { total: 0, passed: 0 };
+  return {
+    total: Number(row.total) || 0,
+    passed: Number(row.passed) || 0,
+  };
+}

@@ -267,6 +267,15 @@ async function listMyAttempts(req, res) {
   }
 }
 
+async function getMySummary(req, res) {
+  try {
+    const data = await quizModel.getAssessmentSummary(req.user.id);
+    res.json({ success: true, data, message: 'OK' });
+  } catch (err) {
+    sendError(res, err, 'Failed to load assessment summary');
+  }
+}
+
 async function getAttemptResults(req, res) {
   try {
     const attempt = await quizModel.getAttempt(req.params.id);
@@ -444,6 +453,7 @@ module.exports = {
   submitAttempt,
   cancelAttempt,
   listMyAttempts,
+  getMySummary,
   getAttemptResults,
   getQuizResultsForTaker,
   logViolation,

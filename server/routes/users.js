@@ -78,6 +78,11 @@ router.get('/leaderboard', async (req, res) => {
       effectiveDepartmentId = req.user.department_id;
       effectiveBusinessId = req.user.business_id;
     } else if (req.user.role !== 'super_admin') {
+      // Regular employees should only see their own department's leaderboard,
+      // not everyone across the business.
+      if (req.user.department_id) {
+        effectiveDepartmentId = req.user.department_id;
+      }
       effectiveBusinessId = req.user.business_id;
     }
 
