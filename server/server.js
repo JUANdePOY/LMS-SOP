@@ -91,6 +91,7 @@ const clientsRoutes = require('./routes/clients');
 const taskAttachmentPublicFile = require('./services/taskAttachmentPublicFile');
 const employeeRoutes = require('./routes/employee');
 const notificationsRoutes = require('./routes/notifications');
+const bannersRoutes = require('./routes/banners');
 
 const { templateRouter, templateFramePublicRouter, signatureRouter, signatureImageRouter, issuanceRouter } = require('./routes/certificates');
 const { certificateCourseLinkRouter } = require('./routes/certificate-course-links');
@@ -160,6 +161,7 @@ app.use('/api/tasks/attachments', taskAttachmentPublicFile.router);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/notifications', notificationsRoutes);
+app.use('/api/banners', bannersRoutes);
 
 const searchRoutes = require('./routes/search');
 app.use('/api/search', searchRoutes);

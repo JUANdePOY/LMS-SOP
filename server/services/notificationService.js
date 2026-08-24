@@ -1,15 +1,67 @@
 const db = require('../config/database');
 const { broadcastToUser } = require('../websocket/clients');
+const prefs = require('./notificationPreferenceService');
 
 const DEDUP_WINDOW_MS = 30 * 60 * 1000;
 
-async function createNotification({ userId, title, body, type = 'info', link, entityType, entityId }) {
+// A notification is in-app visible regardless of category preference (the user
+// can still open the panel and read it), but push/email/sound channels are
+// gated by the user's per-category and per-channel preferences and quiet hours.
+async function shouldSuppressChannels(userId, category) {
+  try {
+    const quiet = await prefs.isQuietHours(userId);
+    const categoryOn = await prefs.isCategoryEnabled(userId, category);
+    const pushOn = await prefs.isChannelEnabled(userId, 'push');
+    const soundOn = await prefs.isChannelEnabled(userId, 'sound');
+    return {
+      suppressPush: quiet || !categoryOn || !pushOn,
+      suppressSound: quiet || !categoryOn || !soundOn,
+    };
+  } catch {
+    return { suppressPush: false, suppressSound: false };
+  }
+}
+
+async function createNotification({
+  userId,
+  title,
+  body,
+  type = 'info',
+  link,
+  entityType,
+  entityId,
+  priority = 0,
+  category = 'system',
+  imageUrl = null,
+  scheduledAt = null,
+  expiresAt = null,
+  actionLabel = null,
+  actionUrl = null,
+  soundEnabled = 1,
+}) {
   if (!userId || !title) return null;
 
   const result = await db.query(
-    `INSERT INTO notifications (user_id, title, body, type, link, entity_type, entity_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [userId, String(title).slice(0, 255), body || null, type, link || null, entityType || null, entityId || null]
+    `INSERT INTO notifications
+      (user_id, title, body, type, link, entity_type, entity_id, priority, category, image_url, scheduled_at, expires_at, action_label, action_url, sound_enabled)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      userId,
+      String(title).slice(0, 255),
+      body || null,
+      type,
+      link || null,
+      entityType || null,
+      entityId || null,
+      priority || 0,
+      category || 'system',
+      imageUrl || null,
+      scheduledAt || null,
+      expiresAt || null,
+      actionLabel || null,
+      actionUrl || null,
+      soundEnabled ? 1 : 0,
+    ]
   );
 
   const notificationId = result[0]?.insertId || null;
@@ -26,13 +78,20 @@ async function createNotification({ userId, title, body, type = 'info', link, en
         link,
         entity_type: entityType,
         entity_id: entityId,
+        priority,
+        category,
+        image_url: imageUrl,
+        action_label: actionLabel,
+        action_url: actionUrl,
         created_at: new Date().toISOString(),
       },
     };
 
     const sent = broadcastToUser(userId, payload);
 
-    triggerDevicePush(userId, payload.data).catch(() => {});
+    const { suppressPush, suppressSound } = await shouldSuppressChannels(userId, category);
+    if (!suppressPush) triggerDevicePush(userId, payload.data).catch(() => {});
+    if (!suppressSound && soundEnabled) triggerSound(userId).catch(() => {});
   }
 
   return notificationId;
@@ -48,9 +107,9 @@ async function findExistingNotification(userId, entityType, entityId, action) {
   return rows[0] || null;
 }
 
-async function deduplicatedCreate({ userId, title, body, type, link, entityType, entityId }) {
+async function deduplicatedCreate({ userId, title, body, type, link, entityType, entityId, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled }) {
   if (!userId || !title || !entityType || !entityId) {
-    return createNotification({ userId, title, body, type, link, entityType, entityId });
+    return createNotification({ userId, title, body, type, link, entityType, entityId, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled });
   }
 
   const actionPrefix = `${entityType}_${title.toLowerCase().replace(/\s+/g, '_').slice(0, 30)}`;
@@ -60,18 +119,30 @@ async function deduplicatedCreate({ userId, title, body, type, link, entityType,
     const createdAt = new Date(existing.created_at).getTime();
     if (Date.now() - createdAt < DEDUP_WINDOW_MS) {
       await db.query(
-        `UPDATE notifications SET title = ?, body = ?, created_at = NOW(), type = ?, link = ?
+        `UPDATE notifications SET title = ?, body = ?, created_at = NOW(), type = ?, link = ?, priority = ?, category = ?, image_url = ?, action_label = ?, action_url = ?, sound_enabled = ?
          WHERE id = ?`,
-        [title, body || null, type || 'info', link || null, existing.id]
+        [
+          title,
+          body || null,
+          type || 'info',
+          link || null,
+          priority || 0,
+          category || 'system',
+          imageUrl || null,
+          actionLabel || null,
+          actionUrl || null,
+          soundEnabled ? 1 : 0,
+          existing.id,
+        ]
       );
       return existing.id;
     }
   }
 
-  return createNotification({ userId, title, body, type, link, entityType, entityId });
+  return createNotification({ userId, title, body, type, link, entityType, entityId, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled });
 }
 
-async function broadcastSystemChange({ title, body, type = 'info', link, entityType, entityId, excludeUserId = null, targetUserIds = null }) {
+async function broadcastSystemChange({ title, body, type = 'info', link, entityType, entityId, excludeUserId = null, targetUserIds = null, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled }) {
   if (!title || !entityType || !entityId) return [];
 
   try {
@@ -97,6 +168,14 @@ async function broadcastSystemChange({ title, body, type = 'info', link, entityT
           link,
           entityType,
           entityId,
+          priority,
+          category,
+          imageUrl,
+          scheduledAt,
+          expiresAt,
+          actionLabel,
+          actionUrl,
+          soundEnabled,
         }).catch(() => null)
       );
 
@@ -114,13 +193,20 @@ async function broadcastSystemChange({ title, body, type = 'info', link, entityT
           link,
           entity_type: entityType,
           entity_id: entityId,
+          priority,
+          category,
+          image_url: imageUrl,
+          action_label: actionLabel,
+          action_url: actionUrl,
           created_at: new Date().toISOString(),
         },
       };
 
       for (const id of createdIds) {
         broadcastToUser(id, payload).catch(() => {});
-        triggerDevicePush(id, payload.data).catch(() => {});
+        const { suppressPush, suppressSound } = await shouldSuppressChannels(id, category);
+        if (!suppressPush) triggerDevicePush(id, payload.data).catch(() => {});
+        if (!suppressSound && soundEnabled) triggerSound(id).catch(() => {});
       }
     }
 
@@ -130,8 +216,8 @@ async function broadcastSystemChange({ title, body, type = 'info', link, entityT
   }
 }
 
-async function createSystemNotification({ userId, title, body, type = 'info', link, entityType, entityId }) {
-  return deduplicatedCreate({ userId, title, body, type, link, entityType, entityId });
+async function createSystemNotification({ userId, title, body, type = 'info', link, entityType, entityId, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled }) {
+  return deduplicatedCreate({ userId, title, body, type, link, entityType, entityId, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled });
 }
 
 async function triggerDevicePush(userId, data) {
@@ -145,8 +231,21 @@ async function triggerDevicePush(userId, data) {
   }
 }
 
+// Surface a sound cue to the connected client via the WebSocket channel. The
+// actual audio playback is performed client-side, gated by the user's sound
+// preference and quiet hours (see shouldSuppressChannels).
+async function triggerSound(userId) {
+  try {
+    const { broadcastToUser } = require('../websocket/clients');
+    broadcastToUser(userId, { type: 'notification', action: 'sound', data: { at: new Date().toISOString() } });
+  } catch {
+    // no-op if WS unavailable
+  }
+}
+
 module.exports = {
   createNotification,
   broadcastSystemChange,
   createSystemNotification,
+  triggerSound,
 };

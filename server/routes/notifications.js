@@ -16,15 +16,40 @@ router.get('/', async (req, res) => {
     const userId = req.user.id;
     const limit = Math.min(parseInt(req.query.limit) || 20, 50);
     const unreadOnly = req.query.unread_only === 'true';
+    const category = req.query.category || null;
+    const priorityMin = req.query.priority ? parseInt(req.query.priority, 10) : null;
+    const cursor = req.query.cursor || null; // ISO created_at of last item
+
     let whereClause = 'WHERE user_id = ?';
     const params = [userId];
     if (unreadOnly) {
       whereClause += ' AND is_read = FALSE';
     }
+    if (category) {
+      whereClause += ' AND category = ?';
+      params.push(category);
+    }
+    if (priorityMin != null && !Number.isNaN(priorityMin)) {
+      whereClause += ' AND priority >= ?';
+      params.push(priorityMin);
+    }
+    if (cursor) {
+      whereClause += ' AND created_at < ?';
+      params.push(cursor);
+    }
+
     const [rows] = await db.query(
-      `SELECT id, title, body, type, is_read, link, entity_type, entity_id, created_at FROM notifications ${whereClause} ORDER BY created_at DESC LIMIT ?`,
-      [...params, limit]
+      `SELECT id, title, body, type, is_read, link, entity_type, entity_id, priority, category, image_url, action_label, action_url, created_at
+       FROM notifications ${whereClause} ORDER BY created_at DESC LIMIT ?`,
+      [...params, limit + 1]
     );
+
+    let nextCursor = null;
+    if (rows.length > limit) {
+      nextCursor = rows[limit - 1].created_at;
+      rows.length = limit;
+    }
+
     const [unreadResult] = await db.query(
       'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE',
       [userId]
@@ -32,6 +57,7 @@ router.get('/', async (req, res) => {
     res.json({
       notifications: rows,
       unread_count: unreadResult[0].count,
+      next_cursor: nextCursor,
     });
   } catch (err) {
     console.error('Notification fetch error:', err);
@@ -130,13 +156,13 @@ router.patch('/read', async (req, res) => {
     const notificationIds = req.body.ids || [];
     if (notificationIds.length === 0) {
       await db.query(
-        'UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE',
+        'UPDATE notifications SET is_read = TRUE, read_at = NOW() WHERE user_id = ? AND is_read = FALSE',
         [userId]
       );
     } else {
       const placeholders = notificationIds.map(() => '?').join(',');
       await db.query(
-        `UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND id IN (${placeholders})`,
+        `UPDATE notifications SET is_read = TRUE, read_at = NOW() WHERE user_id = ? AND id IN (${placeholders})`,
         [userId, ...notificationIds]
       );
     }
@@ -155,7 +181,7 @@ router.patch('/read-all', async (req, res) => {
   try {
     const userId = req.user.id;
     await db.query(
-      'UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE',
+      'UPDATE notifications SET is_read = TRUE, read_at = NOW() WHERE user_id = ? AND is_read = FALSE',
       [userId]
     );
     res.json({ success: true, unread_count: 0 });
@@ -208,6 +234,56 @@ router.delete('/', async (req, res) => {
   } catch (err) {
     console.error('Delete notifications error:', err);
     res.status(500).json({ code: 'DELETE_ERROR', message: 'Failed to delete notifications' });
+  }
+});
+
+router.get('/summary', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const [unread] = await db.query(
+      'SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND is_read = FALSE',
+      [userId]
+    );
+    const [byCategory] = await db.query(
+      `SELECT category, COUNT(*) as count
+       FROM notifications WHERE user_id = ? AND is_read = FALSE
+       GROUP BY category`,
+      [userId]
+    );
+    const counts = {};
+    byCategory.forEach((r) => {
+      counts[r.category] = r.count;
+    });
+    res.json({
+      success: true,
+      unread_total: unread[0].count,
+      by_category: counts,
+    });
+  } catch (err) {
+    console.error('Notification summary error:', err);
+    res.status(500).json({ code: 'SUMMARY_ERROR', message: 'Failed to load summary' });
+  }
+});
+
+router.get('/preferences', authenticateToken, async (req, res) => {
+  try {
+    const prefs = require('../services/notificationPreferenceService');
+    const data = await prefs.getPreferences(req.user.id);
+    res.json({ success: true, preferences: data });
+  } catch (err) {
+    console.error('Notification preferences error:', err);
+    res.status(500).json({ code: 'PREFS_ERROR', message: 'Failed to load preferences' });
+  }
+});
+
+router.put('/preferences', authenticateToken, async (req, res) => {
+  try {
+    const prefs = require('../services/notificationPreferenceService');
+    const data = await prefs.updatePreferences(req.user.id, req.body || {});
+    res.json({ success: true, preferences: data });
+  } catch (err) {
+    console.error('Notification preferences update error:', err);
+    res.status(500).json({ code: 'PREFS_UPDATE_ERROR', message: 'Failed to update preferences' });
   }
 });
 

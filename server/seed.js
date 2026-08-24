@@ -36,6 +36,7 @@ async function seed() {
     { name: 'view_audit_logs', display_name: 'View Audit Logs', category: 'audit' },
     { name: 'notifications.send', display_name: 'Send Notifications', category: 'notifications' },
     { name: 'notifications.broadcast', display_name: 'Broadcast Notifications', category: 'notifications' },
+    { name: 'banners.manage', display_name: 'Manage Banners', category: 'banners' },
   ];
 
   for (const perm of permissions) {
@@ -61,6 +62,7 @@ async function seed() {
     ['super_admin', 'manage_events'],
     ['super_admin', 'notifications.send'],
     ['super_admin', 'notifications.broadcast'],
+    ['super_admin', 'banners.manage'],
     ['admin', 'view_dashboard'],
     ['admin', 'manage_users'],
     ['admin', 'manage_departments'],
@@ -72,6 +74,7 @@ async function seed() {
     ['admin', 'manage_events'],
     ['admin', 'notifications.send'],
     ['admin', 'notifications.broadcast'],
+    ['admin', 'banners.manage'],
     ['department_head', 'view_dashboard'],
     ['department_head', 'manage_sops'],
     ['department_head', 'manage_courses'],
@@ -81,6 +84,7 @@ async function seed() {
     ['department_head', 'manage_events'],
     ['department_head', 'notifications.send'],
     ['department_head', 'notifications.broadcast'],
+    ['department_head', 'banners.manage'],
     ['employee', 'view_dashboard'],
     ['employee', 'view_reports'],
   ];

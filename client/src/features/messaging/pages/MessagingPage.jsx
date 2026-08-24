@@ -128,6 +128,16 @@ export default function MessagingPage() {
     }
   }, [selectedConversation, messages, user?.id, markAllAsRead, refreshConversations]);
 
+  // Keep the conversation list fresh so a newly received direct message
+  // (e.g. an employee messaging an admin) shows up for the recipient without
+  // requiring a manual page refresh.
+  useEffect(() => {
+    const id = setInterval(() => {
+      refreshConversations();
+    }, 10000);
+    return () => clearInterval(id);
+  }, [refreshConversations]);
+
   const handleSend = async (body) => {
     try {
       await send(body);

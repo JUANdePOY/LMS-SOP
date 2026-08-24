@@ -13,7 +13,14 @@ function sendError(res, err, fallback = 'Request failed') {
     if (err.code) body.code = err.code;
   }
   if (code === 500) console.error('[Messaging Controller Error]', err);
-  return res.status(code).json(body);
+  try {
+    return res.status(code).json(body);
+  } catch {
+    // Fallback: never let a serialization failure crash the process or throw
+    // "headers already sent" when the response was already flushed.
+    if (!res.headersSent) res.status(code).end(message);
+    return undefined;
+  }
 }
 
 function listConversations(req, res) {
@@ -74,11 +81,12 @@ async function createConversation(req, res) {
         .filter((p) => p.id !== userId)
         .map((p) => p.id);
       const sender = await messageModel.getParticipants(existing.id).then((ps) => ps.find((p) => p.id === userId));
+      const senderName = req.user?.full_name || sender?.full_name || 'Someone';
       for (const recipientId of recipientIds) {
         createNotification({
           userId: recipientId,
           title: 'New Message',
-          body: `${sender?.full_name || 'Someone'}: ${body.trim().slice(0, 120)}`,
+          body: `${senderName}: ${body.trim().slice(0, 120)}`,
           type: 'info',
           link: `/messaging`,
           entityType: 'message',
@@ -111,11 +119,12 @@ async function createConversation(req, res) {
         .filter((p) => p.id !== userId)
         .map((p) => p.id);
       const sender = conversation.participants.find((p) => p.id === userId);
+      const senderName = req.user?.full_name || sender?.full_name || 'Someone';
       for (const recipientId of recipientIds) {
         createNotification({
           userId: recipientId,
           title: 'New Conversation',
-          body: `${sender?.full_name || 'Someone'}: ${body.trim().slice(0, 120)}`,
+          body: `${senderName}: ${body.trim().slice(0, 120)}`,
           type: 'info',
           link: `/messaging`,
           entityType: 'message',
@@ -147,11 +156,12 @@ function sendMessage(req, res) {
         .filter((p) => p.id !== userId)
         .map((p) => p.id);
       const sender = conversation.participants.find((p) => p.id === userId);
+      const senderName = req.user?.full_name || sender?.full_name || 'Someone';
       for (const recipientId of recipientIds) {
         createNotification({
           userId: recipientId,
           title: 'New Message',
-          body: `${sender?.full_name || 'Someone'}: ${body.trim().slice(0, 120)}`,
+          body: `${senderName}: ${body.trim().slice(0, 120)}`,
           type: 'info',
           link: `/messaging`,
           entityType: 'message',

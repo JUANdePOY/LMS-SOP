@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Users, UserCheck, FileText, BookOpen,
   ClipboardCheck, Award, TrendingUp,
@@ -11,7 +11,6 @@ import {
 import { Card } from '@/shared/components/ui/card';
 import { cn } from '@/lib/utils';
 import { StaggerList, MotionItem } from '@/shared/motion';
-import BannerSection from '@/shared/components/ui/BannerSection';
 import useAdminDashboard from './hooks/useAdminDashboard';
 import { useNotifications } from '@/shared/stores/notificationStore.js';
 
@@ -53,7 +52,7 @@ function formatEventDate(dateStr) {
 
 export default function Dashboard() {
   const { data, loading, error, refetch } = useAdminDashboard();
-  const { notifications, unreadServerCount, fetch: fetchNotifications } = useNotifications();
+  const { fetch: fetchNotifications } = useNotifications();
   const [period, setPeriod] = useState('month');
 
   const trainingCompletionData = data
@@ -74,81 +73,6 @@ export default function Dashboard() {
   const messages = data?.messages || [];
   const departments = data?.departments?.performance || [];
   const taskStats = data?.tasks || {};
-
-  const dashboardBanners = useMemo(() => {
-    const banners = [];
-
-    const unreadNotifications = (notifications || []).filter((n) => !n.is_read);
-    unreadNotifications.forEach((notification) => {
-      const entityType = notification.entity_type || 'notification';
-      banners.push({
-        id: `notification-${notification.id}`,
-        type: entityType === 'enrollment' ? 'new_course' : entityType === 'sop' ? 'new_sop' : entityType === 'task' ? 'alert' : 'announcement',
-        title: notification.title,
-        message: notification.body || '',
-        link: notification.link || '/notifications',
-        ctaLabel: 'View',
-        priority: 5,
-      });
-    });
-
-    if (announcements.length > 0) {
-      banners.push({
-        id: 'dashboard-announcement',
-        type: 'announcement',
-        title: announcements[0].title || 'New Announcement',
-        message: announcements[0].body || announcements[0].description || 'Check the latest announcement.',
-        link: '/announcements',
-        ctaLabel: 'View announcement',
-        priority: 2,
-      });
-    }
-    if (events.length > 0) {
-      banners.push({
-        id: 'dashboard-event',
-        type: 'event',
-        title: events[0].title || 'Upcoming Event',
-        message: `Event on ${events[0].event_date || events[0].start_date || 'soon'}`,
-        link: '/events',
-        ctaLabel: 'View event',
-        priority: 2,
-      });
-    }
-    if (messages.length > 0) {
-      banners.push({
-        id: 'dashboard-message',
-        type: 'new_course',
-        title: 'New Message',
-        message: messages[0].subject || 'You have an unread message.',
-        link: '/messaging',
-        ctaLabel: 'Open message',
-        priority: 3,
-      });
-    }
-    if (taskStats?.overdue > 0) {
-      banners.push({
-        id: 'dashboard-overdue',
-        type: 'alert',
-        title: 'Overdue Tasks',
-        message: `${taskStats.overdue} task${taskStats.overdue !== 1 ? 's' : ''} are currently overdue.`,
-        link: '/tasks',
-        ctaLabel: 'View tasks',
-        priority: 4,
-      });
-    }
-    if (data?.training?.avg_progress >= 80) {
-      banners.push({
-        id: 'dashboard-progress',
-        type: 'achievement',
-        title: 'Training Progress',
-        message: `Average completion is ${data.training.avg_progress}%. Great work!`,
-        link: '/reports',
-        ctaLabel: 'View reports',
-        priority: 1,
-      });
-    }
-    return banners.sort((a, b) => (b.priority || 0) - (a.priority || 0));
-  }, [data, announcements, events, messages, taskStats, notifications]);
 
   useEffect(() => {
     fetchNotifications();
@@ -199,10 +123,6 @@ export default function Dashboard() {
           </span>
         </div>
       </div>
-
-      {dashboardBanners.length > 0 && (
-        <BannerSection items={dashboardBanners} carousel autoPlayInterval={5000} />
-      )}
 
       {/* Stat Cards - fluid grid */}
       <StaggerList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">

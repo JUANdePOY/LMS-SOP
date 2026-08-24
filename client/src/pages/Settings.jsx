@@ -9,6 +9,7 @@ import {
 } from "@/services/api";
 import UsersPanel from "@/pages/management/userspanel";
 import { usePushNotifications } from "@/features/notifications/hooks/usePushNotifications";
+import { useNotifications } from "@/shared/stores/notificationStore.js";
 
 const TABS = [
   { key: "users", label: "User Management", icon: Users },
@@ -202,6 +203,7 @@ export default function Settings() {
           </div>
 
           <PushNotificationsSection />
+          <NotificationPreferencesSection />
 
           <div className="flex items-center justify-between">
             <p className="text-xs text-neutral-500">{settings.length} configuration settings</p>
@@ -276,6 +278,129 @@ export default function Settings() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function NotificationPreferencesSection() {
+  const { preferences, fetchPreferences, updatePreferences } = useNotifications();
+  const [local, setLocal] = useState(null);
+
+  useEffect(() => {
+    fetchPreferences();
+  }, [fetchPreferences]);
+
+  useEffect(() => {
+    if (preferences) setLocal(preferences);
+  }, [preferences]);
+
+  const save = useCallback(async (patch) => {
+    setLocal((prev) => ({ ...prev, ...patch }));
+    await updatePreferences(patch);
+  }, [updatePreferences]);
+
+  if (!local) {
+    return (
+      <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4">
+        <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Notification Preferences</h3>
+        <p className="text-xs text-neutral-500 mt-1">Loading…</p>
+      </div>
+    );
+  }
+
+  const categories = [
+    { key: 'system', label: 'System' },
+    { key: 'social', label: 'Social' },
+    { key: 'training', label: 'Training' },
+    { key: 'security', label: 'Security' },
+    { key: 'marketing', label: 'Marketing' },
+  ];
+  const channels = [
+    { key: 'in_app', label: 'In-app' },
+    { key: 'push', label: 'Push' },
+    { key: 'email', label: 'Email' },
+    { key: 'sound', label: 'Sound' },
+  ];
+
+  const Toggle = ({ checked, onChange }) => (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40",
+        checked ? "bg-blue-600" : "bg-neutral-300 dark:bg-neutral-700"
+      )}
+    >
+      <span className={cn("inline-block h-4 w-4 transform rounded-full bg-white transition-transform", checked ? "translate-x-4" : "translate-x-0.5")} />
+    </button>
+  );
+
+  return (
+    <div className="rounded-xl border border-neutral-200 dark:border-neutral-800 p-4 space-y-4">
+      <div>
+        <h3 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Notification Preferences</h3>
+        <p className="text-xs text-neutral-500 mt-1">Choose what you hear about and how.</p>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-2">Categories</p>
+        <div className="space-y-2">
+          {categories.map((c) => (
+            <div key={c.key} className="flex items-center justify-between">
+              <span className="text-xs text-neutral-700 dark:text-neutral-300">{c.label}</span>
+              <Toggle
+                checked={Boolean(local.categories?.[c.key])}
+                onChange={(v) => save({ categories: { ...local.categories, [c.key]: v } })}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-2">Channels</p>
+        <div className="space-y-2">
+          {channels.map((c) => (
+            <div key={c.key} className="flex items-center justify-between">
+              <span className="text-xs text-neutral-700 dark:text-neutral-300">{c.label}</span>
+              <Toggle
+                checked={Boolean(local.channels?.[c.key])}
+                onChange={(v) => save({ channels: { ...local.channels, [c.key]: v } })}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-2">Quiet Hours</p>
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-neutral-700 dark:text-neutral-300">Mute outside these hours</span>
+          <Toggle
+            checked={Boolean(local.quiet_hours_enabled)}
+            onChange={(v) => save({ quiet_hours_enabled: v })}
+          />
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            type="time"
+            value={(local.quiet_hours_start || '22:00').slice(0, 5)}
+            disabled={!local.quiet_hours_enabled}
+            onChange={(e) => save({ quiet_hours_start: e.target.value })}
+            className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 text-xs"
+          />
+          <span className="text-xs text-neutral-400">to</span>
+          <input
+            type="time"
+            value={(local.quiet_hours_end || '07:00').slice(0, 5)}
+            disabled={!local.quiet_hours_enabled}
+            onChange={(e) => save({ quiet_hours_end: e.target.value })}
+            className="rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2 py-1 text-xs"
+          />
+        </div>
+      </div>
     </div>
   );
 }

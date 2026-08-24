@@ -38,7 +38,7 @@ api.interceptors.response.use(
     if (status === 401 && code === 'INVALID_TOKEN' && !originalRequest?.skipAuthRedirect && !originalRequest?._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
-          subscribeTokenRefresh(async (newToken, newRefreshToken) => {
+          subscribeTokenRefresh(async (newToken) => {
             try {
               originalRequest.headers.Authorization = `Bearer ${newToken}`;
               const response = await axios(originalRequest);
@@ -152,10 +152,16 @@ export const updateSetting = (key, data) => api.put(`/settings/${key}`, data);
 export const globalSearch = (params = {}) => api.get('/search', { params });
 
 export const getNotifications = (params = {}) => api.get('/notifications', { params });
+export const getNotificationSummary = () => api.get('/notifications/summary');
+export const getNotificationPreferences = () => api.get('/notifications/preferences');
+export const updateNotificationPreferences = (patch) => api.put('/notifications/preferences', patch);
 export const markNotificationsRead = (ids) => api.patch('/notifications/read', { ids });
 export const markAllNotificationsRead = () => api.patch('/notifications/read-all');
 export const deleteNotification = (id) => api.delete(`/notifications/${id}`);
 export const deleteNotifications = (ids) => api.delete('/notifications', { data: { ids } });
+
+export const getActiveBanners = () => api.get('/banners/active');
+export const recordBannerEvent = (id, event) => api.post(`/banners/${id}/events`, { event });
 
 export const getCourses = (params = {}) => api.get('/courses', { params });
 export const getCourse = (id) => api.get(`/courses/${id}`);

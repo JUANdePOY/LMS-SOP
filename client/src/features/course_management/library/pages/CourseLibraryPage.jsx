@@ -260,7 +260,7 @@ export default function CourseLibraryPage() {
               {isSuperAdmin ? "All Published Courses" : isAdmin ? "Business Course Library" : isDepartmentHead ? "Department Course Library" : "My Course Library"}
             </h1>
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
-              {isSuperAdmin ? "Browse and manage published courses across all businesses" : isAdmin ? "Browse published courses for your business" : isDepartmentHead ? "Browse published courses for your department" : "Browse available courses assigned to you"}
+              {isSuperAdmin ? "Browse and manage published courses across all businesses" : isAdmin ? "Browse published courses for your business" : isDepartmentHead ? "Browse published courses for your department" : "Browse all available courses in your department and business"}
             </p>
           </div>
           <div className="flex items-center gap-2">

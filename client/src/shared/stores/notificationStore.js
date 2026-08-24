@@ -1,7 +1,8 @@
 import { useSyncExternalStore, useState, useCallback, useEffect } from "react";
-import { getNotifications, markNotificationsRead, markAllNotificationsRead } from "@/services/api.js";
+import { getNotifications, markNotificationsRead, markAllNotificationsRead, getNotificationPreferences, updateNotificationPreferences } from "@/services/api.js";
 import { getConversations } from "@/features/messaging/api/message.api";
 import { playNotificationSound } from "@/shared/utils/notificationSound.js";
+import { isQuietHours } from "@/shared/utils/quietHours.js";
 
 const POLL_INTERVAL_MS = 25000;
 
@@ -43,6 +44,7 @@ let unreadMessageCount = 0;
 let pendingBanners = [];
 let previousUnreadServerCount = 0;
 let previousUnreadMessageCount = 0;
+let preferences = null;
 
 let cachedSnapshot = null;
 
@@ -67,6 +69,7 @@ function computeSnapshot() {
     unreadTotal: unreadServerCount + unreadMessageCount,
     unreadBannerCount: APP_BANNER_IDS.filter((id) => !dismissed.includes(id)).length,
     pendingBanners,
+    preferences,
   };
 }
 
@@ -114,7 +117,7 @@ export const NotificationStore = {
       }
       serverNotifications = Array.isArray(notifications) ? notifications : prevNotifications;
       unreadServerCount = data.unread_count || 0;
-      if (unreadServerCount > previousUnreadServerCount) {
+      if (unreadServerCount > previousUnreadServerCount && !isQuietHours(preferences) && preferences?.channels?.sound !== false) {
         playNotificationSound();
       }
       previousUnreadServerCount = unreadServerCount;
@@ -135,7 +138,7 @@ export const NotificationStore = {
       const res = await getConversations();
       const rows = Array.isArray(res?.data?.data) ? res.data.data : [];
       unreadMessageCount = rows.reduce((sum, c) => sum + (Number(c.unread_count) || 0), 0);
-      if (unreadMessageCount > previousUnreadMessageCount) {
+      if (unreadMessageCount > previousUnreadMessageCount && !isQuietHours(preferences) && preferences?.channels?.sound !== false) {
         playNotificationSound();
       }
       previousUnreadMessageCount = unreadMessageCount;
@@ -202,6 +205,28 @@ export const NotificationStore = {
     unreadMessageCount = 0;
     pendingBanners = [];
     emitChange();
+  },
+
+  async fetchPreferences() {
+    try {
+      const res = await getNotificationPreferences();
+      preferences = res.data?.preferences || null;
+    } catch {
+      preferences = null;
+    }
+    emitChange();
+    return preferences;
+  },
+
+  async updatePreferences(patch) {
+    try {
+      const res = await updateNotificationPreferences(patch);
+      preferences = res.data?.preferences || preferences;
+    } catch {
+      /* ignore */
+    }
+    emitChange();
+    return preferences;
   },
 
   enqueueBanner(entry) {
@@ -289,12 +314,21 @@ export const useNotifications = () => {
     await NotificationStore.markEntityTypeRead(entityType);
   }, []);
 
+  const fetchPreferences = useCallback(async () => {
+    return NotificationStore.fetchPreferences();
+  }, []);
+
+  const updatePreferences = useCallback(async (patch) => {
+    return NotificationStore.updatePreferences(patch);
+  }, []);
+
   return {
     notifications: store.serverNotifications,
     unreadCount: store.unreadTotal,
     unreadServerCount: store.unreadServerCount,
     unreadMessageCount: store.unreadMessageCount,
     dismissed: store.dismissed,
+    preferences: store.preferences,
     loading,
     fetched,
     fetch: load,
@@ -302,6 +336,8 @@ export const useNotifications = () => {
     markRead,
     markAllRead: markAllReadAction,
     markEntityTypeRead: markEntityTypeReadAction,
+    fetchPreferences,
+    updatePreferences,
     getSystemNotifications: () => NotificationStore.getSystemNotifications(),
     getUnreadSystemNotifications: () => NotificationStore.getUnreadSystemNotifications(),
     getEnrollmentNotificationCount: () => NotificationStore.getEnrollmentNotificationCount(),

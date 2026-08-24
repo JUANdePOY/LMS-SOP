@@ -854,6 +854,14 @@ async function runMigrations() {
   }
 
   try {
+    const { runBannerMigrations } = require('../migrations/banners');
+    await runBannerMigrations();
+    console.log('Banner & notification preference migrations applied');
+  } catch (err) {
+    console.error('Banner migration error:', err.message);
+  }
+
+  try {
     const { runTaskMigrations } = require('../migrations/taskManagement');
     await runTaskMigrations();
     console.log('Task management migrations applied');

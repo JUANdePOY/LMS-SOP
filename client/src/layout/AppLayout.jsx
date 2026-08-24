@@ -30,7 +30,9 @@ import NotificationBadge from "@/shared/components/ui/NotificationBadge";
 import { useNotificationStore, useNotificationPoller, useNotifications } from "@/shared/stores/notificationStore.js";
 import { PageTransition } from "@/shared/motion";
 import { useWebSocket } from "@/features/notifications/hooks/useWebSocket";
+import { useActiveBanners } from "@/features/notifications/hooks/useActiveBanners";
 import { useTabNotificationBadge } from "@/hooks/useTabNotificationBadge";
+import { isQuietHours } from "@/shared/utils/quietHours";
 
 const MOBILE_BOTTOM_NAV_ADMIN = [
   { name: "Home", path: "/", icon: BookOpen },
@@ -114,11 +116,18 @@ export default function AppLayout() {
   useNotificationPoller();
   useWebSocket();
   const notificationData = useNotifications();
+  const { fetchPreferences } = notificationData;
+  const { banners: activeBanners } = useActiveBanners();
   const messageBadgeCount = notificationData.unreadMessageCount || 0;
   const eventBadgeCount = notificationData.getUnreadCountByEntityType('event') || 0;
   const announcementBadgeCount = notificationData.getUnreadCountByEntityType('announcement') || 0;
   const systemBadgeCount = notificationData.getSystemNotificationCount() || 0;
   useTabNotificationBadge(messageBadgeCount + systemBadgeCount);
+  const quietHours = isQuietHours(notificationData.preferences);
+
+  useEffect(() => {
+    fetchPreferences();
+  }, [fetchPreferences]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -292,7 +301,7 @@ export default function AppLayout() {
                       )}
                     >
                       <Icon size={18} strokeWidth={active ? 2.5 : 2} />
-                      {badgeCount > 0 && <NotificationBadge count={badgeCount} />}
+                      {badgeCount > 0 && <NotificationBadge count={badgeCount} muted={quietHours} />}
                     </button>
                   );
                 })}
@@ -355,7 +364,7 @@ export default function AppLayout() {
           </header>
 
           <div className="flex-1 w-full px-4 sm:px-6 py-4 sm:py-6">
-            <BannerSection />
+            <BannerSection items={activeBanners} />
             <PageTransition>
               <Outlet />
             </PageTransition>

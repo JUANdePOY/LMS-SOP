@@ -224,73 +224,43 @@ export default function NewConversationModal({ open, onClose, currentUserId, onC
   return (
     <Modal open={open} onClose={handleClose} title="New Conversation" footer={footer}>
       <div className="space-y-3">
-        <div>
-          <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-            Type
-          </label>
-          <div className={cn(
-            "flex gap-1 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 p-1",
-            !canCreateGroup && "hidden"
-          )}>
-            <button
-              type="button"
-              onClick={() => handleModeChange(MODE.DIRECT)}
-              className={cn(
-                "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                mode === MODE.DIRECT
-                  ? "btn-primary"
-                  : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100"
-              )}
-            >
-              <MessageCircle size={12} className="mr-1 inline" />
-              Direct Message
-            </button>
-            <button
-              type="button"
-              onClick={() => handleModeChange(MODE.GROUP_FORUM)}
-              className={cn(
-                "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                mode === MODE.GROUP_FORUM
-                  ? "btn-primary"
-                  : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100"
-              )}
-            >
-              <BookOpen size={12} className="mr-1 inline" />
-              Group Forum
-            </button>
+        {canCreateGroup && (
+          <div>
+            <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+              Type
+            </label>
+            <div className={cn(
+              "flex gap-1 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 p-1"
+            )}>
+              <button
+                type="button"
+                onClick={() => handleModeChange(MODE.DIRECT)}
+                className={cn(
+                  "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                  mode === MODE.DIRECT
+                    ? "btn-primary"
+                    : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100"
+                )}
+              >
+                <MessageCircle size={12} className="mr-1 inline" />
+                Direct Message
+              </button>
+              <button
+                type="button"
+                onClick={() => handleModeChange(MODE.GROUP_FORUM)}
+                className={cn(
+                  "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                  mode === MODE.GROUP_FORUM
+                    ? "btn-primary"
+                    : "text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100"
+                )}
+              >
+                <BookOpen size={12} className="mr-1 inline" />
+                Group Forum
+              </button>
+            </div>
           </div>
-          {!canCreateGroup && (
-            <p className="text-[10px] text-neutral-500 dark:text-neutral-400">
-              Only Super Admins and Admins can create group forums.
-            </p>
-          )}
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-            Subject
-          </label>
-          <input
-            type="text"
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
-            placeholder="Conversation subject"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-            Message
-          </label>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={3}
-            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
-            placeholder="Type your message..."
-          />
-        </div>
+        )}
 
         <div>
           <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
@@ -331,6 +301,19 @@ export default function NewConversationModal({ open, onClose, currentUserId, onC
               </button>
             </div>
           )}
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
+            Message
+          </label>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={3}
+            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm"
+            placeholder="Type your message..."
+          />
         </div>
 
         {mode === MODE.GROUP_FORUM && (
