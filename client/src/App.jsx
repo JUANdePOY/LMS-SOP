@@ -229,7 +229,13 @@ const router = createBrowserRouter([
       { path: "tasks", element: LMSProtectedWrapper(TasksPage), handle: { title: "Tasks & Projects" } },
       { path: "tasks/:id", element: LMSProtectedWrapper(TaskDetailsPage), handle: { title: "Task Details" } },
       { path: "tasks/my", element: LMSProtectedWrapper(MyTasksPage), handle: { title: "My Tasks" } },
-      { path: "employee/settings", element: EmployeeProtectedWrapper(EmployeeSettingsPage), handle: { title: "Settings" } },
+      { path: "employee/settings", element: (
+        <ProtectedRoute allowedRoles={['employee', 'department_head']}>
+          <Suspense fallback={<PageLoader />}>
+            <EmployeeSettingsPage />
+          </Suspense>
+        </ProtectedRoute>
+      ), handle: { title: "Settings" } },
     ],
   },
   {

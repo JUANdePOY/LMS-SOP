@@ -3,6 +3,8 @@ import { X } from 'lucide-react';
 import { TASK_PRIORITIES, TASK_STATUSES } from '../constants/taskConstants';
 import { validateTaskPayload } from '../utils/taskValidation';
 import AssignmentInput from './AssignmentInput';
+import { getBusinesses } from '../../organization-management/api/business.api';
+import { getClientOptions } from '../api/client.api';
 
 function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
   const [title, setTitle] = useState('');
@@ -15,6 +17,27 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
   const [category, setCategory] = useState('');
   const [assignments, setAssignments] = useState([]);
   const [errors, setErrors] = useState({});
+
+  const [businessId, setBusinessId] = useState('');
+  const [clientId, setClientId] = useState('');
+  const [clientBusinessId, setClientBusinessId] = useState('');
+
+  const [businessOptions, setBusinessOptions] = useState([]);
+  const [clientOptions, setClientOptions] = useState([]);
+
+  const selectedClientBusinesses =
+    clientOptions.find((c) => String(c.id) === String(clientId))?.businesses || [];
+
+  useEffect(() => {
+    if (show) {
+      getBusinesses({ limit: 200 })
+        .then((res) => setBusinessOptions(res.data?.data?.rows || []))
+        .catch(() => setBusinessOptions([]));
+      getClientOptions()
+        .then((res) => setClientOptions(res.data?.data || []))
+        .catch(() => setClientOptions([]));
+    }
+  }, [show]);
 
   useEffect(() => {
     if (initialData) {
@@ -33,6 +56,9 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
           reference_name: a.reference_name,
         })) || []
       );
+      setBusinessId(initialData.business_id || '');
+      setClientId(initialData.client_id || '');
+      setClientBusinessId(initialData.client_business_id || '');
     } else {
       setTitle('');
       setDescription('');
@@ -43,9 +69,17 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
       setEstimatedHours('');
       setCategory('');
       setAssignments([]);
+      setBusinessId('');
+      setClientId('');
+      setClientBusinessId('');
     }
     setErrors({});
   }, [initialData, show]);
+
+  const handleClientChange = (value) => {
+    setClientId(value);
+    setClientBusinessId('');
+  };
 
   const addAssignment = () => {
     setAssignments([...assignments, { assignment_type: 'User', reference_id: '', reference_name: '' }]);
@@ -72,6 +106,9 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
       estimated_hours: estimatedHours,
       category,
       assignments,
+      business_id: businessId || null,
+      client_id: clientId || null,
+      client_business_id: clientBusinessId || null,
     };
     const result = validateTaskPayload(payload, true);
     setErrors(result.errors);
@@ -89,11 +126,17 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
       deadline_datetime: deadlineDatetime,
       estimated_hours: estimatedHours ? Number(estimatedHours) : null,
       category: category || null,
+      business_id: businessId ? Number(businessId) : null,
+      client_id: clientId ? Number(clientId) : null,
+      client_business_id: clientBusinessId ? Number(clientBusinessId) : null,
       assignments: assignments.filter((a) => a.reference_id || a.reference_name),
     });
   };
 
   if (!show) return null;
+
+  const fieldClass = (hasError) =>
+    `w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 placeholder:text-[var(--text-muted)] ${hasError ? 'border-red-500' : 'border-[var(--border)]'}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
@@ -108,13 +151,66 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
 
         <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-4 space-y-4">
           <div>
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Business *</label>
+            <select
+              value={businessId}
+              onChange={(e) => setBusinessId(e.target.value)}
+              className={fieldClass(errors.business_id)}
+            >
+              <option value="">Select business</option>
+              {businessOptions.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.business_name}
+                </option>
+              ))}
+            </select>
+            {errors.business_id && <p className="text-xs text-red-500 mt-1">{errors.business_id}</p>}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Client Name *</label>
+              <select
+                value={clientId}
+                onChange={(e) => handleClientChange(e.target.value)}
+                className={fieldClass(errors.client_name)}
+              >
+                <option value="">Select client</option>
+                {clientOptions.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.client_name}
+                  </option>
+                ))}
+              </select>
+              {errors.client_name && <p className="text-xs text-red-500 mt-1">{errors.client_name}</p>}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Client Business *</label>
+              <select
+                value={clientBusinessId}
+                onChange={(e) => setClientBusinessId(e.target.value)}
+                disabled={!clientId}
+                className={fieldClass(errors.client_business)}
+              >
+                <option value="">{clientId ? 'Select client business' : 'Select a client first'}</option>
+                {selectedClientBusinesses.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.business_name}
+                  </option>
+                ))}
+              </select>
+              {errors.client_business && <p className="text-xs text-red-500 mt-1">{errors.client_business}</p>}
+            </div>
+          </div>
+
+          <div>
             <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Title *</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Task title"
-              className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 placeholder:text-[var(--text-muted)] ${errors.title ? 'border-red-500' : 'border-[var(--border)]'}`}
+              className={fieldClass(errors.title)}
             />
             {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title}</p>}
           </div>
@@ -168,7 +264,7 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
                 type="datetime-local"
                 value={startDatetime}
                 onChange={(e) => setStartDatetime(e.target.value)}
-                className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 ${errors.start_datetime ? 'border-red-500' : 'border-[var(--border)]'}`}
+                className={fieldClass(errors.start_datetime)}
               />
               {errors.start_datetime && <p className="text-xs text-red-500 mt-1">{errors.start_datetime}</p>}
             </div>
@@ -178,7 +274,7 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
                 type="datetime-local"
                 value={deadlineDatetime}
                 onChange={(e) => setDeadlineDatetime(e.target.value)}
-                className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 ${errors.deadline_datetime ? 'border-red-500' : 'border-[var(--border)]'}`}
+                className={fieldClass(errors.deadline_datetime)}
               />
               {errors.deadline_datetime && <p className="text-xs text-red-500 mt-1">{errors.deadline_datetime}</p>}
             </div>
@@ -193,7 +289,7 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
                 onChange={(e) => setEstimatedHours(e.target.value)}
                 placeholder="Optional"
                 min="0"
-                className={`w-full rounded-lg border bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 placeholder:text-[var(--text-muted)] ${errors.estimated_hours ? 'border-red-500' : 'border-[var(--border)]'}`}
+                className={fieldClass(errors.estimated_hours)}
               />
               {errors.estimated_hours && <p className="text-xs text-red-500 mt-1">{errors.estimated_hours}</p>}
             </div>
@@ -215,7 +311,7 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
               <button
                 type="button"
                 onClick={addAssignment}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                className="text-xs text-[var(--color-primary)] hover:text-[var(--color-primary-hover)] font-medium"
               >
                 + Add Assignment
               </button>
@@ -246,7 +342,7 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
             type="button"
             onClick={handleSubmit}
             disabled={saving}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors disabled:opacity-50"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-active)] transition-colors disabled:opacity-50"
           >
             {saving ? 'Saving...' : initialData ? 'Update' : 'Create'}
           </button>

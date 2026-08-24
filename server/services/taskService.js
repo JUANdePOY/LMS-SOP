@@ -13,7 +13,9 @@ function computeAutoStatus(startDatetime, deadlineDatetime, currentStatus) {
     return currentStatus;
   }
 
-  // Only auto-compute from dates when status is still the default/unset state
+  // Only auto-compute from dates when status is still the default/unset state.
+  // Any explicit status (e.g. a user-set 'Pending' or 'In Progress') is preserved
+  // as-is; progress-driven status changes are handled in updateProgress().
   if (currentStatus !== 'Pending') {
     return currentStatus;
   }
@@ -32,6 +34,16 @@ function computeAutoStatus(startDatetime, deadlineDatetime, currentStatus) {
     return 'Overdue';
   }
   return currentStatus;
+}
+
+function deriveParentStatus(children) {
+  if (!children || children.length === 0) return null;
+  const statuses = children.map((c) => c.status);
+  if (statuses.every((s) => s === 'Completed')) return 'Completed';
+  if (statuses.some((s) => s === 'In Progress')) return 'In Progress';
+  if (statuses.some((s) => s === 'Overdue')) return 'Overdue';
+  if (statuses.every((s) => s === 'Cancelled')) return 'Cancelled';
+  return 'Pending';
 }
 
 async function listTasks(filters = {}, actorId) {
@@ -127,10 +139,59 @@ async function listTasks(filters = {}, actorId) {
 
   const rows = result.rows.map((task) => ({
     ...task,
-    status: task.status,
+    // Apply the same auto-status rules used by getStats / task detail so the
+    // table's status groups match the KPI card (e.g. a Pending task past its
+    // deadline is shown as Overdue instead of staying Pending).
+    status: computeAutoStatus(task.start_datetime, task.deadline_datetime, task.status),
     progress_rate: progressMap[task.id] ?? null,
     assignments: assignmentsMap[task.id] || [],
   }));
+
+  // A child task can be returned on its own when the current user is directly
+  // assigned to it but NOT to its parent (e.g. a sub-task on "My Tasks"). The
+  // front-end table only renders tasks without a parent_task_id and nests the
+  // rest under their parent, so an orphaned child would be filtered out and
+  // never shown. Promote any child whose parent is missing from this result set
+  // to top-level so it stays visible. Children whose parent IS present remain
+  // nested as usual.
+  const rowIds = new Set(rows.map((t) => t.id));
+  for (const task of rows) {
+    if (task.parent_task_id != null && !rowIds.has(task.parent_task_id)) {
+      task.parent_task_id = null;
+    }
+  }
+
+  // Build the parent -> direct children hierarchy and compute each parent's
+  // auto progress rate as the average of its direct sub-tasks' progress.
+  const childrenMap = {};
+  for (const task of rows) {
+    if (task.parent_task_id != null) {
+      if (!childrenMap[task.parent_task_id]) childrenMap[task.parent_task_id] = [];
+      childrenMap[task.parent_task_id].push(task);
+    }
+  }
+
+  for (const task of rows) {
+    const children = childrenMap[task.id];
+    if (children && children.length > 0) {
+      const rates = children.map((c) => Number(c.progress_rate ?? 0));
+      const avg = Math.round(rates.reduce((sum, r) => sum + r, 0) / rates.length);
+      task.progress_rate = avg;
+      task.is_parent = true;
+      task.subtasks = children;
+      // Derive the parent's status from its children so the parent moves to the
+      // correct status row (Completed when all done, In Progress when any child
+      // is active, Overdue if any child is overdue). A Cancelled parent is left
+      // as-is.
+      if (task.status !== 'Cancelled') {
+        const derived = deriveParentStatus(children);
+        if (derived) task.status = derived;
+      }
+    } else {
+      task.is_parent = false;
+      task.subtasks = [];
+    }
+  }
 
   return { ...result, rows };
 }
@@ -222,7 +283,10 @@ async function createTask(payload, actorId) {
     throw error;
   }
 
-  const { title, description, priority, status, start_datetime, deadline_datetime, estimated_hours, category } = validation.value;
+  const {
+    title, description, priority, status, start_datetime, deadline_datetime,
+    estimated_hours, category, parent_task_id, client_id, client_business_id, business_id
+  } = validation.value;
 
   if (new Date(deadline_datetime) <= new Date(start_datetime)) {
     const error = new Error('Deadline must be after start date and time');
@@ -268,6 +332,10 @@ async function createTask(payload, actorId) {
     deadline_datetime,
     estimated_hours,
     category,
+    parent_task_id: parent_task_id ?? null,
+    client_id: client_id ?? null,
+    client_business_id: client_business_id ?? null,
+    business_id: business_id ?? null,
     created_by: actorId,
   });
 
@@ -394,9 +462,22 @@ async function deleteTask(id, actorId) {
     }
   }
 
+  const parentTaskId = task.parent_task_id;
   await taskAssignmentModel.removeByTaskId(id);
   await taskCommentModel.removeByTaskId(id);
   await taskModel.remove(id);
+
+  // Recompute the (former) parent's derived status now that a child is gone.
+  if (parentTaskId != null) {
+    const children = await taskModel.findByParentId(parentTaskId);
+    const parent = await taskModel.findById(parentTaskId);
+    if (parent && parent.status !== 'Cancelled') {
+      const derived = deriveParentStatus(children);
+      if (derived && derived !== parent.status) {
+        await taskModel.update(parent.id, { status: derived });
+      }
+    }
+  }
 
   logAudit('task.delete', actorId, { task_id: id, title: task.title });
 }
@@ -516,12 +597,27 @@ async function updateProgress(payload, actorId) {
     throw error;
   }
 
+  // Block progress edits on finalized tasks. To change the progress rate the
+  // user must first move the task out of Completed/Cancelled via its status.
+  // Status-only changes (e.g. re-opening a Completed task) are still allowed.
+  if (completion_rate !== undefined && (task.status === 'Completed' || task.status === 'Cancelled')) {
+    const error = new Error('Update the Status Before editing the progress rate');
+    error.code = 'VALIDATION_ERROR';
+    throw error;
+  }
+
   const autoStatus = computeAutoStatus(task.start_datetime, task.deadline_datetime, task.status);
   let finalStatus = status || autoStatus;
 
-  // Business rule: 100% completion automatically marks task as Completed
-  if (completion_rate === 100 && !status) {
-    finalStatus = 'Completed';
+  // When no explicit status is supplied (i.e. a progress-rate edit), derive the
+  // status from the progress: any recorded progress -> In Progress, 100% -> Completed.
+  // An explicit status set via the status menu always wins and is preserved as-is.
+  if (!status) {
+    if (completion_rate >= 100) {
+      finalStatus = 'Completed';
+    } else if (completion_rate > 0) {
+      finalStatus = 'In Progress';
+    }
   }
 
   // Business rule: marking as Completed implies 100% completion rate
@@ -554,6 +650,31 @@ async function updateProgress(payload, actorId) {
   });
 
   await taskModel.update(task_id, { status: finalStatus });
+
+  // Recompute the parent task's status from its children so the parent moves to
+  // the correct status row and KPI stats stay consistent with this update.
+  if (task.parent_task_id != null) {
+    const children = await taskModel.findByParentId(task.parent_task_id);
+    const parent = await taskModel.findById(task.parent_task_id);
+    if (parent && parent.status !== 'Cancelled') {
+      const derived = deriveParentStatus(children);
+      if (derived && derived !== parent.status) {
+        await taskModel.update(parent.id, { status: derived });
+      }
+    }
+  }
+
+  // When a parent task's status is explicitly changed, propagate it to its direct
+  // children so they "respect the parent status" and the parent row stays consistent
+  // with what the user selected.
+  if (task.parent_task_id == null && status) {
+    const children = await taskModel.findByParentId(task.id);
+    for (const child of children) {
+      if (child.status !== status) {
+        await taskModel.update(child.id, { status });
+      }
+    }
+  }
 
   logAudit('task.progress.update', actorId, {
     task_id,

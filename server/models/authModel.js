@@ -206,6 +206,60 @@ async function getStats() {
   };
 }
 
+async function getUserLeaderboard(filters = {}) {
+  const { period = 'all', business_id, department_id, limit = 20 } = filters;
+  const validPeriods = ['all', 'week', 'month'];
+  const safePeriod = validPeriods.includes(period) ? period : 'all';
+
+  let dateFilter = '';
+  if (safePeriod === 'week') {
+    dateFilter = ' AND quiz_attempts.submitted_at >= DATE_SUB(NOW(), INTERVAL 1 WEEK)';
+  } else if (safePeriod === 'month') {
+    dateFilter = ' AND quiz_attempts.submitted_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)';
+  }
+
+  let scopeCondition = '';
+  const params = [];
+
+  if (business_id) {
+    scopeCondition = ' AND u.business_id = ?';
+    params.push(business_id);
+  }
+  if (department_id) {
+    scopeCondition = ' AND u.department_id = ?';
+    params.push(department_id);
+  }
+
+  const [rows] = await db.query(
+    `SELECT 
+      u.id,
+      u.full_name,
+      COUNT(DISTINCT best.quiz_id) AS quizzes_completed,
+      ROUND(AVG(best.pct), 1) AS points
+    FROM users u
+    JOIN (
+      SELECT user_id, quiz_id, 
+        ROUND(100.0 * MAX(score) / NULLIF(MAX(max_score), 0), 1) AS pct
+      FROM quiz_attempts
+      WHERE status IN ('completed', 'graded')
+        AND is_deleted = FALSE
+        AND score IS NOT NULL
+        AND max_score IS NOT NULL
+        AND max_score > 0
+        ${dateFilter}
+      GROUP BY user_id, quiz_id
+    ) best ON best.user_id = u.id
+    WHERE u.is_active = TRUE
+      ${scopeCondition}
+    GROUP BY u.id, u.full_name
+    ORDER BY points DESC, u.full_name ASC
+    LIMIT ?`,
+    [...params, parseInt(limit, 10)]
+  );
+
+  return rows;
+}
+
 module.exports = {
   findByEmail,
   findById,
@@ -216,4 +270,5 @@ module.exports = {
   updateLastLogin,
   listUsers,
   getStats,
+  getUserLeaderboard,
 };

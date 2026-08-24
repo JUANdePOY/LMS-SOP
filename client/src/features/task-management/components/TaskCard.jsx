@@ -29,7 +29,7 @@ function TaskCard({ task, onEdit, onDelete, onView, canManage }) {
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <Link to={`/tasks/${task.id}`} onClick={onView} className="font-medium text-blue-600 dark:text-blue-400 hover:underline break-words leading-snug">
+            <Link to={`/tasks/${task.id}`} onClick={onView}               className="font-medium text-[var(--color-primary)] dark:text-[var(--color-primary)] hover:underline break-words leading-snug">
               {task.title}
             </Link>
           </div>

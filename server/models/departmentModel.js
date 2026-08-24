@@ -251,6 +251,52 @@ async function getUsers(departmentId) {
   return rows;
 }
 
+async function getDepartmentLeaderboard(filters = {}) {
+  const { period = 'all', business_id } = filters;
+  const validPeriods = ['all', 'week', 'month'];
+  const safePeriod = validPeriods.includes(period) ? period : 'all';
+
+  let dateFilter = '';
+  if (safePeriod === 'week') {
+    dateFilter = ' AND e.enrolled_at >= DATE_SUB(NOW(), INTERVAL 1 WEEK)';
+  } else if (safePeriod === 'month') {
+    dateFilter = ' AND e.enrolled_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)';
+  }
+
+  let scopeCondition = '';
+  const params = [];
+
+  if (business_id) {
+    scopeCondition = ' AND (d.business_id = ? OR d.business_id IS NULL)';
+    params.push(business_id);
+  }
+
+  const [rows] = await db.query(
+    `SELECT 
+      d.id,
+      d.name,
+      d.code,
+      COUNT(DISTINCT e.id) AS total_enrollments,
+      COUNT(DISTINCT CASE WHEN e.status = 'completed' THEN e.id END) AS completed_enrollments,
+      ROUND(100.0 * COUNT(DISTINCT CASE WHEN e.status = 'completed' THEN e.id END) / NULLIF(COUNT(DISTINCT e.id), 0), 1) AS completion_rate,
+      ROUND(AVG(e.progress_percentage), 1) AS avg_progress
+    FROM departments d
+    LEFT JOIN users u ON u.department_id = d.id AND u.is_active = TRUE
+    LEFT JOIN course_enrollments e ON e.user_id = u.id 
+      AND e.status IN ('active', 'completed') 
+      AND e.is_deleted = FALSE
+      ${dateFilter}
+    WHERE d.status = 'active'
+      ${scopeCondition}
+    GROUP BY d.id, d.name, d.code
+    ORDER BY completion_rate DESC, total_enrollments DESC, d.name ASC
+    LIMIT 10`,
+    params
+  );
+
+  return rows;
+}
+
 module.exports = {
   findAll,
   findById,
@@ -262,5 +308,6 @@ module.exports = {
   getHierarchy,
   getChildren,
   getUsers,
+  getDepartmentLeaderboard,
   DEPARTMENT_STATUSES,
 };

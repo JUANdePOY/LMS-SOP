@@ -174,7 +174,7 @@ export default function MessagingPage() {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto">
+    <div className="mx-auto w-full max-w-6xl px-3 sm:px-0">
       <div className="mb-4">
         <h1 className="text-xl font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
           <MessageSquare size={20} className="text-neutral-400 dark:text-neutral-500" />
@@ -183,9 +183,9 @@ export default function MessagingPage() {
         <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">Communicate with your team members</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-[calc(100dvh-180px)] md:h-[calc(100vh-180px)]">
+      <div className="grid h-[calc(100dvh-12rem)] grid-cols-1 gap-0 sm:gap-4 md:h-[calc(100vh-12rem)] md:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]">
         <div className={cn(
-          "md:col-span-1 overflow-hidden fb-card flex flex-col",
+          "fb-card flex min-h-0 flex-col overflow-hidden rounded-xl",
           selectedConversation ? "hidden md:flex" : "flex"
         )}>
           <MessengerHeader
@@ -196,7 +196,7 @@ export default function MessagingPage() {
             onSearchChange={setSearch}
             onNew={() => setShowNewConversation(true)}
           />
-          <div className="flex-1 overflow-y-auto">
+          <div className="min-h-0 flex-1 overflow-y-auto">
             {convLoading && !selectedConversation ? (
               <div className="flex items-center justify-center py-8 text-neutral-500 text-xs">
                 Loading conversations...
@@ -215,7 +215,7 @@ export default function MessagingPage() {
           </div>
         </div>
         <div className={cn(
-          "md:col-span-2 overflow-hidden fb-card",
+          "fb-card flex min-h-0 flex-col overflow-hidden rounded-xl",
           selectedConversation ? "flex" : "hidden md:flex"
         )}>
           <MessageThread

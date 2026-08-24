@@ -227,13 +227,13 @@ export default function TaskDetailsModal({ taskId, open, onClose }) {
                 className={cn(
                   'relative flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-colors',
                   isActive
-                    ? 'text-blue-600 dark:text-blue-400'
+                     ? 'text-[var(--color-primary)] dark:text-[var(--color-primary)]'
                     : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
                 )}
               >
                 <Icon size={14} />
                 <span className="hidden sm:inline">{tab.label}</span>
-                {isActive && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-blue-500" />}
+                {isActive && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-[var(--color-primary)]" />}
               </button>
             );
           })}
@@ -329,7 +329,7 @@ export default function TaskDetailsModal({ taskId, open, onClose }) {
                               {p.attachments?.length > 0 && (
                                 <div className="mt-2 space-y-1">
                                   {p.attachments.map((att) => (
-                                    <a key={att.id} href={att.view_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                                     <a key={att.id} href={att.view_url} target="_blank" rel="noopener noreferrer" className="text-xs text-[var(--color-primary)] hover:underline flex items-center gap-1">
                                       <Paperclip size={10} /> {att.original_name || att.file_name}
                                     </a>
                                   ))}
@@ -349,7 +349,7 @@ export default function TaskDetailsModal({ taskId, open, onClose }) {
                       <button
                         type="button"
                         onClick={() => setShowProgress(true)}
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-3 py-1.5 text-xs font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-active)] transition-colors"
                       >
                         <Plus size={12} /> Add First Progress Update
                       </button>
@@ -373,7 +373,7 @@ export default function TaskDetailsModal({ taskId, open, onClose }) {
               {activeTab === 'attachments' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="inline-flex items-center gap-2 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-page)] px-3.5 py-2 text-xs font-medium cursor-pointer hover:border-blue-400 hover:bg-[var(--bg-hover)] transition-colors">
+                    <label                      className="inline-flex items-center gap-2 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-page)] px-3.5 py-2 text-xs font-medium cursor-pointer hover:border-[var(--color-primary)] hover:bg-[var(--bg-hover)] transition-colors">
                       <Paperclip size={14} /> Upload Attachment
                       <input type="file" className="hidden" onChange={handleFileUpload} disabled={uploading} />
                     </label>

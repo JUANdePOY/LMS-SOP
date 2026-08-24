@@ -6,6 +6,7 @@ const { requireSuperAdmin, requireAdmin } = require('../middleware/auth');
 const { requireBusinessScope } = require('../middleware/scope');
 const { logAudit } = require('../utils/auditLogger');
 const departmentModel = require('../models/departmentModel');
+const departmentsController = require('../controllers/departmentsController');
 
 const router = express.Router();
 
@@ -53,6 +54,9 @@ router.get('/hierarchy', async (req, res) => {
     res.status(500).json({ status: 'error', message: 'Failed to fetch department hierarchy', code: 'DB_ERROR' });
   }
 });
+
+// GET /api/departments/leaderboard
+router.get('/leaderboard', authenticateToken, departmentsController.getDepartmentLeaderboard);
 
 router.get('/:id', async (req, res) => {
   try {

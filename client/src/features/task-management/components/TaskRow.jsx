@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, memo } from 'react';
-import { MoreVertical, Pencil, Trash2, ArrowUpRight } from 'lucide-react';
+import { MoreVertical, Pencil, Trash2, ArrowUpRight, Plus, ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { TASK_PRIORITY_DOT, TASK_TABLE_GRID_COLS } from '../constants/taskConstants';
@@ -227,13 +227,13 @@ function AssigneePopover({ assignments, onSave, onClose }) {
         ))}
       </div>
       <div className="mt-2 flex items-center justify-between">
-        <button type="button" onClick={add} className="text-xs font-medium text-blue-600 hover:text-blue-700">
+        <button type="button" onClick={add}             className="text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">
           + Add assignment
         </button>
         <button
           type="button"
           onClick={handleDone}
-          className="rounded-lg bg-neutral-900 dark:bg-neutral-100 px-3 py-1 text-xs font-medium text-white dark:text-neutral-900 hover:bg-neutral-800"
+          className="rounded-lg bg-[var(--color-primary)] px-3 py-1 text-xs font-medium text-white hover:bg-[var(--color-primary-hover)] active:bg-[var(--color-primary-active)]"
         >
           Done
         </button>
@@ -270,7 +270,7 @@ const AssignedCell = memo(function AssignedCell({ assignments, onSave }) {
   );
 });
 
-const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, onInlineUpdate, onViewTask, onProgressChange, canManage }) {
+const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, onInlineUpdate, onViewTask, onProgressChange, canManage, depth = 0, onAddSubtask, collapsed = false, onToggleCollapse }) {
   const assignments = task.assignments || [];
   const saveField = (changes) => {
     if (!canManage) return;
@@ -282,23 +282,49 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
   return (
     <div
       className="group grid items-center gap-3 border-b border-[var(--border)] px-4 py-2.5 last:border-b-0 hover:bg-[var(--bg-hover)] transition-colors"
-      style={{ gridTemplateColumns: TASK_TABLE_GRID_COLS }}
+      style={{ gridTemplateColumns: TASK_TABLE_GRID_COLS, paddingLeft: 16 }}
     >
-      <span onClick={(e) => e.stopPropagation()}>
-        <StatusMenu status={task.status} onStatusChange={(newStatus) => onStatusChange?.(task, newStatus)} />
-      </span>
+      {depth > 0 ? (
+        <span aria-hidden="true" />
+      ) : (
+        <span onClick={(e) => e.stopPropagation()}>
+          <StatusMenu status={task.status} onStatusChange={(newStatus) => onStatusChange?.(task, newStatus)} />
+        </span>
+      )}
 
-       <div className="min-w-0 flex items-center gap-1.5">
+        <div className="min-w-0 flex items-center gap-1.5">
+          {onToggleCollapse && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onToggleCollapse(); }}
+              className="shrink-0 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-opacity"
+              aria-label={collapsed ? 'Expand sub-tasks' : 'Collapse sub-tasks'}
+              title={collapsed ? 'Expand sub-tasks' : 'Collapse sub-tasks'}
+            >
+              {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+            </button>
+          )}
+          {onAddSubtask && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onAddSubtask(task); }}
+              className="shrink-0 text-[var(--text-muted)] hover:text-[var(--color-primary)] dark:hover:text-[var(--color-primary)] transition-opacity"
+              aria-label="Add sub-task"
+              title="Add sub-task"
+            >
+              <Plus size={14} />
+            </button>
+          )}
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onViewTask?.(task); }}
-            className="shrink-0 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-blue-600 dark:hover:text-blue-400 transition-opacity"
+            className="shrink-0 opacity-0 group-hover:opacity-100 text-[var(--text-muted)] hover:text-[var(--color-primary)] dark:hover:text-[var(--color-primary)] transition-opacity"
             aria-label="Open task details"
             title="Open details"
           >
             <ArrowUpRight size={14} />
           </button>
-         {canManage ? (
+          {canManage ? (
            <PriorityDot priority={task.priority} onSave={saveField} />
          ) : (
            <span className={cn('h-2 w-2 rounded-full shrink-0', TASK_PRIORITY_DOT[task.priority] || TASK_PRIORITY_DOT.Medium)} title={`${task.priority} priority`} />
@@ -331,9 +357,15 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
          )}
        </div>
 
-       <div className="min-w-0">
-         <ProgressBar rate={task.progress_rate} taskId={task.id} onProgressChange={onProgressChange} />
-       </div>
+        <div className="min-w-0">
+          <ProgressBar
+            rate={task.progress_rate}
+            taskId={task.id}
+            onProgressChange={
+              task.status === 'Completed' || task.status === 'Cancelled' ? undefined : onProgressChange
+            }
+          />
+        </div>
 
        <div className="min-w-0">
          {canManage ? (
