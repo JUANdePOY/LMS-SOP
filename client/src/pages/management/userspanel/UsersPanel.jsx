@@ -7,7 +7,7 @@ import { Select } from '@/shared/components/ui/select';
 import { Card } from '@/shared/components/ui/card';
 import { Modal } from '@/shared/components/ui/modal';
 import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
-import { Search, Plus, Edit2, Trash2, Shield, Users, Briefcase, Loader2, Upload, Download, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Shield, Users, Briefcase, Loader2, Upload, Download, ChevronUp, ChevronDown, ChevronsUpDown, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/shared/components/ui/Toast';
 import BulkUploadModal from './BulkUploadModal';
 import { cn } from '@/lib/utils';
@@ -83,6 +83,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   const [sortField, setSortField] = useState('full_name');
   const [sortDirection, setSortDirection] = useState('asc');
   const [modalDepartments, setModalDepartments] = useState([]);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (formData.business_id) {
@@ -609,10 +610,27 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                 <Input type="email" value={formData.email || ''} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="user@organization.com" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Password <span className="text-red-500">*</span></label>
-              <Input type="password" value={formData.password || ''} onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))} placeholder="Min 8 characters" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
-            </div>
+             <div>
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Password <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password || ''}
+                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Min 8 characters"
+                    className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                <div>
                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
