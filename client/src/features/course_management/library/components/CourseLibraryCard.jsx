@@ -95,12 +95,12 @@ export default function CourseLibraryCard({ course, onClick, onAssign, myProgres
           {course.description || "No description provided"}
         </p>
 
-        {!isAdmin && (
+        {!isAdmin && isEnrolled && (
           <div className="mt-auto space-y-1.5">
             <div className="flex items-center justify-between text-[11px] text-neutral-500 dark:text-neutral-400">
               <span className="inline-flex items-center gap-1">
                 <BarChart3 size={12} />
-                {isEnrolled ? "Your progress" : "Avg progress"}
+                Your progress
               </span>
               <span className="font-medium text-neutral-700 dark:text-neutral-200">{avgProgress}%</span>
             </div>

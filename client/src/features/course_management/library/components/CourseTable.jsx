@@ -15,6 +15,7 @@ const COLUMNS = [
 function CourseTableRow({ course, onClick, myProgress, showProgress }) {
   const enrollments = course.enrollment_count || course.enrollments_count || 0;
   const avgProgress = myProgress != null ? myProgress : course.avg_progress || 0;
+  const isEnrolled = myProgress != null;
   const difficultyMeta = getDifficultyMeta(course.difficulty);
 
   const handleKeyDown = (e) => {
@@ -79,18 +80,22 @@ function CourseTableRow({ course, onClick, myProgress, showProgress }) {
       </td>
       {showProgress && (
         <td className="hidden px-3 py-3 sm:table-cell">
-          <div className="flex items-center gap-2">
-            <div className="h-1.5 w-20 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
-              <div
-                className={`h-full rounded-full ${avgProgress >= 80 ? "bg-success-soft0" : avgProgress >= 50 ? "bg-[rgba(242,92,5,0.08)]0" : "bg-warning-soft0"}`}
-                style={{ width: `${avgProgress}%` }}
-              />
+          {isEnrolled ? (
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
+                <div
+                  className={`h-full rounded-full ${avgProgress >= 80 ? "bg-success-soft0" : avgProgress >= 50 ? "bg-[rgba(242,92,5,0.08)]0" : "bg-warning-soft0"}`}
+                  style={{ width: `${avgProgress}%` }}
+                />
+              </div>
+              <span className="inline-flex items-center gap-1 text-xs tabular-nums text-neutral-500 dark:text-neutral-400">
+                <BarChart3 size={11} />
+                {avgProgress}%
+              </span>
             </div>
-            <span className="inline-flex items-center gap-1 text-xs tabular-nums text-neutral-500 dark:text-neutral-400">
-              <BarChart3 size={11} />
-              {avgProgress}%
-            </span>
-          </div>
+          ) : (
+            <span className="text-xs text-neutral-400 dark:text-neutral-500">—</span>
+          )}
         </td>
       )}
       <td className="py-3 pl-3 pr-4 text-right">

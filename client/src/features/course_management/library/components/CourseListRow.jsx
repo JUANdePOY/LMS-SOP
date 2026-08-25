@@ -61,13 +61,17 @@ export default function CourseListRow({ course, onClick, myProgress }) {
           </p>
 
           <div className="mt-2 flex items-center gap-3">
-            <div className="flex-1">
-              <ProgressBar value={avgProgress} />
-            </div>
-            <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400">
-              <BarChart3 size={11} />
-              {avgProgress}%
-            </span>
+            {isEnrolled && (
+              <>
+                <div className="flex-1">
+                  <ProgressBar value={avgProgress} />
+                </div>
+                <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400">
+                  <BarChart3 size={11} />
+                  {avgProgress}%
+                </span>
+              </>
+            )}
             <span className="hidden items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400 sm:inline-flex" title="Enrollments">
               <Users size={11} />
               {enrollments}

@@ -1,7 +1,8 @@
 import { useState, useCallback } from "react";
-import { ChevronRight, BookOpen, FileText, Video, ListChecks, Clock, GraduationCap } from "lucide-react";
+import { ChevronRight, BookOpen, FileText, Video, ListChecks, Clock, GraduationCap, Lock } from "lucide-react";
 import { useModules } from "@/features/course_management/hooks/useModules";
 import { getContent } from "@/features/course_management/api/content.api";
+import { cn } from "@/lib/utils";
 
 const LESSON_TYPE_META = {
   video: { icon: Video, label: "Video" },
@@ -10,9 +11,25 @@ const LESSON_TYPE_META = {
   text: { icon: FileText, label: "Reading" },
 };
 
-function LessonRow({ moduleId, lesson, onView }) {
+function LessonRow({ moduleId, lesson, onView, disabled }) {
   const meta = LESSON_TYPE_META[lesson.type] || LESSON_TYPE_META.text;
   const Icon = meta.icon;
+
+  if (disabled) {
+    return (
+      <div className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-neutral-400 dark:text-neutral-500">
+        <Icon size={15} className="shrink-0 text-neutral-300 dark:text-neutral-600" />
+        <span className="flex-1 min-w-0 truncate">{lesson.title}</span>
+        {lesson.duration ? (
+          <span className="inline-flex items-center gap-1 text-[11px] text-neutral-300 dark:text-neutral-600">
+            <Clock size={11} />
+            {lesson.duration}m
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -34,12 +51,13 @@ function LessonRow({ moduleId, lesson, onView }) {
   );
 }
 
-function ModuleBlock({ courseId, module, index, onLessonView }) {
+function ModuleBlock({ courseId, module, index, onLessonView, locked }) {
   const [open, setOpen] = useState(false);
   const [lessons, setLessons] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const toggle = useCallback(async () => {
+    if (locked) return;
     const next = !open;
     setOpen(next);
     if (next && lessons.length === 0) {
@@ -53,7 +71,7 @@ function ModuleBlock({ courseId, module, index, onLessonView }) {
         setLoading(false);
       }
     }
-  }, [open, lessons.length, courseId, module.id]);
+  }, [open, lessons.length, courseId, module.id, locked]);
 
   const count = module.content_count ?? lessons.length;
 
@@ -62,11 +80,18 @@ function ModuleBlock({ courseId, module, index, onLessonView }) {
       <button
         type="button"
         onClick={toggle}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50/70 dark:hover:bg-neutral-800/40"
+        disabled={locked}
+        aria-disabled={locked || undefined}
+        className={cn(
+          "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+          locked
+            ? "cursor-not-allowed text-neutral-400 dark:text-neutral-500"
+            : "hover:bg-neutral-50/70 dark:hover:bg-neutral-800/40"
+        )}
       >
         <ChevronRight
           size={16}
-          className={`shrink-0 text-neutral-400 transition-transform ${open ? "rotate-90" : ""}`}
+          className={`shrink-0 text-neutral-400 transition-transform ${locked ? "" : open ? "rotate-90" : ""}`}
         />
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-xs font-bold text-[var(--color-primary-hover)] dark:bg-blue-900/20 dark:text-[var(--color-primary)]">
           {index + 1}
@@ -80,9 +105,10 @@ function ModuleBlock({ courseId, module, index, onLessonView }) {
         <span className="shrink-0 text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
           {count} {count === 1 ? "lesson" : "lessons"}
         </span>
+        {locked && <Lock size={13} className="shrink-0 text-neutral-300 dark:text-neutral-600" />}
       </button>
 
-      {open && (
+      {open && !locked && (
         <div className="border-t border-neutral-100 dark:border-neutral-800 px-3 py-2">
           {loading ? (
             <div className="space-y-2 px-2.5 py-2">
@@ -100,6 +126,7 @@ function ModuleBlock({ courseId, module, index, onLessonView }) {
                   moduleId={module.id}
                   lesson={lesson}
                   onView={onLessonView}
+                  disabled={locked}
                 />
               ))}
             </div>
@@ -110,7 +137,7 @@ function ModuleBlock({ courseId, module, index, onLessonView }) {
   );
 }
 
-export default function CourseContentSection({ courseId, onLessonView, headerAction }) {
+export default function CourseContentSection({ courseId, onLessonView, headerAction, locked }) {
   const { data: modules, loading, error } = useModules(courseId);
 
   const totalLessons = modules.reduce(
@@ -165,6 +192,13 @@ export default function CourseContentSection({ courseId, onLessonView, headerAct
         {headerAction}
       </div>
 
+      {locked && (
+        <div className="flex items-center gap-2 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-800/40 px-3 py-2 text-xs text-neutral-500 dark:text-neutral-400">
+          <Lock size={13} className="shrink-0" />
+          Enroll in this course to access its lessons.
+        </div>
+      )}
+
       <div className="space-y-3">
         {modules.map((module, i) => (
           <ModuleBlock
@@ -173,6 +207,7 @@ export default function CourseContentSection({ courseId, onLessonView, headerAct
             module={module}
             index={i}
             onLessonView={onLessonView}
+            locked={locked}
           />
         ))}
       </div>

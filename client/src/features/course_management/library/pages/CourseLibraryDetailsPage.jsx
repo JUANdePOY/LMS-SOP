@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Users, BarChart3, CheckCircle, Download, BookOpen, GraduationCap, Layers, PlayCircle, Video, FileText, ListChecks, Clock, ChevronRight, ClipboardCheck } from "lucide-react";
+import { Users, BarChart3, CheckCircle, Download, BookOpen, GraduationCap, Layers, PlayCircle, Video, FileText, ListChecks, Clock, ChevronRight, ClipboardCheck, Lock } from "lucide-react";
 import { ActionIcons } from "@/shared/components/ui/actionIcons";
 import { useCourseLibraryDetails } from "../hooks/useCourseLibraryDetails";
 import { useCourseAnalytics } from "../hooks/useCourseAnalytics";
@@ -71,9 +71,25 @@ const LESSON_TYPE_META = {
   text: { icon: FileText, label: "Reading" },
 };
 
-function LessonRow({ lesson, onView }) {
+function LessonRow({ lesson, onView, disabled }) {
   const meta = LESSON_TYPE_META[lesson.type] || LESSON_TYPE_META.text;
   const Icon = meta.icon;
+
+  if (disabled) {
+    return (
+      <div className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-neutral-400 dark:text-neutral-500">
+        <Icon size={15} className="shrink-0 text-neutral-300 dark:text-neutral-600" />
+        <span className="flex-1 min-w-0 truncate">{lesson.title}</span>
+        {lesson.duration ? (
+          <span className="inline-flex items-center gap-1 text-[11px] text-neutral-300 dark:text-neutral-600">
+            <Clock size={11} />
+            {lesson.duration}m
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <button
       type="button"
@@ -95,12 +111,13 @@ function LessonRow({ lesson, onView }) {
   );
 }
 
-function ModuleAccordion({ courseId, module, index, onView, getContent }) {
+function ModuleAccordion({ courseId, module, index, onView, getContent, locked }) {
   const [open, setOpen] = useState(false);
   const [lessons, setLessons] = useState([]);
   const [loadState, setLoadState] = useState("idle");
 
   const toggle = async () => {
+    if (locked) return;
     const next = !open;
     setOpen(next);
     if (next && lessons.length === 0 && loadState === "idle") {
@@ -123,11 +140,18 @@ function ModuleAccordion({ courseId, module, index, onView, getContent }) {
       <button
         type="button"
         onClick={toggle}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50/70 dark:hover:bg-neutral-800/40"
+        disabled={locked}
+        aria-disabled={locked || undefined}
+        className={cn(
+          "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+          locked
+            ? "cursor-not-allowed text-neutral-400 dark:text-neutral-500"
+            : "hover:bg-neutral-50/70 dark:hover:bg-neutral-800/40"
+        )}
       >
         <ChevronRight
           size={16}
-          className={`shrink-0 text-neutral-400 transition-transform ${open ? "rotate-90" : ""}`}
+          className={`shrink-0 text-neutral-400 transition-transform ${locked ? "" : open ? "rotate-90" : ""}`}
         />
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-xs font-bold text-[var(--color-primary-hover)] dark:bg-blue-900/20 dark:text-[var(--color-primary)]">
           {index + 1}
@@ -141,9 +165,10 @@ function ModuleAccordion({ courseId, module, index, onView, getContent }) {
         <span className="shrink-0 text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
           {count} {count === 1 ? "lesson" : "lessons"}
         </span>
+        {locked && <Lock size={13} className="shrink-0 text-neutral-300 dark:text-neutral-600" />}
       </button>
 
-      {open && (
+      {open && !locked && (
         <div className="border-t border-neutral-100 dark:border-neutral-800 px-3 py-2">
           {loadState === "loading" ? (
             <div className="space-y-2 px-2.5 py-2">
@@ -158,7 +183,7 @@ function ModuleAccordion({ courseId, module, index, onView, getContent }) {
           ) : (
             <div className="space-y-0.5">
               {lessons.map((lesson) => (
-                <LessonRow key={lesson.id} lesson={lesson} onView={onView} />
+                <LessonRow key={lesson.id} lesson={lesson} onView={onView} disabled={locked} />
               ))}
             </div>
           )}
@@ -168,7 +193,7 @@ function ModuleAccordion({ courseId, module, index, onView, getContent }) {
   );
 }
 
-function CourseLessonsSection({ courseId, modules, modulesLoading, onView }) {
+function CourseLessonsSection({ courseId, modules, modulesLoading, onView, locked }) {
   if (modules.length === 0) return null;
 
   const totalLessons = modules.reduce((sum, m) => sum + (m.content_count ?? 0), 0);
@@ -186,6 +211,13 @@ function CourseLessonsSection({ courseId, modules, modulesLoading, onView }) {
         </span>
       </div>
 
+      {locked && (
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-800/40 px-3 py-2 text-xs text-neutral-500 dark:text-neutral-400">
+          <Lock size={13} className="shrink-0" />
+          Enroll in this course to access its lessons.
+        </div>
+      )}
+
       {modulesLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -202,6 +234,7 @@ function CourseLessonsSection({ courseId, modules, modulesLoading, onView }) {
               index={i}
               onView={onView}
               getContent={getContent}
+              locked={locked}
             />
           ))}
         </div>
@@ -232,6 +265,13 @@ export default function CourseLibraryDetailsPage() {
     if (!mine) return undefined;
     return typeof mine.progress_percentage === "number" ? mine.progress_percentage : Number(mine.progress) || 0;
   }, [enrollments, user?.id]);
+
+  const employeeEnrolled = useMemo(
+    () => enrollments.some((e) => e.user_id === user?.id),
+    [enrollments, user?.id]
+  );
+
+  const canAccessContent = !isEmployee || employeeEnrolled;
 
   const handleExport = async (format) => {
     try {
@@ -376,6 +416,7 @@ export default function CourseLibraryDetailsPage() {
             progress={isEmployee ? myProgress : undefined}
             primaryAction={
           isEmployee ? (
+            employeeEnrolled && (
             <button
               onClick={() => navigate(`/my-learning/course/${courseId}`)}
               className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover-brand transition-all"
@@ -383,6 +424,7 @@ export default function CourseLibraryDetailsPage() {
               <PlayCircle size={14} />
               Open Course
             </button>
+            )
           ) : (
             <button
               onClick={() => navigate(`/courses/${courseId}/builder`)}
@@ -427,13 +469,14 @@ export default function CourseLibraryDetailsPage() {
         {activeTab === "content" ? (
           <CourseContentSection
             courseId={courseId}
+            locked={!canAccessContent}
             onLessonView={(payload) =>
               isEmployee
                 ? navigate(`/my-learning/course/${courseId}`)
                 : trackContentView(payload)
             }
             headerAction={
-              isEmployee ? (
+              isEmployee && employeeEnrolled ? (
                 <button
                   onClick={() => navigate(`/my-learning/course/${courseId}`)}
                   className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover-brand transition-colors"
@@ -722,6 +765,7 @@ export default function CourseLibraryDetailsPage() {
                 courseId={courseId}
                 modules={modules}
                 modulesLoading={modulesLoading}
+                locked={!canAccessContent}
                 onView={(payload) =>
                   isEmployee
                     ? navigate(`/my-learning/course/${courseId}`)
