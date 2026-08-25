@@ -7,6 +7,7 @@ import CreateModuleModal from '@/features/sop-management/components/SOPEditor/Cr
 import AttachmentUploader from '@/features/sop-management/components/SOPEditor/AttachmentUploader';
 import SOPActionBar from '@/features/sop-management/components/SOPActionBar';
 import SOPSidebar from '@/features/sop-management/components/SOPSidebar';
+import AssignmentModal from '@/features/sop-management/components/AssignmentModal';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useAuth } from '@/contexts/AuthContext';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
@@ -36,6 +37,7 @@ function SOPWorkspacePage() {
   const { isEmployee } = useAuth();
   const [selectedModule, setSelectedModule] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [creatingModule, setCreatingModule] = useState(false);
   const [saving, setSaving] = useState(false);
   const [restoring, setRestoring] = useState(false);
@@ -463,6 +465,15 @@ function SOPWorkspacePage() {
           <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">SOP Workspace</h1>
         </div>
         <div className="flex gap-2">
+          {!isEmployee && (
+            <button
+              onClick={() => setShowAssignModal(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 border border-neutral-200 dark:border-neutral-700 rounded-md text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+            >
+              <Plus size={18} />
+              <span className="hidden sm:inline">Assign SOP</span>
+            </button>
+          )}
           <button
             onClick={() => setShowLeftSidebar(!showLeftSidebar)}
             className="inline-flex items-center gap-2 px-3 py-2 border border-neutral-200 dark:border-neutral-700 rounded-md text-sm text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
@@ -588,6 +599,12 @@ function SOPWorkspacePage() {
         onClose={() => setShowCreateModal(false)}
         onSave={handleCreateModule}
         loading={creatingModule}
+      />
+
+      <AssignmentModal
+        sopId={sopId}
+        open={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
       />
     </div>
   );

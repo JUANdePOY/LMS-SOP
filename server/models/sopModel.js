@@ -65,7 +65,16 @@ function restrictionWhere(user, cols, alias = 's') {
       ${alias}.restriction_type = 'public'
       OR (
         ${alias}.restriction_type = 'department'
-        AND ${alias}.department_id = ?
+        AND EXISTS (
+          SELECT 1
+          FROM sop_assignments sa
+          INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
+          WHERE sa.sop_version_id = (
+            SELECT current_version_id FROM sops WHERE id = ${alias}.id
+          )
+            AND sa.is_deleted = FALSE
+            AND ad.department_id = ?
+        )
       )
       OR (
         ${alias}.restriction_type = 'assigned'
@@ -167,7 +176,24 @@ async function canAccessSop(sop, user) {
   if (role === 'admin' || role === 'super_admin') return true;
 
   if (restriction === 'public') return true;
-  if (restriction === 'department' && sop.department_id && user.department_id && sop.department_id === user.department_id) return true;
+  if (restriction === 'department') {
+    // Only grant access when the user's department was EXPLICITLY assigned to
+    // the SOP via sop_assignments -> assignment_departments. Merely sharing the
+    // SOP's owner department must NOT auto-grant visibility.
+    if (user.department_id) {
+      const [deptLinks] = await db.query(`
+        SELECT 1
+        FROM sop_assignments sa
+        INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
+        WHERE sa.sop_version_id = (SELECT current_version_id FROM sops WHERE id = ?)
+          AND sa.is_deleted = FALSE
+          AND ad.department_id = ?
+        LIMIT 1
+      `, [sop.id, user.department_id]);
+      if (deptLinks.length) return true;
+    }
+    return false;
+  }
   if (restriction === 'private' && sop.owner_id && user.id && sop.owner_id === user.id) return true;
 
   if (restriction === 'assigned') {

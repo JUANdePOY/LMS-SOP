@@ -50,3 +50,8 @@ export async function getEmployeeSops(params = {}) {
   const res = await fetch(url, { headers: authHeaders() });
   return handle(res);
 }
+
+export async function getEmployeeSopSummary() {
+  const res = await fetch(`${API_BASE}/sops/summary`, { headers: authHeaders() });
+  return handle(res);
+}

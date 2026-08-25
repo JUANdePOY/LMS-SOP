@@ -140,17 +140,11 @@ export function useSOPList() {
       });
       const moduleId = moduleResponse?.data?.id || moduleResponse?.id;
       
-      // Handle assignments
-      if (sopId && cascade.selectedDeptIds.length > 0) {
-        await createAssignment(sopId, {
-          department_ids: cascade.selectedDeptIds,
-          position_names: cascade.selectedPositions,
-          user_ids: cascade.selectedUserIds,
-          due_date: null,
-          notes: '',
-        });
-      }
-      
+      // SOPs are created unassigned by default. Visibility is driven entirely
+      // by explicit assignment records, so an administrator must manually
+      // assign the SOP (to a user, department, or position) before it becomes
+      // visible to employees. No assignment is created automatically here.
+
       // Handle link if provided
       if (sopId && newLink && newLink.trim() && moduleId) {
         await createLink(moduleId, {

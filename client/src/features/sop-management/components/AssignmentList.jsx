@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Trash2 } from 'lucide-react';
 import { fetchAssigned, deleteAssignment } from '@/features/sop-management/services/assignmentService';
 
-export default function AssignmentList({ sopId }) {
+export default function AssignmentList({ sopId, refreshSignal = 0 }) {
   const [assignments, setAssignments] = useState([]);
 
   const load = useCallback(async () => {
@@ -12,7 +12,7 @@ export default function AssignmentList({ sopId }) {
     } catch { setAssignments([]); }
   }, [sopId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, refreshSignal]);
 
   const handleDelete = async (id) => {
     try {

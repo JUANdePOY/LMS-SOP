@@ -306,7 +306,13 @@ function buildSopRestriction(user, cols) {
   const userId = user.id || null;
   const sql = `(
     s.restriction_type = 'public'
-    OR (s.restriction_type = 'department' AND s.department_id = ?)
+    OR (s.restriction_type = 'department' AND EXISTS (
+      SELECT 1 FROM sop_assignments sa
+      INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
+      WHERE sa.sop_version_id = (SELECT current_version_id FROM sops WHERE id = s.id)
+        AND sa.is_deleted = FALSE
+        AND ad.department_id = ?
+    ))
     OR (s.restriction_type = 'assigned' AND EXISTS (
       SELECT 1 FROM sop_assignments sa
       LEFT JOIN assignment_departments ad ON ad.assignment_id = sa.id

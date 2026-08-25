@@ -32,6 +32,12 @@ const dbConfig = {
   timezone: '+00:00',
   multipleStatements: true,
   charset: 'utf8mb4',
+  // Tables are created with utf8mb4_unicode_ci. Some MySQL servers default the
+  // *connection* collation to utf8mb4_general_ci, which makes literal/CAST
+  // comparisons (e.g. `status = 'Published'`) mix collations and throw
+  // ER_CANT_AGGREGATE_2COLLATIONS. Pin the connection to the table collation so
+  // string comparisons stay consistent.
+  collation: 'utf8mb4_unicode_ci',
   // Keep TCP keepalive on so the remote MySQL proxy (srv2101.hstgr.io) does not
   // silently drop our idle connection, which would force a reconnect (another
   // counted attempt) on the next query.
@@ -213,6 +219,15 @@ function getPool() {
     });
 
     pool.on('connection', (connection) => {
+      // The MySQL server's default connection collation can differ from the
+      // tables' collation (utf8mb4_unicode_ci). Pin every connection to the
+      // table collation so literal/CAST string comparisons (e.g.
+      // `status = 'Published'`, `mc.url = CAST(s.id AS CHAR)`) never mix
+      // collations and throw ER_CANT_AGGREGATE_2COLLATIONS.
+      try {
+        connection.query("SET collation_connection = 'utf8mb4_unicode_ci'");
+      } catch { /* ignore — collation option on the pool covers the common case */ }
+
       connection.on('error', (err) => {
         const msg = (err && err.message) ? err.message : String(err);
         if (msg.includes('ECONNRESET') || msg.includes('PROTOCOL_CONNECTION_LOST')) return;

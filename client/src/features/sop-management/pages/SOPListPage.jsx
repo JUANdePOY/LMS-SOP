@@ -7,6 +7,7 @@ import { SOP_STATUSES, VIEW_MODES } from '@/features/sop-management/constants/so
 import { ActionButton, ActionIcons } from '@/shared/components/ui/actionIcons';
 import SOPCreateForm from '@/features/sop-management/components/SOPCreateForm';
 import SOPEditForm from '@/features/sop-management/components/SOPEditForm';
+import AssignmentModal from '@/features/sop-management/components/AssignmentModal';
 import TrashPanel from '@/features/sop-management/components/TrashPanel';
 import { StaggerList, MotionItem } from '@/shared/motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -48,7 +49,7 @@ function RestrictionBadge({ restrictionType }) {
   );
 }
 
-function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop, canManage }) {
+function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop, onAssignSop, canManage }) {
 
   if (viewMode === VIEW_MODES.GRID) {
     return (
@@ -73,6 +74,10 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop, canMan
             <button onClick={() => onEditStart(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
               <ActionIcons.Edit className="h-3.5 w-3.5" />
               Edit
+            </button>
+            <button onClick={() => onAssignSop(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
+              <ActionIcons.Assign className="h-3.5 w-3.5" />
+              Assign
             </button>
             <button onClick={() => onArchiveSop(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
               {sop.status === SOP_STATUSES.ARCHIVED ? <ActionIcons.Unarchive className="h-3.5 w-3.5" /> : <ActionIcons.Archive className="h-3.5 w-3.5" />}
@@ -106,6 +111,7 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop, canMan
         {canManage && (
           <div className="flex gap-1 shrink-0">
             <ActionButton action="Edit" label="Edit SOP" onClick={() => onEditStart(sop)} />
+            <ActionButton action="Assign" label="Assign SOP" onClick={() => onAssignSop(sop)} />
             <ActionButton
               action={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}
               label={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive SOP' : 'Archive SOP'}
@@ -139,6 +145,7 @@ function SOPListPage() {
 
   const [activeTab, setActiveTab] = useState('sops');
   const [viewMode, setViewMode] = useState(VIEW_MODES.LIST);
+  const [assignSopId, setAssignSopId] = useState(null);
   const debouncedSearch = useDebounce(search, 400);
   const debouncedStatus = useDebounce(status, 400);
 
@@ -167,6 +174,9 @@ function SOPListPage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [editingSopId, handleEditCancel]);
   const editingSop = sops.find(s => s.id === editingSopId);
+
+  const handleAssignStart = (sop) => setAssignSopId(sop.id);
+  const handleAssignClose = () => setAssignSopId(null);
 
   const renderSops = () => {
     if (loading) {
@@ -198,7 +208,7 @@ function SOPListPage() {
       <StaggerList className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5' : 'space-y-2'}>
         {sops.map((sop) => (
           <MotionItem key={sop.id}>
-            <SOPCard sop={sop} viewMode={viewMode} onEditStart={handleEditStart} onDeleteSop={handleDeleteSop} onArchiveSop={handleArchiveSop} canManage={canManage} />
+            <SOPCard sop={sop} viewMode={viewMode} onEditStart={handleEditStart} onDeleteSop={handleDeleteSop} onArchiveSop={handleArchiveSop} onAssignSop={handleAssignStart} canManage={canManage} />
           </MotionItem>
         ))}
       </StaggerList>
@@ -325,6 +335,10 @@ function SOPListPage() {
       )}
 
       {activeTab === 'trash' && <TrashPanel />}
+
+      {assignSopId && (
+        <AssignmentModal sopId={assignSopId} open={true} onClose={handleAssignClose} />
+      )}
 
       {editingSopId && editingSop && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

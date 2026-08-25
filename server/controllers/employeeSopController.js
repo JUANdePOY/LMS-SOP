@@ -123,9 +123,19 @@ async function getEmployeeSop(req, res) {
   }
 }
 
+async function summary(req, res) {
+  try {
+    const data = await sopAssignmentService.getEmployeeSopSummary(req.user.id);
+    res.json({ success: true, data });
+  } catch (error) {
+    sendError(res, error, 'Failed to load SOP summary');
+  }
+}
+
 const employeeSopController = {
   list,
   getSop: getEmployeeSop,
+  summary,
 };
 
 module.exports = employeeSopController;

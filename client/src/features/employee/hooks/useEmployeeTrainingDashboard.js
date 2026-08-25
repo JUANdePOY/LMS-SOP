@@ -3,10 +3,10 @@ import {
   getAnnouncements,
   getEvents,
   getMyTasks,
-  getMySopAcknowledgements,
   getUserCertificates,
 } from '@/services/api';
 import { getEmployeeEnrollmentsWithCourses } from '../api/employee.api';
+import { getEmployeeSopSummary } from '../api/employeeSop.api';
 import { getMyAssessmentSummary } from '@/features/assessments/api/attempt.api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -22,6 +22,19 @@ function ensureArray(val, fallback = []) {
   return Array.isArray(val) ? val : fallback;
 }
 
+// The server already derives `status` per task (Overdue from deadline, parent
+// status from children, etc.) and attaches `progress_rate`. We only upgrade a
+// task to Completed when its progress is fully done, so the cards match the
+// employee's real standing on the My Tasks page.
+function getEffectiveTaskStatus(task) {
+  const rate = Number(task?.progress_rate || 0);
+  if (rate >= 100) return 'Completed';
+
+  const raw = task?.status;
+  if (raw === 'Completed' || raw === 'Cancelled') return raw;
+  return raw || 'Pending';
+}
+
 export default function useEmployeeTrainingDashboard() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -29,7 +42,7 @@ export default function useEmployeeTrainingDashboard() {
   const [announcements, setAnnouncements] = useState([]);
   const [events, setEvents] = useState([]);
   const [myTasks, setMyTasks] = useState([]);
-  const [sopAcknowledgements, setSopAcknowledgements] = useState([]);
+  const [assignedSops, setAssignedSops] = useState({ total: 0, items: [] });
   const [enrollments, setEnrollments] = useState([]);
   const [certificates, setCertificates] = useState([]);
   const [assessmentSummary, setAssessmentSummary] = useState({ passed: 0, total: 0 });
@@ -39,11 +52,11 @@ export default function useEmployeeTrainingDashboard() {
     setError(null);
     try {
       const userId = user?.id;
-      const [announcementsRes, eventsRes, myTasksRes, acksRes, enrollmentsRes, certificatesRes, assessmentSummaryRes] = await Promise.all([
+      const [announcementsRes, eventsRes, myTasksRes, summaryRes, enrollmentsRes, certificatesRes, assessmentSummaryRes] = await Promise.all([
         getAnnouncements({ limit: 10 }),
         getEvents({ limit: 10 }),
         getMyTasks({ limit: 50 }),
-        getMySopAcknowledgements().catch(() => null),
+        getEmployeeSopSummary().catch(() => null),
         getEmployeeEnrollmentsWithCourses({ limit: 100 }).catch(() => null),
         userId ? getUserCertificates(userId).catch(() => ({ data: { rows: [] } })) : Promise.resolve({ data: { rows: [] } }),
         getMyAssessmentSummary().catch(() => ({ data: { passed: 0, total: 0 } })),
@@ -57,19 +70,24 @@ export default function useEmployeeTrainingDashboard() {
         ? (myTasksRaw.rows || myTasksRaw.data || [])
         : ensureArray(myTasksRaw, []);
 
-      const acksData = ensureArray(unwrap(acksRes), []);
       const enrollmentsData = ensureArray(unwrap(enrollmentsRes), []);
       const certificatesData = unwrap(certificatesRes);
       const certificatesList = certificatesData && typeof certificatesData === 'object' && !Array.isArray(certificatesData)
         ? (certificatesData.rows || certificatesData.data || [])
         : ensureArray(certificatesData, []);
 
+      const summaryData = unwrap(summaryRes) || { total: 0, items: [] };
+      const assignedSopsData = {
+        total: summaryData.total || 0,
+        items: Array.isArray(summaryData.items) ? summaryData.items : [],
+      };
+
       setAssessmentSummary(unwrap(assessmentSummaryRes) || { passed: 0, total: 0 });
 
       setAnnouncements(announcementsData.slice(0, 4));
       setEvents(eventsData.slice(0, 4));
       setMyTasks(myTasksList);
-      setSopAcknowledgements(acksData);
+      setAssignedSops(assignedSopsData);
       setEnrollments(enrollmentsData);
       setCertificates(certificatesList);
     } catch (err) {
@@ -89,35 +107,36 @@ export default function useEmployeeTrainingDashboard() {
   const totalCourses = myCourses.length;
   const trainingProgress = totalCourses > 0 ? Math.round((completedCourses / totalCourses) * 100) : 0;
 
-  const todoTasks = myTasks.filter((t) => t.status === 'Pending' || t.status === 'To Do').length;
-  const inProgressTasks = myTasks.filter((t) => t.status === 'In Progress').length;
-  const completedTasks = myTasks.filter((t) => t.status === 'Completed').length;
-  const overdueTasks = myTasks.filter((t) => t.status === 'Overdue').length;
+  const todoTasks = myTasks.filter((t) => getEffectiveTaskStatus(t) === 'Pending').length;
+  const inProgressTasks = myTasks.filter((t) => getEffectiveTaskStatus(t) === 'In Progress').length;
+  const completedTasks = myTasks.filter((t) => getEffectiveTaskStatus(t) === 'Completed').length;
+  const overdueTasks = myTasks.filter((t) => getEffectiveTaskStatus(t) === 'Overdue').length;
 
-  const totalSops = sopAcknowledgements.length;
-  const acknowledgedSops = sopAcknowledgements.filter((a) => a.status === 'Acknowledged').length;
-  const pendingSops = totalSops - acknowledgedSops;
+  const totalSops = assignedSops.total;
+  const assignedItems = assignedSops.items || [];
+  const toPercent = (count) => (totalSops > 0 ? Math.round((count / totalSops) * 100) : 0);
+
+  // "SOPs by Status" reflects completion status of the employee's actual
+  // assigned SOPs (resolved via sop_assignments + course modules), not the
+  // acknowledgement table which is only a publish-time side effect.
+  const acknowledgedCount = assignedItems.filter((s) => s.acknowledged).length;
+  const notAcknowledgedCount = assignedItems.length - acknowledgedCount;
+  const sopStatus = [
+    { name: 'Acknowledged', value: toPercent(acknowledgedCount), count: acknowledgedCount, color: '#10B981' },
+    { name: 'Not Acknowledged', value: toPercent(notAcknowledgedCount), count: notAcknowledgedCount, color: '#F59E0B' },
+  ].filter((s) => s.count > 0);
 
   const certificatesEarned = certificates.length;
   const assessmentsPassed = Number(assessmentSummary.passed) || 0;
   const assessmentsTotal = Number(assessmentSummary.total) || 0;
 
-  const sopHighlights = sopAcknowledgements.slice(0, 4).map((ack) => {
-    const sopTitle = ack.sop_title || ack.title || 'Untitled SOP';
-    let status = 'Not Started';
-    let progress = 0;
-    if (ack.status === 'Acknowledged') {
-      status = 'Completed';
-      progress = 100;
-    } else if (ack.status === 'Pending' || ack.status === 'In Progress') {
-      status = 'In Progress';
-      progress = ack.progress_percentage ?? 50;
-    }
+  const sopHighlights = assignedItems.slice(0, 4).map((sop) => {
+    const status = sop.acknowledged ? 'Completed' : 'In Progress';
     return {
-      title: sopTitle,
+      title: sop.title || 'Untitled SOP',
       status,
-      progress,
-      updated: ack.acknowledged_at || ack.created_at ? new Date(ack.acknowledged_at || ack.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '',
+      progress: sop.acknowledged ? 100 : 0,
+      updated: '',
     };
   });
 
@@ -151,11 +170,7 @@ export default function useEmployeeTrainingDashboard() {
       overdue: overdueTasks,
     },
     sopHighlights,
-    sopStatus: [
-      { name: 'Completed', value: acknowledgedSops, count: acknowledgedSops, color: '#2F5EFF' },
-      { name: 'In Progress', value: pendingSops, count: pendingSops, color: '#7CA0FF' },
-      { name: 'Not Started', value: 0, count: 0, color: '#E2E8F0' },
-    ],
+    sopStatus,
     trainingChartData: [
       { date: 'Week 1', value: Math.max(0, trainingProgress - 20) },
       { date: 'Week 2', value: Math.max(0, trainingProgress - 10) },

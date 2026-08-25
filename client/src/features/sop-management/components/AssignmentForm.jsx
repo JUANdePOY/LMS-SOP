@@ -78,7 +78,21 @@ export default function AssignmentForm({ sopId, onCreated }) {
       <div>
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-medium text-[var(--text-secondary)]">Users</span>
-          <span className="text-xs text-[var(--text-muted)]">{cascade.totalUsers} found</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-[var(--text-muted)]">{cascade.totalUsers} found</span>
+            {cascade.users.length > 0 && (
+              <button
+                type="button"
+                onClick={() => cascade.toggleUsers(cascade.users.map((u) => u.id))}
+                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+                disabled={cascade.loading.users}
+              >
+                {cascade.users.length > 0 && cascade.users.every((u) => cascade.selectedUserIds.includes(u.id))
+                  ? 'Clear all'
+                  : 'Select all'}
+              </button>
+            )}
+          </div>
         </div>
         <input
           type="search"

@@ -181,12 +181,24 @@ async function isAssignedToUser(sopId, userId) {
   const versionId = await getCurrentVersionId(sopId);
   if (!versionId) return false;
 
+  const [userRows] = await db.query(
+    'SELECT department_id, position_title FROM users WHERE id = ?',
+    [userId]
+  );
+  const user = userRows[0] || {};
+  const userDept = user.department_id ?? null;
+  const userPos = user.position_title ?? null;
+
   const [rows] = await db.query(`
-    SELECT sa.id FROM sop_assignments sa
-    INNER JOIN assignment_users au ON au.assignment_id = sa.id
-    WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE AND au.user_id = ?
+    SELECT sa.id
+    FROM sop_assignments sa
+    LEFT JOIN assignment_users au ON au.assignment_id = sa.id AND au.user_id = ?
+    LEFT JOIN assignment_departments ad ON ad.assignment_id = sa.id AND ad.department_id = ?
+    LEFT JOIN assignment_positions ap ON ap.assignment_id = sa.id AND LOWER(ap.position_name) = LOWER(?)
+    WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE
+      AND (au.assignment_id IS NOT NULL OR ad.assignment_id IS NOT NULL OR ap.assignment_id IS NOT NULL)
     LIMIT 1
-  `, [versionId, userId]);
+  `, [userId, userDept, userPos, versionId]);
 
   return rows.length > 0;
 }
@@ -200,6 +212,14 @@ async function listAccessibleSops(userId, filters = {}) {
   const orderBy = sort === 'title' ? 's.title' : 's.created_at';
   const orderDir = sort === 'title' ? 'ASC' : 'DESC';
 
+  const [userRows] = await db.query(
+    'SELECT department_id, position_title FROM users WHERE id = ?',
+    [userId]
+  );
+  const user = userRows[0] || {};
+  const userDept = user.department_id ?? null;
+  const userPos = user.position_title ?? null;
+
   const sql = `
     SELECT s.*, d.name AS department_name, c.name AS category_name, u.full_name AS owner_name
     FROM sops s
@@ -212,8 +232,12 @@ async function listAccessibleSops(userId, filters = {}) {
         EXISTS (
           SELECT 1 FROM sop_versions sv
           JOIN sop_assignments sa ON sa.sop_version_id = sv.id AND sa.is_deleted = FALSE
-          JOIN assignment_users au ON au.assignment_id = sa.id AND au.user_id = ?
           WHERE sv.sop_id = s.id AND sv.is_current = TRUE AND sv.deleted_at IS NULL
+            AND (
+              EXISTS (SELECT 1 FROM assignment_users au WHERE au.assignment_id = sa.id AND au.user_id = ?)
+              OR (? IS NOT NULL AND EXISTS (SELECT 1 FROM assignment_departments ad WHERE ad.assignment_id = sa.id AND ad.department_id = ?))
+              OR (? IS NOT NULL AND EXISTS (SELECT 1 FROM assignment_positions ap WHERE ap.assignment_id = sa.id AND LOWER(ap.position_name) = LOWER(?)))
+            )
         )
         OR EXISTS (
           SELECT 1 FROM module_content mc
@@ -223,7 +247,7 @@ async function listAccessibleSops(userId, filters = {}) {
         )
       )
   `;
-  const params = [userId, userId];
+  const params = [userId, userDept, userDept, userPos, userPos, userId];
 
   let finalSql = sql;
   if (search) {
@@ -245,8 +269,12 @@ async function listAccessibleSops(userId, filters = {}) {
         EXISTS (
           SELECT 1 FROM sop_versions sv
           JOIN sop_assignments sa ON sa.sop_version_id = sv.id AND sa.is_deleted = FALSE
-          JOIN assignment_users au ON au.assignment_id = sa.id AND au.user_id = ?
           WHERE sv.sop_id = s.id AND sv.is_current = TRUE AND sv.deleted_at IS NULL
+            AND (
+              EXISTS (SELECT 1 FROM assignment_users au WHERE au.assignment_id = sa.id AND au.user_id = ?)
+              OR (? IS NOT NULL AND EXISTS (SELECT 1 FROM assignment_departments ad WHERE ad.assignment_id = sa.id AND ad.department_id = ?))
+              OR (? IS NOT NULL AND EXISTS (SELECT 1 FROM assignment_positions ap WHERE ap.assignment_id = sa.id AND LOWER(ap.position_name) = LOWER(?)))
+            )
         )
         OR EXISTS (
           SELECT 1 FROM module_content mc
@@ -256,7 +284,7 @@ async function listAccessibleSops(userId, filters = {}) {
         )
       )
   `;
-  const countParams = [userId, userId];
+  const countParams = [userId, userDept, userDept, userPos, userPos, userId];
   if (search) {
     countSql += ' AND (s.title LIKE ? OR s.' + codeCol + ' LIKE ? OR s.description LIKE ?)';
     countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);
@@ -274,6 +302,28 @@ async function listAccessibleSops(userId, filters = {}) {
   };
 }
 
+async function getEmployeeSopSummary(userId) {
+  const result = await listAccessibleSops(userId, { limit: 100000, page: 1, sort: 'created_at' });
+
+  const [ackRows] = await db.query(
+    `SELECT DISTINCT sv.sop_id AS sop_id
+     FROM sop_acknowledgements sa
+     JOIN sop_versions sv ON sa.sop_version_id = sv.id AND sv.deleted_at IS NULL
+     WHERE sa.user_id = ? AND sa.status = 'Acknowledged'`,
+    [userId]
+  );
+  const ackSet = new Set(ackRows.map((r) => r.sop_id));
+
+  const items = (result.rows || []).map((r) => ({
+    id: r.id,
+    title: r.title,
+    status: r.status,
+    acknowledged: ackSet.has(r.id),
+  }));
+
+  return { total: result.total, items };
+}
+
 module.exports = {
   listAssignments,
   createAssignment,
@@ -281,6 +331,7 @@ module.exports = {
   resolveAssignedUserIds,
   isAssignedToUser,
   listAccessibleSops,
+  getEmployeeSopSummary,
   getAssignmentDropdowns: assignmentCascadeService.getDepartments,
   getPositionsFromDepartment: assignmentCascadeService.getPositionsForDepartment,
   getUsersFromDepartment: assignmentCascadeService.getUsersFromDepartment,

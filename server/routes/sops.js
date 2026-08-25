@@ -187,7 +187,7 @@ router.route('/:sopId/assigned')
   .get(requireSopReadScope, assignmentCascadeController.listAssigned);
 
 router.route('/assignments/:id')
-  .delete(requireSopWriteScope, assignmentController.remove);
+  .delete(requirePermission('manage_sops'), assignmentController.remove);
 
 router.route('/acknowledgements/my')
   .get(authenticateToken, acknowledgementController.listByUser);

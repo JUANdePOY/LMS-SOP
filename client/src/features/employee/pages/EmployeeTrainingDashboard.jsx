@@ -5,7 +5,7 @@ import { getUserLeaderboard } from "@/features/course_management/api/userLeaderb
 import { cn } from "@/lib/utils";
 import {
   BookOpen, GraduationCap, ClipboardCheck, Award,
-  Megaphone, Trophy, Calendar, ChevronDown, ArrowRight,
+  Megaphone, Trophy, ChevronDown, ArrowRight,
 } from "lucide-react";
 
 import DashboardStatCard from "../components/dashboard/DashboardStatCard";
@@ -236,7 +236,7 @@ export default function EmployeeTrainingDashboard() {
         </PanelCard>
 
         <PanelCard title="SOPs by Status">
-          <DonutChart data={dashboard.sopStatus} total={dashboard.stats.sopsAssigned || 18} />
+          <DonutChart data={dashboard.sopStatus} total={dashboard.stats.sopsAssigned} />
         </PanelCard>
       </div>
 
@@ -384,29 +384,6 @@ export default function EmployeeTrainingDashboard() {
           </StaggerList>
         </PanelCard>
       </div>
-
-      {/* Upcoming Events */}
-      <PanelCard title="Upcoming Events" action={<ViewAllLink onClick={() => navigate("/events")} label="View Calendar" />}>
-        {dashboard.events.length > 0 ? (
-          <FadeIn>
-            <ul className="space-y-2">
-              {dashboard.events.map((event, i) => (
-                <li key={i} className="group flex items-center gap-3 rounded-lg p-2 transition-all duration-300 hover:bg-slate-50 dark:hover:bg-neutral-800/50">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-blue-500/10 dark:text-blue-400">
-                    <Calendar size={16} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{event.title}</p>
-                    <p className="text-xs text-slate-400 dark:text-neutral-500">{event.date} &middot; {event.time}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </FadeIn>
-        ) : (
-          <p className="text-xs text-neutral-400 dark:text-neutral-500">No upcoming events.</p>
-        )}
-      </PanelCard>
 
       {/* Bottom CTA Banner */}
       <div className="flex flex-col items-start justify-between gap-4 rounded-xl bg-blue-50 p-6 dark:bg-blue-500/10 sm:flex-row sm:items-center">
