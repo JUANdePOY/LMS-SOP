@@ -23,7 +23,7 @@ const FILTER = {
 export default function MessagingPage() {
   const { toast } = useToast();
   const { user, isSuperAdmin, isAdmin } = useAuth();
-  const { conversations, loading: convLoading, error, refresh: refreshConversations, create: createConversation, remove: removeConversation } = useConversations();
+  const { conversations, loading: convLoading, error, refresh: refreshConversations, create: createConversation } = useConversations();
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [presetUser, setPresetUser] = useState(null);
@@ -163,16 +163,6 @@ export default function MessagingPage() {
     handleSelectConversation(conv);
   };
 
-  const handleDeleteConversation = async (id) => {
-    try {
-      await removeConversation(id);
-      toast.success("Conversation deleted");
-      if (selectedConversation?.id === id) setSelectedConversation(null);
-    } catch (err) {
-      toast.error(err.message || "Failed to delete conversation");
-    }
-  };
-
   if (error) {
     return <div className="text-sm text-red-600">{error}</div>;
   }
@@ -218,7 +208,6 @@ export default function MessagingPage() {
                   onSelect={handleSelectConversation}
                   selectedId={selectedConversation?.id}
                   currentUserId={user?.id}
-                  onDelete={handleDeleteConversation}
                 />
               </FadeIn>
             )}
@@ -236,7 +225,6 @@ export default function MessagingPage() {
             onMarkAllRead={() => {
               markAllAsRead(user?.id).then(() => refreshConversations()).catch(() => {});
             }}
-            onDelete={() => selectedConversation && handleDeleteConversation(selectedConversation.id)}
           />
         </div>
       </div>

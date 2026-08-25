@@ -8,6 +8,7 @@ const {
   normalizeAssignmentType,
   validateAssignmentPayload,
 } = require('../validators/sopAssignmentValidator');
+const notificationService = require('../services/notificationService');
 
 async function departmentExists(departmentId) {
   const [rows] = await db.query('SELECT id FROM departments WHERE id = ?', [departmentId]);
@@ -129,6 +130,38 @@ async function createAssignment(sopId, payload, assignedBy) {
     notes: normalized.notes || null,
     assigned_by: assignedBy,
   });
+
+  // Notify each assigned employee so a banner/notification surfaces on their
+  // side. Targets can include whole departments/positions, so resolve the
+  // actual users and notify each once (dedup handled by the notification
+  // service). Notifications are best-effort and must never fail the assignment.
+  try {
+    const targetUserIds = new Set();
+    for (const deptId of departmentIds) {
+      (await complianceModel.resolveUsersForDepartment(deptId)).forEach((uid) => targetUserIds.add(uid));
+    }
+    for (const positionName of positionNames) {
+      (await complianceModel.resolveUsersForPosition(positionName)).forEach((uid) => targetUserIds.add(uid));
+    }
+    userIds.forEach((uid) => targetUserIds.add(uid));
+    if (assignedBy) targetUserIds.delete(assignedBy);
+
+    for (const uid of targetUserIds) {
+      notificationService
+        .createSystemNotification({
+          userId: uid,
+          title: 'A new SOP has been assigned to you',
+          body: sop.title,
+          type: 'info',
+          link: `/my-learning/sops/${sopId}`,
+          entityType: 'sop',
+          entityId: sopId,
+        })
+        .catch(() => {});
+    }
+  } catch (notifyErr) {
+    console.error('Failed to send SOP assignment notifications:', notifyErr);
+  }
 
   return complianceModel.findAssignmentById(id);
 }
@@ -261,7 +294,7 @@ async function listAccessibleSops(userId, filters = {}) {
   const [rows] = await db.query(finalSql, params);
   const normalizedRows = rows.map((r) => sopModel.normalizeSopRow(r, cols));
 
-  const countSql = `
+  let countSql = `
     SELECT COUNT(*) AS total FROM sops s
     WHERE s.status = 'Published'
       AND (s.is_deleted = 0 OR s.is_deleted IS NULL)

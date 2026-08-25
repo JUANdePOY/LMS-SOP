@@ -80,7 +80,7 @@ export default function NotificationDropdown({ showBadge = true, onFetch, count 
   const [category, setCategory] = useState("all");
   const [unreadOnly, setUnreadOnly] = useState(false);
   const dropdownRef = useRef(null);
-  const { unreadCount, notifications, loading, fetched, fetch, markRead, markAllRead } = useNotifications();
+  const { unreadCount, notifications, loading, fetched, fetch, markRead, markAllRead, clearAll } = useNotifications();
   const navigate = useNavigate();
 
   const categories = useMemo(() => {
@@ -111,7 +111,7 @@ export default function NotificationDropdown({ showBadge = true, onFetch, count 
     setDeleting(true);
     try {
       await deleteNotifications([]);
-      markAllRead();
+      clearAll();
     } catch {
       /* error silently ignored; store retains data on failure */
     } finally {

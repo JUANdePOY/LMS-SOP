@@ -1,4 +1,4 @@
-import { ChevronRight, Users, Trash2 } from "lucide-react";
+import { ChevronRight, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/shared/components/ui/Avatar";
 import {
@@ -36,7 +36,7 @@ function StackedAvatars({ participants, max = 3 }) {
   );
 }
 
-export default function ConversationList({ conversations, onSelect, selectedId, currentUserId, onDelete }) {
+export default function ConversationList({ conversations, onSelect, selectedId, currentUserId }) {
   return (
     <div className="space-y-0.5 p-2">
       {conversations.length === 0 ? (
@@ -106,13 +106,6 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
                     )}
                   </div>
                 </div>
-              </button>
-              <button
-                onClick={() => onDelete && onDelete(conv.id)}
-                title="Delete conversation"
-                className="shrink-0 flex h-8 w-8 items-center justify-center rounded-full text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 max-md:flex md:hidden group-hover:md:flex"
-              >
-                <Trash2 size={15} />
               </button>
               <ChevronRight size={14} className="text-neutral-300 dark:text-neutral-600 shrink-0 block max-md:block md:hidden group-hover:md:block" />
             </div>

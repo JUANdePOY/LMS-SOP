@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, Lock, Camera } from 'lucide-react';
+import { Loader2, Lock, Camera, Eye, EyeOff } from 'lucide-react';
 import {
   getProfile,
   updateProfile,
@@ -46,6 +46,7 @@ export default function Profile() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [coverUrl, setCoverUrl] = useState(null);
   const [previewCover, setPreviewCover] = useState(null);
+  const [showPasswords, setShowPasswords] = useState(false);
 
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -282,33 +283,53 @@ export default function Profile() {
                 <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
                   Current Password
                 </label>
-                <input
-                  type="password"
-                  value={passwordData.current_password}
-                  onChange={e => setPasswordData(prev => ({ ...prev, current_password: e.target.value }))}
-                  className={cn(
-                    "w-full rounded-md border border-neutral-300 dark:border-neutral-600",
-                    "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
-                    "focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] focus:border-[var(--color-primary)]"
-                  )}
-                  placeholder="Enter current password"
-                />
+                <div className="relative">
+                  <input
+                    type={showPasswords ? 'text' : 'password'}
+                    value={passwordData.current_password}
+                    onChange={e => setPasswordData(prev => ({ ...prev, current_password: e.target.value }))}
+                    className={cn(
+                      "w-full rounded-md border border-neutral-300 dark:border-neutral-600",
+                      "bg-white dark:bg-neutral-800 px-3 py-2 pr-10 text-sm",
+                      "focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] focus:border-[var(--color-primary)]"
+                    )}
+                    placeholder="Enter current password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(v => !v)}
+                    aria-label={showPasswords ? 'Hide passwords' : 'Show passwords'}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 focus:outline-none"
+                  >
+                    {showPasswords ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
                   New Password
                 </label>
-                <input
-                  type="password"
-                  value={passwordData.new_password}
-                  onChange={e => setPasswordData(prev => ({ ...prev, new_password: e.target.value }))}
-                  className={cn(
-                    "w-full rounded-md border border-neutral-300 dark:border-neutral-600",
-                    "bg-white dark:bg-neutral-800 px-3 py-2 text-sm",
-                    "focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] focus:border-[var(--color-primary)]"
-                  )}
-                  placeholder="Enter new password (min 8 characters)"
-                />
+                <div className="relative">
+                  <input
+                    type={showPasswords ? 'text' : 'password'}
+                    value={passwordData.new_password}
+                    onChange={e => setPasswordData(prev => ({ ...prev, new_password: e.target.value }))}
+                    className={cn(
+                      "w-full rounded-md border border-neutral-300 dark:border-neutral-600",
+                      "bg-white dark:bg-neutral-800 px-3 py-2 pr-10 text-sm",
+                      "focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] focus:border-[var(--color-primary)]"
+                    )}
+                    placeholder="Enter new password (min 8 characters)"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswords(v => !v)}
+                    aria-label={showPasswords ? 'Hide passwords' : 'Show passwords'}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 focus:outline-none"
+                  >
+                    {showPasswords ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
               <button
                 onClick={handlePasswordChange}

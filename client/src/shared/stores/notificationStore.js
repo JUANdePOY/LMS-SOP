@@ -207,6 +207,12 @@ export const NotificationStore = {
     emitChange();
   },
 
+  clearServerNotifications() {
+    serverNotifications = [];
+    unreadServerCount = 0;
+    emitChange();
+  },
+
   async fetchPreferences() {
     try {
       const res = await getNotificationPreferences();
@@ -314,6 +320,10 @@ export const useNotifications = () => {
     await NotificationStore.markEntityTypeRead(entityType);
   }, []);
 
+  const clearAll = useCallback(() => {
+    NotificationStore.clearServerNotifications();
+  }, []);
+
   const fetchPreferences = useCallback(async () => {
     return NotificationStore.fetchPreferences();
   }, []);
@@ -336,6 +346,7 @@ export const useNotifications = () => {
     markRead,
     markAllRead: markAllReadAction,
     markEntityTypeRead: markEntityTypeReadAction,
+    clearAll,
     fetchPreferences,
     updatePreferences,
     getSystemNotifications: () => NotificationStore.getSystemNotifications(),

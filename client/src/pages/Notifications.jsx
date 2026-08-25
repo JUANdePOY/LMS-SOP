@@ -3,6 +3,7 @@ import { Bell, Info, AlertCircle, Check, BookOpen, FileText, HelpCircle, Award, 
 import { getNotifications, markNotificationsRead, markAllNotificationsRead, deleteNotification, deleteNotifications } from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
 import { cn } from '@/lib/utils';
+import { NotificationStore } from '@/shared/stores/notificationStore';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 
 const TYPE_ICON = {
@@ -159,6 +160,7 @@ export default function Notifications() {
       await deleteNotifications([]);
       setNotifications([]);
       setSelectedIds([]);
+      NotificationStore.clearServerNotifications();
       addToast('All notifications deleted', 'success');
     } catch {
       addToast('Failed to delete all notifications', 'error');

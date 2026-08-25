@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Send, Loader2, Check, CheckCheck, Users, Trash2, ChevronLeft } from "lucide-react";
+import { Send, Loader2, Check, CheckCheck, Users, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/shared/components/ui/Avatar";
 import {
@@ -30,7 +30,6 @@ function dayLabel(dateStr) {
 }
 
 function Header({ conversation, onBack }) {
-  const [confirming, setConfirming] = useState(false);
   const isGroup = conversation?.type === "group_forum";
   const name = getConversationDisplayName(conversation, conversation?.current_user_id);
   const others = getOtherParticipants(conversation, conversation?.current_user_id);
@@ -65,7 +64,7 @@ function Header({ conversation, onBack }) {
             <span className="presence-dot" style={{ width: "0.95rem", height: "0.95rem" }} aria-label="Online" />
           )}
         </div>
-        <div className="min-w-0">
+      <div className="min-w-0">
           <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">
             {name}
           </h3>
@@ -75,48 +74,11 @@ function Header({ conversation, onBack }) {
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-1 shrink-0">
-        <div className="relative">
-          <button
-            onClick={() => setConfirming((v) => !v)}
-            className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-500/10"
-            title="Delete conversation"
-          >
-            <Trash2 size={16} />
-          </button>
-          {confirming && (
-            <div className="absolute right-0 top-11 z-20 w-56 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 p-3 shadow-lg">
-              <p className="text-xs text-neutral-700 dark:text-neutral-200 mb-2">
-                Delete this conversation? This cannot be undone.
-              </p>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => setConfirming(false)}
-                  className="rounded-md px-2.5 py-1 text-xs border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                >
-                  Cancel
-                </button>
-                {conversation?.onDelete && (
-                  <button
-                    onClick={() => {
-                      setConfirming(false);
-                      conversation.onDelete();
-                    }}
-                    className="rounded-md px-2.5 py-1 text-xs bg-red-600 text-white hover:bg-red-700"
-                  >
-                    Delete
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
 
-export default function MessageThread({ conversation, onSend, loading, onMarkAllRead, onDelete, onBack }) {
+export default function MessageThread({ conversation, onSend, loading, onMarkAllRead, onBack }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
@@ -159,14 +121,13 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
     );
   }
 
-  const enriched = { ...conversation, onDelete };
   const isGroup = conversation?.type === "group_forum";
 
   let lastDay = null;
 
   return (
     <div className="flex h-full flex-col">
-      <Header conversation={enriched} onBack={onBack} />
+      <Header conversation={conversation} onBack={onBack} />
 
       {hasUnread && onMarkAllRead && (
         <div className="flex justify-center pt-2">
