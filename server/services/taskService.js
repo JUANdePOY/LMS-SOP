@@ -6,45 +6,8 @@ const taskAttachmentModel = require('../models/taskAttachmentModel');
 const { buildViewUrl } = require('../services/taskAttachmentPublicFile');
 const taskCommentModel = require('../models/taskCommentModel');
 const { logAudit } = require('../utils/auditLogger');
+const { computeAutoStatus, deriveParentStatus } = require('../utils/taskStatus');
 const { validateTaskPayload, validateAssignmentPayload, validateProgressPayload, validateCommentPayload } = require('../validators/taskValidator');
-
-function computeAutoStatus(startDatetime, deadlineDatetime, currentStatus) {
-  if (currentStatus === 'Completed' || currentStatus === 'Cancelled') {
-    return currentStatus;
-  }
-
-  // Only auto-compute from dates when status is still the default/unset state.
-  // Any explicit status (e.g. a user-set 'Pending' or 'In Progress') is preserved
-  // as-is; progress-driven status changes are handled in updateProgress().
-  if (currentStatus !== 'Pending') {
-    return currentStatus;
-  }
-
-  const now = new Date();
-  const start = new Date(startDatetime);
-  const deadline = new Date(deadlineDatetime);
-
-  if (now < start) {
-    return 'Pending';
-  }
-  if (now >= start && now < deadline) {
-    return 'In Progress';
-  }
-  if (now >= deadline) {
-    return 'Overdue';
-  }
-  return currentStatus;
-}
-
-function deriveParentStatus(children) {
-  if (!children || children.length === 0) return null;
-  const statuses = children.map((c) => c.status);
-  if (statuses.every((s) => s === 'Completed')) return 'Completed';
-  if (statuses.some((s) => s === 'In Progress')) return 'In Progress';
-  if (statuses.some((s) => s === 'Overdue')) return 'Overdue';
-  if (statuses.every((s) => s === 'Cancelled')) return 'Cancelled';
-  return 'Pending';
-}
 
 async function listTasks(filters = {}, actorId) {
   const isAdmin = await isUserAdmin(actorId);
@@ -811,7 +774,9 @@ async function getMyTasks(userId, filters = {}) {
 async function getTaskStats(filters = {}, actorId) {
   const isAdmin = await isUserAdmin(actorId);
   if (!isAdmin) {
-    filters.created_by = actorId;
+    filters.task_ids = await getAssignedTaskIdsForUser(actorId);
+  } else {
+    filters.task_ids = await getBusinessScopedTaskIdsForAdmin(actorId);
   }
   return await taskModel.getStats(filters);
 }

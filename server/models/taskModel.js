@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { computeAutoStatus, deriveParentStatus } = require('../utils/taskStatus');
 
 const TASK_PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
 const TASK_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled'];
@@ -181,41 +182,37 @@ async function remove(id) {
 }
 
 async function getStats(filters = {}) {
-  const { created_by } = filters;
+  const { task_ids } = filters;
 
-  // Only count top-level tasks so the KPI card matches the task table, which
-  // renders only tasks without a parent (subtasks are nested under parents
-  // and therefore excluded from the row list).
-  let whereClause = 'WHERE parent_task_id IS NULL';
+  // Restrict to the same set of tasks the table renders for this user
+  // (business-scoped for admins, assigned for regular users).
+  let where = 'WHERE 1 = 1';
   const params = [];
-
-  if (created_by) {
-    whereClause += ' AND created_by = ?';
-    params.push(created_by);
+  if (Array.isArray(task_ids) && task_ids.length > 0) {
+    where += ' AND id IN (?)';
+    params.push(task_ids);
   }
 
-  const [statusRows] = await db.query(
-    `SELECT status, COUNT(*) AS count FROM tasks ${whereClause} GROUP BY status`,
+  const [rows] = await db.query(
+    `SELECT id, parent_task_id, status, start_datetime, deadline_datetime
+     FROM tasks ${where}`,
     params
   );
 
-  const [priorityRows] = await db.query(
-    `SELECT priority, COUNT(*) AS count FROM tasks ${whereClause} GROUP BY priority`,
-    params
-  );
+  const presentIds = new Set(rows.map((r) => r.id));
+  const autoStatus = new Map();
+  const childrenMap = {};
 
-  // A "Pending" task whose deadline has already passed is effectively Overdue, so
-  // it counts as Overdue (not Pending). Both counts are parent-scoped by the
-  // whereClause above, keeping the KPI card consistent with the task table.
-  const [overdueRows] = await db.query(
-    `SELECT COUNT(*) AS count FROM tasks ${whereClause} AND (status = 'Overdue' OR (status = 'Pending' AND deadline_datetime < NOW()))`,
-    params
-  );
+  for (const r of rows) {
+    autoStatus.set(r.id, computeAutoStatus(r.start_datetime, r.deadline_datetime, r.status));
+  }
 
-  const [pendingRows] = await db.query(
-    `SELECT COUNT(*) AS count FROM tasks ${whereClause} AND status = 'Pending' AND deadline_datetime >= NOW()`,
-    params
-  );
+  for (const r of rows) {
+    if (r.parent_task_id != null) {
+      if (!childrenMap[r.parent_task_id]) childrenMap[r.parent_task_id] = [];
+      childrenMap[r.parent_task_id].push(r.id);
+    }
+  }
 
   const stats = {
     total: 0,
@@ -227,18 +224,42 @@ async function getStats(filters = {}) {
     by_priority: {},
   };
 
-  for (const row of statusRows) {
-    stats.total += Number(row.count);
-    const key = row.status.toLowerCase().replace(' ', '_');
-    stats[key] = Number(row.count);
+  const topLevelIds = [];
+
+  for (const r of rows) {
+    // A child whose parent is outside the result set is promoted to top-level
+    // (exactly like the task list) so it is still counted.
+    const isTopLevel = r.parent_task_id == null || !presentIds.has(r.parent_task_id);
+    if (!isTopLevel) continue;
+
+    let finalStatus = autoStatus.get(r.id);
+
+    const children = childrenMap[r.id];
+    if (children && children.length > 0) {
+      const childStatuses = children.map((cid) => autoStatus.get(cid));
+      const derived = deriveParentStatus(childStatuses);
+      // A Cancelled parent is left as-is; otherwise use the derived status so a
+      // parent with all-completed children counts as Completed, etc.
+      if (derived && finalStatus !== 'Cancelled') {
+        finalStatus = derived;
+      }
+    }
+
+    stats.total += 1;
+    topLevelIds.push(r.id);
+    const key = finalStatus.toLowerCase().replace(' ', '_');
+    if (stats[key] !== undefined) stats[key] += 1;
   }
 
-  for (const row of priorityRows) {
-    stats.by_priority[row.priority.toLowerCase()] = Number(row.count);
+  if (topLevelIds.length > 0) {
+    const [priorityRows] = await db.query(
+      `SELECT priority, COUNT(*) AS count FROM tasks WHERE id IN (?)`,
+      [topLevelIds]
+    );
+    for (const row of priorityRows) {
+      stats.by_priority[row.priority.toLowerCase()] = Number(row.count);
+    }
   }
-
-  stats.pending = Number(pendingRows[0]?.count || 0);
-  stats.overdue = Number(overdueRows[0]?.count || 0);
 
   return stats;
 }
