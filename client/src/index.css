@@ -41,6 +41,18 @@ select option {
   --header-input-placeholder: #6b7280;
   --header-input-icon: #6b7280;
   --header-input-focus-ring: rgba(59, 130, 246, 0.3);
+  /* Shared top-bar height — the app header and the sidebar logo bar both read
+     this token so the two always line up. Change it here only. */
+  --header-height:      60px;
+  /* Top bar surface — soft off-white with neutral (dark gray) icons */
+  --header-bg:          #F5F7FA;
+  --header-fg:          #374151;
+  --header-fg-muted:    #6b7280;
+  --header-hover-bg:    rgba(17, 24, 39, 0.06);
+  --header-active-bg:   rgba(17, 24, 39, 0.10);
+  --header-focus-ring:  rgba(17, 24, 39, 0.18);
+  --header-pill-bg:     rgba(17, 24, 39, 0.04);
+  --header-greeting-bg: #2A63CD;
   --bg-hover:       rgba(19, 47, 69, 0.06);
   --bg-active:      rgba(19, 47, 69, 0.09);
   --bg-input:       #ffffff;
@@ -114,6 +126,28 @@ select option {
   --scrollbar-width: 6px;
   --scrollbar-border-radius: 999px;
 
+  /* ── Boxed app shell ────────────────────────────────────────────
+     The whole shell (sidebar + header + content) floats as one
+     rounded card on a light-gray canvas. Radius/shadow/margin only
+     apply from `lg` up — mobile & tablet stay full-bleed. */
+  --app-canvas:        #F1F2F6;
+  --app-shell-bg:      var(--bg-page);
+  --app-shell-radius:  14px;
+  --app-shell-inset:   16px;
+  --app-shell-inset-lg: 20px;
+  --app-shell-shadow:  0 4px 20px rgba(0, 0, 0, 0.06);
+
+  /* ── Notice banner (stacked account / system messages) ────────── */
+  --notice-bg:         #EFF1F3;
+  --notice-divider:    rgba(17, 24, 39, 0.08);
+  --notice-text:       #3F4650;
+  --notice-btn-bg:     #ffffff;
+  --notice-btn-border: #D8DCE1;
+  --notice-btn-text:   #3F4650;
+  --notice-accent-warning: #E39A3F;
+  --notice-accent-info:    #2A63CD;
+  --notice-accent-danger:  #CC1F1F;
+
   /* ── Facebook-style social tokens (layered on brand theme) ─────── */
   --fb-blue:        #1877F2;
   --fb-blue-hover:  #166FE5;
@@ -138,6 +172,15 @@ select option {
   --header-input-placeholder: #d1d5db;
   --header-input-icon: #d1d5db;
   --header-input-focus-ring: rgba(96, 165, 250, 0.4);
+  /* Top bar surface — dark neutral counterpart of the off-white bar */
+  --header-bg:          #30302e;
+  --header-fg:          #e8e6dc;
+  --header-fg-muted:    #a8a6a0;
+  --header-hover-bg:    rgba(255, 255, 255, 0.08);
+  --header-active-bg:   rgba(255, 255, 255, 0.14);
+  --header-focus-ring:  rgba(255, 255, 255, 0.22);
+  --header-pill-bg:     rgba(255, 255, 255, 0.07);
+  --header-greeting-bg: #2A63CD;
   --bg-hover:       rgba(255, 255, 255, 0.06);
   --bg-active:      rgba(255, 255, 255, 0.1);
   --bg-input:       #30302e;
@@ -191,6 +234,23 @@ select option {
   --scrollbar-track: transparent;
   --scrollbar-width: 6px;
   --scrollbar-border-radius: 999px;
+
+  /* ── Boxed app shell (dark) ─────────────────────────────────── */
+  --app-canvas:        #1b1b1a;
+  --app-shell-bg:      var(--bg-page);
+  --app-shell-radius:  14px;
+  --app-shell-shadow:  0 4px 20px rgba(0, 0, 0, 0.35);
+
+  /* ── Notice banner (dark) ───────────────────────────────────── */
+  --notice-bg:         #2b2b29;
+  --notice-divider:    rgba(255, 255, 255, 0.08);
+  --notice-text:       #d6d3ca;
+  --notice-btn-bg:     #3a3937;
+  --notice-btn-border: #4a4947;
+  --notice-btn-text:   #e8e6dc;
+  --notice-accent-warning: #E39A3F;
+  --notice-accent-info:    #4d7fdc;
+  --notice-accent-danger:  #d97a6c;
 
   /* ── Facebook-style social tokens (dark) ──────────────────────── */
   --fb-blue:        #1877F2;
@@ -319,6 +379,56 @@ select option {
     height: var(--scrollbar-width);
   }
 
+  /* ── Fade-on-scroll variant ─────────────────────────────────────────
+     The thumb is fully transparent while the container is idle and fades
+     in only while the user is actively scrolling. `data-scrolling` is
+     toggled by the useAutoHideScrollbar hook.
+
+     Unlike .scrollbar-auto-hide (which animates the scrollbar WIDTH and
+     therefore reflows content by --scrollbar-width), this keeps the gutter
+     reserved at all times and only animates the thumb colour, so showing
+     and hiding never shifts the layout. */
+  .scrollbar-fade {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    transition: scrollbar-color 200ms ease;
+  }
+
+  .scrollbar-fade[data-scrolling="true"] {
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  .scrollbar-fade::-webkit-scrollbar {
+    width: var(--scrollbar-width);
+    height: var(--scrollbar-width);
+  }
+
+  .scrollbar-fade::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-fade::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: var(--scrollbar-border-radius);
+    transition: background-color 250ms ease;
+  }
+
+  .scrollbar-fade[data-scrolling="true"]::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+  }
+
+  .scrollbar-fade::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Respect reduced-motion: skip the fade, just swap instantly. */
+  @media (prefers-reduced-motion: reduce) {
+    .scrollbar-fade,
+    .scrollbar-fade::-webkit-scrollbar-thumb {
+      transition: none;
+    }
+  }
+
   /* ── Viewport scrollbar (applies to document root) ─────────────── */
   .scrollbar-viewport {
     scrollbar-width: thin;
@@ -347,6 +457,72 @@ select option {
 
   .scrollbar-viewport::-webkit-scrollbar-corner {
     background: transparent;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   BOXED APP SHELL
+   The full app shell (sidebar + header + main content) is rendered inside one
+   rounded card that floats on a light-gray canvas.
+
+   The card owns a definite height, so the sidebar nav and the main column each
+   keep their own independent scrollbar instead of scrolling the document.
+
+   Mobile & tablet stay full-bleed (no margin, no radius, no shadow); the boxed
+   treatment kicks in from `lg` up, where the sidebar is permanently visible.
+───────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  .app-canvas {
+    background-color: var(--app-canvas);
+    padding: 0;
+  }
+
+  .app-shell {
+    background-color: var(--app-shell-bg);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /*
+    The sidebar ships with `position: fixed` so that it is anchored to the
+    viewport. Inside the boxed shell it has to be anchored to the card instead,
+    so it is promoted to `absolute` here (higher specificity than the `.fixed`
+    utility) — this keeps Sidebar itself untouched.
+
+    Overlays that intentionally cover the whole viewport (modals, the mobile
+    scrim, the mobile bottom nav) are NOT descendant `aside` elements and keep
+    `position: fixed`, so they still span edge to edge.
+  */
+  .app-shell > aside {
+    position: absolute;
+  }
+
+  /*
+    Modals lock background scrolling via `body { overflow: hidden }`. The boxed
+    shell scrolls inside #main-content rather than the document, so the lock is
+    mirrored onto the scroll container.
+  */
+  body.modal-open #main-content,
+  body[style*="overflow: hidden"] #main-content,
+  body[style*="overflow:hidden"] #main-content {
+    overflow: hidden;
+  }
+
+  @media (min-width: 1024px) {
+    .app-canvas {
+      padding: var(--app-shell-inset, 16px);
+    }
+
+    .app-shell {
+      border-radius: var(--app-shell-radius);
+      box-shadow: var(--app-shell-shadow);
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .app-canvas {
+      padding: var(--app-shell-inset-lg, 20px);
+    }
   }
 }
 

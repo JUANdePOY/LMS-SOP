@@ -157,7 +157,8 @@ export default function Notifications() {
   const handleDeleteAll = async () => {
     setDeleting(true);
     try {
-      await deleteNotifications([]);
+      const ids = notifications.map((n) => n.id);
+      await deleteNotifications(ids);
       setNotifications([]);
       setSelectedIds([]);
       NotificationStore.clearServerNotifications();
@@ -297,7 +298,7 @@ export default function Notifications() {
       <ConfirmationDialog
         open={deleteAllOpen}
         title="Delete all notifications"
-        description="This will permanently delete all your notifications. This action cannot be undone."
+        message="This will permanently delete all your notifications. This action cannot be undone."
         confirmLabel="Delete all"
         cancelLabel="Cancel"
         onConfirm={handleDeleteAll}

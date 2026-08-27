@@ -158,8 +158,6 @@ export default function NotificationDropdown({ showBadge = true, onFetch, count 
     }
   };
 
-  const hasUnread = notifications.some((n) => !n.is_read);
-
   return (
     <div ref={dropdownRef} className="relative" onKeyDown={handleKeyDown}>
       <button
@@ -168,7 +166,7 @@ export default function NotificationDropdown({ showBadge = true, onFetch, count 
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={handleBellClick}
-        className="relative flex h-9 w-9 items-center justify-center rounded-xl text-white hover:text-white hover:bg-white/15 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-white/30"
+        className="relative flex h-9 w-9 items-center justify-center rounded-xl text-[var(--header-fg)] hover:text-[var(--header-fg)] hover:bg-[var(--header-hover-bg)] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[var(--header-focus-ring)]"
       >
         <Bell size={18} />
         {showBadge && <NotificationBadge count={count != null ? count : unreadCount} />}
@@ -182,7 +180,7 @@ export default function NotificationDropdown({ showBadge = true, onFetch, count 
         >
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-neutral-200 dark:border-neutral-800">
             <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">Notifications</h3>
-            {hasUnread && (
+            {notifications.length > 0 && (
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -346,7 +344,7 @@ export default function NotificationDropdown({ showBadge = true, onFetch, count 
       <ConfirmationDialog
         open={deleteAllOpen}
         title="Delete all notifications"
-        description="This will permanently delete all your notifications. This action cannot be undone."
+        message="This will permanently delete all your notifications. This action cannot be undone."
         confirmLabel="Delete all"
         cancelLabel="Cancel"
         onConfirm={handleDeleteAll}

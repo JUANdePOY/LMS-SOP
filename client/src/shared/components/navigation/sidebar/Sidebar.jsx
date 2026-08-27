@@ -19,6 +19,8 @@ import {
    ChevronDown,
    Building2,
    FileText,
+   PanelLeftClose,
+   PanelRightClose,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SidebarItem from "./SidebarItem";
@@ -137,7 +139,7 @@ const SIDEBAR_WIDTH = {
   collapsed: "w-[72px]",
 };
 
-export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
+export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggleCollapse }) {
   const [expandedSubMenus, setExpandedSubMenus] = useState({});
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -230,8 +232,11 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
     >
       <div
         className={cn(
-          "flex h-14 shrink-0 items-center",
-          "bg-[var(--bg-topbar)] shadow-[0_1px_0_rgba(0,0,0,0.15)]",
+          /* Height must match the app header exactly: both read
+             --header-height and both carry their 1px divider INSIDE that
+             height (border-box), so the two bottom edges line up. */
+          "group relative flex h-[var(--header-height)] shrink-0 items-center",
+          "bg-[var(--header-bg)] border-b border-[var(--header-border)]",
           collapsed ? "justify-center px-0" : "justify-between px-4"
         )}
       >
@@ -240,17 +245,56 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose }) {
           onClick={handleNavClick}
           className={cn(
             "flex items-center gap-2.5 overflow-hidden",
-            collapsed && "justify-center"
+            collapsed && "justify-center transition-opacity duration-150 lg:group-hover:opacity-0"
           )}
         >
-           <div className={cn("flex items-center justify-center rounded-lg", collapsed ? "h-10 w-10" : "h-11 w-auto max-w-[180px]")}>
-             <img
-               src={collapsed ? "/UseThisLogo.png" : "/UseThisLogo.v.1.2.png"}
-               alt="The Roldan Group"
-               className={cn("object-contain", collapsed ? "h-8 w-8" : "h-11 w-auto")}
-             />
-          </div>
+           <div
+              role="img"
+              aria-label="The Roldan Group"
+              className={cn(
+                "flex items-center justify-center rounded-lg",
+                collapsed ? "h-10 w-10" : "h-11 w-[170px]"
+              )}
+              style={{
+                backgroundColor: "var(--color-primary)",
+                WebkitMaskImage: `url(${collapsed ? "/UseThisLogo.png" : "/UseThisLogo.v.1.2.png"})`,
+                maskImage: `url(${collapsed ? "/UseThisLogo.png" : "/UseThisLogo.v.1.2.png"})`,
+                WebkitMaskRepeat: "no-repeat",
+                maskRepeat: "no-repeat",
+                WebkitMaskPosition: "center",
+                maskPosition: "center",
+                WebkitMaskSize: "contain",
+                maskSize: "contain",
+              }}
+            />
+
         </Link>
+
+        {/*
+          Sidebar collapse toggle. Expanded: sits at the right edge of the logo
+          bar. Collapsed: the 72px rail has no room beside the mark, so the
+          button is centred over it and revealed on hover / keyboard focus.
+        */}
+        {onToggleCollapse && (
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className={cn(
+              "hidden lg:flex h-9 w-9 shrink-0 items-center justify-center rounded-xl",
+              "text-[var(--color-primary)] hover:bg-[color-mix(in_srgb,var(--color-primary)_15%,transparent)] transition-all duration-150",
+              "focus:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--color-primary)_40%,transparent)]",
+              collapsed && [
+                "absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2",
+                "opacity-0 group-hover:opacity-100",
+                "focus-visible:opacity-100 focus-visible:bg-[color-mix(in_srgb,var(--color-primary)_15%,transparent)]",
+              ]
+            )}
+          >
+            {collapsed ? <PanelRightClose size={20} /> : <PanelLeftClose size={20} />}
+          </button>
+        )}
       </div>
 
       <nav

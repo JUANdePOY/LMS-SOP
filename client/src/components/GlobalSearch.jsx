@@ -150,7 +150,7 @@ export default function GlobalSearch() {
       {open && query && (
         <div
           className={cn(
-            "fixed inset-x-0 top-14 z-50 mt-0 w-auto sm:absolute sm:inset-x-auto sm:top-full sm:mt-1 sm:w-full sm:max-w-lg",
+            "fixed inset-x-0 top-[var(--header-height)] z-50 mt-0 w-auto sm:absolute sm:inset-x-auto sm:top-full sm:mt-1 sm:w-full sm:max-w-lg",
             "rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900",
             "shadow-2xl shadow-neutral-200/80 dark:shadow-neutral-950/60",
             "ring-1 ring-neutral-200 dark:ring-neutral-800",

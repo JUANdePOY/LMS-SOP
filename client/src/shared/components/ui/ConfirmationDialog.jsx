@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createPortal } from 'react-dom';
@@ -23,10 +23,20 @@ export default function ConfirmationDialog({
   cancelText = DEFAULT_CANCEL_TEXT,
   processingText = DEFAULT_PROCESSING_TEXT,
   variant = 'default',
+  loading = false,
   children,
 }) {
   const [isConfirming, setIsConfirming] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsConfirming(false);
+      setError(null);
+    }
+  }, [isOpen]);
+
+  const isBusy = isConfirming || loading;
 
   if (!isOpen) return null;
 
@@ -108,13 +118,13 @@ export default function ConfirmationDialog({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={isConfirming || error !== null}
+            disabled={isBusy}
             className={cn(
               'px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed',
               btnColor
             )}
           >
-            {isConfirming ? processingText : confirmText}
+            {isBusy ? processingText : confirmText}
           </button>
         </div>
       </div>
