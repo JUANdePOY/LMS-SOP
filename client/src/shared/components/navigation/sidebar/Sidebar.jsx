@@ -443,7 +443,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
       <div
         ref={dropdownRef}
         className={cn(
-          "flex shrink-0 items-center",
+          "relative flex shrink-0 items-center bg-[var(--bg-sidebar)] rounded-bl-[var(--app-shell-radius)]",
           "border-t border-[var(--border-sidebar)]",
           collapsed ? "justify-center gap-2 p-3" : "gap-3 px-3 sm:px-4 py-3",
           "cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"

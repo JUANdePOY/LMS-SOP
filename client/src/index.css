@@ -549,14 +549,14 @@ select option {
 
   /*
     On desktop the shell grows with content and the page scrolls naturally.
-    The aside is a STICKY panel pinned at the viewport top (`top: 0`): at the
-    top of the page it sits at the card's inset, so as you scroll the logo/
-    collapse bar (the sidebar header) travels up ~one inset and then locks to
-    the viewport top — the same "moves up, then sticks" behaviour as the app
-    header — while the nav below stays visible (the panel is pinned) and
-    scrolls internally via `flex-1 overflow-y-auto`. The footer therefore sits
-    at the bottom of the panel (viewport bottom when content is tall).
-    Scoped to ≥1024px; mobile keeps the absolute off-canvas drawer behaviour.
+    The aside is a STICKY PANEL pinned at the viewport top (`top: 0`) with a
+    fixed viewport height, so the nav inside it (flex-1 overflow-y-auto) stays
+    pinned and scrolls internally — and the profile footer sits at the bottom
+    of the panel (so it does not levitate). The header (sticky top-0 inside the
+    panel) travels up ~one inset and locks to the viewport top. The panel
+    height uses a SINGLE inset so its bottom lands exactly on the card's bottom
+    edge (no gap below it). Scoped to ≥1024px; mobile keeps the absolute
+    off-canvas drawer behaviour.
   */
   @media (min-width: 1024px) {
     .app-shell > aside {
