@@ -395,7 +395,7 @@ export default function QuestionTypeTabs({
 
   return (
     <div className="space-y-4">
-      <div className="sticky top-0 z-10 -mx-1 px-1 py-2 bg-gradient-to-b from-[var(--bg-page,white)] via-[var(--bg-page,white)]/95 to-transparent dark:from-neutral-950 dark:via-neutral-950/95 backdrop-blur-sm">
+      <div className="sticky top-[var(--page-sticky-top)] z-10 -mx-1 px-1 py-2 bg-gradient-to-b from-[var(--bg-page,white)] via-[var(--bg-page,white)]/95 to-transparent dark:from-neutral-950 dark:via-neutral-950/95 backdrop-blur-sm">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div
             role="tablist"

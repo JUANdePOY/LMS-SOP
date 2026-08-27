@@ -286,7 +286,7 @@ export default function CourseLibraryPage() {
         </div>
       </div>
 
-      <div className="sticky top-0 z-20 -mx-1 rounded-xl border border-neutral-200/70 dark:border-neutral-700/70 bg-white/85 dark:bg-neutral-900/85 px-3 py-2.5 shadow-sm backdrop-blur sm:px-4">
+      <div className="sticky top-[var(--page-sticky-top)] z-20 -mx-1 rounded-xl border border-neutral-200/70 dark:border-neutral-700/70 bg-white/85 dark:bg-neutral-900/85 px-3 py-2.5 shadow-sm backdrop-blur sm:px-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />

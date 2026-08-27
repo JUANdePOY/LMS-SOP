@@ -29,7 +29,7 @@ select option {
   Palette: #132F45 · #32667F · #EEA23A · #F3B940 · #EA8B33
 */
 :root {
-  --bg-page:        #F2F2F0;
+  --bg-page:        #F3F0EA;            /* warm paper */
   --bg-surface:     #ffffff;
   --bg-sidebar:     #ffffff;
   --bg-topbar:      #F25C05;
@@ -44,6 +44,11 @@ select option {
   /* Shared top-bar height — the app header and the sidebar logo bar both read
      this token so the two always line up. Change it here only. */
   --header-height:      60px;
+  /* Offset at which in-page sticky bars (toolbars, filters) should pin so they
+     sit just BELOW the app header instead of at the viewport top (which would
+     overlap the header). Mobile (no inset) = header height; desktop = inset +
+     header height. */
+  --page-sticky-top:    var(--header-height, 60px);
   /* Top bar surface — soft off-white with neutral (dark gray) icons */
   --header-bg:          #F5F7FA;
   --header-fg:          #374151;
@@ -56,18 +61,18 @@ select option {
   --bg-hover:       rgba(19, 47, 69, 0.06);
   --bg-active:      rgba(19, 47, 69, 0.09);
   --bg-input:       #ffffff;
-  --bg-subtle:      #f6fafd;
+  --bg-subtle:      #FAF8F4;            /* warm inset wells */
   --bg-cover-overlay: rgba(0, 0, 0, 0.4);
   --btn-bg:         #1F1D1C;
   --btn-bg-hover:   #322f2d;
 
-  --border:         #dde8ef;
-  --border-light:   #edf3f7;
-  --border-sidebar: #e5eaf0;
+  --border:         #E6E0D8;            /* warm hairline */
+  --border-light:   #F0EBE3;
+  --border-sidebar: #ECE6DD;
 
   --text-primary:   #132F45;
   --text-secondary: #32667F;
-  --text-muted:     #405b6b;
+  --text-muted:     #6E665C;            /* warm gray, ~5.3:1 on white */
   --text-on-sidebar:#2f5770;
 
   --accent-danger:   #cc1f1f;
@@ -78,14 +83,18 @@ select option {
   --status-red:      #cc1f1f;
 
   /* ── Button role tokens (brand-consistent) ───────────────────────
-     primary = orange topbar color; secondary = navy; success/warning/danger
-     reuse existing status/accent tokens so everything stays single-source. */
-  --color-primary:        #F25C05;
-  --color-primary-hover:  #d94e04;
-  --color-primary-active: #c04504;
+      primary = deepened burnt orange so white text passes WCAG AA;
+      secondary = navy; success/warning/danger reuse existing status/accent
+      tokens so everything stays single-source. Bright #F25C05 is kept as
+      --color-brand-bright for large/decorative brand uses only (3:1). */
+  --color-primary:        #C14E08;
+  --color-primary-hover:  #A84206;
+  --color-primary-active: #8F3905;
+  --color-brand-bright:   #F25C05;        /* logo, large headings, focus rings */
   --color-secondary:      #132F45;
   --color-secondary-hover:#1c3f5c;
-  --color-accent:         #F25C05;
+  --color-accent:         #C8A24B;        /* champagne gold — decorative only */
+  --color-accent-strong:  #A47E2E;        /* gold safe for large text */
   --color-success:        #205733;
   --color-success-hover:  #2a6e44;
   --color-warning:        #d9a300;
@@ -95,10 +104,17 @@ select option {
   --color-info:           #32667F;
   --color-info-hover:     #28536a;
 
-  --shadow-sm:  0 1px 3px rgba(19,47,69,0.06);
-  --shadow-md:  0 4px 12px rgba(19,47,69,0.10);
-  --shadow-lg:  0 8px 24px rgba(19,47,69,0.13);
-  --shadow-xl:  0 24px 60px rgba(0,0,0,0.25);
+  /* ── Premium gradients ──────────────────────────────────────── */
+  --accent-gradient: linear-gradient(135deg, #F25C05, #C14E08);
+  --gold-gradient:   linear-gradient(135deg, #E0BD72, #B8860B);
+
+  /* ── Focus ring (visible on both themes) ────────────────────── */
+  --focus-ring: 0 0 0 3px rgba(193, 78, 8, 0.35);
+
+  --shadow-sm:  0 1px 2px rgba(40,30,20,0.04), 0 1px 3px rgba(40,30,20,0.06);
+  --shadow-md:  0 4px 10px rgba(40,30,20,0.06), 0 2px 4px rgba(40,30,20,0.04);
+  --shadow-lg:  0 12px 28px rgba(40,30,20,0.10), 0 4px 8px rgba(40,30,20,0.05);
+  --shadow-xl:  0 24px 60px rgba(20,12,4,0.18);
   --shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   --glass-bg: rgba(255, 255, 255, 0.7);
   --glass-border: rgba(255, 255, 255, 0.3);
@@ -107,7 +123,7 @@ select option {
   --card-foreground: var(--text-primary);
   --popover: var(--bg-surface);
   --popover-foreground: var(--text-primary);
-  --primary: 25 91% 49%;       /* #F25C05 orange — brand primary button */
+  --primary: 23 93% 39%;       /* #C14E08 deepened burnt orange — AA with white text */
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 96%;
   --secondary-foreground: 0 0% 25%;
@@ -127,15 +143,23 @@ select option {
   --scrollbar-border-radius: 999px;
 
   /* ── Boxed app shell ────────────────────────────────────────────
-     The whole shell (sidebar + header + content) floats as one
-     rounded card on a light-gray canvas. Radius/shadow/margin only
-     apply from `lg` up — mobile & tablet stay full-bleed. */
-  --app-canvas:        #F1F2F6;
-  --app-shell-bg:      var(--bg-page);
-  --app-shell-radius:  14px;
-  --app-shell-inset:   16px;
-  --app-shell-inset-lg: 20px;
-  --app-shell-shadow:  0 4px 20px rgba(0, 0, 0, 0.06);
+      The whole shell (sidebar + header + content) floats as one
+      rounded card on a deeper warm canvas. Depth comes from a 4-step
+      tonal ramp (canvas → shell → card → inset) plus a layered soft
+      shadow and a hairline border. Radius/shadow/margin only apply
+      from `lg` up — mobile & tablet stay full-bleed. */
+  --app-canvas:        #E9E5DE;            /* deeper warm greige — recedes */
+  --app-shell-bg:      #F6F4F0;            /* warm off-white — floats */
+  --app-shell-radius:  18px;
+  --app-shell-inset:   20px;
+  --app-shell-inset-lg: 28px;
+  --app-shell-border:  1px solid rgba(40, 30, 20, 0.06);
+  --app-shell-shadow:  0 1px 2px rgba(30,20,10,0.04),
+                       0 8px 24px rgba(30,20,10,0.08),
+                       0 24px 48px rgba(30,20,10,0.06);
+  /* Sidebar width — toggled by sidebar collapsed/expanded state */
+  --sidebar-width:     260px;
+  --sidebar-width-collapsed: 72px;
 
   /* ── Notice banner (stacked account / system messages) ────────── */
   --notice-bg:         #EFF1F3;
@@ -160,9 +184,9 @@ select option {
 }
 
 .dark {
-  --bg-page:        #262624;
-  --bg-surface:     #30302e;
-  --bg-sidebar:     #1f1e1d;
+  --bg-page:        #1A1814;            /* warm near-black */
+  --bg-surface:     #26241F;            /* warm charcoal */
+  --bg-sidebar:     #1f1e1b;
   --bg-topbar:      #F25C05; /* #bd5d3a  Darker*/
   --header-text:    #ffffff;
   --header-text-muted: #e8e6dc;
@@ -184,19 +208,19 @@ select option {
   --bg-hover:       rgba(255, 255, 255, 0.06);
   --bg-active:      rgba(255, 255, 255, 0.1);
   --bg-input:       #30302e;
-  --bg-subtle:      #262624;
+  --bg-subtle:      #221F1B;
   --bg-cover-overlay: rgba(0, 0, 0, 0.6);
   --btn-bg:         #da7756;
   --btn-bg-hover:   #e08d6f;
 
-  --border:         #3a3937;
-  --border-light:   #333230;
-  --border-sidebar: #333230;
+  --border:         rgba(255,255,255,0.09);
+  --border-light:   rgba(255,255,255,0.05);
+  --border-sidebar: rgba(255,255,255,0.07);
 
-  --text-primary:   #e8e6dc;
-  --text-secondary: #a8a6a0;
-  --text-muted:     #78766f;
-  --text-on-sidebar:#a8a6a0;
+  --text-primary:   #F2EDE4;
+  --text-secondary: #A8B6C0;
+  --text-muted:     #9A9186;
+  --text-on-sidebar:#A8B6C0;
 
   --accent-amber:   #da7756;
   --accent-orange:  #da7756;
@@ -204,10 +228,20 @@ select option {
   --status-green:   #5a9d6f;
   --status-red:     #d97a6c;
 
-  --shadow-sm:  0 1px 3px rgba(0,0,0,0.3);
-  --shadow-md:  0 4px 12px rgba(0,0,0,0.35);
-  --shadow-lg:  0 8px 24px rgba(0,0,0,0.4);
-  --shadow-xl:  0 24px 60px rgba(0,0,0,0.5);
+  /* ── Button role tokens (dark) ────────────────────────────────
+      primary stays the deepened burnt orange so white text passes WCAG AA
+      on dark too (4.76:1); gold accent brightens for visibility. */
+  --color-primary:        #C14E08;
+  --color-primary-hover:  #A84206;
+  --color-primary-active: #8F3905;
+  --color-brand-bright:   #F25C05;
+  --color-accent:         #D9B36B;
+  --color-accent-strong:  #E0BD72;
+
+  --shadow-sm:  0 1px 2px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md:  0 4px 10px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3);
+  --shadow-lg:  0 12px 28px rgba(0,0,0,0.45), 0 4px 8px rgba(0,0,0,0.35);
+  --shadow-xl:  0 24px 60px rgba(0,0,0,0.55);
   --glass-bg: rgba(38, 38, 36, 0.7);
   --glass-border: rgba(255, 255, 255, 0.08);
 
@@ -217,7 +251,7 @@ select option {
   --card-foreground: var(--text-primary);
   --popover: var(--bg-surface);
   --popover-foreground: var(--text-primary);
-  --primary: 25 91% 49%;       /* #F25C05 orange — brand primary button */
+  --primary: 23 93% 39%;       /* #C14E08 deepened burnt orange — AA with white text */
   --primary-foreground: 0 0% 100%;
   --secondary: 30 4% 20%;
   --secondary-foreground: 40 15% 90%;
@@ -236,10 +270,13 @@ select option {
   --scrollbar-border-radius: 999px;
 
   /* ── Boxed app shell (dark) ─────────────────────────────────── */
-  --app-canvas:        #1b1b1a;
-  --app-shell-bg:      var(--bg-page);
-  --app-shell-radius:  14px;
-  --app-shell-shadow:  0 4px 20px rgba(0, 0, 0, 0.35);
+  --app-canvas:        #16140F;
+  --app-shell-bg:      #1E1C19;
+  --app-shell-radius:  18px;
+  --app-shell-border:  1px solid rgba(255,255,255,0.07);
+  --app-shell-shadow:  0 1px 2px rgba(0,0,0,0.3),
+                       0 8px 24px rgba(0,0,0,0.4),
+                       0 24px 48px rgba(0,0,0,0.45);
 
   /* ── Notice banner (dark) ───────────────────────────────────── */
   --notice-bg:         #2b2b29;
@@ -279,6 +316,13 @@ select option {
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Visible focus ring for keyboard users (accessibility). Uses outline so it
+     composes with, rather than replaces, component box-shadow rings. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
   }
 }
 
@@ -465,8 +509,13 @@ select option {
    The full app shell (sidebar + header + main content) is rendered inside one
    rounded card that floats on a light-gray canvas.
 
-   The card owns a definite height, so the sidebar nav and the main column each
-   keep their own independent scrollbar instead of scrolling the document.
+     The card grows (extends) with its content and the document scrolls naturally:
+     the header is `sticky` (stays pinned at the top of the viewport) and the
+     footer is `sticky bottom-0` (stays pinned at the bottom while content is long,
+     sits at the end when short). The content region (`#main-content`) carries
+     `overflow: clip`, so scrolling content is clipped at its own top edge — right
+     beneath the pinned header — and can never paint above/outside the header. The
+     card itself keeps growing with content, so the lower edge stays dynamic.
 
    Mobile & tablet stay full-bleed (no margin, no radius, no shadow); the boxed
    treatment kicks in from `lg` up, where the sidebar is permanently visible.
@@ -481,6 +530,7 @@ select option {
     background-color: var(--app-shell-bg);
     border-radius: 0;
     box-shadow: none;
+    border: none;
   }
 
   /*
@@ -498,6 +548,30 @@ select option {
   }
 
   /*
+    On desktop the shell grows with content and the page scrolls naturally.
+    The aside is a STICKY panel pinned at the viewport top (`top: 0`): at the
+    top of the page it sits at the card's inset, so as you scroll the logo/
+    collapse bar (the sidebar header) travels up ~one inset and then locks to
+    the viewport top — the same "moves up, then sticks" behaviour as the app
+    header — while the nav below stays visible (the panel is pinned) and
+    scrolls internally via `flex-1 overflow-y-auto`. The footer therefore sits
+    at the bottom of the panel (viewport bottom when content is tall).
+    Scoped to ≥1024px; mobile keeps the absolute off-canvas drawer behaviour.
+  */
+  @media (min-width: 1024px) {
+    .app-shell > aside {
+      position: sticky;
+      top: 0;
+      bottom: auto;
+      left: 0;
+      align-self: flex-start;
+      height: calc(100dvh - var(--app-shell-inset, 16px));
+      border-top-left-radius: var(--app-shell-radius);
+      border-bottom-left-radius: var(--app-shell-radius);
+    }
+  }
+
+  /*
     Modals lock background scrolling via `body { overflow: hidden }`. The boxed
     shell scrolls inside #main-content rather than the document, so the lock is
     mirrored onto the scroll container.
@@ -509,19 +583,37 @@ select option {
   }
 
   @media (min-width: 1024px) {
+    :root {
+      --page-sticky-top: calc(var(--app-shell-inset, 20px) + var(--header-height, 60px));
+    }
+
     .app-canvas {
-      padding: var(--app-shell-inset, 16px);
+      /* Top padding restored: the header is now `sticky` (in normal flow), not
+         `fixed`, so a gap above the card no longer lets content bleed through —
+         the whole card now floats with the same inset on every side. */
+      padding: var(--app-shell-inset, 16px) var(--app-shell-inset, 16px) var(--app-shell-inset, 16px);
     }
 
     .app-shell {
       border-radius: var(--app-shell-radius);
       box-shadow: var(--app-shell-shadow);
+      border: var(--app-shell-border);
     }
   }
 
   @media (min-width: 1280px) {
+    :root {
+      --page-sticky-top: calc(var(--app-shell-inset-lg, 28px) + var(--header-height, 60px));
+    }
+
     .app-canvas {
-      padding: var(--app-shell-inset-lg, 20px);
+      padding: var(--app-shell-inset-lg, 28px) var(--app-shell-inset-lg, 28px) var(--app-shell-inset-lg, 28px);
+    }
+
+    /* Match the pinned sidebar panel height to the larger (≥1280px) inset so its
+       rounded corners stay flush with the card edges. */
+    .app-shell > aside {
+      height: calc(100dvh - var(--app-shell-inset-lg, 28px));
     }
   }
 }
@@ -938,25 +1030,25 @@ select option {
   .login-page {
     color-scheme: light;
 
-    --bg-page: #F2F2F0;
+    --bg-page: #F3F0EA;
     --bg-surface: #ffffff;
     --bg-sidebar: #ffffff;
     --bg-topbar: #F25C05;
     --bg-hover: rgba(19, 47, 69, 0.06);
     --bg-active: rgba(19, 47, 69, 0.09);
     --bg-input: #ffffff;
-    --bg-subtle: #f6fafd;
+    --bg-subtle: #FAF8F4;
     --bg-cover-overlay: rgba(0, 0, 0, 0.4);
     --btn-bg: #1F1D1C;
     --btn-bg-hover: #322f2d;
 
-    --border: #dde8ef;
-    --border-light: #edf3f7;
-    --border-sidebar: #e5eaf0;
+    --border: #E6E0D8;
+    --border-light: #F0EBE3;
+    --border-sidebar: #ECE6DD;
 
     --text-primary: #132F45;
     --text-secondary: #32667F;
-    --text-muted: #405b6b;
+    --text-muted: #6E665C;
     --text-on-sidebar: #2f5770;
 
     --accent-danger: #cc1f1f;
@@ -966,10 +1058,10 @@ select option {
     --status-green: #205733;
     --status-red: #cc1f1f;
 
-    --shadow-sm: 0 1px 3px rgba(19, 47, 69, 0.06);
-    --shadow-md: 0 4px 12px rgba(19, 47, 69, 0.10);
-    --shadow-lg: 0 8px 24px rgba(19, 47, 69, 0.13);
-    --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.25);
+    --shadow-sm: 0 1px 2px rgba(40,30,20,0.04), 0 1px 3px rgba(40,30,20,0.06);
+    --shadow-md: 0 4px 10px rgba(40,30,20,0.06), 0 2px 4px rgba(40,30,20,0.04);
+    --shadow-lg: 0 12px 28px rgba(40,30,20,0.10), 0 4px 8px rgba(40,30,20,0.05);
+    --shadow-xl: 0 24px 60px rgba(20,12,4,0.18);
     --shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     --glass-bg: rgba(255, 255, 255, 0.7);
     --glass-border: rgba(255, 255, 255, 0.3);
@@ -980,7 +1072,7 @@ select option {
     --card-foreground: var(--text-primary);
     --popover: var(--bg-surface);
     --popover-foreground: var(--text-primary);
-    --primary: 60 2% 18%;
+    --primary: 23 93% 39%;
     --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 25%;
@@ -991,7 +1083,7 @@ select option {
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --input: var(--bg-input);
-    --ring: 25 60% 30%;
+    --ring: 23 93% 39%;
 
     --scrollbar-thumb: #F25C05;
     --scrollbar-track: transparent;

@@ -132,16 +132,21 @@ export default function AppLayout() {
     <div
       className={cn(
         "app-canvas",
-        "flex w-full overflow-hidden",
-        "h-screen supports-[height:100dvh]:h-[100dvh]",
+        "flex w-full min-h-[100dvh]",
         "transition-colors duration-300"
       )}
     >
       {/* Boxed app shell — sidebar + header + content inside one rounded card. */}
       <div
         className={cn(
+          /* overflow-clip removed: it made .app-shell the clip/scroll context
+             and broke `position: sticky` for the header (content bled through),
+             while also clipping the card to a fixed box. Rounded corners are now
+             applied per-edge on the outer elements instead (see Sidebar's
+             border-radius via .app-shell > aside, the header's rounded-tr, and
+             the footer's rounded-br). */
           "app-shell",
-          "relative flex h-full flex-1 min-w-0 overflow-hidden",
+          "relative flex min-h-full flex-1 min-w-0",
           "text-[var(--text-primary)]",
           "transition-colors duration-300"
         )}
@@ -161,25 +166,15 @@ export default function AppLayout() {
           onToggleCollapse={() => setCollapsed((v) => !v)}
         />
         )}
-        <main
-          id="main-content"
-          ref={mainScrollRef}
-          className={cn(
-            "flex-1 min-w-0 flex flex-col",
-            "h-full overflow-y-auto overflow-x-hidden scrollbar-fade",
-            "transition-all duration-200 ease-out",
-            collapsed ? "lg:ml-[72px]" : "lg:ml-[260px]",
-            "ml-0",
-            "pb-16 lg:pb-0"
-          )}
-        >
-          <Scrollbar variant="viewport">
+        <div className="flex-1 min-w-0 flex flex-col">
           <header
             className={cn(
-              /* shrink-0 is essential: `main` is a height-constrained flex
-                 column, so without it the header gets compressed below
-                 --header-height whenever page content overflows. */
-              "sticky top-0 z-30 shrink-0 flex items-center gap-2 sm:gap-3 lg:px-6 h-[var(--header-height)]",
+              /* sticky top-0: the header scrolls with the page like a normal
+                 block until its top edge reaches the viewport's top, then it
+                 pins in place for the rest of the scroll — the "moves up, then
+                 locks" behavior in pure CSS. z-30 keeps it above page content
+                 but below the mobile menu overlay (z-40) and the sidebar (z-50). */
+              "sticky top-0 z-30 shrink-0 flex items-center gap-2 sm:gap-3 lg:px-6 h-[var(--header-height)] lg:rounded-tr-[var(--app-shell-radius)]",
               "border-b border-[var(--header-border)]",
               "bg-[var(--header-bg)] backdrop-blur"
             )}
@@ -302,20 +297,34 @@ export default function AppLayout() {
             </div>
           </header>
 
-          <div className="flex-1 w-full px-4 sm:px-6 py-4 sm:py-6">
+          <main
+            id="main-content"
+            ref={mainScrollRef}
+            className={cn(
+              /* pt-[var(--header-height)] removed: the header now reserves its
+                 own space in normal flow as a sticky element, so this hack is no
+                 longer needed and can't drift out of sync with the header's real
+                 height (the root cause of the top-of-box overlap bug). */
+              "flex-1 min-w-0 flex flex-col pb-16 lg:pb-0",
+              "transition-all duration-200 ease-out"
+            )}
+          >
+          <Scrollbar variant="viewport">
+          <div className="w-full px-4 sm:px-6 pt-4 sm:pt-6 pb-8 sm:pb-10 flex-1">
             <BannerSection items={activeBanners} />
             <PageTransition>
               <Outlet />
             </PageTransition>
           </div>
 
-          <footer className="shrink-0 border-t border-[var(--border)] py-2.5 text-center">
+          <footer className="border-t border-[var(--border)] bg-[var(--app-shell-bg)] py-2.5 text-center lg:rounded-br-[var(--app-shell-radius)]">
             <p className="text-[11px] sm:text-xs text-neutral-400">
               © {new Date().getFullYear()} SOP Training Platform. All rights reserved.
             </p>
           </footer>
           </Scrollbar>
-        </main>
+          </main>
+        </div>
 
         {showSearchMobile && (
           <div className="fixed inset-0 z-50 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md p-4 md:hidden">

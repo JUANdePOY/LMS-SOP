@@ -234,9 +234,13 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
         className={cn(
           /* Height must match the app header exactly: both read
              --header-height and both carry their 1px divider INSIDE that
-             height (border-box), so the two bottom edges line up. */
-          "group relative flex h-[var(--header-height)] shrink-0 items-center",
+             height (border-box), so the two bottom edges line up.
+             `sticky top-0`: the sidebar header scrolls with the page but pins
+             to the top of the viewport once it reaches it (the whole sidebar is
+             no longer sticky, so only this bar sticks). */
+          "group sticky top-0 z-30 flex h-[var(--header-height)] shrink-0 items-center",
           "bg-[var(--header-bg)] border-b border-[var(--header-border)]",
+          "rounded-tl-[var(--app-shell-radius)]",
           collapsed ? "justify-center px-0" : "justify-between px-4"
         )}
       >
@@ -446,9 +450,11 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
         )}
         onClick={() => setProfileMenuOpen((v) => !v)}
       >
-        <div className="relative">
-          <UserAvatar user={user} size="sm" ring />
-          <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-[var(--bg-surface)] bg-emerald-400" />
+        <div className="relative self-stretch flex items-center">
+          <div className="relative">
+            <UserAvatar user={user} size="sm" ring />
+            <span className="absolute bottom-0 right-0 h-2 w-2 rounded-full border-2 border-[var(--bg-surface)] bg-emerald-400" />
+          </div>
 
           {profileMenuOpen && (
             <>
