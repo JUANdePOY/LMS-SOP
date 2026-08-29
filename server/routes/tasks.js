@@ -80,6 +80,9 @@ router.put('/:id', authenticateToken, requireAdmin, taskController.updateTask);
 // Admin: delete task
 router.delete('/:id', authenticateToken, requireAdmin, taskController.deleteTask);
 
+// Admin: duplicate task
+router.post('/:id/duplicate', authenticateToken, requireAdmin, taskController.duplicateTask);
+
 // Admin: unassign task
 router.delete('/:taskId/unassign/:assignmentType/:referenceId', authenticateToken, requireAdmin, taskController.unassignTask);
 

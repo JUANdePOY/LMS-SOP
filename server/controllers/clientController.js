@@ -107,6 +107,44 @@ const clientController = {
       handleError(res, error);
     }
   },
+
+  async deleteBusiness(req, res) {
+    try {
+      const businessId = parseInt(req.params.businessId, 10);
+      const affected = await clientModel.removeBusiness(businessId);
+      if (affected === 0) {
+        return res.status(404).json({ success: false, message: 'Business not found', code: 'NOT_FOUND' });
+      }
+      res.json({ success: true, message: 'Business deleted successfully' });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  async addBusiness(req, res) {
+    try {
+      const clientId = parseInt(req.params.id, 10);
+      const name = (req.body.business_name || '').toString().trim();
+      if (!name) {
+        return res.status(400).json({ success: false, message: 'Business name is required', code: 'VALIDATION_ERROR' });
+      }
+      const existing = await clientModel.getClient(clientId);
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'Client not found', code: 'NOT_FOUND' });
+      }
+      const id = await clientModel.addBusiness(clientId, name);
+      res.status(201).json({
+        success: true,
+        data: { id, client_id: clientId, business_name: name, project_count: 0 },
+        message: 'Business created successfully',
+      });
+    } catch (error) {
+      if (/Duplicate entry/.test(error.message) && /uk_client_business/.test(error.message)) {
+        return res.status(409).json({ success: false, message: 'A business with this name already exists for this client', code: 'DUPLICATE' });
+      }
+      handleError(res, error);
+    }
+  },
 };
 
 module.exports = { clientController };

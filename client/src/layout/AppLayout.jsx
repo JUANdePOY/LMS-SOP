@@ -25,12 +25,15 @@ import BannerSection from "@/shared/components/ui/BannerSection";
 import GlobalSearch from "@/components/GlobalSearch";
 import NotificationDropdown from "@/shared/components/ui/NotificationDropdown";
 import NotificationBadge from "@/shared/components/ui/NotificationBadge";
+import QuickCreateMenu from "@/features/task-management/components/QuickCreateMenu";
 import { useNotificationStore, useNotificationPoller, useNotifications } from "@/shared/stores/notificationStore.js";
 import { PageTransition } from "@/shared/motion";
 import { useWebSocket } from "@/features/notifications/hooks/useWebSocket";
 import { useActiveBanners } from "@/features/notifications/hooks/useActiveBanners";
 import { useTabNotificationBadge } from "@/hooks/useTabNotificationBadge";
 import { isQuietHours } from "@/shared/utils/quietHours";
+import { NavigationProvider, useNavigation } from "@/shared/contexts/NavigationContext";
+import SecondarySidebar from "@/shared/components/navigation/SecondarySidebar";
 
 const MOBILE_BOTTOM_NAV_ADMIN = [
   { name: "Home", path: "/", icon: BookOpen },
@@ -51,6 +54,20 @@ const HEADER_QUICK_ACCESS = [
   { name: "Announcements", path: "/announcements", icon: Megaphone },
   { name: "Events", path: "/events", icon: Calendar, roles: ["super_admin"] },
 ];
+
+function SecondaryNavRouteSync() {
+  const { openSecondaryNav, closeSecondaryNav } = useNavigation();
+  const location = useLocation();
+  useEffect(() => {
+    if (location.pathname.startsWith("/clients")) {
+      openSecondaryNav("clients");
+    } else if (location.pathname !== "/tasks") {
+      // Navigated via any other sidebar item — collapse the panel.
+      closeSecondaryNav();
+    }
+  }, [location.pathname, openSecondaryNav, closeSecondaryNav]);
+  return null;
+}
 
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
@@ -128,7 +145,8 @@ export default function AppLayout() {
   }, []);
 
   return (
-    /* Canvas — light gray plate the boxed app shell floats on. */
+    <NavigationProvider>
+    {/* Canvas — light gray plate the boxed app shell floats on. */}
     <div
       className={cn(
         "app-canvas",
@@ -166,6 +184,7 @@ export default function AppLayout() {
           onToggleCollapse={() => setCollapsed((v) => !v)}
         />
         )}
+        <SecondarySidebar />
         <div className="flex-1 min-w-0 flex flex-col">
           <header
             className={cn(
@@ -240,6 +259,8 @@ export default function AppLayout() {
                   );
                 })}
               </div>
+
+              <QuickCreateMenu />
 
               <div className="relative" ref={profileRef}>
                 <button
@@ -383,5 +404,7 @@ export default function AppLayout() {
         )}
       </div>
     </div>
+    <SecondaryNavRouteSync />
+    </NavigationProvider>
   );
 }

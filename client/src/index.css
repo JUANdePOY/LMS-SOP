@@ -104,6 +104,24 @@ select option {
   --color-info:           #32667F;
   --color-info-hover:     #28536a;
 
+  /* ── Asana-style detail panel + entity tokens (Tasks & Projects) ── */
+  --ppm-shadow-panel: 0 24px 48px -12px rgba(0, 0, 0, 0.28);
+  /* Status palette (pill fill + text, fixed per TASK_STATUSES) */
+  --ppm-status-pending: #64748b;     --ppm-status-pending-bg: #f1f5f9;
+  --ppm-status-progress: #2563eb;    --ppm-status-progress-bg: #eff6ff;
+  --ppm-status-completed: #059669;   --ppm-status-completed-bg: #ecfdf5;
+  --ppm-status-overdue: #dc2626;     --ppm-status-overdue-bg: #fef2f2;
+  --ppm-status-cancelled: #6b7280;   --ppm-status-cancelled-bg: #f3f4f6;
+  /* Priority palette */
+  --ppm-priority-critical: #dc2626;  --ppm-priority-critical-bg: #fef2f2;
+  --ppm-priority-high: #ea580c;      --ppm-priority-high-bg: #fff7ed;
+  --ppm-priority-medium: #ca8a04;    --ppm-priority-medium-bg: #fefce8;
+  --ppm-priority-low: #6b7280;       --ppm-priority-low-bg: #f3f4f6;
+  /* Deterministic avatar palette (assigned by name/id hash) */
+  --ppm-avatar-1: #C14E08; --ppm-avatar-2: #132F45; --ppm-avatar-3: #205733;
+  --ppm-avatar-4: #32667F; --ppm-avatar-5: #7c3aed; --ppm-avatar-6: #be185d;
+  --ppm-avatar-7: #b45309; --ppm-avatar-8: #0f766e;
+
   /* ── Premium gradients ──────────────────────────────────────── */
   --accent-gradient: linear-gradient(135deg, #F25C05, #C14E08);
   --gold-gradient:   linear-gradient(135deg, #E0BD72, #B8860B);
@@ -1153,4 +1171,91 @@ select option {
 
 .banner-rich-message p + p {
   margin-top: 0.25rem;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Task & Project management — status / priority / card system
+   Monday-style saturated status pills. Tokens live in :root and .dark below;
+   utility classes consume them so every view stays theme-aware and single-source.
+   ─────────────────────────────────────────────────────────────────────────── */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.status-pill .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+.s-planning   { background: var(--status-planning-bg);   color: var(--status-planning-fg);   border-color: var(--status-planning-border); }
+.s-active     { background: var(--status-active-bg);     color: var(--status-active-fg);     border-color: var(--status-active-border); }
+.s-on_hold    { background: var(--status-onhold-bg);    color: var(--status-onhold-fg);     border-color: var(--status-onhold-border); }
+.s-completed  { background: var(--status-completed-bg);  color: var(--status-completed-fg);  border-color: var(--status-completed-border); }
+.s-cancelled  { background: var(--status-cancelled-bg);  color: var(--status-cancelled-fg);  border-color: var(--status-cancelled-border); }
+.s-pending    { background: var(--status-pending-bg);    color: var(--status-pending-fg);    border-color: var(--status-pending-border); }
+.s-in_progress{ background: var(--status-inprogress-bg); color: var(--status-inprogress-fg); border-color: var(--status-inprogress-border); }
+.s-overdue    { background: var(--status-overdue-bg);    color: var(--status-overdue-fg);    border-color: var(--status-overdue-border); }
+
+.priority-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 9999px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.p-low      { background: var(--priority-low); }
+.p-medium   { background: var(--priority-medium); }
+.p-high    { background: var(--priority-high); }
+.p-critical { background: var(--priority-critical); }
+
+/* Card chrome — Board cards get more radius/shadow, List/Table rows stay flat. */
+.ppm-card {
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+}
+
+:root {
+  /* Project lifecycle statuses */
+  --status-planning-bg: #EFF6FF; --status-planning-fg: #1D4ED8; --status-planning-border: #BFDBFE;
+  --status-active-bg: #ECFDF5;   --status-active-fg: #047857;   --status-active-border: #A7F3D0;
+  --status-onhold-bg: #FEF3C7;   --status-onhold-fg: #B45309;   --status-onhold-border: #FDE68A;
+  --status-completed-bg: #ECFDF5;--status-completed-fg: #047857; --status-completed-border: #A7F3D0;
+  --status-cancelled-bg: #F3F4F6;--status-cancelled-fg: #4B5563; --status-cancelled-border: #E5E7EB;
+  /* Task statuses (mirrors server TASK_STATUSES) */
+  --status-pending-bg: #F1F5F9;     --status-pending-fg: #475569;     --status-pending-border: #E2E8F0;
+  --status-inprogress-bg: #DBEAFE;  --status-inprogress-fg: #1D4ED8;  --status-inprogress-border: #BFDBFE;
+  --status-overdue-bg: #FEE2E2;     --status-overdue-fg: #B91C1C;     --status-overdue-border: #FECACA;
+  /* Priority ramp */
+  --priority-low: #10B981;
+  --priority-medium: #3B82F6;
+  --priority-high: #F59E0B;
+  --priority-critical: #EF4444;
+  /* Card chrome */
+  --card-radius: 14px;
+  --card-shadow: 0 1px 3px rgba(16,24,40,0.10), 0 1px 2px rgba(16,24,40,0.06);
+}
+
+.dark {
+  --status-planning-bg: rgba(30,58,138,0.30);  --status-planning-fg: #93C5FD;  --status-planning-border: rgba(30,64,175,0.55);
+  --status-active-bg: rgba(6,95,70,0.30);      --status-active-fg: #6EE7B7;    --status-active-border: rgba(4,120,87,0.55);
+  --status-onhold-bg: rgba(180,83,9,0.28);     --status-onhold-fg: #FCD34D;    --status-onhold-border: rgba(180,83,9,0.55);
+  --status-completed-bg: rgba(6,95,70,0.30);   --status-completed-fg: #6EE7B7;  --status-completed-border: rgba(4,120,87,0.55);
+  --status-cancelled-bg: rgba(75,85,99,0.30);  --status-cancelled-fg: #CBD5E1;  --status-cancelled-border: rgba(75,85,99,0.55);
+  --status-pending-bg: rgba(71,85,105,0.28);   --status-pending-fg: #CBD5E1;    --status-pending-border: rgba(71,85,105,0.55);
+  --status-inprogress-bg: rgba(30,58,138,0.30);--status-inprogress-fg: #93C5FD; --status-inprogress-border: rgba(30,64,175,0.55);
+  --status-overdue-bg: rgba(185,28,28,0.30);   --status-overdue-fg: #FCA5A5;    --status-overdue-border: rgba(185,28,28,0.55);
+  --priority-low: #34D399;
+  --priority-medium: #60A5FA;
+  --priority-high: #FBBF24;
+  --priority-critical: #F87171;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.40), 0 1px 2px rgba(0,0,0,0.30);
 }

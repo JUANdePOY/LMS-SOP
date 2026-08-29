@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { resolveFileUrl } from "@/lib/fileUrl";
-import { useAuth } from "@/contexts/AuthContext";
-import * as session from "@/services/session";
 
 const DEFAULT_AVATAR =
   "data:image/svg+xml," +
@@ -20,7 +18,6 @@ const SIZES = {
 
 export default function UserAvatar({ user, size = "sm", className, ring = false }) {
   const [imgError, setImgError] = useState(false);
-  const { user: currentUser } = useAuth();
 
   // Use the shared file resolver for all avatars so local /uploads paths
   // are rewritten through the authenticated streaming route instead of relying
@@ -52,6 +49,72 @@ export default function UserAvatar({ user, size = "sm", className, ring = false 
         onError={() => setImgError(true)}
         className="h-full w-full object-cover"
       />
+    </span>
+  );
+}
+
+function hashString(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i += 1) {
+    h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+function getInitials(name) {
+  if (!name) return "?";
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return parts[0].slice(0, 2).toUpperCase();
+}
+
+// Asana-style circular avatar: shows the image when available, otherwise
+// deterministic colored initials (same person always gets the same color via
+// a name hash into the --ppm-avatar-* palette).
+const AVATAR_SIZES = {
+  "20": "h-5 w-5 text-[10px]",
+  "28": "h-7 w-7 text-xs",
+  "36": "h-9 w-9 text-sm",
+  xs: "h-7 w-7 text-[11px]",
+  sm: "h-8 w-8 text-xs",
+  md: "h-10 w-10 text-sm",
+  lg: "h-14 w-14 text-lg",
+};
+
+export function Avatar({ name, avatarUrl, size = "28", className, ring = false }) {
+  const [imgError, setImgError] = useState(false);
+  const resolved = avatarUrl ? resolveFileUrl(avatarUrl) : null;
+  const showImage = Boolean(resolved) && !imgError;
+
+  useEffect(() => {
+    setImgError(false);
+  }, [resolved]);
+
+  const colorVar = `var(--ppm-avatar-${(hashString(name || "?") % 8) + 1})`;
+  const sizeCls = AVATAR_SIZES[size] || AVATAR_SIZES["28"];
+
+  return (
+    <span
+      className={cn(
+        "relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold text-white",
+        sizeCls,
+        ring && "ring-2 ring-white dark:ring-neutral-700 shadow-sm",
+        className
+      )}
+      style={showImage ? undefined : { backgroundColor: colorVar }}
+    >
+      {showImage ? (
+        <img
+          src={resolved}
+          alt={name || "User"}
+          onError={() => setImgError(true)}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <span aria-hidden="true">{getInitials(name)}</span>
+      )}
     </span>
   );
 }

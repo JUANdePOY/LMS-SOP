@@ -6,6 +6,7 @@ const { requireBusinessScope } = require('../middleware/scope');
 const { logAudit } = require('../utils/auditLogger');
 const businessModel = require('../models/businessModel');
 const { upload } = require('../middleware/businessUpload');
+const { projectController } = require('../controllers/projectController');
 
 const router = express.Router();
 
@@ -36,6 +37,10 @@ router.get('/', async (req, res) => {
     res.status(500).json({ status: 'error', message: 'Failed to fetch businesses', code: 'DB_ERROR' });
   }
 });
+
+// GET /api/businesses/:id/projects
+// Portfolio tree: lazy-load a business's projects (with task rollups) on expand.
+router.get('/:id/projects', authenticateToken, requireAdmin, projectController.listByBusiness);
 
 // GET /api/businesses/hierarchy
 router.get('/hierarchy', async (req, res) => {

@@ -8,15 +8,15 @@ async function create(data) {
   const {
     title, description, priority, status, start_datetime, deadline_datetime,
     estimated_hours, category, created_by, parent_task_id, client_id,
-    client_business_id, business_id
+    client_business_id, business_id, project_id
   } = data;
 
   const [result] = await db.query(
     `INSERT INTO tasks (
        title, description, priority, status, start_datetime, deadline_datetime,
        estimated_hours, category, created_by, parent_task_id, client_id,
-       client_business_id, business_id
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       client_business_id, business_id, project_id
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       title,
       description || null,
@@ -31,6 +31,7 @@ async function create(data) {
       client_id ?? null,
       client_business_id ?? null,
       business_id ?? null,
+      project_id ?? null,
     ]
   );
   return result.insertId;
@@ -64,7 +65,7 @@ async function findByParentId(parentId) {
 
 async function findAll(filters = {}) {
   const {
-    status, priority, category, search, created_by, task_ids, page = 1, limit = 20
+    status, priority, category, search, created_by, task_ids, project_id, page = 1, limit = 20
   } = filters;
   const offset = (page - 1) * limit;
 
@@ -106,6 +107,10 @@ async function findAll(filters = {}) {
     sql += ' AND t.id IN (?)';
     params.push(task_ids);
   }
+  if (project_id) {
+    sql += ' AND t.project_id = ?';
+    params.push(project_id);
+  }
 
   sql += ' ORDER BY t.created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
@@ -138,6 +143,10 @@ async function findAll(filters = {}) {
     countSql += ' AND t.id IN (?)';
     countParams.push(task_ids);
   }
+  if (project_id) {
+    countSql += ' AND t.project_id = ?';
+    countParams.push(project_id);
+  }
 
   const [countRows] = await db.query(countSql, countParams);
 
@@ -154,7 +163,7 @@ async function update(id, updates) {
   const allowed = [
     'title', 'description', 'priority', 'status',
     'start_datetime', 'deadline_datetime', 'estimated_hours', 'category',
-    'parent_task_id', 'client_id', 'client_business_id', 'business_id'
+    'parent_task_id', 'client_id', 'client_business_id', 'business_id', 'project_id'
   ];
   const sets = [];
   const params = [];

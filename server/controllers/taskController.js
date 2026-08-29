@@ -94,6 +94,24 @@ const taskController = {
     }
   },
 
+  async duplicateTask(req, res) {
+    try {
+      const taskId = parseInt(req.params.id, 10);
+      const task = await taskService.duplicateTask(taskId, req.user.id);
+      broadcastSystemChange({
+        title: 'Task Duplicated',
+        body: task.title,
+        type: 'info',
+        link: `/tasks/${task.id}`,
+        entityType: 'task',
+        entityId: task.id,
+      }).catch(() => {});
+      res.status(201).json({ success: true, data: task, message: 'Task duplicated successfully' });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
   async assignTask(req, res) {
     try {
       const assignment = await taskService.assignTask(req.body, req.user.id);

@@ -35,6 +35,11 @@ export async function deleteTask(id) {
   return ensureSuccess(res, 'Failed to delete task').data;
 }
 
+export async function duplicateTask(id) {
+  const res = await api.post(`${API_BASE}/${id}/duplicate`);
+  return ensureSuccess(res, 'Failed to duplicate task').data;
+}
+
 export async function assignTask(payload) {
   const res = await api.post(`${API_BASE}/assign`, payload);
   return ensureSuccess(res, 'Failed to assign task').data;

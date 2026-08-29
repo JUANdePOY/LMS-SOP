@@ -891,6 +891,14 @@ async function runMigrations() {
   } catch (err) {
     console.error('Client management migration error:', err.message);
   }
+
+  try {
+    const { runProjectMigrations } = require('../migrations/projectManagement');
+    await runProjectMigrations();
+    console.log('Project management migrations applied');
+  } catch (err) {
+    console.error('Project management migration error:', err.message);
+  }
 }
 
 async function initDatabase() {

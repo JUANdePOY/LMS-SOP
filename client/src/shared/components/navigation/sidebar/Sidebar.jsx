@@ -28,6 +28,7 @@ import UserAvatar from "@/shared/components/ui/Avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { filterMenuByRole, LMS_ROLES } from "@/config/menuItems";
 import { useNotificationStore, useNotifications } from "@/shared/stores/notificationStore.js";
+import { useNavigation } from "@/shared/contexts/NavigationContext";
 
 const EMPLOYEE_MENU_ITEMS = [
   {
@@ -147,6 +148,18 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { openSecondaryNav } = useNavigation();
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : true
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const handler = (e) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   const roleLabel = typeof user?.role === 'string' ? user.role.replace('_', ' ') : '';
   const isEmployee = user?.role === 'employee';
   const isDepartmentHead = user?.role === 'department_head';
@@ -417,6 +430,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
                           onNavClick={handleNavClick}
                           isActive={isActive(sub.path)}
                           badgeCount={getBadgeCount(sub.path)}
+                          onActivate={isDesktop && sub.path === "/tasks" ? () => { openSecondaryNav("clients"); navigate("/tasks"); } : undefined}
                         />
                       )}
                     </li>
@@ -434,10 +448,12 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
                 onNavClick={handleNavClick}
                 isActive={isActive(item.path)}
                 badgeCount={getBadgeCount(item.path)}
+                onActivate={isDesktop && item.path === "/tasks" ? () => { openSecondaryNav("clients"); navigate("/tasks"); } : undefined}
               />
             </li>
           );
         })}
+
       </nav>
 
       <div

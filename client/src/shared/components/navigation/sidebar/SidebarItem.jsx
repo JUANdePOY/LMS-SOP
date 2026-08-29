@@ -45,7 +45,7 @@ function SidebarSubItem({ item, onNavClick }) {
   );
 }
 
-export default function SidebarItem({ item, isCollapsed, onNavClick, badgeCount = 0 }) {
+export default function SidebarItem({ item, isCollapsed, onNavClick, badgeCount = 0, onActivate }) {
   const Icon = item.icon;
   const location = useLocation();
   const navigate = useNavigate();
@@ -158,7 +158,13 @@ isParentActive
       <NavLink
         to={item.path}
         end={item.path === "/"}
-        onClick={onNavClick}
+        onClick={(e) => {
+          if (onActivate) {
+            e.preventDefault();
+            onActivate();
+          }
+          onNavClick?.();
+        }}
         className={({ isActive }) =>
           cn(
             "relative flex items-center gap-3 rounded-lg px-3 py-2.5 w-full",

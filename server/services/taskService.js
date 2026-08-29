@@ -5,6 +5,7 @@ const taskProgressModel = require('../models/taskProgressModel');
 const taskAttachmentModel = require('../models/taskAttachmentModel');
 const { buildViewUrl } = require('../services/taskAttachmentPublicFile');
 const taskCommentModel = require('../models/taskCommentModel');
+const projectModel = require('../models/projectModel');
 const { logAudit } = require('../utils/auditLogger');
 const { computeAutoStatus, deriveParentStatus } = require('../utils/taskStatus');
 const { validateTaskPayload, validateAssignmentPayload, validateProgressPayload, validateCommentPayload } = require('../validators/taskValidator');
@@ -226,6 +227,8 @@ async function getTask(id, actorId) {
 
   const autoStatus = computeAutoStatus(task.start_datetime, task.deadline_datetime, task.status);
 
+  const customFields = await projectModel.getTaskCustomFields(id);
+
   return {
     ...task,
     auto_status: autoStatus,
@@ -234,6 +237,7 @@ async function getTask(id, actorId) {
     progress: enrichedProgress,
     comments,
     attachments: enrichedTaskAttachments,
+    custom_fields: customFields,
   };
 }
 
@@ -248,7 +252,7 @@ async function createTask(payload, actorId) {
 
   const {
     title, description, priority, status, start_datetime, deadline_datetime,
-    estimated_hours, category, parent_task_id, client_id, client_business_id, business_id
+    estimated_hours, category, parent_task_id, client_id, client_business_id, business_id, project_id
   } = validation.value;
 
   if (new Date(deadline_datetime) <= new Date(start_datetime)) {
@@ -299,6 +303,7 @@ async function createTask(payload, actorId) {
     client_id: client_id ?? null,
     client_business_id: client_business_id ?? null,
     business_id: business_id ?? null,
+    project_id: project_id ?? null,
     created_by: actorId,
   });
 
@@ -318,9 +323,65 @@ async function createTask(payload, actorId) {
     });
   }
 
+  if (Array.isArray(payload.custom_fields) && payload.custom_fields.length > 0) {
+    await projectModel.setTaskCustomFields(taskId, payload.custom_fields);
+  }
+
   logAudit('task.create', actorId, { task_id: taskId, title });
 
   return await getTask(taskId, actorId);
+}
+
+async function duplicateTask(id, actorId) {
+  const source = await taskModel.findById(id);
+  if (!source) {
+    const error = new Error('Task not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+
+  const isAdmin = await isUserAdmin(actorId);
+  if (!isAdmin) {
+    const error = new Error('You are not authorized to duplicate this task');
+    error.code = 'FORBIDDEN';
+    throw error;
+  }
+
+  // Copy the source task's assignments onto the duplicate.
+  const [assignmentRows] = await db.query(
+    'SELECT assignment_type, reference_id FROM task_assignments WHERE task_id = ?',
+    [id]
+  );
+
+  const newId = await taskModel.create({
+    title: `${source.title} (copy)`,
+    description: source.description,
+    priority: source.priority || 'Medium',
+    status: source.status || 'Pending',
+    start_datetime: source.start_datetime,
+    deadline_datetime: source.deadline_datetime,
+    estimated_hours: source.estimated_hours,
+    category: source.category,
+    parent_task_id: null,
+    client_id: source.client_id ?? null,
+    client_business_id: source.client_business_id ?? null,
+    business_id: source.business_id ?? null,
+    project_id: source.project_id ?? null,
+    created_by: actorId,
+  });
+
+  for (const a of assignmentRows) {
+    await taskAssignmentModel.create({
+      task_id: newId,
+      assignment_type: a.assignment_type,
+      reference_id: a.reference_id,
+      assigned_by: actorId,
+    });
+  }
+
+  logAudit('task.duplicate', actorId, { task_id: newId, source_task_id: id, title: source.title });
+
+  return await getTask(newId, actorId);
 }
 
 async function updateTask(id, payload, actorId) {
@@ -394,6 +455,10 @@ async function updateTask(id, payload, actorId) {
         });
       }
     }
+  }
+
+  if (Array.isArray(payload.custom_fields) && payload.custom_fields.length > 0) {
+    await projectModel.setTaskCustomFields(id, payload.custom_fields);
   }
 
   logAudit('task.update', actorId, { task_id: id, changes: validation.value });
@@ -922,6 +987,7 @@ module.exports = {
   listTasks,
   getTask,
   createTask,
+  duplicateTask,
   updateTask,
   deleteTask,
   assignTask,

@@ -57,23 +57,91 @@ export function useTasks(filters = {}) {
     await loadStats();
   }, [loadStats]);
 
+  // Optimistically patch a task in local state. Returns a rollback function
+  // that restores the previous snapshot if the server call fails.
+  const patchTask = useCallback((id, changes) => {
+    let snapshot;
+    setTasks((prev) => {
+      snapshot = prev.find((t) => t.id === id);
+      return prev.map((t) => (t.id === id ? { ...t, ...changes } : t));
+    });
+    return () => {
+      if (snapshot) {
+        setTasks((prev) => prev.map((t) => (t.id === id ? snapshot : t)));
+      }
+    };
+  }, []);
+
   const create = async (payload) => {
-    await createTask(payload);
-    toast.success('Task created successfully');
-    await load();
+    const tempId = `temp-${Date.now()}`;
+    const optimistic = {
+      id: tempId,
+      status: payload.status || 'Pending',
+      progress_rate: payload.progress_rate ?? 0,
+      assignments: payload.assignments || [],
+      created_at: new Date().toISOString(),
+      ...payload,
+    };
+    setTasks((prev) => [optimistic, ...prev]);
+    setStats((s) => (s ? { ...s, total: s.total + 1 } : s));
+    try {
+      const data = await createTask(payload);
+      const real = data && data.id ? data : null;
+      setTasks((prev) => prev.map((t) => (t.id === tempId ? (real || { ...optimistic, id: tempId }) : t)));
+      toast.success('Task created successfully');
+      await refreshStats();
+    } catch (err) {
+      setTasks((prev) => prev.filter((t) => t.id !== tempId));
+      setStats((s) => (s ? { ...s, total: Math.max(0, s.total - 1) } : s));
+      toast.error(err.message || 'Failed to create task');
+    }
   };
 
   const update = async (id, payload) => {
-    await updateTask(id, payload);
-    toast.success('Task updated successfully');
-    await load();
+    let snapshot;
+    setTasks((prev) => {
+      snapshot = prev.find((t) => t.id === id);
+      return prev.map((t) => (t.id === id ? { ...t, ...payload } : t));
+    });
+    try {
+      await updateTask(id, payload);
+      toast.success('Task updated successfully');
+      await refreshStats();
+    } catch (err) {
+      if (snapshot) setTasks((prev) => prev.map((t) => (t.id === id ? snapshot : t)));
+      toast.error(err.message || 'Failed to update task');
+    }
   };
 
   const remove = async (id) => {
-    await deleteTask(id);
-    toast.success('Task deleted successfully');
-    setTasks((prev) => prev.filter((t) => t.id !== id));
+    let prevArr;
+    setTasks((curr) => {
+      prevArr = curr;
+      return curr.filter((t) => t.id !== id);
+    });
+    try {
+      await deleteTask(id);
+      toast.success('Task deleted successfully');
+      await refreshStats();
+    } catch (err) {
+      if (prevArr) setTasks(prevArr);
+      toast.error(err.message || 'Failed to delete task');
+    }
   };
 
-  return { tasks, loading, error, pagination, stats, statsLoading, refresh, refreshTasks, refreshStats, create, update, remove };
+  return {
+    tasks,
+    loading,
+    error,
+    pagination,
+    stats,
+    statsLoading,
+    refresh,
+    refreshTasks,
+    refreshStats,
+    patchTask,
+    create,
+    update,
+    remove,
+  };
 }

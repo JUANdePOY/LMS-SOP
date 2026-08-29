@@ -69,7 +69,7 @@ function validateTaskPayload(body, requireAll = true) {
 
   const hasParent = body.parent_task_id !== undefined && body.parent_task_id !== null && body.parent_task_id !== '';
 
-  for (const key of ['parent_task_id', 'client_id', 'client_business_id', 'business_id']) {
+  for (const key of ['parent_task_id', 'client_id', 'client_business_id', 'business_id', 'project_id']) {
     if (body[key] !== undefined) {
       if (body[key] === null || body[key] === '') {
         value[key] = null;
@@ -84,9 +84,11 @@ function validateTaskPayload(body, requireAll = true) {
     }
   }
 
-  // Main tasks (no parent) must be linked to a Business, Client, and Client Business.
+  // Main tasks (no parent) must be linked to a Client and Client Business.
+  // The org-level Business is optional when a Client Business is provided
+  // (the client business already establishes the business context).
   if (requireAll && !hasParent && !value.parent_task_id) {
-    for (const key of ['business_id', 'client_id', 'client_business_id']) {
+    for (const key of ['client_id', 'client_business_id']) {
       if (value[key] === undefined || value[key] === null) {
         errors.push(`${key.replace(/_/g, ' ')} is required`);
       }
@@ -232,6 +234,13 @@ function validateFilters(query) {
 
   if (query.search) {
     filters.search = String(query.search).trim();
+  }
+
+  if (query.project_id) {
+    const pid = parseInt(query.project_id, 10);
+    if (Number.isFinite(pid) && pid > 0) {
+      filters.project_id = pid;
+    }
   }
 
   const page = parseInt(query.page, 10);

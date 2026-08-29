@@ -50,7 +50,6 @@ export function validateTaskPayload(payload) {
 
   const hasParent = payload.parent_task_id !== undefined && payload.parent_task_id !== null && payload.parent_task_id !== '';
   if (!hasParent) {
-    if (!payload.business_id) errors.business_id = 'Business is required';
     if (!payload.client_id) errors.client_name = 'Client name is required';
     if (!payload.client_business_id) errors.client_business = 'Client business is required';
   }

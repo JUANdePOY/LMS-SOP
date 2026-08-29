@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router-dom";
 import AppLayout from "@/layout/AppLayout";
 import { lazy, Suspense } from "react";
+import "@/features/task-management/styles/minimal.css";
 
 import { ToastProvider } from "@/shared/components/Toast";
 import ErrorBoundary from "@/shared/components/ErrorBoundary";
@@ -69,6 +70,10 @@ const EmployeeDirectoryPage = lazy(() => import("@/features/employee-directory/p
 const TasksPage = lazy(() => import("@/features/task-management/pages/TasksPage"));
 const TaskDetailsPage = lazy(() => import("@/features/task-management/pages/TaskDetailsPage"));
 const MyTasksPage = lazy(() => import("@/features/task-management/pages/MyTasksPage"));
+const ClientsOverviewPage = lazy(() => import("@/features/task-management/pages/ClientsOverviewPage"));
+const ClientDetailPage = lazy(() => import("@/features/task-management/pages/ClientDetailPage"));
+const BusinessProjectsPage = lazy(() => import("@/features/task-management/pages/BusinessProjectsPage"));
+const ProjectWorkspacePage = lazy(() => import("@/features/task-management/pages/ProjectWorkspacePage"));
 const EmployeeSettingsPage = lazy(() => import("@/features/employee/pages/EmployeeSettings"));
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
@@ -229,6 +234,11 @@ const router = createBrowserRouter([
       { path: "tasks", element: LMSProtectedWrapper(TasksPage), handle: { title: "Tasks & Projects" } },
       { path: "tasks/:id", element: LMSProtectedWrapper(TaskDetailsPage), handle: { title: "Task Details" } },
       { path: "tasks/my", element: LMSProtectedWrapper(MyTasksPage), handle: { title: "My Tasks" } },
+      { path: "clients", element: LMSProtectedWrapper(ClientsOverviewPage), handle: { title: "Clients" } },
+      { path: "clients/:clientId", element: LMSProtectedWrapper(ClientDetailPage), handle: { title: "Client" } },
+      { path: "clients/:clientId/businesses/:businessId", element: LMSProtectedWrapper(BusinessProjectsPage), handle: { title: "Business" } },
+      { path: "clients/:clientId/businesses/:businessId/projects/:projectId", element: LMSProtectedWrapper(ProjectWorkspacePage), handle: { title: "Project" } },
+      { path: "projects/:projectId", element: LMSProtectedWrapper(ProjectWorkspacePage), handle: { title: "Project" } },
       { path: "employee/settings", element: (
         <ProtectedRoute allowedRoles={['employee', 'department_head']}>
           <Suspense fallback={<PageLoader />}>

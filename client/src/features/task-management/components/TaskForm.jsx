@@ -6,7 +6,7 @@ import AssignmentInput from './AssignmentInput';
 import { getBusinesses } from '../../organization-management/api/business.api';
 import { getClientOptions } from '../api/client.api';
 
-function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
+function TaskForm({ show, onClose, onSubmit, saving, initialData, defaultValues }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('Medium');
@@ -21,6 +21,7 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
   const [businessId, setBusinessId] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientBusinessId, setClientBusinessId] = useState('');
+  const [projectId, setProjectId] = useState(null);
 
   const [businessOptions, setBusinessOptions] = useState([]);
   const [clientOptions, setClientOptions] = useState([]);
@@ -40,41 +41,32 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
   }, [show]);
 
   useEffect(() => {
-    if (initialData) {
-      setTitle(initialData.title || '');
-      setDescription(initialData.description || '');
-      setPriority(initialData.priority || 'Medium');
-      setStatus(initialData.status || 'Pending');
-      setStartDatetime(initialData.start_datetime ? initialData.start_datetime.slice(0, 16) : '');
-      setDeadlineDatetime(initialData.deadline_datetime ? initialData.deadline_datetime.slice(0, 16) : '');
-      setEstimatedHours(initialData.estimated_hours || '');
-      setCategory(initialData.category || '');
-      setAssignments(
-        initialData.assignments?.map((a) => ({
-          assignment_type: a.assignment_type,
-          reference_id: a.reference_id,
-          reference_name: a.reference_name,
-        })) || []
-      );
-      setBusinessId(initialData.business_id || '');
-      setClientId(initialData.client_id || '');
-      setClientBusinessId(initialData.client_business_id || '');
-    } else {
-      setTitle('');
-      setDescription('');
-      setPriority('Medium');
-      setStatus('Pending');
-      setStartDatetime('');
-      setDeadlineDatetime('');
-      setEstimatedHours('');
-      setCategory('');
-      setAssignments([]);
-      setBusinessId('');
-      setClientId('');
-      setClientBusinessId('');
-    }
+    // Editing an existing task takes precedence; otherwise prefill from
+    // `defaultValues` (used to seed a NEW task, e.g. from a client/business
+    // scope) so creation stays in "New Task" mode.
+    const isEdit = !!(initialData && initialData.id);
+    const source = isEdit ? initialData : (initialData || defaultValues || {});
+    setTitle(source.title || '');
+    setDescription(source.description || '');
+    setPriority(source.priority || 'Medium');
+    setStatus(source.status || 'Pending');
+    setStartDatetime(source.start_datetime ? source.start_datetime.slice(0, 16) : '');
+    setDeadlineDatetime(source.deadline_datetime ? source.deadline_datetime.slice(0, 16) : '');
+    setEstimatedHours(source.estimated_hours || '');
+    setCategory(source.category || '');
+    setAssignments(
+      source.assignments?.map((a) => ({
+        assignment_type: a.assignment_type,
+        reference_id: a.reference_id,
+        reference_name: a.reference_name,
+      })) || []
+    );
+    setBusinessId(source.business_id || '');
+    setClientId(source.client_id || '');
+    setClientBusinessId(source.client_business_id || '');
+    setProjectId(source.project_id || null);
     setErrors({});
-  }, [initialData, show]);
+  }, [initialData, show, defaultValues]);
 
   const handleClientChange = (value) => {
     setClientId(value);
@@ -129,6 +121,7 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
       business_id: businessId ? Number(businessId) : null,
       client_id: clientId ? Number(clientId) : null,
       client_business_id: clientBusinessId ? Number(clientBusinessId) : null,
+      project_id: projectId ? Number(projectId) : null,
       assignments: assignments.filter((a) => a.reference_id || a.reference_name),
     });
   };
@@ -151,13 +144,13 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData }) {
 
         <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Business *</label>
+            <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Business</label>
             <select
               value={businessId}
               onChange={(e) => setBusinessId(e.target.value)}
               className={fieldClass(errors.business_id)}
             >
-              <option value="">Select business</option>
+              <option value="">Select business (optional)</option>
               {businessOptions.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.business_name}
