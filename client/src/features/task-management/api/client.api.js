@@ -6,3 +6,5 @@ export const getClient = (id) => api.get(`/clients/${id}`).then((r) => r.data?.d
 export const createClient = (data) => api.post('/clients', data);
 export const updateClient = (id, data) => api.put(`/clients/${id}`, data).then((r) => r.data?.data);
 export const deleteClient = (id) => api.delete(`/clients/${id}`);
+export const deleteClientBusiness = (clientId, businessId) =>
+  api.delete(`/clients/${clientId}/businesses/${businessId}`);

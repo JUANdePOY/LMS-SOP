@@ -140,7 +140,7 @@ const SIDEBAR_WIDTH = {
   collapsed: "w-[72px]",
 };
 
-export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggleCollapse }) {
+export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggleCollapse, onCollapseSidebar }) {
   const [expandedSubMenus, setExpandedSubMenus] = useState({});
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -176,6 +176,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
     if (path === "/events") return notifications.getUnreadCountByEntityType?.('event') || 0;
     if (path === "/courses/library") return notifications.getUnreadCountByEntityType?.('course') || 0;
     if (path === "/certificates/my-certificates") return notifications.getUnreadCountByEntityType?.('certificate') || 0;
+    if (path === "/tasks" || path === "/tasks/my") return notifications.getUnreadCountByEntityType?.('task') || 0;
     const bannerIds = PATH_BANNER_MAP[path] || [];
     const unreadBannerIds = bannerIds.filter(
       (id) => !notificationStore.dismissed.includes(id)
@@ -232,7 +233,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
       className={cn(
         "fixed inset-y-0 left-0 z-50 flex flex-col",
         "bg-[var(--bg-sidebar)] text-[var(--text-on-sidebar)]",
-        "transition-transform duration-200 ease-out",
+        "transition-[transform,width] duration-200 ease-out",
         "bg-white/95 dark:bg-neutral-900/95",
         "backdrop-blur-md",
         "border-r border-[var(--border-sidebar)]",
@@ -430,7 +431,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
                           onNavClick={handleNavClick}
                           isActive={isActive(sub.path)}
                           badgeCount={getBadgeCount(sub.path)}
-                          onActivate={isDesktop && sub.path === "/tasks" ? () => { openSecondaryNav("clients"); navigate("/tasks"); } : undefined}
+                          onActivate={isDesktop && sub.path === "/tasks" ? () => { openSecondaryNav("clients"); navigate("/tasks"); handleNavClick(); onCollapseSidebar?.(); } : undefined}
                         />
                       )}
                     </li>
@@ -448,7 +449,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
                 onNavClick={handleNavClick}
                 isActive={isActive(item.path)}
                 badgeCount={getBadgeCount(item.path)}
-                onActivate={isDesktop && item.path === "/tasks" ? () => { openSecondaryNav("clients"); navigate("/tasks"); } : undefined}
+                onActivate={isDesktop && item.path === "/tasks" ? () => { openSecondaryNav("clients"); navigate("/tasks"); handleNavClick(); onCollapseSidebar?.(); } : undefined}
               />
             </li>
           );

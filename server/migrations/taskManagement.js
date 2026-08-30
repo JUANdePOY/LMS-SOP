@@ -4,6 +4,11 @@ const TASK_MANAGEMENT_MIGRATIONS = [
   `ALTER TABLE task_comments ADD COLUMN IF NOT EXISTS parent_id INT DEFAULT NULL AFTER user_id`,
   `ALTER TABLE task_comments ADD CONSTRAINT fk_task_comments_parent FOREIGN KEY (parent_id) REFERENCES task_comments(id) ON DELETE CASCADE`,
   `CREATE INDEX IF NOT EXISTS idx_task_comments_parent ON task_comments(parent_id)`,
+
+  // Rich comments: store @mentions and allow attachments inside a comment.
+  `ALTER TABLE task_comments ADD COLUMN IF NOT EXISTS mentions JSON DEFAULT NULL AFTER comment`,
+  `ALTER TABLE task_attachments ADD COLUMN IF NOT EXISTS comment_id INT DEFAULT NULL AFTER task_progress_id`,
+  `ALTER TABLE task_attachments ADD CONSTRAINT fk_task_attachments_comment FOREIGN KEY (comment_id) REFERENCES task_comments(id) ON DELETE CASCADE`,
   // Allow tasks to be created without a status, priority, or dates so the new
   // task can be configured afterwards (the hierarchy quick-add leaves them empty).
   `ALTER TABLE tasks MODIFY COLUMN priority ENUM('Low','Medium','High','Critical') NULL DEFAULT 'Medium'`,

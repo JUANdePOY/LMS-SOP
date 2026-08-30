@@ -1,10 +1,9 @@
-import { useEffect, useCallback, useMemo } from "react";
+import { useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
 import {
   BookOpen, PlayCircle, RefreshCw, Clock,
-  ArrowRight, UserPlus,
 } from "lucide-react";
 import EmployeeCourseCard from "../components/EmployeeCourseCard";
 import { resolveFileUrl } from "@/lib/fileUrl";
@@ -13,7 +12,6 @@ import { useEmployeeDashboard } from "../hooks/useEmployeeDashboard";
 import { usePageUpdates } from "@/shared/hooks/usePageUpdates";
 import UpdateNotificationBanner from "@/shared/components/ui/UpdateNotificationBanner";
 import { useNotifications } from "@/shared/stores/notificationStore.js";
-import BannerSection from "@/shared/components/ui/BannerSection";
 import { StaggerList, MotionItem } from "@/shared/motion";
 
 function getGreeting() {
@@ -38,47 +36,11 @@ export default function EmployeeDashboard() {
 
   const { enrollments, loading, error, refetch } = useEmployeeDashboard();
 
-  const { getUnreadEnrollmentNotifications, markRead, notifications, fetch: fetchNotifications } = useNotifications();
-
-  const unreadEnrollmentNotifications = getUnreadEnrollmentNotifications();
-
-  const dashboardBanners = useMemo(() => {
-    const banners = [];
-    const unreadNotifications = (notifications || []).filter((n) => !n.is_read);
-    unreadNotifications.forEach((notification) => {
-      const entityType = notification.entity_type || 'notification';
-      banners.push({
-        id: `notification-${notification.id}`,
-        type: entityType === 'enrollment' ? 'new_course' : entityType === 'sop' ? 'new_sop' : entityType === 'task' ? 'alert' : 'announcement',
-        title: notification.title,
-        message: notification.body || '',
-        link: notification.link || '/notifications',
-        ctaLabel: 'View',
-        priority: 5,
-      });
-    });
-    unreadEnrollmentNotifications.forEach((notification) => {
-      banners.push({
-        id: `enrollment-${notification.id}`,
-        type: 'new_course',
-        title: 'New Enrollment',
-        message: notification.body || 'You have been enrolled in a new course.',
-        link: '/my-learning',
-        ctaLabel: 'Continue learning',
-        priority: 5,
-      });
-    });
-    return banners.sort((a, b) => (b.priority || 0) - (a.priority || 0));
-  }, [notifications, unreadEnrollmentNotifications]);
+  const { fetch: fetchNotifications } = useNotifications();
 
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
-
-  const handleEnrollmentClick = useCallback((notification) => {
-    markRead(notification.id);
-    navigate("/my-learning");
-  }, [markRead, navigate]);
 
   const { hasUpdate, loading: refreshingUpdates, refresh: refreshUpdates, dismiss: dismissUpdates } = usePageUpdates({
     intervalMs: 30000,
@@ -146,10 +108,6 @@ export default function EmployeeDashboard() {
 
   return (
     <div className="w-full max-w-none mx-auto max-w-6xl space-y-6">
-      {dashboardBanners.length > 0 && (
-        <BannerSection items={dashboardBanners} carousel autoPlayInterval={5000} />
-      )}
-
       <UpdateNotificationBanner
         open={hasUpdate}
         message="New changes are available on your dashboard. Refresh to see the latest updates."

@@ -1,6 +1,6 @@
 const taskService = require('../services/taskService');
 const { validateFilters, validateBatchIds, validateBatchUpdatePayload } = require('../validators/taskValidator');
-const { broadcastSystemChange } = require('../services/notificationService');
+const taskNotifications = require('../services/taskNotificationService');
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
@@ -52,14 +52,9 @@ const taskController = {
   async createTask(req, res) {
     try {
       const task = await taskService.createTask(req.body, req.user.id);
-      broadcastSystemChange({
-        title: 'New Task Created',
-        body: task.title,
-        type: 'info',
-        link: `/tasks/${task.id}`,
-        entityType: 'task',
-        entityId: task.id,
-      }).catch(() => {});
+      // Only notify the employees actually assigned to this task (with push),
+      // not every employee in the system.
+      taskNotifications.notifyTaskAssigned(task, { push: true }).catch(() => {});
       res.status(201).json({ success: true, data: task, message: 'Task created successfully' });
     } catch (error) {
       handleError(res, error);
@@ -69,15 +64,23 @@ const taskController = {
   async updateTask(req, res) {
     try {
       const taskId = parseInt(req.params.id, 10);
+      // Capture the assignment set before the update so we can detect which
+      // employees were newly assigned (and notify only those).
+      const before = Array.isArray(req.body.assignments)
+        ? await taskService.getTask(taskId, req.user.id).catch(() => null)
+        : null;
+      const beforeKeys = before
+        ? (before.assignments || []).map((a) => `${a.assignment_type}:${a.reference_id}`)
+        : [];
+
       const task = await taskService.updateTask(taskId, req.body, req.user.id);
-      broadcastSystemChange({
-        title: 'Task Updated',
-        body: task.title,
-        type: 'info',
-        link: `/tasks/${task.id}`,
-        entityType: 'task',
-        entityId: task.id,
-      }).catch(() => {});
+
+      // Notify only employees newly added as assignees. Field-only edits (title,
+      // dates, status, …) must not push-notify employees.
+      if (Array.isArray(req.body.assignments)) {
+        taskNotifications.notifyNewAssignments(taskId, beforeKeys).catch(() => {});
+      }
+
       res.json({ success: true, data: task, message: 'Task updated successfully' });
     } catch (error) {
       handleError(res, error);
@@ -98,14 +101,8 @@ const taskController = {
     try {
       const taskId = parseInt(req.params.id, 10);
       const task = await taskService.duplicateTask(taskId, req.user.id);
-      broadcastSystemChange({
-        title: 'Task Duplicated',
-        body: task.title,
-        type: 'info',
-        link: `/tasks/${task.id}`,
-        entityType: 'task',
-        entityId: task.id,
-      }).catch(() => {});
+      // A duplicated task is a new task: notify only its assigned employees (push).
+      taskNotifications.notifyTaskAssigned(task, { push: true }).catch(() => {});
       res.status(201).json({ success: true, data: task, message: 'Task duplicated successfully' });
     } catch (error) {
       handleError(res, error);
@@ -115,14 +112,8 @@ const taskController = {
   async assignTask(req, res) {
     try {
       const assignment = await taskService.assignTask(req.body, req.user.id);
-      broadcastSystemChange({
-        title: 'Task Assigned',
-        body: assignment.title || 'A task has been assigned',
-        type: 'info',
-        link: `/tasks/${assignment.task_id || assignment.id}`,
-        entityType: 'task',
-        entityId: assignment.task_id || assignment.id,
-      }).catch(() => {});
+      // Notify only the newly-assigned employee(s) — with push for non-admins.
+      taskNotifications.notifyAssignmentAdded(assignment.task_id, assignment).catch(() => {});
       res.status(201).json({ success: true, data: assignment, message: 'Task assigned successfully' });
     } catch (error) {
       handleError(res, error);
@@ -146,7 +137,24 @@ const taskController = {
 
   async updateProgress(req, res) {
     try {
+      const taskId = parseInt(req.body.task_id, 10);
+      const before = Number.isFinite(taskId)
+        ? await taskService.getTask(taskId, req.user.id).catch(() => null)
+        : null;
       const progress = await taskService.updateProgress(req.body, req.user.id);
+      const after = Number.isFinite(taskId)
+        ? await taskService.getTask(taskId, req.user.id).catch(() => null)
+        : null;
+
+      // Admins are pushed only when a task is marked done or becomes overdue.
+      if (after) {
+        if (after.status === 'Completed' && before && before.status !== 'Completed') {
+          taskNotifications.notifyAdminsTaskStatus(after, 'Completed').catch(() => {});
+        } else if (after.status === 'Overdue' && before && before.status !== 'Overdue') {
+          taskNotifications.notifyAdminsTaskStatus(after, 'Overdue').catch(() => {});
+        }
+      }
+
       res.json({ success: true, data: progress, message: 'Progress updated successfully' });
     } catch (error) {
       handleError(res, error);
@@ -156,7 +164,23 @@ const taskController = {
   async addComment(req, res) {
     try {
       const payload = { task_id: req.params.taskId, ...req.body };
-      const comment = await taskService.addComment(payload, req.user.id);
+      if (req.body.mentions) {
+        try {
+          payload.mentions = JSON.parse(req.body.mentions);
+        } catch {
+          payload.mentions = [];
+        }
+      }
+      payload.files = req.files || [];
+      const comment = await taskService.addComment(payload, req.user.id, req);
+      // Notify only the explicitly mentioned employees (in-app, no push).
+      const mentionedIds = Array.isArray(payload.mentions)
+        ? payload.mentions.map((m) => m && m.id).filter(Boolean)
+        : [];
+      if (mentionedIds.length > 0) {
+        const task = await taskService.getTask(req.params.taskId, req.user.id).catch(() => null);
+        taskNotifications.notifyMentioned(task, mentionedIds).catch(() => {});
+      }
       res.status(201).json({ success: true, data: comment, message: 'Comment added successfully' });
     } catch (error) {
       handleError(res, error);
@@ -235,6 +259,19 @@ const taskController = {
     }
   },
 
+  async getMyTaskHierarchy(req, res) {
+    try {
+      const data = await taskService.getMyTaskHierarchy(req.user.id);
+      res.json({
+        success: true,
+        data,
+        message: 'My task hierarchy retrieved successfully',
+      });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
   async getMyTaskCount(req, res) {
     try {
       const count = await taskService.getMyTaskCount(req.user.id);
@@ -261,13 +298,6 @@ const taskController = {
         validation.value.changes,
         req.user.id
       );
-      broadcastSystemChange({
-        title: 'Tasks Updated',
-        body: `${result.updated} task(s) updated in bulk`,
-        type: 'info',
-        entityType: 'task',
-        entityId: validation.value.ids[0],
-      }).catch(() => {});
       res.json({ success: true, data: result, message: 'Tasks updated successfully' });
     } catch (error) {
       handleError(res, error);

@@ -3,17 +3,17 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, ClipboardList, Clock, XCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/components/ui/Toast';
+import { useNotifications } from '@/shared/stores/notificationStore.js';
 import { useTasks } from '../hooks/useTasks';
 import { updateProgress, bulkUpdateTasks, bulkDeleteTasks } from '../services/taskService';
-import { getProjects, updateProject } from '../services/projectService';
+import { getProjects, getProjectTree, updateProject } from '../services/projectService';
 import { updateClient } from '../api/client.api';
 import { updateBusiness } from '../api/business.api';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import EntityDetailPanel from '../components/EntityDetailPanel';
 import BulkActionBar from '../components/BulkActionBar';
 import TaskForm from '../components/TaskForm';
-import { deleteClient } from '../api/client.api';
-import { deleteBusiness } from '../api/business.api';
+import { deleteClient, deleteClientBusiness } from '../api/client.api';
 import { deleteProject } from '../services/projectService';
 import api from '@/services/api';
 import ProjectTaskViews, { TASK_VIEWS, TASK_VIEW_KEYS } from '../components/ProjectTaskViews';
@@ -38,6 +38,7 @@ export default function TasksPage() {
   const { isAnyAdmin, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { markEntityTypeRead } = useNotifications();
   const [searchParams] = useSearchParams();
   const viewParam = searchParams.get('view');
   const clientParam = searchParams.get('client');
@@ -47,6 +48,10 @@ export default function TasksPage() {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [activeViewKey, setActiveViewKey] = useState('all');
+
+  useEffect(() => {
+    markEntityTypeRead('task');
+  }, [markEntityTypeRead]);
 
   const filters = useMemo(
     () => ({ search, status: statusFilter, priority: priorityFilter }),
@@ -82,16 +87,20 @@ export default function TasksPage() {
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
   // All projects, keyed by id, used for hierarchy grouping and scope prefill.
+  // clientTree holds the full Client -> Business skeleton (including businesses
+  // that have no projects yet) so newly created ones still appear in the table.
   const [projectsById, setProjectsById] = useState({});
+  const [clientTree, setClientTree] = useState([]);
   const loadProjects = useCallback(() => {
     let active = true;
-    getProjects()
-      .then((data) => {
+    Promise.all([getProjects(), getProjectTree()])
+      .then(([projData, treeData]) => {
         if (!active) return;
-        const arr = Array.isArray(data) ? data : (data?.rows || []);
+        const arr = Array.isArray(projData) ? projData : (projData?.rows || []);
         const map = {};
         arr.forEach((p) => { map[String(p.id)] = p; });
         setProjectsById(map);
+        setClientTree(Array.isArray(treeData) ? treeData : (treeData?.rows || []));
       })
       .catch(() => {})
       .finally(() => { active = false; });
@@ -164,17 +173,32 @@ export default function TasksPage() {
     }
   }, [toast, loadProjects]);
 
+  // The hierarchy's "business" node is a client_businesses row (built from the
+  // project tree), so deleting it must hit the client-business endpoint, not the
+  // unrelated `businesses` table endpoint. Resolve the owning client id here.
+  const findClientIdForBusiness = useCallback((id) => {
+    for (const client of clientTree || []) {
+      const match = (client.businesses || []).find((b) => String(b.id) === String(id));
+      if (match) return client.id;
+    }
+    return null;
+  }, [clientTree]);
+
   const handleDeleteEntity = useCallback(async (kind, id) => {
     try {
       if (kind === 'client') await deleteClient(id);
-      else if (kind === 'business') await deleteBusiness(id);
-      else if (kind === 'project') await deleteProject(id);
+      else if (kind === 'business') {
+        const clientId = findClientIdForBusiness(id);
+        if (clientId == null) throw new Error('Could not resolve the owning client for this business');
+        await deleteClientBusiness(clientId, id);
+      } else if (kind === 'project') await deleteProject(id);
       toast.success(`${kind[0].toUpperCase()}${kind.slice(1)} deleted`);
       loadProjects();
+      refreshTasks();
     } catch (err) {
       toast.error(err.message || `Failed to delete ${kind}`);
     }
-  }, [toast, loadProjects]);
+  }, [toast, loadProjects, refreshTasks, findClientIdForBusiness]);
 
   // When a client/business scope is active, seed new-task forms with those
   // values so the user doesn't have to pick them manually.
@@ -359,6 +383,26 @@ export default function TasksPage() {
     });
     return scoped;
   }, [projectsById, clientParam, businessParam]);
+
+  // When a client or business scope is active, restrict the Client -> Business
+  // skeleton so the hierarchy tree renders only the selected branch (matching the
+  // scoped tasks/projects). Without this the tree still seeded every client from
+  // the full org tree, so the scope only auto-expanded instead of filtering.
+  const scopedClientTree = useMemo(() => {
+    if (!clientParam && !businessParam) return clientTree;
+    return (clientTree || [])
+      .map((client) => {
+        if (clientParam && String(client.id) !== String(clientParam)) return null;
+        if (businessParam) {
+          const businesses = (client.businesses || []).filter(
+            (b) => String(b.id) === String(businessParam)
+          );
+          return { ...client, businesses };
+        }
+        return client;
+      })
+      .filter(Boolean);
+  }, [clientTree, clientParam, businessParam]);
 
   const applySavedView = useCallback((key) => {
     const v = SAVED_VIEWS.find((x) => x.key === key);
@@ -610,6 +654,7 @@ export default function TasksPage() {
           tasks={displayedTasks}
           loading={loading}
           projectsById={scopedProjectsById}
+          clientTree={scopedClientTree}
           canManage
           scopeClientId={clientParam}
           scopeBusinessId={businessParam}

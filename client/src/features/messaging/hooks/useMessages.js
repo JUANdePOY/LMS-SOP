@@ -92,8 +92,8 @@ export function useMessages(conversationId) {
     };
   }, [load]);
 
-  const send = async (body) => {
-    const res = await sendMessage(conversationId, body);
+  const send = async ({ text, mentions, files }) => {
+    const res = await sendMessage(conversationId, { text, mentions, files });
     if (res.data?.success) {
       setMessages((prev) => [...prev, res.data.data]);
       return res.data;

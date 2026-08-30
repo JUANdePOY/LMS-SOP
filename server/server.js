@@ -158,6 +158,8 @@ app.use('/api/announcements', announcementsRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/messages', messagesRoutes);
+const messageAttachmentPublicFile = require('./services/messageAttachmentPublicFile');
+app.use('/api/messages/attachments', messageAttachmentPublicFile.router);
 app.use('/api/tasks/attachments', taskAttachmentPublicFile.router);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/clients', clientsRoutes);

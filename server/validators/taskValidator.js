@@ -190,13 +190,9 @@ function validateCommentPayload(body) {
     }
   }
 
-  if (!body.comment) {
-    errors.push('comment is required');
-  } else {
+  if (body.comment !== undefined && body.comment !== null) {
     const comment = String(body.comment).trim();
-    if (comment.length === 0) {
-      errors.push('comment cannot be empty');
-    } else if (comment.length > 5000) {
+    if (comment.length > 5000) {
       errors.push('comment must not exceed 5000 characters');
     } else {
       value.comment = comment;
@@ -214,6 +210,17 @@ function validateCommentPayload(body) {
         value.parent_id = parentId;
       }
     }
+  }
+
+  if (body.mentions !== undefined) {
+    const mentions = Array.isArray(body.mentions) ? body.mentions : [];
+    const clean = [];
+    for (const m of mentions) {
+      if (m && Number.isFinite(Number(m.id)) && m.name) {
+        clean.push({ id: Number(m.id), name: String(m.name) });
+      }
+    }
+    value.mentions = clean;
   }
 
   return { valid: errors.length === 0, value, errors };

@@ -59,7 +59,7 @@ export default function BusinessFormModal({ open, clientId, clientName, onClose,
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
-            placeholder="Acme Retail"
+            placeholder="Business name"
             autoFocus
           />
         </div>

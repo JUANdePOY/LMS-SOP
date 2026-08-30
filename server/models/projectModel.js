@@ -84,7 +84,7 @@ async function findByClientBusiness(clientBusinessId) {
 
 async function getTree() {
   const [rows] = await db.query(
-    `SELECT c.id AS client_id, c.client_name,
+    `SELECT c.id AS client_id, c.client_name, c.color AS client_color,
             cb.id AS business_id, cb.business_name,
             p.id AS project_id, p.name AS project_name, p.status AS project_status,
             p.color AS project_color, p.due_date AS project_due_date
@@ -100,6 +100,7 @@ async function getTree() {
       clientsMap.set(row.client_id, {
         id: row.client_id,
         client_name: row.client_name,
+        color: row.client_color || null,
         businesses: new Map(),
       });
     }

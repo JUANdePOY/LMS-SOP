@@ -15,22 +15,35 @@ router.use(authenticateToken);
 // GET /api/businesses
 router.get('/', async (req, res) => {
   try {
-    let filters = {};
-    if (req.user.role !== 'super_admin') {
-      if (!req.user.business_id) {
-        return res.status(403).json({ status: 'error', message: 'No business scope assigned', code: 'NO_BUSINESS_SCOPE' });
-      }
-      filters.business_id = req.user.business_id;
-    }
-
     const { search, status, page = 1, limit = 50 } = req.query;
-    const result = await businessModel.findAll({
-      search: search || undefined,
-      status: status || undefined,
-      business_id: filters.business_id,
-      page: parseInt(page),
-      limit: parseInt(limit),
-    });
+    const parsedLimit = parseInt(limit) || 50;
+    const parsedPage = parseInt(page) || 1;
+
+    // Super admins (and users explicitly scoped to a single business) use the
+    // normal scoped lookup. Users without a direct business_id (e.g. department
+    // heads) are NOT rejected: the navigation tree needs the SOP businesses that
+    // own the clients they manage. We return just those businesses so the panel
+    // can render without leaking unrelated businesses.
+    const callsAll = req.user.role === 'super_admin';
+    const scopedBusinessId = !callsAll ? req.user.business_id : null;
+
+    let result;
+    if (!callsAll && !scopedBusinessId) {
+      result = await businessModel.findBusinessesWithClients({
+        search: search || undefined,
+        status: status || undefined,
+        page: parsedPage,
+        limit: parsedLimit,
+      });
+    } else {
+      result = await businessModel.findAll({
+        search: search || undefined,
+        status: status || undefined,
+        business_id: scopedBusinessId,
+        page: parsedPage,
+        limit: parsedLimit,
+      });
+    }
     res.json({ status: 'success', data: result });
   } catch (err) {
     console.error('Businesses list error:', err);

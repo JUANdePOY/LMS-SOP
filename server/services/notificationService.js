@@ -38,6 +38,8 @@ async function createNotification({
   actionLabel = null,
   actionUrl = null,
   soundEnabled = 1,
+  disablePush = false,
+  disableSound = false,
 }) {
   if (!userId || !title) return null;
 
@@ -90,8 +92,8 @@ async function createNotification({
     const sent = broadcastToUser(userId, payload);
 
     const { suppressPush, suppressSound } = await shouldSuppressChannels(userId, category);
-    if (!suppressPush) triggerDevicePush(userId, payload.data).catch(() => {});
-    if (!suppressSound && soundEnabled) triggerSound(userId).catch(() => {});
+    if (!suppressPush && !disablePush) triggerDevicePush(userId, payload.data).catch(() => {});
+    if (!suppressSound && !disableSound && soundEnabled) triggerSound(userId).catch(() => {});
   }
 
   return notificationId;
@@ -107,9 +109,9 @@ async function findExistingNotification(userId, entityType, entityId, action) {
   return rows[0] || null;
 }
 
-async function deduplicatedCreate({ userId, title, body, type, link, entityType, entityId, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled }) {
+async function deduplicatedCreate({ userId, title, body, type, link, entityType, entityId, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled, disablePush, disableSound }) {
   if (!userId || !title || !entityType || !entityId) {
-    return createNotification({ userId, title, body, type, link, entityType, entityId, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled });
+    return createNotification({ userId, title, body, type, link, entityType, entityId, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled, disablePush, disableSound });
   }
 
   const actionPrefix = `${entityType}_${title.toLowerCase().replace(/\s+/g, '_').slice(0, 30)}`;
@@ -139,7 +141,7 @@ async function deduplicatedCreate({ userId, title, body, type, link, entityType,
     }
   }
 
-  return createNotification({ userId, title, body, type, link, entityType, entityId, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled });
+  return createNotification({ userId, title, body, type, link, entityType, entityId, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled, disablePush, disableSound });
 }
 
 async function broadcastSystemChange({ title, body, type = 'info', link, entityType, entityId, excludeUserId = null, targetUserIds = null, priority, category, imageUrl, scheduledAt, expiresAt, actionLabel, actionUrl, soundEnabled }) {

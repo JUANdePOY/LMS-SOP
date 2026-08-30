@@ -20,8 +20,17 @@ const PROJECT_MANAGEMENT_MIGRATIONS = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 
   `ALTER TABLE tasks ADD COLUMN project_id INT DEFAULT NULL`,
-  `ALTER TABLE tasks ADD CONSTRAINT fk_tasks_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL`,
+  `ALTER TABLE tasks ADD CONSTRAINT fk_tasks_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE`,
   `ALTER TABLE tasks ADD INDEX idx_tasks_project (project_id)`,
+
+  // Existing databases already created fk_tasks_project with ON DELETE SET NULL,
+  // which leaves tasks orphaned (project_id = NULL) when a project is deleted and
+  // breaksClient/project/task cascade-deletion. Recreate it as ON DELETE CASCADE
+  // so deleting a project (and transitively a client or business) also removes its
+  // tasks. Safe to re-run: on a fresh DB the constraint is created above, so the
+  // DROP here is a no-op, and on older DBs it swaps the rule to CASCADE.
+  `ALTER TABLE tasks DROP FOREIGN KEY fk_tasks_project`,
+  `ALTER TABLE tasks ADD CONSTRAINT fk_tasks_project FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE`,
 
   `CREATE TABLE IF NOT EXISTS task_custom_field_definitions (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -55,7 +64,7 @@ async function runProjectMigrations() {
     try {
       await db.query(sql);
     } catch (err) {
-      const ignoreCodes = ['ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 'ER_DUP_ENTRY', 1060, 1050, 1061, 121];
+      const ignoreCodes = ['ER_DUP_COLUMN', 'ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 'ER_DUP_ENTRY', 'ER_CANT_DROP_FIELD_OR_KEY', 1060, 1050, 1061, 1091, 121];
       if (
         ignoreCodes.includes(err.code) ||
         ignoreCodes.includes(err.errno) ||

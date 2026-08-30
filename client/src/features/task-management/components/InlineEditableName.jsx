@@ -83,9 +83,9 @@ export default function InlineEditableName({
             if (e.key === 'Enter') { e.preventDefault(); commit(); }
             if (e.key === 'Escape') { e.preventDefault(); cancel(); }
           }}
-          style={inputWidth != null ? { width: `${inputWidth}px`, maxWidth: '100%' } : { maxWidth: '100%' }}
+          style={inputWidth != null ? { width: `${inputWidth}px`, maxWidth: 'min(80vw, 760px)' } : { width: '100%', maxWidth: 'min(80vw, 760px)' }}
           className={cn(
-            'rounded border border-[var(--color-primary)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-sm outline-none',
+            'relative z-20 rounded border border-[var(--color-primary)] bg-[var(--bg-surface)] px-1.5 py-0.5 text-sm shadow-md outline-none',
             inputClassName
           )}
           aria-label={ariaLabel}

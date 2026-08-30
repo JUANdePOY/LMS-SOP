@@ -22,7 +22,7 @@ import {
   uploadAvatar,
   deleteAvatar,
 } from "@/services/api";
-import { usePushNotifications } from "@/features/notifications/hooks/usePushNotifications";
+import NotificationPreferences from "@/features/notifications/components/NotificationPreferences";
 import { Input } from "@/shared/components/ui/input";
 import { Button } from "@/shared/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/shared/components/ui/card";
@@ -83,44 +83,6 @@ function PasswordField({ label, value, onChange, placeholder }) {
           {show ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
       </div>
-    </div>
-  );
-}
-
-function Toggle({ checked, onChange, disabled, label, description, error }) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <div className="space-y-0.5">
-        <p className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-          {label}
-        </p>
-        {description && (
-          <p className="text-xs text-neutral-500">{description}</p>
-        )}
-        {error && (
-          <p className="text-xs text-red-500">{error}</p>
-        )}
-      </div>
-      <button
-        type="button"
-        onClick={() => onChange(!checked)}
-        disabled={disabled}
-        aria-label={checked ? "Turn off" : "Turn on"}
-        className={cn(
-          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors",
-          checked
-            ? "bg-[var(--color-primary)]"
-            : "bg-neutral-200 dark:bg-neutral-700",
-          disabled && "opacity-50 cursor-not-allowed"
-        )}
-      >
-        <span
-          className={cn(
-            "inline-block h-4 w-4 rounded-full bg-white shadow transition-transform",
-            checked ? "translate-x-6" : "translate-x-1"
-          )}
-        />
-      </button>
     </div>
   );
 }
@@ -190,15 +152,6 @@ function PasswordStrengthIndicator({ password }) {
 export default function EmployeeSettings() {
   const toast = useToast();
   const { user, updateUser } = useAuth();
-
-  const {
-    permission,
-    loading: notifLoading,
-    requestPermission,
-    unsubscribe,
-    isSupported,
-    error: notifError,
-  } = usePushNotifications();
 
   const [profile, setProfile] = useState(null);
   const [email, setEmail] = useState("");
@@ -340,26 +293,6 @@ export default function EmployeeSettings() {
       setSaving(false);
     }
   };
-
-  const handleNotifToggle = async () => {
-    try {
-      if (permission === "granted") {
-        await unsubscribe();
-        toast.success("Push notifications disabled");
-      } else {
-        await requestPermission();
-        toast.success("Push notifications enabled");
-      }
-    } catch (err) {
-      toast.error(
-        err?.message ||
-          err?.response?.data?.message ||
-          "Failed to update notification settings"
-      );
-    }
-  };
-
-  const notifErrorDisplay = notifError || undefined;
 
   if (loading) {
     return (
@@ -590,33 +523,18 @@ export default function EmployeeSettings() {
       <AppearanceSettings />
 
       {/* Notifications */}
-      {isSupported && (
-        <Card>
-          <CardHeader>
-            <SectionHeader
-              icon={Bell}
-              title="Notifications"
-              description="Manage how you receive notifications"
-            />
-          </CardHeader>
-          <CardContent>
-            <Toggle
-              label="Push Notifications"
-              description={
-                permission === "granted"
-                  ? "You will receive push notifications even when the app is closed"
-                  : permission === "denied"
-                  ? "Permission was denied. Update in your browser site settings."
-                  : "Enable to receive push notifications"
-              }
-              checked={permission === "granted"}
-              onChange={handleNotifToggle}
-              disabled={notifLoading}
-              error={notifErrorDisplay}
-            />
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <SectionHeader
+            icon={Bell}
+            title="Notifications"
+            description="Manage how you receive notifications"
+          />
+        </CardHeader>
+        <CardContent>
+          <NotificationPreferences />
+        </CardContent>
+      </Card>
     </div>
     </FadeIn>
   );

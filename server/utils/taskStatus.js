@@ -13,9 +13,22 @@ function computeAutoStatus(startDatetime, deadlineDatetime, currentStatus) {
     return currentStatus;
   }
 
+  // Without both a start and deadline date we cannot derive a meaningful auto
+  // status. Previously missing dates fell through to `new Date(null)` (epoch
+  // 1970), which made `now >= deadline` true and incorrectly flagged brand-new
+  // tasks (created with no dates) as "Overdue". Keep the stored default instead.
+  if (!startDatetime || !deadlineDatetime) {
+    return currentStatus;
+  }
+
   const now = new Date();
   const start = new Date(startDatetime);
   const deadline = new Date(deadlineDatetime);
+
+  // Guard against malformed/empty date values so we never derive a bogus status.
+  if (Number.isNaN(start.getTime()) || Number.isNaN(deadline.getTime())) {
+    return currentStatus;
+  }
 
   if (now < start) {
     return 'Pending';

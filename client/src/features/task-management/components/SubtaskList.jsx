@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import StatusBadge from './StatusBadge';
 import UserAvatar from '@/shared/components/ui/Avatar';
 import { formatDateTime } from '../utils/taskDateUtils';
+import { AssigneePicker } from './TaskListRow';
 
 function isCompleted(node) {
   return node.auto_status === 'Completed' || node.status === 'Completed';
@@ -51,10 +52,15 @@ function AddSubtaskRow({ parentId, depth, onAdd, autoFocus }) {
   );
 }
 
-function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, onAdd }) {
+function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, onAdd, onAssign }) {
   const done = isCompleted(node);
   const userAssignees = (node.assignments || []).filter((a) => a.assignment_type === 'User');
   const children = node.subtasks || [];
+
+  const handleAssign = (userList) => {
+    const teams = (node.assignments || []).filter((a) => a.assignment_type !== 'User');
+    onAssign?.(node.id, [...teams, ...userList]);
+  };
 
   return (
     <div>
@@ -110,6 +116,12 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
         )}
 
         {canManage && (
+          <span onClick={(e) => e.stopPropagation()} className="shrink-0">
+            <AssigneePicker assignments={node.assignments} onSave={handleAssign} />
+          </span>
+        )}
+
+        {canManage && (
           <button
             type="button"
             onClick={() => onDelete(node.id)}
@@ -133,6 +145,7 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
               onDelete={onDelete}
               onOpenTask={onOpenTask}
               onAdd={onAdd}
+              onAssign={onAssign}
             />
           ))}
         </div>
@@ -145,7 +158,7 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
   );
 }
 
-export default function SubtaskList({ subtasks = [], canManage, onToggle, onDelete, onAdd, onOpenTask }) {
+export default function SubtaskList({ subtasks = [], canManage, onToggle, onDelete, onAdd, onOpenTask, onAssign }) {
   const flat = subtasks || [];
   const doneCount = flat.filter(isCompleted).length;
 

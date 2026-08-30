@@ -1,4 +1,4 @@
-import { request } from "@/services/api";
+import api, { request } from "@/services/api";
 import * as session from '@/services/session';
 
 const API_BASE = "/messages";
@@ -18,10 +18,21 @@ export async function createConversation(payload) {
   });
 }
 
-export async function sendMessage(conversationId, body) {
-  return request(`${API_BASE}/conversations/${conversationId}/messages`, {
-    method: "POST",
-    body: JSON.stringify({ body }),
+export async function sendMessage(conversationId, { text, mentions, files }) {
+  if (files && files.length > 0) {
+    const formData = new FormData();
+    if (text) formData.append('body', text);
+    if (mentions && mentions.length > 0) formData.append('mentions', JSON.stringify(mentions));
+    for (const file of files) {
+      formData.append('files', file);
+    }
+    return api.post(`${API_BASE}/conversations/${conversationId}/messages`, formData, {
+      skipAuthRedirect: true,
+    });
+  }
+  return api.post(`${API_BASE}/conversations/${conversationId}/messages`, {
+    body: text || '',
+    mentions: mentions && mentions.length > 0 ? mentions : undefined,
   });
 }
 

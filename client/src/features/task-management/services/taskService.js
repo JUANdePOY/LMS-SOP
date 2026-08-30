@@ -58,9 +58,26 @@ export async function updateProgress(payload) {
 }
 
 export async function addComment(payload) {
+  if (payload.files && payload.files.length > 0) {
+    const formData = new FormData();
+    if (payload.comment) formData.append('comment', payload.comment);
+    if (payload.parent_id != null) formData.append('parent_id', String(payload.parent_id));
+    if (payload.mentions && payload.mentions.length > 0) {
+      formData.append('mentions', JSON.stringify(payload.mentions));
+    }
+    for (const file of payload.files) {
+      formData.append('files', file);
+    }
+    const res = await api.post(`${API_BASE}/${payload.task_id}/comments`, formData, {
+      skipAuthRedirect: true,
+    });
+    return ensureSuccess(res, 'Failed to add comment').data;
+  }
+
   const res = await api.post(`${API_BASE}/${payload.task_id}/comments`, {
     comment: payload.comment,
     parent_id: payload.parent_id ?? null,
+    mentions: payload.mentions && payload.mentions.length > 0 ? payload.mentions : undefined,
   });
   return ensureSuccess(res, 'Failed to add comment').data;
 }
@@ -80,6 +97,11 @@ export async function deleteAttachment(taskId, attachmentId) {
 export async function getMyTasks(params = {}) {
   const res = await api.get(`${API_BASE}/my`, { params });
   return ensureSuccess(res, 'Failed to load my tasks').data;
+}
+
+export async function getMyTaskHierarchy() {
+  const res = await api.get(`${API_BASE}/my/hierarchy`);
+  return ensureSuccess(res, 'Failed to load my task hierarchy').data;
 }
 
 export async function getMyTaskCount() {

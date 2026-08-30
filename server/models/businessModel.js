@@ -352,6 +352,59 @@ async function getDepartmentChildren(parentId) {
   return rows;
 }
 
+// Returns only the SOP businesses that actually own at least one client. Used by
+// the navigation tree for users (e.g. department heads) that have no explicit
+// single-business scope, so they can still group their clients without exposing
+// unrelated businesses.
+async function findBusinessesWithClients(filters = {}) {
+  const { search, status, page = 1, limit = 50 } = filters;
+  const offset = (page - 1) * limit;
+
+  let where = 'WHERE 1 = 1';
+  const params = [];
+
+  if (search) {
+    where += ' AND (b.business_name LIKE ? OR b.business_code LIKE ?)';
+    params.push(`%${search}%`, `%${search}%`);
+  }
+  if (status && status !== 'all') {
+    where += ' AND b.status = ?';
+    params.push(status);
+  }
+
+  const sql = `
+    SELECT b.*,
+           creator.full_name AS created_by_name,
+           updater.full_name AS updated_by_name,
+           (SELECT COUNT(*) FROM departments d WHERE d.business_id = b.id) AS department_count
+    FROM businesses b
+    LEFT JOIN users creator ON b.created_by = creator.id
+    LEFT JOIN users updater ON b.updated_by = updater.id
+    INNER JOIN clients c ON c.business_id = b.id
+    ${where}
+    GROUP BY b.id
+    ORDER BY b.business_name ASC
+    LIMIT ? OFFSET ?
+  `;
+  const [rows] = await db.query(sql, [...params, limit, offset]);
+
+  const [countRows] = await db.query(
+    `SELECT COUNT(DISTINCT b.id) AS total
+     FROM businesses b
+     INNER JOIN clients c ON c.business_id = b.id
+     ${where}`,
+    params
+  );
+
+  return {
+    rows,
+    total: countRows[0]?.total ?? 0,
+    page,
+    limit,
+    totalPages: Math.ceil((countRows[0]?.total ?? 0) / limit),
+  };
+}
+
 module.exports = {
   findAll,
   findById,
@@ -364,5 +417,6 @@ module.exports = {
   clearLogo,
   getHierarchy,
   getDepartmentTreeForBusiness,
+  findBusinessesWithClients,
   BUSINESS_STATUSES,
 };

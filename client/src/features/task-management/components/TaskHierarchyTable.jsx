@@ -1,4 +1,5 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, ExternalLink, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -6,12 +7,26 @@ import { useClickOutside } from '../hooks/useClickOutside';
 import { TaskRow } from './TaskListRow';
 import InlineEditableName from './InlineEditableName';
 import InlineNameRow from './InlineNameRow';
-import QuickAddRow from './QuickAddRow';
 
-// Shared grid template for the hierarchy table. The trailing 28px column is the
-// selection checkbox (used for bulk actions on task rows). Keep TaskListRow's
-// TaskRow grid in sync with this constant.
-export const HIERARCHY_GRID = 'grid-cols-[36px_minmax(0,1fr)_120px_150px_100px_90px_110px_40px_28px]';
+// Shared responsive grid template for the hierarchy table. Column order is
+// always: [toggle, name, assignees, status, priority, due, progress, open, select].
+// Less-critical columns are dropped on smaller screens so the table reflows
+// instead of forcing horizontal scroll:
+//   base (<640px):  toggle · name · status · select   (4 cols)
+//   sm   (>=640px): + assignees · priority · due · progress (8 cols)
+//   lg   (>=1024px): + open icon                       (9 cols)
+// Every row (header, task rows, hierarchy rows) must render exactly these 9
+// cells in order and apply the matching visibility classes below. The trailing
+// 28px column is the selection checkbox (bulk actions on task rows).
+export const HIERARCHY_GRID =
+  'grid-cols-[36px_minmax(150px,1fr)_minmax(90px,120px)_28px] ' +
+  'sm:grid-cols-[36px_minmax(160px,1fr)_minmax(120px,160px)_minmax(100px,130px)_minmax(70px,90px)_minmax(60px,80px)_minmax(80px,100px)_28px] ' +
+  'lg:grid-cols-[36px_minmax(160px,1fr)_minmax(120px,160px)_minmax(100px,130px)_minmax(70px,90px)_minmax(60px,80px)_minmax(80px,100px)_minmax(36px,40px)_28px]';
+
+// Visibility classes that must be applied to the corresponding grid cell so the
+// number of visible cells always matches the active HIERARCHY_GRID column count.
+const CELL_HIDE_SM = 'hidden sm:block'; // assignees / priority / due / progress
+const CELL_HIDE_LG = 'hidden lg:block'; // open icon
 
 /**
  * TaskHierarchyTable
@@ -53,36 +68,61 @@ function formatDue(dateStr) {
 }
 
 /** Builds Client -> Business -> Project -> Task[] tree from flat data. */
-function useHierarchy(tasks, projectsById) {
+function useHierarchy(tasks, projectsById, clientTree = []) {
   return useMemo(() => {
     const clients = new Map(); // client_id -> { id, name, businesses: Map }
+
+    // Ensures the Client node exists (preserving its accent color from the org
+    // tree) and returns it.
+    const ensureClient = (clientId, clientName, color) => {
+      const cid = clientId ?? 'unassigned-client';
+      const cname = clientName || 'Unassigned Client';
+      if (!clients.has(cid)) {
+        clients.set(cid, { id: cid, name: cname, color: color ?? null, businesses: new Map() });
+      } else if (color != null) {
+        clients.get(cid).color = color;
+      }
+      return clients.get(cid);
+    };
+
+    // Ensures the Client -> Business skeleton exists and returns the business
+    // node so a project (or a tree-sourced business with no projects) can be attached.
+    const ensureBusiness = (clientId, clientName, businessId, businessName, color) => {
+      const client = ensureClient(clientId, clientName, color);
+      const bid = businessId ?? 'unassigned-business';
+      const bname = businessName || 'Unassigned Business';
+
+      if (!client.businesses.has(bid)) {
+        client.businesses.set(bid, { id: bid, name: bname, clientId: client.id, projects: new Map() });
+      }
+      return client.businesses.get(bid);
+    };
 
     // Ensures the Client -> Business -> Project skeleton exists and returns
     // the project node so a task can be attached to it.
     const ensureProject = (project) => {
-      const clientId = project.client_id ?? 'unassigned-client';
-      const clientName = project.client_name || 'Unassigned Client';
-      const businessId = project.client_business_id ?? 'unassigned-business';
-      const businessName = project.client_business_name || 'Unassigned Business';
-
-      if (!clients.has(clientId)) {
-        clients.set(clientId, { id: clientId, name: clientName, businesses: new Map() });
-      }
-      const client = clients.get(clientId);
-
-      if (!client.businesses.has(businessId)) {
-        client.businesses.set(businessId, { id: businessId, name: businessName, clientId, projects: new Map() });
-      }
-      const business = client.businesses.get(businessId);
-
+      const business = ensureBusiness(
+        project.client_id,
+        project.client_name,
+        project.client_business_id,
+        project.client_business_name
+      );
       if (!business.projects.has(project.id)) {
-        business.projects.set(project.id, { id: project.id, name: project.name, clientId, businessId, tasks: [] });
+        business.projects.set(project.id, { id: project.id, name: project.name, clientId: business.clientId, businessId: business.id, tasks: [] });
       }
       return business.projects.get(project.id);
     };
 
-    // Seed the full structure from every known project so the tree still
-    // renders even when there are no tasks yet.
+    // Seed the full Client -> Business skeleton from the org tree so that
+    // businesses with no projects yet (e.g. just created) still appear in the
+    // table and can be renamed / deleted.
+    for (const client of clientTree || []) {
+      for (const business of client.businesses || []) {
+        ensureBusiness(client.id, client.client_name, business.id, business.business_name, client.color);
+      }
+    }
+
+    // Seed projects (also guarantees the skeleton for any project-only data).
     for (const project of Object.values(projectsById || {})) {
       if (project?.id == null) continue;
       ensureProject(project);
@@ -96,30 +136,51 @@ function useHierarchy(tasks, projectsById) {
       ensureProject(project).tasks.push(task);
     }
 
-    // Convert Maps to arrays and compute rollups bottom-up.
+    // Convert Maps to arrays and compute rollups bottom-up. Progress is a
+    // hierarchical average: a project's progress is the avg of its tasks, a
+    // business's progress is the avg of its project progresses, and a client's
+    // progress is the avg of its business progresses. The other rollup fields
+    // (total/atRisk/earliestDue/summary) stay computed from the flat task list.
     const clientList = [...clients.values()].map((client) => {
       const businessList = [...client.businesses.values()].map((business) => {
         const projectList = [...business.projects.values()].map((project) => {
           const rollup = computeRollup(project.tasks);
           return { ...project, rollup };
         });
-        const businessRollup = computeRollup(projectList.flatMap((p) => p.tasks));
+        const businessProgress = projectList.length
+          ? Math.round(projectList.reduce((sum, p) => sum + (p.rollup.avgProgress || 0), 0) / projectList.length)
+          : 0;
+        const businessRollup = computeRollup(
+          projectList.flatMap((p) => p.tasks),
+          businessProgress
+        );
         return { ...business, projects: projectList, rollup: businessRollup };
       });
-      const clientRollup = computeRollup(businessList.flatMap((b) => b.projects.flatMap((p) => p.tasks)));
+      const clientProgress = businessList.length
+        ? Math.round(businessList.reduce((sum, b) => sum + (b.rollup.avgProgress || 0), 0) / businessList.length)
+        : 0;
+      const clientRollup = computeRollup(
+        businessList.flatMap((b) => b.projects.flatMap((p) => p.tasks)),
+        clientProgress
+      );
       return { ...client, businesses: businessList, rollup: clientRollup };
     });
 
     return clientList;
-  }, [tasks, projectsById]);
+  }, [tasks, projectsById, clientTree]);
 }
 
-function computeRollup(taskList) {
+function computeRollup(taskList, progress) {
   const total = taskList.length;
-  if (total === 0) return { total: 0, atRisk: 0, avgProgress: 0, earliestDue: null, summary: 'No tasks' };
+  // When `progress` is supplied it is the hierarchical rollup value (avg of the
+  // child-group progresses), so it takes precedence over a flat task average.
+  if (total === 0) {
+    return { total: 0, atRisk: 0, avgProgress: progress ?? 0, earliestDue: null, summary: 'No tasks' };
+  }
   const atRisk = taskList.filter(isOverdue).length;
   const active = taskList.filter((t) => t.status !== 'Completed' && t.status !== 'Cancelled').length;
-  const avgProgress = Math.round(taskList.reduce((sum, t) => sum + getProgress(t), 0) / total);
+  const computed = Math.round(taskList.reduce((sum, t) => sum + getProgress(t), 0) / total);
+  const avgProgress = progress ?? computed;
   const upcoming = taskList
     .filter((t) => t.deadline_datetime && t.status !== 'Completed' && t.status !== 'Cancelled')
     .sort((a, b) => new Date(a.deadline_datetime) - new Date(b.deadline_datetime));
@@ -164,6 +225,7 @@ function loadExpanded() {
 export default function TaskHierarchyTable({
   tasks,
   projectsById,
+  clientTree = [],
   search,
   onViewTask,
   onDelete,
@@ -189,7 +251,7 @@ export default function TaskHierarchyTable({
   onSelectAll,
 }) {
   const navigate = useNavigate();
-  const clients = useHierarchy(tasks, projectsById);
+  const clients = useHierarchy(tasks, projectsById, clientTree);
   const [expanded, setExpanded] = useState(loadExpanded);
   // Which parent is currently showing an inline "add" row: { kind, parentId }.
   const [addingFor, setAddingFor] = useState(null);
@@ -212,6 +274,11 @@ export default function TaskHierarchyTable({
         if (owning?.client_id != null) next.add(`client-${owning.client_id}`);
         return next;
       });
+    } else if (kind === 'project') {
+      // A project's children are tasks, so reveal an inline task-add row
+      // (matching how the business row reveals a project row) instead of a modal.
+      setAddingFor({ kind: 'task', parentId: id });
+      setExpanded((prev) => { const next = new Set(prev); next.add(`project-${id}`); return next; });
     }
   }, [projectsById]);
 
@@ -293,7 +360,7 @@ export default function TaskHierarchyTable({
   }
 
   return (
-    <div role="table" aria-label="Client to task hierarchy" className="w-full">
+    <div role="table" aria-label="Client to task hierarchy" className="w-full overflow-x-auto">
       {/* Header row */}
       <div
         role="row"
@@ -319,12 +386,12 @@ export default function TaskHierarchyTable({
           </button>
         </span>
         <span>Name</span>
-        <span>Assignees</span>
+        <span className={CELL_HIDE_SM}>Assignees</span>
         <span>Status</span>
-        <span>Priority</span>
-        <span>Due</span>
-        <span>Progress</span>
-        <span />
+        <span className={CELL_HIDE_SM}>Priority</span>
+        <span className={CELL_HIDE_SM}>Due</span>
+        <span className={CELL_HIDE_SM}>Progress</span>
+        <span className={CELL_HIDE_LG} />
         <span />
       </div>
 
@@ -332,6 +399,7 @@ export default function TaskHierarchyTable({
         const dimmed = search && !subtreeMatches(client, 'client', search);
         const clientKey = `client-${client.id}`;
         const open = isExpanded(clientKey, 'client', client);
+        const clientProjectCount = client.businesses.reduce((sum, b) => sum + b.projects.length, 0);
         return (
           <div key={clientKey}>
             <Row
@@ -341,7 +409,7 @@ export default function TaskHierarchyTable({
               name={client.name}
               open={open}
               onToggle={() => toggle(clientKey)}
-              rollupText={client.rollup.summary}
+              rollupText={`${clientProjectCount} project${clientProjectCount === 1 ? '' : 's'}`}
               dueDate={client.rollup.earliestDue}
               progress={client.rollup.avgProgress}
               dimmed={dimmed}
@@ -350,8 +418,9 @@ export default function TaskHierarchyTable({
               canEdit={canManage}
               onRename={onRenameClient}
               onAddChild={startAdd}
-              onDelete={onDeleteEntity}
+              onDeleteEntity={onDeleteEntity}
               onHideEmptyGroups={hideEmptyGroups}
+              hideDue
             />
             {open && client.businesses.map((business) => {
               const bDimmed = search && !subtreeMatches(business, 'business', search);
@@ -366,7 +435,7 @@ export default function TaskHierarchyTable({
                     name={business.name}
                     open={bOpen}
                     onToggle={() => toggle(businessKey)}
-                    rollupText={business.rollup.summary}
+                    rollupText={`${business.projects.length} project${business.projects.length === 1 ? '' : 's'}`}
                     dueDate={business.rollup.earliestDue}
                     progress={business.rollup.avgProgress}
                     dimmed={bDimmed}
@@ -374,7 +443,7 @@ export default function TaskHierarchyTable({
                           canEdit={canManage}
                           onRename={onRenameBusiness}
                           onAddChild={startAdd}
-                          onDelete={onDeleteEntity}
+                          onDeleteEntity={onDeleteEntity}
                           onHideEmptyGroups={hideEmptyGroups}
                         />
                   {bOpen && business.projects.map((project) => {
@@ -384,29 +453,25 @@ export default function TaskHierarchyTable({
                     return (
                       <div key={projectKey}>
                          <Row
-                          depth={2}
-                          kind="project"
-                          id={project.id}
-                          name={project.name}
-                          open={pOpen}
-                          onToggle={() => toggle(projectKey)}
-                          rollupText={project.rollup.summary}
-                          dueDate={project.rollup.earliestDue}
-                          progress={project.rollup.avgProgress}
-                          dimmed={pDimmed}
-                          onOpenPage={() => navigate(`/clients/${client.id}/businesses/${business.id}/projects/${project.id}`)}
-                          menu={canManage ? [
-                            { label: '+ New Task', onClick: () => onAddProjectTask?.(project.id) },
-                          ] : null}
-                          onAddTask={canManage ? () => onAddProjectTask?.(project.id) : undefined}
-                          onEditProject={canManage && onEditProject ? () => onEditProject?.(project.id) : undefined}
-                           canEdit={canManage}
-                           onRename={onRenameProject}
-                           onAddChild={startAdd}
-                           onDelete={onDeleteEntity}
-                           onHideEmptyGroups={hideEmptyGroups}
-                           hideAdd
-                         />
+                           depth={2}
+                           kind="project"
+                           id={project.id}
+                           name={project.name}
+                           open={pOpen}
+                           onToggle={() => toggle(projectKey)}
+                           rollupText={project.rollup.summary}
+                           dueDate={project.rollup.earliestDue}
+                           progress={project.rollup.avgProgress}
+                           dimmed={pDimmed}
+                           onOpenPage={() => navigate(`/clients/${client.id}/businesses/${business.id}/projects/${project.id}`)}
+                           onAddTask={canManage ? () => onAddProjectTask?.(project.id) : undefined}
+                           onEditProject={canManage && onEditProject ? () => onEditProject?.(project.id) : undefined}
+                             canEdit={canManage}
+                             onRename={onRenameProject}
+                             onAddChild={startAdd}
+                             onDeleteEntity={onDeleteEntity}
+                             onHideEmptyGroups={hideEmptyGroups}
+                          />
                         {pOpen && project.tasks.map((task) => {
                           const tDimmed = search && !subtreeMatches(task, 'task', search);
                           return (
@@ -428,21 +493,18 @@ export default function TaskHierarchyTable({
                             />
                           );
                         })}
-                        {pOpen && canManage && (
-                          <div
-                            className="grid grid-cols-[36px_minmax(0,1fr)_120px_150px_100px_90px_110px_40px] gap-2 px-2 py-2"
-                            style={{ paddingLeft: `${3 * 20 + 8}px` }}
-                          >
-                            <span />
-                            <QuickAddRow
-                              label="Add task"
-                              placeholder="Add a task to this project…"
-                              onQuickAdd={(title) => {
-                                if (onQuickAddTask) onQuickAddTask(project.id, title);
-                                else onAddProjectTask?.(project.id);
-                              }}
-                            />
-                          </div>
+                        {addingFor?.kind === 'task' && addingFor.parentId === project.id && (
+                          <InlineNameRow
+                            key="__add-task"
+                            placeholder="New task name…"
+                            indent={DEPTH_INDENT_PX * 3}
+                            onCommit={async (name) => {
+                              if (onQuickAddTask) await onQuickAddTask(project.id, name);
+                              else onAddProjectTask?.(project.id);
+                              setAddingFor(null);
+                            }}
+                            onCancel={() => setAddingFor(null)}
+                          />
                         )}
                       </div>
                     );
@@ -477,19 +539,48 @@ export default function TaskHierarchyTable({
 
 const DEPTH_INDENT_PX = 20;
 
-function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progress, dimmed, onOpenPage, colorDot, canEdit, onRename, onAddChild, onDeleteEntity, onHideEmptyGroups, hideAdd }) {
+function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progress, dimmed, onOpenPage, colorDot, canEdit, onRename, onAddChild, onAddTask, onEditProject, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renameSignal, setRenameSignal] = useState(0);
+  const [menuCoords, setMenuCoords] = useState({ top: 0, left: 0 });
   const menuRef = useClickOutside(() => { setMenuOpen(false); setConfirmDelete(false); });
+  const menuTriggerRef = useRef(null);
+
+  // Position the action menu with fixed coordinates so it escapes the table's
+  // overflow-x-auto scroll container and isn't painted under later rows (e.g. a
+  // project's own task rows). Mirrors the approach used by TaskListRow.
+  useLayoutEffect(() => {
+    if (!menuOpen && !confirmDelete) return;
+    const update = () => {
+      const el = menuTriggerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      setMenuCoords({ top: rect.bottom + 4, left: rect.left });
+    };
+    update();
+    const onScroll = (e) => {
+      if (menuRef.current && e.target && menuRef.current.contains(e.target)) return;
+      setMenuOpen(false);
+      setConfirmDelete(false);
+    };
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [menuOpen, confirmDelete]);
 
   const childNoun = kind === 'client' ? 'business' : kind === 'business' ? 'project' : 'task';
   const addTitle = `Add ${childNoun}`;
 
   const menuItems = [];
-  // Projects are added via the inline QuickAddRow, so the menu's "Add task"
-  // item is omitted there to avoid a dead action.
-  if (kind !== 'project') {
+  if (kind === 'project') {
+    // Projects manage tasks via the new-task form, not an inline child row.
+    if (onAddTask) menuItems.push({ label: 'New Task', icon: Plus, onClick: () => { setMenuOpen(false); onAddTask(); } });
+    if (onEditProject) menuItems.push({ label: 'Edit Project', icon: Pencil, onClick: () => { setMenuOpen(false); onEditProject(); } });
+  } else {
     menuItems.push({ label: `Add ${childNoun}`, icon: Plus, onClick: () => onAddChild?.(kind, id) });
   }
   if (canEdit) {
@@ -501,7 +592,13 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
   return (
     <div
       role="row"
-      onClick={onToggle}
+      onClick={(e) => {
+        // Don't toggle when the click lands on the name (it renames) — those
+        // stop propagation themselves, but this is a safety net so the row never
+        // both renames and expands/collapses.
+        if (e.target.closest('[data-no-nav]')) return;
+        onToggle();
+      }}
       className={cn(
         'group grid cursor-pointer items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-2.5 text-sm transition-colors',
         'hover:bg-[var(--bg-surface-hover)]',
@@ -520,33 +617,39 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
       </span>
 
       <span
-        className="relative min-w-0"
+        className="relative z-10 min-w-0"
         style={{ paddingLeft: `${depth * DEPTH_INDENT_PX}px` }}
       >
-        <div className="flex min-w-0 items-center gap-2">
-          <InlineEditableName
-            value={name}
-            canEdit={canEdit}
-            onCommit={(next) => onRename?.(id, next)}
-            renameSignal={renameSignal}
-            className={cn(
-              'truncate flex-1 min-w-0',
-              kind === 'client' ? 'font-medium text-[var(--text-primary)]' : 'text-[var(--text-primary)]'
-            )}
-            inputClassName={kind === 'client' ? 'font-medium' : ''}
-            ariaLabel={`Rename ${kind}`}
-          />
-        {canEdit && !hideAdd && (
-             <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+           <span className="flex min-w-0 items-center" data-no-nav>
+            <InlineEditableName
+              value={name}
+              canEdit={canEdit}
+              onCommit={(next) => onRename?.(id, next)}
+              renameSignal={renameSignal}
+              className={cn(
+                'whitespace-normal break-words',
+                kind === 'client' ? 'font-medium text-[var(--text-primary)]' : 'text-[var(--text-primary)]'
+              )}
+              inputClassName={kind === 'client' ? 'font-medium' : ''}
+              ariaLabel={`Rename ${kind}`}
+            />
+          </span>
+          {canEdit && !hideAdd && (
+            <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); onAddChild?.(kind, id); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddChild?.(kind, id);
+                }}
                 title={addTitle}
                 className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
               >
                 <Plus size={13} />
               </button>
               <button
+                ref={menuTriggerRef}
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
                 title="More actions"
@@ -556,13 +659,19 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
               </button>
             </span>
           )}
+          {rollupText && (
+            <span className="ml-auto hidden rounded-full bg-[var(--bg-surface-hover)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)] sm:inline">
+              {rollupText}
+            </span>
+          )}
         </div>
 
-        {(menuOpen || confirmDelete) && (
+        {(menuOpen || confirmDelete) && createPortal(
           <div
             ref={menuRef}
             onClick={(e) => e.stopPropagation()}
-            className="absolute left-0 top-full z-30 mt-1 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-lg"
+            style={{ position: 'fixed', top: menuCoords.top, left: menuCoords.left, zIndex: 50 }}
+            className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-lg"
           >
             {menuOpen && menuItems.map((item) => (
               <button
@@ -599,14 +708,16 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
                 </button>
               </div>
             )}
-          </div>
+          </div>,
+          document.body
         )}
       </span>
 
-      <span className="truncate text-xs text-[var(--text-secondary)]">{rollupText}</span>
+      <span className={CELL_HIDE_SM} />
       <span />
-      <span className="text-xs text-[var(--text-secondary)]">{formatDue(dueDate)}</span>
-      <span className="flex items-center gap-2">
+      <span className={CELL_HIDE_SM} />
+      <span className={cn('text-xs text-[var(--text-secondary)]', CELL_HIDE_SM)}>{hideDue ? '' : formatDue(dueDate)}</span>
+      <span className={cn('flex items-center gap-2', CELL_HIDE_SM)}>
         <span className="h-1 flex-1 rounded-full bg-[var(--border-subtle)]">
           <span
             className="block h-1 rounded-full bg-[var(--color-primary)]"
@@ -614,7 +725,7 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
           />
         </span>
       </span>
-      <span className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+      <span className={cn('flex items-center justify-end', CELL_HIDE_LG)} onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onOpenPage?.(); }}
@@ -625,7 +736,7 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
         </button>
       </span>
       <span />
-    </div>
+      </div>
   );
 }
 

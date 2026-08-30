@@ -1,12 +1,56 @@
-import { useState, useEffect, useRef } from "react";
-import { Send, Loader2, Check, CheckCheck, Users, ChevronLeft } from "lucide-react";
+import { useEffect, useRef, useCallback } from "react";
+import { Loader2, Check, CheckCheck, Users, ChevronLeft, Paperclip, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/shared/components/ui/Avatar";
+import RichComposer from "@/features/task-management/components/RichComposer";
+import { getUsers } from "@/services/api";
 import {
   getConversationDisplayName,
   getOtherParticipants,
   getDisplayName,
 } from "../utils/conversationDisplay";
+
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Highlights stored @mentions inside the message body.
+function renderBody(text, mentions) {
+  const list = Array.isArray(mentions) ? mentions : [];
+  if (list.length === 0 || !text) return text;
+
+  const names = list
+    .map((m) => m.name)
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegExp);
+
+  if (names.length === 0) return text;
+
+  const re = new RegExp(`@(${names.join('|')})`, 'g');
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <span
+        key={`mention-${key++}`}
+        className="rounded bg-white/20 px-1 font-medium"
+      >
+        {match[0]}
+      </span>
+    );
+    lastIndex = re.lastIndex;
+  }
+
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
 
 function formatTime(dateStr) {
   if (!dateStr) return "";
@@ -64,7 +108,7 @@ function Header({ conversation, onBack }) {
             <span className="presence-dot" style={{ width: "0.95rem", height: "0.95rem" }} aria-label="Online" />
           )}
         </div>
-      <div className="min-w-0">
+        <div className="min-w-0">
           <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">
             {name}
           </h3>
@@ -79,8 +123,6 @@ function Header({ conversation, onBack }) {
 }
 
 export default function MessageThread({ conversation, onSend, loading, onMarkAllRead, onBack }) {
-  const [text, setText] = useState("");
-  const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
   const lastMessageId = useRef(null);
 
@@ -93,17 +135,12 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
     }
   }, [conversation?.messages]);
 
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!text.trim() || sending) return;
-    setSending(true);
-    try {
-      await onSend(text.trim());
-      setText("");
-    } finally {
-      setSending(false);
-    }
-  };
+  const mentionSearch = useCallback(async (q) => {
+    const res = await getUsers({ search: q || '', limit: 8, page: 1 });
+    const payload = res?.data?.data;
+    const rows = Array.isArray(payload) ? payload : payload?.rows;
+    return Array.isArray(rows) ? rows : [];
+  }, []);
 
   const hasUnread = conversation?.messages?.some(
     (m) => !m.read_at && m.sender_id !== conversation.current_user_id
@@ -122,7 +159,6 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
   }
 
   const isGroup = conversation?.type === "group_forum";
-
   let lastDay = null;
 
   return (
@@ -162,6 +198,7 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
               full_name: msg.sender_name,
               avatar_url: msg.sender_avatar_url,
             };
+            const attachments = Array.isArray(msg.attachments) ? msg.attachments : [];
             return (
               <div key={msg.id}>
                 {showDay && (
@@ -187,7 +224,51 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
                         </p>
                       </div>
                     )}
-                    <p className="whitespace-pre-wrap break-words leading-snug">{msg.body}</p>
+                    <p className="whitespace-pre-wrap break-words leading-snug">{renderBody(msg.body, msg.mentions)}</p>
+
+                    {attachments.length > 0 && (
+                      <div className="mt-2 space-y-2">
+                        {attachments.map((att) => {
+                          const isImage = att.mime_type && att.mime_type.startsWith('image/');
+                          if (isImage) {
+                            return (
+                              <a
+                                key={att.id}
+                                href={att.view_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block overflow-hidden rounded-lg border border-white/20"
+                              >
+                                <img
+                                  src={att.view_url}
+                                  alt={att.original_name || att.file_name}
+                                  className="max-h-56 w-auto max-w-full object-cover"
+                                  loading="lazy"
+                                />
+                              </a>
+                            );
+                          }
+                          return (
+                            <a
+                              key={att.id}
+                              href={att.view_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${
+                                isMine
+                                  ? 'border-white/30 bg-white/10 text-white hover:bg-white/20'
+                                  : 'border-neutral-200 dark:border-neutral-700 text-[var(--color-primary)] hover:bg-neutral-100 dark:hover:bg-neutral-700'
+                              }`}
+                            >
+                              <Paperclip size={13} className="shrink-0" />
+                              <span className="truncate">{att.original_name || att.file_name}</span>
+                              <Download size={12} className="shrink-0 opacity-70" />
+                            </a>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     <div className={cn(
                       "text-[10px] mt-2 flex items-center gap-1 justify-end",
                       isMine ? "text-white/85" : "text-neutral-400"
@@ -206,24 +287,14 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSend} className="border-t border-neutral-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-900 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 rounded-full border border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-800 px-4 py-2 text-sm focus:outline-none focus:border-[var(--color-primary)]"
-          />
-          <button
-            type="submit"
-            disabled={sending || !text.trim()}
-            className="flex h-10 w-10 items-center justify-center rounded-full btn-primary disabled:opacity-50 hover-brand"
-          >
-            {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-          </button>
-        </div>
-      </form>
+      <div className="border-t border-neutral-200 dark:border-neutral-700 p-3 bg-white dark:bg-neutral-900 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        <RichComposer
+          disabled={!conversation}
+          placeholder="Type a message... use @ to mention"
+          mentionSearch={mentionSearch}
+          onSend={onSend}
+        />
+      </div>
     </div>
   );
 }

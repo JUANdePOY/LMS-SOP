@@ -10,7 +10,6 @@ import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import AssignmentSection from '../components/AssignmentSection';
 import AttachmentSection from '../components/AttachmentSection';
 import CommentSection from '../components/CommentSection';
-import CommentInput from '../components/CommentInput';
 import ProgressModal from '../components/ProgressModal';
 import { PRIORITY_STYLES, STATUS_STYLES } from '../constants/taskConstants';
 import { FadeIn } from "@/shared/motion";
@@ -50,6 +49,11 @@ export default function TaskDetailsPage() {
   if (!task) {
     return <div className="text-sm text-[var(--text-muted)]">Task not found.</div>;
   }
+
+  // The list/table derives an "Overdue" status when a Pending task is past its
+  // deadline. Mirror that here so the detail view shows the same status the user
+  // sees in the hierarchy instead of the raw stored value.
+  const displayStatus = task.auto_status ?? task.status;
 
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -109,7 +113,7 @@ export default function TaskDetailsPage() {
             {task.description && <p className="mt-1 text-sm text-[var(--text-muted)]">{task.description}</p>}
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <span className={`inline-flex items-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium ${PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.Medium}`}>{task.priority}</span>
-              <span className={`inline-flex items-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[task.status] || STATUS_STYLES.Pending}`}>{task.status}</span>
+              <span className={`inline-flex items-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[displayStatus] || STATUS_STYLES.Pending}`}>{displayStatus}</span>
               {task.category && <span className="text-xs text-[var(--text-muted)]">{task.category}</span>}
             </div>
           </div>
@@ -147,7 +151,7 @@ export default function TaskDetailsPage() {
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="text-[var(--text-muted)]">Priority:</span> <span className="font-medium">{task.priority}</span></div>
-                <div><span className="text-[var(--text-muted)]">Status:</span> <span className="font-medium">{task.status}</span></div>
+                <div><span className="text-[var(--text-muted)]">Status:</span> <span className="font-medium">{displayStatus}</span></div>
                 <div><span className="text-[var(--text-muted)]">Start:</span> <span className="font-medium">{formatDate(task.start_datetime)}</span></div>
                 <div><span className="text-[var(--text-muted)]">Deadline:</span> <span className="font-medium">{formatDate(task.deadline_datetime)}</span></div>
               </div>
@@ -196,15 +200,8 @@ export default function TaskDetailsPage() {
                 <CommentSection
                   comments={task.comments}
                   currentUser={currentUser}
-                  isAdmin={isAnyAdmin}
-                  onAddComment={(comment, parentId) => addComment(task.id, comment, parentId)}
+                  onAddComment={(comment, parentId, files, mentions) => addComment(task.id, comment, parentId, files, mentions)}
                   canReply
-                />
-              </div>
-              <div className="shrink-0 border-t border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3">
-                <CommentInput
-                  onAddComment={(comment, parentId) => addComment(task.id, comment, parentId)}
-                  canComment
                 />
               </div>
             </div>

@@ -29,7 +29,6 @@ import BannerSection from "@/shared/components/ui/BannerSection";
 import GlobalSearch from "@/components/GlobalSearch";
 import NotificationDropdown from "@/shared/components/ui/NotificationDropdown";
 import NotificationBadge from "@/shared/components/ui/NotificationBadge";
-import QuickCreateMenu from "@/features/task-management/components/QuickCreateMenu";
 import TaskCommandPalette from "@/features/task-management/components/TaskCommandPalette";
 import { getProjects } from "@/features/task-management/services/projectService";
 import { getClients } from "@/features/task-management/api/client.api";
@@ -37,6 +36,7 @@ import { useNotificationStore, useNotificationPoller, useNotifications } from "@
 import { PageTransition } from "@/shared/motion";
 import { useWebSocket } from "@/features/notifications/hooks/useWebSocket";
 import { useActiveBanners } from "@/features/notifications/hooks/useActiveBanners";
+import { useContextualBanners } from "@/features/notifications/hooks/useContextualBanners";
 import { useTabNotificationBadge } from "@/hooks/useTabNotificationBadge";
 import { isQuietHours } from "@/shared/utils/quietHours";
 import { NavigationProvider, useNavigation } from "@/shared/contexts/NavigationContext";
@@ -104,6 +104,7 @@ export default function AppLayout() {
   const notificationData = useNotifications();
   const { fetchPreferences } = notificationData;
   const { banners: activeBanners } = useActiveBanners();
+  const { banners: contextualBanners } = useContextualBanners();
   const messageBadgeCount = notificationData.unreadMessageCount || 0;
   const eventBadgeCount = notificationData.getUnreadCountByEntityType('event') || 0;
   const announcementBadgeCount = notificationData.getUnreadCountByEntityType('announcement') || 0;
@@ -269,6 +270,7 @@ export default function AppLayout() {
           mobileOpen={mobileOpen}
           onMobileClose={() => setMobileOpen(false)}
           onToggleCollapse={() => setCollapsed((v) => !v)}
+          onCollapseSidebar={() => setCollapsed(true)}
         />
         )}
         <SecondarySidebar />
@@ -347,8 +349,6 @@ export default function AppLayout() {
                 })}
               </div>
 
-              <QuickCreateMenu />
-
               <TaskCommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={globalCommands} />
 
               <div className="relative" ref={profileRef}>
@@ -421,7 +421,7 @@ export default function AppLayout() {
           >
           <Scrollbar variant="viewport">
           <div className="w-full px-4 sm:px-6 pt-4 sm:pt-6 pb-8 sm:pb-10 flex-1">
-            <BannerSection items={activeBanners} />
+            <BannerSection items={[...activeBanners, ...contextualBanners]} />
             <PageTransition>
               <Outlet />
             </PageTransition>

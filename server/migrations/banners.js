@@ -74,7 +74,7 @@ const MIGRATIONS = [
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
-const DEFAULT_CATEGORIES = ['system', 'social', 'training', 'security', 'marketing'];
+const DEFAULT_CATEGORIES = ['system', 'social', 'training', 'security', 'marketing', 'task', 'mention', 'task_admin'];
 const DEFAULT_CHANNELS = { in_app: true, push: true, email: false, sound: true };
 
 async function runBannerMigrations() {

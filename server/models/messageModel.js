@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const db = require('../config/database');
+const { buildViewUrl } = require('../services/messageAttachmentPublicFile');
 
 const CREATE_CONVERSATIONS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS conversations (
   id VARCHAR(36) NOT NULL DEFAULT (UUID()),
@@ -17,6 +18,7 @@ const CREATE_MESSAGES_TABLE_SQL = `CREATE TABLE IF NOT EXISTS messages (
   conversation_id VARCHAR(36) NOT NULL,
   sender_id INT NOT NULL,
   body TEXT NOT NULL,
+  mentions JSON DEFAULT NULL,
   sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   read_at DATETIME DEFAULT NULL,
   PRIMARY KEY (id),
@@ -24,6 +26,21 @@ const CREATE_MESSAGES_TABLE_SQL = `CREATE TABLE IF NOT EXISTS messages (
   KEY idx_sender (sender_id),
   KEY idx_sent_at (sent_at DESC),
   FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`;
+
+const CREATE_MESSAGE_ATTACHMENTS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS message_attachments (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  message_id VARCHAR(36) NOT NULL,
+  file_name VARCHAR(500) NOT NULL,
+  original_name VARCHAR(500) NOT NULL,
+  mime_type VARCHAR(100) DEFAULT NULL,
+  size_bytes BIGINT DEFAULT NULL,
+  file_data LONGBLOB DEFAULT NULL,
+  uploaded_by INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE,
+  FOREIGN KEY (uploaded_by) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_message_attachments_message (message_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`;
 
 const CREATE_CONVERSATION_PARTICIPANTS_TABLE_SQL = `CREATE TABLE IF NOT EXISTS conversation_participants (
@@ -41,6 +58,9 @@ async function ensureTables() {
     await db.query(CREATE_CONVERSATIONS_TABLE_SQL);
     await db.query(CREATE_MESSAGES_TABLE_SQL);
     await db.query(CREATE_CONVERSATION_PARTICIPANTS_TABLE_SQL);
+    await db.query(CREATE_MESSAGE_ATTACHMENTS_TABLE_SQL);
+    // Add the mentions column on existing deployments (idempotent).
+    await db.query('ALTER TABLE messages ADD COLUMN IF NOT EXISTS mentions JSON DEFAULT NULL AFTER body');
   } catch (err) {
     console.error('Failed to ensure messaging tables:', err.message);
   }
@@ -144,14 +164,47 @@ const messageModel = {
     return conversations;
   },
 
-  async addMessage({ conversationId, senderId, body }) {
+  async addMessage({ conversationId, senderId, body, mentions, files }) {
     const id = crypto.randomUUID();
     await db.query(
-      'INSERT INTO messages (id, conversation_id, sender_id, body) VALUES (?, ?, ?, ?)',
-      [id, conversationId, senderId, body]
+      'INSERT INTO messages (id, conversation_id, sender_id, body, mentions) VALUES (?, ?, ?, ?, ?)',
+      [id, conversationId, senderId, body, mentions ? JSON.stringify(mentions) : null]
     );
+
+    const attachments = [];
+    const fileList = Array.isArray(files) ? files : [];
+    for (const file of fileList) {
+      const originalName = file.originalname || 'attachment';
+      const fileSize = file.size || (file.buffer ? file.buffer.length : 0);
+      const [result] = await db.query(
+        `INSERT INTO message_attachments (message_id, file_name, original_name, mime_type, size_bytes, file_data, uploaded_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [id, originalName, originalName, file.mimetype || null, fileSize, file.buffer || null, senderId]
+      );
+      const attachment = await this.getMessageAttachmentById(result.insertId);
+      attachments.push({ ...attachment, view_url: buildViewUrl(attachment.id) });
+    }
+
     await db.query('UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = ?', [conversationId]);
-    return this.getMessage(id);
+    const message = await this.getMessage(id);
+    return { ...message, attachments };
+  },
+
+  async getMessageAttachmentById(attachmentId) {
+    const [rows] = await db.query(
+      'SELECT * FROM message_attachments WHERE id = ? LIMIT 1',
+      [attachmentId]
+    );
+    return rows[0] || null;
+  },
+
+  async getMessageAttachments(messageId) {
+    const [rows] = await db.query(
+      `SELECT id, message_id, file_name, original_name, mime_type, size_bytes, uploaded_by, created_at
+       FROM message_attachments WHERE message_id = ? ORDER BY created_at ASC`,
+      [messageId]
+    );
+    return rows.map((att) => ({ ...att, view_url: buildViewUrl(att.id) }));
   },
 
   async getMessage(id) {
@@ -161,7 +214,11 @@ const messageModel = {
       LEFT JOIN users u ON u.id = m.sender_id
       WHERE m.id = ?
     `, [id]);
-    return rows[0] || null;
+    const message = rows[0] || null;
+    if (message) {
+      message.attachments = await this.getMessageAttachments(id);
+    }
+    return message;
   },
 
   async listMessages(conversationId) {
@@ -172,7 +229,11 @@ const messageModel = {
       WHERE m.conversation_id = ?
       ORDER BY m.sent_at ASC
     `, [conversationId]);
-    return rows;
+    const messages = [];
+    for (const m of rows) {
+      messages.push({ ...m, attachments: await this.getMessageAttachments(m.id) });
+    }
+    return messages;
   },
 
   async markAsRead(messageId, userId) {

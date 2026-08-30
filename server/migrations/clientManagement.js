@@ -36,6 +36,17 @@ const CLIENT_MANAGEMENT_MIGRATIONS = [
   `ALTER TABLE tasks ADD INDEX idx_tasks_parent (parent_task_id)`,
   `ALTER TABLE tasks ADD INDEX idx_tasks_client (client_id)`,
   `ALTER TABLE tasks ADD INDEX idx_tasks_business (business_id)`,
+
+  // Link each client to a SOP business (top-level `businesses` table) so the
+  // secondary panel can group clients under their SOP business. Nullable + SET
+  // NULL so removing a SOP business does not cascade-delete its clients.
+  `ALTER TABLE clients ADD COLUMN IF NOT EXISTS business_id INT DEFAULT NULL`,
+  `ALTER TABLE clients ADD CONSTRAINT fk_clients_business FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE SET NULL`,
+  `ALTER TABLE clients ADD INDEX IF NOT EXISTS idx_clients_business (business_id)`,
+
+  // Per-client accent color shown as a dot before the name in the task
+  // hierarchy table. Nullable; falls back to the brand accent when unset.
+  `ALTER TABLE clients ADD COLUMN color VARCHAR(32) DEFAULT NULL`,
 ];
 
 async function runClientMigrations() {

@@ -1,7 +1,50 @@
 import { useState, useMemo, memo } from 'react';
-import { MessageCircle, Reply, Clock } from 'lucide-react';
+import { MessageCircle, Reply, Clock, Paperclip, Download } from 'lucide-react';
 import CommentInput from './CommentInput';
-import UserAvatar from "@/shared/components/ui/Avatar"
+import UserAvatar from "@/shared/components/ui/Avatar";
+
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Highlights stored @mentions inside the comment body so the reader can see
+// who was pinged. Mentions are matched by display name recorded at send time.
+function renderBody(text, mentions) {
+  const list = Array.isArray(mentions) ? mentions : [];
+  if (list.length === 0 || !text) return text;
+
+  const names = list
+    .map((m) => m.name)
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length)
+    .map(escapeRegExp);
+
+  if (names.length === 0) return text;
+
+  const re = new RegExp(`@(${names.join('|')})`, 'g');
+  const parts = [];
+  let lastIndex = 0;
+  let match;
+  let key = 0;
+
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    parts.push(
+      <span
+        key={`mention-${key++}`}
+        className="rounded bg-[var(--color-primary)]/10 px-1 font-medium text-[var(--color-primary)]"
+      >
+        {match[0]}
+      </span>
+    );
+    lastIndex = re.lastIndex;
+  }
+
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts;
+}
 
 
 function formatTime(dateStr) {
@@ -54,7 +97,50 @@ function CommentItem({ comment, currentUser, isReplyTarget, onReply, depth = 0 }
               : 'bg-[var(--bg-page)] border border-[var(--border)] text-[var(--text-secondary)] rounded-tl-md'
           } ${isReplyTarget ? 'ring-2 ring-blue-400/60 ring-offset-1 ring-offset-[var(--bg-page)]' : ''}`}
         >
-          {comment.comment}
+          <p className="whitespace-pre-wrap break-words">{renderBody(comment.comment, comment.mentions)}</p>
+
+          {Array.isArray(comment.attachments) && comment.attachments.length > 0 && (
+            <div className="mt-2 space-y-2">
+              {comment.attachments.map((att) => {
+                const isImage = att.mime_type && att.mime_type.startsWith('image/');
+                if (isImage) {
+                  return (
+                    <a
+                      key={att.id}
+                      href={att.view_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block overflow-hidden rounded-lg border border-white/20"
+                    >
+                      <img
+                        src={att.view_url}
+                        alt={att.original_name || att.file_name}
+                        className="max-h-56 w-auto max-w-full object-cover"
+                        loading="lazy"
+                      />
+                    </a>
+                  );
+                }
+                return (
+                  <a
+                    key={att.id}
+                    href={att.view_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${
+                      isOwn
+                        ? 'border-white/30 bg-white/10 text-white hover:bg-white/20'
+                        : 'border-[var(--border)] text-[var(--color-primary)] hover:bg-[var(--bg-hover)]'
+                    }`}
+                  >
+                    <Paperclip size={13} className="shrink-0" />
+                    <span className="truncate">{att.original_name || att.file_name}</span>
+                    <Download size={12} className="shrink-0 opacity-70" />
+                  </a>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <button
@@ -74,7 +160,6 @@ function CommentItem({ comment, currentUser, isReplyTarget, onReply, depth = 0 }
 const CommentSection = memo(function CommentSection({
   comments = [],
   currentUser,
-  isAdmin = false,
   onAddComment,
   canReply = true,
 }) {
@@ -112,13 +197,13 @@ const CommentSection = memo(function CommentSection({
   const handleReply = (comment) => setReplyingTo(comment);
   const handleCancelReply = () => setReplyingTo(null);
 
-  const handleAdd = async (text, parentId) => {
+  const handleAdd = async (text, parentId, files, mentions) => {
     // If replying, comments should thread under the top-level ancestor.
     let effectiveParentId = parentId;
     if (parentId && allById[parentId]?.parent_id) {
       effectiveParentId = allById[parentId].parent_id;
     }
-    await onAddComment(text, effectiveParentId);
+    await onAddComment(text, effectiveParentId, files, mentions);
   };
 
   return (

@@ -1,13 +1,13 @@
 const db = require('../config/database');
 
-async function createClient({ client_name, businesses, created_by }) {
+async function createClient({ client_name, businesses, created_by, business_id }) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
     const [clientResult] = await conn.query(
-      'INSERT INTO clients (client_name, created_by) VALUES (?, ?)',
-      [client_name, created_by ?? null]
+      'INSERT INTO clients (client_name, created_by, business_id) VALUES (?, ?, ?)',
+      [client_name, created_by ?? null, business_id ? Number(business_id) : null]
     );
     const clientId = clientResult.insertId;
 
@@ -33,14 +33,21 @@ async function createClient({ client_name, businesses, created_by }) {
   }
 }
 
-async function listClients() {
+async function listClients(businessId) {
+  const params = [];
+  let where = '';
+  if (businessId !== undefined && businessId !== null && businessId !== '') {
+    where = 'WHERE c.business_id = ? ';
+    params.push(Number(businessId));
+  }
   const [clients] = await db.query(
-    `SELECT c.id, c.client_name, c.created_by,
+    `SELECT c.id, c.client_name, c.business_id, c.created_by,
             creator.full_name AS created_by_name,
             c.created_at, c.updated_at
      FROM clients c
      LEFT JOIN users creator ON c.created_by = creator.id
-     ORDER BY c.client_name ASC`
+     ${where}ORDER BY c.client_name ASC`,
+    params
   );
 
   if (clients.length === 0) return [];
@@ -192,7 +199,7 @@ function withBusinessRollups(clients, rollupsByBusiness) {
 
 async function listClientOptions() {
   const [clients] = await db.query(
-    'SELECT id, client_name FROM clients ORDER BY client_name ASC'
+    'SELECT id, client_name, business_id FROM clients ORDER BY client_name ASC'
   );
 
   if (clients.length === 0) return [];
@@ -242,15 +249,15 @@ async function addBusiness(clientId, businessName) {
 }
 
 async function getClient(id) {
-  const [clients] = await db.query(
-    `SELECT c.id, c.client_name, c.created_by,
-            creator.full_name AS created_by_name,
-            c.created_at, c.updated_at
-     FROM clients c
-     LEFT JOIN users creator ON c.created_by = creator.id
-     WHERE c.id = ?`,
-    [id]
-  );
+   const [clients] = await db.query(
+     `SELECT c.id, c.client_name, c.business_id, c.color, c.created_by,
+             creator.full_name AS created_by_name,
+             c.created_at, c.updated_at
+      FROM clients c
+      LEFT JOIN users creator ON c.created_by = creator.id
+      WHERE c.id = ?`,
+     [id]
+   );
   const client = clients[0];
   if (!client) return null;
 
@@ -266,13 +273,24 @@ async function getClient(id) {
   return client;
 }
 
-async function updateClient(id, { client_name, businesses }) {
+async function updateClient(id, { client_name, businesses, business_id, color }) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
     if (client_name !== undefined) {
       await conn.query('UPDATE clients SET client_name = ? WHERE id = ?', [client_name, id]);
+    }
+
+    if (business_id !== undefined) {
+      await conn.query(
+        'UPDATE clients SET business_id = ? WHERE id = ?',
+        [business_id ? Number(business_id) : null, id]
+      );
+    }
+
+    if (color !== undefined) {
+      await conn.query('UPDATE clients SET color = ? WHERE id = ?', [color ? String(color) : null, id]);
     }
 
     if (businesses !== undefined && Array.isArray(businesses)) {

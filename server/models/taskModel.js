@@ -77,7 +77,7 @@ async function findByParentId(parentId) {
 
 async function findAll(filters = {}) {
   const {
-    status, priority, category, search, created_by, task_ids, project_id, page = 1, limit = 20
+    status, priority, category, search, created_by, task_ids, project_id, project_ids, page = 1, limit = 20
   } = filters;
   const offset = (page - 1) * limit;
 
@@ -123,6 +123,10 @@ async function findAll(filters = {}) {
     sql += ' AND t.project_id = ?';
     params.push(project_id);
   }
+  if (project_ids && Array.isArray(project_ids) && project_ids.length > 0) {
+    sql += ' AND t.project_id IN (?)';
+    params.push(project_ids);
+  }
 
   sql += ' ORDER BY t.created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
@@ -158,6 +162,10 @@ async function findAll(filters = {}) {
   if (project_id) {
     countSql += ' AND t.project_id = ?';
     countParams.push(project_id);
+  }
+  if (project_ids && Array.isArray(project_ids) && project_ids.length > 0) {
+    countSql += ' AND t.project_id IN (?)';
+    countParams.push(project_ids);
   }
 
   const [countRows] = await db.query(countSql, countParams);

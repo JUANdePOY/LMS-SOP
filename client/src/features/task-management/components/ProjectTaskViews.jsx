@@ -31,6 +31,7 @@ export default function ProjectTaskViews({
   tasks = [],
   loading = false,
   projectsById = {},
+  clientTree = [],
   canManage = false,
   storageKey,
   viewProp,
@@ -98,6 +99,7 @@ export default function ProjectTaskViews({
             <TaskHierarchyTable
               tasks={tasks}
               projectsById={projectsById}
+              clientTree={clientTree}
               search={search || ''}
               onViewTask={onViewTask}
               onEdit={onEdit}
@@ -118,7 +120,7 @@ export default function ProjectTaskViews({
               onRenameProject={onRenameProject}
               onRenameTask={onRenameTask}
               onAddChild={onAddChild}
-              onDelete={onDeleteEntity}
+              onDeleteEntity={onDeleteEntity}
               onCreateBusiness={onCreateBusiness}
               onCreateProject={onCreateProject}
               selectedIds={selectedIds}

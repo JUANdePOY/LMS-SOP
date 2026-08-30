@@ -1,12 +1,12 @@
 const db = require('../config/database');
 
 async function create(data) {
-  const { task_id, user_id, comment, parent_id } = data;
+  const { task_id, user_id, comment, parent_id, mentions } = data;
 
   const [result] = await db.query(
-    `INSERT INTO task_comments (task_id, user_id, comment, parent_id)
-     VALUES (?, ?, ?, ?)`,
-    [task_id, user_id, comment, parent_id || null]
+    `INSERT INTO task_comments (task_id, user_id, comment, parent_id, mentions)
+     VALUES (?, ?, ?, ?, ?)`,
+    [task_id, user_id, comment, parent_id || null, mentions ? JSON.stringify(mentions) : null]
   );
   return result.insertId;
 }

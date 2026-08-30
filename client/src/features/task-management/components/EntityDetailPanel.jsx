@@ -17,6 +17,7 @@ import CommentSection from './CommentSection';
 import ProgressModal from './ProgressModal';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import SubtaskList from './SubtaskList';
+import { AssigneePicker } from './TaskListRow';
 
 const ENTITY_LABEL = {
   task: 'Task',
@@ -79,7 +80,6 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
   const { toast } = useToast();
   const { user, isAnyAdmin } = useAuth();
   const [local, setLocal] = useState(null);
-  const [comment, setComment] = useState('');
   const [showProgress, setShowProgress] = useState(false);
   const [pendingAttachmentId, setPendingAttachmentId] = useState(null);
   const [pendingSubtaskId, setPendingSubtaskId] = useState(null);
@@ -97,14 +97,6 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
     } catch (err) {
       toast.error(err.message || 'Failed to update task');
     }
-  };
-
-  const handleComment = async () => {
-    if (!comment.trim()) return;
-    try {
-      await postComment(taskId, comment.trim());
-      setComment('');
-    } catch { /* toast handled in hook */ }
   };
 
   const buildSubtaskPayload = (parentId, title) => ({
@@ -143,6 +135,15 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
     }
   };
 
+  const handleAssignSubtask = async (subtaskId, userList) => {
+    try {
+      await updateTask(subtaskId, { assignments: userList });
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to assign sub-task');
+    }
+  };
+
   const handleDeleteSubtask = async () => {
     const id = pendingSubtaskId;
     setPendingSubtaskId(null);
@@ -165,25 +166,43 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
   const userAssignees = (local.assignments || []).filter((a) => a.assignment_type === 'User');
   const teamAssignees = (local.assignments || []).filter((a) => a.assignment_type === 'Department');
 
+  // Mirror the hierarchy/list: show the derived auto status (e.g. "Overdue" for a
+  // Pending task past its deadline) rather than the raw stored value, so the
+  // drawer and the table agree. The <select> below still edits the stored status.
+  const displayStatus = local.auto_status ?? local.status;
+
+  // Only admins may edit task details (title, status, priority, dates,
+  // description, assignees, sub-tasks). Regular assignees can still message,
+  // upload attachments, and update progress — but not change the task itself.
+  const canEdit = isAnyAdmin;
+
+  // Save only the user picks, but preserve any team/department assignments that
+  // the picker doesn't manage so they aren't lost on update.
+  const handleAssigneesSave = (userList) => {
+    const teams = (local.assignments || []).filter((a) => a.assignment_type !== 'User');
+    patch({ assignments: [...teams, ...userList] });
+  };
+
   return (
     <div className="space-y-5">
       <input
         value={local.title || ''}
         onChange={(e) => setLocal({ ...local, title: e.target.value })}
         onBlur={() => patch({ title: local.title })}
-        className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-base font-semibold text-[var(--text-primary)] hover:border-[var(--border)] focus:border-[var(--color-primary)] focus:outline-none"
+        disabled={!canEdit}
+        className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-base font-semibold text-[var(--text-primary)] hover:border-[var(--border)] focus:border-[var(--color-primary)] focus:outline-none disabled:cursor-default disabled:opacity-100 disabled:hover:border-transparent"
       />
 
       <div className="grid grid-cols-2 gap-3 px-2">
         <div>
           <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Status</label>
           <div className="flex items-center gap-2">
-            <Pill label={local.status} color={STATUS_COLORS[local.status]} bg={STATUS_BG[local.status]} />
+            <Pill label={displayStatus} color={STATUS_COLORS[displayStatus]} bg={STATUS_BG[displayStatus]} />
             <select
               value={local.status}
-              disabled={saving}
+              disabled={!canEdit || saving}
               onChange={(e) => patch({ status: e.target.value })}
-              className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
+              className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)] disabled:opacity-60"
             >
               {TASK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -195,16 +214,16 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
             <PriorityFlag priority={local.priority} />
             <select
               value={local.priority}
-              disabled={saving}
+              disabled={!canEdit || saving}
               onChange={(e) => patch({ priority: e.target.value })}
-              className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
+              className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)] disabled:opacity-60"
             >
               {TASK_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
         </div>
-        <EditableDate label="Start" value={local.start_datetime} disabled={saving} onChange={(v) => patch({ start_datetime: v })} />
-        <EditableDate label="Due" value={local.deadline_datetime} disabled={saving} onChange={(v) => patch({ deadline_datetime: v })} />
+        <EditableDate label="Start" value={local.start_datetime} disabled={!canEdit || saving} onChange={(v) => patch({ start_datetime: v })} />
+        <EditableDate label="Due" value={local.deadline_datetime} disabled={!canEdit || saving} onChange={(v) => patch({ deadline_datetime: v })} />
       </div>
 
       <div className="px-2">
@@ -213,18 +232,21 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
           value={local.description || ''}
           onChange={(e) => setLocal({ ...local, description: e.target.value })}
           onBlur={() => patch({ description: local.description })}
+          disabled={!canEdit}
           rows={3}
           placeholder="Add a description…"
-          className="w-full resize-y rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
+          className="w-full resize-y rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)] disabled:cursor-default disabled:opacity-100 disabled:hover:border-[var(--border)]"
         />
       </div>
 
       <div className="px-2">
-        <h4 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Assignees</h4>
+        <h4 className="mb-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Assignees</h4>
         <div className="flex flex-wrap items-center gap-2">
-          {userAssignees.length === 0 && <span className="text-xs text-[var(--text-muted)]">No users assigned</span>}
+          {userAssignees.length === 0 && teamAssignees.length === 0 && (
+            <span className="text-xs text-[var(--text-muted)]">No users assigned</span>
+          )}
           {userAssignees.map((a, i) => (
-            <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-subtle)] px-2 py-0.5 text-xs">
+            <span key={i} className="inline-flex items-center gap-1.5 rounded-full bg-[var(--bg-subtle)] py-0.5 pl-0.5 pr-2.5 text-xs ring-1 ring-[var(--border-subtle)]">
               <UserAvatar user={{ full_name: a.reference_name, avatar_url: a.avatar_url }} size="xs" />
               {a.reference_name}
             </span>
@@ -233,6 +255,14 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
             <span className="inline-flex items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--color-secondary)_14%,transparent)] px-2.5 py-0.5 text-xs text-[var(--color-secondary)]">
               <UserIcon size={12} /> {teamAssignees.length} team{teamAssignees.length > 1 ? 's' : ''}
             </span>
+          )}
+          {isAnyAdmin && (
+            <AssigneePicker
+              assignments={local.assignments}
+              onSave={handleAssigneesSave}
+              alwaysAdd
+              buttonClassName="h-7 w-7 justify-center rounded-full border-dashed p-0 text-[var(--text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+            />
           )}
         </div>
       </div>
@@ -243,6 +273,7 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
         onToggle={handleToggleSubtask}
         onDelete={(id) => setPendingSubtaskId(id)}
         onAdd={handleAddSubtask}
+        onAssign={handleAssignSubtask}
         onOpenTask={onOpenTask}
       />
 
@@ -297,17 +328,7 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
       <div className="border-t border-[var(--border)] px-2 pt-4">
         <h4 className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><MessageSquare size={15} /> Activity</h4>
         <CommentSection comments={local.comments} currentUser={user} isAdmin={isAnyAdmin} canReply
-          onAddComment={(c, parentId) => postComment(taskId, c, parentId)} />
-        <div className="mt-3 flex gap-2">
-          <input
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleComment()}
-            placeholder="Write a comment…"
-            className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-1.5 text-sm outline-none focus:border-[var(--color-primary)]"
-          />
-          <button onClick={handleComment} disabled={!comment.trim()} className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">Send</button>
-        </div>
+          onAddComment={(c, parentId, files, mentions) => postComment(taskId, c, parentId, files, mentions)} />
       </div>
 
       <ProgressModal open={showProgress} onClose={() => setShowProgress(false)} onSubmit={updateProgress} saving={saving} taskId={taskId} initialProgress={local.progress?.[0]} />

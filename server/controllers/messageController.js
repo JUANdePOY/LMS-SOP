@@ -140,16 +140,23 @@ async function createConversation(req, res) {
 function sendMessage(req, res) {
   const { conversationId } = req.params;
   const userId = req.user?.id;
-  const { body } = req.body;
+  const rawBody = req.body.body || '';
+  const body = typeof rawBody === 'string' ? rawBody.trim() : '';
+  const files = req.files || [];
 
-  if (!body || !body.trim()) {
-    return res.status(400).json({ success: false, message: 'Message body is required', code: 'VALIDATION_ERROR' });
+  let mentions = [];
+  if (req.body.mentions) {
+    try { mentions = JSON.parse(req.body.mentions); } catch { mentions = []; }
+  }
+
+  if (!body && files.length === 0) {
+    return res.status(400).json({ success: false, message: 'Message body or attachment is required', code: 'VALIDATION_ERROR' });
   }
 
   messageModel.getConversation(conversationId)
     .then(async (conversation) => {
       if (!conversation) return res.status(404).json({ success: false, message: 'Conversation not found', code: 'NOT_FOUND' });
-      const message = await messageModel.addMessage({ conversationId, senderId: userId, body: body.trim() });
+      const message = await messageModel.addMessage({ conversationId, senderId: userId, body, mentions, files });
       logAudit && logAudit('message.send', userId, { conversationId, messageId: message.id });
 
       const recipientIds = conversation.participants
@@ -157,11 +164,12 @@ function sendMessage(req, res) {
         .map((p) => p.id);
       const sender = conversation.participants.find((p) => p.id === userId);
       const senderName = req.user?.full_name || sender?.full_name || 'Someone';
+      const preview = body || `${files.length} attachment(s)`;
       for (const recipientId of recipientIds) {
         createNotification({
           userId: recipientId,
           title: 'New Message',
-          body: `${senderName}: ${body.trim().slice(0, 120)}`,
+          body: `${senderName}: ${preview.slice(0, 120)}`,
           type: 'info',
           link: `/messaging`,
           entityType: 'message',

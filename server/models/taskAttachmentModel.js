@@ -28,14 +28,15 @@ function validateAttachment(mimeType, originalName) {
 }
 
 async function create(data) {
-  const { task_progress_id, task_id, file_name, original_name, mime_type, size_bytes, file_data, uploaded_by } = data;
+  const { task_progress_id, task_id, comment_id, file_name, original_name, mime_type, size_bytes, file_data, uploaded_by } = data;
 
   const [result] = await db.query(
-    `INSERT INTO task_attachments (task_progress_id, task_id, file_name, original_name, mime_type, size_bytes, file_data, uploaded_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO task_attachments (task_progress_id, task_id, comment_id, file_name, original_name, mime_type, size_bytes, file_data, uploaded_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       task_progress_id || null,
       task_id,
+      comment_id || null,
       file_name,
       original_name,
       mime_type || null,
@@ -68,11 +69,22 @@ async function findByProgressId(progressId) {
 
 async function findByTaskId(taskId) {
   const [rows] = await db.query(
-    `SELECT id, task_progress_id, task_id, file_name, original_name, mime_type, size_bytes, uploaded_by, created_at
+    `SELECT id, task_progress_id, task_id, comment_id, file_name, original_name, mime_type, size_bytes, uploaded_by, created_at
      FROM task_attachments
-     WHERE task_id = ? AND task_progress_id IS NULL
+     WHERE task_id = ? AND task_progress_id IS NULL AND comment_id IS NULL
      ORDER BY created_at DESC`,
     [taskId]
+  );
+  return rows;
+}
+
+async function findByCommentId(commentId) {
+  const [rows] = await db.query(
+    `SELECT id, task_progress_id, task_id, comment_id, file_name, original_name, mime_type, size_bytes, uploaded_by, created_at
+     FROM task_attachments
+     WHERE comment_id = ?
+     ORDER BY created_at ASC`,
+    [commentId]
   );
   return rows;
 }
@@ -95,6 +107,7 @@ module.exports = {
   findById,
   findByProgressId,
   findByTaskId,
+  findByCommentId,
   remove,
   removeByTaskId,
 };

@@ -138,9 +138,9 @@ export default function MessagingPage() {
     return () => clearInterval(id);
   }, [refreshConversations]);
 
-  const handleSend = async (body) => {
+  const handleSend = async ({ text, mentions, files }) => {
     try {
-      await send(body);
+      await send({ text, mentions, files });
     } catch (err) {
       toast.error(err.message || "Failed to send message");
     }

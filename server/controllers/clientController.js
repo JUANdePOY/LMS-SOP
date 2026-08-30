@@ -16,7 +16,8 @@ function handleError(res, error) {
 const clientController = {
   async listClients(req, res) {
     try {
-      const clients = await clientModel.listClients();
+      const businessId = req.query.business_id;
+      const clients = await clientModel.listClients(businessId);
       res.json({ success: true, data: clients, message: 'Clients retrieved successfully' });
     } catch (error) {
       handleError(res, error);

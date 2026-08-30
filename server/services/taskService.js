@@ -214,10 +214,19 @@ async function getTask(id, actorId) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  if (!isAdmin && !(await isUserAssignedToTask(actorId, id))) {
-    const error = new Error('You are not authorized to view this task');
-    error.code = 'FORBIDDEN';
-    throw error;
+  if (!isAdmin) {
+    const directlyAssigned = await isUserAssignedToTask(actorId, id);
+    if (!directlyAssigned) {
+      // Allow viewing any task that belongs to a project the user is assigned to,
+      // so employees can see the progress of their peers on the same project.
+      const pid = task.project_id;
+      const assignedProjectIds = await getAssignedProjectIdsForUser(actorId);
+      if (pid == null || !assignedProjectIds.map(String).includes(String(pid))) {
+        const error = new Error('You are not authorized to view this task');
+        error.code = 'FORBIDDEN';
+        throw error;
+      }
+    }
   }
 
   if (isAdmin) {
@@ -232,6 +241,14 @@ async function getTask(id, actorId) {
   const assignments = await taskAssignmentModel.findByTaskId(id);
   const progress = await taskProgressModel.findByTaskId(id);
   const comments = await taskCommentModel.findByTaskId(id);
+  const enrichedComments = await Promise.all(comments.map(async (c) => {
+    const attachments = await taskAttachmentModel.findByCommentId(c.id);
+    const enrichedAttachments = attachments.map((att) => ({
+      ...att,
+      view_url: buildViewUrl(att.id),
+    }));
+    return { ...c, attachments: enrichedAttachments };
+  }));
   const taskAttachments = await taskAttachmentModel.findByTaskId(id);
 
   const enrichedAssignments = await enrichAssignmentRows(assignments);
@@ -262,7 +279,7 @@ async function getTask(id, actorId) {
     status: task.status,
     assignments: enrichedAssignments,
     progress: enrichedProgress,
-    comments,
+    comments: enrichedComments,
     attachments: enrichedTaskAttachments,
     custom_fields: customFields,
     subtasks,
@@ -451,8 +468,12 @@ async function updateTask(id, payload, actorId) {
 
   await taskModel.update(id, validation.value);
 
-  const assignments = Array.isArray(payload.assignments) ? payload.assignments : [];
-  if (assignments.length > 0) {
+  // When assignments are explicitly provided (including an empty array), treat
+  // it as a full replace: sync the stored rows to exactly match the payload so
+  // clearing all assignees actually removes them. Only skip when the key is
+  // absent entirely (a normal field update that shouldn't touch assignments).
+  const assignments = Array.isArray(payload.assignments) ? payload.assignments : null;
+  if (assignments !== null) {
     const currentAssignments = await taskAssignmentModel.findByTaskId(id);
     const currentMap = new Map(currentAssignments.map((a) => [`${a.assignment_type}:${a.reference_id}`, a]));
     const newMap = new Map(assignments.map((a) => [`${a.assignment_type}:${a.reference_id}`, a]));
@@ -739,7 +760,7 @@ async function updateProgress(payload, actorId) {
   return updated;
 }
 
-async function addComment(payload, actorId) {
+async function addComment(payload, actorId, req) {
   const validation = validateCommentPayload(payload);
   if (!validation.valid) {
     const error = new Error('Validation failed');
@@ -748,7 +769,14 @@ async function addComment(payload, actorId) {
     throw error;
   }
 
-  const { task_id, comment, parent_id } = validation.value;
+  const { task_id, comment, parent_id, mentions } = validation.value;
+  const files = Array.isArray(payload.files) ? payload.files : [];
+
+  if ((!comment || !comment.trim()) && files.length === 0) {
+    const error = new Error('Comment or attachment is required');
+    error.code = 'VALIDATION_ERROR';
+    throw error;
+  }
 
   const task = await taskModel.findById(task_id);
   if (!task) {
@@ -777,13 +805,48 @@ async function addComment(payload, actorId) {
   const commentId = await taskCommentModel.create({
     task_id,
     user_id: actorId,
-    comment,
+    comment: comment || '',
     parent_id: parent_id || null,
+    mentions: mentions || [],
   });
 
-  logAudit('task.comment.create', actorId, { task_id, comment_id: commentId });
+  const attachments = [];
+  for (const file of files) {
+    const fileValidation = taskAttachmentModel.validateAttachment(file.mimetype, file.originalname);
+    if (!fileValidation.valid) {
+      const error = new Error(fileValidation.error);
+      error.code = 'VALIDATION_ERROR';
+      throw error;
+    }
 
-  return await taskCommentModel.findById(commentId);
+    const originalName = file.originalname || 'attachment';
+    const fileSize = file.size || (file.buffer ? file.buffer.length : 0);
+
+    const attachmentId = await taskAttachmentModel.create({
+      task_progress_id: null,
+      task_id,
+      comment_id: commentId,
+      file_name: originalName,
+      original_name: originalName,
+      mime_type: file.mimetype,
+      size_bytes: fileSize,
+      file_data: file.buffer || null,
+      uploaded_by: actorId,
+    });
+
+    const attachment = await taskAttachmentModel.findById(attachmentId);
+    attachments.push({ ...attachment, view_url: buildViewUrl(attachmentId, req) });
+  }
+
+  logAudit('task.comment.create', actorId, {
+    task_id,
+    comment_id: commentId,
+    attachment_count: attachments.length,
+    mention_count: (mentions || []).length,
+  });
+
+  const created = await taskCommentModel.findById(commentId);
+  return { ...created, attachments };
 }
 
 async function uploadAttachment(taskId, file, actorId, req) {
@@ -861,6 +924,132 @@ async function getMyTasks(userId, filters = {}) {
   return await listTasks(filters, userId);
 }
 
+// Employee "My Tasks" hierarchy. Returns the full set of clients / businesses /
+// projects the user is assigned to, plus every task inside those projects (so the
+// employee can see the progress of their peers), shaped exactly like the admin
+// Tasks page expects: { tasks, projectsById, clientTree }. The task rows are
+// enriched with the same auto-status + progress + assignments as the admin list.
+async function getMyTaskHierarchy(userId) {
+  const projectIds = await getAssignedProjectIdsForUser(userId);
+  if (!projectIds.length) {
+    return { tasks: [], projectsById: {}, clientTree: [] };
+  }
+
+  const result = await taskModel.findAll({ project_ids: projectIds, limit: 100000, page: 1 });
+  const rows = result.rows;
+  const taskIds = rows.map((task) => task.id);
+
+  // Progress (latest per task) + assignments, mirroring listTasks enrichment.
+  let progressMap = {};
+  const assignmentsMap = {};
+  if (taskIds.length > 0) {
+    const [progressRows] = await db.query(
+      `SELECT tp.task_id, tp.completion_rate
+       FROM task_progress tp
+       INNER JOIN (
+         SELECT task_id, MAX(updated_at) AS max_updated
+         FROM task_progress WHERE task_id IN (?) GROUP BY task_id
+       ) latest ON tp.task_id = latest.task_id AND tp.updated_at = latest.max_updated`,
+      [taskIds]
+    );
+    progressRows.forEach((p) => { progressMap[p.task_id] = p.completion_rate; });
+
+    const [assignmentRows] = await db.query(
+      `SELECT ta.task_id, ta.assignment_type, ta.reference_id, ta.assigned_at
+       FROM task_assignments ta WHERE ta.task_id IN (?) ORDER BY ta.assigned_at ASC`,
+      [taskIds]
+    );
+
+    const userIds = [...new Set(assignmentRows.filter((a) => a.assignment_type === 'User').map((a) => Number(a.reference_id)).filter(Boolean))];
+    const deptIds = [...new Set(assignmentRows.filter((a) => a.assignment_type === 'Department').map((a) => Number(a.reference_id)).filter(Boolean))];
+
+    const userMap = {};
+    if (userIds.length > 0) {
+      const [users] = await db.query('SELECT id, full_name FROM users WHERE id IN (?)', [userIds]);
+      users.forEach((u) => { userMap[u.id] = u.full_name; });
+    }
+    const userAvatarMap = {};
+    if (userIds.length > 0) {
+      const [usersWithAvatar] = await db.query('SELECT id, avatar_url FROM users WHERE id IN (?)', [userIds]);
+      usersWithAvatar.forEach((u) => { userAvatarMap[u.id] = u.avatar_url; });
+    }
+    const deptMap = {};
+    if (deptIds.length > 0) {
+      const [depts] = await db.query('SELECT id, name FROM departments WHERE id IN (?)', [deptIds]);
+      depts.forEach((d) => { deptMap[d.id] = d.name; });
+    }
+
+    assignmentRows.forEach((a) => {
+      if (!assignmentsMap[a.task_id]) assignmentsMap[a.task_id] = [];
+      let referenceName = null;
+      let avatarUrl = null;
+      if (a.assignment_type === 'User') {
+        referenceName = userMap[a.reference_id] || null;
+        avatarUrl = userAvatarMap[a.reference_id] || null;
+      } else if (a.assignment_type === 'Department') {
+        referenceName = deptMap[a.reference_id] || null;
+      } else if (a.assignment_type === 'Position') {
+        referenceName = a.reference_id;
+      }
+      assignmentsMap[a.task_id].push({ ...a, reference_name: referenceName, avatar_url: avatarUrl });
+    });
+  }
+
+  const tasks = rows.map((task) => ({
+    ...task,
+    status: computeAutoStatus(task.start_datetime, task.deadline_datetime, task.status),
+    progress_rate: progressMap[task.id] ?? null,
+    assignments: assignmentsMap[task.id] || [],
+  }));
+
+  // Build projectsById + clientTree from project linkage.
+  const [projRows] = await db.query(
+    `SELECT p.id, p.name, p.client_business_id,
+            cb.client_id, cb.business_name AS client_business_name,
+            c.client_name, c.color AS client_color
+     FROM projects p
+     LEFT JOIN client_businesses cb ON p.client_business_id = cb.id
+     LEFT JOIN clients c ON cb.client_id = c.id
+     WHERE p.id IN (?)`,
+    [projectIds]
+  );
+
+  const projectsById = {};
+  const clientsMap = new Map();
+  for (const p of projRows) {
+    projectsById[String(p.id)] = {
+      id: p.id,
+      name: p.name,
+      client_id: p.client_id,
+      client_name: p.client_name,
+      client_business_id: p.client_business_id,
+      client_business_name: p.client_business_name,
+    };
+    if (p.client_id == null) continue;
+    if (!clientsMap.has(p.client_id)) {
+      clientsMap.set(p.client_id, {
+        id: p.client_id,
+        client_name: p.client_name,
+        color: p.client_color || null,
+        businesses: new Map(),
+      });
+    }
+    const client = clientsMap.get(p.client_id);
+    if (!client.businesses.has(p.client_business_id)) {
+      client.businesses.set(p.client_business_id, { id: p.client_business_id, business_name: p.client_business_name });
+    }
+  }
+
+  const clientTree = Array.from(clientsMap.values()).map((c) => ({
+    id: c.id,
+    client_name: c.client_name,
+    color: c.color,
+    businesses: Array.from(c.businesses.values()),
+  }));
+
+  return { tasks, projectsById, clientTree };
+}
+
 async function getTaskStats(filters = {}, actorId) {
   const isAdmin = await isUserAdmin(actorId);
   if (!isAdmin) {
@@ -928,6 +1117,28 @@ async function getAssignedTaskIdsForUser(userId) {
   );
 
   return rows.map(r => r.task_id);
+}
+
+// Distinct project ids the user is attached to (via any of their assigned tasks).
+// Used to scope the employee "My Tasks" hierarchy so they only see the clients /
+// businesses / projects they actually work on, while still seeing every task
+// (including peers') within those projects.
+async function getAssignedProjectIdsForUser(userId) {
+  const user = await getUser(userId);
+  if (!user) return [];
+  const [rows] = await db.query(
+    `SELECT DISTINCT t.project_id
+     FROM tasks t
+     INNER JOIN task_assignments ta ON ta.task_id = t.id
+     WHERE t.project_id IS NOT NULL
+       AND (
+         (ta.assignment_type = 'User' AND ta.reference_id = ?)
+         OR (ta.assignment_type = 'Department' AND ta.reference_id = ?)
+         OR (ta.assignment_type = 'Position' AND ta.reference_id = ?)
+       )`,
+    [userId, user.department_id, user.position_title]
+  );
+  return rows.map((r) => r.project_id);
 }
 
 async function getBusinessScopedTaskIdsForAdmin(userId) {
@@ -1135,6 +1346,7 @@ module.exports = {
   uploadAttachment,
   deleteAttachment,
   getMyTasks,
+  getMyTaskHierarchy,
   getMyTaskCount,
   getTaskStats,
   batchUpdateTasks,
