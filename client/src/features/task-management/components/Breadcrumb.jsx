@@ -17,7 +17,11 @@ export default function Breadcrumb({ items, chip = false, className }) {
         return (
           <Fragment key={i}>
             {i > 0 && <span className="ppm-breadcrumb__sep" aria-hidden="true">/</span>}
-            {item.to && !isLast ? (
+            {item.onClick && !isLast ? (
+              <button type="button" onClick={item.onClick} className="ppm-breadcrumb__link">
+                {item.label}
+              </button>
+            ) : item.to && !isLast ? (
               <Link to={item.to} className="ppm-breadcrumb__link">
                 {item.label}
               </Link>

@@ -1,8 +1,17 @@
 import { useMemo, useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, ExternalLink, MoreHorizontal, Plus, Pencil } from 'lucide-react';
+import { ChevronRight, ExternalLink, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useClickOutside } from '../hooks/useClickOutside';
 import { TaskRow } from './TaskListRow';
+import InlineEditableName from './InlineEditableName';
+import InlineNameRow from './InlineNameRow';
+import QuickAddRow from './QuickAddRow';
+
+// Shared grid template for the hierarchy table. The trailing 28px column is the
+// selection checkbox (used for bulk actions on task rows). Keep TaskListRow's
+// TaskRow grid in sync with this constant.
+export const HIERARCHY_GRID = 'grid-cols-[36px_minmax(0,1fr)_120px_150px_100px_90px_110px_40px_28px]';
 
 /**
  * TaskHierarchyTable
@@ -167,12 +176,59 @@ export default function TaskHierarchyTable({
   onEditProject,
   onDeleteImmediate,
   onDuplicated,
+  onQuickAddTask,
+  onRenameClient,
+  onRenameBusiness,
+  onRenameProject,
+  onRenameTask,
+  onCreateBusiness,
+  onCreateProject,
+  onDeleteEntity,
+  selectedIds,
+  onToggleSelect,
+  onSelectAll,
 }) {
   const navigate = useNavigate();
   const clients = useHierarchy(tasks, projectsById);
   const [expanded, setExpanded] = useState(loadExpanded);
+  // Which parent is currently showing an inline "add" row: { kind, parentId }.
+  const [addingFor, setAddingFor] = useState(null);
+
+  // Opens an inline "add" row directly under the clicked parent (no modal):
+  // a client reveals a business row, a business reveals a project row. A project
+  // already has its own QuickAddRow for tasks, so it is excluded here.
+  const startAdd = useCallback((kind, id) => {
+    if (kind === 'client') {
+      setAddingFor({ kind: 'business', parentId: id });
+      setExpanded((prev) => { const next = new Set(prev); next.add(`client-${id}`); return next; });
+    } else if (kind === 'business') {
+      setAddingFor({ kind: 'project', parentId: id });
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        next.add(`business-${id}`);
+        const owning = Object.values(projectsById).find(
+          (p) => String(p.client_business_id) === String(id)
+        );
+        if (owning?.client_id != null) next.add(`client-${owning.client_id}`);
+        return next;
+      });
+    }
+  }, [projectsById]);
 
   const projects = useMemo(() => Object.values(projectsById || {}), [projectsById]);
+
+  const visibleTaskIds = useMemo(
+    () => (tasks || []).map((t) => String(t.id)),
+    [tasks]
+  );
+  const selectedVisibleCount = visibleTaskIds.filter((id) => selectedIds?.has(id)).length;
+  const allSelected = visibleTaskIds.length > 0 && selectedVisibleCount === visibleTaskIds.length;
+  const someSelected = selectedVisibleCount > 0 && !allSelected;
+
+  const handleSelectAll = () => {
+    if (allSelected) onSelectAll?.([]);
+    else onSelectAll?.(visibleTaskIds);
+  };
 
   const toggle = useCallback((key) => {
     setExpanded((prev) => {
@@ -182,6 +238,24 @@ export default function TaskHierarchyTable({
       return next;
     });
   }, []);
+
+  // Collapse every client/business/project branch that has no tasks anywhere in
+  // its subtree (rollup.total === 0). Keeps only populated groups visible.
+  const hideEmptyGroups = useCallback(() => {
+    setExpanded(() => {
+      const next = new Set();
+      for (const client of clients) {
+        if (client.rollup.total > 0) next.add(`client-${client.id}`);
+        for (const business of client.businesses) {
+          if (business.rollup.total > 0) next.add(`business-${business.id}`);
+          for (const project of business.projects) {
+            if (project.rollup.total > 0) next.add(`project-${project.id}`);
+          }
+        }
+      }
+      return next;
+    });
+  }, [clients]);
 
   // When a client/business scope is active (e.g. opened from the sidebar),
   // seed the expansion state so the relevant branches start open. The user
@@ -223,15 +297,34 @@ export default function TaskHierarchyTable({
       {/* Header row */}
       <div
         role="row"
-        className="grid grid-cols-[36px_minmax(0,1fr)_120px_150px_100px_90px_110px_40px] gap-2 border-b border-[var(--border-subtle)] px-2 py-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]"
+        className={cn('grid gap-2 border-b border-[var(--border-subtle)] px-2 py-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]', HIERARCHY_GRID)}
       >
-        <span />
+        <span className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            onClick={handleSelectAll}
+            aria-label="Select all tasks"
+            className={cn(
+              'grid h-4 w-4 place-items-center rounded border-2 transition-colors',
+              (allSelected || someSelected)
+                ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                : 'border-[var(--border)] hover:border-[var(--color-primary)]'
+            )}
+          >
+            {allSelected ? (
+              <Check size={10} strokeWidth={3} />
+            ) : someSelected ? (
+              <span className="h-0.5 w-2 rounded bg-white" />
+            ) : null}
+          </button>
+        </span>
         <span>Name</span>
         <span>Assignees</span>
         <span>Status</span>
         <span>Priority</span>
         <span>Due</span>
         <span>Progress</span>
+        <span />
         <span />
       </div>
 
@@ -244,6 +337,7 @@ export default function TaskHierarchyTable({
             <Row
               depth={0}
               kind="client"
+              id={client.id}
               name={client.name}
               open={open}
               onToggle={() => toggle(clientKey)}
@@ -253,6 +347,11 @@ export default function TaskHierarchyTable({
               dimmed={dimmed}
               onOpenPage={() => navigate(`/clients/${client.id}`)}
               colorDot
+              canEdit={canManage}
+              onRename={onRenameClient}
+              onAddChild={startAdd}
+              onDelete={onDeleteEntity}
+              onHideEmptyGroups={hideEmptyGroups}
             />
             {open && client.businesses.map((business) => {
               const bDimmed = search && !subtreeMatches(business, 'business', search);
@@ -260,9 +359,10 @@ export default function TaskHierarchyTable({
               const bOpen = isExpanded(businessKey, 'business', business);
               return (
                 <div key={businessKey}>
-                  <Row
+                   <Row
                     depth={1}
                     kind="business"
+                    id={business.id}
                     name={business.name}
                     open={bOpen}
                     onToggle={() => toggle(businessKey)}
@@ -271,16 +371,22 @@ export default function TaskHierarchyTable({
                     progress={business.rollup.avgProgress}
                     dimmed={bDimmed}
                     onOpenPage={() => navigate(`/clients/${client.id}/businesses/${business.id}`)}
-                  />
+                          canEdit={canManage}
+                          onRename={onRenameBusiness}
+                          onAddChild={startAdd}
+                          onDelete={onDeleteEntity}
+                          onHideEmptyGroups={hideEmptyGroups}
+                        />
                   {bOpen && business.projects.map((project) => {
                     const pDimmed = search && !subtreeMatches(project, 'project', search);
                     const projectKey = `project-${project.id}`;
                     const pOpen = isExpanded(projectKey, 'project', project);
                     return (
                       <div key={projectKey}>
-                        <Row
+                         <Row
                           depth={2}
                           kind="project"
+                          id={project.id}
                           name={project.name}
                           open={pOpen}
                           onToggle={() => toggle(projectKey)}
@@ -294,7 +400,13 @@ export default function TaskHierarchyTable({
                           ] : null}
                           onAddTask={canManage ? () => onAddProjectTask?.(project.id) : undefined}
                           onEditProject={canManage && onEditProject ? () => onEditProject?.(project.id) : undefined}
-                        />
+                           canEdit={canManage}
+                           onRename={onRenameProject}
+                           onAddChild={startAdd}
+                           onDelete={onDeleteEntity}
+                           onHideEmptyGroups={hideEmptyGroups}
+                           hideAdd
+                         />
                         {pOpen && project.tasks.map((task) => {
                           const tDimmed = search && !subtreeMatches(task, 'task', search);
                           return (
@@ -302,33 +414,60 @@ export default function TaskHierarchyTable({
                               key={task.id}
                               task={task}
                               dimmed={tDimmed}
+                              selected={selectedIds?.has(String(task.id))}
+                              onToggleSelect={onToggleSelect}
                               onViewTask={onViewTask}
                               onStatusChange={onStatusChange}
                               onInlineUpdate={onInlineUpdate}
                               onDelete={onDelete}
                               onDeleteImmediate={onDeleteImmediate}
                               onDuplicated={onDuplicated}
+                              onRenameTask={onRenameTask}
+                              canManage={canManage}
                               projects={projects}
                             />
                           );
                         })}
                         {pOpen && canManage && (
-                          <div className="grid grid-cols-[36px_minmax(0,1fr)_120px_150px_100px_90px_110px_40px] gap-2 px-2 py-2" style={{ paddingLeft: `${3 * 20 + 8}px` }}>
+                          <div
+                            className="grid grid-cols-[36px_minmax(0,1fr)_120px_150px_100px_90px_110px_40px] gap-2 px-2 py-2"
+                            style={{ paddingLeft: `${3 * 20 + 8}px` }}
+                          >
                             <span />
-                            <button
-                              onClick={() => onAddProjectTask?.(project.id)}
-                              className="col-span-1 flex items-center gap-1.5 text-left text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
-                            >
-                              <Plus size={13} /> Add task
-                            </button>
+                            <QuickAddRow
+                              label="Add task"
+                              placeholder="Add a task to this project…"
+                              onQuickAdd={(title) => {
+                                if (onQuickAddTask) onQuickAddTask(project.id, title);
+                                else onAddProjectTask?.(project.id);
+                              }}
+                            />
                           </div>
                         )}
                       </div>
                     );
                   })}
+                  {addingFor?.kind === 'project' && addingFor.parentId === business.id && (
+                    <InlineNameRow
+                      key="__add-project"
+                      placeholder="New project name…"
+                      indent={DEPTH_INDENT_PX * 2}
+                      onCommit={async (name) => { await onCreateProject?.(business.id, name); setAddingFor(null); }}
+                      onCancel={() => setAddingFor(null)}
+                    />
+                  )}
                 </div>
               );
             })}
+            {addingFor?.kind === 'business' && addingFor.parentId === client.id && (
+              <InlineNameRow
+                key="__add-business"
+                placeholder="New business name…"
+                indent={DEPTH_INDENT_PX * 1}
+                onCommit={async (name) => { await onCreateBusiness?.(client.id, name); setAddingFor(null); }}
+                onCancel={() => setAddingFor(null)}
+              />
+            )}
           </div>
         );
       })}
@@ -338,19 +477,39 @@ export default function TaskHierarchyTable({
 
 const DEPTH_INDENT_PX = 20;
 
-function Row({ depth, kind, name, open, onToggle, rollupText, dueDate, progress, dimmed, onOpenPage, colorDot, menu, onAddTask, onEditProject }) {
+function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progress, dimmed, onOpenPage, colorDot, canEdit, onRename, onAddChild, onDeleteEntity, onHideEmptyGroups, hideAdd }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [renameSignal, setRenameSignal] = useState(0);
+  const menuRef = useClickOutside(() => { setMenuOpen(false); setConfirmDelete(false); });
+
+  const childNoun = kind === 'client' ? 'business' : kind === 'business' ? 'project' : 'task';
+  const addTitle = `Add ${childNoun}`;
+
+  const menuItems = [];
+  // Projects are added via the inline QuickAddRow, so the menu's "Add task"
+  // item is omitted there to avoid a dead action.
+  if (kind !== 'project') {
+    menuItems.push({ label: `Add ${childNoun}`, icon: Plus, onClick: () => onAddChild?.(kind, id) });
+  }
+  if (canEdit) {
+    menuItems.push({ label: 'Rename', icon: Pencil, onClick: () => setRenameSignal((s) => s + 1) });
+  }
+  menuItems.push({ label: 'Delete', icon: Trash2, danger: true, onClick: () => { setMenuOpen(false); setConfirmDelete(true); } });
+  menuItems.push({ label: 'Hide all empty groups', icon: EyeOff, onClick: () => { setMenuOpen(false); onHideEmptyGroups?.(); } });
+
   return (
     <div
       role="row"
       onClick={onToggle}
       className={cn(
-        'group grid cursor-pointer grid-cols-[36px_minmax(0,1fr)_120px_150px_100px_90px_110px_40px] items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-2.5 text-sm transition-colors',
+        'group grid cursor-pointer items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-2.5 text-sm transition-colors',
         'hover:bg-[var(--bg-surface-hover)]',
-        dimmed && 'opacity-40'
+        dimmed && 'opacity-40',
+        HIERARCHY_GRID
       )}
     >
-      <span className="flex min-w-0 items-center gap-1.5" style={{ paddingLeft: `${depth * DEPTH_INDENT_PX}px` }}>
+      <span className="flex min-w-0 items-center gap-1.5">
         <ChevronRight
           size={14}
           className={cn('shrink-0 text-[var(--text-muted)] transition-transform duration-150', open && 'rotate-90')}
@@ -358,11 +517,92 @@ function Row({ depth, kind, name, open, onToggle, rollupText, dueDate, progress,
         {colorDot && (
           <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-primary)]" aria-hidden="true" />
         )}
-        <span className={cn('truncate', kind === 'client' ? 'font-medium text-[var(--text-primary)]' : 'text-[var(--text-primary)]')}>
-          {name}
-        </span>
       </span>
-      <span />
+
+      <span
+        className="relative min-w-0"
+        style={{ paddingLeft: `${depth * DEPTH_INDENT_PX}px` }}
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <InlineEditableName
+            value={name}
+            canEdit={canEdit}
+            onCommit={(next) => onRename?.(id, next)}
+            renameSignal={renameSignal}
+            className={cn(
+              'truncate flex-1 min-w-0',
+              kind === 'client' ? 'font-medium text-[var(--text-primary)]' : 'text-[var(--text-primary)]'
+            )}
+            inputClassName={kind === 'client' ? 'font-medium' : ''}
+            ariaLabel={`Rename ${kind}`}
+          />
+        {canEdit && !hideAdd && (
+             <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onAddChild?.(kind, id); }}
+                title={addTitle}
+                className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+              >
+                <Plus size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
+                title="More actions"
+                className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+              >
+                <MoreHorizontal size={13} />
+              </button>
+            </span>
+          )}
+        </div>
+
+        {(menuOpen || confirmDelete) && (
+          <div
+            ref={menuRef}
+            onClick={(e) => e.stopPropagation()}
+            className="absolute left-0 top-full z-30 mt-1 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-lg"
+          >
+            {menuOpen && menuItems.map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={item.onClick}
+                className={cn(
+                  'flex w-48 items-center gap-2 px-3 py-1.5 text-left text-xs',
+                  item.danger
+                    ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40'
+                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
+                )}
+              >
+                {item.icon && <item.icon size={13} />}
+                {item.label}
+              </button>
+            ))}
+            {confirmDelete && (
+              <div className="flex items-center gap-2 px-3 py-2 text-xs text-red-700 dark:text-red-300">
+                <span>Delete {kind}?</span>
+                <button
+                  type="button"
+                  onClick={() => { onDeleteEntity?.(kind, id); setConfirmDelete(false); }}
+                  className="rounded bg-red-600 px-2 py-0.5 font-medium text-white hover:bg-red-700"
+                >
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(false)}
+                  className="rounded px-1.5 py-0.5 text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </span>
+
       <span className="truncate text-xs text-[var(--text-secondary)]">{rollupText}</span>
       <span />
       <span className="text-xs text-[var(--text-secondary)]">{formatDue(dueDate)}</span>
@@ -374,56 +614,17 @@ function Row({ depth, kind, name, open, onToggle, rollupText, dueDate, progress,
           />
         </span>
       </span>
-      <span className="relative flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        {kind === 'project' && onAddTask && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onAddTask(); }}
-            title="Add task"
-            className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-          >
-            <Plus size={13} />
-          </button>
-        )}
+      <span className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
         <button
+          type="button"
           onClick={(e) => { e.stopPropagation(); onOpenPage?.(); }}
           title="Open full page"
-          className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+          className="rounded p-1 text-[var(--text-muted)] opacity-0 transition-opacity hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] group-hover:opacity-100"
         >
           <ExternalLink size={13} />
         </button>
-        {(menu || (kind === 'project' && onEditProject)) && (
-          <button
-            onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
-            className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
-          >
-            <MoreHorizontal size={13} />
-          </button>
-        )}
-        {menuOpen && (menu || (kind === 'project' && onEditProject)) && (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="absolute right-0 top-full z-20 mt-1 w-40 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-lg"
-          >
-            {menu?.map((item) => (
-              <button
-                key={item.label}
-                onClick={() => { item.onClick(); setMenuOpen(false); }}
-                className="flex w-full items-center px-3 py-1.5 text-left text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
-              >
-                {item.label}
-              </button>
-            ))}
-            {kind === 'project' && onEditProject && (
-              <button
-                onClick={() => { onEditProject(); setMenuOpen(false); }}
-                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
-              >
-                <Pencil size={12} /> Edit project
-              </button>
-            )}
-          </div>
-        )}
       </span>
+      <span />
     </div>
   );
 }

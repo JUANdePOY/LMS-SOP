@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
-import { X, Calendar, User as UserIcon, MessageSquare, Paperclip, TrendingUp, Loader2 } from 'lucide-react';
+import { X, User as UserIcon, MessageSquare, Paperclip, TrendingUp, Loader2 } from 'lucide-react';
 import Drawer from '@/shared/components/ui/Drawer';
 import { useAuth } from '@/contexts/AuthContext';
 import UserAvatar from '@/shared/components/ui/Avatar';
 import PriorityFlag from './PriorityFlag';
-import { updateTask, getTask } from '../services/taskService';
-import { getProject, updateProject } from '../services/projectService';
+import { updateTask, getTask, createTask, deleteTask } from '../services/taskService';
+import { getProject, updateProject, deleteProject } from '../services/projectService';
+import { getClient, updateClient, deleteClient } from '../api/client.api';
+import { getBusiness, updateBusiness, deleteBusiness } from '../api/business.api';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useTaskDetails } from '../hooks/useTaskDetails';
 import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
@@ -14,6 +16,7 @@ import AttachmentSection from './AttachmentSection';
 import CommentSection from './CommentSection';
 import ProgressModal from './ProgressModal';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
+import SubtaskList from './SubtaskList';
 
 const ENTITY_LABEL = {
   task: 'Task',
@@ -57,13 +60,29 @@ function Field({ label, children }) {
   );
 }
 
-function TaskBody({ taskId, open, onUpdated }) {
+function EditableDate({ label, value, disabled, onChange }) {
+  return (
+    <div>
+      <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{label}</label>
+      <input
+        type="datetime-local"
+        value={toLocalInputValue(value) || ''}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value ? new Date(e.target.value).toISOString() : null)}
+        className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)] disabled:opacity-60"
+      />
+    </div>
+  );
+}
+
+function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
   const { toast } = useToast();
   const { user, isAnyAdmin } = useAuth();
   const [local, setLocal] = useState(null);
   const [comment, setComment] = useState('');
   const [showProgress, setShowProgress] = useState(false);
   const [pendingAttachmentId, setPendingAttachmentId] = useState(null);
+  const [pendingSubtaskId, setPendingSubtaskId] = useState(null);
   const { task, loading, error, saving, load, updateProgress, addComment: postComment, uploadFile, removeAttachment } = useTaskDetails(taskId);
 
   useEffect(() => { if (open) load(); }, [open, load]);
@@ -86,6 +105,54 @@ function TaskBody({ taskId, open, onUpdated }) {
       await postComment(taskId, comment.trim());
       setComment('');
     } catch { /* toast handled in hook */ }
+  };
+
+  const buildSubtaskPayload = (parentId, title) => ({
+    title: title.trim(),
+    parent_task_id: parentId,
+    status: 'Pending',
+    priority: 'Medium',
+    start_datetime: local.start_datetime || null,
+    deadline_datetime: local.deadline_datetime || null,
+    estimated_hours: 1,
+    client_id: local.client_id ?? null,
+    client_business_id: local.client_business_id ?? null,
+    business_id: local.business_id ?? null,
+    project_id: local.project_id ?? null,
+    assignments: [],
+  });
+
+  const handleAddSubtask = async (parentId, title) => {
+    const pid = parentId ?? taskId;
+    try {
+      await createTask(buildSubtaskPayload(pid, title));
+      toast.success('Sub-task added');
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to add sub-task');
+      throw err;
+    }
+  };
+
+  const handleToggleSubtask = async (id, next) => {
+    try {
+      await updateTask(id, { status: next });
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update sub-task');
+    }
+  };
+
+  const handleDeleteSubtask = async () => {
+    const id = pendingSubtaskId;
+    setPendingSubtaskId(null);
+    try {
+      await deleteTask(id);
+      toast.success('Sub-task deleted');
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete sub-task');
+    }
   };
 
   if (!open) return null;
@@ -136,17 +203,8 @@ function TaskBody({ taskId, open, onUpdated }) {
             </select>
           </div>
         </div>
-        <Field label="Start">{local.start_datetime ? formatDateTime(local.start_datetime) : '—'}</Field>
-        <Field label="Due">{local.deadline_datetime ? formatDateTime(local.deadline_datetime) : '—'}</Field>
-      </div>
-
-      <div className="space-y-2 px-2">
-        <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-          <Calendar size={15} /> Start: {local.start_datetime ? formatDateTime(local.start_datetime) : '—'}
-        </div>
-        <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-          <Calendar size={15} /> Due: {local.deadline_datetime ? formatDateTime(local.deadline_datetime) : '—'}
-        </div>
+        <EditableDate label="Start" value={local.start_datetime} disabled={saving} onChange={(v) => patch({ start_datetime: v })} />
+        <EditableDate label="Due" value={local.deadline_datetime} disabled={saving} onChange={(v) => patch({ deadline_datetime: v })} />
       </div>
 
       <div className="px-2">
@@ -178,6 +236,15 @@ function TaskBody({ taskId, open, onUpdated }) {
           )}
         </div>
       </div>
+
+      <SubtaskList
+        subtasks={local.subtasks}
+        canManage={isAnyAdmin}
+        onToggle={handleToggleSubtask}
+        onDelete={(id) => setPendingSubtaskId(id)}
+        onAdd={handleAddSubtask}
+        onOpenTask={onOpenTask}
+      />
 
       {Array.isArray(local.custom_fields) && local.custom_fields.length > 0 && (
         <div className="px-2">
@@ -253,6 +320,15 @@ function TaskBody({ taskId, open, onUpdated }) {
         confirmText="Delete"
         variant="destructive"
       />
+      <ConfirmationDialog
+        isOpen={pendingSubtaskId !== null}
+        onClose={() => setPendingSubtaskId(null)}
+        onConfirm={handleDeleteSubtask}
+        title="Delete Sub-task"
+        message="Are you sure you want to delete this sub-task? Its own sub-tasks, if any, will be removed too."
+        confirmText="Delete"
+        variant="destructive"
+      />
     </div>
   );
 }
@@ -299,19 +375,67 @@ function ActivityPlaceholder() {
   );
 }
 
-// Read-only presentation for a Client. Editing (and its trigger from the
-// sidebar/breadcrumb) is wired in Phase 5; this keeps the panel intentional
-// for all four entity types in the meantime.
-function ClientBody({ entity }) {
-  if (!entity) return <div className="text-sm text-[var(--text-muted)]">No details.</div>;
-  const businesses = Array.isArray(entity.businesses) ? entity.businesses : [];
+function EntityLoader() {
+  return (
+    <div className="flex flex-col items-center gap-2 py-12 text-sm text-[var(--text-muted)]">
+      <Loader2 size={18} className="animate-spin" /> Loading…
+    </div>
+  );
+}
+
+// Editable Client panel. Opens directly editable — no separate view/edit step.
+function ClientBody({ clientId, entity, open, onUpdated }) {
+  const { toast } = useToast();
+  const [local, setLocal] = useState(entity || null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    if (clientId) {
+      let active = true;
+      setLoading(true);
+      getClient(clientId)
+        .then((data) => { if (active) setLocal(data); })
+        .catch((err) => toast.error(err.message || 'Failed to load client'))
+        .finally(() => { if (active) setLoading(false); });
+      return () => { active = false; };
+    }
+    setLocal(entity || null);
+  }, [open, clientId, entity, toast]);
+
+  const patch = async (payload) => {
+    if (!local?.id) return;
+    setSaving(true);
+    try {
+      const updated = await updateClient(local.id, payload);
+      setLocal((p) => ({ ...p, ...updated }));
+      onUpdated?.(updated);
+      toast.success('Client updated');
+    } catch (err) {
+      toast.error(err.message || 'Failed to update client');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) return null;
+  if (loading && !local) return <EntityLoader />;
+  if (!local) return <div className="text-sm text-[var(--text-muted)]">Client not found.</div>;
+
+  const businesses = Array.isArray(local.businesses) ? local.businesses : [];
+
   return (
     <div className="space-y-5">
-      <input
-        defaultValue={entity.client_name || ''}
-        readOnly
-        className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-base font-semibold text-[var(--text-primary)] focus:border-[var(--border)] focus:outline-none"
-      />
+      <div className="flex items-center gap-2 px-2">
+        {saving && <Loader2 size={14} className="animate-spin text-[var(--text-muted)]" />}
+        <input
+          value={local.client_name || ''}
+          onChange={(e) => setLocal({ ...local, client_name: e.target.value })}
+          onBlur={() => patch({ client_name: local.client_name })}
+          className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-base font-semibold text-[var(--text-primary)] hover:border-[var(--border)] focus:border-[var(--color-primary)] focus:outline-none"
+        />
+      </div>
       <div className="px-2">
         <h4 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Businesses</h4>
         {businesses.length === 0 ? (
@@ -327,10 +451,10 @@ function ClientBody({ entity }) {
           </ul>
         )}
       </div>
-      {(entity.created_by_name || entity.created_at) && (
+      {(local.created_by_name || local.created_at) && (
         <div className="grid grid-cols-2 gap-3 px-2">
-          {entity.created_by_name && <Field label="Created by">{entity.created_by_name}</Field>}
-          {entity.created_at && <Field label="Created">{formatDateTime(entity.created_at)}</Field>}
+          {local.created_by_name && <Field label="Created by">{local.created_by_name}</Field>}
+          {local.created_at && <Field label="Created">{formatDateTime(local.created_at)}</Field>}
         </div>
       )}
       <ActivityPlaceholder />
@@ -338,27 +462,109 @@ function ClientBody({ entity }) {
   );
 }
 
-// Read-only presentation for a Business. Editing (and its trigger) is wired in
-// Phase 5; fields mirror server/businessModel.js.
-function BusinessBody({ entity }) {
-  if (!entity) return <div className="text-sm text-[var(--text-muted)]">No details.</div>;
+// Editable Business panel. Mirrors server/businessModel allowed fields.
+function BusinessBody({ businessId, entity, open, onUpdated }) {
+  const { toast } = useToast();
+  const [local, setLocal] = useState(entity || null);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    if (businessId) {
+      let active = true;
+      setLoading(true);
+      getBusiness(businessId)
+        .then((data) => { if (active) setLocal(data); })
+        .catch((err) => toast.error(err.message || 'Failed to load business'))
+        .finally(() => { if (active) setLoading(false); });
+      return () => { active = false; };
+    }
+    setLocal(entity || null);
+  }, [open, businessId, entity, toast]);
+
+  const patch = async (field, value) => {
+    if (!local?.id) return;
+    setSaving(true);
+    try {
+      const updated = await updateBusiness(local.id, { [field]: value });
+      setLocal((p) => ({ ...p, ...updated }));
+      onUpdated?.(updated);
+      toast.success('Business updated');
+    } catch (err) {
+      toast.error(err.message || 'Failed to update business');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!open) return null;
+  if (loading && !local) return <EntityLoader />;
+  if (!local) return <div className="text-sm text-[var(--text-muted)]">Business not found.</div>;
+
   return (
     <div className="space-y-5">
-      <input
-        defaultValue={entity.business_name || ''}
-        readOnly
-        className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-base font-semibold text-[var(--text-primary)] focus:border-[var(--border)] focus:outline-none"
-      />
+      <div className="flex items-center gap-2 px-2">
+        {saving && <Loader2 size={14} className="animate-spin text-[var(--text-muted)]" />}
+        <input
+          value={local.business_name || ''}
+          onChange={(e) => setLocal({ ...local, business_name: e.target.value })}
+          onBlur={() => patch('business_name', local.business_name)}
+          className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-base font-semibold text-[var(--text-primary)] hover:border-[var(--border)] focus:border-[var(--color-primary)] focus:outline-none"
+        />
+      </div>
       <div className="px-2">
         <h4 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Description</h4>
-        <p className="whitespace-pre-wrap text-sm text-[var(--text-secondary)]">{entity.description || '—'}</p>
+        <textarea
+          value={local.description || ''}
+          onChange={(e) => setLocal({ ...local, description: e.target.value })}
+          onBlur={() => patch('description', local.description)}
+          rows={3}
+          placeholder="Add a description…"
+          className="w-full resize-y rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
+        />
       </div>
       <div className="grid grid-cols-2 gap-3 px-2">
-        {entity.status && <Field label="Status">{entity.status}</Field>}
-        {entity.business_code && <Field label="Code">{entity.business_code}</Field>}
-        {entity.email && <Field label="Email">{entity.email}</Field>}
-        {entity.phone && <Field label="Phone">{entity.phone}</Field>}
-        {entity.address && <Field label="Address">{entity.address}</Field>}
+        <div>
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Status</label>
+          <select
+            value={local.status || 'Active'}
+            onChange={(e) => { const v = e.target.value; setLocal((p) => ({ ...p, status: v })); patch('status', v); }}
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
+          >
+            {['Active', 'On Hold', 'Completed', 'Cancelled'].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+        </div>
+        <Field label="Code">{local.business_code || '—'}</Field>
+        <div className="col-span-2">
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Email</label>
+          <input
+            value={local.email || ''}
+            onChange={(e) => setLocal({ ...local, email: e.target.value })}
+            onBlur={() => patch('email', local.email)}
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-1.5 text-sm outline-none focus:border-[var(--color-primary)]"
+          />
+        </div>
+        <div className="col-span-2">
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Phone</label>
+          <input
+            value={local.phone || ''}
+            onChange={(e) => setLocal({ ...local, phone: e.target.value })}
+            onBlur={() => patch('phone', local.phone)}
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-1.5 text-sm outline-none focus:border-[var(--color-primary)]"
+          />
+        </div>
+        <div className="col-span-2">
+          <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Address</label>
+          <input
+            value={local.address || ''}
+            onChange={(e) => setLocal({ ...local, address: e.target.value })}
+            onBlur={() => patch('address', local.address)}
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-1.5 text-sm outline-none focus:border-[var(--color-primary)]"
+          />
+        </div>
       </div>
       <ActivityPlaceholder />
     </div>
@@ -459,8 +665,27 @@ function ProjectBody({ projectId, open, onUpdated }) {
   );
 }
 
-export default function EntityDetailPanel({ open, onClose, type = 'task', taskId, projectId, entity, onUpdated }) {
+export default function EntityDetailPanel({ open, onClose, type = 'task', taskId, projectId, clientId, businessId, entity, onUpdated, onDeleted, onOpenTask }) {
+  const { toast } = useToast();
+  const [pendingDelete, setPendingDelete] = useState(false);
   const label = ENTITY_LABEL[type] || 'Task';
+
+  const confirmDelete = async () => {
+    try {
+      if (type === 'project' && projectId) await deleteProject(projectId);
+      else if (type === 'client' && clientId) await deleteClient(clientId);
+      else if (type === 'business' && businessId) await deleteBusiness(businessId);
+      else return;
+      toast.success(`${label} deleted`);
+      setPendingDelete(false);
+      onClose();
+      onDeleted?.();
+    } catch (err) {
+      toast.error(err.message || `Failed to delete ${label.toLowerCase()}`);
+      setPendingDelete(false);
+    }
+  };
+
   return (
     <Drawer open={open} onClose={onClose} title={null} size="lg" showBackdrop={false}>
       {open && (
@@ -472,21 +697,40 @@ export default function EntityDetailPanel({ open, onClose, type = 'task', taskId
             >
               {label}
             </span>
-            <button onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]">
-              <X size={18} />
-            </button>
+            <div className="flex items-center gap-1">
+              {type !== 'task' && (
+                <button
+                  onClick={() => setPendingDelete(true)}
+                  className="rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                >
+                  Delete
+                </button>
+              )}
+              <button onClick={onClose} aria-label="Close" className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--bg-hover)]">
+                <X size={18} />
+              </button>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-4">
             {type === 'task'
-              ? <TaskBody taskId={taskId} open={open} onClose={onClose} onUpdated={onUpdated} />
+              ? <TaskBody taskId={taskId} open={open} onClose={onClose} onUpdated={onUpdated} onOpenTask={onOpenTask} />
               : type === 'project'
                 ? <ProjectBody projectId={projectId} open={open} onClose={onClose} onUpdated={onUpdated} />
                 : type === 'client'
-                  ? <ClientBody entity={entity} />
+                  ? <ClientBody clientId={clientId} entity={entity} open={open} onUpdated={onUpdated} onDeleted={onDeleted} />
                   : type === 'business'
-                    ? <BusinessBody entity={entity} />
+                    ? <BusinessBody businessId={businessId} entity={entity} open={open} onUpdated={onUpdated} onDeleted={onDeleted} />
                     : <GenericBody entity={entity} type={type} />}
           </div>
+          <ConfirmationDialog
+            isOpen={pendingDelete}
+            onClose={() => setPendingDelete(false)}
+            onConfirm={confirmDelete}
+            title={`Delete ${label}`}
+            message={`Are you sure you want to delete this ${label.toLowerCase()}? This action cannot be undone.`}
+            confirmText="Delete"
+            variant="destructive"
+          />
         </div>
       )}
     </Drawer>

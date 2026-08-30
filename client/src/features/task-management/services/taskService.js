@@ -45,6 +45,13 @@ export async function assignTask(payload) {
   return ensureSuccess(res, 'Failed to assign task').data;
 }
 
+export async function unassignTask(taskId, assignmentType, referenceId) {
+  const res = await api.delete(
+    `${API_BASE}/${taskId}/unassign/${encodeURIComponent(assignmentType)}/${encodeURIComponent(referenceId)}`
+  );
+  return ensureSuccess(res, 'Failed to unassign task').data;
+}
+
 export async function updateProgress(payload) {
   const res = await api.post(`${API_BASE}/progress`, payload);
   return ensureSuccess(res, 'Failed to update progress').data;
@@ -83,4 +90,14 @@ export async function getMyTaskCount() {
 export async function getTaskStats() {
   const res = await api.get(`${API_BASE}/stats`);
   return ensureSuccess(res, 'Failed to load task stats').data;
+}
+
+export async function bulkUpdateTasks(ids, changes) {
+  const res = await api.post(`${API_BASE}/batch`, { ids, changes });
+  return ensureSuccess(res, 'Failed to update tasks').data;
+}
+
+export async function bulkDeleteTasks(ids) {
+  const res = await api.post(`${API_BASE}/batch/delete`, { ids });
+  return ensureSuccess(res, 'Failed to delete tasks').data;
 }

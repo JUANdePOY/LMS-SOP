@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Check, ChevronDown, Copy, FolderInput, Trash2, MoreHorizontal, Calendar } from 'lucide-react';
+import { Check, ChevronDown, Copy, FolderInput, Trash2, MoreHorizontal, Calendar, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TASK_PRIORITIES, TASK_PRIORITY_DOT } from '../constants/taskConstants';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -7,6 +7,8 @@ import { getUsersForAssignment } from '../api/assignment.api';
 import { formatDate } from '../utils/taskDateUtils';
 import { useToast } from '@/shared/components/ui/Toast';
 import { duplicateTask } from '../services/taskService';
+import { HIERARCHY_GRID } from './TaskHierarchyTable';
+import InlineEditableName from './InlineEditableName';
 
 const STATUS_TOKENS = {
   Pending: { var: '--ppm-st-pending', label: 'Not Started' },
@@ -17,6 +19,14 @@ const STATUS_TOKENS = {
 };
 
 function StatusDot({ status }) {
+  if (!status) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--border)]" aria-hidden="true" />
+        No status
+      </span>
+    );
+  }
   const token = STATUS_TOKENS[status] || STATUS_TOKENS.Pending;
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-primary)]">
@@ -32,7 +42,7 @@ function StatusDropdown({ status, onChange }) {
   return (
     <span ref={ref} className="relative inline-block">
       <button type="button" onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} className="rounded px-1 py-0.5 hover:bg-[var(--bg-surface-hover)]">
-        <StatusDot status={status} />
+        {status ? <StatusDot status={status} /> : <span className="text-xs text-[var(--text-muted)]">Set status</span>}
       </button>
       {open && (
         <div className="absolute left-0 top-full z-30 mt-1 w-36 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-xl">
@@ -302,7 +312,7 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
   );
 }
 
-export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, projects }) {
+export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects }) {
   const { toast } = useToast();
   const overdue = task.deadline_datetime && task.status !== 'Completed' && task.status !== 'Cancelled' && new Date(task.deadline_datetime) < new Date();
 
@@ -342,9 +352,12 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
   return (
     <div
       role="row"
+      onClick={() => onViewTask?.(task)}
       className={cn(
-        'group grid grid-cols-[36px_minmax(0,1fr)_120px_150px_100px_90px_110px_40px] items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-2 text-sm transition-colors',
+        'group grid cursor-pointer items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-2 text-sm transition-colors',
+        HIERARCHY_GRID,
         'hover:bg-[var(--bg-surface-hover)]',
+        selected && 'bg-[var(--color-primary)]/5',
         dimmed && 'opacity-40'
       )}
     >
@@ -365,8 +378,26 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
         </button>
       </span>
 
-      <span className="min-w-0 truncate text-[var(--text-primary)] cursor-pointer hover:underline" style={{ paddingLeft: '4px' }} onClick={() => onViewTask?.(task)}>
-        {task.title}
+      <span
+        className="flex min-w-0 items-center gap-1.5"
+        style={{ paddingLeft: '4px' }}
+      >
+        <InlineEditableName
+          value={task.title}
+          canEdit={canManage}
+          onCommit={(next) => onRenameTask?.(task.id, next)}
+          className="truncate flex-1 min-w-0 text-[var(--text-primary)] hover:underline cursor-text"
+          ariaLabel="Rename task"
+        />
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onViewTask?.(task); }}
+          title="Open task details"
+          aria-label="Open task details"
+          className="shrink-0 rounded p-1 text-[var(--text-muted)] opacity-0 transition-opacity hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] group-hover:opacity-100"
+        >
+          <ExternalLink size={13} />
+        </button>
       </span>
 
       <span onClick={(e) => e.stopPropagation()}>
@@ -400,6 +431,22 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
           onDelete={handleDelete}
           onDuplicate={handleDuplicate}
         />
+      </span>
+
+      <span className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          onClick={() => onToggleSelect?.(task.id)}
+          aria-label={selected ? 'Deselect task' : 'Select task'}
+          className={cn(
+            'grid h-4 w-4 place-items-center rounded border-2 transition-colors',
+            selected
+              ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+              : 'border-[var(--border)] hover:border-[var(--color-primary)]'
+          )}
+        >
+          {selected && <Check size={10} strokeWidth={3} />}
+        </button>
       </span>
     </div>
   );

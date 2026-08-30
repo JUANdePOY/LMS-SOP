@@ -1,8 +1,5 @@
 import { useState } from 'react';
 import { List, KanbanSquare, GanttChart, CalendarDays, Users, FolderKanban, PenTool } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import TaskListTable from './TaskListTable';
-import TaskListTableSkeleton from './TaskListTableSkeleton';
 import TaskBoard from './TaskBoard';
 import TaskTimeline from './TaskTimeline';
 import TaskCalendar from './TaskCalendar';
@@ -10,8 +7,10 @@ import TaskWorkload from './TaskWorkload';
 import TaskPortfolio from './TaskPortfolio';
 import TaskWhiteboard from './TaskWhiteboard';
 import TaskHierarchyTable from './TaskHierarchyTable';
+import ViewTabs from './ViewTabs';
+import TaskListTableSkeleton from './TaskListTableSkeleton';
 
-export const TASK_VIEW_KEYS = ['list', 'board', 'timeline', 'calendar', 'workload', 'portfolio', 'whiteboard', 'tree'];
+export const TASK_VIEW_KEYS = ['list', 'board', 'timeline', 'calendar', 'workload', 'portfolio', 'whiteboard'];
 
 export const TASK_VIEWS = [
   { key: 'list', label: 'List', icon: List },
@@ -21,7 +20,6 @@ export const TASK_VIEWS = [
   { key: 'workload', label: 'Workload', icon: Users },
   { key: 'portfolio', label: 'Portfolio', icon: FolderKanban },
   { key: 'whiteboard', label: 'Whiteboard', icon: PenTool },
-  { key: 'tree', label: 'Table', icon: List },
 ];
 
 /**
@@ -41,7 +39,6 @@ export default function ProjectTaskViews({
   onEdit,
   onDelete,
   onStatusChange,
-  onProgressChange,
   onViewTask,
   onInlineUpdate,
   onView,
@@ -52,9 +49,22 @@ export default function ProjectTaskViews({
   onEditProject,
   onDeleteImmediate,
   onDuplicated,
+  onQuickAddTask,
+  onRenameClient,
+  onRenameBusiness,
+  onRenameProject,
+  onRenameTask,
+  onAddChild,
+  onDeleteEntity,
+  onCreateBusiness,
+  onCreateProject,
   search,
   scopeClientId,
   scopeBusinessId,
+  selectedIds,
+  onToggleSelect,
+  onSelectAll,
+  hideTabs = false,
 }) {
   const [internalView, setInternalView] = useState(() => {
     const initial = storageKey ? localStorage.getItem(storageKey) : null;
@@ -77,25 +87,9 @@ export default function ProjectTaskViews({
 
   return (
     <div className="ppm-fade">
-      <div className="ppm-tabs">
-        {views.map((v) => {
-          const Icon = v.icon;
-          const active = view === v.key;
-          return (
-            <button
-              key={v.key}
-              type="button"
-              onClick={() => changeView(v.key)}
-              className={cn('ppm-tab', active && 'ppm-tab--active')}
-              aria-pressed={active}
-            >
-              <Icon size={15} />
-              {v.label}
-            </button>
-          );
-        })}
-      </div>
-
+      {!hideTabs && (
+        <ViewTabs views={views} active={view} onChange={changeView} />
+      )}
       {showSkeleton ? (
         <TaskListTableSkeleton count={5} />
       ) : (
@@ -118,6 +112,18 @@ export default function ProjectTaskViews({
               onEditProject={onEditProject}
               onDeleteImmediate={onDeleteImmediate}
               onDuplicated={onDuplicated}
+              onQuickAddTask={onQuickAddTask}
+              onRenameClient={onRenameClient}
+              onRenameBusiness={onRenameBusiness}
+              onRenameProject={onRenameProject}
+              onRenameTask={onRenameTask}
+              onAddChild={onAddChild}
+              onDelete={onDeleteEntity}
+              onCreateBusiness={onCreateBusiness}
+              onCreateProject={onCreateProject}
+              selectedIds={selectedIds}
+              onToggleSelect={onToggleSelect}
+              onSelectAll={onSelectAll}
             />
           )}
           {view === 'board' && (
@@ -137,21 +143,6 @@ export default function ProjectTaskViews({
           {view === 'workload' && <TaskWorkload tasks={tasks} />}
           {view === 'portfolio' && <TaskPortfolio tasks={tasks} projectsById={projectsById} />}
           {view === 'whiteboard' && <TaskWhiteboard tasks={tasks} onView={onView || onViewTask} />}
-          {view === 'tree' && (
-            <TaskListTable
-              tasks={tasks}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onStatusChange={onStatusChange}
-              onInlineUpdate={onInlineUpdate}
-              onCreateTask={onCreateTask}
-              onViewTask={onViewTask}
-              onProgressChange={onProgressChange}
-              canManage={canManage}
-              projectsById={projectsById}
-              onQuickCreate={onQuickCreate}
-            />
-          )}
         </>
       )}
     </div>

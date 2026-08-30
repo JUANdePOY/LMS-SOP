@@ -1,18 +1,28 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, AlertTriangle, ClipboardList, Clock, XCircle, CheckCircle, RefreshCw, FolderKanban } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Clock, XCircle, CheckCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useTasks } from '../hooks/useTasks';
-import { updateProgress } from '../services/taskService';
-import { getProjects } from '../services/projectService';
+import { updateProgress, bulkUpdateTasks, bulkDeleteTasks } from '../services/taskService';
+import { getProjects, updateProject } from '../services/projectService';
+import { updateClient } from '../api/client.api';
+import { updateBusiness } from '../api/business.api';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import EntityDetailPanel from '../components/EntityDetailPanel';
+import BulkActionBar from '../components/BulkActionBar';
 import TaskForm from '../components/TaskForm';
-import TaskFilters from '../components/TaskFilters';
-import TaskCommandPalette from '../components/TaskCommandPalette';
-import ProjectFormModal from '../components/ProjectFormModal';
+import { deleteClient } from '../api/client.api';
+import { deleteBusiness } from '../api/business.api';
+import { deleteProject } from '../services/projectService';
+import api from '@/services/api';
 import ProjectTaskViews, { TASK_VIEWS, TASK_VIEW_KEYS } from '../components/ProjectTaskViews';
+import ViewTabs from '../components/ViewTabs';
+import SavedViewChips from '../components/SavedViewChips';
+import FilterBar from '@/shared/components/ui/FilterBar';
+import Breadcrumb from '../components/Breadcrumb';
+import QuickCreateMenu from '../components/QuickCreateMenu';
+import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
 
 const VIEW_STORAGE_KEY = 'ppm:tasks:view';
 
@@ -49,14 +59,31 @@ export default function TasksPage() {
   const [saving, setSaving] = useState(false);
   const [viewingTaskId, setViewingTaskId] = useState(null);
   const [viewingProjectId, setViewingProjectId] = useState(null);
+  const [viewingClientId, setViewingClientId] = useState(null);
+  const [viewingBusinessId, setViewingBusinessId] = useState(null);
   const [view, setView] = useState(() => localStorage.getItem(VIEW_STORAGE_KEY) || 'list');
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [showProject, setShowProject] = useState(false);
   const [, setTaskDefaults] = useState(undefined);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+
+  const toggleSelect = useCallback((id) => {
+    const key = String(id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const selectAllIds = useCallback((ids) => {
+    setSelectedIds(new Set(ids));
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
   // All projects, keyed by id, used for hierarchy grouping and scope prefill.
   const [projectsById, setProjectsById] = useState({});
-  useEffect(() => {
+  const loadProjects = useCallback(() => {
     let active = true;
     getProjects()
       .then((data) => {
@@ -66,9 +93,88 @@ export default function TasksPage() {
         arr.forEach((p) => { map[String(p.id)] = p; });
         setProjectsById(map);
       })
-      .catch(() => {});
-    return () => { active = false; };
+      .catch(() => {})
+      .finally(() => { active = false; });
   }, []);
+  useEffect(() => { loadProjects(); }, [loadProjects]);
+
+  const renameProject = useCallback(async (id, name) => {
+    try {
+      await updateProject(id, { name });
+      toast.success('Project renamed');
+      loadProjects();
+    } catch (err) {
+      toast.error(err.message || 'Failed to rename project');
+    }
+  }, [toast, loadProjects]);
+
+  const renameClient = useCallback(async (id, name) => {
+    try {
+      await updateClient(id, { client_name: name });
+      toast.success('Client renamed');
+      loadProjects();
+    } catch (err) {
+      toast.error(err.message || 'Failed to rename client');
+    }
+  }, [toast, loadProjects]);
+
+  const renameBusiness = useCallback(async (id, name) => {
+    try {
+      await updateBusiness(id, { business_name: name });
+      toast.success('Business renamed');
+      loadProjects();
+    } catch (err) {
+      toast.error(err.message || 'Failed to rename business');
+    }
+  }, [toast, loadProjects]);
+
+  const renameTask = useCallback(async (id, title) => {
+    try {
+      await update(id, { title });
+    } catch (err) {
+      toast.error(err.message || 'Failed to rename task');
+    }
+  }, [update, toast]);
+
+  // Inline create handlers for the hierarchy table's "+" buttons (client -> business,
+  // business -> project). These create the entity by name only and refresh the tree;
+  // no modal is opened.
+  const handleCreateBusiness = useCallback(async (clientId, name) => {
+    try {
+      await api.post(`/clients/${clientId}/businesses`, { business_name: name.trim() });
+      toast.success('Business created');
+      loadProjects();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create business');
+      throw err;
+    }
+  }, [toast, loadProjects]);
+
+  const handleCreateProject = useCallback(async (businessId, name) => {
+    try {
+      await api.post('/projects', {
+        client_business_id: parseInt(businessId, 10),
+        name: name.trim(),
+      });
+      toast.success('Project created');
+      loadProjects();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create project');
+      throw err;
+    }
+  }, [toast, loadProjects]);
+
+  const handleDeleteEntity = useCallback(async (kind, id) => {
+    try {
+      if (kind === 'client') await deleteClient(id);
+      else if (kind === 'business') await deleteBusiness(id);
+      else if (kind === 'project') await deleteProject(id);
+      toast.success(`${kind[0].toUpperCase()}${kind.slice(1)} deleted`);
+      loadProjects();
+    } catch (err) {
+      toast.error(err.message || `Failed to delete ${kind}`);
+    }
+  }, [toast, loadProjects]);
 
   // When a client/business scope is active, seed new-task forms with those
   // values so the user doesn't have to pick them manually.
@@ -121,22 +227,40 @@ export default function TasksPage() {
     setShowForm(true);
   }, [scopeDefaults]);
 
+  const handleQuickAddTask = useCallback(async (projectId, title) => {
+    const project = projectsById[String(projectId)];
+    if (!project) return;
+    // New tasks default to "Not Started" (status = 'Pending'); priority, due
+    // date, and assignee are left empty so they can be set afterwards.
+    const payload = {
+      title,
+      status: 'Pending',
+      client_id: project.client_id,
+      client_business_id: project.client_business_id,
+      project_id: project.id,
+      assignments: [],
+    };
+    try {
+      await create(payload);
+      await refreshStats();
+    } catch (err) {
+      toast.error(err.message || 'Failed to create task');
+    }
+  }, [projectsById, create, refreshStats, toast]);
+
   const handleProjectCreated = (project) => {
-    setShowProject(false);
     if (project?.id && project?.client_id) {
       navigate(`/clients/${project.client_id}/businesses/${project.client_business_id}/projects/${project.id}`);
     }
   };
 
-  // Keyboard shortcuts: Cmd/Ctrl+K palette, N for new task
+  // Keyboard shortcut: N opens the quick-add task form (Cmd/Ctrl+K palette is
+  // now global, owned by the app shell).
   useEffect(() => {
     const onKey = (e) => {
       const tag = (e.target?.tagName || '').toLowerCase();
       const typing = tag === 'input' || tag === 'textarea' || e.target?.isContentEditable;
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        setPaletteOpen((v) => !v);
-      } else if (!typing && e.key.toLowerCase() === 'n' && !e.metaKey && !e.ctrlKey) {
+      if (!typing && e.key.toLowerCase() === 'n' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
         openNewTask();
       }
@@ -236,14 +360,6 @@ export default function TasksPage() {
     return scoped;
   }, [projectsById, clientParam, businessParam]);
 
-  const clearFilters = useCallback(() => {
-    setSearch('');
-    setStatusFilter('');
-    setPriorityFilter('');
-    setAssigneeFilter('');
-    setActiveViewKey('all');
-  }, []);
-
   const applySavedView = useCallback((key) => {
     const v = SAVED_VIEWS.find((x) => x.key === key);
     if (!v) return;
@@ -303,6 +419,40 @@ export default function TasksPage() {
       toast.error(err.message || 'Failed to delete task');
     }
   }, [remove, refreshStats, toast]);
+
+  const runBulk = useCallback(async (fn, successMsg) => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    try {
+      await fn(ids);
+      await refreshTasks();
+      await refreshStats();
+      toast.success(successMsg);
+      clearSelection();
+    } catch (err) {
+      toast.error(err.message || 'Bulk action failed');
+    }
+  }, [selectedIds, refreshTasks, refreshStats, toast, clearSelection]);
+
+  const handleBulkStatus = useCallback((status) => runBulk(
+    (ids) => bulkUpdateTasks(ids, { status }),
+    `${selectedIds.size} task(s) updated to ${status}`
+  ), [runBulk, selectedIds.size]);
+
+  const handleBulkPriority = useCallback((priority) => runBulk(
+    (ids) => bulkUpdateTasks(ids, { priority }),
+    `${selectedIds.size} task(s) set to ${priority} priority`
+  ), [runBulk, selectedIds.size]);
+
+  const handleBulkAssignee = useCallback((assignments) => runBulk(
+    (ids) => bulkUpdateTasks(ids, { assignments }),
+    `${selectedIds.size} task(s) reassigned`
+  ), [runBulk, selectedIds.size]);
+
+  const handleBulkDelete = useCallback(() => runBulk(
+    (ids) => bulkDeleteTasks(ids),
+    `${selectedIds.size} task(s) deleted`
+  ), [runBulk, selectedIds.size]);
 
   const handleStatusChange = useCallback(async (task, newStatus) => {
     const changes = { status: newStatus };
@@ -364,61 +514,6 @@ export default function TasksPage() {
     }
   };
 
-  const commands = useMemo(() => {
-    const viewCommands = TASK_VIEWS.map((v) => ({
-      id: `view-${v.key}`,
-      label: `Switch to ${v.label} view`,
-      group: 'Navigate',
-      icon: v.icon,
-      run: () => changeView(v.key),
-    }));
-    const viewFilters = SAVED_VIEWS.map((sv) => ({
-      id: `filter-${sv.key}`,
-      label: `Apply filter: ${sv.label}`,
-      group: 'Filters',
-      run: () => applySavedView(sv.key),
-    }));
-    const projectCommands = Object.values(projectsById).map((p) => ({
-      id: `project-${p.id}`,
-      label: `Open project: ${p.name}`,
-      group: 'Projects',
-      run: () => navigate(`/clients/${p.client_id}/businesses/${p.client_business_id}/projects/${p.id}`),
-    }));
-    const clientCommands = Object.values(projectsById).reduce((acc, p) => {
-      const key = `client-${p.client_id}`;
-      if (!acc[key] && p.client_id) {
-        acc[key] = {
-          id: key,
-          label: `Open client: ${p.client_name || p.client_id}`,
-          group: 'Clients',
-          run: () => navigate(`/clients/${p.client_id}`),
-        };
-      }
-      return acc;
-    }, {});
-    const businessCommands = Object.values(projectsById).reduce((acc, p) => {
-      const key = `business-${p.client_business_id}`;
-      if (!acc[key] && p.client_business_id) {
-        acc[key] = {
-          id: key,
-          label: `Open business: ${p.client_business_name || p.client_business_id}`,
-          group: 'Businesses',
-          run: () => navigate(`/clients/${p.client_id}/businesses/${p.client_business_id}`),
-        };
-      }
-      return acc;
-    }, {});
-    return [
-      { id: 'new-task', label: 'Create new task', group: 'Actions', icon: Plus, run: openNewTask },
-      { id: 'clear-filters', label: 'Clear all filters', group: 'Actions', run: clearFilters },
-      ...viewCommands,
-      ...viewFilters,
-      ...Object.values(clientCommands),
-      ...Object.values(businessCommands),
-      ...projectCommands,
-    ];
-  }, [projectsById, applySavedView, changeView, clearFilters, navigate, openNewTask]);
-
   if (!isAnyAdmin) {
     return null;
   }
@@ -429,26 +524,25 @@ export default function TasksPage() {
       <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
-            Tasks & Projects
+            Tasks &amp; Projects
           </h1>
           <p className="text-xs text-[var(--ppm-text-muted)] mt-0.5">Create, assign, and monitor tasks</p>
         </div>
-        <button
-          onClick={() => setShowProject(true)}
-          className="ppm-btn-primary"
-        >
-          <FolderKanban size={14} />
-          New Project
-        </button>
+        <QuickCreateMenu clientId={clientParam ? Number(clientParam) : undefined} onProjectCreated={handleProjectCreated} />
       </div>
 
       {(clientParam || businessParam) && (
         <div className="mb-4 flex items-center gap-2 text-xs">
-          <span className="rounded-full bg-[var(--bg-active)] px-3 py-1 text-[var(--text-on-sidebar)]">
-            {businessParam
-              ? `Business: ${filteredBusinessName || 'selected'}`
-              : `Client: ${filteredClientName || 'selected'}`}
-          </span>
+          <Breadcrumb
+            items={[
+              clientParam
+                ? { label: filteredClientName || 'Client', onClick: () => setViewingClientId(Number(clientParam)) }
+                : null,
+              businessParam
+                ? { label: filteredBusinessName || 'Business', onClick: () => setViewingBusinessId(Number(businessParam)) }
+                : null,
+            ].filter(Boolean)}
+          />
           <button
             onClick={() => navigate('/tasks')}
             className="text-[var(--color-primary)] hover:underline"
@@ -458,33 +552,42 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* Stats — neutral row, no colored fills */}
+      {/* Summary — condensed strip, not a competing block of tiles */}
       {stats && (
-        <div className="ppm-stat-row mb-6">
-          {statItems.map((stat) => (
-            <div key={stat.label} className="ppm-stat">
-              <span className="ppm-stat__label">{stat.label}</span>
-              <span className="ppm-stat__value">{stat.value}</span>
-            </div>
-          ))}
+        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--ppm-border)] pb-3 text-xs text-[var(--ppm-text-muted)]">
+          {statItems.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <span key={stat.label} className="inline-flex items-center gap-1.5">
+                <Icon size={13} className="text-[var(--ppm-text-muted)]" />
+                <span className="font-semibold tabular-nums text-[var(--ppm-text)]">{stat.value}</span>
+                <span>{stat.label}</span>
+              </span>
+            );
+          })}
         </div>
       )}
 
-      <TaskFilters
+      {/* View type — a distinct control from filters/saved views */}
+      <ViewTabs views={TASK_VIEWS} active={view} onChange={changeView} />
+
+      {/* Saved filter presets — visually separate from view type */}
+      <div className="mb-3">
+        <SavedViewChips views={SAVED_VIEWS} activeKey={activeViewKey} onApply={applySavedView} />
+      </div>
+
+      <FilterBar
         search={search}
         onSearch={setSearch}
         statusFilter={statusFilter}
         onStatus={setStatusFilter}
+        statusOptions={TASK_STATUSES}
         priorityFilter={priorityFilter}
         onPriority={setPriorityFilter}
+        priorityOptions={TASK_PRIORITIES}
         assigneeFilter={assigneeFilter}
         onAssignee={setAssigneeFilter}
         assigneeOptions={assigneeOptions}
-        savedViews={SAVED_VIEWS}
-        activeViewKey={activeViewKey}
-        onApplyView={applySavedView}
-        hasActiveFilters={hasActiveFilters}
-        onClear={clearFilters}
       />
 
       {error && (
@@ -527,6 +630,18 @@ export default function TasksPage() {
           onQuickCreate={handleQuickCreate}
           onEditProject={handleEditProject}
           search={search}
+          hideTabs
+          onQuickAddTask={handleQuickAddTask}
+          onRenameClient={renameClient}
+          onRenameBusiness={renameBusiness}
+          onRenameProject={renameProject}
+          onRenameTask={renameTask}
+          onCreateBusiness={handleCreateBusiness}
+          onCreateProject={handleCreateProject}
+          onDeleteEntity={handleDeleteEntity}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onSelectAll={selectAllIds}
         />
       )}
 
@@ -555,6 +670,7 @@ export default function TasksPage() {
         open={viewingTaskId !== null}
         onClose={() => setViewingTaskId(null)}
         onUpdated={handleTaskUpdated}
+        onOpenTask={(id) => setViewingTaskId(id)}
       />
 
       <EntityDetailPanel
@@ -565,17 +681,34 @@ export default function TasksPage() {
         onUpdated={handleTaskUpdated}
       />
 
-      <TaskCommandPalette
-        open={paletteOpen}
-        onClose={() => setPaletteOpen(false)}
-        commands={commands}
+      <EntityDetailPanel
+        type="client"
+        clientId={viewingClientId}
+        open={viewingClientId !== null}
+        onClose={() => setViewingClientId(null)}
+        onUpdated={loadProjects}
+        onDeleted={loadProjects}
       />
 
-      <ProjectFormModal
-        open={showProject}
-        onClose={() => setShowProject(false)}
-        onCreated={handleProjectCreated}
+      <EntityDetailPanel
+        type="business"
+        businessId={viewingBusinessId}
+        open={viewingBusinessId !== null}
+        onClose={() => setViewingBusinessId(null)}
+        onUpdated={loadProjects}
+        onDeleted={loadProjects}
       />
+
+      {selectedIds.size > 0 && (
+        <BulkActionBar
+          count={selectedIds.size}
+          onStatusChange={handleBulkStatus}
+          onPriorityChange={handleBulkPriority}
+          onAssigneeChange={handleBulkAssignee}
+          onDelete={handleBulkDelete}
+          onClear={clearSelection}
+        />
+      )}
     </div>
   );
 }

@@ -38,20 +38,12 @@ function validateTaskPayload(body, requireAll = true) {
     }
   }
 
-  if (requireAll || body.start_datetime !== undefined) {
-    if (!body.start_datetime) {
-      errors.push('Start date and time is required');
-    } else {
-      value.start_datetime = body.start_datetime;
-    }
+  if (body.start_datetime != null) {
+    value.start_datetime = body.start_datetime;
   }
 
-  if (requireAll || body.deadline_datetime !== undefined) {
-    if (!body.deadline_datetime) {
-      errors.push('Deadline is required');
-    } else {
-      value.deadline_datetime = body.deadline_datetime;
-    }
+  if (body.deadline_datetime != null) {
+    value.deadline_datetime = body.deadline_datetime;
   }
 
   if (body.estimated_hours !== undefined && body.estimated_hours !== null && body.estimated_hours !== '') {
@@ -69,6 +61,11 @@ function validateTaskPayload(body, requireAll = true) {
 
   const hasParent = body.parent_task_id !== undefined && body.parent_task_id !== null && body.parent_task_id !== '';
 
+  // Sub-tasks inherit their parent's context, so they don't need their own
+  // Client/Business linkage or explicit start/deadline dates. Top-level tasks
+  // may also be created without dates so they can be filled in afterwards.
+  const requiresDates = false;
+
   for (const key of ['parent_task_id', 'client_id', 'client_business_id', 'business_id', 'project_id']) {
     if (body[key] !== undefined) {
       if (body[key] === null || body[key] === '') {
@@ -84,9 +81,15 @@ function validateTaskPayload(body, requireAll = true) {
     }
   }
 
+  if (requiresDates || body.start_datetime != null) {
+    value.start_datetime = body.start_datetime;
+  }
+
+  if (requiresDates || body.deadline_datetime != null) {
+    value.deadline_datetime = body.deadline_datetime;
+  }
+
   // Main tasks (no parent) must be linked to a Client and Client Business.
-  // The org-level Business is optional when a Client Business is provided
-  // (the client business already establishes the business context).
   if (requireAll && !hasParent && !value.parent_task_id) {
     for (const key of ['client_id', 'client_business_id']) {
       if (value[key] === undefined || value[key] === null) {
@@ -216,6 +219,109 @@ function validateCommentPayload(body) {
   return { valid: errors.length === 0, value, errors };
 }
 
+function validateBatchIds(body) {
+  const errors = [];
+  const value = { ids: [] };
+
+  if (!Array.isArray(body.ids) || body.ids.length === 0) {
+    errors.push('ids must be a non-empty array of task IDs');
+  } else {
+    const ids = [];
+    for (const raw of body.ids) {
+      const id = parseInt(raw, 10);
+      if (!Number.isFinite(id) || id <= 0) {
+        errors.push('All task IDs must be positive integers');
+        break;
+      }
+      ids.push(id);
+    }
+    if (ids.length > 500) {
+      errors.push('You can operate on at most 500 tasks at once');
+    } else {
+      value.ids = ids;
+    }
+  }
+
+  return { valid: errors.length === 0, value, errors };
+}
+
+function validateBatchUpdatePayload(body) {
+  const errors = [];
+  const value = { ids: [], changes: {} };
+
+  if (!Array.isArray(body.ids) || body.ids.length === 0) {
+    errors.push('ids must be a non-empty array of task IDs');
+  } else {
+    const ids = [];
+    for (const raw of body.ids) {
+      const id = parseInt(raw, 10);
+      if (!Number.isFinite(id) || id <= 0) {
+        errors.push('All task IDs must be positive integers');
+        break;
+      }
+      ids.push(id);
+    }
+    if (ids.length > 500) {
+      errors.push('You can update at most 500 tasks at once');
+    } else {
+      value.ids = ids;
+    }
+  }
+
+  const changes = body.changes || {};
+  if (changes.status !== undefined) {
+    const status = String(changes.status).replace(/\b\w/g, c => c.toUpperCase());
+    if (!TASK_STATUSES.includes(status)) {
+      errors.push(`Status must be one of: ${TASK_STATUSES.join(', ')}`);
+    } else {
+      value.changes.status = status;
+    }
+  }
+
+  if (changes.priority !== undefined) {
+    const priority = String(changes.priority).charAt(0).toUpperCase() + String(changes.priority).slice(1).toLowerCase();
+    if (!TASK_PRIORITIES.includes(priority)) {
+      errors.push(`Priority must be one of: ${TASK_PRIORITIES.join(', ')}`);
+    } else {
+      value.changes.priority = priority;
+    }
+  }
+
+  for (const key of ['project_id', 'client_id', 'client_business_id', 'business_id']) {
+    if (changes[key] !== undefined && changes[key] !== null && changes[key] !== '') {
+      const intVal = parseInt(changes[key], 10);
+      if (!Number.isFinite(intVal) || intVal <= 0) {
+        errors.push(`${key.replace(/_/g, ' ')} must be a positive integer`);
+      } else {
+        value.changes[key] = intVal;
+      }
+    }
+  }
+
+  if (changes.assignments !== undefined) {
+    if (!Array.isArray(changes.assignments)) {
+      errors.push('assignments must be an array');
+    } else {
+      const validated = [];
+      for (const a of changes.assignments) {
+        const v = validateAssignmentPayload({ ...a, task_id: 0 });
+        if (!v.valid) {
+          errors.push(`Invalid assignment: ${v.errors.join(', ')}`);
+          break;
+        }
+        validated.push(v.value);
+      }
+      if (errors.length === 0) value.changes.assignments = validated;
+    }
+  }
+
+  if (Object.keys(value.changes).length === 0) {
+    errors.push('changes must contain at least one field to update');
+  }
+
+  return { valid: errors.length === 0, value, errors };
+}
+
 function validateFilters(query) {
   const filters = {};
   const errors = [];
@@ -266,4 +372,6 @@ module.exports = {
   validateProgressPayload,
   validateCommentPayload,
   validateFilters,
+  validateBatchIds,
+  validateBatchUpdatePayload,
 };

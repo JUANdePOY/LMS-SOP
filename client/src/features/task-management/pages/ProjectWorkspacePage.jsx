@@ -247,6 +247,7 @@ export default function ProjectWorkspacePage() {
             setSelected(updated);
             setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
           }}
+          onOpenTask={(id) => { setSelected({ id }); setPanelOpen(true); }}
         />
       )}
 

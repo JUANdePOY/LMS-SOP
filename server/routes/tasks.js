@@ -62,6 +62,12 @@ router.post('/assign', authenticateToken, requireAdmin, taskController.assignTas
 // User/Admin: update progress
 router.post('/progress', authenticateToken, taskController.updateProgress);
 
+// Admin: bulk update tasks (status / priority / assignments / etc.)
+router.post('/batch', authenticateToken, requireAdmin, taskController.batchUpdateTasks);
+
+// Admin: bulk delete tasks
+router.post('/batch/delete', authenticateToken, requireAdmin, taskController.batchDeleteTasks);
+
 // User: my tasks
 router.get('/my', authenticateToken, taskController.getMyTasks);
 

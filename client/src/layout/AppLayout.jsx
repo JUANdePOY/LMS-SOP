@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Search,
@@ -13,6 +13,10 @@ import {
   Calendar,
   User,
   FileText,
+  Settings,
+  FolderKanban,
+  Building2,
+  CheckSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,6 +30,9 @@ import GlobalSearch from "@/components/GlobalSearch";
 import NotificationDropdown from "@/shared/components/ui/NotificationDropdown";
 import NotificationBadge from "@/shared/components/ui/NotificationBadge";
 import QuickCreateMenu from "@/features/task-management/components/QuickCreateMenu";
+import TaskCommandPalette from "@/features/task-management/components/TaskCommandPalette";
+import { getProjects } from "@/features/task-management/services/projectService";
+import { getClients } from "@/features/task-management/api/client.api";
 import { useNotificationStore, useNotificationPoller, useNotifications } from "@/shared/stores/notificationStore.js";
 import { PageTransition } from "@/shared/motion";
 import { useWebSocket } from "@/features/notifications/hooks/useWebSocket";
@@ -74,6 +81,7 @@ export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showSearchMobile, setShowSearchMobile] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const { user, logout, isDepartmentHead } = useAuth();
   const { toggleTheme, isDark } = useTheme();
   const location = useLocation();
@@ -102,6 +110,85 @@ export default function AppLayout() {
   const systemBadgeCount = notificationData.getSystemNotificationCount() || 0;
   useTabNotificationBadge(messageBadgeCount + systemBadgeCount);
   const quietHours = isQuietHours(notificationData.preferences);
+
+  // Global command palette (Cmd/Ctrl+K) — available on every page, not just the
+  // Tasks pages. Navigation + quick-create are static; project/client "open"
+  // commands are fetched once and merged in.
+  const [entityCommands, setEntityCommands] = useState([]);
+
+  useEffect(() => {
+    const normalize = (data) => (Array.isArray(data) ? data : (data?.rows || data?.data || []));
+    let active = true;
+    Promise.all([
+      getProjects().then((d) => normalize(d)).catch(() => []),
+      getClients().then((d) => normalize(d?.data ?? d)).catch(() => []),
+    ]).then(([projects, clients]) => {
+      if (!active) return;
+      const cmds = [];
+      projects.forEach((p) => {
+        if (!p?.id) return;
+        cmds.push({
+          id: `proj-${p.id}`,
+          label: `Open project: ${p.name}`,
+          group: 'Projects',
+          icon: FolderKanban,
+          run: () => navigate(`/clients/${p.client_id}/businesses/${p.client_business_id}/projects/${p.id}`),
+        });
+      });
+      clients.forEach((c) => {
+        if (!c?.id) return;
+        cmds.push({
+          id: `client-${c.id}`,
+          label: `Open client: ${c.name || c.client_name}`,
+          group: 'Clients',
+          icon: Building2,
+          run: () => navigate(`/clients/${c.id}`),
+        });
+      });
+      setEntityCommands(cmds);
+    });
+    return () => { active = false; };
+  }, [navigate]);
+
+  const globalCommands = useMemo(() => {
+    const role = user?.role;
+    const navCmds = [
+      { id: 'nav-mytasks', label: 'Go to My Tasks', group: 'Navigate', icon: CheckSquare, run: () => navigate('/tasks/my'), roles: ['employee', 'department_head', 'admin', 'super_admin'] },
+      { id: 'nav-tasks', label: 'Go to Tasks & Projects', group: 'Navigate', icon: FolderKanban, run: () => navigate('/tasks'), roles: ['admin', 'super_admin', 'department_head'] },
+      { id: 'nav-courses', label: 'Go to Courses', group: 'Navigate', icon: BookOpen, run: () => navigate('/courses') },
+      { id: 'nav-sops', label: 'Go to SOPs', group: 'Navigate', icon: FileText, run: () => navigate('/sops') },
+      { id: 'nav-clients', label: 'Go to Clients', group: 'Navigate', icon: Building2, run: () => navigate('/clients'), roles: ['admin', 'super_admin', 'department_head'] },
+      { id: 'nav-messaging', label: 'Go to Messaging', group: 'Navigate', icon: MessageSquare, run: () => navigate('/messaging') },
+      { id: 'nav-announcements', label: 'Go to Announcements', group: 'Navigate', icon: Megaphone, run: () => navigate('/announcements') },
+      { id: 'nav-events', label: 'Go to Events', group: 'Navigate', icon: Calendar, run: () => navigate('/events'), roles: ['super_admin'] },
+      { id: 'nav-profile', label: 'Go to Profile', group: 'Navigate', icon: User, run: () => navigate('/profile') },
+      { id: 'nav-settings', label: 'Go to Settings', group: 'Navigate', icon: Settings, run: () => navigate(isDepartmentHead ? '/employee/settings' : '/settings'), roles: ['admin', 'super_admin', 'department_head'] },
+    ].filter((c) => !c.roles || c.roles.includes(role));
+    const createCmds = [
+      { id: 'qc-task', label: 'Create new task', group: 'Create', icon: CheckSquare, run: () => window.dispatchEvent(new CustomEvent('app:quick-create', { detail: { type: 'task' } })) },
+      { id: 'qc-project', label: 'Create new project', group: 'Create', icon: FolderKanban, run: () => window.dispatchEvent(new CustomEvent('app:quick-create', { detail: { type: 'project' } })) },
+      { id: 'qc-business', label: 'Create new business', group: 'Create', icon: Building2, run: () => window.dispatchEvent(new CustomEvent('app:quick-create', { detail: { type: 'business' } })) },
+      { id: 'qc-client', label: 'Create new client', group: 'Create', icon: Building2, run: () => window.dispatchEvent(new CustomEvent('app:quick-create', { detail: { type: 'client' } })) },
+    ];
+    return [...navCmds, ...createCmds, ...entityCommands];
+  }, [entityCommands, user?.role, navigate, isDepartmentHead]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = (e.target?.tagName || '').toLowerCase();
+      const typing = tag === 'input' || tag === 'textarea' || e.target?.isContentEditable;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPaletteOpen((v) => !v);
+      } else if (!typing && e.key.toLowerCase() === 'n' && !e.metaKey && !e.ctrlKey && e.altKey === false) {
+        // Reserve the single-key `N` shortcut for task creation only where it
+        // was already established (Tasks page). Globally we leave `N` alone to
+        // avoid hijacking typing in unrelated contexts.
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   useEffect(() => {
     fetchPreferences();
@@ -261,6 +348,8 @@ export default function AppLayout() {
               </div>
 
               <QuickCreateMenu />
+
+              <TaskCommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} commands={globalCommands} />
 
               <div className="relative" ref={profileRef}>
                 <button

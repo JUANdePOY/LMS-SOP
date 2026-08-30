@@ -1,5 +1,5 @@
 const taskService = require('../services/taskService');
-const { validateFilters } = require('../validators/taskValidator');
+const { validateFilters, validateBatchIds, validateBatchUpdatePayload } = require('../validators/taskValidator');
 const { broadcastSystemChange } = require('../services/notificationService');
 
 function handleError(res, error) {
@@ -239,6 +239,55 @@ const taskController = {
     try {
       const count = await taskService.getMyTaskCount(req.user.id);
       res.json({ success: true, data: { count }, message: 'Task count retrieved successfully' });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  async batchUpdateTasks(req, res) {
+    try {
+      const validation = validateBatchUpdatePayload(req.body);
+      if (!validation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: validation.errors.join('; '),
+          code: 'VALIDATION_ERROR',
+          errors: validation.errors,
+        });
+      }
+
+      const result = await taskService.batchUpdateTasks(
+        validation.value.ids,
+        validation.value.changes,
+        req.user.id
+      );
+      broadcastSystemChange({
+        title: 'Tasks Updated',
+        body: `${result.updated} task(s) updated in bulk`,
+        type: 'info',
+        entityType: 'task',
+        entityId: validation.value.ids[0],
+      }).catch(() => {});
+      res.json({ success: true, data: result, message: 'Tasks updated successfully' });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  async batchDeleteTasks(req, res) {
+    try {
+      const validation = validateBatchIds(req.body);
+      if (!validation.valid) {
+        return res.status(400).json({
+          success: false,
+          message: validation.errors.join('; '),
+          code: 'VALIDATION_ERROR',
+          errors: validation.errors,
+        });
+      }
+
+      const result = await taskService.batchDeleteTasks(validation.value.ids, req.user.id);
+      res.json({ success: true, data: result, message: 'Tasks deleted successfully' });
     } catch (error) {
       handleError(res, error);
     }

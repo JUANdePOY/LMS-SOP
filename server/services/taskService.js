@@ -160,6 +160,51 @@ async function listTasks(filters = {}, actorId) {
   return { ...result, rows };
 }
 
+async function enrichAssignmentRows(assignments) {
+  return Promise.all(assignments.map(async (assignment) => {
+    if (assignment.assignment_type === 'User') {
+      const [users] = await db.query(
+        'SELECT id, full_name, email, avatar_url FROM users WHERE id = ? LIMIT 1',
+        [assignment.reference_id]
+      );
+      return { ...assignment, reference_name: users[0]?.full_name || null, avatar_url: users[0]?.avatar_url || null };
+    }
+    if (assignment.assignment_type === 'Department') {
+      const [depts] = await db.query(
+        'SELECT id, name, code FROM departments WHERE id = ? LIMIT 1',
+        [assignment.reference_id]
+      );
+      return { ...assignment, reference_name: depts[0]?.name || null };
+    }
+    if (assignment.assignment_type === 'Position') {
+      return { ...assignment, reference_name: assignment.reference_id };
+    }
+    return assignment;
+  }));
+}
+
+// Build a nested tree of sub-tasks for a parent. Depth is bounded to avoid
+// runaway recursion on malformed data (a cycle cannot happen because the FK is
+// ON DELETE CASCADE and self-references are rejected by the validator, but we
+// guard anyway). Each node is enriched with assignments + auto status so the
+// client can render the tree without extra round-trips.
+async function buildSubtree(parentId, depth = 0) {
+  if (depth > 6) return [];
+  const children = await taskModel.findByParentId(parentId);
+  const nodes = [];
+  for (const child of children) {
+    const assignments = await taskAssignmentModel.findByTaskId(child.id);
+    nodes.push({
+      ...child,
+      auto_status: computeAutoStatus(child.start_datetime, child.deadline_datetime, child.status),
+      status: child.status,
+      assignments: await enrichAssignmentRows(assignments),
+      subtasks: await buildSubtree(child.id, depth + 1),
+    });
+  }
+  return nodes;
+}
+
 async function getTask(id, actorId) {
   const task = await taskModel.findById(id);
   if (!task) {
@@ -189,27 +234,7 @@ async function getTask(id, actorId) {
   const comments = await taskCommentModel.findByTaskId(id);
   const taskAttachments = await taskAttachmentModel.findByTaskId(id);
 
-  const enrichedAssignments = await Promise.all(assignments.map(async (assignment) => {
-    if (assignment.assignment_type === 'User') {
-      const [users] = await db.query(
-        'SELECT id, full_name, email, avatar_url FROM users WHERE id = ? LIMIT 1',
-        [assignment.reference_id]
-      );
-      return { ...assignment, reference_name: users[0]?.full_name || null, avatar_url: users[0]?.avatar_url || null };
-    }
-
-    if (assignment.assignment_type === 'Department') {
-      const [depts] = await db.query(
-        'SELECT id, name, code FROM departments WHERE id = ? LIMIT 1',
-        [assignment.reference_id]
-      );
-      return { ...assignment, reference_name: depts[0]?.name || null };
-    }
-    if (assignment.assignment_type === 'Position') {
-      return { ...assignment, reference_name: assignment.reference_id };
-    }
-    return assignment;
-  }));
+  const enrichedAssignments = await enrichAssignmentRows(assignments);
 
   const enrichedProgress = await Promise.all(progress.map(async (p) => {
     const attachments = await taskAttachmentModel.findByProgressId(p.id);
@@ -229,6 +254,8 @@ async function getTask(id, actorId) {
 
   const customFields = await projectModel.getTaskCustomFields(id);
 
+  const subtasks = await buildSubtree(id);
+
   return {
     ...task,
     auto_status: autoStatus,
@@ -238,6 +265,7 @@ async function getTask(id, actorId) {
     comments,
     attachments: enrichedTaskAttachments,
     custom_fields: customFields,
+    subtasks,
   };
 }
 
@@ -255,7 +283,7 @@ async function createTask(payload, actorId) {
     estimated_hours, category, parent_task_id, client_id, client_business_id, business_id, project_id
   } = validation.value;
 
-  if (new Date(deadline_datetime) <= new Date(start_datetime)) {
+  if (deadline_datetime && start_datetime && new Date(deadline_datetime) <= new Date(start_datetime)) {
     const error = new Error('Deadline must be after start date and time');
     error.code = 'VALIDATION_ERROR';
     throw error;
@@ -263,11 +291,8 @@ async function createTask(payload, actorId) {
 
   const actor = await getUser(actorId);
   const assignments = Array.isArray(payload.assignments) ? payload.assignments : [];
-  if (assignments.length === 0) {
-    const error = new Error('At least one assignment is required');
-    error.code = 'VALIDATION_ERROR';
-    throw error;
-  }
+  // Tasks may be created unassigned; assignees can be added afterwards.
+  // (Sub-tasks may also inherit their parent's context.)
 
     for (const assignment of assignments) {
     const assignmentValidation = validateAssignmentPayload({ ...assignment, task_id: 0 });
@@ -982,6 +1007,119 @@ async function getMyTaskCount(userId) {
   return countRow[0]?.total ?? 0;
 }
 
+async function batchUpdateTasks(ids, changes, actorId) {
+  const isAdmin = await isUserAdmin(actorId);
+  if (!isAdmin) {
+    const error = new Error('Only admins can update tasks in bulk');
+    error.code = 'FORBIDDEN';
+    throw error;
+  }
+
+  const businessTaskIds = await getBusinessScopedTaskIdsForAdmin(actorId);
+  const scoped = new Set(businessTaskIds);
+  for (const id of ids) {
+    if (!scoped.has(id)) {
+      const error = new Error('Access denied: one or more tasks are outside your business scope');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+  }
+
+  const updatableCols = ['status', 'priority', 'project_id', 'client_id', 'client_business_id', 'business_id'];
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    for (const id of ids) {
+      const sets = [];
+      const params = [];
+      for (const key of updatableCols) {
+        if (changes[key] !== undefined) {
+          sets.push(`${key} = ?`);
+          params.push(changes[key]);
+        }
+      }
+      if (sets.length > 0) {
+        params.push(id);
+        await conn.query(
+          `UPDATE tasks SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+          params
+        );
+      }
+      if (Array.isArray(changes.assignments)) {
+        await conn.query('DELETE FROM task_assignments WHERE task_id = ?', [id]);
+        for (const a of changes.assignments) {
+          await conn.query(
+            'INSERT INTO task_assignments (task_id, assignment_type, reference_id, assigned_by) VALUES (?, ?, ?, ?)',
+            [id, a.assignment_type, a.reference_id, actorId]
+          );
+        }
+      }
+      logAudit('task.update', actorId, { task_id: id, changes, batch: true });
+    }
+    await conn.commit();
+    return { updated: ids.length };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    if (conn && typeof conn.release === 'function') conn.release();
+  }
+}
+
+async function batchDeleteTasks(ids, actorId) {
+  const isAdmin = await isUserAdmin(actorId);
+  if (!isAdmin) {
+    const error = new Error('Only admins can delete tasks in bulk');
+    error.code = 'FORBIDDEN';
+    throw error;
+  }
+
+  const businessTaskIds = await getBusinessScopedTaskIdsForAdmin(actorId);
+  const scoped = new Set(businessTaskIds);
+  for (const id of ids) {
+    if (!scoped.has(id)) {
+      const error = new Error('Access denied: one or more tasks are outside your business scope');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [rows] = await conn.query('SELECT id, parent_task_id FROM tasks WHERE id IN (?)', [ids]);
+    const parentIds = [...new Set(rows.map((r) => r.parent_task_id).filter(Boolean))];
+
+    for (const id of ids) {
+      await conn.query('DELETE FROM tasks WHERE id = ?', [id]);
+      logAudit('task.delete', actorId, { task_id: id, batch: true });
+    }
+
+    // Recompute the derived status of any (non-cancelled) parent whose children
+    // changed as a result of the deletes, so the parent row stays consistent.
+    for (const pid of parentIds) {
+      const [children] = await conn.query('SELECT id, status FROM tasks WHERE parent_task_id = ?', [pid]);
+      const [parentRows] = await conn.query('SELECT id, status FROM tasks WHERE id = ?', [pid]);
+      const parent = parentRows[0];
+      if (parent && parent.status !== 'Cancelled' && children.length > 0) {
+        const derived = deriveParentStatus(children.map((c) => c.status));
+        if (derived && derived !== parent.status) {
+          await conn.query('UPDATE tasks SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [derived, pid]);
+        }
+      }
+    }
+
+    await conn.commit();
+    return { deleted: ids.length };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    if (conn && typeof conn.release === 'function') conn.release();
+  }
+}
+
 module.exports = {
   computeAutoStatus,
   listTasks,
@@ -999,4 +1137,6 @@ module.exports = {
   getMyTasks,
   getMyTaskCount,
   getTaskStats,
+  batchUpdateTasks,
+  batchDeleteTasks,
 };

@@ -4,6 +4,12 @@ const TASK_MANAGEMENT_MIGRATIONS = [
   `ALTER TABLE task_comments ADD COLUMN IF NOT EXISTS parent_id INT DEFAULT NULL AFTER user_id`,
   `ALTER TABLE task_comments ADD CONSTRAINT fk_task_comments_parent FOREIGN KEY (parent_id) REFERENCES task_comments(id) ON DELETE CASCADE`,
   `CREATE INDEX IF NOT EXISTS idx_task_comments_parent ON task_comments(parent_id)`,
+  // Allow tasks to be created without a status, priority, or dates so the new
+  // task can be configured afterwards (the hierarchy quick-add leaves them empty).
+  `ALTER TABLE tasks MODIFY COLUMN priority ENUM('Low','Medium','High','Critical') NULL DEFAULT 'Medium'`,
+  `ALTER TABLE tasks MODIFY COLUMN status ENUM('Pending','In Progress','Completed','Overdue','Cancelled') NULL DEFAULT 'Pending'`,
+  `ALTER TABLE tasks MODIFY COLUMN start_datetime DATETIME NULL`,
+  `ALTER TABLE tasks MODIFY COLUMN deadline_datetime DATETIME NULL`,
 ];
 
 async function runTaskMigrations() {

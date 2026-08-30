@@ -19,7 +19,6 @@ function DraggableCard({ task, onEdit, onDelete, onView, canManage }) {
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData('text/task-id', String(task.id));
-        e.dataTransfer.setData('text/task-status', task.status || 'Pending');
         e.dataTransfer.effectAllowed = 'move';
         setDragging(true);
       }}
@@ -31,15 +30,15 @@ function DraggableCard({ task, onEdit, onDelete, onView, canManage }) {
   );
 }
 
-function BoardColumn({ status, tasks, onEdit, onDelete, onView, onStatusChange, canManage, onAddToColumn }) {
+function BoardColumn({ status, tasks, tasksById, onEdit, onDelete, onView, onStatusChange, canManage, onAddToColumn }) {
   const [dragOver, setDragOver] = useState(false);
 
   const handleDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
     const id = e.dataTransfer.getData('text/task-id');
-    const fromStatus = e.dataTransfer.getData('text/task-status');
-    if (id && fromStatus !== status) onStatusChange(Number(id), status);
+    const task = id ? tasksById[id] : null;
+    if (task && task.status !== status) onStatusChange(task, status);
   };
 
   return (
@@ -92,10 +91,12 @@ function BoardColumn({ status, tasks, onEdit, onDelete, onView, onStatusChange, 
 
 function TaskBoard({ tasks, onEdit, onDelete, onView, onStatusChange, canManage, onCreateTask, onAddToColumn }) {
   const grouped = {};
+  const byId = {};
   TASK_STATUSES.forEach((s) => { grouped[s] = []; });
   (tasks || []).forEach((t) => {
     const key = TASK_STATUSES.includes(t.status) ? t.status : 'Pending';
     grouped[key].push(t);
+    byId[String(t.id)] = t;
   });
 
   return (
@@ -105,6 +106,7 @@ function TaskBoard({ tasks, onEdit, onDelete, onView, onStatusChange, canManage,
           key={status}
           status={status}
           tasks={grouped[status]}
+          tasksById={byId}
           onEdit={onEdit}
           onDelete={onDelete}
           onView={onView}

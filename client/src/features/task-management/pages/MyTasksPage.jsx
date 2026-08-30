@@ -217,6 +217,7 @@ export default function MyTasksPage() {
         taskId={viewingTaskId}
         open={viewingTaskId !== null}
         onClose={() => setViewingTaskId(null)}
+        onOpenTask={(id) => setViewingTaskId(id)}
       />
     </div>
   );

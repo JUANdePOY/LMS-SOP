@@ -1,6 +1,18 @@
 const db = require('../config/database');
 const { computeAutoStatus, deriveParentStatus } = require('../utils/taskStatus');
 
+// MySQL DATETIME columns reject ISO-8601 strings (e.g. "2026-08-30T02:33:30.495Z").
+// Convert them to "YYYY-MM-DD HH:MM:SS"; pass through values already in that shape.
+function toMysqlDateTime(value) {
+  if (!value) return value;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d+)?$/.test(value)) {
+    return value;
+  }
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  return d.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 const TASK_PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
 const TASK_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled'];
 
@@ -20,10 +32,10 @@ async function create(data) {
     [
       title,
       description || null,
-      priority || 'Medium',
-      status || 'Pending',
-      start_datetime,
-      deadline_datetime,
+      priority ?? null,
+      status ?? null,
+      start_datetime ? toMysqlDateTime(start_datetime) : null,
+      deadline_datetime ? toMysqlDateTime(deadline_datetime) : null,
       estimated_hours || null,
       category || null,
       created_by,
@@ -171,7 +183,8 @@ async function update(id, updates) {
   for (const key of allowed) {
     if (Object.prototype.hasOwnProperty.call(updates, key)) {
       sets.push(`${key} = ?`);
-      params.push(updates[key]);
+      const v = updates[key];
+      params.push(key === 'start_datetime' || key === 'deadline_datetime' ? toMysqlDateTime(v) : v);
     }
   }
 

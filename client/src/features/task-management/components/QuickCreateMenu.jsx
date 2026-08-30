@@ -6,7 +6,7 @@ import ClientFormModal from '@/features/task-management/components/ClientFormMod
 import BusinessFormModal from '@/features/task-management/components/BusinessFormModal';
 import ProjectFormModal from '@/features/task-management/components/ProjectFormModal';
 
-export default function QuickCreateMenu() {
+export default function QuickCreateMenu({ clientId: propClientId, onProjectCreated }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [open, setOpen] = useState(false);
@@ -15,8 +15,23 @@ export default function QuickCreateMenu() {
   const [showProject, setShowProject] = useState(false);
   const ref = useRef(null);
 
-  // Resolve an active client from the URL so "New Business" can be pre-scoped.
-  const activeClientId = (location.pathname.match(/^\/clients\/(\d+)/) || [])[1] || null;
+  // Resolve an active client from the URL or an explicit prop so "New Business"
+  // / "New Project" can be pre-scoped to the current context.
+  const activeClientId = propClientId || (location.pathname.match(/^\/clients\/(\d+)/) || [])[1] || null;
+
+  // Allow the global command palette (rendered in the app shell) to trigger the
+  // same create flows without the palette needing to own these modals.
+  useEffect(() => {
+    const onQuickCreate = (e) => {
+      const type = e.detail?.type;
+      if (type === 'client') setShowClient(true);
+      else if (type === 'business') setShowBusiness(true);
+      else if (type === 'project') setShowProject(true);
+      else if (type === 'task') navigate('/tasks');
+    };
+    window.addEventListener('app:quick-create', onQuickCreate);
+    return () => window.removeEventListener('app:quick-create', onQuickCreate);
+  }, [navigate]);
 
   useEffect(() => {
     const onClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
@@ -80,7 +95,7 @@ export default function QuickCreateMenu() {
       <ProjectFormModal
         open={showProject}
         onClose={() => setShowProject(false)}
-        onCreated={(p) => setShowProject(false)}
+        onCreated={(p) => { setShowProject(false); onProjectCreated?.(p); }}
       />
     </>
   );
