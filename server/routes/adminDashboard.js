@@ -9,6 +9,7 @@ const enrollmentModel = require('../models/enrollmentModel');
 const messageModel = require('../models/messageModel');
 const announcementModel = require('../models/announcementModel');
 const eventModel = require('../models/eventModel');
+const sopService = require('../services/sopService');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.statusCode && Number.isInteger(err.statusCode) ? err.statusCode : 500;
@@ -102,6 +103,31 @@ router.get('/', authenticateToken, async (req, res) => {
       created_at: item.created_at,
     }));
 
+    // Real SOP statistics grouped by category for the "SOPs by Category" card.
+    const sopStatsRows = await sopService.getSopStats().catch(() => []);
+    const sopTotal = sopStatsRows.reduce((sum, r) => sum + Number(r.count || 0), 0);
+    const sopPublished = sopStatsRows
+      .filter((r) => r.status === 'Published')
+      .reduce((sum, r) => sum + Number(r.count || 0), 0);
+
+    const [sopByCategoryRows] = await db
+      .query(
+        `SELECT c.name AS category_name, COUNT(s.id) AS count
+         FROM sops s
+         LEFT JOIN categories c ON s.category_id = c.id
+         WHERE (s.is_deleted = 0 OR s.is_deleted IS NULL)
+         GROUP BY c.name
+         ORDER BY count DESC`
+      )
+      .catch(() => [[]]);
+    const sopByCategory = (sopByCategoryRows || [])
+      .map((r) => ({
+        name: r.category_name || 'Uncategorized',
+        count: Number(r.count) || 0,
+        value: Number(r.count) || 0,
+      }))
+      .filter((c) => c.count > 0);
+
     res.json({
       success: true,
       message: 'OK',
@@ -112,7 +138,11 @@ router.get('/', authenticateToken, async (req, res) => {
           admins: Number(userStats.admins) || 0,
           employees: Number(userStats.employees) || 0,
         },
-        sops: userStats,
+        sops: {
+          total: sopTotal,
+          published: sopPublished,
+          byCategory: sopByCategory,
+        },
         tasks: {
           total: Number(taskStats.total) || 0,
           todo: Number(taskStats.pending) || 0,

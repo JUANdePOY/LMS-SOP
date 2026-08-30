@@ -29,6 +29,21 @@ function getAnnouncementBusinessFilter(user) {
   return { business_id: businessId };
 }
 
+// Ensure a referenced business actually exists before using it as the FK.
+// Announcements allow a NULL business_id (global), so an invalid/missing id is
+// safely downgraded to NULL instead of triggering a foreign key error.
+async function resolveBusinessId(businessId) {
+  if (businessId == null || businessId === '') return null;
+  const id = Number(businessId);
+  if (!Number.isFinite(id) || id <= 0) return null;
+  try {
+    const [rows] = await db.query('SELECT id FROM businesses WHERE id = ? LIMIT 1', [id]);
+    return rows.length > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 function listAnnouncements(req, res) {
   const { type, priority, status, page = 1, limit = 20, target_role, target_department } = req.query;
   const pageNum = parseInt(page, 10);

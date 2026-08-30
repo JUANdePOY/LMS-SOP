@@ -38,7 +38,10 @@ export default function AnnouncementForm({ initialData, onSubmit, onCancel, savi
   const [priority, setPriority] = useState(initialData?.priority || "medium");
   const [status, setStatus] = useState(initialData?.status || "active");
 
-  const [businessId, setBusinessId] = useState(() => initialData?.business_id || scopedBusinessId || "");
+  const [businessId, setBusinessId] = useState(() => {
+    if (initialData?.business_id != null) return initialData.business_id;
+    return isSuperAdmin ? "" : (scopedBusinessId || "");
+  });
   const [targetDepartmentCode, setTargetDepartmentCode] = useState(() => {
     if (!initialData?.target_departments) return "";
     const codes = Array.isArray(initialData.target_departments) ? initialData.target_departments : [];
@@ -106,7 +109,7 @@ export default function AnnouncementForm({ initialData, onSubmit, onCancel, savi
       setType(initialData.type || "General");
       setPriority(initialData.priority || "medium");
       setStatus(initialData.status || "active");
-      const initBusinessId = initialData.business_id || scopedBusinessId || "";
+      const initBusinessId = initialData.business_id != null ? initialData.business_id : (isSuperAdmin ? "" : scopedBusinessId || "");
       setBusinessId(initBusinessId);
       if (initialData.target_departments) {
         const codes = Array.isArray(initialData.target_departments) ? initialData.target_departments : [];

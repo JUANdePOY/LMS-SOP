@@ -14,12 +14,9 @@ import { StaggerList, MotionItem } from '@/shared/motion';
 import useAdminDashboard from './hooks/useAdminDashboard';
 import { useNotifications } from '@/shared/stores/notificationStore.js';
 
-const SOP_BY_CATEGORY_DATA = [
-  { name: 'Operations', value: 45, count: 19, color: '#F25C05' },
-  { name: 'HR & Admin', value: 24, count: 10, color: '#da7756' },
-  { name: 'Sales & Marketing', value: 17, count: 7, color: '#d97a6c' },
-  { name: 'Finance', value: 9, count: 4, color: '#1D3067' },
-  { name: 'IT', value: 5, count: 2, color: '#32667F' },
+const SOP_CATEGORY_COLORS = [
+  '#F25C05', '#da7756', '#d97a6c', '#1D3067', '#32667F',
+  '#5b8c5a', '#8a6d3b', '#7d5ba6', '#c05621', '#2c7a7b',
 ];
 
 const CARD_COLORS = {
@@ -73,6 +70,11 @@ export default function Dashboard() {
   const messages = data?.messages || [];
   const departments = data?.departments?.performance || [];
   const taskStats = data?.tasks || {};
+
+  const sopCategories = (data?.sops?.byCategory || []).map((category, index) => ({
+    ...category,
+    color: SOP_CATEGORY_COLORS[index % SOP_CATEGORY_COLORS.length],
+  }));
 
   useEffect(() => {
     fetchNotifications();
@@ -284,48 +286,46 @@ export default function Dashboard() {
         <Card className="p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">SOPs by Category</h2>
-            <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-[rgba(242,92,5,0.20)]"
-            >
-              <option value="month">This Month</option>
-              <option value="week">This Week</option>
-            </select>
           </div>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
-            <div className="relative shrink-0" style={{ width: 150, height: 150 }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <RePieChart>
-                  <Pie
-                    data={SOP_BY_CATEGORY_DATA}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={65}
-                    dataKey="value"
-                    stroke="none"
-                  >
-                  {SOP_BY_CATEGORY_DATA.map((entry) => (
-                    <Cell key={entry.name} fill={entry.color} />
-                  ))}
-                  </Pie>
-                </RePieChart>
-              </ResponsiveContainer>
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-neutral-100">{data?.sops?.total || 0}</span>
-                <span className="text-[10px] sm:text-xs text-neutral-500">Total</span>
-              </div>
-            </div>
-            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
-              {SOP_BY_CATEGORY_DATA.map((item) => (
-                <div key={item.name} className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                  <span className="text-[11px] sm:text-xs text-neutral-600 dark:text-neutral-400">{item.name}</span>
-                  <span className="text-[11px] sm:text-xs font-semibold text-neutral-900 dark:text-neutral-100">{item.count}</span>
+            {sopCategories.length > 0 ? (
+              <>
+                <div className="relative shrink-0" style={{ width: 150, height: 150 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RePieChart>
+                      <Pie
+                        data={sopCategories}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={45}
+                        outerRadius={65}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {sopCategories.map((entry) => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Pie>
+                    </RePieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-lg sm:text-xl font-bold text-neutral-900 dark:text-neutral-100">{data?.sops?.total || 0}</span>
+                    <span className="text-[10px] sm:text-xs text-neutral-500">Total</span>
+                  </div>
                 </div>
-              ))}
-            </div>
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
+                  {sopCategories.map((item) => (
+                    <div key={item.name} className="flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                      <span className="text-[11px] sm:text-xs text-neutral-600 dark:text-neutral-400">{item.name}</span>
+                      <span className="text-[11px] sm:text-xs font-semibold text-neutral-900 dark:text-neutral-100">{item.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-neutral-400 dark:text-neutral-500 py-8">No SOP data available yet.</p>
+            )}
           </div>
         </Card>
 
