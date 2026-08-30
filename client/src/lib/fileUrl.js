@@ -39,4 +39,29 @@ export function resolveBodyImages(html) {
   });
 }
 
+/**
+ * Reverse of resolveBodyImages: strip the authenticated /api/files/stream URL
+ * (which carries a user-specific, expiring JWT token) back to the canonical
+ * /uploads/... path before persisting HTML. This keeps the stored body stable
+ * and viewable by every user, instead of baking in a token that expires and
+ * makes the image "disappear" later.
+ */
+export function canonicalizeBodyImages(html) {
+  if (!html || typeof html !== 'string') return html;
+  return html.replace(
+    /<img([^>]+)src="([^"]*\/api\/files\/stream\?path=([^&"#]+)(?:&[^"#]*)?)"/gi,
+    (match, attrs, src, encPath) => {
+      try {
+        const decoded = decodeURIComponent(encPath);
+        if (decoded.startsWith('/uploads/')) {
+          return match.replace(src, decoded);
+        }
+      } catch {
+        /* leave unchanged if the path can't be decoded */
+      }
+      return match;
+    }
+  );
+}
+
 export default resolveFileUrl;

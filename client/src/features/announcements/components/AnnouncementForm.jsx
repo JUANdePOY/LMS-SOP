@@ -3,7 +3,7 @@ import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichT
 import { useAuth } from "@/contexts/AuthContext";
 import { getBusinesses } from "@/features/organization-management/api/business.api";
 import { getDepartments } from "@/features/organization-management/api/department.api";
-import { resolveFileUrl, resolveBodyImages } from "@/lib/fileUrl";
+import { resolveBodyImages, canonicalizeBodyImages } from "@/lib/fileUrl";
 import api from "@/services/api";
 
 const PRIORITY_OPTIONS = [
@@ -126,7 +126,7 @@ export default function AnnouncementForm({ initialData, onSubmit, onCancel, savi
     const targetDepartments = targetDepartmentCode ? [targetDepartmentCode] : null;
     onSubmit({
       title: title.trim(),
-      body: body.trim(),
+      body: canonicalizeBodyImages(body.trim()),
       type,
       priority,
       status,
@@ -163,7 +163,10 @@ export default function AnnouncementForm({ initialData, onSubmit, onCancel, savi
             const formData = new FormData();
             formData.append('file', file);
             const res = await api.post('/announcements/upload-image', formData);
-            return resolveFileUrl(res.data.url);
+            // Store the canonical /uploads/... path; the URL is resolved to the
+            // authenticated stream route at render time (resolveBodyImages) so
+            // the image isn't tied to a single user's expiring token.
+            return res.data.url;
           }}
         />
       </div>

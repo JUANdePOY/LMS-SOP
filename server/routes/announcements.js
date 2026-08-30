@@ -7,19 +7,20 @@ const storage = require('../config/storage');
 
 router.use(authenticateToken);
 
-// Upload an image to be embedded in an announcement body. Returns a servable
-// URL (a relative /uploads/... path for local storage, or an absolute object
-// URL for S3) that the rich-text editor inserts into the HTML body. In DB-blob
-// storage the client rewrites this to the authenticated /api/files/stream URL
-// (see client resolveFileUrl) so the image actually renders.
+// Upload an image to be embedded in an announcement body. The bytes are always
+// persisted into the `file_blobs` table (independent of STORAGE_DRIVER) so the
+// asset survives redeploys where the host filesystem is ephemeral. The route
+// returns the canonical /uploads/... path; the client rewrites it to the
+// authenticated /api/files/stream URL (see client resolveFileUrl) at render
+// time, so the image renders for every viewer without a stale/expiring token
+// being baked into the stored HTML.
 router.post('/upload-image', requirePermission('manage_announcements'), announcementImageUpload, async (req, res) => {
   try {
-    const url = await storage.saveFile({
-      buffer: req.file.buffer,
-      dir: 'announcements',
-      filename: req.file.filename,
-      contentType: req.file.mimetype,
-    });
+    const url = await storage.dbSave(
+      req.file.buffer,
+      `announcements/${req.file.filename}`,
+      req.file.mimetype
+    );
     res.json({ success: true, url });
   } catch (err) {
     console.error('Announcement image upload error:', err.message);

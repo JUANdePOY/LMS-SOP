@@ -471,7 +471,15 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
       const el = triggerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      setCoords({ top: rect.bottom + 4, left: rect.right - 176 });
+      const MENU_W = 176;
+      const MARGIN = 8;
+      const dd = dropdownRef.current;
+      const ddHeight = dd ? dd.offsetHeight : 200;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const flipUp = ddHeight > spaceBelow && rect.top > spaceBelow;
+      let top = flipUp ? rect.top - ddHeight - 4 : rect.bottom + 4;
+      top = Math.max(MARGIN, Math.min(top, window.innerHeight - ddHeight - MARGIN));
+      setCoords({ top, left: rect.right - MENU_W });
     };
     update();
     const onScroll = (e) => {
