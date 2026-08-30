@@ -89,7 +89,7 @@ async function getTree() {
             p.id AS project_id, p.name AS project_name, p.status AS project_status,
             p.color AS project_color, p.due_date AS project_due_date
      FROM clients c
-     INNER JOIN client_businesses cb ON cb.client_id = c.id
+     LEFT JOIN client_businesses cb ON cb.client_id = c.id
      LEFT JOIN projects p ON p.client_business_id = cb.id
      ORDER BY c.client_name ASC, cb.business_name ASC, p.name ASC`
   );
@@ -104,6 +104,10 @@ async function getTree() {
         businesses: new Map(),
       });
     }
+    // Clients without any client_businesses row yet still appear in the tree
+    // (so a freshly created client shows up even before businesses/projects
+    // are added), but they have no business/branch to render.
+    if (row.business_id == null) continue;
     const client = clientsMap.get(row.client_id);
     if (!client.businesses.has(row.business_id)) {
       client.businesses.set(row.business_id, {

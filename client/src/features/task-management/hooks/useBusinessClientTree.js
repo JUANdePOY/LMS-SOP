@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '@/services/api';
+import { useOrgTreeVersion } from '@/shared/store/orgTreeBus';
 
 /**
  * Builds the secondary-panel tree: SOP Business -> Clients -> (client) Business units.
@@ -56,9 +57,11 @@ export function useBusinessClientTree() {
     }
   }, []);
 
+  const orgVersion = useOrgTreeVersion();
+
   useEffect(() => {
     load();
-  }, [load]);
+  }, [load, orgVersion]);
 
   const { grouped, unassigned } = useMemo(() => {
     const byBiz = {};

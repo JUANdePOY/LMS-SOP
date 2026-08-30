@@ -82,7 +82,12 @@ function PriorityDropdown({ priority, onChange }) {
   );
 }
 
-function DueDateCell({ value, onChange }) {
+function isOverdue(task) {
+  if (!task.deadline_datetime || task.status === 'Completed' || task.status === 'Cancelled') return false;
+  return new Date(task.deadline_datetime) < new Date();
+}
+
+function DueDateCell({ value, onChange, overdue = false }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
 
@@ -116,8 +121,15 @@ function DueDateCell({ value, onChange }) {
   }
 
   return (
-    <button type="button" onClick={(e) => { e.stopPropagation(); open(); }} className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]">
-      <Calendar size={11} className="text-[var(--text-muted)]" />
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); open(); }}
+      className={cn(
+        'inline-flex items-center gap-1 rounded px-1 py-0.5 text-xs tabular-nums hover:bg-[var(--bg-surface-hover)]',
+        overdue ? 'text-red-600 dark:text-red-400' : 'text-[var(--text-secondary)]'
+      )}
+    >
+      <Calendar size={11} className={overdue ? 'text-red-600 dark:text-red-400' : 'text-[var(--text-muted)]'} />
       {value ? formatDate(value) : '—'}
     </button>
   );
@@ -160,17 +172,31 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 224 });
+  const [maxHeight, setMaxHeight] = useState(null);
   const triggerRef = useRef(null);
   const dropdownRef = useRef(null);
 
+  const VIEWPORT_MARGIN = 8;
+
   // Position the popover with fixed coordinates so it renders above scrollable
   // / overflow containers (the hierarchy table lives inside an overflow-x-auto
-  // wrapper) that would otherwise clip an absolutely-positioned dropdown.
+  // wrapper) that would otherwise clip an absolutely-positioned dropdown. It
+  // also flips upward and clamps its height when there isn't enough room below
+  // the trigger, so it never overflows the bottom of the viewport.
   const updatePosition = useCallback(() => {
     const el = triggerRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
-    setCoords({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 224) });
+    const width = Math.max(rect.width, 224);
+    const ddHeight = dropdownRef.current ? dropdownRef.current.offsetHeight : 360;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const flipUp = ddHeight > spaceBelow && spaceAbove > spaceBelow;
+    let top = flipUp ? rect.top - ddHeight - 4 : rect.bottom + 4;
+    top = Math.max(VIEWPORT_MARGIN, Math.min(top, window.innerHeight - ddHeight - VIEWPORT_MARGIN));
+    setCoords({ top, left: rect.left, width });
+    const available = (flipUp ? rect.top : window.innerHeight - rect.bottom) - VIEWPORT_MARGIN;
+    setMaxHeight(available > 160 ? available : 160);
   }, []);
 
   useEffect(() => {
@@ -310,10 +336,10 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
       {open && createPortal(
         <div
           ref={dropdownRef}
-          className="fixed z-50 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-2 shadow-xl"
-          style={{ top: coords.top, left: coords.left, width: coords.width }}
+          className="fixed z-50 flex max-h-full flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-2 shadow-xl"
+          style={{ top: coords.top, left: coords.left, width: coords.width, maxHeight }}
         >
-          <div className="px-2 pb-1">
+          <div className="shrink-0 px-2 pb-1">
             <input
               autoFocus
               value={query}
@@ -322,7 +348,7 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
               className="w-full rounded border border-[var(--border)] bg-[var(--bg-page)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
             />
           </div>
-          <div className="max-h-32 overflow-y-auto px-1">
+          <div className="min-h-0 flex-1 overflow-y-auto px-1">
             {loading && <p className="px-2 py-1 text-xs text-[var(--text-muted)]">Searching...</p>}
             {!loading && selectableOptions.length === 0 && (
               <p className="px-2 py-1 text-xs text-[var(--text-muted)]">
@@ -337,7 +363,7 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
             ))}
           </div>
           {currentUsers.length > 0 && (
-            <div className="mt-1 border-t border-[var(--border)] px-2 pt-1">
+            <div className="mt-1 shrink-0 border-t border-[var(--border)] px-2 pt-1">
               {currentUsers.map((a) => (
                 <div key={a.reference_id} className="flex items-center justify-between gap-2 py-0.5">
                   <span className="flex min-w-0 items-center gap-2">
@@ -529,6 +555,8 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
 export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects }) {
   const { toast } = useToast();
 
+  const overdue = isOverdue(task);
+
   const handleCompleteToggle = () => {
     if (task.status === 'Completed') {
       onStatusChange?.(task, 'In Progress');
@@ -585,17 +613,25 @@ export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, on
           type="button"
           onClick={handleCompleteToggle}
           disabled={!canManage}
+          aria-pressed={task.status === 'Completed'}
           className={cn(
-            'grid h-4 w-4 place-items-center rounded border-2 transition-colors',
+            'grid h-4 w-4 place-items-center rounded-full border-[1.5px] transition-colors duration-150 ease-out motion-reduce:transition-none',
             task.status === 'Completed'
-              ? 'border-emerald-500 bg-emerald-500 text-white'
-              : 'border-[var(--border)] hover:border-emerald-500',
+              ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+              : 'border-[var(--border)] hover:border-[var(--color-primary)]',
             !canManage && 'cursor-not-allowed opacity-60'
           )}
           title={task.status === 'Completed' ? 'Mark incomplete' : 'Mark complete'}
           aria-label={task.status === 'Completed' ? 'Mark incomplete' : 'Mark complete'}
         >
-          {task.status === 'Completed' && <Check size={10} strokeWidth={3} />}
+          <span
+            className={cn(
+              'transition-transform duration-100 ease-out motion-reduce:transition-none',
+              task.status === 'Completed' ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
+            )}
+          >
+            <Check size={10} strokeWidth={3} />
+          </span>
         </button>
       </span>
 
@@ -658,18 +694,16 @@ export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, on
         )}
       </span>
 
-      <span className="hidden sm:block" onClick={(e) => e.stopPropagation()}>
+       <span className="hidden sm:block" onClick={(e) => e.stopPropagation()}>
         {canManage ? (
-          <DueDateCell value={task.deadline_datetime} onChange={(d) => onInlineUpdate?.(task, { deadline_datetime: d })} />
+          <DueDateCell value={task.deadline_datetime} overdue={overdue} onChange={(d) => onInlineUpdate?.(task, { deadline_datetime: d })} />
         ) : (
-          <span className="text-xs text-[var(--text-secondary)]">{formatDate(task.deadline_datetime)}</span>
+          <span className={cn('text-xs tabular-nums', overdue ? 'text-red-600 dark:text-red-400' : 'text-[var(--text-secondary)]')}>{formatDate(task.deadline_datetime)}</span>
         )}
       </span>
 
-      <span className="hidden items-center gap-1.5 sm:flex">
-        <span className="h-1 flex-1 rounded-full bg-[var(--border-subtle)]">
-          <span className="block h-1 rounded-full bg-[var(--color-primary)]" style={{ width: `${Math.max(0, Math.min(100, Number(task.progress_rate ?? task.completion_rate ?? 0)))}%` }} />
-        </span>
+      <span className="hidden items-center justify-end tabular-nums text-xs text-[var(--text-secondary)] sm:flex">
+        {Math.round(Math.max(0, Math.min(100, Number(task.progress_rate ?? task.completion_rate ?? 0))))}%
       </span>
 
       <span className="hidden lg:block" />

@@ -53,6 +53,7 @@ export default function ProjectTaskViews({
   onQuickAddTask,
   onRenameClient,
   onRenameBusiness,
+  onCreateClient,
   onRenameProject,
   onRenameTask,
   onAddChild,
@@ -123,6 +124,7 @@ export default function ProjectTaskViews({
               onDeleteEntity={onDeleteEntity}
               onCreateBusiness={onCreateBusiness}
               onCreateProject={onCreateProject}
+              onCreateClient={onCreateClient}
               selectedIds={selectedIds}
               onToggleSelect={onToggleSelect}
               onSelectAll={onSelectAll}

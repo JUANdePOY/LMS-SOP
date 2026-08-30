@@ -5,6 +5,7 @@ import { getProject } from '../services/projectService';
 import { getTasks, createTask, updateTask, deleteTask, updateProgress } from '../services/taskService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/components/ui/Toast';
+import { useOrgTreeVersion } from '@/shared/store/orgTreeBus';
 import Breadcrumb from '../components/Breadcrumb';
 import ProjectTaskViews from '../components/ProjectTaskViews';
 import EntityDetailPanel from '../components/EntityDetailPanel';
@@ -17,6 +18,7 @@ export default function ProjectWorkspacePage() {
   const { projectId } = useParams();
   const { isAnyAdmin } = useAuth();
   const { toast } = useToast();
+  const orgVersion = useOrgTreeVersion();
 
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -53,7 +55,7 @@ export default function ProjectWorkspacePage() {
     }
   }, [projectId, toast]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, orgVersion]);
 
   const openTask = useCallback((t) => {
     setSelected(t);

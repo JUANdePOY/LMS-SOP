@@ -1,5 +1,11 @@
 import api from '@/services/api';
 
+export const getBusinesses = async () => {
+  const res = await api.get('/businesses');
+  const payload = res.data?.data;
+  return Array.isArray(payload) ? payload : (payload?.rows || []);
+};
+
 export const getBusiness = (id) =>
   api.get(`/businesses/${id}`).then((r) => r.data?.data);
 

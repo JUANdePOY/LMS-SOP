@@ -6,6 +6,7 @@ import api from "@/services/api";
 import { useToast } from "@/shared/components/ui/Toast";
 import { useNavigation } from "@/shared/contexts/NavigationContext";
 import { useBusinessClientTree } from "@/features/task-management/hooks/useBusinessClientTree";
+import { notifyOrgTreeChanged } from "@/shared/store/orgTreeBus";
 import InlineNameRow from "@/features/task-management/components/InlineNameRow";
 import ConfirmationDialog from "@/shared/components/ui/ConfirmationDialog";
 
@@ -85,6 +86,7 @@ export default function SecondarySidebar() {
       toast.success("Client created");
       setAddingClientBiz(null);
       refresh();
+      notifyOrgTreeChanged();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to create client");
       throw err;
@@ -97,6 +99,7 @@ export default function SecondarySidebar() {
       toast.success("Business unit created");
       setAddingUnitClient(null);
       refresh();
+      notifyOrgTreeChanged();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to create business unit");
       throw err;
@@ -121,6 +124,7 @@ export default function SecondarySidebar() {
       }
       setPendingDelete(null);
       refresh();
+      notifyOrgTreeChanged();
     } catch (err) {
       toast.error(err.response?.data?.message || `Failed to delete ${kind}`);
       setPendingDelete(null);
@@ -470,7 +474,7 @@ export default function SecondarySidebar() {
         {clientBizPicker ? (
           <div className="space-y-1">
             <p className="px-1 pb-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
-              Select an SOP business
+              Select an Business
             </p>
             <div className="max-h-44 overflow-y-auto space-y-0.5 scrollbar-none">
               {businesses.map((b) => (

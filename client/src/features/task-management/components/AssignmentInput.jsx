@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { X, Users, Building2 } from 'lucide-react';
 import { ASSIGNMENT_TYPES } from '../constants/taskConstants';
 import { getUsersForAssignment, getDepartmentsForAssignment } from '../api/assignment.api';
@@ -17,6 +17,7 @@ export default function AssignmentInput({ assignment, onUpdate, onRemove, canRem
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownCoords, setDropdownCoords] = useState({ top: 0, left: 0, width: 0 });
   const dropdownRef = useRef(null);
+  const menuRef = useRef(null);
   const inputContainerRef = useRef(null);
   const justSelectedRef = useRef(false);
 
@@ -64,16 +65,23 @@ export default function AssignmentInput({ assignment, onUpdate, onRemove, canRem
 
   // Position the dropdown using fixed coordinates so it renders above
   // modal overlays and overflow containers that would otherwise clip it.
-  useEffect(() => {
+  // It opens downward by default, but flips upward when there isn't enough
+  // room below the input so the menu stays fully within the viewport.
+  useLayoutEffect(() => {
     if (!showDropdown || !inputContainerRef.current) return;
 
     const updatePosition = () => {
-      const rect = inputContainerRef.current.getBoundingClientRect();
-      setDropdownCoords({
-        top: rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
-      });
+      const input = inputContainerRef.current;
+      if (!input) return;
+      const rect = input.getBoundingClientRect();
+      // Measure the actual menu height (falls back to an estimate before paint).
+      const menuHeight = menuRef.current?.offsetHeight || 240;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const openUp = spaceBelow < menuHeight + 8;
+      const top = openUp
+        ? Math.max(8, rect.top - menuHeight - 4)
+        : rect.bottom + 4;
+      setDropdownCoords({ top, left: rect.left, width: rect.width });
     };
 
     updatePosition();
@@ -90,7 +98,7 @@ export default function AssignmentInput({ assignment, onUpdate, onRemove, canRem
       window.removeEventListener('scroll', handleScroll, true);
       window.removeEventListener('resize', updatePosition);
     };
-  }, [showDropdown]);
+  }, [showDropdown, options]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -168,6 +176,7 @@ export default function AssignmentInput({ assignment, onUpdate, onRemove, canRem
 
         {showDropdown && options.length > 0 && (
           <div
+            ref={menuRef}
             className="fixed z-50 max-h-48 min-w-[220px] max-w-[280px] overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] shadow-lg"
             style={dropdownStyle}
           >
@@ -199,6 +208,7 @@ export default function AssignmentInput({ assignment, onUpdate, onRemove, canRem
 
         {showDropdown && !loading && query && options.length === 0 && (
           <div
+            ref={menuRef}
             className="fixed z-50 min-w-[220px] rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-xs text-[var(--text-muted)] shadow-lg whitespace-nowrap"
             style={dropdownStyle}
           >

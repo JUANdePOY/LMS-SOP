@@ -1,9 +1,10 @@
 import { useMemo, useState, useCallback, useEffect, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, ExternalLink, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2 } from 'lucide-react';
+import { ChevronRight, ExternalLink, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2, Inbox } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useClickOutside } from '../hooks/useClickOutside';
+import { getBusinesses } from '../api/business.api';
 import { TaskRow } from './TaskListRow';
 import InlineEditableName from './InlineEditableName';
 import InlineNameRow from './InlineNameRow';
@@ -27,6 +28,81 @@ export const HIERARCHY_GRID =
 // number of visible cells always matches the active HIERARCHY_GRID column count.
 const CELL_HIDE_SM = 'hidden sm:block'; // assignees / priority / due / progress
 const CELL_HIDE_LG = 'hidden lg:block'; // open icon
+
+/**
+ * Inline "add client" form. Beyond a name it lets the user assign the new client
+ * to an existing SOP business (clients.business_id) via a select populated from
+ * GET /api/businesses. The business choice is optional ("— SOP business —").
+ */
+function AddClientForm({ onCommit, onCancel }) {
+  const [name, setName] = useState('');
+  const [businessId, setBusinessId] = useState('');
+  const [businesses, setBusinesses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    getBusinesses()
+      .then((list) => { if (active) setBusinesses(Array.isArray(list) ? list : []); })
+      .catch(() => { if (active) setBusinesses([]); })
+      .finally(() => { if (active) setLoading(false); });
+    inputRef.current?.focus();
+    return () => { active = false; };
+  }, []);
+
+  const commit = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) { onCancel?.(); return; }
+    setSubmitting(true);
+    try {
+      await onCommit(trimmed, businessId ? Number(businessId) : null);
+      setName('');
+      setBusinessId('');
+    } catch {
+      // Parent surfaces its own error toast; keep the form open so the user can retry.
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-2 text-sm" style={{ paddingLeft: '8px' }}>
+      <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-primary)] opacity-40" aria-hidden="true" />
+      <input
+        ref={inputRef}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') { e.preventDefault(); onCancel?.(); }
+        }}
+        placeholder="New client name…"
+        className="min-w-[160px] flex-1 rounded border border-[var(--color-primary)] bg-[var(--bg-surface)] px-2 py-1 text-sm outline-none"
+      />
+      <select
+        value={businessId}
+        onChange={(e) => setBusinessId(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') { e.preventDefault(); onCancel?.(); }
+        }}
+        disabled={loading}
+        className="rounded border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-sm text-[var(--text-secondary)] outline-none transition-colors duration-150 ease-out focus:border-[var(--color-primary)] motion-reduce:transition-none"
+      >
+        <option value="">{loading ? 'Loading businesses…' : '— SOP business —'}</option>
+        {businesses.map((b) => (
+          <option key={b.id} value={b.id}>{b.business_name}</option>
+        ))}
+      </select>
+      {submitting && (
+        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--color-primary)]" />
+      )}
+    </div>
+  );
+}
 
 /**
  * TaskHierarchyTable
@@ -113,10 +189,11 @@ function useHierarchy(tasks, projectsById, clientTree = []) {
       return business.projects.get(project.id);
     };
 
-    // Seed the full Client -> Business skeleton from the org tree so that
-    // businesses with no projects yet (e.g. just created) still appear in the
-    // table and can be renamed / deleted.
+    // Seed the full Client -> Business skeleton from the org tree. Ensure every
+    // client row exists first (even clients with no businesses yet, e.g. just
+    // created) so they appear in the table, then attach their businesses.
     for (const client of clientTree || []) {
+      ensureClient(client.id, client.client_name, client.color);
       for (const business of client.businesses || []) {
         ensureBusiness(client.id, client.client_name, business.id, business.business_name, client.color);
       }
@@ -245,6 +322,7 @@ export default function TaskHierarchyTable({
   onRenameTask,
   onCreateBusiness,
   onCreateProject,
+  onCreateClient,
   onDeleteEntity,
   selectedIds,
   onToggleSelect,
@@ -255,6 +333,8 @@ export default function TaskHierarchyTable({
   const [expanded, setExpanded] = useState(loadExpanded);
   // Which parent is currently showing an inline "add" row: { kind, parentId }.
   const [addingFor, setAddingFor] = useState(null);
+  // Whether the inline "add client" row at the bottom of the table is open.
+  const [addingClient, setAddingClient] = useState(false);
 
   // Opens an inline "add" row directly under the clicked parent (no modal):
   // a client reveals a business row, a business reveals a project row. A project
@@ -351,15 +431,12 @@ export default function TaskHierarchyTable({
     return expanded.has(key);
   }, [expanded, search]);
 
-  if (clients.length === 0) {
-    return (
-      <div className="ppm-empty">
-        <p className="text-sm">No tasks found</p>
-      </div>
-    );
-  }
-
-  return (
+  const table = clients.length === 0 ? (
+    <div className="flex flex-col items-center justify-center gap-3 px-4 py-16 text-center">
+      <Inbox size={28} className="text-[var(--text-muted)]" aria-hidden="true" />
+      <p className="text-sm text-[var(--text-muted)]">No tasks found</p>
+    </div>
+  ) : (
     <div role="table" aria-label="Client to task hierarchy" className="w-full overflow-x-auto">
       {/* Header row */}
       <div
@@ -401,21 +478,22 @@ export default function TaskHierarchyTable({
         const open = isExpanded(clientKey, 'client', client);
         const clientProjectCount = client.businesses.reduce((sum, b) => sum + b.projects.length, 0);
         return (
-          <div key={clientKey}>
-            <Row
-              depth={0}
-              kind="client"
-              id={client.id}
-              name={client.name}
-              open={open}
-              onToggle={() => toggle(clientKey)}
-              rollupText={`${clientProjectCount} project${clientProjectCount === 1 ? '' : 's'}`}
-              dueDate={client.rollup.earliestDue}
-              progress={client.rollup.avgProgress}
-              dimmed={dimmed}
-              onOpenPage={() => navigate(`/clients/${client.id}`)}
-              colorDot
-              canEdit={canManage}
+           <div key={clientKey} className="mt-2 first:mt-0">
+             <Row
+               depth={0}
+               kind="client"
+               id={client.id}
+               name={client.name}
+               open={open}
+               onToggle={() => toggle(clientKey)}
+               rollupText={`${clientProjectCount} project${clientProjectCount === 1 ? '' : 's'}`}
+               dueDate={client.rollup.earliestDue}
+               progress={client.rollup.avgProgress}
+               dimmed={dimmed}
+               onOpenPage={() => navigate(`/clients/${client.id}`)}
+               colorDot
+               color={client.color}
+               canEdit={canManage}
               onRename={onRenameClient}
               onAddChild={startAdd}
               onDeleteEntity={onDeleteEntity}
@@ -535,11 +613,46 @@ export default function TaskHierarchyTable({
       })}
     </div>
   );
+
+  return (
+    <div>
+      {table}
+      {canManage && (
+        <div className="px-2 pt-3">
+          {addingClient ? (
+            <AddClientForm
+              key="__add-client"
+              onCommit={async (name, businessId) => { await onCreateClient?.(name, businessId); setAddingClient(false); }}
+              onCancel={() => setAddingClient(false)}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddingClient(true)}
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm font-medium text-[var(--text-secondary)] transition-colors duration-150 ease-out motion-reduce:transition-none hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)]"
+            >
+              <Plus size={14} />
+              Add client
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const DEPTH_INDENT_PX = 20;
 
-function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progress, dimmed, onOpenPage, colorDot, canEdit, onRename, onAddChild, onAddTask, onEditProject, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue }) {
+// Centralized per-kind typography. Hierarchy reads through size/weight/spacing
+// only — no per-level color, background, or border.
+const LEVEL_STYLE = {
+  client:   { font: 'font-semibold', size: 'text-[15px]', py: 'py-3.5', tracking: 'tracking-[0.01em]', leading: 'leading-relaxed' },
+  business: { font: 'font-medium',   size: 'text-sm',     py: 'py-3',   tracking: '', leading: '' },
+  project:  { font: 'font-medium',   size: 'text-sm',     py: 'py-2.5', tracking: '', leading: '' },
+};
+
+function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progress, dimmed, onOpenPage, colorDot, color, canEdit, onRename, onAddChild, onAddTask, onEditProject, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue }) {
+  const level = LEVEL_STYLE[kind] || LEVEL_STYLE.project;
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renameSignal, setRenameSignal] = useState(0);
@@ -600,19 +713,35 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
         onToggle();
       }}
       className={cn(
-        'group grid cursor-pointer items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-2.5 text-sm transition-colors',
+        'group grid cursor-pointer items-center gap-2 border-b border-[var(--border-subtle)] px-2 text-sm transition-colors duration-150 ease-out motion-reduce:transition-none',
+        level.py,
         'hover:bg-[var(--bg-surface-hover)]',
         dimmed && 'opacity-40',
         HIERARCHY_GRID
       )}
     >
       <span className="flex min-w-0 items-center gap-1.5">
-        <ChevronRight
-          size={14}
-          className={cn('shrink-0 text-[var(--text-muted)] transition-transform duration-150', open && 'rotate-90')}
-        />
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          aria-expanded={open}
+          aria-label={`${open ? 'Collapse' : 'Expand'} ${name}`}
+          className="grid h-5 w-5 shrink-0 place-items-center rounded transition-colors duration-150 ease-out motion-reduce:transition-none hover:bg-[var(--bg-surface-hover)]"
+        >
+          <ChevronRight
+            size={14}
+            className={cn(
+              'shrink-0 text-[var(--text-muted)] transition-transform duration-150 ease-out motion-reduce:transition-none',
+              open ? 'rotate-90 text-[var(--color-primary)]' : 'group-hover:text-[var(--color-primary)]'
+            )}
+          />
+        </button>
         {colorDot && (
-          <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-primary)]" aria-hidden="true" />
+          <span
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: color || 'var(--color-primary)' }}
+            aria-hidden="true"
+          />
         )}
       </span>
 
@@ -628,15 +757,18 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
               onCommit={(next) => onRename?.(id, next)}
               renameSignal={renameSignal}
               className={cn(
-                'whitespace-normal break-words',
-                kind === 'client' ? 'font-medium text-[var(--text-primary)]' : 'text-[var(--text-primary)]'
+                'whitespace-normal break-words text-[var(--text-primary)]',
+                level.font,
+                level.size,
+                level.tracking,
+                level.leading
               )}
-              inputClassName={kind === 'client' ? 'font-medium' : ''}
+              inputClassName={cn(level.font, level.size, level.tracking, level.leading)}
               ariaLabel={`Rename ${kind}`}
             />
           </span>
           {canEdit && !hideAdd && (
-            <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 motion-reduce:transition-none group-hover:opacity-100">
               <button
                 type="button"
                 onClick={(e) => {
@@ -644,7 +776,7 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
                   onAddChild?.(kind, id);
                 }}
                 title={addTitle}
-                className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+                className="rounded p-1 text-[var(--text-muted)] transition-colors duration-150 ease-out hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)] motion-reduce:transition-none"
               >
                 <Plus size={13} />
               </button>
@@ -653,14 +785,14 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setMenuOpen((v) => !v); }}
                 title="More actions"
-                className="rounded p-1 text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+                className="rounded p-1 text-[var(--text-muted)] transition-colors duration-150 ease-out hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)] motion-reduce:transition-none"
               >
                 <MoreHorizontal size={13} />
               </button>
             </span>
           )}
           {rollupText && (
-            <span className="ml-auto hidden rounded-full bg-[var(--bg-surface-hover)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-muted)] sm:inline">
+            <span className="ml-auto hidden text-xs text-[var(--text-muted)] sm:inline">
               {rollupText}
             </span>
           )}
@@ -671,7 +803,7 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
             ref={menuRef}
             onClick={(e) => e.stopPropagation()}
             style={{ position: 'fixed', top: menuCoords.top, left: menuCoords.left, zIndex: 50 }}
-            className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-lg"
+            className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-[0_2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
           >
             {menuOpen && menuItems.map((item) => (
               <button
@@ -679,7 +811,7 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
                 type="button"
                 onClick={item.onClick}
                 className={cn(
-                  'flex w-48 items-center gap-2 px-3 py-1.5 text-left text-xs',
+                  'flex w-48 items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors duration-150 ease-out motion-reduce:transition-none',
                   item.danger
                     ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40'
                     : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
@@ -695,14 +827,14 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
                 <button
                   type="button"
                   onClick={() => { onDeleteEntity?.(kind, id); setConfirmDelete(false); }}
-                  className="rounded bg-red-600 px-2 py-0.5 font-medium text-white hover:bg-red-700"
+                  className="rounded bg-red-600 px-2 py-0.5 font-medium text-white transition-colors duration-150 ease-out hover:bg-red-700 motion-reduce:transition-none"
                 >
                   Delete
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(false)}
-                  className="rounded px-1.5 py-0.5 text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
+                  className="rounded px-1.5 py-0.5 text-[var(--text-secondary)] transition-colors duration-150 ease-out hover:bg-[var(--bg-surface-hover)] motion-reduce:transition-none"
                 >
                   Cancel
                 </button>
@@ -716,21 +848,16 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
       <span className={CELL_HIDE_SM} />
       <span />
       <span className={CELL_HIDE_SM} />
-      <span className={cn('text-xs text-[var(--text-secondary)]', CELL_HIDE_SM)}>{hideDue ? '' : formatDue(dueDate)}</span>
-      <span className={cn('flex items-center gap-2', CELL_HIDE_SM)}>
-        <span className="h-1 flex-1 rounded-full bg-[var(--border-subtle)]">
-          <span
-            className="block h-1 rounded-full bg-[var(--color-primary)]"
-            style={{ width: `${progress || 0}%` }}
-          />
-        </span>
+      <span className={cn('text-xs tabular-nums text-[var(--text-secondary)]', CELL_HIDE_SM)}>{hideDue ? '' : formatDue(dueDate)}</span>
+      <span className={cn('flex items-center justify-end tabular-nums text-xs text-[var(--text-secondary)]', CELL_HIDE_SM)}>
+        {Math.round(progress || 0)}%
       </span>
       <span className={cn('flex items-center justify-end', CELL_HIDE_LG)} onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onOpenPage?.(); }}
           title="Open full page"
-          className="rounded p-1 text-[var(--text-muted)] opacity-0 transition-opacity hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)] group-hover:opacity-100"
+          className="rounded p-1 text-[var(--text-muted)] opacity-0 transition-opacity duration-150 motion-reduce:transition-none hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)] group-hover:opacity-100"
         >
           <ExternalLink size={13} />
         </button>

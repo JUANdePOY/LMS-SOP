@@ -7,7 +7,7 @@ import { useNotifications } from '@/shared/stores/notificationStore.js';
 import { useTasks } from '../hooks/useTasks';
 import { updateProgress, bulkUpdateTasks, bulkDeleteTasks } from '../services/taskService';
 import { getProjects, getProjectTree, updateProject } from '../services/projectService';
-import { updateClient } from '../api/client.api';
+import { createClient, updateClient } from '../api/client.api';
 import { updateBusiness } from '../api/business.api';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import EntityDetailPanel from '../components/EntityDetailPanel';
@@ -23,6 +23,7 @@ import FilterBar from '@/shared/components/ui/FilterBar';
 import Breadcrumb from '../components/Breadcrumb';
 import QuickCreateMenu from '../components/QuickCreateMenu';
 import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
+import { notifyOrgTreeChanged, useOrgTreeVersion } from '@/shared/store/orgTreeBus';
 
 const VIEW_STORAGE_KEY = 'ppm:tasks:view';
 
@@ -91,6 +92,7 @@ export default function TasksPage() {
   // that have no projects yet) so newly created ones still appear in the table.
   const [projectsById, setProjectsById] = useState({});
   const [clientTree, setClientTree] = useState([]);
+  const orgVersion = useOrgTreeVersion();
   const loadProjects = useCallback(() => {
     let active = true;
     Promise.all([getProjects(), getProjectTree()])
@@ -105,7 +107,7 @@ export default function TasksPage() {
       .catch(() => {})
       .finally(() => { active = false; });
   }, []);
-  useEffect(() => { loadProjects(); }, [loadProjects]);
+  useEffect(() => { loadProjects(); }, [loadProjects, orgVersion]);
 
   const renameProject = useCallback(async (id, name) => {
     try {
@@ -153,6 +155,7 @@ export default function TasksPage() {
       await api.post(`/clients/${clientId}/businesses`, { business_name: name.trim() });
       toast.success('Business created');
       loadProjects();
+      notifyOrgTreeChanged();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create business');
       throw err;
@@ -167,8 +170,21 @@ export default function TasksPage() {
       });
       toast.success('Project created');
       loadProjects();
+      notifyOrgTreeChanged();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create project');
+      throw err;
+    }
+  }, [toast, loadProjects]);
+
+  const handleCreateClient = useCallback(async (name, businessId = null) => {
+    try {
+      await createClient({ client_name: name.trim(), business_id: businessId || null });
+      toast.success('Client created');
+      loadProjects();
+      notifyOrgTreeChanged();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create client');
       throw err;
     }
   }, [toast, loadProjects]);
@@ -195,6 +211,7 @@ export default function TasksPage() {
       toast.success(`${kind[0].toUpperCase()}${kind.slice(1)} deleted`);
       loadProjects();
       refreshTasks();
+      notifyOrgTreeChanged();
     } catch (err) {
       toast.error(err.message || `Failed to delete ${kind}`);
     }
@@ -681,8 +698,9 @@ export default function TasksPage() {
           onRenameBusiness={renameBusiness}
           onRenameProject={renameProject}
           onRenameTask={renameTask}
-          onCreateBusiness={handleCreateBusiness}
-          onCreateProject={handleCreateProject}
+              onCreateBusiness={handleCreateBusiness}
+              onCreateProject={handleCreateProject}
+              onCreateClient={handleCreateClient}
           onDeleteEntity={handleDeleteEntity}
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
