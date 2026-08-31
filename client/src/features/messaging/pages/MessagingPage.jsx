@@ -116,6 +116,31 @@ export default function MessagingPage() {
     });
   }, [conversations, filter, search, user?.id]);
 
+  // On initial load (no deep-link), auto-open the conversation with the most
+  // recent message so the user lands on live activity rather than the Saved
+  // Messages self-chat. Only runs once.
+  const autoSelectedRef = useRef(false);
+  useEffect(() => {
+    if (autoSelectedRef.current || selectedConversation) return undefined;
+    const targetId = searchParams.get("conversation");
+    const toId = searchParams.get("to");
+    if (targetId || toId || convLoading || !conversations.length || !user?.id) {
+      return undefined;
+    }
+    const isSelfChat = (c) =>
+      c.type !== "group_forum" &&
+      (c.participants || []).filter((p) => p.id !== user.id).length === 0;
+    const sorted = [...conversations]
+      .filter((c) => !isSelfChat(c) && c.last_message_at)
+      .sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at));
+    const latest = sorted[0];
+    if (latest) {
+      handleSelectConversation(latest);
+      autoSelectedRef.current = true;
+    }
+    return undefined;
+  }, [conversations, convLoading, searchParams, selectedConversation, user?.id, handleSelectConversation]);
+
   const { messages, loading: msgLoading, send, markAllAsRead } = useMessages(selectedConversation?.id);
 
   useEffect(() => {

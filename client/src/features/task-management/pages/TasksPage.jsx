@@ -693,6 +693,7 @@ export default function TasksPage() {
           onEditProject={handleEditProject}
           search={search}
           hideTabs
+          activeViews={TASK_VIEW_KEYS.filter((k) => k !== 'portfolio')}
           onQuickAddTask={handleQuickAddTask}
           onRenameClient={renameClient}
           onRenameBusiness={renameBusiness}

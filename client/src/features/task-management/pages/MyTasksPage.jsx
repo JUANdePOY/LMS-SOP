@@ -5,7 +5,7 @@ import { useNotifications } from '@/shared/stores/notificationStore.js';
 import { getMyTaskHierarchy } from '../services/taskService';
 import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
 import Breadcrumb from '../components/Breadcrumb';
-import ProjectTaskViews from '../components/ProjectTaskViews';
+import ProjectTaskViews, { TASK_VIEW_KEYS } from '../components/ProjectTaskViews';
 import EntityDetailPanel from '../components/EntityDetailPanel';
 import FilterBar from '@/shared/components/ui/FilterBar';
 import { ClipboardList, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
@@ -144,6 +144,7 @@ export default function MyTasksPage() {
           clientTree={hierarchy.clientTree}
           canManage={false}
           storageKey="ppm:mytasks:view"
+          activeViews={TASK_VIEW_KEYS.filter((k) => k !== 'portfolio')}
           onViewTask={(task) => setViewingTaskId(task.id)}
           onView={(task) => setViewingTaskId(task.id)}
         />

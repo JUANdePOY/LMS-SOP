@@ -69,8 +69,9 @@ export default function ProjectTaskViews({
   hideTabs = false,
 }) {
   const [internalView, setInternalView] = useState(() => {
+    const validKeys = activeViews || TASK_VIEW_KEYS;
     const initial = storageKey ? localStorage.getItem(storageKey) : null;
-    return initial || 'list';
+    return initial && validKeys.includes(initial) ? initial : 'list';
   });
 
   const view = viewProp ?? internalView;

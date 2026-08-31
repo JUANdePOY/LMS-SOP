@@ -1,7 +1,8 @@
 import { useEffect, useRef, useCallback } from "react";
-import { Loader2, Check, CheckCheck, Users, ChevronLeft, Paperclip, Download } from "lucide-react";
+import { Loader2, Check, CheckCheck, Users, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/shared/components/ui/Avatar";
+import AttachmentView from "@/shared/components/ui/AttachmentView";
 import RichComposer from "@/features/task-management/components/RichComposer";
 import { getUsers } from "@/services/api";
 import {
@@ -227,46 +228,7 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
                     <p className="whitespace-pre-wrap break-words leading-snug">{renderBody(msg.body, msg.mentions)}</p>
 
                     {attachments.length > 0 && (
-                      <div className="mt-2 space-y-2">
-                        {attachments.map((att) => {
-                          const isImage = att.mime_type && att.mime_type.startsWith('image/');
-                          if (isImage) {
-                            return (
-                              <a
-                                key={att.id}
-                                href={att.view_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="block overflow-hidden rounded-lg border border-white/20"
-                              >
-                                <img
-                                  src={att.view_url}
-                                  alt={att.original_name || att.file_name}
-                                  className="max-h-56 w-auto max-w-full object-cover"
-                                  loading="lazy"
-                                />
-                              </a>
-                            );
-                          }
-                          return (
-                            <a
-                              key={att.id}
-                              href={att.view_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${
-                                isMine
-                                  ? 'border-white/30 bg-white/10 text-white hover:bg-white/20'
-                                  : 'border-neutral-200 dark:border-neutral-700 text-[var(--color-primary)] hover:bg-neutral-100 dark:hover:bg-neutral-700'
-                              }`}
-                            >
-                              <Paperclip size={13} className="shrink-0" />
-                              <span className="truncate">{att.original_name || att.file_name}</span>
-                              <Download size={12} className="shrink-0 opacity-70" />
-                            </a>
-                          );
-                        })}
-                      </div>
+                      <AttachmentView attachments={attachments} isOwn={isMine} variant="chat" />
                     )}
 
                     <div className={cn(
