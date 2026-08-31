@@ -63,6 +63,9 @@ export default function ProjectTaskViews({
   search,
   scopeClientId,
   scopeBusinessId,
+  scopeProjectId,
+  showCountBadges = false,
+  newTaskIds,
   selectedIds,
   onToggleSelect,
   onSelectAll,
@@ -112,6 +115,7 @@ export default function ProjectTaskViews({
               canManage={canManage}
               scopeClientId={scopeClientId}
               scopeBusinessId={scopeBusinessId}
+              scopeProjectId={scopeProjectId}
               onAddProjectTask={onAddProjectTask}
               onEditProject={onEditProject}
               onDeleteImmediate={onDeleteImmediate}
@@ -120,7 +124,7 @@ export default function ProjectTaskViews({
               onRenameClient={onRenameClient}
               onRenameBusiness={onRenameBusiness}
               onRenameProject={onRenameProject}
-              onRenameTask={onRenameTask}
+               onRenameTask={onRenameTask}
               onAddChild={onAddChild}
               onDeleteEntity={onDeleteEntity}
               onCreateBusiness={onCreateBusiness}
@@ -129,6 +133,8 @@ export default function ProjectTaskViews({
               selectedIds={selectedIds}
               onToggleSelect={onToggleSelect}
               onSelectAll={onSelectAll}
+              showCountBadges={showCountBadges}
+              newTaskIds={newTaskIds}
             />
           )}
           {view === 'board' && (

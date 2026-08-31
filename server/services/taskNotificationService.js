@@ -147,34 +147,45 @@ async function notifyNewAssignments(taskId, previousKeys = []) {
   return Promise.all(promises);
 }
 
-// Notify only the users explicitly mentioned in a comment. Mentions are
-// in-app only (never push), per the notification rules.
-async function notifyMentioned(task, mentionedUserIds = []) {
-  const ids = Array.isArray(mentionedUserIds)
-    ? mentionedUserIds.map((v) => Number(v)).filter(Boolean)
-    : [];
+// Notify only the users explicitly mentioned in a comment. A mention is treated
+// like a direct nudge, so the employee is both notified in-app and pushed to
+// their device. `actorId` is excluded so authors don't ping themselves.
+async function notifyMentioned(task, mentionedUserIds = [], actorId = null) {
+  const ids = (Array.isArray(mentionedUserIds) ? mentionedUserIds : [])
+    .map((v) => Number(typeof v === 'object' && v !== null ? v.id : v))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (actorId != null) {
+    const me = Number(actorId);
+    for (let i = ids.length - 1; i >= 0; i--) {
+      if (ids[i] === me) ids.splice(i, 1);
+    }
+  }
   if (!ids.length) return [];
 
   const [rows] = await db.query(
-    `SELECT id FROM users WHERE id IN (?) AND is_active = 1`,
+    `SELECT id, role FROM users WHERE id IN (?) AND is_active = 1`,
     [ids]
   );
-  const validIds = rows.map((r) => r.id);
 
-  const promises = validIds.map((userId) =>
-    notificationService.createNotification({
-      userId,
-      title: 'You were mentioned',
+  const promises = rows.map((u) => {
+    const isAdmin = ADMIN_ROLES.includes(u.role);
+    // Employees open the task from their My Tasks page (which focuses it via
+    // ?task=); admins open it directly on the Tasks board. `task` may be null
+    // (e.g. its lookup failed), so guard the id access below.
+    const link = isAdmin ? `/tasks/${task?.id ?? ''}` : `/tasks/my?task=${task?.id ?? ''}`;
+    return notificationService.createNotification({
+      userId: u.id,
+      title: 'You were mentioned in a task',
       body: task ? task.title : 'A task comment mentioned you',
       type: 'info',
-      link: task ? `/tasks/${task.id}` : undefined,
+      link,
       entityType: 'task',
       entityId: task ? task.id : undefined,
       category: 'mention',
-      disablePush: true,
+      disablePush: false,
       disableSound: false,
-    })
-  );
+    });
+  });
   return Promise.all(promises);
 }
 

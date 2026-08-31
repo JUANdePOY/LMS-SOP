@@ -4,8 +4,9 @@ const { clientController } = require('../controllers/clientController');
 
 const router = express.Router();
 
-// Admin + department head can manage clients.
-router.get('/', authenticateToken, requireAdmin, clientController.listClients);
+// Authenticated users may list clients; employees are scoped to their own SOP
+// business by the controller. Mutation routes remain admin-only.
+router.get('/', authenticateToken, clientController.listClients);
 router.get('/options', authenticateToken, requireAdmin, clientController.listClientOptions);
 router.get('/:id', authenticateToken, requireAdmin, clientController.getClient);
 router.post('/', authenticateToken, requireAdmin, clientController.createClient);

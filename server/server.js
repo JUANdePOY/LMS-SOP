@@ -157,9 +157,13 @@ app.use('/api/discussions', discussionsRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/events', eventsRoutes);
 app.use('/api/calendar', calendarRoutes);
-app.use('/api/messages', messagesRoutes);
+// Public HMAC-scoped attachment routers MUST be mounted before the authenticated
+// /api/messages and /api/tasks routers so requests like
+// /api/messages/attachments/:id/file (which carry only the HMAC token in the
+// query string, no JWT) are not intercepted by authenticateToken and 401'd.
 const messageAttachmentPublicFile = require('./services/messageAttachmentPublicFile');
 app.use('/api/messages/attachments', messageAttachmentPublicFile.router);
+app.use('/api/messages', messagesRoutes);
 app.use('/api/tasks/attachments', taskAttachmentPublicFile.router);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/clients', clientsRoutes);

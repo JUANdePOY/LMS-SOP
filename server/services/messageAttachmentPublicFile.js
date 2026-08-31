@@ -10,7 +10,16 @@
 
 const express = require('express');
 const crypto = require('crypto');
-const messageModel = require('../models/messageModel');
+// NOTE: messageModel is required lazily inside the route handler (not at module
+// top) to avoid a circular dependency. messageModel.js requires this module for
+// buildViewUrl, and it reassigns module.exports at the end — so a top-level
+// require here would capture the empty, half-initialized object and
+// getMessageAttachmentById would be undefined at request time (404).
+let messageModel;
+function getMessageModel() {
+  if (!messageModel) messageModel = require('../models/messageModel');
+  return messageModel;
+}
 
 function getViewSecret() {
   const secret = process.env.ATTACHMENT_VIEW_SECRET || process.env.JWT_SECRET;
@@ -46,7 +55,7 @@ router.get('/:attachmentId/file', async (req, res) => {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'File not found' } });
     }
 
-    const attachment = await messageModel.getMessageAttachmentById(attachmentId);
+    const attachment = await getMessageModel().getMessageAttachmentById(attachmentId);
     if (!attachment || !attachment.file_data) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'File not found' } });
     }

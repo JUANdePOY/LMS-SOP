@@ -68,7 +68,7 @@ function SecondaryNavRouteSync() {
   useEffect(() => {
     if (location.pathname.startsWith("/clients")) {
       openSecondaryNav("clients");
-    } else if (location.pathname !== "/tasks") {
+    } else if (location.pathname !== "/tasks" && location.pathname !== "/tasks/my") {
       // Navigated via any other sidebar item — collapse the panel.
       closeSecondaryNav();
     }

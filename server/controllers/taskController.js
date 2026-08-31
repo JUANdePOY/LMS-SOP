@@ -1,4 +1,5 @@
 const taskService = require('../services/taskService');
+const taskModel = require('../models/taskModel');
 const { validateFilters, validateBatchIds, validateBatchUpdatePayload } = require('../validators/taskValidator');
 const taskNotifications = require('../services/taskNotificationService');
 
@@ -138,6 +139,14 @@ const taskController = {
   async updateProgress(req, res) {
     try {
       const taskId = parseInt(req.body.task_id, 10);
+      if (!Number.isFinite(taskId) || taskId <= 0) {
+        return res.status(400).json({ success: false, message: 'Invalid task ID', code: 'VALIDATION_ERROR' });
+      }
+      // Only assignees (or admins) may update a task's progress.
+      const allowed = await taskService.isUserAssignedToTask(taskId, req.user).catch(() => false);
+      if (!allowed) {
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'You are not assigned to this task' });
+      }
       const before = Number.isFinite(taskId)
         ? await taskService.getTask(taskId, req.user.id).catch(() => null)
         : null;
@@ -164,22 +173,38 @@ const taskController = {
   async addComment(req, res) {
     try {
       const payload = { task_id: req.params.taskId, ...req.body };
+      const taskId = parseInt(req.params.taskId, 10);
+      // Only assignees (or admins) may comment on a task.
+      const allowed = await taskService.isUserAssignedToTask(taskId, req.user).catch(() => false);
+      if (!allowed) {
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'You are not assigned to this task' });
+      }
       if (req.body.mentions) {
         try {
-          payload.mentions = JSON.parse(req.body.mentions);
+          // Mentions may arrive as a JSON string (multipart/form-data, when a
+          // file is attached) or as an already-parsed array (JSON body, no file).
+          payload.mentions =
+            typeof req.body.mentions === 'string'
+              ? JSON.parse(req.body.mentions)
+              : Array.isArray(req.body.mentions)
+                ? req.body.mentions
+                : [];
         } catch {
           payload.mentions = [];
         }
       }
       payload.files = req.files || [];
       const comment = await taskService.addComment(payload, req.user.id, req);
-      // Notify only the explicitly mentioned employees (in-app, no push).
+      // Notify only the explicitly mentioned employees (in-app + push).
       const mentionedIds = Array.isArray(payload.mentions)
         ? payload.mentions.map((m) => m && m.id).filter(Boolean)
         : [];
       if (mentionedIds.length > 0) {
-        const task = await taskService.getTask(req.params.taskId, req.user.id).catch(() => null);
-        taskNotifications.notifyMentioned(task, mentionedIds).catch(() => {});
+        // Use a plain lookup (no scope/auth guards) so the notification is sent
+        // even when the acting admin's business scope doesn't cover the task —
+        // the comment was already posted, so the mention must still notify.
+        const task = await taskModel.findById(req.params.taskId).catch(() => null);
+        taskNotifications.notifyMentioned(task, mentionedIds, req.user.id).catch(() => {});
       }
       res.status(201).json({ success: true, data: comment, message: 'Comment added successfully' });
     } catch (error) {
@@ -203,6 +228,11 @@ const taskController = {
       const taskId = parseInt(req.params.taskId, 10);
       if (!Number.isFinite(taskId) || taskId <= 0) {
         return res.status(400).json({ success: false, message: 'Invalid task ID', code: 'VALIDATION_ERROR' });
+      }
+      // Only assignees (or admins) may attach files to a task.
+      const allowed = await taskService.isUserAssignedToTask(taskId, req.user).catch(() => false);
+      if (!allowed) {
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'You are not assigned to this task' });
       }
       if (!req.file) {
         return res.status(400).json({ success: false, message: 'File is required', code: 'VALIDATION_ERROR' });

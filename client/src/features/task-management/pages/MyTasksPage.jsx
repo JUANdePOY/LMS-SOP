@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useNotifications } from '@/shared/stores/notificationStore.js';
@@ -8,12 +9,18 @@ import Breadcrumb from '../components/Breadcrumb';
 import ProjectTaskViews, { TASK_VIEW_KEYS } from '../components/ProjectTaskViews';
 import EntityDetailPanel from '../components/EntityDetailPanel';
 import FilterBar from '@/shared/components/ui/FilterBar';
-import { ClipboardList, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { ClipboardList, AlertTriangle, CheckCircle, Clock, X } from 'lucide-react';
+
+function getProjectId(task) {
+  return task?.project_id ?? task?.projectId ?? task?.project?.id ?? null;
+}
 
 export default function MyTasksPage() {
   const { isAnyAdmin } = useAuth();
   const { toast } = useToast();
-  const { markEntityTypeRead } = useNotifications();
+  const { notifications, markRead } = useNotifications();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusTaskId = searchParams.get('task');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
@@ -22,9 +29,58 @@ export default function MyTasksPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // When arriving from a "You have been assigned a task" banner, scope the
+  // table to the single project tree that contains that task.
+  const [scope, setScope] = useState(null);
   useEffect(() => {
-    markEntityTypeRead('task');
-  }, [markEntityTypeRead]);
+    if (!focusTaskId) {
+      setScope(null);
+      return;
+    }
+    const task = (hierarchy.tasks || []).find((t) => String(t.id) === String(focusTaskId));
+    if (!task) {
+      setScope(null);
+      return;
+    }
+    const projectId = getProjectId(task);
+    const proj = projectId != null ? hierarchy.projectsById[String(projectId)] : null;
+    setScope({
+      clientId: proj?.client_id ?? null,
+      businessId: proj?.client_business_id ?? null,
+      projectId: projectId ?? null,
+    });
+  }, [focusTaskId, hierarchy.tasks, hierarchy.projectsById]);
+
+  // Identify tasks that still have an unread assignment notification so we can
+  // surface a red "New" badge on each task row. The badge clears for a task once
+  // the user opens it (see handleViewTask), rather than being wiped on page load
+  // — that way the employee actually notices it.
+  const unreadTaskNotifications = useMemo(
+    () => (notifications || []).filter((n) => n.entity_type === 'task' && !n.is_read && n.entity_id),
+    [notifications]
+  );
+  const newTaskIds = useMemo(
+    () => new Set(unreadTaskNotifications.map((n) => String(n.entity_id))),
+    [unreadTaskNotifications]
+  );
+
+  const scopedClientTree = useMemo(() => {
+    if (!scope) return hierarchy.clientTree;
+    return (hierarchy.clientTree || [])
+      .filter((c) => !scope.clientId || String(c.id) === String(scope.clientId))
+      .map((c) => ({
+        ...c,
+        businesses: (c.businesses || []).filter(
+          (b) => !scope.businessId || String(b.id) === String(scope.businessId)
+        ),
+      }));
+  }, [hierarchy.clientTree, scope]);
+
+  const scopedProjectsById = useMemo(() => {
+    if (!scope || !scope.projectId) return hierarchy.projectsById;
+    const p = hierarchy.projectsById[String(scope.projectId)];
+    return p ? { [scope.projectId]: p } : {};
+  }, [hierarchy.projectsById, scope]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -42,6 +98,14 @@ export default function MyTasksPage() {
       setLoading(false);
     }
   }, [toast]);
+
+  // Opening a task clears its unread assignment notification so its red "new"
+  // badge disappears and the header count decrements.
+  const handleViewTask = useCallback((task) => {
+    setViewingTaskId(task.id);
+    const notif = unreadTaskNotifications.find((n) => String(n.entity_id) === String(task.id));
+    if (notif) markRead(notif.id);
+  }, [unreadTaskNotifications, markRead]);
 
   useEffect(() => {
     if (isAnyAdmin) return;
@@ -69,6 +133,13 @@ export default function MyTasksPage() {
     }
     return result;
   }, [tasks, statusFilter, priorityFilter, search]);
+
+  // When scoped to a single task (from the assignment banner), show only the
+  // project tree that contains it.
+  const scopedTasks = useMemo(() => {
+    if (!scope || !scope.projectId) return displayedTasks;
+    return (tasks || []).filter((t) => String(getProjectId(t)) === String(scope.projectId));
+  }, [tasks, displayedTasks, scope]);
 
   const statItems = useMemo(() => {
     const total = tasks.length;
@@ -128,6 +199,24 @@ export default function MyTasksPage() {
         <div className="mb-4 text-sm text-red-600">{error}</div>
       )}
 
+      {scope?.projectId && (
+        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-[var(--ppm-border)] bg-[var(--bg-surface)] px-3 py-2 text-xs">
+          <span className="min-w-0 truncate text-[var(--ppm-text-muted)]">
+            Showing the task tree for{' '}
+            <span className="font-medium text-[var(--text-primary)]">
+              {hierarchy.projectsById[String(scope.projectId)]?.name || 'this project'}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setSearchParams({})}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-[var(--ppm-text-muted)] transition-colors hover:bg-[var(--bg-surface-hover)] hover:text-[var(--text-primary)]"
+          >
+            <X size={12} /> Clear
+          </button>
+        </div>
+      )}
+
       {displayedTasks.length === 0 && !loading ? (
         <div className="ppm-empty">
           <ClipboardList size={28} />
@@ -138,15 +227,19 @@ export default function MyTasksPage() {
         </div>
       ) : (
         <ProjectTaskViews
-          tasks={displayedTasks}
+          tasks={scopedTasks}
           loading={loading}
-          projectsById={hierarchy.projectsById}
-          clientTree={hierarchy.clientTree}
+          projectsById={scopedProjectsById}
+          clientTree={scopedClientTree}
           canManage={false}
           storageKey="ppm:mytasks:view"
           activeViews={TASK_VIEW_KEYS.filter((k) => k !== 'portfolio')}
-          onViewTask={(task) => setViewingTaskId(task.id)}
-          onView={(task) => setViewingTaskId(task.id)}
+          onViewTask={handleViewTask}
+          onView={handleViewTask}
+          scopeClientId={scope?.clientId}
+          scopeBusinessId={scope?.businessId}
+          showCountBadges={true}
+          newTaskIds={newTaskIds}
         />
       )}
 

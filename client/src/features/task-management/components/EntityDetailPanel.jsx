@@ -76,6 +76,19 @@ function EditableDate({ label, value, disabled, onChange }) {
   );
 }
 
+// Returns true when the given user is allowed to update progress, attach files,
+// and comment on a task: they must be assigned (directly, or via a department /
+// position assignment) or be an admin.
+function isUserAssigned(assignments, user) {
+  if (!Array.isArray(assignments) || !user) return false;
+  return assignments.some((a) => {
+    if (a.assignment_type === 'User') return String(a.reference_id) === String(user.id);
+    if (a.assignment_type === 'Department') return String(a.reference_id) === String(user.department_id);
+    if (a.assignment_type === 'Position') return Boolean(a.reference_id) && a.reference_id === user.position_title;
+    return false;
+  });
+}
+
 function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
   const { toast } = useToast();
   const { user, isAnyAdmin } = useAuth();
@@ -173,8 +186,10 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
 
   // Only admins may edit task details (title, status, priority, dates,
   // description, assignees, sub-tasks). Regular assignees can still message,
-  // upload attachments, and update progress — but not change the task itself.
+  // upload attachments, and update progress — but only when they are assigned to
+  // the task itself.
   const canEdit = isAnyAdmin;
+  const isAssigned = isAnyAdmin || isUserAssigned(local.assignments, user);
 
   // Save only the user picks, but preserve any team/department assignments that
   // the picker doesn't manage so they aren't lost on update.
@@ -294,9 +309,11 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
       <div className="border-t border-[var(--border)] px-2 pt-4">
         <div className="mb-2 flex items-center justify-between">
           <h4 className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><TrendingUp size={15} /> Progress</h4>
-          <button type="button" onClick={() => setShowProgress(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
-            <TrendingUp size={12} /> Update
-          </button>
+          {isAssigned && (
+            <button type="button" onClick={() => setShowProgress(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
+              <TrendingUp size={12} /> Update
+            </button>
+          )}
         </div>
         {local.progress && local.progress.length > 0 ? (
           <div className="space-y-2">
@@ -318,16 +335,18 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
 
       <div className="px-2">
         <h4 className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><Paperclip size={15} /> Attachments</h4>
-        <AttachmentSection attachments={local.attachments} onDelete={(id) => setPendingAttachmentId(id)} canManage />
-        <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-page)] px-3.5 py-2 text-xs font-medium hover:border-[var(--color-primary)] hover:bg-[var(--bg-hover)]">
-          <Paperclip size={14} /> Upload
-          <input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const fd = new FormData(); fd.append('file', f); try { await uploadFile(taskId, fd); } catch { /* toast in hook */ } } }} />
-        </label>
+        <AttachmentSection attachments={local.attachments} onDelete={(id) => setPendingAttachmentId(id)} canManage={isAssigned} />
+        {isAssigned && (
+          <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[var(--border)] bg-[var(--bg-page)] px-3.5 py-2 text-xs font-medium hover:border-[var(--color-primary)] hover:bg-[var(--bg-hover)]">
+            <Paperclip size={14} /> Upload
+            <input type="file" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) { const fd = new FormData(); fd.append('file', f); try { await uploadFile(taskId, fd); } catch { /* toast in hook */ } } }} />
+          </label>
+        )}
       </div>
 
       <div className="border-t border-[var(--border)] px-2 pt-4">
         <h4 className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><MessageSquare size={15} /> Activity</h4>
-        <CommentSection comments={local.comments} currentUser={user} isAdmin={isAnyAdmin} canReply
+        <CommentSection comments={local.comments} currentUser={user} isAdmin={isAnyAdmin} canReply={isAssigned}
           onAddComment={(c, parentId, files, mentions) => postComment(taskId, c, parentId, files, mentions)} />
       </div>
 

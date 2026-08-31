@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, ExternalLink, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2, Inbox } from 'lucide-react';
+import { ChevronRight, ExternalLink, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2, Inbox, Building2, Briefcase, FolderKanban, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { getBusinesses } from '../api/business.api';
@@ -312,6 +312,7 @@ export default function TaskHierarchyTable({
   canManage,
   scopeClientId,
   scopeBusinessId,
+  scopeProjectId,
   onEditProject,
   onDeleteImmediate,
   onDuplicated,
@@ -327,6 +328,8 @@ export default function TaskHierarchyTable({
   selectedIds,
   onToggleSelect,
   onSelectAll,
+  showCountBadges = false,
+  newTaskIds = null,
 }) {
   const navigate = useNavigate();
   const clients = useHierarchy(tasks, projectsById, clientTree);
@@ -407,23 +410,31 @@ export default function TaskHierarchyTable({
   // When a client/business scope is active (e.g. opened from the sidebar),
   // seed the expansion state so the relevant branches start open. The user
   // can still collapse them afterwards because this only runs on scope change.
+  // When a client/business/project scope is active (e.g. chosen in the secondary
+  // panel), collapse everything and open ONLY that branch. We must include the
+  // branch's ancestors (client/business) so the chosen row is actually visible.
+  // The expanded set is *replaced* (not merged) so every other row closes.
   useEffect(() => {
     const forced = new Set();
-    if (scopeClientId) forced.add(`client-${scopeClientId}`);
-    if (scopeBusinessId) {
+    if (scopeProjectId) {
+      const p = projectsById[String(scopeProjectId)];
+      if (p) {
+        forced.add(`project-${p.id}`);
+        if (p.client_business_id != null) forced.add(`business-${p.client_business_id}`);
+        if (p.client_id != null) forced.add(`client-${p.client_id}`);
+      }
+    } else if (scopeBusinessId) {
       forced.add(`business-${scopeBusinessId}`);
       const owning = Object.values(projectsById).find(
         (p) => String(p.client_business_id) === String(scopeBusinessId)
       );
       if (owning?.client_id != null) forced.add(`client-${owning.client_id}`);
+    } else if (scopeClientId) {
+      forced.add(`client-${scopeClientId}`);
     }
     if (forced.size === 0) return;
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      forced.forEach((key) => next.add(key));
-      return next;
-    });
-  }, [scopeClientId, scopeBusinessId, projectsById]);
+    setExpanded(forced);
+  }, [scopeClientId, scopeBusinessId, scopeProjectId, projectsById]);
 
   // Auto-expand branches that match an active search term.
   const isExpanded = useCallback((key, kind, node) => {
@@ -491,15 +502,20 @@ export default function TaskHierarchyTable({
                progress={client.rollup.avgProgress}
                dimmed={dimmed}
                onOpenPage={() => navigate(`/clients/${client.id}`)}
-               colorDot
-               color={client.color}
-               canEdit={canManage}
-              onRename={onRenameClient}
-              onAddChild={startAdd}
-              onDeleteEntity={onDeleteEntity}
-              onHideEmptyGroups={hideEmptyGroups}
-              hideDue
-            />
+                colorDot
+                color={client.color}
+                canEdit={canManage}
+               onRename={onRenameClient}
+               onAddChild={startAdd}
+               onDeleteEntity={onDeleteEntity}
+               onHideEmptyGroups={hideEmptyGroups}
+                hideDue
+                showCountBadges={showCountBadges}
+                count={client.rollup.total}
+                taskIds={client.businesses.flatMap((b) => b.projects.flatMap((p) => p.tasks.map((t) => String(t.id))))}
+                selectedIds={selectedIds}
+                onSelectAll={onSelectAll}
+              />
             {open && client.businesses.map((business) => {
               const bDimmed = search && !subtreeMatches(business, 'business', search);
               const businessKey = `business-${business.id}`;
@@ -520,10 +536,13 @@ export default function TaskHierarchyTable({
                     onOpenPage={() => navigate(`/clients/${client.id}/businesses/${business.id}`)}
                           canEdit={canManage}
                           onRename={onRenameBusiness}
-                          onAddChild={startAdd}
-                          onDeleteEntity={onDeleteEntity}
-                          onHideEmptyGroups={hideEmptyGroups}
-                        />
+                           onAddChild={startAdd}
+                           onDeleteEntity={onDeleteEntity}
+                           onHideEmptyGroups={hideEmptyGroups}
+taskIds={business.projects.flatMap((p) => p.tasks.map((t) => String(t.id)))}
+                            selectedIds={selectedIds}
+                            onSelectAll={onSelectAll}
+                          />
                   {bOpen && business.projects.map((project) => {
                     const pDimmed = search && !subtreeMatches(project, 'project', search);
                     const projectKey = `project-${project.id}`;
@@ -546,10 +565,13 @@ export default function TaskHierarchyTable({
                            onEditProject={canManage && onEditProject ? () => onEditProject?.(project.id) : undefined}
                              canEdit={canManage}
                              onRename={onRenameProject}
-                             onAddChild={startAdd}
-                             onDeleteEntity={onDeleteEntity}
-                             onHideEmptyGroups={hideEmptyGroups}
-                          />
+                              onAddChild={startAdd}
+                              onDeleteEntity={onDeleteEntity}
+                              onHideEmptyGroups={hideEmptyGroups}
+taskIds={project.tasks.map((t) => String(t.id))}
+                               selectedIds={selectedIds}
+                               onSelectAll={onSelectAll}
+                            />
                         {pOpen && project.tasks.map((task) => {
                           const tDimmed = search && !subtreeMatches(task, 'task', search);
                           return (
@@ -568,6 +590,9 @@ export default function TaskHierarchyTable({
                               onRenameTask={onRenameTask}
                               canManage={canManage}
                               projects={projects}
+                              showCountBadges={showCountBadges}
+                              subtaskCount={task.subtasks?.length || 0}
+                              isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
                             />
                           );
                         })}
@@ -643,6 +668,31 @@ export default function TaskHierarchyTable({
 
 const DEPTH_INDENT_PX = 20;
 
+// Per-kind visual identity. Each hierarchy level (client / business / project)
+// gets a subtle, premium accent so a row's type is obvious at a glance — a
+// tinted chip (icon + label) and a matching accent on the expand caret. Colors
+// are intentionally low-saturation tints that also work in dark mode.
+const KIND_META = {
+  client: {
+    label: 'Client',
+    icon: Building2,
+    chip: 'text-violet-600 bg-violet-50 dark:text-violet-300 dark:bg-violet-500/15',
+    accent: 'text-violet-500 dark:text-violet-400',
+  },
+  business: {
+    label: 'Business',
+    icon: Briefcase,
+    chip: 'text-sky-600 bg-sky-50 dark:text-sky-300 dark:bg-sky-500/15',
+    accent: 'text-sky-500 dark:text-sky-400',
+  },
+  project: {
+    label: 'Project',
+    icon: FolderKanban,
+    chip: 'text-amber-600 bg-amber-50 dark:text-amber-300 dark:bg-amber-500/15',
+    accent: 'text-amber-500 dark:text-amber-400',
+  },
+};
+
 // Centralized per-kind typography. Hierarchy reads through size/weight/spacing
 // only — no per-level color, background, or border.
 const LEVEL_STYLE = {
@@ -651,8 +701,9 @@ const LEVEL_STYLE = {
   project:  { font: 'font-medium',   size: 'text-sm',     py: 'py-2.5', tracking: '', leading: '' },
 };
 
-function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progress, dimmed, onOpenPage, colorDot, color, canEdit, onRename, onAddChild, onAddTask, onEditProject, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue }) {
+function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progress, dimmed, onOpenPage, colorDot, color, canEdit, onRename, onAddChild, onAddTask, onEditProject, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, showCountBadges, count, taskIds, selectedIds, onSelectAll, onFilter }) {
   const level = LEVEL_STYLE[kind] || LEVEL_STYLE.project;
+  const meta = KIND_META[kind];
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renameSignal, setRenameSignal] = useState(0);
@@ -665,11 +716,26 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
   // project's own task rows). Mirrors the approach used by TaskListRow.
   useLayoutEffect(() => {
     if (!menuOpen && !confirmDelete) return;
+    const MARGIN = 8;
     const update = () => {
       const el = menuTriggerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      setMenuCoords({ top: rect.bottom + 4, left: rect.left });
+      // Vertical: open below the trigger, flip above if it would overflow the
+      // bottom of the viewport.
+      let top = rect.bottom + 4;
+      const menuW = menuRef.current?.offsetWidth || 192;
+      const menuH = menuRef.current?.offsetHeight || 0;
+      if (menuH && top + menuH > window.innerHeight - MARGIN) {
+        top = Math.max(MARGIN, rect.top - menuH - 4);
+      }
+      // Horizontal: anchor to the trigger's left edge, but flip so the menu's
+      // right edge stays inside the viewport when near the right edge.
+      let left = rect.left;
+      if (left + menuW > window.innerWidth - MARGIN) {
+        left = Math.max(MARGIN, rect.right - menuW);
+      }
+      setMenuCoords({ top, left });
     };
     update();
     const onScroll = (e) => {
@@ -702,6 +768,21 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
   menuItems.push({ label: 'Delete', icon: Trash2, danger: true, onClick: () => { setMenuOpen(false); setConfirmDelete(true); } });
   menuItems.push({ label: 'Hide all empty groups', icon: EyeOff, onClick: () => { setMenuOpen(false); onHideEmptyGroups?.(); } });
 
+  // Per-row "select all" for the subtree under this client/business/project.
+  // Toggling adds/removes only this branch's task ids from the shared selection
+  // so an admin can accumulate selections across multiple rows, then bulk-manage.
+  const subIds = Array.isArray(taskIds) ? taskIds : [];
+  const selectedInSub = subIds.filter((id) => selectedIds?.has(id));
+  const allSubSelected = subIds.length > 0 && selectedInSub.length === subIds.length;
+  const someSubSelected = selectedInSub.length > 0 && !allSubSelected;
+  // Selecting a row's checkbox replaces the selection with exactly that
+  // branch's tasks, so it scopes management (bulk delete / filter) to the row
+  // the user clicked — never an unrelated task.
+  const toggleSubtree = () => {
+    if (!subIds.length) return;
+    onSelectAll?.(allSubSelected ? [] : subIds);
+  };
+
   return (
     <div
       role="row"
@@ -720,22 +801,7 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
         HIERARCHY_GRID
       )}
     >
-      <span className="flex min-w-0 items-center gap-1.5">
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onToggle(); }}
-          aria-expanded={open}
-          aria-label={`${open ? 'Collapse' : 'Expand'} ${name}`}
-          className="grid h-5 w-5 shrink-0 place-items-center rounded transition-colors duration-150 ease-out motion-reduce:transition-none hover:bg-[var(--bg-surface-hover)]"
-        >
-          <ChevronRight
-            size={14}
-            className={cn(
-              'shrink-0 text-[var(--text-muted)] transition-transform duration-150 ease-out motion-reduce:transition-none',
-              open ? 'rotate-90 text-[var(--color-primary)]' : 'group-hover:text-[var(--color-primary)]'
-            )}
-          />
-        </button>
+      <span className="flex items-center">
         {colorDot && (
           <span
             className="h-2 w-2 shrink-0 rounded-full"
@@ -750,6 +816,33 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
         style={{ paddingLeft: `${depth * DEPTH_INDENT_PX}px` }}
       >
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+           <button
+             type="button"
+             onClick={(e) => { e.stopPropagation(); onToggle(); }}
+             aria-expanded={open}
+             aria-label={`${open ? 'Collapse' : 'Expand'} ${name}`}
+             className="grid h-5 w-5 shrink-0 place-items-center rounded transition-colors duration-150 ease-out motion-reduce:transition-none hover:bg-[var(--bg-surface-hover)]"
+           >
+             <ChevronRight
+               size={15}
+               className={cn(
+                 'shrink-0 transition-transform duration-150 ease-out motion-reduce:transition-none',
+                 open ? 'rotate-90' : 'rotate-0',
+                 meta?.accent || 'text-[var(--text-muted)]'
+               )}
+             />
+           </button>
+           {meta && (
+             <span
+               className={cn(
+                 'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+                 meta.chip
+               )}
+             >
+               <meta.icon size={11} />
+               {meta.label}
+             </span>
+           )}
            <span className="flex min-w-0 items-center" data-no-nav>
             <InlineEditableName
               value={name}
@@ -766,8 +859,13 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
               inputClassName={cn(level.font, level.size, level.tracking, level.leading)}
               ariaLabel={`Rename ${kind}`}
             />
-          </span>
-          {canEdit && !hideAdd && (
+           </span>
+           {showCountBadges && kind === 'client' && count != null && (
+             <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--bg-surface-hover)] px-1.5 text-[11px] font-medium tabular-nums text-[var(--text-secondary)]">
+               {count}
+             </span>
+           )}
+           {canEdit && !hideAdd && (
             <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 motion-reduce:transition-none group-hover:opacity-100">
               <button
                 type="button"
@@ -862,7 +960,28 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
           <ExternalLink size={13} />
         </button>
       </span>
-      <span />
+      <span className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+        {subIds.length > 0 && (
+          <button
+            type="button"
+            onClick={toggleSubtree}
+            aria-label={allSubSelected ? `Deselect all tasks in ${name}` : `Select all tasks in ${name}`}
+            aria-checked={allSubSelected}
+            className={cn(
+              'grid h-4 w-4 place-items-center rounded border-2 transition-colors duration-150 ease-out motion-reduce:transition-none',
+              allSubSelected || someSubSelected
+                ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                : 'border-[var(--border)] hover:border-[var(--color-primary)]'
+            )}
+          >
+            {allSubSelected ? (
+              <Check size={10} strokeWidth={3} />
+            ) : someSubSelected ? (
+              <span className="h-0.5 w-2 rounded bg-white" />
+            ) : null}
+          </button>
+        )}
+      </span>
       </div>
   );
 }

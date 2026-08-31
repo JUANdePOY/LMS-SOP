@@ -1351,4 +1351,29 @@ module.exports = {
   getTaskStats,
   batchUpdateTasks,
   batchDeleteTasks,
+  isUserAssignedToTask,
 };
+
+// Returns true when the given user is allowed to interact with a task's progress,
+// attachments, and comments. Admins (super_admin/admin/department_head) are
+// always allowed; otherwise the user must be assigned to the task — directly, or
+// via a department/position assignment that resolves to them.
+const ADMIN_ROLES = ['super_admin', 'admin', 'department_head'];
+async function isUserAssignedToTask(taskId, user) {
+  if (!user) return false;
+  if (ADMIN_ROLES.includes(user.role)) return true;
+  const [rows] = await db.query(
+    `SELECT assignment_type, reference_id FROM task_assignments WHERE task_id = ?`,
+    [taskId]
+  );
+  return rows.some((a) => {
+    if (a.assignment_type === 'User') return String(a.reference_id) === String(user.id);
+    if (a.assignment_type === 'Department') {
+      return user.department_id != null && String(a.reference_id) === String(user.department_id);
+    }
+    if (a.assignment_type === 'Position') {
+      return Boolean(a.reference_id) && a.reference_id === user.position_title;
+    }
+    return false;
+  });
+}

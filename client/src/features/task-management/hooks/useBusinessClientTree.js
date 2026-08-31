@@ -17,6 +17,7 @@ import { useOrgTreeVersion } from '@/shared/store/orgTreeBus';
 export function useBusinessClientTree() {
   const [businesses, setBusinesses] = useState([]);
   const [clients, setClients] = useState([]);
+  const [projectsByBiz, setProjectsByBiz] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -27,9 +28,10 @@ export function useBusinessClientTree() {
       // Fetch independently: a failure on one endpoint (e.g. the businesses
       // list being unavailable for a given role) must not blank the other list,
       // otherwise the whole secondary panel renders empty.
-      const [bizRes, clientRes] = await Promise.allSettled([
+      const [bizRes, clientRes, projectRes] = await Promise.allSettled([
         api.get('/businesses', { params: { limit: 1000 } }),
         api.get('/clients'),
+        api.get('/projects', { params: { limit: 1000 } }),
       ]);
 
       const bizRows = bizRes.status === 'fulfilled'
@@ -40,6 +42,21 @@ export function useBusinessClientTree() {
             ? clientRes.value.data.data
             : (clientRes.value?.data?.rows || []))
         : [];
+      const projectRows = projectRes.status === 'fulfilled'
+        ? (projectRes.value?.data?.data?.rows || projectRes.value?.data?.rows || [])
+        : [];
+
+      // Group projects by the client business unit they belong to so each unit
+      // can list its projects (used for deep-linking into a single project).
+      const projectsByBiz = {};
+      for (const p of projectRows) {
+        const bid = p.client_business_id != null ? Number(p.client_business_id) : null;
+        if (bid == null) continue;
+        (projectsByBiz[bid] = projectsByBiz[bid] || []).push({
+          id: p.id,
+          name: p.name || p.project_name || `Project ${p.id}`,
+        });
+      }
 
       setBusinesses(
         bizRows
@@ -50,6 +67,7 @@ export function useBusinessClientTree() {
           .filter((b) => b.id != null)
       );
       setClients(Array.isArray(clientRows) ? clientRows : []);
+      setProjectsByBiz(projectsByBiz);
     } catch (err) {
       setError(err?.message || 'Failed to load business/client tree');
     } finally {
@@ -82,11 +100,23 @@ export function useBusinessClientTree() {
     () => ({
       businesses: businesses.map((b) => ({
         ...b,
-        clients: grouped[Number(b.id)] || [],
+        clients: (grouped[Number(b.id)] || []).map((c) => ({
+          ...c,
+          businesses: (c.businesses || []).map((u) => ({
+            ...u,
+            projects: projectsByBiz[Number(u.id)] || [],
+          })),
+        })),
       })),
-      unassigned,
+      unassigned: (unassigned || []).map((c) => ({
+        ...c,
+        businesses: (c.businesses || []).map((u) => ({
+          ...u,
+          projects: projectsByBiz[Number(u.id)] || [],
+        })),
+      })),
     }),
-    [businesses, grouped, unassigned]
+    [businesses, grouped, unassigned, projectsByBiz]
   );
 
   return { ...tree, loading, error, refresh: load };

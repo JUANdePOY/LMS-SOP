@@ -44,6 +44,7 @@ export default function TasksPage() {
   const viewParam = searchParams.get('view');
   const clientParam = searchParams.get('client');
   const businessParam = searchParams.get('business');
+  const projectParam = searchParams.get('project');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
@@ -360,6 +361,9 @@ export default function TasksPage() {
     if (businessParam) {
       result = result.filter((t) => String(taskClientId(t)?.businessId) === String(businessParam));
     }
+    if (projectParam) {
+      result = result.filter((t) => String(t.project_id ?? t.projectId ?? t.project?.id) === String(projectParam));
+    }
     if (assigneeFilter) {
       if (assigneeFilter === '__me__') {
         const uid = String(user?.id);
@@ -377,49 +381,55 @@ export default function TasksPage() {
     if (!clientParam) return null;
     const p = Object.values(projectsById).find((x) => String(x.client_id) === String(clientParam));
     return p?.client_name || null;
-  }, [clientParam, projectsById]);
+  }, [clientParam, projectsById, projectParam]);
 
   const filteredBusinessName = useMemo(() => {
     if (!businessParam) return null;
     const p = Object.values(projectsById).find((x) => String(x.client_business_id) === String(businessParam));
     return p?.client_business_name || null;
-  }, [businessParam, projectsById]);
+  }, [businessParam, projectsById, projectParam]);
 
   // When a client/business scope is active, restrict the hierarchy source to
   // that scope so the Client -> Business -> Project tree still renders (even
   // with no tasks) for the selected business/client.
   const scopedProjectsById = useMemo(() => {
-    if (!clientParam && !businessParam) return projectsById;
+    if (!clientParam && !businessParam && !projectParam) return projectsById;
     const scoped = {};
     Object.values(projectsById).forEach((p) => {
-      if (businessParam && String(p.client_business_id) === String(businessParam)) {
+      if (projectParam) {
+        if (String(p.id) === String(projectParam)) scoped[String(p.id)] = p;
+      } else if (businessParam && String(p.client_business_id) === String(businessParam)) {
         scoped[String(p.id)] = p;
       } else if (clientParam && String(p.client_id) === String(clientParam)) {
         scoped[String(p.id)] = p;
       }
     });
     return scoped;
-  }, [projectsById, clientParam, businessParam]);
+  }, [projectsById, clientParam, businessParam, projectParam]);
 
   // When a client or business scope is active, restrict the Client -> Business
   // skeleton so the hierarchy tree renders only the selected branch (matching the
   // scoped tasks/projects). Without this the tree still seeded every client from
   // the full org tree, so the scope only auto-expanded instead of filtering.
   const scopedClientTree = useMemo(() => {
-    if (!clientParam && !businessParam) return clientTree;
+    if (!clientParam && !businessParam && !projectParam) return clientTree;
+    // A project scope resolves to its owning client/business, so the tree still
+    // renders only the branch that contains the selected project.
+    const targetClient = clientParam ?? (projectParam ? projectsById[String(projectParam)]?.client_id : null);
+    const targetBusiness = businessParam ?? (projectParam ? projectsById[String(projectParam)]?.client_business_id : null);
     return (clientTree || [])
       .map((client) => {
-        if (clientParam && String(client.id) !== String(clientParam)) return null;
-        if (businessParam) {
+        if (targetClient && String(client.id) !== String(targetClient)) return null;
+        if (targetBusiness) {
           const businesses = (client.businesses || []).filter(
-            (b) => String(b.id) === String(businessParam)
+            (b) => String(b.id) === String(targetBusiness)
           );
           return { ...client, businesses };
         }
         return client;
       })
       .filter(Boolean);
-  }, [clientTree, clientParam, businessParam]);
+  }, [clientTree, clientParam, businessParam, projectParam, projectsById]);
 
   const applySavedView = useCallback((key) => {
     const v = SAVED_VIEWS.find((x) => x.key === key);
@@ -675,6 +685,7 @@ export default function TasksPage() {
           canManage
           scopeClientId={clientParam}
           scopeBusinessId={businessParam}
+          scopeProjectId={projectParam}
           viewProp={view}
           onViewChange={changeView}
           onEdit={handleEdit}

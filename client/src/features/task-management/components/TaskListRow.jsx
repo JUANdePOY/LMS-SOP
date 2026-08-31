@@ -560,7 +560,7 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
   );
 }
 
-export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects }) {
+export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects, showCountBadges = false, subtaskCount = 0, isNew = false }) {
   const { toast } = useToast();
 
   const overdue = isOverdue(task);
@@ -655,6 +655,16 @@ export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, on
             className="truncate text-[var(--text-primary)] hover:underline cursor-text"
             ariaLabel="Rename task"
           />
+          {showCountBadges && subtaskCount > 0 && (
+            <span className="ml-1.5 inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface-hover)] px-1.5 text-[11px] font-medium tabular-nums text-[var(--text-secondary)]">
+              {subtaskCount}
+            </span>
+          )}
+          {isNew && (
+            <span className="ml-1.5 inline-flex h-5 shrink-0 items-center rounded-full bg-red-600 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+              New
+            </span>
+          )}
         </span>
         <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
           <button

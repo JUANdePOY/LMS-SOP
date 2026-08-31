@@ -93,6 +93,12 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
           {node.title}
         </button>
 
+        {canManage && (
+          <span onClick={(e) => e.stopPropagation()} className="shrink-0">
+            <AssigneePicker assignments={node.assignments} onSave={handleAssign} />
+          </span>
+        )}
+
         <StatusBadge status={node.auto_status} className="shrink-0" />
 
         {node.deadline_datetime && (
@@ -112,12 +118,6 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
                 className="ring-2 ring-[var(--bg-surface)]"
               />
             ))}
-          </span>
-        )}
-
-        {canManage && (
-          <span onClick={(e) => e.stopPropagation()} className="shrink-0">
-            <AssigneePicker assignments={node.assignments} onSave={handleAssign} />
           </span>
         )}
 

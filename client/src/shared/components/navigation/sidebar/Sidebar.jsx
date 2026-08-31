@@ -431,7 +431,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
                           onNavClick={handleNavClick}
                           isActive={isActive(sub.path)}
                           badgeCount={getBadgeCount(sub.path)}
-                          onActivate={isDesktop && sub.path === "/tasks" ? () => { openSecondaryNav("clients"); navigate("/tasks"); handleNavClick(); onCollapseSidebar?.(); } : undefined}
+                          onActivate={isDesktop && (sub.path === "/tasks" || sub.path === "/tasks/my") ? () => { openSecondaryNav("clients"); navigate(sub.path); handleNavClick(); onCollapseSidebar?.(); } : undefined}
                         />
                       )}
                     </li>
@@ -449,7 +449,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
                 onNavClick={handleNavClick}
                 isActive={isActive(item.path)}
                 badgeCount={getBadgeCount(item.path)}
-                onActivate={isDesktop && item.path === "/tasks" ? () => { openSecondaryNav("clients"); navigate("/tasks"); handleNavClick(); onCollapseSidebar?.(); } : undefined}
+                onActivate={isDesktop && (item.path === "/tasks" || item.path === "/tasks/my") ? () => { openSecondaryNav("clients"); navigate(item.path); handleNavClick(); onCollapseSidebar?.(); } : undefined}
               />
             </li>
           );

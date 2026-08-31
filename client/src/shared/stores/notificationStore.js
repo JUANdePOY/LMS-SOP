@@ -48,6 +48,11 @@ let preferences = null;
 
 let cachedSnapshot = null;
 
+// Tracks which task-assignment notifications we've already surfaced as a banner
+// so each assignment only produces one banner (across polls/WS refreshes).
+let seenTaskNotificationIds = new Set();
+let taskNotificationsInitialized = false;
+
 function sortBanners(entries) {
   return [...entries].sort((a, b) => {
     const priorityDiff = (b.priority || 0) - (a.priority || 0);
@@ -121,6 +126,33 @@ export const NotificationStore = {
         playNotificationSound();
       }
       previousUnreadServerCount = unreadServerCount;
+
+      // Surface a banner for the assigned employee when a NEW task-assignment
+      // notification arrives (works for both the 25s poller and WS-driven
+      // refreshes). Only genuinely new notifications are banner-ed; the first
+      // fetch just seeds the seen set so pre-existing tasks don't re-banner.
+      const taskNotifications = notifications.filter(
+        (n) => n.entity_type === 'task' && (n.category === 'task' || !n.category)
+      );
+      if (taskNotificationsInitialized) {
+        taskNotifications
+          .filter((n) => !seenTaskNotificationIds.has(n.id))
+          .forEach((n) => {
+            enqueueBanner({
+              id: `task-assigned-${n.id}`,
+              type: 'announcement',
+              title: n.title || 'New task assigned',
+              message: n.body || '',
+              link: n.entity_id ? `/tasks/my?task=${n.entity_id}` : (n.link || null),
+              ctaLabel: 'View',
+              priority: 2,
+            });
+          });
+      } else {
+        taskNotificationsInitialized = true;
+      }
+      taskNotifications.forEach((n) => seenTaskNotificationIds.add(n.id));
+
       emitChange();
       return serverNotifications;
     } catch {

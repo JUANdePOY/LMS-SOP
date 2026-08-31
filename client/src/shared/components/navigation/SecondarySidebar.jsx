@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { Building2, Search, X, ChevronRight, ChevronDown, Plus, Briefcase, MoreHorizontal, Trash2 } from "lucide-react";
+import { Building2, Search, X, ChevronRight, ChevronDown, Plus, Briefcase, MoreHorizontal, Trash2, FolderKanban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/services/api";
 import { useToast } from "@/shared/components/ui/Toast";
 import { useNavigation } from "@/shared/contexts/NavigationContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { useBusinessClientTree } from "@/features/task-management/hooks/useBusinessClientTree";
 import { notifyOrgTreeChanged } from "@/shared/store/orgTreeBus";
 import InlineNameRow from "@/features/task-management/components/InlineNameRow";
@@ -37,14 +38,27 @@ function highlight(text, q) {
 
 export default function SecondarySidebar() {
   const { secondaryNav, closeSecondaryNav } = useNavigation();
+  const { user, isAnyAdmin } = useAuth();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const hasScope = searchParams.get("client") || searchParams.get("business");
   const { businesses, unassigned, loading, refresh } = useBusinessClientTree();
+
+  // Employees (non-admins) only ever see the single SOP business linked to their
+  // account — the task tree in the My Tasks page is scoped to it, so this panel
+  // mirrors that scope instead of exposing the whole org. Admins keep the full list.
+  const employeeBusinessId = isAnyAdmin ? null : (user?.business_id ?? null);
+  const visibleBusinesses = useMemo(() => {
+    if (isAnyAdmin) return businesses;
+    // Employees with no SOP business linked see an empty panel, never the full org.
+    if (employeeBusinessId == null) return [];
+    return businesses.filter((b) => Number(b.id) === Number(employeeBusinessId));
+  }, [businesses, employeeBusinessId, isAnyAdmin]);
+  const showUnassigned = isAnyAdmin;
   const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [expandedBiz, setExpandedBiz] = useState({});
   const [expandedClient, setExpandedClient] = useState({});
+  const [expandedUnit, setExpandedUnit] = useState({});
   const [addingClientBiz, setAddingClientBiz] = useState(null); // SOP biz id or 'unassigned' or null
   const [addingUnitClient, setAddingUnitClient] = useState(null); // client id or null
   const [menu, setMenu] = useState(null); // { kind: 'client'|'unit', id, clientId, name }
@@ -139,16 +153,42 @@ export default function SecondarySidebar() {
   })();
 
   const activeUnit = searchParams.get("business");
+  const activeProject = searchParams.get("project");
 
   // Auto-expand the SOP business + client whose page is currently open.
   useEffect(() => {
     if (!open || !activeClientId) return;
     setExpandedClient((prev) => (prev[activeClientId] ? prev : { ...prev, [activeClientId]: true }));
-    const owner = businesses.find((b) => (b.clients || []).some((c) => String(c.id) === String(activeClientId)));
+    const owner = visibleBusinesses.find((b) => (b.clients || []).some((c) => String(c.id) === String(activeClientId)));
     if (owner) {
       setExpandedBiz((prev) => (prev[owner.id] ? prev : { ...prev, [owner.id]: true }));
     }
-  }, [open, activeClientId, businesses]);
+  }, [open, activeClientId, visibleBusinesses]);
+
+  // Employees only have one business, so reveal it by default (clients stay
+  // collapsed until the user opens the business) so the panel isn't blank.
+  useEffect(() => {
+    if (employeeBusinessId == null) return;
+    const key = String(employeeBusinessId);
+    if (visibleBusinesses.length && !expandedBiz[key]) {
+      setExpandedBiz((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
+    }
+  }, [employeeBusinessId, visibleBusinesses, expandedBiz]);
+
+  // Expand the branch that matches an active Tasks scope (client/business/
+  // project chosen in the panel) so the selected row is visible. Keyed on the
+  // scope string so it only fires when the selection actually changes.
+  const scopeKey = `${searchParams.get("client") || ""}|${searchParams.get("business") || ""}|${searchParams.get("project") || ""}`;
+  useEffect(() => {
+    if (!open) return;
+    const c = searchParams.get("client");
+    const b = searchParams.get("business");
+    if (c) setExpandedClient((prev) => (prev[c] ? prev : { ...prev, [c]: true }));
+    if (b) {
+      setExpandedBiz((prev) => (prev[b] ? prev : { ...prev, [b]: true }));
+      setExpandedUnit((prev) => (prev[b] ? prev : { ...prev, [b]: true }));
+    }
+  }, [open, scopeKey]);
 
   const q = query.trim().toLowerCase();
   const searching = q.length > 0;
@@ -157,8 +197,8 @@ export default function SecondarySidebar() {
   // a client (or a client's business unit) whose name matches. Matched clients /
   // units are narrowed to just the hits so the expanded list shows only results.
   const filteredBusinesses = useMemo(() => {
-    if (!q) return businesses;
-    return businesses
+    if (!q) return visibleBusinesses;
+    return visibleBusinesses
       .map((b) => {
         const bizMatch = (b.name || "").toLowerCase().includes(q);
         const clients = (b.clients || [])
@@ -175,9 +215,10 @@ export default function SecondarySidebar() {
         return null;
       })
       .filter(Boolean);
-  }, [businesses, q]);
+  }, [visibleBusinesses, q]);
 
   const filteredUnassigned = useMemo(() => {
+    if (!showUnassigned) return [];
     if (!q) return unassigned;
     return unassigned
       .map((c) => {
@@ -187,7 +228,7 @@ export default function SecondarySidebar() {
         return null;
       })
       .filter(Boolean);
-  }, [unassigned, q]);
+  }, [showUnassigned, unassigned, q]);
 
   const isClientActive = (id) => location.pathname.startsWith(`/clients/${id}`);
   const isUnitActive = (clientId, unitId) =>
@@ -195,45 +236,88 @@ export default function SecondarySidebar() {
     location.pathname.startsWith(`/clients/${clientId}/businesses/${unitId}/`) ||
     (activeUnit && String(activeUnit) === String(unitId));
 
-  const renderUnit = (client, unit) => (
-    <Link
-      key={unit.id}
-      to={`/tasks?view=list&business=${unit.id}&client=${client.id}`}
-      className={cn(
-        "flex items-center gap-2 rounded-lg py-2 pl-3 pr-2 text-[13px] transition-colors",
-        isUnitActive(client.id, unit.id)
-          ? "bg-[var(--bg-active)] text-[var(--text-on-sidebar)]"
-          : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:bg-[var(--bg-hover)]"
-      )}
-    >
-      <Briefcase size={14} className="shrink-0" />
-       <span className="flex-1 truncate">{highlight(unit.business_name, q)}</span>
-      <div className="relative">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setMenu((m) => (m?.kind === "unit" && m.id === unit.id ? null : { kind: "unit", id: unit.id, clientId: client.id, name: unit.business_name }));
-          }}
-          title="More actions"
-          className="rounded p-1 text-[var(--text-on-sidebar)] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--bg-hover)]"
+  const renderUnit = (client, unit) => {
+    const unitOpen = expandedUnit[unit.id] || searching;
+    const projects = unit.projects || [];
+    const unitActive = isUnitActive(client.id, unit.id);
+    return (
+      <>
+        <div
+          className={cn(
+            "group flex items-center gap-1 rounded-lg pr-2 transition-colors",
+            unitActive
+              ? "bg-[var(--bg-active)] text-[var(--text-on-sidebar)]"
+              : "hover:bg-[var(--bg-hover)]"
+          )}
         >
-          <MoreHorizontal size={13} />
-        </button>
-        {menu?.kind === "unit" && menu?.id === unit.id && (
-          <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-lg">
+          <button
+            type="button"
+            onClick={() => setExpandedUnit((p) => ({ ...p, [unit.id]: !p[unit.id] }))}
+            aria-label={unitOpen ? "Collapse projects" : "Expand projects"}
+            aria-expanded={unitOpen}
+            className="flex h-9 w-7 shrink-0 items-center justify-center text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:text-[var(--text-on-sidebar)] focus:outline-none"
+          >
+            {unitOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </button>
+          <Link
+            to={`/tasks?view=list&business=${unit.id}&client=${client.id}`}
+            className="flex min-w-0 flex-1 items-center gap-2 py-2 text-[13px]"
+          >
+            <Briefcase size={14} className="shrink-0" />
+            <span className="flex-1 truncate">{highlight(unit.business_name, q)}</span>
+            {projects.length > 0 && <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{projects.length}</span>}
+          </Link>
+          <div className="relative">
             <button
               type="button"
-              onClick={() => requestDelete("unit", unit.id, client.id, unit.business_name)}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+              onClick={(e) => {
+                e.stopPropagation();
+                setMenu((m) => (m?.kind === "unit" && m.id === unit.id ? null : { kind: "unit", id: unit.id, clientId: client.id, name: unit.business_name }));
+              }}
+              title="More actions"
+              className="rounded p-1 text-[var(--text-on-sidebar)] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--bg-hover)]"
             >
-              <Trash2 size={13} /> Delete
+              <MoreHorizontal size={13} />
             </button>
+            {menu?.kind === "unit" && menu?.id === unit.id && (
+              <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => requestDelete("unit", unit.id, client.id, unit.business_name)}
+                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                >
+                  <Trash2 size={13} /> Delete
+                </button>
+              </div>
+            )}
           </div>
+        </div>
+        {unitOpen && projects.length > 0 && (
+          <ul className="ml-6 mt-0.5 space-y-0.5 border-l border-[var(--border-sidebar)] pb-0.5">
+            {projects.map((p) => {
+              const active = activeProject && String(activeProject) === String(p.id);
+              return (
+                <li key={p.id}>
+                  <Link
+                    to={`/tasks?view=list&project=${p.id}&business=${unit.id}&client=${client.id}`}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg py-1.5 pl-2 pr-2 text-[12px] transition-colors",
+                      active
+                        ? "bg-[var(--bg-active)] text-[var(--text-on-sidebar)]"
+                        : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:bg-[var(--bg-hover)]"
+                    )}
+                  >
+                    <FolderKanban size={13} className="shrink-0" />
+                    <span className="flex-1 truncate">{highlight(p.name, q)}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </div>
-    </Link>
-  );
+      </>
+    );
+  };
 
   const renderClient = (client) => {
     const cOpen = expandedClient[client.id] || searching;
@@ -267,6 +351,7 @@ export default function SecondarySidebar() {
             {units.length > 0 && <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{units.length}</span>}
           </Link>
           <div className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            {isAnyAdmin && (
             <button
               type="button"
               onClick={(e) => {
@@ -278,6 +363,7 @@ export default function SecondarySidebar() {
             >
               <Plus size={14} />
             </button>
+            )}
             <div className="relative">
               <button
                 type="button"
@@ -354,6 +440,7 @@ export default function SecondarySidebar() {
             <span className="flex-1 truncate text-left">{highlight(label, q)}</span>
             {items.length > 0 && <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{items.length}</span>}
           </button>
+          {isAnyAdmin && (
           <button
             type="button"
             onClick={(e) => {
@@ -365,6 +452,7 @@ export default function SecondarySidebar() {
           >
             <Plus size={14} />
           </button>
+          )}
         </div>
         {bOpen && (
           <ul className="ml-[22px] mt-0.5 space-y-0.5 border-l border-[var(--border-sidebar)] pb-0.5">
@@ -445,7 +533,11 @@ export default function SecondarySidebar() {
           </div>
         ) : filteredBusinesses.length === 0 && filteredUnassigned.length === 0 && addingClientBiz !== "unassigned" ? (
           <p className="px-3 py-4 text-xs text-[var(--text-muted)]">
-            {query ? "No businesses or clients match your search." : "No businesses yet."}
+            {query
+              ? "No businesses or clients match your search."
+              : employeeBusinessId != null
+                ? "Your SOP business has no clients yet."
+                : "No businesses yet."}
           </p>
         ) : (
           <ul className="mt-0.5 space-y-0.5" role="list">
@@ -458,7 +550,7 @@ export default function SecondarySidebar() {
                 <Building2 size={16} className="shrink-0 text-[color-mix(in_srgb,var(--text-on-sidebar)_60%,transparent)]" />
               )
             )}
-            {(filteredUnassigned.length > 0 || addingClientBiz === "unassigned") &&
+            {showUnassigned && (filteredUnassigned.length > 0 || addingClientBiz === "unassigned") &&
               renderBizGroup(
                 null,
                 "Unassigned",
@@ -471,7 +563,7 @@ export default function SecondarySidebar() {
       </nav>
 
       <div className="border-t border-[var(--border-sidebar)] p-2">
-        {clientBizPicker ? (
+        {isAnyAdmin && (clientBizPicker ? (
           <div className="space-y-1">
             <p className="px-1 pb-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
               Select an Business
@@ -508,7 +600,8 @@ export default function SecondarySidebar() {
           >
             <Plus size={16} /> New Client
           </button>
-        )}
+        )
+      )}
       </div>
 
       <ConfirmationDialog

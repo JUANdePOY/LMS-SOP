@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Users, Building2 } from 'lucide-react';
 import { ASSIGNMENT_TYPES } from '../constants/taskConstants';
 import { getUsersForAssignment, getDepartmentsForAssignment } from '../api/assignment.api';
@@ -66,22 +67,36 @@ export default function AssignmentInput({ assignment, onUpdate, onRemove, canRem
   // Position the dropdown using fixed coordinates so it renders above
   // modal overlays and overflow containers that would otherwise clip it.
   // It opens downward by default, but flips upward when there isn't enough
-  // room below the input so the menu stays fully within the viewport.
+  // room below the input so the menu stays fully within the viewport. It also
+  // flips horizontally (to the left of the input) when it would otherwise be
+  // clipped by the right edge of the viewport.
   useLayoutEffect(() => {
     if (!showDropdown || !inputContainerRef.current) return;
 
+    const MARGIN = 8;
     const updatePosition = () => {
       const input = inputContainerRef.current;
       if (!input) return;
       const rect = input.getBoundingClientRect();
-      // Measure the actual menu height (falls back to an estimate before paint).
+      // The menu has min-w-[220px] and max-w-[280px], so its actual width is the
+      // input width clamped to that range. Use this for collision math instead of
+      // the measured offsetWidth, which can lag a render behind the applied style.
       const menuHeight = menuRef.current?.offsetHeight || 240;
+      const menuWidth = Math.min(280, Math.max(rect.width || 220, 220));
       const spaceBelow = window.innerHeight - rect.bottom;
-      const openUp = spaceBelow < menuHeight + 8;
+      const openUp = spaceBelow < menuHeight + MARGIN;
       const top = openUp
-        ? Math.max(8, rect.top - menuHeight - 4)
+        ? Math.max(MARGIN, rect.top - menuHeight - 4)
         : rect.bottom + 4;
-      setDropdownCoords({ top, left: rect.left, width: rect.width });
+      // Prefer aligning the menu's left edge with the input, but if that would
+      // overflow the right edge, shift it left (right-aligned to the input) so
+      // the whole menu stays inside the viewport.
+      const maxLeft = window.innerWidth - MARGIN - menuWidth;
+      let left = rect.left;
+      if (left > maxLeft) {
+        left = Math.max(MARGIN, Math.min(left, maxLeft, rect.right - menuWidth));
+      }
+      setDropdownCoords({ top, left, width: rect.width });
     };
 
     updatePosition();
@@ -89,6 +104,7 @@ export default function AssignmentInput({ assignment, onUpdate, onRemove, canRem
     const handleScroll = (e) => {
       // Don't close when scrolling inside the dropdown or input area
       if (dropdownRef.current && e.target && dropdownRef.current.contains(e.target)) return;
+      if (menuRef.current && e.target && menuRef.current.contains(e.target)) return;
       setShowDropdown(false);
     };
     window.addEventListener('scroll', handleScroll, true);
@@ -103,6 +119,8 @@ export default function AssignmentInput({ assignment, onUpdate, onRemove, canRem
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        // The menu is portaled to <body>, so also ignore clicks inside it.
+        if (menuRef.current && menuRef.current.contains(event.target)) return;
         setShowDropdown(false);
       }
     }
@@ -174,7 +192,7 @@ export default function AssignmentInput({ assignment, onUpdate, onRemove, canRem
           )}
         </div>
 
-        {showDropdown && options.length > 0 && (
+        {showDropdown && options.length > 0 && createPortal(
           <div
             ref={menuRef}
             className="fixed z-50 max-h-48 min-w-[220px] max-w-[280px] overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] shadow-lg"
@@ -203,17 +221,19 @@ export default function AssignmentInput({ assignment, onUpdate, onRemove, canRem
                 </button>
               );
             })}
-          </div>
+          </div>,
+          document.body
         )}
 
-        {showDropdown && !loading && query && options.length === 0 && (
+        {showDropdown && !loading && query && options.length === 0 && createPortal(
           <div
             ref={menuRef}
             className="fixed z-50 min-w-[220px] rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-xs text-[var(--text-muted)] shadow-lg whitespace-nowrap"
             style={dropdownStyle}
           >
             No results found
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 
