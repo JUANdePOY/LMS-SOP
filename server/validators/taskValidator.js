@@ -90,6 +90,8 @@ function validateTaskPayload(body, requireAll = true) {
   }
 
   // Main tasks (no parent) must be linked to a Client and Client Business.
+  // The project layer has been removed from the table, so project_id is now
+  // optional — a task can live directly under its client business unit.
   if (requireAll && !hasParent && !value.parent_task_id) {
     for (const key of ['client_id', 'client_business_id']) {
       if (value[key] === undefined || value[key] === null) {

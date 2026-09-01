@@ -89,7 +89,7 @@ function isUserAssigned(assignments, user) {
   });
 }
 
-function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
+function TaskBody({ taskId, open, onUpdated, onOpenTask, focusSubtasks = false, readOnly = false }) {
   const { toast } = useToast();
   const { user, isAnyAdmin } = useAuth();
   const [local, setLocal] = useState(null);
@@ -187,9 +187,10 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
   // Only admins may edit task details (title, status, priority, dates,
   // description, assignees, sub-tasks). Regular assignees can still message,
   // upload attachments, and update progress — but only when they are assigned to
-  // the task itself.
-  const canEdit = isAnyAdmin;
-  const isAssigned = isAnyAdmin || isUserAssigned(local.assignments, user);
+  // the task itself. When readOnly is forced (employee viewing an unassigned
+  // task), everything is view-only.
+  const canEdit = !readOnly && isAnyAdmin;
+  const isAssigned = !readOnly && (isAnyAdmin || isUserAssigned(local.assignments, user));
 
   // Save only the user picks, but preserve any team/department assignments that
   // the picker doesn't manage so they aren't lost on update.
@@ -290,6 +291,7 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask }) {
         onAdd={handleAddSubtask}
         onAssign={handleAssignSubtask}
         onOpenTask={onOpenTask}
+        scrollIntoView={focusSubtasks}
       />
 
       {Array.isArray(local.custom_fields) && local.custom_fields.length > 0 && (
@@ -705,7 +707,7 @@ function ProjectBody({ projectId, open, onUpdated }) {
   );
 }
 
-export default function EntityDetailPanel({ open, onClose, type = 'task', taskId, projectId, clientId, businessId, entity, onUpdated, onDeleted, onOpenTask }) {
+export default function EntityDetailPanel({ open, onClose, type = 'task', taskId, projectId, clientId, businessId, entity, onUpdated, onDeleted, onOpenTask, focusSubtasks = false, readOnly = false }) {
   const { toast } = useToast();
   const [pendingDelete, setPendingDelete] = useState(false);
   const label = ENTITY_LABEL[type] || 'Task';
@@ -727,16 +729,23 @@ export default function EntityDetailPanel({ open, onClose, type = 'task', taskId
   };
 
   return (
-    <Drawer open={open} onClose={onClose} title={null} size="lg" showBackdrop={false}>
+    <Drawer open={open} onClose={onClose} title={null} size="lg" showBackdrop>
       {open && (
         <div className="flex h-full flex-col">
           <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
-              style={{ color: 'var(--color-primary)', backgroundColor: 'color-mix(in_srgb, var(--color-primary) 12%, transparent)' }}
-            >
-              {label}
-            </span>
+            <div className="flex items-center gap-2">
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ color: 'var(--color-primary)', backgroundColor: 'color-mix(in_srgb, var(--color-primary) 12%, transparent)' }}
+              >
+                {label}
+              </span>
+              {readOnly && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">
+                  View Only
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1">
               {type !== 'task' && (
                 <button
@@ -753,7 +762,7 @@ export default function EntityDetailPanel({ open, onClose, type = 'task', taskId
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-4">
             {type === 'task'
-              ? <TaskBody taskId={taskId} open={open} onClose={onClose} onUpdated={onUpdated} onOpenTask={onOpenTask} />
+              ? <TaskBody taskId={taskId} open={open} onClose={onClose} onUpdated={onUpdated} onOpenTask={onOpenTask} focusSubtasks={focusSubtasks} readOnly={readOnly} />
               : type === 'project'
                 ? <ProjectBody projectId={projectId} open={open} onClose={onClose} onUpdated={onUpdated} />
                 : type === 'client'

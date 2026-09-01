@@ -27,7 +27,7 @@ const ENTITY_BANNER_TYPE = {
   onboarding: "announcement",
 };
 
-export function useContextualBanners() {
+export function useContextualBanners({ enabled = true } = {}) {
   const { user, isAnyAdmin } = useAuth();
   const userId = user?.id;
   const { notifications } = useNotifications();
@@ -36,7 +36,7 @@ export function useContextualBanners() {
   const [overdueCount, setOverdueCount] = useState(0);
 
   const loadTasks = useCallback(async () => {
-    if (!userId) return;
+    if (!enabled || !userId) return;
     setTasksLoading(true);
     try {
       const data = await getMyTaskHierarchy();
@@ -47,17 +47,17 @@ export function useContextualBanners() {
     } finally {
       setTasksLoading(false);
     }
-  }, [userId]);
+  }, [enabled, userId]);
 
   const loadAdminStats = useCallback(async () => {
-    if (!isAnyAdmin) return;
+    if (!enabled || !isAnyAdmin) return;
     try {
       const stats = await getTaskStats();
       setOverdueCount(Number(stats?.overdue) || 0);
     } catch {
       setOverdueCount(0);
     }
-  }, [isAnyAdmin]);
+  }, [enabled, isAnyAdmin]);
 
   useEffect(() => {
     loadTasks();

@@ -79,7 +79,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const recentMessagesList = (recentMessages || [])
       .filter((m) => new Date(m.last_message_at || m.updated_at || m.created_at) >= thirtyDaysAgo)
-      .sort((a, b) => new Date(b.last_message_at || m.updated_at || m.created_at) - new Date(a.last_message_at || m.updated_at || m.created_at))
+      .sort((a, b) => new Date(b.last_message_at || b.updated_at || b.created_at) - new Date(a.last_message_at || a.updated_at || a.created_at))
       .slice(0, 5);
 
     const normalizedAnnouncements = (Array.isArray(announcements) ? announcements : []).map((item) => ({

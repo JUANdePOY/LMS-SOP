@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FolderKanban, ChevronRight, Plus, CalendarDays } from 'lucide-react';
+import { FolderKanban, ChevronRight, Plus, CalendarDays, ArrowLeft, CheckSquare } from 'lucide-react';
 import api from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
 import Breadcrumb from '../components/Breadcrumb';
 import StatusDot from '../components/StatusDot';
 import ProjectFormModal from '../components/ProjectFormModal';
+import TaskCard from '../components/TaskCard';
+import { getTasks } from '../services/taskService';
 
 function ProjectCard({ project, onOpen }) {
   const due = project.due_date
@@ -48,7 +50,7 @@ export default function BusinessProjectsPage() {
   const { toast } = useToast();
   const [client, setClient] = useState(null);
   const [business, setBusiness] = useState(null);
-  const [projects, setProjects] = useState([]);
+  const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -58,27 +60,29 @@ export default function BusinessProjectsPage() {
     setLoading(true);
     Promise.all([
       api.get(`/clients/${clientId}`),
-      api.get('/projects', { params: { client_business_id: businessId } }),
+      getTasks({ client_business_id: businessId }),
     ])
-      .then(([clientRes, projRes]) => {
+      .then(([clientRes, tasksData]) => {
         if (!active) return;
         const c = clientRes.data?.data;
         setClient(c);
         setBusiness((c?.businesses || []).find((b) => String(b.id) === String(businessId)) || null);
-        setProjects(projRes.data?.data || []);
+        const rows = Array.isArray(tasksData?.rows) ? tasksData.rows : (Array.isArray(tasksData) ? tasksData : []);
+        setTasks(rows);
       })
       .catch((err) => {
         if (!active) return;
-        setError(err.response?.data?.message || err.message || 'Failed to load projects');
-        toast.error('Failed to load projects');
+        setError(err.response?.data?.message || err.message || 'Failed to load tasks');
+        toast.error('Failed to load tasks');
       })
       .finally(() => active && setLoading(false));
     return () => { active = false; };
   }, [clientId, businessId, toast]);
 
   const breadcrumbItems = [
-    { label: 'Clients', to: '/clients' },
-    client?.client_name && { label: client.client_name, to: `/clients/${clientId}` },
+    { label: 'Tasks & Projects', onClick: () => navigate('/tasks') },
+    { label: 'Clients', onClick: () => navigate('/clients') },
+    { label: client?.client_name, onClick: () => navigate(`/clients/${clientId}`) },
     { label: business?.business_name || 'Business' },
   ].filter(Boolean);
 
@@ -89,33 +93,40 @@ export default function BusinessProjectsPage() {
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-[var(--text-primary)]">{business?.business_name || 'Business'}</h1>
-          <p className="text-sm text-[var(--ppm-text-muted)]">Projects under this business.</p>
+          <p className="text-sm text-[var(--ppm-text-muted)]">Tasks under this business.</p>
         </div>
-        {client && (
-          <button onClick={() => setShowForm(true)} className="ppm-btn-primary shrink-0">
-            <Plus size={16} /> New Project
+        <div className="flex shrink-0 items-center gap-2">
+          <button onClick={() => navigate('/tasks')} className="ppm-btn-ghost shrink-0">
+            <ArrowLeft size={16} /> Back
           </button>
-        )}
+          <button onClick={() => navigate('/tasks')} className="ppm-btn-ghost shrink-0">
+            <CheckSquare size={16} /> New Task
+          </button>
+          {client && (
+            <button onClick={() => setShowForm(true)} className="ppm-btn-primary shrink-0">
+              <Plus size={16} /> New Projects
+            </button>
+          )}
+        </div>
       </div>
 
       {loading && <p className="text-sm text-[var(--ppm-text-muted)]">Loading…</p>}
       {error && !loading && <p className="text-sm text-red-600">{error}</p>}
-      {!loading && !error && projects.length === 0 && (
+      {!loading && !error && tasks.length === 0 && (
         <div className="ppm-empty">
           <FolderKanban size={28} />
-          <p className="text-sm">No projects yet for this business.</p>
+          <p className="text-sm">No tasks yet for this business.</p>
           {client && (
-            <button onClick={() => setShowForm(true)} className="ppm-btn-ghost">
-              <Plus size={15} /> Create your first project
+            <button onClick={() => navigate('/tasks')} className="ppm-btn-ghost">
+              <Plus size={15} /> Create your first task
             </button>
           )}
         </div>
       )}
-
-      {!loading && !error && projects.length > 0 && (
+      {!loading && !error && tasks.length > 0 && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((p) => (
-            <ProjectCard key={p.id} project={p} onOpen={(id) => navigate(`/clients/${clientId}/businesses/${businessId}/projects/${id}`)} />
+          {tasks.map((t) => (
+            <TaskCard key={t.id} task={t} onOpen={() => navigate('/tasks')} />
           ))}
         </div>
       )}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Trash2, Check, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import StatusBadge from './StatusBadge';
@@ -158,12 +158,43 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
   );
 }
 
-export default function SubtaskList({ subtasks = [], canManage, onToggle, onDelete, onAdd, onOpenTask, onAssign }) {
+export default function SubtaskList({ subtasks = [], canManage, onToggle, onDelete, onAdd, onOpenTask, onAssign, scrollIntoView = false }) {
   const flat = subtasks || [];
   const doneCount = flat.filter(isCompleted).length;
+  const sectionRef = useRef(null);
+
+  // When the parent (task detail drawer) wants the user's attention drawn to
+  // the sub-tasks area — e.g. the user clicked the "N" subtask-count pill on
+  // a task row — scroll the section into view inside the nearest scrollable
+  // ancestor and pulse-highlight it so the user lands exactly where they
+  // expect. Honors reduced-motion by skipping the highlight transition.
+  useEffect(() => {
+    if (!scrollIntoView || !sectionRef.current) return;
+    const el = sectionRef.current;
+    const reduce = typeof window !== 'undefined'
+      && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Find the drawer's scroll container so we scroll within it (not the page).
+    const scrollParent = el.closest('.overflow-y-auto') || el.parentElement;
+    if (scrollParent && typeof scrollParent.scrollTo === 'function') {
+      const elTop = el.getBoundingClientRect().top;
+      const parentTop = scrollParent.getBoundingClientRect().top;
+      scrollParent.scrollTo({ top: scrollParent.scrollTop + (elTop - parentTop) - 16, behavior: reduce ? 'auto' : 'smooth' });
+    } else {
+      el.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    }
+    if (!reduce) {
+      el.classList.add('ring-2', 'ring-[var(--color-primary)]', 'ring-offset-2', 'ring-offset-[var(--bg-surface)]', 'rounded-lg', 'transition');
+      const t = setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-[var(--color-primary)]', 'ring-offset-2', 'ring-offset-[var(--bg-surface)]');
+      }, 1400);
+      return () => clearTimeout(t);
+    }
+    return undefined;
+  }, [scrollIntoView, flat.length]);
 
   return (
-    <div className="border-t border-[var(--border)] px-2 pt-4">
+    <div ref={sectionRef} className="border-t border-[var(--border)] px-2 pt-4">
       <div className="mb-1 flex items-center justify-between">
         <h4 className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">
           Sub-tasks

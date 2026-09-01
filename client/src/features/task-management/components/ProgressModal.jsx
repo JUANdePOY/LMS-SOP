@@ -12,7 +12,7 @@ const STATUS_DOT_COLORS = {
 const DEFAULT_DOT_COLOR = 'bg-neutral-400';
 
 const ProgressModal = memo(function ProgressModal({ open, onClose, onSubmit, saving, taskId, initialProgress }) {
-  const [completionRate, setCompletionRate] = useState(initialProgress ? Number(initialProgress) : 0);
+  const [completionRate, setCompletionRate] = useState(initialProgress ? Number(initialProgress.completion_rate || 0) : 0);
   const [status, setStatus] = useState(initialProgress ? (initialProgress.status || 'In Progress') : 'In Progress');
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState({});

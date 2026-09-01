@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Building2, FolderKanban, ChevronRight, Plus } from 'lucide-react';
+import { Building2, FolderKanban, ChevronRight, Plus, ArrowLeft, CheckSquare } from 'lucide-react';
 import api from '@/services/api';
 import { Button } from '@/shared/components/ui/button';
 import { Modal } from '@/shared/components/ui/modal';
@@ -37,7 +37,8 @@ export default function ClientDetailPage() {
   if (!client) return <p className="text-sm text-[var(--ppm-text-muted)]">Client not found.</p>;
 
   const breadcrumbItems = [
-    { label: 'Clients', to: '/clients' },
+    { label: 'Tasks & Projects', onClick: () => navigate('/tasks') },
+    { label: 'Clients', onClick: () => navigate('/clients') },
     { label: client.client_name },
   ];
 
@@ -55,9 +56,17 @@ export default function ClientDetailPage() {
             <p className="text-sm text-[var(--ppm-text-muted)]">{client.businesses.length} businesses</p>
           </div>
         </div>
-        <Button onClick={() => setShowBiz(true)} className="gap-1.5">
-          <Plus size={16} /> New Business
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => navigate('/tasks')} className="gap-1.5">
+            <ArrowLeft size={16} /> Back
+          </Button>
+          <Button variant="outline" onClick={() => navigate('/tasks')} className="gap-1.5">
+            <CheckSquare size={16} /> New Task
+          </Button>
+          <Button onClick={() => setShowBiz(true)} className="gap-1.5">
+            <Plus size={16} /> New Busines
+          </Button>
+        </div>
       </div>
 
       {client.businesses.length === 0 ? (

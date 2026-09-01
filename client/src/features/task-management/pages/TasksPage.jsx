@@ -21,7 +21,6 @@ import ViewTabs from '../components/ViewTabs';
 import SavedViewChips from '../components/SavedViewChips';
 import FilterBar from '@/shared/components/ui/FilterBar';
 import Breadcrumb from '../components/Breadcrumb';
-import QuickCreateMenu from '../components/QuickCreateMenu';
 import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
 import { notifyOrgTreeChanged, useOrgTreeVersion } from '@/shared/store/orgTreeBus';
 
@@ -65,11 +64,12 @@ export default function TasksPage() {
   const [editingTask, setEditingTask] = useState(null);
   const [saving, setSaving] = useState(false);
   const [viewingTaskId, setViewingTaskId] = useState(null);
+  const [focusSubtasks, setFocusSubtasks] = useState(false);
   const [viewingProjectId, setViewingProjectId] = useState(null);
   const [viewingClientId, setViewingClientId] = useState(null);
   const [viewingBusinessId, setViewingBusinessId] = useState(null);
   const [view, setView] = useState(() => localStorage.getItem(VIEW_STORAGE_KEY) || 'list');
-  const [, setTaskDefaults] = useState(undefined);
+  const [taskDefaults, setTaskDefaults] = useState(undefined);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
 
   const toggleSelect = useCallback((id) => {
@@ -269,26 +269,52 @@ export default function TasksPage() {
     setShowForm(true);
   }, [scopeDefaults]);
 
-  const handleQuickAddTask = useCallback(async (projectId, title) => {
-    const project = projectsById[String(projectId)];
-    if (!project) return;
+  // Opens an inline "add task" row under a business unit. Since the project layer
+  // has been removed from the table, `parentId` is a client_business_id, not a
+  // project id — resolve the owning project (if any) to inherit its client scope.
+  const handleQuickAddTask = useCallback(async (businessId, clientId, title) => {
     // New tasks default to "Not Started" (status = 'Pending'); priority, due
-    // date, and assignee are left empty so they can be set afterwards.
+    // date, and assignee are left empty so they can be set afterwards. Omit
+    // empty client/business values rather than sending "" — the server rejects
+    // empty strings as invalid FKs.
     const payload = {
       title,
       status: 'Pending',
-      client_id: project.client_id,
-      client_business_id: project.client_business_id,
-      project_id: project.id,
       assignments: [],
     };
+    if (clientId !== undefined && clientId !== '' && clientId !== null) {
+      payload.client_id = Number(clientId);
+    }
+    if (businessId !== undefined && businessId !== '' && businessId !== null) {
+      payload.client_business_id = Number(businessId);
+    }
     try {
       await create(payload);
       await refreshStats();
     } catch (err) {
       toast.error(err.message || 'Failed to create task');
     }
-  }, [projectsById, create, refreshStats, toast]);
+  }, [create, refreshStats, toast]);
+
+  // Add a sub-task under an existing task. Sub-tasks inherit their parent's
+  // client/business scope so they stay in the same tree branch.
+  const handleQuickAddSubtask = useCallback(async (parentTaskId, title) => {
+    const parent = tasks.find((t) => String(t.id) === String(parentTaskId));
+    const payload = {
+      title,
+      status: 'Pending',
+      parent_task_id: Number(parentTaskId),
+      assignments: [],
+    };
+    if (parent?.client_id != null) payload.client_id = Number(parent.client_id);
+    if (parent?.client_business_id != null) payload.client_business_id = Number(parent.client_business_id);
+    try {
+      await create(payload);
+      await refreshStats();
+    } catch (err) {
+      toast.error(err.message || 'Failed to create sub-task');
+    }
+  }, [tasks, create, refreshStats, toast]);
 
   const handleProjectCreated = (project) => {
     if (project?.id && project?.client_id) {
@@ -353,7 +379,13 @@ export default function TasksPage() {
     const taskClientId = (t) => {
       const pid = t.project_id ?? t.projectId ?? t.project?.id;
       const proj = pid != null ? projectsById[String(pid)] : null;
-      return proj ? { clientId: proj.client_id, businessId: proj.client_business_id } : null;
+      if (proj) return { clientId: proj.client_id, businessId: proj.client_business_id };
+      // Fall back to client/business IDs stored directly on the task so tasks
+      // created without a project still respect the scope filter.
+      if (t.client_id != null || t.client_business_id != null) {
+        return { clientId: t.client_id ?? null, businessId: t.client_business_id ?? null };
+      }
+      return null;
     };
     if (clientParam) {
       result = result.filter((t) => String(taskClientId(t)?.clientId) === String(clientParam));
@@ -599,7 +631,6 @@ export default function TasksPage() {
           </h1>
           <p className="text-xs text-[var(--ppm-text-muted)] mt-0.5">Create, assign, and monitor tasks</p>
         </div>
-        <QuickCreateMenu clientId={clientParam ? Number(clientParam) : undefined} onProjectCreated={handleProjectCreated} />
       </div>
 
       {(clientParam || businessParam) && (
@@ -693,8 +724,9 @@ export default function TasksPage() {
           onStatusChange={handleStatusChange}
           onProgressChange={handleProgressChange}
           onInlineUpdate={handleInlineUpdate}
-          onViewTask={(task) => setViewingTaskId(task.id)}
+          onViewTask={(task) => { setFocusSubtasks(false); setViewingTaskId(task.id); }}
           onView={(task) => setViewingTaskId(task.id)}
+          onViewSubtasks={(task) => { setFocusSubtasks(true); setViewingTaskId(task.id); }}
           onDeleteImmediate={deleteTaskNow}
           onDuplicated={handleTaskUpdated}
           onCreateTask={() => { setEditingTask(null); setTaskDefaults(scopeDefaults); setShowForm(true); }}
@@ -706,6 +738,7 @@ export default function TasksPage() {
           hideTabs
           activeViews={TASK_VIEW_KEYS.filter((k) => k !== 'portfolio')}
           onQuickAddTask={handleQuickAddTask}
+          onQuickAddSubtask={handleQuickAddSubtask}
           onRenameClient={renameClient}
           onRenameBusiness={renameBusiness}
           onRenameProject={renameProject}
@@ -726,7 +759,7 @@ export default function TasksPage() {
         onSubmit={handleSubmit}
         saving={saving}
         initialData={editingTask}
-
+        defaultValues={taskDefaults}
       />
 
       <ConfirmationDialog
@@ -743,9 +776,10 @@ export default function TasksPage() {
         type="task"
         taskId={viewingTaskId}
         open={viewingTaskId !== null}
-        onClose={() => setViewingTaskId(null)}
+        onClose={() => { setViewingTaskId(null); setFocusSubtasks(false); }}
         onUpdated={handleTaskUpdated}
-        onOpenTask={(id) => setViewingTaskId(id)}
+        onOpenTask={(id) => { setFocusSubtasks(false); setViewingTaskId(id); }}
+        focusSubtasks={focusSubtasks}
       />
 
       <EntityDetailPanel

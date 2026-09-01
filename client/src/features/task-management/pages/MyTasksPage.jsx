@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useNotifications } from '@/shared/stores/notificationStore.js';
-import { getMyTaskHierarchy } from '../services/taskService';
+import { getMyTaskHierarchy, updateProgress, updateTask } from '../services/taskService';
 import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
 import Breadcrumb from '../components/Breadcrumb';
 import ProjectTaskViews, { TASK_VIEW_KEYS } from '../components/ProjectTaskViews';
@@ -16,7 +16,7 @@ function getProjectId(task) {
 }
 
 export default function MyTasksPage() {
-  const { isAnyAdmin } = useAuth();
+  const { isAnyAdmin, user } = useAuth();
   const { toast } = useToast();
   const { notifications, markRead } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -24,10 +24,11 @@ export default function MyTasksPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
-  const [viewingTaskId, setViewingTaskId] = useState(null);
   const [hierarchy, setHierarchy] = useState({ tasks: [], projectsById: {}, clientTree: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [viewingTaskId, setViewingTaskId] = useState(null);
+  const [viewingTaskReadOnly, setViewingTaskReadOnly] = useState(false);
 
   // When arriving from a "You have been assigned a task" banner, scope the
   // table to the single project tree that contains that task.
@@ -99,13 +100,76 @@ export default function MyTasksPage() {
     }
   }, [toast]);
 
+  // Per-task actions available to the employee who is assigned to that task.
+  // An employee may only edit/delete the tasks they are assigned to; tasks
+  // they aren't assigned to are read-only (no Edit/Delete, drag is still
+  // allowed so they can move their own tasks between columns).
+  // Uses the backend-computed is_assigned flag (which covers User, Department,
+  // and Position assignments) so the UI matches the actual access rules.
+  const isAssignedTask = useCallback((task) => {
+    if (task.is_assigned != null) return task.is_assigned;
+    return (task.assignments || []).some(
+      (a) => a.assignment_type === 'User' && String(a.reference_id) === String(user?.id)
+    );
+  }, [user]);
+
   // Opening a task clears its unread assignment notification so its red "new"
   // badge disappears and the header count decrements.
   const handleViewTask = useCallback((task) => {
     setViewingTaskId(task.id);
+    setViewingTaskReadOnly(!isAssignedTask(task));
     const notif = unreadTaskNotifications.find((n) => String(n.entity_id) === String(task.id));
     if (notif) markRead(notif.id);
-  }, [unreadTaskNotifications, markRead]);
+  }, [unreadTaskNotifications, markRead, isAssignedTask]);
+
+  const handleEditTask = useCallback((task) => {
+    setViewingTaskId(task.id);
+  }, []);
+
+  const handleDeleteTask = useCallback(async (taskId) => {
+    try {
+      await updateTask(taskId, { status: 'Cancelled' });
+      await load();
+      toast.success('Task cancelled');
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete task');
+    }
+  }, [load, toast]);
+
+  const handleStatusChange = useCallback(async (task, newStatus) => {
+    const changes = { status: newStatus };
+    if (newStatus === 'Completed') changes.completion_rate = 100;
+    try {
+      await updateProgress({ task_id: task.id, ...changes });
+      await load();
+      toast.success(`Status updated to ${newStatus}`);
+    } catch (err) {
+      toast.error(err.message || 'Failed to update status');
+    }
+  }, [load, toast]);
+
+  const handleProgressChange = useCallback(async (taskId, rate) => {
+    const task = (hierarchy.tasks || []).find((t) => t.id === taskId);
+    if (task && (task.status === 'Completed' || task.status === 'Cancelled')) {
+      toast.error('Update the Status Before editing the progress rate');
+      return;
+    }
+    try {
+      await updateProgress({ task_id: taskId, completion_rate: rate });
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update progress');
+    }
+  }, [hierarchy, load, toast]);
+
+  const handleInlineUpdate = useCallback(async (task, changes) => {
+    try {
+      await updateTask(task.id, { ...task, ...changes });
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update task');
+    }
+  }, [load, toast]);
 
   useEffect(() => {
     if (isAnyAdmin) return;
@@ -232,8 +296,14 @@ export default function MyTasksPage() {
           projectsById={scopedProjectsById}
           clientTree={scopedClientTree}
           canManage={false}
+          canManageTask={isAssignedTask}
           storageKey="ppm:mytasks:view"
           activeViews={TASK_VIEW_KEYS.filter((k) => k !== 'portfolio')}
+          onEdit={handleEditTask}
+          onDelete={handleDeleteTask}
+          onStatusChange={handleStatusChange}
+          onProgressChange={handleProgressChange}
+          onInlineUpdate={handleInlineUpdate}
           onViewTask={handleViewTask}
           onView={handleViewTask}
           scopeClientId={scope?.clientId}
@@ -247,9 +317,10 @@ export default function MyTasksPage() {
         type="task"
         taskId={viewingTaskId}
         open={viewingTaskId !== null}
-        onClose={() => setViewingTaskId(null)}
+        onClose={() => { setViewingTaskId(null); setViewingTaskReadOnly(false); }}
         onUpdated={load}
         onOpenTask={(id) => setViewingTaskId(id)}
+        readOnly={viewingTaskReadOnly}
       />
     </div>
   );

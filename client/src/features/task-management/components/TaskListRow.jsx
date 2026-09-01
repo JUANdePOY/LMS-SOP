@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, Copy, FolderInput, Trash2, MoreHorizontal, Calendar, ExternalLink, UserPlus } from 'lucide-react';
+import { Check, ChevronDown, Copy, FolderInput, Trash2, MoreHorizontal, Calendar, ExternalLink, UserPlus, Link2, ListTodo } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TASK_PRIORITIES, TASK_PRIORITY_DOT } from '../constants/taskConstants';
 import { useClickOutside } from '../hooks/useClickOutside';
@@ -454,7 +454,7 @@ function InlineDeleteConfirm({ onConfirm, onCancel }) {
   );
 }
 
-function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDuplicate, canManage = true }) {
+function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDuplicate, onAddSubtask, canManage = true }) {
   const [open, setOpen] = useState(false);
   const [subview, setSubview] = useState(null); // null | 'move' | 'delete'
   const [coords, setCoords] = useState({ top: 0, left: 0 });
@@ -526,6 +526,9 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
       </button>
       {canManage && (
         <>
+          <button type="button" onClick={(e) => { e.stopPropagation(); onAddSubtask?.(task); close(); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]">
+            <FolderInput size={13} /> Add sub-task
+          </button>
           <button type="button" onClick={(e) => { e.stopPropagation(); onDuplicate?.(task); close(); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]">
             <Copy size={13} /> Duplicate
           </button>
@@ -560,10 +563,16 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
   );
 }
 
-export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects, showCountBadges = false, subtaskCount = 0, isNew = false }) {
+export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects, showCountBadges = false, subtaskCount = 0, isNew = false, tasksById = {}, onAddSubtask, onViewSubtasks }) {
   const { toast } = useToast();
 
   const overdue = isOverdue(task);
+
+  // A sub-task is one with a parent_task_id. Resolve the parent's title from
+  // the sibling map so the employee can see which task this one belongs to.
+  const isSubtask = task.parent_task_id != null && task.parent_task_id !== '';
+  const parentTask = isSubtask ? tasksById[String(task.parent_task_id)] : null;
+  const parentTitle = parentTask?.title || null;
 
   const handleCompleteToggle = () => {
     if (task.status === 'Completed') {
@@ -655,14 +664,18 @@ export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, on
             className="truncate text-[var(--text-primary)] hover:underline cursor-text"
             ariaLabel="Rename task"
           />
-          {showCountBadges && subtaskCount > 0 && (
-            <span className="ml-1.5 inline-flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-full bg-[var(--bg-surface-hover)] px-1.5 text-[11px] font-medium tabular-nums text-[var(--text-secondary)]">
-              {subtaskCount}
-            </span>
-          )}
           {isNew && (
             <span className="ml-1.5 inline-flex h-5 shrink-0 items-center rounded-full bg-red-600 px-1.5 text-[10px] font-semibold uppercase tracking-wide text-white">
               New
+            </span>
+          )}
+          {isSubtask && (
+            <span
+              className="ml-1.5 inline-flex h-5 shrink-0 items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--color-primary)_12%,transparent)] px-1.5 text-[10px] font-medium text-[var(--color-primary)]"
+              title={parentTitle ? `Sub-task of "${parentTitle}"` : 'Sub-task'}
+            >
+              <Link2 size={10} className="shrink-0" />
+              Sub-task
             </span>
           )}
         </span>
@@ -685,6 +698,22 @@ export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, on
             onDelete={handleDelete}
             onDuplicate={handleDuplicate}
           />
+          {subtaskCount > 0 && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onViewSubtasks) onViewSubtasks(task);
+                else onViewTask?.(task);
+              }}
+              title={`${subtaskCount} sub-task${subtaskCount === 1 ? '' : 's'}`}
+              aria-label={`${subtaskCount} sub-task${subtaskCount === 1 ? '' : 's'}, open task`}
+              className="ml-1.5 inline-flex h-5 shrink-0 items-center gap-1 rounded-full bg-[var(--bg-surface-hover)] px-1.5 text-[11px] font-medium tabular-nums text-[var(--text-secondary)] transition-colors hover:bg-[var(--color-primary)] hover:text-white"
+            >
+              <ListTodo size={11} className="shrink-0" />
+              {subtaskCount}
+            </button>
+          )}
         </span>
       </span>
 

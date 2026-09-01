@@ -43,6 +43,7 @@ export default function ProjectTaskViews({
   onViewTask,
   onInlineUpdate,
   onView,
+  onViewSubtasks,
   onCreateTask,
   onQuickCreate,
   onAddProjectTask,
@@ -51,6 +52,7 @@ export default function ProjectTaskViews({
   onDeleteImmediate,
   onDuplicated,
   onQuickAddTask,
+  onQuickAddSubtask,
   onRenameClient,
   onRenameBusiness,
   onCreateClient,
@@ -60,6 +62,7 @@ export default function ProjectTaskViews({
   onDeleteEntity,
   onCreateBusiness,
   onCreateProject,
+  canManageTask,
   search,
   scopeClientId,
   scopeBusinessId,
@@ -107,6 +110,7 @@ export default function ProjectTaskViews({
               clientTree={clientTree}
               search={search || ''}
               onViewTask={onViewTask}
+              onViewSubtasks={onViewSubtasks}
               onEdit={onEdit}
               onDelete={onDelete}
               onStatusChange={onStatusChange}
@@ -121,6 +125,7 @@ export default function ProjectTaskViews({
               onDeleteImmediate={onDeleteImmediate}
               onDuplicated={onDuplicated}
               onQuickAddTask={onQuickAddTask}
+              onQuickAddSubtask={onQuickAddSubtask}
               onRenameClient={onRenameClient}
               onRenameBusiness={onRenameBusiness}
               onRenameProject={onRenameProject}
@@ -147,6 +152,7 @@ export default function ProjectTaskViews({
               onCreateTask={onCreateTask}
               onAddToColumn={onAddToColumn}
               canManage={canManage}
+              canManageTask={canManageTask}
             />
           )}
           {view === 'timeline' && <TaskTimeline tasks={tasks} onView={onView || onViewTask} />}

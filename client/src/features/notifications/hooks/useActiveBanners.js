@@ -4,12 +4,13 @@ import { getActiveBanners } from '@/services/api';
 // Loads server-managed, audience-targeted banners for the current user and
 // maps them into the shape BannerSection expects. `remoteId` lets the banner
 // component record impression/click/dismiss analytics against the server.
-export function useActiveBanners() {
+export function useActiveBanners({ enabled = true } = {}) {
   const [banners, setBanners] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
+    if (!enabled) return;
     setLoading(true);
     try {
       const res = await getActiveBanners();
@@ -33,7 +34,7 @@ export function useActiveBanners() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
     load();

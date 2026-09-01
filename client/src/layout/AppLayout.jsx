@@ -82,7 +82,7 @@ export default function AppLayout() {
   const [showSearchMobile, setShowSearchMobile] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const { user, logout, isDepartmentHead } = useAuth();
+  const { user, logout, isDepartmentHead, isAnyAdmin } = useAuth();
   const { toggleTheme, isDark } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -101,10 +101,11 @@ export default function AppLayout() {
   useNotificationStore();
   useNotificationPoller();
   useWebSocket();
+  const isDashboard = location.pathname === '/';
   const notificationData = useNotifications();
   const { fetchPreferences } = notificationData;
-  const { banners: activeBanners } = useActiveBanners();
-  const { banners: contextualBanners } = useContextualBanners();
+  const { banners: activeBanners } = useActiveBanners({ enabled: isDashboard });
+  const { banners: contextualBanners } = useContextualBanners({ enabled: isDashboard });
   const messageBadgeCount = notificationData.unreadMessageCount || 0;
   const eventBadgeCount = notificationData.getUnreadCountByEntityType('event') || 0;
   const announcementBadgeCount = notificationData.getUnreadCountByEntityType('announcement') || 0;
@@ -120,10 +121,11 @@ export default function AppLayout() {
   useEffect(() => {
     const normalize = (data) => (Array.isArray(data) ? data : (data?.rows || data?.data || []));
     let active = true;
-    Promise.all([
-      getProjects().then((d) => normalize(d)).catch(() => []),
+    const calls = [
+      isAnyAdmin ? getProjects().then((d) => normalize(d)).catch(() => []) : Promise.resolve([]),
       getClients().then((d) => normalize(d?.data ?? d)).catch(() => []),
-    ]).then(([projects, clients]) => {
+    ];
+    Promise.all(calls).then(([projects, clients]) => {
       if (!active) return;
       const cmds = [];
       projects.forEach((p) => {
@@ -421,7 +423,7 @@ export default function AppLayout() {
           >
           <Scrollbar variant="viewport">
           <div className="w-full px-4 sm:px-6 pt-4 sm:pt-6 pb-8 sm:pb-10 flex-1">
-            <BannerSection items={[...activeBanners, ...contextualBanners]} />
+            {isDashboard && <BannerSection items={[...activeBanners, ...contextualBanners]} />}
             <PageTransition>
               <Outlet />
             </PageTransition>

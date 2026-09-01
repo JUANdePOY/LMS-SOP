@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, FolderKanban, Plus, Users } from 'lucide-react';
+import { Building2, FolderKanban, Plus, Users, CheckSquare, ArrowLeft } from 'lucide-react';
 import api from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
 import Breadcrumb from '../components/Breadcrumb';
@@ -57,16 +57,27 @@ export default function ClientsOverviewPage() {
 
   return (
     <div className="ppm mx-auto max-w-6xl">
-      <Breadcrumb items={[{ label: 'Clients' }]} className="mb-3" />
+      <Breadcrumb
+            items={[
+              { label: 'Tasks & Projects', onClick: () => navigate('/tasks') },
+              { label: 'Clients' },
+            ]}
+            className="mb-3"
+          />
 
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-[var(--text-primary)]">Clients</h1>
           <p className="text-sm text-[var(--ppm-text-muted)]">External clients, their businesses, and project portfolios.</p>
         </div>
-        <button onClick={() => setShowClient(true)} className="ppm-btn-primary shrink-0">
-          <Plus size={16} /> New Client
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button onClick={() => navigate('/tasks')} className="ppm-btn-ghost shrink-0">
+            <ArrowLeft size={16} /> Back
+          </button>
+          <button onClick={() => setShowClient(true)} className="ppm-btn-primary shrink-0">
+            <Plus size={16} /> New Client
+          </button>
+        </div>
       </div>
 
       {loading && <p className="text-sm text-[var(--ppm-text-muted)]">Loading clients…</p>}

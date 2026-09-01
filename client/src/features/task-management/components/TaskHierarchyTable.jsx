@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect, useRef, useLayoutEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef, useLayoutEffect, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight, ExternalLink, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2, Inbox, Building2, Briefcase, FolderKanban, Filter } from 'lucide-react';
@@ -106,8 +106,9 @@ function AddClientForm({ onCommit, onCancel }) {
 
 /**
  * TaskHierarchyTable
- * Renders Client -> Business -> Project -> Task as one continuous,
- * inline-expandable tree table (no page navigation on row click).
+ * Renders Client -> Business -> Task as one continuous, inline-expandable
+ * tree table (no page navigation on row click). The project layer has been
+ * removed — tasks live directly under their client business unit.
  *
  * Built from data already loaded in TasksPage:
  *  - tasks: flat array, each task must resolve to a project via one of
@@ -143,8 +144,8 @@ function formatDue(dateStr) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
-/** Builds Client -> Business -> Project -> Task[] tree from flat data. */
-function useHierarchy(tasks, projectsById, clientTree = []) {
+/** Builds Client -> Business -> Task[] tree from flat data. */
+function useHierarchy(tasks, projectsById, clientTree = [], tasksById = {}) {
   return useMemo(() => {
     const clients = new Map(); // client_id -> { id, name, businesses: Map }
 
@@ -162,31 +163,16 @@ function useHierarchy(tasks, projectsById, clientTree = []) {
     };
 
     // Ensures the Client -> Business skeleton exists and returns the business
-    // node so a project (or a tree-sourced business with no projects) can be attached.
+    // node so tasks can be attached directly to it (the project layer has been
+    // removed — tasks live under their client business unit).
     const ensureBusiness = (clientId, clientName, businessId, businessName, color) => {
       const client = ensureClient(clientId, clientName, color);
       const bid = businessId ?? 'unassigned-business';
       const bname = businessName || 'Unassigned Business';
-
       if (!client.businesses.has(bid)) {
-        client.businesses.set(bid, { id: bid, name: bname, clientId: client.id, projects: new Map() });
+        client.businesses.set(bid, { id: bid, name: bname, clientId: client.id, tasks: [] });
       }
       return client.businesses.get(bid);
-    };
-
-    // Ensures the Client -> Business -> Project skeleton exists and returns
-    // the project node so a task can be attached to it.
-    const ensureProject = (project) => {
-      const business = ensureBusiness(
-        project.client_id,
-        project.client_name,
-        project.client_business_id,
-        project.client_business_name
-      );
-      if (!business.projects.has(project.id)) {
-        business.projects.set(project.id, { id: project.id, name: project.name, clientId: business.clientId, businessId: business.id, tasks: [] });
-      }
-      return business.projects.get(project.id);
     };
 
     // Seed the full Client -> Business skeleton from the org tree. Ensure every
@@ -199,45 +185,90 @@ function useHierarchy(tasks, projectsById, clientTree = []) {
       }
     }
 
-    // Seed projects (also guarantees the skeleton for any project-only data).
-    for (const project of Object.values(projectsById || {})) {
-      if (project?.id == null) continue;
-      ensureProject(project);
-    }
-
-    // Attach tasks to their projects.
+    // Attach tasks directly to their owning client business. Tasks carry their own
+    // client_id / client_business_id, so they no longer need to resolve through a
+    // project — that's how a task created without a project_id still shows up.
+    // Tasks with no client/business scope (created from the New Task modal
+    // without selecting a client) are grouped under an "Unassigned" pseudo-client
+    // so they are still visible instead of being silently dropped.
+    // Sub-tasks (those with a parent_task_id) are intentionally NOT pushed onto
+    // the business here — they are attached to their parent task's `subtasks`
+    // list in the second loop below, so the hierarchy table only renders the
+    // parent row. The parent row surfaces its sub-task count via a button in
+    // the name column (Asana-style), which opens the task detail drawer where
+    // the sub-tasks are managed.
     for (const task of tasks || []) {
-      const projectId = getProjectId(task);
-      const project = projectId != null ? projectsById[String(projectId)] : null;
-      if (!project) continue; // task without a resolvable project is skipped from the tree
-      ensureProject(project).tasks.push(task);
+      if (task.parent_task_id != null && task.parent_task_id !== '') continue;
+      // Enrich tasks that have a project but missing client/business data by
+      // inheriting from the project. This ensures the hierarchy groups them under
+      // the correct client/business instead of "Unassigned".
+      if ((task.client_id == null || task.client_business_id == null) && task.project_id != null) {
+        const proj = projectsById[String(task.project_id)];
+        if (proj) {
+          if (task.client_id == null && proj.client_id != null) {
+            task.client_id = proj.client_id;
+            task.client_name = proj.client_name;
+          }
+          if (task.client_business_id == null && proj.client_business_id != null) {
+            task.client_business_id = proj.client_business_id;
+            task.client_business_name = proj.client_business_name;
+          }
+        }
+      }
+      let business = null;
+      if (task.client_business_id != null && task.client_id != null) {
+        business = ensureBusiness(
+          task.client_id,
+          task.client_name,
+          task.client_business_id,
+          task.client_business_name
+        );
+      } else {
+        const projectId = getProjectId(task);
+        const project = projectId != null ? projectsById[String(projectId)] : null;
+        if (project) {
+          business = ensureBusiness(
+            project.client_id,
+            project.client_name,
+            project.client_business_id,
+            project.client_business_name
+          );
+        }
+      }
+      if (!business) {
+        business = ensureBusiness(
+          null,
+          'Unassigned Client',
+          'unassigned-business',
+          'Unassigned Business'
+        );
+      }
+      // Attach the parent task to its business unit, and seed an empty
+      // subtasks list so the second loop can safely push children onto it.
+      business.tasks.push(task);
+      if (!task.subtasks) task.subtasks = [];
     }
 
-    // Convert Maps to arrays and compute rollups bottom-up. Progress is a
-    // hierarchical average: a project's progress is the avg of its tasks, a
-    // business's progress is the avg of its project progresses, and a client's
-    // progress is the avg of its business progresses. The other rollup fields
-    // (total/atRisk/earliestDue/summary) stay computed from the flat task list.
+    // Re-attach sub-tasks to their parent task node (the flat list above only
+    // knows each task's parent_task_id, not the resolved parent node).
+    for (const task of tasks || []) {
+      if (task.parent_task_id == null || task.parent_task_id === '') continue;
+      const parent = tasksById[String(task.parent_task_id)];
+      if (parent && !parent.subtasks) parent.subtasks = [];
+      if (parent) parent.subtasks.push(task);
+    }
+
+    // Convert Maps to arrays and compute rollups bottom-up.
     const clientList = [...clients.values()].map((client) => {
       const businessList = [...client.businesses.values()].map((business) => {
-        const projectList = [...business.projects.values()].map((project) => {
-          const rollup = computeRollup(project.tasks);
-          return { ...project, rollup };
-        });
-        const businessProgress = projectList.length
-          ? Math.round(projectList.reduce((sum, p) => sum + (p.rollup.avgProgress || 0), 0) / projectList.length)
-          : 0;
-        const businessRollup = computeRollup(
-          projectList.flatMap((p) => p.tasks),
-          businessProgress
-        );
-        return { ...business, projects: projectList, rollup: businessRollup };
+        const rollup = computeRollup(business.tasks);
+        return { ...business, rollup };
       });
       const clientProgress = businessList.length
         ? Math.round(businessList.reduce((sum, b) => sum + (b.rollup.avgProgress || 0), 0) / businessList.length)
         : 0;
       const clientRollup = computeRollup(
-        businessList.flatMap((b) => b.projects.flatMap((p) => p.tasks)),
+        businessList.flatMap((b) => b.tasks),
         clientProgress
       );
       return { ...client, businesses: businessList, rollup: clientRollup };
@@ -279,7 +310,7 @@ function subtreeMatches(node, kind, term) {
   }
   if (kind === 'business') {
     if ((node.name || '').toLowerCase().includes(t)) return true;
-    return node.projects.some((p) => subtreeMatches(p, 'project', term));
+    return node.tasks.some((task) => subtreeMatches(task, 'task', term));
   }
   if (kind === 'client') {
     if ((node.name || '').toLowerCase().includes(t)) return true;
@@ -317,6 +348,7 @@ export default function TaskHierarchyTable({
   onDeleteImmediate,
   onDuplicated,
   onQuickAddTask,
+  onQuickAddSubtask,
   onRenameClient,
   onRenameBusiness,
   onRenameProject,
@@ -330,42 +362,57 @@ export default function TaskHierarchyTable({
   onSelectAll,
   showCountBadges = false,
   newTaskIds = null,
+  onViewSubtasks,
 }) {
   const navigate = useNavigate();
-  const clients = useHierarchy(tasks, projectsById, clientTree);
+
+  const tasksById = useMemo(() => {
+    const map = {};
+    for (const t of tasks || []) {
+      if (t?.id != null) map[String(t.id)] = t;
+    }
+    return map;
+  }, [tasks]);
+
+  const projects = useMemo(() => Object.values(projectsById || {}), [projectsById]);
+
+  const clients = useHierarchy(tasks, projectsById, clientTree, tasksById);
   const [expanded, setExpanded] = useState(loadExpanded);
+
+  const subtaskCountMap = useMemo(() => {
+    const counts = {};
+    for (const t of tasks || []) {
+      const pid = t.parent_task_id;
+      if (pid != null && pid !== '') {
+        counts[String(pid)] = (counts[String(pid)] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [tasks]);
   // Which parent is currently showing an inline "add" row: { kind, parentId }.
   const [addingFor, setAddingFor] = useState(null);
   // Whether the inline "add client" row at the bottom of the table is open.
   const [addingClient, setAddingClient] = useState(false);
 
   // Opens an inline "add" row directly under the clicked parent (no modal):
-  // a client reveals a business row, a business reveals a project row. A project
-  // already has its own QuickAddRow for tasks, so it is excluded here.
+  // a client reveals a business row, a business reveals a task row.
   const startAdd = useCallback((kind, id) => {
     if (kind === 'client') {
       setAddingFor({ kind: 'business', parentId: id });
       setExpanded((prev) => { const next = new Set(prev); next.add(`client-${id}`); return next; });
     } else if (kind === 'business') {
-      setAddingFor({ kind: 'project', parentId: id });
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        next.add(`business-${id}`);
-        const owning = Object.values(projectsById).find(
-          (p) => String(p.client_business_id) === String(id)
-        );
-        if (owning?.client_id != null) next.add(`client-${owning.client_id}`);
-        return next;
-      });
-    } else if (kind === 'project') {
-      // A project's children are tasks, so reveal an inline task-add row
-      // (matching how the business row reveals a project row) instead of a modal.
       setAddingFor({ kind: 'task', parentId: id });
-      setExpanded((prev) => { const next = new Set(prev); next.add(`project-${id}`); return next; });
+      setExpanded((prev) => { const next = new Set(prev); next.add(`business-${id}`); return next; });
+    } else if (kind === 'task') {
+      // Add a sub-task under a task: reveal an inline add row indented under it.
+      setAddingFor({ kind: 'subtask', parentId: id });
+      setExpanded((prev) => { const next = new Set(prev); next.add(`task-${id}`); return next; });
     }
-  }, [projectsById]);
+  }, []);
 
-  const projects = useMemo(() => Object.values(projectsById || {}), [projectsById]);
+  // Opens an inline "add sub-task" row directly under the clicked task so the
+  // new sub-task inherits the parent's context (client/business/project).
+  const startAddSubtask = (taskId) => startAdd('task', taskId);
 
   const visibleTaskIds = useMemo(
     () => (tasks || []).map((t) => String(t.id)),
@@ -389,8 +436,8 @@ export default function TaskHierarchyTable({
     });
   }, []);
 
-  // Collapse every client/business/project branch that has no tasks anywhere in
-  // its subtree (rollup.total === 0). Keeps only populated groups visible.
+  // Collapse every client/business branch that has no tasks anywhere in its
+  // subtree (rollup.total === 0). Keeps only populated groups visible.
   const hideEmptyGroups = useCallback(() => {
     setExpanded(() => {
       const next = new Set();
@@ -398,9 +445,6 @@ export default function TaskHierarchyTable({
         if (client.rollup.total > 0) next.add(`client-${client.id}`);
         for (const business of client.businesses) {
           if (business.rollup.total > 0) next.add(`business-${business.id}`);
-          for (const project of business.projects) {
-            if (project.rollup.total > 0) next.add(`project-${project.id}`);
-          }
         }
       }
       return next;
@@ -425,16 +469,23 @@ export default function TaskHierarchyTable({
       }
     } else if (scopeBusinessId) {
       forced.add(`business-${scopeBusinessId}`);
+      // Resolve the owning client: first try projects, then fall back to the
+      // hierarchy's client list (so a business with no projects still opens).
       const owning = Object.values(projectsById).find(
         (p) => String(p.client_business_id) === String(scopeBusinessId)
       );
-      if (owning?.client_id != null) forced.add(`client-${owning.client_id}`);
+      if (owning?.client_id != null) {
+        forced.add(`client-${owning.client_id}`);
+      } else {
+        const client = clients.find((c) => c.businesses.some((b) => String(b.id) === String(scopeBusinessId)));
+        if (client) forced.add(`client-${client.id}`);
+      }
     } else if (scopeClientId) {
       forced.add(`client-${scopeClientId}`);
     }
     if (forced.size === 0) return;
     setExpanded(forced);
-  }, [scopeClientId, scopeBusinessId, scopeProjectId, projectsById]);
+  }, [scopeClientId, scopeBusinessId, scopeProjectId, projectsById, clients]);
 
   // Auto-expand branches that match an active search term.
   const isExpanded = useCallback((key, kind, node) => {
@@ -487,8 +538,7 @@ export default function TaskHierarchyTable({
         const dimmed = search && !subtreeMatches(client, 'client', search);
         const clientKey = `client-${client.id}`;
         const open = isExpanded(clientKey, 'client', client);
-        const clientProjectCount = client.businesses.reduce((sum, b) => sum + b.projects.length, 0);
-        return (
+return (
            <div key={clientKey} className="mt-2 first:mt-0">
              <Row
                depth={0}
@@ -497,7 +547,7 @@ export default function TaskHierarchyTable({
                name={client.name}
                open={open}
                onToggle={() => toggle(clientKey)}
-               rollupText={`${clientProjectCount} project${clientProjectCount === 1 ? '' : 's'}`}
+               rollupText={null}
                dueDate={client.rollup.earliestDue}
                progress={client.rollup.avgProgress}
                dimmed={dimmed}
@@ -511,8 +561,8 @@ export default function TaskHierarchyTable({
                onHideEmptyGroups={hideEmptyGroups}
                 hideDue
                 showCountBadges={showCountBadges}
-                count={client.rollup.total}
-                taskIds={client.businesses.flatMap((b) => b.projects.flatMap((p) => p.tasks.map((t) => String(t.id))))}
+          count={client.rollup.total}
+                taskIds={client.businesses.flatMap((b) => b.tasks.map((t) => String(t.id)))}
                 selectedIds={selectedIds}
                 onSelectAll={onSelectAll}
               />
@@ -529,7 +579,7 @@ export default function TaskHierarchyTable({
                     name={business.name}
                     open={bOpen}
                     onToggle={() => toggle(businessKey)}
-                    rollupText={`${business.projects.length} project${business.projects.length === 1 ? '' : 's'}`}
+                    rollupText={business.rollup.summary}
                     dueDate={business.rollup.earliestDue}
                     progress={business.rollup.avgProgress}
                     dimmed={bDimmed}
@@ -539,87 +589,73 @@ export default function TaskHierarchyTable({
                            onAddChild={startAdd}
                            onDeleteEntity={onDeleteEntity}
                            onHideEmptyGroups={hideEmptyGroups}
-taskIds={business.projects.flatMap((p) => p.tasks.map((t) => String(t.id)))}
+                    taskIds={business.tasks.map((t) => String(t.id))}
                             selectedIds={selectedIds}
                             onSelectAll={onSelectAll}
                           />
-                  {bOpen && business.projects.map((project) => {
-                    const pDimmed = search && !subtreeMatches(project, 'project', search);
-                    const projectKey = `project-${project.id}`;
-                    const pOpen = isExpanded(projectKey, 'project', project);
+                  {bOpen && business.tasks.map((task) => {
+                    const tDimmed = search && !subtreeMatches(task, 'task', search);
                     return (
-                      <div key={projectKey}>
-                         <Row
-                           depth={2}
-                           kind="project"
-                           id={project.id}
-                           name={project.name}
-                           open={pOpen}
-                           onToggle={() => toggle(projectKey)}
-                           rollupText={project.rollup.summary}
-                           dueDate={project.rollup.earliestDue}
-                           progress={project.rollup.avgProgress}
-                           dimmed={pDimmed}
-                           onOpenPage={() => navigate(`/clients/${client.id}/businesses/${business.id}/projects/${project.id}`)}
-                           onAddTask={canManage ? () => onAddProjectTask?.(project.id) : undefined}
-                           onEditProject={canManage && onEditProject ? () => onEditProject?.(project.id) : undefined}
-                             canEdit={canManage}
-                             onRename={onRenameProject}
-                              onAddChild={startAdd}
-                              onDeleteEntity={onDeleteEntity}
-                              onHideEmptyGroups={hideEmptyGroups}
-taskIds={project.tasks.map((t) => String(t.id))}
-                               selectedIds={selectedIds}
-                               onSelectAll={onSelectAll}
-                            />
-                        {pOpen && project.tasks.map((task) => {
-                          const tDimmed = search && !subtreeMatches(task, 'task', search);
-                          return (
-                            <TaskRow
-                              key={task.id}
-                              task={task}
-                              dimmed={tDimmed}
-                              selected={selectedIds?.has(String(task.id))}
-                              onToggleSelect={onToggleSelect}
-                              onViewTask={onViewTask}
-                              onStatusChange={onStatusChange}
-                              onInlineUpdate={onInlineUpdate}
-                              onDelete={onDelete}
-                              onDeleteImmediate={onDeleteImmediate}
-                              onDuplicated={onDuplicated}
-                              onRenameTask={onRenameTask}
-                              canManage={canManage}
-                              projects={projects}
-                              showCountBadges={showCountBadges}
-                              subtaskCount={task.subtasks?.length || 0}
-                              isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
-                            />
-                          );
-                        })}
-                        {addingFor?.kind === 'task' && addingFor.parentId === project.id && (
+                      <Fragment key={task.id}>
+                        <TaskRow
+                          task={task}
+                          dimmed={tDimmed}
+                          selected={selectedIds?.has(String(task.id))}
+                          onToggleSelect={onToggleSelect}
+                          onViewTask={onViewTask}
+                          onViewSubtasks={onViewSubtasks}
+                          onStatusChange={onStatusChange}
+                          onInlineUpdate={onInlineUpdate}
+                          onDelete={onDelete}
+                          onDeleteImmediate={onDeleteImmediate}
+                          onDuplicated={onDuplicated}
+                          onRenameTask={onRenameTask}
+                          canManage={canManage}
+                          projects={projects}
+                          tasksById={tasksById}
+                          onAddSubtask={(t) => startAdd('task', t.id)}
+                          showCountBadges={showCountBadges}
+                          subtaskCount={subtaskCountMap[task.id] || 0}
+                          isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
+                        />
+                        {addingFor?.kind === 'subtask' && addingFor.parentId === task.id && (
                           <InlineNameRow
-                            key="__add-task"
-                            placeholder="New task name…"
+                            key="__add-subtask"
+                            placeholder="New sub-task name…"
                             indent={DEPTH_INDENT_PX * 3}
                             onCommit={async (name) => {
-                              if (onQuickAddTask) await onQuickAddTask(project.id, name);
-                              else onAddProjectTask?.(project.id);
+                              await onQuickAddSubtask?.(task.id, name);
                               setAddingFor(null);
                             }}
                             onCancel={() => setAddingFor(null)}
                           />
                         )}
-                      </div>
+                      </Fragment>
                     );
                   })}
-                  {addingFor?.kind === 'project' && addingFor.parentId === business.id && (
-                    <InlineNameRow
-                      key="__add-project"
-                      placeholder="New project name…"
-                      indent={DEPTH_INDENT_PX * 2}
-                      onCommit={async (name) => { await onCreateProject?.(business.id, name); setAddingFor(null); }}
-                      onCancel={() => setAddingFor(null)}
-                    />
+                  {bOpen && (
+                    addingFor?.kind === 'subtask' && addingFor.parentId === business.id ? (
+                      <InlineNameRow
+                        key="__add-task"
+                        placeholder="New task name…"
+                        indent={DEPTH_INDENT_PX * 2}
+                        onCommit={async (name) => {
+                          if (onQuickAddTask) await onQuickAddTask(business.id, client.id, name);
+                          else onAddProjectTask?.(business.id);
+                          setAddingFor(null);
+                        }}
+                        onCancel={() => setAddingFor(null)}
+                      />
+                    ) : canManage && (
+                      <button
+                        type="button"
+                        onClick={() => startAdd('task', business.id)}
+                        className="flex w-full cursor-pointer items-center gap-1.5 border-b border-[var(--border-subtle)] py-2 pl-[44px] text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)]"
+                      >
+                        <Plus size={13} className="shrink-0" />
+                        Add task
+                      </button>
+                    )
                   )}
                 </div>
               );
@@ -668,10 +704,10 @@ taskIds={project.tasks.map((t) => String(t.id))}
 
 const DEPTH_INDENT_PX = 20;
 
-// Per-kind visual identity. Each hierarchy level (client / business / project)
-// gets a subtle, premium accent so a row's type is obvious at a glance — a
-// tinted chip (icon + label) and a matching accent on the expand caret. Colors
-// are intentionally low-saturation tints that also work in dark mode.
+// Per-kind visual identity. Each hierarchy level (client / business) gets a
+// subtle, premium accent so a row's type is obvious at a glance — a tinted
+// chip (icon + label) and a matching accent on the expand caret. Colors are
+// intentionally low-saturation tints that also work in dark mode.
 const KIND_META = {
   client: {
     label: 'Client',
@@ -685,12 +721,6 @@ const KIND_META = {
     chip: 'text-sky-600 bg-sky-50 dark:text-sky-300 dark:bg-sky-500/15',
     accent: 'text-sky-500 dark:text-sky-400',
   },
-  project: {
-    label: 'Project',
-    icon: FolderKanban,
-    chip: 'text-amber-600 bg-amber-50 dark:text-amber-300 dark:bg-amber-500/15',
-    accent: 'text-amber-500 dark:text-amber-400',
-  },
 };
 
 // Centralized per-kind typography. Hierarchy reads through size/weight/spacing
@@ -698,11 +728,10 @@ const KIND_META = {
 const LEVEL_STYLE = {
   client:   { font: 'font-semibold', size: 'text-[15px]', py: 'py-3.5', tracking: 'tracking-[0.01em]', leading: 'leading-relaxed' },
   business: { font: 'font-medium',   size: 'text-sm',     py: 'py-3',   tracking: '', leading: '' },
-  project:  { font: 'font-medium',   size: 'text-sm',     py: 'py-2.5', tracking: '', leading: '' },
 };
 
-function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progress, dimmed, onOpenPage, colorDot, color, canEdit, onRename, onAddChild, onAddTask, onEditProject, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, showCountBadges, count, taskIds, selectedIds, onSelectAll, onFilter }) {
-  const level = LEVEL_STYLE[kind] || LEVEL_STYLE.project;
+function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progress, dimmed, onOpenPage, colorDot, color, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, showCountBadges, count, taskIds, selectedIds, onSelectAll, onFilter }) {
+  const level = LEVEL_STYLE[kind] || LEVEL_STYLE.business;
   const meta = KIND_META[kind];
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -751,14 +780,14 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
     };
   }, [menuOpen, confirmDelete]);
 
-  const childNoun = kind === 'client' ? 'business' : kind === 'business' ? 'project' : 'task';
+  const childNoun = kind === 'client' ? 'business' : 'task';
   const addTitle = `Add ${childNoun}`;
 
   const menuItems = [];
-  if (kind === 'project') {
-    // Projects manage tasks via the new-task form, not an inline child row.
+  if (kind === 'business') {
+    // Tasks live directly under the business unit now, so the inline add row
+    // creates a task rather than a nested project.
     if (onAddTask) menuItems.push({ label: 'New Task', icon: Plus, onClick: () => { setMenuOpen(false); onAddTask(); } });
-    if (onEditProject) menuItems.push({ label: 'Edit Project', icon: Pencil, onClick: () => { setMenuOpen(false); onEditProject(); } });
   } else {
     menuItems.push({ label: `Add ${childNoun}`, icon: Plus, onClick: () => onAddChild?.(kind, id) });
   }

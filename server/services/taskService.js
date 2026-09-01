@@ -215,16 +215,38 @@ async function getTask(id, actorId) {
 
   const isAdmin = await isUserAdmin(actorId);
   if (!isAdmin) {
-    const directlyAssigned = await isUserAssignedToTask(actorId, id);
+    const directlyAssigned = await isUserAssignedToTaskById(actorId, id);
     if (!directlyAssigned) {
       // Allow viewing any task that belongs to a project the user is assigned to,
-      // so employees can see the progress of their peers on the same project.
+      // so employees can see the progress of their peers on the project.
+      // Also allow viewing any task in a business where the user has at least one
+      // assignment, so employees can see all tasks in their business scope.
       const pid = task.project_id;
       const assignedProjectIds = await getAssignedProjectIdsForUser(actorId);
-      if (pid == null || !assignedProjectIds.map(String).includes(String(pid))) {
-        const error = new Error('You are not authorized to view this task');
-        error.code = 'FORBIDDEN';
-        throw error;
+      if (pid != null && assignedProjectIds.map(String).includes(String(pid))) {
+        // allowed via project
+      } else {
+        // Check if the user has any assignment in the same business as this task
+        const actor = await getUser(actorId);
+        const [bizCheck] = await db.query(
+          `SELECT 1
+           FROM tasks t
+           INNER JOIN task_assignments ta ON ta.task_id = t.id
+           WHERE t.client_business_id = ?
+             AND t.client_business_id IS NOT NULL
+             AND (
+               (ta.assignment_type = 'User' AND ta.reference_id = ?)
+               OR (ta.assignment_type = 'Department' AND ta.reference_id = ?)
+               OR (ta.assignment_type = 'Position' AND ta.reference_id = ?)
+             )
+           LIMIT 1`,
+          [task.client_business_id, actorId, actor?.department_id, actor?.position_title]
+        );
+        if (!bizCheck.length) {
+          const error = new Error('You are not authorized to view this task');
+          error.code = 'FORBIDDEN';
+          throw error;
+        }
       }
     }
   }
@@ -287,7 +309,9 @@ async function getTask(id, actorId) {
 }
 
 async function createTask(payload, actorId) {
-  const validation = validateTaskPayload(payload, true);
+  // Projects have been removed from the table, so a task no longer needs a
+  // client/business scope to be created — validate as a partial payload.
+  const validation = validateTaskPayload(payload, false);
   if (!validation.valid) {
     const error = new Error('Validation failed');
     error.code = 'VALIDATION_ERROR';
@@ -664,7 +688,7 @@ async function updateProgress(payload, actorId) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  const isAssigned = await isUserAssignedToTask(actorId, task_id);
+  const isAssigned = await isUserAssignedToTaskById(actorId, task_id);
   if (!isAdmin && !isAssigned) {
     const error = new Error('You are not authorized to update progress for this task');
     error.code = 'FORBIDDEN';
@@ -786,7 +810,7 @@ async function addComment(payload, actorId, req) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  const isAssigned = await isUserAssignedToTask(actorId, task_id);
+  const isAssigned = await isUserAssignedToTaskById(actorId, task_id);
   if (!isAdmin && !isAssigned) {
     const error = new Error('You are not authorized to comment on this task');
     error.code = 'FORBIDDEN';
@@ -858,7 +882,7 @@ async function uploadAttachment(taskId, file, actorId, req) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  const isAssigned = await isUserAssignedToTask(actorId, taskId);
+  const isAssigned = await isUserAssignedToTaskById(actorId, taskId);
   if (!isAdmin && !isAssigned) {
     const error = new Error('You are not authorized to upload attachments for this task');
     error.code = 'FORBIDDEN';
@@ -908,7 +932,7 @@ async function deleteAttachment(attachmentId, actorId) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  const isAssigned = await isUserAssignedToTask(actorId, attachment.task_id);
+  const isAssigned = await isUserAssignedToTaskById(actorId, attachment.task_id);
   if (!isAdmin && !isAssigned) {
     const error = new Error('You are not authorized to delete this attachment');
     error.code = 'FORBIDDEN';
@@ -930,13 +954,87 @@ async function getMyTasks(userId, filters = {}) {
 // Tasks page expects: { tasks, projectsById, clientTree }. The task rows are
 // enriched with the same auto-status + progress + assignments as the admin list.
 async function getMyTaskHierarchy(userId) {
-  const projectIds = await getAssignedProjectIdsForUser(userId);
-  if (!projectIds.length) {
+  const user = await getUser(userId);
+  if (!user) return { tasks: [], projectsById: {}, clientTree: [] };
+
+  // Find all businesses where the user has at least one task assignment.
+  // This drives which businesses the employee can see (all tasks in those
+  // businesses, not just their own).
+  const [bizRows] = await db.query(
+    `SELECT DISTINCT t.client_business_id
+     FROM tasks t
+     INNER JOIN task_assignments ta ON ta.task_id = t.id
+     WHERE t.client_business_id IS NOT NULL
+       AND (
+         (ta.assignment_type = 'User' AND ta.reference_id = ?)
+         OR (ta.assignment_type = 'Department' AND ta.reference_id = ?)
+         OR (ta.assignment_type = 'Position' AND ta.reference_id = ?)
+       )`,
+    [userId, user.department_id, user.position_title]
+  );
+  const businessIds = bizRows.map((r) => r.client_business_id);
+
+  // Also find tasks assigned directly to the user (or via dept/position) that
+  // have no client_business_id — these still belong in "My Tasks".
+  const [directRows] = await db.query(
+    `SELECT DISTINCT t.id AS task_id
+     FROM tasks t
+     INNER JOIN task_assignments ta ON ta.task_id = t.id
+     WHERE t.client_business_id IS NULL
+       AND (
+         (ta.assignment_type = 'User' AND ta.reference_id = ?)
+         OR (ta.assignment_type = 'Department' AND ta.reference_id = ?)
+         OR (ta.assignment_type = 'Position' AND ta.reference_id = ?)
+       )`,
+    [userId, user.department_id, user.position_title]
+  );
+  const directTaskIds = directRows.map((r) => r.task_id);
+
+  // Find all task IDs assigned to the user (for marking is_assigned flag)
+  const [assignedRows] = await db.query(
+    `SELECT DISTINCT ta.task_id
+     FROM task_assignments ta
+     WHERE (ta.assignment_type = 'User' AND ta.reference_id = ?)
+        OR (ta.assignment_type = 'Department' AND ta.reference_id = ?)
+        OR (ta.assignment_type = 'Position' AND ta.reference_id = ?)`,
+    [userId, user.department_id, user.position_title]
+  );
+  const assignedTaskIds = new Set(assignedRows.map((r) => String(r.task_id)));
+
+  if (!businessIds.length && !directTaskIds.length) {
     return { tasks: [], projectsById: {}, clientTree: [] };
   }
 
-  const result = await taskModel.findAll({ project_ids: projectIds, limit: 100000, page: 1 });
-  const rows = result.rows;
+  // Fetch ALL tasks in the businesses where the user has assignments,
+  // plus directly assigned tasks that have no business.
+  let rows = [];
+  if (businessIds.length) {
+    const [bizTasks] = await db.query(
+      `SELECT t.*, cl.client_name, cb.business_name AS client_business_name
+       FROM tasks t
+       LEFT JOIN clients cl ON t.client_id = cl.id
+       LEFT JOIN client_businesses cb ON t.client_business_id = cb.id
+       WHERE t.client_business_id IN (?)`,
+      [businessIds]
+    );
+    rows = bizTasks;
+  }
+  if (directTaskIds.length) {
+    const [directTasks] = await db.query(
+      `SELECT t.*, cl.client_name, cb.business_name AS client_business_name
+       FROM tasks t
+       LEFT JOIN clients cl ON t.client_id = cl.id
+       LEFT JOIN client_businesses cb ON t.client_business_id = cb.id
+       WHERE t.id IN (?)`,
+      [directTaskIds]
+    );
+    // Merge, avoiding duplicates
+    const existingIds = new Set(rows.map((r) => r.id));
+    for (const t of directTasks) {
+      if (!existingIds.has(t.id)) rows.push(t);
+    }
+  }
+
   const taskIds = rows.map((task) => task.id);
 
   // Progress (latest per task) + assignments, mirroring listTasks enrichment.
@@ -1000,19 +1098,27 @@ async function getMyTaskHierarchy(userId) {
     status: computeAutoStatus(task.start_datetime, task.deadline_datetime, task.status),
     progress_rate: progressMap[task.id] ?? null,
     assignments: assignmentsMap[task.id] || [],
+    is_assigned: assignedTaskIds.has(String(task.id)),
   }));
 
-  // Build projectsById + clientTree from project linkage.
-  const [projRows] = await db.query(
-    `SELECT p.id, p.name, p.client_business_id,
-            cb.client_id, cb.business_name AS client_business_name,
-            c.client_name, c.color AS client_color
-     FROM projects p
-     LEFT JOIN client_businesses cb ON p.client_business_id = cb.id
-     LEFT JOIN clients c ON cb.client_id = c.id
-     WHERE p.id IN (?)`,
-    [projectIds]
-  );
+  // Build projectsById + clientTree from business linkage. Include ALL
+  // projects in the businesses where the user has tasks, and ALL businesses
+  // in those clients, so the hierarchy shows the full business context.
+  const projectClientMap = {}; // projectId -> { client_id, client_name, client_business_id, client_business_name }
+  let projRows = [];
+  if (businessIds.length > 0) {
+    const [rows] = await db.query(
+      `SELECT p.id, p.name, p.client_business_id,
+              cb.client_id, cb.business_name AS client_business_name,
+              c.client_name, c.color AS client_color
+       FROM projects p
+       LEFT JOIN client_businesses cb ON p.client_business_id = cb.id
+       LEFT JOIN clients c ON cb.client_id = c.id
+       WHERE p.client_business_id IN (?)`,
+      [businessIds]
+    );
+    projRows = rows;
+  }
 
   const projectsById = {};
   const clientsMap = new Map();
@@ -1025,6 +1131,15 @@ async function getMyTaskHierarchy(userId) {
       client_business_id: p.client_business_id,
       client_business_name: p.client_business_name,
     };
+    // Record each project's client/business so tasks can inherit it.
+    if (p.client_id != null && p.client_business_id != null) {
+      projectClientMap[String(p.id)] = {
+        client_id: p.client_id,
+        client_name: p.client_name,
+        client_business_id: p.client_business_id,
+        client_business_name: p.client_business_name,
+      };
+    }
     if (p.client_id == null) continue;
     if (!clientsMap.has(p.client_id)) {
       clientsMap.set(p.client_id, {
@@ -1037,6 +1152,79 @@ async function getMyTaskHierarchy(userId) {
     const client = clientsMap.get(p.client_id);
     if (!client.businesses.has(p.client_business_id)) {
       client.businesses.set(p.client_business_id, { id: p.client_business_id, business_name: p.client_business_name });
+    }
+  }
+
+  // Also seed the clientTree with ALL businesses in the clients where the
+  // user has tasks (not just businesses with tasks), so the hierarchy shows
+  // the full client -> business structure.
+  if (businessIds.length > 0) {
+    const [allBizRows] = await db.query(
+      `SELECT cb.id AS business_id, cb.business_name, cb.client_id,
+              c.client_name, c.color AS client_color
+       FROM client_businesses cb
+       LEFT JOIN clients c ON cb.client_id = c.id
+       WHERE cb.id IN (?)
+          OR cb.client_id IN (SELECT DISTINCT client_id FROM client_businesses WHERE id IN (?))`,
+      [businessIds, businessIds]
+    );
+    for (const b of allBizRows) {
+      if (b.client_id == null) continue;
+      if (!clientsMap.has(b.client_id)) {
+        clientsMap.set(b.client_id, {
+          id: b.client_id,
+          client_name: b.client_name,
+          color: b.client_color || null,
+          businesses: new Map(),
+        });
+      }
+      const client = clientsMap.get(b.client_id);
+      if (!client.businesses.has(b.business_id)) {
+        client.businesses.set(b.business_id, { id: b.business_id, business_name: b.business_name });
+      }
+    }
+  }
+
+  // Enrich tasks that have a project but no client/business of their own.
+  // This ensures the hierarchy table groups them under the correct client
+  // instead of dropping them into "Unassigned". Handles both fully NULL
+  // (client_id and client_business_id both missing) and partially NULL
+  // (client_id set but client_business_id missing) cases.
+  for (const task of tasks) {
+    const needsClient = task.client_id == null;
+    const needsBusiness = task.client_business_id == null;
+    if (!needsClient && !needsBusiness) continue;
+    const proj = task.project_id != null ? projectClientMap[String(task.project_id)] : null;
+    if (proj) {
+      if (needsClient) {
+        task.client_id = proj.client_id;
+        task.client_name = proj.client_name;
+      }
+      if (needsBusiness) {
+        task.client_business_id = proj.client_business_id;
+        task.client_business_name = proj.client_business_name;
+      }
+    }
+  }
+
+  // Also seed the client/business hierarchy from directly assigned tasks
+  // (those without a project) so they appear in the tree.
+  const directClientRows = rows.filter((t) => t.project_id == null && t.client_id != null);
+  for (const t of directClientRows) {
+    const clientId = Number(t.client_id);
+    if (!clientsMap.has(clientId)) {
+      clientsMap.set(clientId, {
+        id: clientId,
+        client_name: t.client_name || 'Unassigned Client',
+        color: t.client_color || null,
+        businesses: new Map(),
+      });
+    }
+    const client = clientsMap.get(clientId);
+    const bizId = t.client_business_id != null ? Number(t.client_business_id) : 'unassigned-business';
+    const bizName = t.client_business_name || 'Unassigned Business';
+    if (!client.businesses.has(bizId)) {
+      client.businesses.set(bizId, { id: bizId, business_name: bizName });
     }
   }
 
@@ -1077,7 +1265,7 @@ async function getUser(userId) {
   return rows[0] || null;
 }
 
-async function isUserAssignedToTask(userId, taskId) {
+async function isUserAssignedToTaskById(userId, taskId) {
   const [assignments] = await db.query(
     `SELECT ta.id FROM task_assignments ta
      WHERE ta.task_id = ?

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { Building2, Search, X, ChevronRight, ChevronDown, Plus, Briefcase, MoreHorizontal, Trash2, FolderKanban } from "lucide-react";
+import { Building2, Search, X, ChevronRight, ChevronDown, Plus, Briefcase, MoreHorizontal, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/services/api";
 import { useToast } from "@/shared/components/ui/Toast";
@@ -58,7 +58,6 @@ export default function SecondarySidebar() {
   const [query, setQuery] = useState("");
   const [expandedBiz, setExpandedBiz] = useState({});
   const [expandedClient, setExpandedClient] = useState({});
-  const [expandedUnit, setExpandedUnit] = useState({});
   const [addingClientBiz, setAddingClientBiz] = useState(null); // SOP biz id or 'unassigned' or null
   const [addingUnitClient, setAddingUnitClient] = useState(null); // client id or null
   const [menu, setMenu] = useState(null); // { kind: 'client'|'unit', id, clientId, name }
@@ -153,7 +152,6 @@ export default function SecondarySidebar() {
   })();
 
   const activeUnit = searchParams.get("business");
-  const activeProject = searchParams.get("project");
 
   // Auto-expand the SOP business + client whose page is currently open.
   useEffect(() => {
@@ -175,10 +173,10 @@ export default function SecondarySidebar() {
     }
   }, [employeeBusinessId, visibleBusinesses, expandedBiz]);
 
-  // Expand the branch that matches an active Tasks scope (client/business/
-  // project chosen in the panel) so the selected row is visible. Keyed on the
-  // scope string so it only fires when the selection actually changes.
-  const scopeKey = `${searchParams.get("client") || ""}|${searchParams.get("business") || ""}|${searchParams.get("project") || ""}`;
+  // Expand the branch that matches an active Tasks scope (client/business
+  // chosen in the panel) so the selected row is visible. Keyed on the scope
+  // string so it only fires when the selection actually changes.
+  const scopeKey = `${searchParams.get("client") || ""}|${searchParams.get("business") || ""}`;
   useEffect(() => {
     if (!open) return;
     const c = searchParams.get("client");
@@ -186,7 +184,6 @@ export default function SecondarySidebar() {
     if (c) setExpandedClient((prev) => (prev[c] ? prev : { ...prev, [c]: true }));
     if (b) {
       setExpandedBiz((prev) => (prev[b] ? prev : { ...prev, [b]: true }));
-      setExpandedUnit((prev) => (prev[b] ? prev : { ...prev, [b]: true }));
     }
   }, [open, scopeKey]);
 
@@ -231,91 +228,52 @@ export default function SecondarySidebar() {
   }, [showUnassigned, unassigned, q]);
 
   const isClientActive = (id) => location.pathname.startsWith(`/clients/${id}`);
-  const isUnitActive = (clientId, unitId) =>
-    location.pathname === `/clients/${clientId}/businesses/${unitId}` ||
-    location.pathname.startsWith(`/clients/${clientId}/businesses/${unitId}/`) ||
+  const isUnitActive = (unitId) =>
     (activeUnit && String(activeUnit) === String(unitId));
 
   const renderUnit = (client, unit) => {
-    const unitOpen = expandedUnit[unit.id] || searching;
-    const projects = unit.projects || [];
-    const unitActive = isUnitActive(client.id, unit.id);
+    const unitActive = isUnitActive(unit.id);
     return (
-      <>
-        <div
-          className={cn(
-            "group flex items-center gap-1 rounded-lg pr-2 transition-colors",
-            unitActive
-              ? "bg-[var(--bg-active)] text-[var(--text-on-sidebar)]"
-              : "hover:bg-[var(--bg-hover)]"
-          )}
+      <div
+        className={cn(
+          "group flex items-center gap-1 rounded-lg pr-2 transition-colors",
+          unitActive
+            ? "bg-[var(--bg-active)] text-[var(--text-on-sidebar)]"
+            : "hover:bg-[var(--bg-hover)]"
+        )}
+      >
+        <Link
+          to={`/tasks?view=list&business=${unit.id}&client=${client.id}`}
+          className="flex min-w-0 flex-1 items-center gap-2 py-2 text-[13px]"
         >
+          <Briefcase size={14} className="shrink-0" />
+          <span className="flex-1 truncate">{highlight(unit.business_name, q)}</span>
+        </Link>
+        <div className="relative">
           <button
             type="button"
-            onClick={() => setExpandedUnit((p) => ({ ...p, [unit.id]: !p[unit.id] }))}
-            aria-label={unitOpen ? "Collapse projects" : "Expand projects"}
-            aria-expanded={unitOpen}
-            className="flex h-9 w-7 shrink-0 items-center justify-center text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:text-[var(--text-on-sidebar)] focus:outline-none"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenu((m) => (m?.kind === "unit" && m.id === unit.id ? null : { kind: "unit", id: unit.id, clientId: client.id, name: unit.business_name }));
+            }}
+            title="More actions"
+            className="rounded p-1 text-[var(--text-on-sidebar)] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--bg-hover)]"
           >
-            {unitOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <MoreHorizontal size={13} />
           </button>
-          <Link
-            to={`/tasks?view=list&business=${unit.id}&client=${client.id}`}
-            className="flex min-w-0 flex-1 items-center gap-2 py-2 text-[13px]"
-          >
-            <Briefcase size={14} className="shrink-0" />
-            <span className="flex-1 truncate">{highlight(unit.business_name, q)}</span>
-            {projects.length > 0 && <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{projects.length}</span>}
-          </Link>
-          <div className="relative">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenu((m) => (m?.kind === "unit" && m.id === unit.id ? null : { kind: "unit", id: unit.id, clientId: client.id, name: unit.business_name }));
-              }}
-              title="More actions"
-              className="rounded p-1 text-[var(--text-on-sidebar)] opacity-0 transition-opacity group-hover:opacity-100 hover:bg-[var(--bg-hover)]"
-            >
-              <MoreHorizontal size={13} />
-            </button>
-            {menu?.kind === "unit" && menu?.id === unit.id && (
-              <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => requestDelete("unit", unit.id, client.id, unit.business_name)}
-                  className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
-                >
-                  <Trash2 size={13} /> Delete
-                </button>
-              </div>
-            )}
-          </div>
+          {menu?.kind === "unit" && menu?.id === unit.id && (
+            <div className="absolute right-0 top-full z-30 mt-1 w-40 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-lg">
+              <button
+                type="button"
+                onClick={() => requestDelete("unit", unit.id, client.id, unit.business_name)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+              >
+                <Trash2 size={13} /> Delete
+              </button>
+            </div>
+          )}
         </div>
-        {unitOpen && projects.length > 0 && (
-          <ul className="ml-6 mt-0.5 space-y-0.5 border-l border-[var(--border-sidebar)] pb-0.5">
-            {projects.map((p) => {
-              const active = activeProject && String(activeProject) === String(p.id);
-              return (
-                <li key={p.id}>
-                  <Link
-                    to={`/tasks?view=list&project=${p.id}&business=${unit.id}&client=${client.id}`}
-                    className={cn(
-                      "flex items-center gap-2 rounded-lg py-1.5 pl-2 pr-2 text-[12px] transition-colors",
-                      active
-                        ? "bg-[var(--bg-active)] text-[var(--text-on-sidebar)]"
-                        : "text-[color-mix(in_srgb,var(--text-on-sidebar)_70%,transparent)] hover:bg-[var(--bg-hover)]"
-                    )}
-                  >
-                    <FolderKanban size={13} className="shrink-0" />
-                    <span className="flex-1 truncate">{highlight(p.name, q)}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </>
+      </div>
     );
   };
 
@@ -403,11 +361,7 @@ export default function SecondarySidebar() {
             {units.length === 0 && addingUnitClient !== client.id ? (
               <p className="px-3 py-1 text-xs text-[var(--text-muted)]">No business units</p>
             ) : (
-              units.map((unit) => (
-                <div key={unit.id} className="group">
-                  {renderUnit(client, unit)}
-                </div>
-              ))
+              units.map((unit) => renderUnit(client, unit))
             )}
           </div>
         )}

@@ -12,8 +12,9 @@ const STATUS_ACCENT = {
   Cancelled: 'bg-neutral-400',
 };
 
-function DraggableCard({ task, onEdit, onDelete, onView, canManage }) {
+function DraggableCard({ task, onEdit, onDelete, onView, canManage, canManageTask }) {
   const [dragging, setDragging] = useState(false);
+  const managed = canManage || (canManageTask ? canManageTask(task) : false);
   return (
     <div
       draggable
@@ -25,12 +26,12 @@ function DraggableCard({ task, onEdit, onDelete, onView, canManage }) {
       onDragEnd={() => setDragging(false)}
       className={cn('mb-2.5', dragging && 'opacity-40')}
     >
-      <TaskCard task={task} onEdit={onEdit} onDelete={onDelete} onView={onView} canManage={canManage} />
+      <TaskCard task={task} onEdit={onEdit} onDelete={onDelete} onView={onView} canManage={managed} />
     </div>
   );
 }
 
-function BoardColumn({ status, tasks, tasksById, onEdit, onDelete, onView, onStatusChange, canManage, onAddToColumn }) {
+function BoardColumn({ status, tasks, tasksById, onEdit, onDelete, onView, onStatusChange, canManage, canManageTask, onAddToColumn }) {
   const [dragOver, setDragOver] = useState(false);
 
   const handleDrop = (e) => {
@@ -79,6 +80,7 @@ function BoardColumn({ status, tasks, tasksById, onEdit, onDelete, onView, onSta
             onDelete={onDelete}
             onView={onView}
             canManage={canManage}
+            canManageTask={canManageTask}
           />
         ))}
         {tasks.length === 0 && (
@@ -89,7 +91,7 @@ function BoardColumn({ status, tasks, tasksById, onEdit, onDelete, onView, onSta
   );
 }
 
-function TaskBoard({ tasks, onEdit, onDelete, onView, onStatusChange, canManage, onCreateTask, onAddToColumn }) {
+function TaskBoard({ tasks, onEdit, onDelete, onView, onStatusChange, canManage, canManageTask, onCreateTask, onAddToColumn }) {
   const grouped = {};
   const byId = {};
   TASK_STATUSES.forEach((s) => { grouped[s] = []; });
