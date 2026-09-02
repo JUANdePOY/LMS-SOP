@@ -44,9 +44,16 @@ const CLIENT_MANAGEMENT_MIGRATIONS = [
   `ALTER TABLE clients ADD CONSTRAINT fk_clients_business FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE SET NULL`,
   `ALTER TABLE clients ADD INDEX IF NOT EXISTS idx_clients_business (business_id)`,
 
-  // Per-client accent color shown as a dot before the name in the task
-  // hierarchy table. Nullable; falls back to the brand accent when unset.
-  `ALTER TABLE clients ADD COLUMN color VARCHAR(32) DEFAULT NULL`,
+   // Per-client accent color shown as a dot before the name in the task
+   // hierarchy table. Nullable; falls back to the brand accent when unset.
+   `ALTER TABLE clients ADD COLUMN color VARCHAR(32) DEFAULT NULL`,
+
+   // Optional department link so a client can be scoped to a specific
+   // department within the SOP business. Nullable + SET NULL so removing a
+   // department does not cascade-delete its clients.
+   `ALTER TABLE clients ADD COLUMN IF NOT EXISTS department_id INT DEFAULT NULL`,
+   `ALTER TABLE clients ADD CONSTRAINT fk_clients_department FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL`,
+   `ALTER TABLE clients ADD INDEX IF NOT EXISTS idx_clients_department (department_id)`,
 ];
 
 async function runClientMigrations() {

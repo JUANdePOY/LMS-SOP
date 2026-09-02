@@ -436,7 +436,7 @@ router.post('/register', authenticateToken, [
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
     const [results] = await db.query(
-      `SELECT u.*, d.name AS department_name
+      `SELECT u.*, d.name AS department_name, d.business_id AS department_business_id
        FROM users u
        LEFT JOIN departments d ON u.department_id = d.id
        WHERE u.id = ?`,
@@ -472,6 +472,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         role: user.role,
         department_id: user.department_id,
         department_name: user.department_name,
+        department_business_id: user.department_business_id ?? null,
         business_id: user.business_id,
         position_title: user.position_title,
         employee_id: user.employee_id,

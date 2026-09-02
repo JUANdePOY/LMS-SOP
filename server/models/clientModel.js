@@ -1,13 +1,13 @@
 const db = require('../config/database');
 
-async function createClient({ client_name, businesses, created_by, business_id }) {
+async function createClient({ client_name, businesses, created_by, business_id, department_id }) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
     const [clientResult] = await conn.query(
-      'INSERT INTO clients (client_name, created_by, business_id) VALUES (?, ?, ?)',
-      [client_name, created_by ?? null, business_id ? Number(business_id) : null]
+      'INSERT INTO clients (client_name, created_by, business_id, department_id) VALUES (?, ?, ?, ?)',
+      [client_name, created_by ?? null, business_id ? Number(business_id) : null, department_id ? Number(department_id) : null]
     );
     const clientId = clientResult.insertId;
 
@@ -41,7 +41,7 @@ async function listClients(businessId) {
     params.push(Number(businessId));
   }
   const [clients] = await db.query(
-    `SELECT c.id, c.client_name, c.business_id, c.created_by,
+    `SELECT c.id, c.client_name, c.business_id, c.department_id, c.created_by,
             creator.full_name AS created_by_name,
             c.created_at, c.updated_at
      FROM clients c
@@ -199,7 +199,7 @@ function withBusinessRollups(clients, rollupsByBusiness) {
 
 async function listClientOptions() {
   const [clients] = await db.query(
-    'SELECT id, client_name, business_id FROM clients ORDER BY client_name ASC'
+    'SELECT id, client_name, business_id, department_id FROM clients ORDER BY client_name ASC'
   );
 
   if (clients.length === 0) return [];
@@ -316,8 +316,10 @@ async function updateClient(id, { client_name, businesses, business_id, color })
 }
 
 // Deletes a single client_businesses row and cascades to its projects (which
-// cascade to tasks via ON DELETE CASCADE). Runs in one transaction so a failure
-// can't leave an orphaned business with projects still attached.
+// cascade to tasks via ON DELETE CASCADE). Also removes tasks linked directly
+// to the business (client_business_id) that have no project. Runs in one
+// transaction so a failure can't leave an orphaned business with projects
+// still attached.
 async function removeBusiness(businessId) {
   const conn = await db.getConnection();
   try {
@@ -326,6 +328,9 @@ async function removeBusiness(businessId) {
     for (const p of projects) {
       await conn.query('DELETE FROM projects WHERE id = ?', [p.id]);
     }
+    // Tasks linked directly to this business (no project) must be removed
+    // explicitly — their client_business_id FK is ON DELETE SET NULL.
+    await conn.query('DELETE FROM tasks WHERE client_business_id = ?', [businessId]);
     const [result] = await conn.query('DELETE FROM client_businesses WHERE id = ?', [businessId]);
     await conn.commit();
     return result.affectedRows;
@@ -338,7 +343,10 @@ async function removeBusiness(businessId) {
 }
 
 // Deletes a client and cascades to its businesses and projects (which cascade
-// to tasks). Wrapped in a transaction for atomicity.
+// to tasks). Wrapped in a transaction for atomicity. Also removes any tasks
+// linked directly to the client or its businesses via client_id /
+// client_business_id (these have ON DELETE SET NULL, so they must be cleared
+// explicitly to avoid orphaned tasks).
 async function remove(id) {
   const conn = await db.getConnection();
   try {
@@ -349,8 +357,14 @@ async function remove(id) {
       for (const p of projects) {
         await conn.query('DELETE FROM projects WHERE id = ?', [p.id]);
       }
+      // Tasks linked directly to this business (no project) must be removed
+      // explicitly — their client_business_id FK is ON DELETE SET NULL.
+      await conn.query('DELETE FROM tasks WHERE client_business_id = ?', [b.id]);
       await conn.query('DELETE FROM client_businesses WHERE id = ?', [b.id]);
     }
+    // Tasks linked directly to the client (no business/project) must also be
+    // removed explicitly.
+    await conn.query('DELETE FROM tasks WHERE client_id = ?', [id]);
     const [result] = await conn.query('DELETE FROM clients WHERE id = ?', [id]);
     await conn.commit();
     return result.affectedRows;

@@ -39,7 +39,11 @@ export async function updateProject(id, payload) {
 }
 
 export async function deleteProject(id) {
-  const res = await api.delete(`/projects/${id}`);
+  const numId = Number(id);
+  if (!Number.isFinite(numId) || numId <= 0) {
+    throw new Error(`Invalid project ID: ${id}`);
+  }
+  const res = await api.delete(`/projects/${numId}`);
   return unwrap(res);
 }
 

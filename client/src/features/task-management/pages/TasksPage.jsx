@@ -35,7 +35,7 @@ const SAVED_VIEWS = [
 ];
 
 export default function TasksPage() {
-  const { isAnyAdmin, user } = useAuth();
+  const { isAnyAdmin, isDepartmentHead, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { markEntityTypeRead } = useNotifications();
@@ -202,6 +202,10 @@ export default function TasksPage() {
   }, [clientTree]);
 
   const handleDeleteEntity = useCallback(async (kind, id) => {
+    if (id == null || (typeof id === 'number' && !Number.isFinite(id))) {
+      toast.error(`Invalid ${kind} ID — cannot delete.`);
+      return;
+    }
     try {
       if (kind === 'client') await deleteClient(id);
       else if (kind === 'business') {
@@ -219,13 +223,16 @@ export default function TasksPage() {
   }, [toast, loadProjects, refreshTasks, findClientIdForBusiness]);
 
   // When a client/business scope is active, seed new-task forms with those
-  // values so the user doesn't have to pick them manually.
+  // values so the user doesn't have to pick them manually. businessParam is a
+  // client_business_id only when clientParam is also set (unit click); when it's
+  // an SOP business scope (business click, no client) we can't prefill a specific
+  // client_business_id, so leave it unset.
   const scopeDefaults = useMemo(() => {
     if (!clientParam && !businessParam) return undefined;
-    return {
-      client_id: clientParam || '',
-      client_business_id: businessParam || '',
-    };
+    const defaults = {};
+    if (clientParam) defaults.client_id = clientParam;
+    if (clientParam && businessParam) defaults.client_business_id = businessParam;
+    return defaults;
   }, [clientParam, businessParam]);
 
   const changeView = useCallback((next) => {
@@ -354,18 +361,6 @@ export default function TasksPage() {
     return () => clearTimeout(timeout);
   }, [filters, isAnyAdmin, refreshTasks]);
 
-  const statItems = useMemo(() => {
-    if (!stats) return [];
-    return [
-      { label: 'Total', value: stats.total, icon: ClipboardList },
-      { label: 'Pending', value: stats.pending, icon: Clock },
-      { label: 'In Progress', value: stats.in_progress, icon: RefreshCw },
-      { label: 'Completed', value: stats.completed, icon: CheckCircle },
-      { label: 'Overdue', value: stats.overdue, icon: AlertTriangle },
-      { label: 'Cancelled', value: stats.cancelled, icon: XCircle },
-    ];
-  }, [stats]);
-
   const assigneeOptions = useMemo(() => {
     const seen = new Set();
     (tasks || []).forEach((t) => (t.assignments || []).forEach((a) => {
@@ -373,6 +368,18 @@ export default function TasksPage() {
     }));
     return [...seen].sort();
   }, [tasks]);
+
+  // When businessParam is an SOP business scope (no clientParam), the set of
+  // client IDs belonging to that business — used to scope tasks to just the SOP
+  // business's clients instead of treating businessParam as a client_business_id.
+  const scopedClientIdsForBusiness = useMemo(() => {
+    if (!businessParam || clientParam || projectParam) return null;
+    return new Set(
+      (clientTree || [])
+        .filter((c) => c.business_id != null && String(c.business_id) === String(businessParam))
+        .map((c) => String(c.id))
+    );
+  }, [clientTree, businessParam, clientParam, projectParam]);
 
   const displayedTasks = useMemo(() => {
     let result = tasks || [];
@@ -387,11 +394,50 @@ export default function TasksPage() {
       }
       return null;
     };
+    // Department Heads see tasks that belong to their department. This includes:
+    // 1. Tasks with a Department-type assignment matching their department ID
+    // 2. Tasks associated with a client that belongs to their department
+    if (isDepartmentHead && user?.department_id != null) {
+      const deptId = String(user.department_id);
+      const sopBizId = user?.department_business_id != null || user?.business_id != null
+        ? String(user.department_business_id ?? user.business_id)
+        : null;
+      // Build set of client IDs in the department head's department
+      const deptClientIds = new Set(
+        (clientTree || [])
+          .filter((c) => {
+            if (sopBizId != null && String(c.business_id) !== sopBizId) return false;
+            if (String(c.department_id) !== deptId) return false;
+            return true;
+          })
+          .map((c) => String(c.id))
+      );
+      result = result.filter((t) => {
+        // Task has a Department-type assignment matching the department
+        if ((t.assignments || []).some(
+          (a) => a.assignment_type === 'Department' && String(a.reference_id) === deptId
+        )) return true;
+        // Task is associated with a client in the department
+        const scope = taskClientId(t);
+        if (scope?.clientId != null && deptClientIds.has(String(scope.clientId))) return true;
+        return false;
+      });
+    }
     if (clientParam) {
       result = result.filter((t) => String(taskClientId(t)?.clientId) === String(clientParam));
     }
     if (businessParam) {
-      result = result.filter((t) => String(taskClientId(t)?.businessId) === String(businessParam));
+      // SOP business scope (no clientParam): match any task whose client belongs
+      // to this business — not tasks by client_business_id, since businessParam
+      // here is the top-level business PK, not a client_businesses row PK.
+      if (!clientParam && !projectParam && scopedClientIdsForBusiness) {
+        result = result.filter((t) => {
+          const scope = taskClientId(t);
+          return scope?.clientId != null && scopedClientIdsForBusiness.has(String(scope.clientId));
+        });
+      } else {
+        result = result.filter((t) => String(taskClientId(t)?.businessId) === String(businessParam));
+      }
     }
     if (projectParam) {
       result = result.filter((t) => String(t.project_id ?? t.projectId ?? t.project?.id) === String(projectParam));
@@ -405,7 +451,25 @@ export default function TasksPage() {
       }
     }
     return result;
-  }, [tasks, assigneeFilter, user, clientParam, businessParam, projectsById]);
+  }, [tasks, assigneeFilter, user, clientParam, businessParam, projectsById, scopedClientIdsForBusiness, isDepartmentHead, clientTree]);
+
+  const statItems = useMemo(() => {
+    const list = displayedTasks || [];
+    const total = list.length;
+    const pending = list.filter((t) => t.status === 'Pending').length;
+    const inProgress = list.filter((t) => t.status === 'In Progress').length;
+    const completed = list.filter((t) => t.status === 'Completed').length;
+    const overdue = list.filter((t) => t.status === 'Overdue').length;
+    const cancelled = list.filter((t) => t.status === 'Cancelled').length;
+    return [
+      { label: 'Total', value: total, icon: ClipboardList },
+      { label: 'Pending', value: pending, icon: Clock },
+      { label: 'In Progress', value: inProgress, icon: RefreshCw },
+      { label: 'Completed', value: completed, icon: CheckCircle },
+      { label: 'Overdue', value: overdue, icon: AlertTriangle },
+      { label: 'Cancelled', value: cancelled, icon: XCircle },
+    ];
+  }, [displayedTasks]);
 
   const hasActiveFilters = search || statusFilter || priorityFilter || assigneeFilter;
 
@@ -417,19 +481,66 @@ export default function TasksPage() {
 
   const filteredBusinessName = useMemo(() => {
     if (!businessParam) return null;
+    // SOP business scope (no clientParam): the name comes from the client tree.
+    if (!clientParam) {
+      const match = (clientTree || []).find(
+        (c) => c.business_id != null && String(c.business_id) === String(businessParam)
+      );
+      return match?.business_name || null;
+    }
+    // Unit click (clientParam set): businessParam is a client_business_id.
     const p = Object.values(projectsById).find((x) => String(x.client_business_id) === String(businessParam));
     return p?.client_business_name || null;
-  }, [businessParam, projectsById, projectParam]);
+  }, [businessParam, clientParam, projectsById, clientTree, projectParam]);
 
   // When a client/business scope is active, restrict the hierarchy source to
   // that scope so the Client -> Business -> Project tree still renders (even
   // with no tasks) for the selected business/client.
   const scopedProjectsById = useMemo(() => {
+    // Department Heads see only projects belonging to clients in their SOP
+    // business (derived from their department's business_id) AND within their
+    // department.
+    if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null) && !clientParam && !businessParam && !projectParam) {
+      const sopBizId = String(user.department_business_id ?? user.business_id);
+      const deptId = user?.department_id != null ? String(user.department_id) : null;
+      const validClientIds = new Set(
+        (clientTree || [])
+          .filter((c) => {
+            if (String(c.business_id) !== sopBizId) return false;
+            if (deptId != null && String(c.department_id) !== deptId) return false;
+            return true;
+          })
+          .map((c) => String(c.id))
+      );
+      const scoped = {};
+      for (const p of Object.values(projectsById)) {
+        if (p.client_id != null && validClientIds.has(String(p.client_id))) {
+          scoped[String(p.id)] = p;
+        }
+      }
+      return scoped;
+    }
     if (!clientParam && !businessParam && !projectParam) return projectsById;
     const scoped = {};
+    // SOP business scope: gather all client_business_ids belonging to clients
+    // of this business so projects can be matched by client_business_id.
+    const clientBusinessIdsForSopBusiness = (() => {
+      if (!businessParam || clientParam || projectParam) return null;
+      const ids = new Set();
+      for (const client of clientTree || []) {
+        if (client.business_id != null && String(client.business_id) === String(businessParam)) {
+          for (const b of client.businesses || []) ids.add(String(b.id));
+        }
+      }
+      return ids;
+    })();
     Object.values(projectsById).forEach((p) => {
       if (projectParam) {
         if (String(p.id) === String(projectParam)) scoped[String(p.id)] = p;
+      } else if (businessParam && !clientParam && clientBusinessIdsForSopBusiness) {
+        if (p.client_business_id != null && clientBusinessIdsForSopBusiness.has(String(p.client_business_id))) {
+          scoped[String(p.id)] = p;
+        }
       } else if (businessParam && String(p.client_business_id) === String(businessParam)) {
         scoped[String(p.id)] = p;
       } else if (clientParam && String(p.client_id) === String(clientParam)) {
@@ -437,21 +548,44 @@ export default function TasksPage() {
       }
     });
     return scoped;
-  }, [projectsById, clientParam, businessParam, projectParam]);
+  }, [projectsById, clientParam, businessParam, projectParam, clientTree, isDepartmentHead, user]);
 
   // When a client or business scope is active, restrict the Client -> Business
   // skeleton so the hierarchy tree renders only the selected branch (matching the
   // scoped tasks/projects). Without this the tree still seeded every client from
   // the full org tree, so the scope only auto-expanded instead of filtering.
+  //
+  // businessParam is overloaded:
+  //   - With clientParam set  -> it's a client_business_id (a unit click)
+  //   - Without clientParam    -> it's an SOP business_id (a business click)
   const scopedClientTree = useMemo(() => {
+    // Department Heads see only clients that belong to their SOP business
+    // (derived from their department's business_id) AND within their department.
+    if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null)) {
+      const sopBizId = String(user.department_business_id ?? user.business_id);
+      const deptId = user?.department_id != null ? String(user.department_id) : null;
+      return (clientTree || []).filter((c) => {
+        if (String(c.business_id) !== sopBizId) return false;
+        if (deptId != null && String(c.department_id) !== deptId) return false;
+        return true;
+      });
+    }
     if (!clientParam && !businessParam && !projectParam) return clientTree;
+    const targetClient = clientParam ?? (projectParam ? projectsById[String(projectParam)]?.client_id : null);
     // A project scope resolves to its owning client/business, so the tree still
     // renders only the branch that contains the selected project.
-    const targetClient = clientParam ?? (projectParam ? projectsById[String(projectParam)]?.client_id : null);
-    const targetBusiness = businessParam ?? (projectParam ? projectsById[String(projectParam)]?.client_business_id : null);
+    const targetBusiness = projectParam ? projectsById[String(projectParam)]?.client_business_id : null;
     return (clientTree || [])
       .map((client) => {
         if (targetClient && String(client.id) !== String(targetClient)) return null;
+        // SOP business scope (no clientParam): keep only clients whose
+        // business_id matches — show all their business units.
+        if (businessParam && !clientParam && !projectParam) {
+          if (client.business_id == null || String(client.business_id) !== String(businessParam)) return null;
+          return client;
+        }
+        // client_business_id scope (unit click or project scope): narrow the
+        // client's business units to just the matching one.
         if (targetBusiness) {
           const businesses = (client.businesses || []).filter(
             (b) => String(b.id) === String(targetBusiness)
@@ -461,7 +595,7 @@ export default function TasksPage() {
         return client;
       })
       .filter(Boolean);
-  }, [clientTree, clientParam, businessParam, projectParam, projectsById]);
+  }, [clientTree, clientParam, businessParam, projectParam, projectsById, isDepartmentHead, user]);
 
   const applySavedView = useCallback((key) => {
     const v = SAVED_VIEWS.find((x) => x.key === key);
@@ -712,9 +846,10 @@ export default function TasksPage() {
           tasks={displayedTasks}
           loading={loading}
           projectsById={scopedProjectsById}
-          clientTree={scopedClientTree}
-          canManage
-          scopeClientId={clientParam}
+           clientTree={scopedClientTree}
+            canManage
+            userDepartmentId={user?.department_id ?? null}
+            scopeClientId={clientParam}
           scopeBusinessId={businessParam}
           scopeProjectId={projectParam}
           viewProp={view}
@@ -757,6 +892,7 @@ export default function TasksPage() {
         saving={saving}
         initialData={editingTask}
         defaultValues={taskDefaults}
+        userDepartmentId={user?.department_id ?? null}
       />
 
       <ConfirmationDialog

@@ -1,9 +1,11 @@
 import { useMemo, useState, useCallback, useEffect, useRef, useLayoutEffect, Fragment } from 'react';
 import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2, Inbox, Building2, Briefcase, FolderKanban, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { getBusinesses } from '../api/business.api';
+import { getDepartmentsForAssignment } from '../api/assignment.api';
 import { TaskRow } from './TaskListRow';
 import InlineEditableName from './InlineEditableName';
 import InlineNameRow from './InlineNameRow';
@@ -29,42 +31,60 @@ const CELL_HIDE_SM = 'hidden sm:block'; // assignees / priority / due / progress
 
 /**
  * Inline "add client" form. Beyond a name it lets the user assign the new client
- * to an existing SOP business (clients.business_id) via a select populated from
- * GET /api/businesses. The business choice is optional ("— SOP business —").
+ * to an existing SOP business (clients.business_id). The business choice is
+ * required — a client cannot be created without a business, so the form stays
+ * open and surfaces a prompt until one is chosen.
  */
 function AddClientForm({ onCommit, onCancel }) {
   const [name, setName] = useState('');
   const [businessId, setBusinessId] = useState('');
+  const [departmentId, setDepartmentId] = useState('');
   const [businesses, setBusinesses] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [touched, setTouched] = useState(false);
   const inputRef = useRef(null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    getBusinesses()
-      .then((list) => { if (active) setBusinesses(Array.isArray(list) ? list : []); })
-      .catch(() => { if (active) setBusinesses([]); })
+    Promise.all([
+      getBusinesses(),
+      getDepartmentsForAssignment(''),
+    ])
+      .then(([bizList, deptList]) => {
+        if (!active) return;
+        setBusinesses(Array.isArray(bizList) ? bizList : []);
+        setDepartments(Array.isArray(deptList) ? deptList : []);
+      })
+      .catch(() => {
+        if (active) { setBusinesses([]); setDepartments([]); }
+      })
       .finally(() => { if (active) setLoading(false); });
     inputRef.current?.focus();
     return () => { active = false; };
   }, []);
 
-  const commit = async () => {
-    const trimmed = name.trim();
-    if (!trimmed) { onCancel?.(); return; }
-    setSubmitting(true);
-    try {
-      await onCommit(trimmed, businessId ? Number(businessId) : null);
-      setName('');
-      setBusinessId('');
-    } catch {
-      // Parent surfaces its own error toast; keep the form open so the user can retry.
-    } finally {
-      setSubmitting(false);
-    }
-  };
+   const canCommit = name.trim() && businessId !== '' && departmentId !== '';
+
+   const commit = async () => {
+     setTouched(true);
+     const trimmed = name.trim();
+     if (!trimmed || businessId === '' || departmentId === '') return;
+     setSubmitting(true);
+     try {
+       await onCommit(trimmed, Number(businessId), Number(departmentId));
+       setName('');
+       setBusinessId('');
+       setDepartmentId('');
+       setTouched(false);
+     } catch {
+       // Parent surfaces its own error toast; keep the form open so the user can retry.
+     } finally {
+       setSubmitting(false);
+     }
+   };
 
   return (
     <div className="flex flex-wrap items-center gap-2 px-2 py-2 text-sm" style={{ paddingLeft: '8px' }}>
@@ -82,21 +102,62 @@ function AddClientForm({ onCommit, onCancel }) {
       />
       <select
         value={businessId}
-        onChange={(e) => setBusinessId(e.target.value)}
+        onChange={(e) => { setBusinessId(e.target.value); setTouched(true); }}
         onKeyDown={(e) => {
           if (e.key === 'Enter') { e.preventDefault(); commit(); }
           if (e.key === 'Escape') { e.preventDefault(); onCancel?.(); }
         }}
         disabled={loading}
-        className="rounded border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-sm text-[var(--text-secondary)] outline-none transition-colors duration-150 ease-out focus:border-[var(--color-primary)] motion-reduce:transition-none"
+        className={cn(
+          'rounded border bg-[var(--bg-surface)] px-2 py-1 text-sm outline-none transition-colors duration-150 ease-out motion-reduce:transition-none',
+          touched && businessId === ''
+            ? 'border-red-400 text-red-600 focus:border-red-500'
+            : 'border-[var(--border)] text-[var(--text-secondary)] focus:border-[var(--color-primary)]'
+        )}
       >
-        <option value="">{loading ? 'Loading businesses…' : '— SOP business —'}</option>
+        <option value="">{loading ? 'Loading businesses…' : '— Select SOP business * —'}</option>
         {businesses.map((b) => (
           <option key={b.id} value={b.id}>{b.business_name}</option>
         ))}
       </select>
-      {submitting && (
-        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--border)] border-t-[var(--color-primary)]" />
+      <select
+        value={departmentId}
+        onChange={(e) => { setDepartmentId(e.target.value); setTouched(true); }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') { e.preventDefault(); onCancel?.(); }
+        }}
+        disabled={loading}
+        className={cn(
+          'rounded border bg-[var(--bg-surface)] px-2 py-1 text-sm outline-none transition-colors duration-150 ease-out motion-reduce:transition-none',
+          touched && departmentId === ''
+            ? 'border-red-400 text-red-600 focus:border-red-500'
+            : 'border-[var(--border)] text-[var(--text-secondary)] focus:border-[var(--color-primary)]'
+        )}
+      >
+        <option value="">{loading ? 'Loading departments…' : '— Select department * —'}</option>
+        {departments.map((d) => (
+          <option key={d.id} value={d.id}>{d.name}</option>
+        ))}
+      </select>
+      <button
+        type="button"
+        onClick={commit}
+        disabled={!canCommit || submitting}
+        className={cn(
+          'rounded px-2.5 py-1 text-xs font-medium transition-colors duration-150 ease-out motion-reduce:transition-none',
+          canCommit && !submitting
+            ? 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]'
+            : 'cursor-not-allowed bg-[var(--border-subtle)] text-[var(--text-muted)]'
+        )}
+      >
+        {submitting ? 'Adding…' : 'Add'}
+      </button>
+      {touched && businessId === '' && (
+        <span className="w-full text-[11px] text-red-500">Select a business to assign this client to.</span>
+      )}
+      {touched && departmentId === '' && (
+        <span className="w-full text-[11px] text-red-500">Select a department to assign this client to.</span>
       )}
     </div>
   );
@@ -332,6 +393,7 @@ export default function TaskHierarchyTable({
   tasks,
   projectsById,
   clientTree = [],
+  loading = false,
   search,
   onViewTask,
   onDelete,
@@ -355,9 +417,10 @@ export default function TaskHierarchyTable({
   onCreateProject,
   onCreateClient,
   onDeleteEntity,
-  newTaskIds = null,
-  onViewSubtasks,
-}) {
+   newTaskIds = null,
+   onViewSubtasks,
+   userDepartmentId = null,
+  }) {
   const tasksById = useMemo(() => {
     const map = {};
     for (const t of tasks || []) {
@@ -366,10 +429,29 @@ export default function TaskHierarchyTable({
     return map;
   }, [tasks]);
 
-  const projects = useMemo(() => Object.values(projectsById || {}), [projectsById]);
+   const projects = useMemo(() => Object.values(projectsById || {}), [projectsById]);
 
-  const clients = useHierarchy(tasks, projectsById, clientTree, tasksById);
-  const [expanded, setExpanded] = useState(loadExpanded);
+   // Department Heads see only clients that belong to their department.
+   // This is a defense-in-depth filter; the parent (TasksPage) already passes
+   // a scoped clientTree, but filtering here keeps the component correct when
+   // used in other contexts.
+   const filteredClientTree = useMemo(() => {
+     if (userDepartmentId == null) return clientTree;
+     return (clientTree || []).filter((c) => String(c.department_id) === String(userDepartmentId));
+   }, [clientTree, userDepartmentId]);
+
+    const clients = useHierarchy(tasks, projectsById, filteredClientTree, tasksById);
+
+   // Build a set of client IDs that belong to the department head's department.
+   // Used to determine which tasks the department head can manage.
+   const userDepartmentClientIds = useMemo(() => {
+     if (userDepartmentId == null) return null;
+     return new Set(
+       (filteredClientTree || []).map((c) => String(c.id))
+     );
+   }, [filteredClientTree, userDepartmentId]);
+
+   const [expanded, setExpanded] = useState(loadExpanded);
 
   const subtaskCountMap = useMemo(() => {
     const counts = {};
@@ -437,6 +519,10 @@ export default function TaskHierarchyTable({
   // panel), collapse everything and open ONLY that branch. We must include the
   // branch's ancestors (client/business) so the chosen row is actually visible.
   // The expanded set is *replaced* (not merged) so every other row closes.
+  //
+  // scopeBusinessId is overloaded:
+  //   - a client_business_id (unit click) -> expand owning client + that business
+  //   - an SOP business_id (business click) -> expand all scoped clients
   useEffect(() => {
     const forced = new Set();
     if (scopeProjectId) {
@@ -447,17 +533,17 @@ export default function TaskHierarchyTable({
         if (p.client_id != null) forced.add(`client-${p.client_id}`);
       }
     } else if (scopeBusinessId) {
-      forced.add(`business-${scopeBusinessId}`);
-      // Resolve the owning client: first try projects, then fall back to the
-      // hierarchy's client list (so a business with no projects still opens).
-      const owning = Object.values(projectsById).find(
-        (p) => String(p.client_business_id) === String(scopeBusinessId)
+      // Determine whether scopeBusinessId is a client_business_id by checking
+      // the hierarchy. If no business matches, it's an SOP business_id and we
+      // expand all clients (already filtered to that business upstream).
+      const owningClient = clients.find((c) =>
+        c.businesses.some((b) => String(b.id) === String(scopeBusinessId))
       );
-      if (owning?.client_id != null) {
-        forced.add(`client-${owning.client_id}`);
+      if (owningClient) {
+        forced.add(`business-${scopeBusinessId}`);
+        forced.add(`client-${owningClient.id}`);
       } else {
-        const client = clients.find((c) => c.businesses.some((b) => String(b.id) === String(scopeBusinessId)));
-        if (client) forced.add(`client-${client.id}`);
+        for (const c of clients) forced.add(`client-${c.id}`);
       }
     } else if (scopeClientId) {
       forced.add(`client-${scopeClientId}`);
@@ -482,7 +568,7 @@ export default function TaskHierarchyTable({
       {/* Header row */}
       <div
         role="row"
-        className={cn('grid gap-0 border-t border-b border-[var(--border-subtle)]/30 px-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)] h-10', HIERARCHY_GRID)}
+        className={cn('sticky top-0 z-20 grid gap-0 border-t border-b border-[var(--border-subtle)]/30 bg-[var(--bg-surface)] px-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)] h-10', HIERARCHY_GRID)}
       >
         <span className="flex items-center justify-center py-2 pr-2 border-r border-[var(--border-subtle)]/30 text-center">Name</span>
         <span className="flex items-center justify-center py-2 px-2 border-r border-[var(--border-subtle)]/30 text-center">Assignees</span>
@@ -516,109 +602,161 @@ return (
                  hideDue
                  taller
                  noBorder
-               />
-            {open && client.businesses.map((business) => {
-              const bDimmed = search && !subtreeMatches(business, 'business', search);
-              const businessKey = `business-${business.id}`;
-              const bOpen = isExpanded(businessKey, 'business', business);
-              return (
-                <div key={businessKey}>
-                    <Row
-                     depth={1}
-                     kind="business"
-                     id={business.id}
-                     name={business.name}
-                     open={bOpen}
-                     onToggle={() => toggle(businessKey)}
-                     dueDate={business.rollup.earliestDue}
-                     progress={business.rollup.avgProgress}
-                     dimmed={bDimmed}
-                     canEdit={canManage}
-                     onRename={onRenameBusiness}
-                            onAddChild={startAdd}
-                            onDeleteEntity={onDeleteEntity}
-                        onHideEmptyGroups={hideEmptyGroups}
-                        hideDue
-                        noBorder
-                      />
-                  {bOpen && business.tasks.map((task) => {
-                    const tDimmed = search && !subtreeMatches(task, 'task', search);
+                />
+            <AnimatePresence initial={false}>
+              {open && (
+                <motion.div
+                  key="client-children"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: "easeInOut" }}
+                  style={{ overflow: "hidden" }}
+                >
+                  {client.businesses.map((business) => {
+                    const bDimmed = search && !subtreeMatches(business, 'business', search);
+                    const businessKey = `business-${business.id}`;
+                    const bOpen = isExpanded(businessKey, 'business', business);
                     return (
-                      <Fragment key={task.id}>
-                        <TaskRow
-                          task={task}
-                          dimmed={tDimmed}
-                          onViewTask={onViewTask}
-                          onViewSubtasks={onViewSubtasks}
-                          onStatusChange={onStatusChange}
-                          onInlineUpdate={onInlineUpdate}
-                          onDelete={onDelete}
-                          onDeleteImmediate={onDeleteImmediate}
-                          onDuplicated={onDuplicated}
-                          onRenameTask={onRenameTask}
-                          canManage={canManage}
-                          projects={projects}
-                          tasksById={tasksById}
-                          onAddSubtask={(t) => startAdd('task', t.id)}
-                          subtaskCount={subtaskCountMap[task.id] || 0}
-                          isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
+                      <div key={businessKey}>
+                        <Row
+                          depth={1}
+                          kind="business"
+                          id={business.id}
+                          name={business.name}
+                          open={bOpen}
+                          onToggle={() => toggle(businessKey)}
+                          dueDate={business.rollup.earliestDue}
+                          progress={business.rollup.avgProgress}
+                          dimmed={bDimmed}
+                          canEdit={canManage}
+                          onRename={onRenameBusiness}
+                          onAddChild={startAdd}
+                          onDeleteEntity={onDeleteEntity}
+                          onHideEmptyGroups={hideEmptyGroups}
+                          hideDue
+                          noBorder
                         />
-                        {addingFor?.kind === 'subtask' && addingFor.parentId === task.id && (
-                          <InlineNameRow
-                            key="__add-subtask"
-                            placeholder="New sub-task name…"
-                            indent={DEPTH_INDENT_PX * 3}
-                            onCommit={async (name) => {
-                              await onQuickAddSubtask?.(task.id, name);
-                              setAddingFor(null);
-                            }}
-                            onCancel={() => setAddingFor(null)}
-                          />
-                        )}
-                      </Fragment>
+                        <AnimatePresence initial={false}>
+                          {bOpen && (
+                            <motion.div
+                              key="business-children"
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.2, ease: "easeInOut" }}
+                              style={{ overflow: "hidden" }}
+                            >
+                              {business.tasks.map((task) => {
+                                const tDimmed = search && !subtreeMatches(task, 'task', search);
+                                return (
+                                  <Fragment key={task.id}>
+                                     <TaskRow
+                                       task={task}
+                                       dimmed={tDimmed}
+                                       onViewTask={onViewTask}
+                                       onViewSubtasks={onViewSubtasks}
+                                       onStatusChange={onStatusChange}
+                                       onInlineUpdate={onInlineUpdate}
+                                       onDelete={onDelete}
+                                       onDeleteImmediate={onDeleteImmediate}
+                                       onDuplicated={onDuplicated}
+                                       onRenameTask={onRenameTask}
+                                       canManage={canManage}
+                                       projects={projects}
+                                       tasksById={tasksById}
+                                       userDepartmentId={userDepartmentId}
+                                       userDepartmentClientIds={userDepartmentClientIds}
+                                      onAddSubtask={(t) => startAdd('task', t.id)}
+                                      subtaskCount={subtaskCountMap[task.id] || 0}
+                                      isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
+                                    />
+                                    {addingFor?.kind === 'subtask' && addingFor.parentId === task.id && (
+                                      <InlineNameRow
+                                        key="__add-subtask"
+                                        placeholder="New sub-task name…"
+                                        indent={DEPTH_INDENT_PX * 3}
+                                        onCommit={async (name) => {
+                                          await onQuickAddSubtask?.(task.id, name);
+                                          setAddingFor(null);
+                                        }}
+                                        onCancel={() => setAddingFor(null)}
+                                      />
+                                    )}
+                                  </Fragment>
+                                );
+                              })}
+                              {(
+                                addingFor?.kind === 'subtask' && addingFor.parentId === business.id ? (
+                                  <InlineNameRow
+                                    key="__add-task"
+                                    placeholder="New task name…"
+                                    indent={DEPTH_INDENT_PX * 2}
+                                    onCommit={async (name) => {
+                                      if (onQuickAddTask) await onQuickAddTask(business.id, client.id, name);
+                                      else onAddProjectTask?.(business.id);
+                                      setAddingFor(null);
+                                    }}
+                                    onCancel={() => setAddingFor(null)}
+                                  />
+                                ) : canManage && (
+                                  <button
+                                    type="button"
+                                    onClick={() => startAdd('task', business.id)}
+                                    className="flex w-full cursor-pointer items-center gap-1.5 py-3 pl-[44px] text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)] h-10"
+                                  >
+                                    <Plus size={13} className="shrink-0" />
+                                    Add task
+                                  </button>
+                                )
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
                     );
                   })}
-                  {bOpen && (
-                    addingFor?.kind === 'subtask' && addingFor.parentId === business.id ? (
-                      <InlineNameRow
-                        key="__add-task"
-                        placeholder="New task name…"
-                        indent={DEPTH_INDENT_PX * 2}
-                        onCommit={async (name) => {
-                          if (onQuickAddTask) await onQuickAddTask(business.id, client.id, name);
-                          else onAddProjectTask?.(business.id);
-                          setAddingFor(null);
-                        }}
-                        onCancel={() => setAddingFor(null)}
-                      />
-                    ) : canManage && (
-                      <button
-                        type="button"
-                        onClick={() => startAdd('task', business.id)}
-                        className="flex w-full cursor-pointer items-center gap-1.5 py-3 pl-[44px] text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)] h-10"
-                      >
-                        <Plus size={13} className="shrink-0" />
-                        Add task
-                      </button>
-                    )
+                  {addingFor?.kind === 'business' && addingFor.parentId === client.id && (
+                    <InlineNameRow
+                      key="__add-business"
+                      placeholder="New business name…"
+                      indent={DEPTH_INDENT_PX * 1}
+                      onCommit={async (name) => { await onCreateBusiness?.(client.id, name); setAddingFor(null); }}
+                      onCancel={() => setAddingFor(null)}
+                    />
                   )}
-                </div>
-              );
-            })}
-            {addingFor?.kind === 'business' && addingFor.parentId === client.id && (
-              <InlineNameRow
-                key="__add-business"
-                placeholder="New business name…"
-                indent={DEPTH_INDENT_PX * 1}
-                onCommit={async (name) => { await onCreateBusiness?.(client.id, name); setAddingFor(null); }}
-                onCancel={() => setAddingFor(null)}
-              />
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         );
       })}
     </div>
   );
+
+  if (loading) {
+    return (
+      <div className="space-y-3 px-2 py-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="flex animate-pulse items-center gap-3 px-2">
+            <span className="h-5 w-5 shrink-0 rounded bg-[var(--border-subtle)]/40" />
+            <span className="h-4 w-4 shrink-0 rounded-full bg-[var(--border-subtle)]/40" />
+            <span className="h-4 w-24 rounded bg-[var(--border-subtle)]/40" />
+            <span className="ml-auto h-4 w-16 rounded bg-[var(--border-subtle)]/40" />
+          </div>
+        ))}
+        <div className="space-y-2 pl-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex animate-pulse items-center gap-2 px-2">
+              <span className="h-4 w-4 shrink-0 rounded-full bg-[var(--border-subtle)]/30" />
+              <span className="h-4 w-32 rounded bg-[var(--border-subtle)]/30" />
+              <span className="ml-auto h-3 w-12 rounded bg-[var(--border-subtle)]/30" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -626,11 +764,11 @@ return (
       {canManage && (
         <div className="px-2 pt-3">
           {addingClient ? (
-            <AddClientForm
-              key="__add-client"
-              onCommit={async (name, businessId) => { await onCreateClient?.(name, businessId); setAddingClient(false); }}
-              onCancel={() => setAddingClient(false)}
-            />
+             <AddClientForm
+               key="__add-client"
+               onCommit={async (name, businessId, departmentId) => { await onCreateClient?.(name, businessId, departmentId); setAddingClient(false); }}
+               onCancel={() => setAddingClient(false)}
+             />
           ) : (
             <button
               type="button"
@@ -886,7 +1024,7 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
       <span className="px-2" />
       <span className={cn(CELL_HIDE_SM, 'px-2')} />
       <span className={cn('text-xs tabular-nums text-[var(--text-secondary)] px-2 text-center', CELL_HIDE_SM)}>{hideDue ? '' : formatDue(dueDate)}</span>
-      <span className={cn('flex items-center justify-center tabular-nums text-xs text-[var(--text-secondary)] px-2 text-center', CELL_HIDE_SM)}>
+      <span className="flex items-center justify-center tabular-nums text-xs text-[var(--text-secondary)] text-center hidden sm:flex">
         {Math.round(progress || 0)}%
       </span>
     </div>

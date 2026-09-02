@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams, useNavigate } from "react-router-dom";
 import { Building2, Search, X, ChevronRight, ChevronDown, Plus, Briefcase, MoreHorizontal, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/services/api";
@@ -9,7 +9,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useBusinessClientTree } from "@/features/task-management/hooks/useBusinessClientTree";
 import { notifyOrgTreeChanged } from "@/shared/store/orgTreeBus";
 import InlineNameRow from "@/features/task-management/components/InlineNameRow";
+import InlineBusinessForm from "@/features/task-management/components/InlineBusinessForm";
 import ConfirmationDialog from "@/shared/components/ui/ConfirmationDialog";
+import { getMyTaskHierarchy } from "@/features/task-management/services/taskService";
+import { getDepartmentsForAssignment } from "@/features/task-management/api/assignment.api";
 
 /**
  * Secondary (nested) sidebar shown beside the main nav rail. Lists every SOP
@@ -37,34 +40,105 @@ function highlight(text, q) {
 }
 
 export default function SecondarySidebar() {
-  const { secondaryNav, closeSecondaryNav } = useNavigation();
-  const { user, isAnyAdmin } = useAuth();
+   const { secondaryNav, closeSecondaryNav } = useNavigation();
+   const { user, isAnyAdmin, isDepartmentHead } = useAuth();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { businesses, unassigned, loading, refresh } = useBusinessClientTree();
 
   // Employees (non-admins) only ever see the single SOP business linked to their
   // account — the task tree in the My Tasks page is scoped to it, so this panel
   // mirrors that scope instead of exposing the whole org. Admins keep the full list.
   const employeeBusinessId = isAnyAdmin ? null : (user?.business_id ?? null);
+
+  // For employees, restrict the visible clients to only those where they have
+  // at least one task assignment. Fetch the employee's task hierarchy to get the
+  // list of client IDs they belong to, then filter the sidebar's client list.
+  // Also filter business units (client_businesses) to only those with tasks.
+  const [employeeClientIds, setEmployeeClientIds] = useState(null);
+  const [employeeBusinessIds, setEmployeeBusinessIds] = useState(null);
+  useEffect(() => {
+    if (isAnyAdmin || employeeBusinessId == null) {
+      setEmployeeClientIds(null);
+      setEmployeeBusinessIds(null);
+      return;
+    }
+    let active = true;
+    getMyTaskHierarchy()
+      .then((data) => {
+        if (!active) return;
+        const clientIds = new Set((data?.clientTree || []).map((c) => Number(c.id)));
+        const bizIds = new Set();
+        for (const c of data?.clientTree || []) {
+          for (const b of c.businesses || []) {
+            bizIds.add(Number(b.id));
+          }
+        }
+        setEmployeeClientIds(clientIds);
+        setEmployeeBusinessIds(bizIds);
+      })
+      .catch(() => {
+        if (active) { setEmployeeClientIds(new Set()); setEmployeeBusinessIds(new Set()); }
+      });
+    return () => { active = false; };
+  }, [isAnyAdmin, employeeBusinessId]);
+
   const visibleBusinesses = useMemo(() => {
+    // Department Heads see their SOP business (derived from their department's
+    // business_id, falling back to their own business_id) and within it, only
+    // clients that belong to their department. The business always shows even
+    // if no clients match yet, so the user can add clients.
+    if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null)) {
+      const sopBizId = Number(user.department_business_id ?? user.business_id);
+      const deptId = user?.department_id != null ? Number(user.department_id) : null;
+      return businesses
+        .filter((b) => Number(b.id) === sopBizId)
+        .map((b) => ({
+          ...b,
+          clients: deptId != null
+            ? (b.clients || []).filter((c) => Number(c.department_id) === deptId)
+            : (b.clients || []),
+        }));
+    }
     if (isAnyAdmin) return businesses;
     // Employees with no SOP business linked see an empty panel, never the full org.
     if (employeeBusinessId == null) return [];
-    return businesses.filter((b) => Number(b.id) === Number(employeeBusinessId));
-  }, [businesses, employeeBusinessId, isAnyAdmin]);
+    const biz = businesses.filter((b) => Number(b.id) === Number(employeeBusinessId));
+    // If we haven't loaded the employee's hierarchy yet, show the full business
+    // (avoids a flash of empty panel while loading).
+    if (employeeClientIds == null || employeeBusinessIds == null) return biz;
+    // Filter each business's clients to only those where the employee has tasks,
+    // and filter each client's business units to only those with tasks.
+    return biz.map((b) => ({
+      ...b,
+      clients: (b.clients || [])
+        .filter((c) => employeeClientIds.has(Number(c.id)))
+        .map((c) => ({
+          ...c,
+          businesses: (c.businesses || []).filter((u) => employeeBusinessIds.has(Number(u.id))),
+        })),
+    }));
+  }, [businesses, employeeBusinessId, isAnyAdmin, isDepartmentHead, user, employeeClientIds, employeeBusinessIds]);
   const showUnassigned = isAnyAdmin;
   const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [expandedBiz, setExpandedBiz] = useState({});
   const [expandedClient, setExpandedClient] = useState({});
-  const [addingClientBiz, setAddingClientBiz] = useState(null); // SOP biz id or 'unassigned' or null
-  const [addingUnitClient, setAddingUnitClient] = useState(null); // client id or null
-  const [menu, setMenu] = useState(null); // { kind: 'client'|'unit', id, clientId, name }
-  const [pendingDelete, setPendingDelete] = useState(null);
-  // When true, the "New Client" control shows an SOP-business picker first so a
-  // client is always created under a chosen business rather than unassigned.
-  const [clientBizPicker, setClientBizPicker] = useState(false);
+   const [addingClientBiz, setAddingClientBiz] = useState(null); // SOP biz id or 'unassigned' or null
+   const [addingClientDeptId, setAddingClientDeptId] = useState(null); // department id or null
+   const [addingUnitClient, setAddingUnitClient] = useState(null); // client id or null
+   const [menu, setMenu] = useState(null); // { kind: 'client'|'unit', id, clientId, name }
+   const [pendingDelete, setPendingDelete] = useState(null);
+   // When true, the "New Client" control shows an SOP-business picker first so a
+   // client is always created under a chosen business rather than unassigned.
+   const [clientBizPicker, setClientBizPicker] = useState(false);
+   // Holds the chosen business while the department picker is shown (next step).
+   const [clientDeptPicker, setClientDeptPicker] = useState(null);
+   // Departments list for the department picker.
+   const [departments, setDepartments] = useState([]);
+   // When true, show the inline "New Business" form with code + name fields.
+   const [addingBusiness, setAddingBusiness] = useState(false);
 
   // Open an inline "add client" row under the given SOP business (or the
   // Unassigned group) and expand it so the input is visible.
@@ -73,15 +147,24 @@ export default function SecondarySidebar() {
     setExpandedBiz((p) => ({ ...p, [bizKey]: true }));
   };
 
-  // "New Client" must be created under a chosen SOP business. If none exist yet,
-  // steer the user to create one first; otherwise reveal the business picker.
-  const handleNewClient = () => {
-    if (!businesses || businesses.length === 0) {
-      toast.error('Create an SOP business first');
-      return;
-    }
-    setClientBizPicker(true);
-  };
+   // "New Client" must be created under a chosen SOP business. If none exist yet,
+   // steer the user to create one first; otherwise reveal the business picker.
+   const handleNewClient = () => {
+     if (!businesses || businesses.length === 0) {
+       toast.error('Create an SOP business first');
+       return;
+     }
+     setClientBizPicker(true);
+   };
+
+   // Load departments once for the department picker.
+   useEffect(() => {
+     let active = true;
+     getDepartmentsForAssignment('')
+       .then((list) => { if (active) setDepartments(Array.isArray(list) ? list : []); })
+       .catch(() => { if (active) setDepartments([]); });
+     return () => { active = false; };
+   }, []);
 
   // Open an inline "add business unit" row under the given client.
   const startAddUnit = (clientId) => {
@@ -89,22 +172,25 @@ export default function SecondarySidebar() {
     setExpandedClient((p) => ({ ...p, [clientId]: true }));
   };
 
-  const commitAddClient = async (name) => {
-    const bizId = addingClientBiz === "unassigned" ? null : addingClientBiz;
-    try {
-      await api.post("/clients", {
-        client_name: name,
-        business_id: bizId ? Number(bizId) : null,
-      });
-      toast.success("Client created");
-      setAddingClientBiz(null);
-      refresh();
-      notifyOrgTreeChanged();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to create client");
-      throw err;
-    }
-  };
+   const commitAddClient = async (name) => {
+     const bizId = addingClientBiz === "unassigned" ? null : addingClientBiz;
+     try {
+       await api.post("/clients", {
+         client_name: name,
+         business_id: bizId ? Number(bizId) : null,
+         department_id: addingClientDeptId ? Number(addingClientDeptId) : null,
+       });
+       toast.success("Client created");
+       setAddingClientBiz(null);
+       setAddingClientDeptId(null);
+       setClientDeptPicker(null);
+       refresh();
+       notifyOrgTreeChanged();
+     } catch (err) {
+       toast.error(err.response?.data?.message || "Failed to create client");
+       throw err;
+     }
+   };
 
   const commitAddUnit = async (name) => {
     try {
@@ -115,6 +201,19 @@ export default function SecondarySidebar() {
       notifyOrgTreeChanged();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to create business unit");
+      throw err;
+    }
+  };
+
+  const commitAddBusiness = async (code, name) => {
+    try {
+      await api.post("/businesses", { business_code: code, business_name: name });
+      toast.success("Business created");
+      setAddingBusiness(false);
+      refresh();
+      notifyOrgTreeChanged();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to create business");
       throw err;
     }
   };
@@ -131,6 +230,9 @@ export default function SecondarySidebar() {
       if (kind === "client") {
         await api.delete(`/clients/${id}`);
         toast.success("Client deleted");
+      } else if (kind === "business") {
+        await api.delete(`/businesses/${id}`);
+        toast.success("Business deleted");
       } else {
         await api.delete(`/clients/${clientId}/businesses/${id}`);
         toast.success("Business deleted");
@@ -308,8 +410,8 @@ export default function SecondarySidebar() {
             <span className="flex-1 truncate">{highlight(client.client_name, q)}</span>
             {units.length > 0 && <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{units.length}</span>}
           </Link>
+          {isAnyAdmin && (
           <div className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-            {isAnyAdmin && (
             <button
               type="button"
               onClick={(e) => {
@@ -321,7 +423,6 @@ export default function SecondarySidebar() {
             >
               <Plus size={14} />
             </button>
-            )}
             <div className="relative">
               <button
                 type="button"
@@ -347,6 +448,7 @@ export default function SecondarySidebar() {
               )}
             </div>
           </div>
+          )}
         </div>
 
         {cOpen && (
@@ -375,7 +477,7 @@ export default function SecondarySidebar() {
     const toggle = () => setExpandedBiz((p) => ({ ...p, [key]: !p[key] }));
     return (
       <li key={key}>
-        <div className="group sticky top-0 z-10 flex items-center gap-1 rounded-lg border-b border-[var(--border-sidebar)] bg-[var(--bg-sidebar)] pr-2 transition-colors hover:bg-[var(--bg-hover)]">
+        <div className="group sticky top-0 flex items-center gap-1 rounded-lg border-b border-[var(--border-sidebar)] bg-[var(--bg-sidebar)] pr-2 transition-colors hover:bg-[var(--bg-hover)]" style={{ zIndex: menu?.kind === "business" && menu?.id === Number(key) ? 20 : 10 }}>
           <button
             type="button"
             onClick={toggle}
@@ -385,27 +487,55 @@ export default function SecondarySidebar() {
           >
             {bOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </button>
-          <button
-            type="button"
-            onClick={toggle}
+          <Link
+            to={`/tasks?view=list&business=${key}`}
+            onClick={(e) => e.stopPropagation()}
             className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left text-sm font-medium focus:outline-none"
           >
             {icon}
             <span className="flex-1 truncate text-left">{highlight(label, q)}</span>
             {items.length > 0 && <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{items.length}</span>}
-          </button>
+          </Link>
           {isAnyAdmin && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              startAddClient(key);
-            }}
-            title="Add client to this business"
-            className="rounded p-1 text-[var(--text-on-sidebar)] opacity-0 transition-opacity hover:bg-[var(--bg-hover)] group-hover:opacity-100"
-          >
-            <Plus size={14} />
-          </button>
+          <div className="ml-auto flex shrink-0 items-center gap-0.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                startAddClient(key);
+              }}
+              title="Add client to this business"
+              className="rounded p-1 text-[var(--text-on-sidebar)] opacity-0 transition-opacity hover:bg-[var(--bg-hover)] group-hover:opacity-100"
+            >
+              <Plus size={14} />
+            </button>
+            {user?.role === 'super_admin' && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMenu((m) => (m?.kind === "business" && m.id === Number(key) ? null : { kind: "business", id: Number(key), name: label }));
+                  }}
+                  title="More actions"
+                  className="rounded p-1 text-[var(--text-on-sidebar)] opacity-0 transition-opacity hover:bg-[var(--bg-hover)] group-hover:opacity-100"
+                >
+                  <MoreHorizontal size={14} />
+                </button>
+                {menu?.kind === "business" && menu?.id === Number(key) && (
+                  <div className="absolute right-0 top-full z-40 mt-1 w-40 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => requestDelete("business", Number(key), null, label)}
+                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                    >
+                      <Trash2 size={13} /> Delete
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           )}
         </div>
         {bOpen && (
@@ -516,46 +646,96 @@ export default function SecondarySidebar() {
         )}
       </nav>
 
-      <div className="border-t border-[var(--border-sidebar)] p-2">
-        {isAnyAdmin && (clientBizPicker ? (
-          <div className="space-y-1">
-            <p className="px-1 pb-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
-              Select an Business
-            </p>
-            <div className="max-h-44 overflow-y-auto space-y-0.5 scrollbar-none">
-              {businesses.map((b) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  onClick={() => {
-                    setClientBizPicker(false);
-                    startAddClient(b.id);
-                  }}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[color-mix(in_srgb,var(--text-on-sidebar)_80%,transparent)] hover:bg-[var(--bg-hover)] transition-colors"
-                >
-                  <Building2 size={14} className="shrink-0" />
-                  <span className="flex-1 truncate text-left">{highlight(b.name, q)}</span>
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setClientBizPicker(false)}
-              className="mt-1 w-full rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-on-sidebar)] transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
+      <div className="border-t border-[var(--border-sidebar)] p-2 space-y-1.5">
+        {isAnyAdmin && addingBusiness ? (
+          <InlineBusinessForm
+            onCommit={commitAddBusiness}
+            onCancel={() => setAddingBusiness(false)}
+          />
         ) : (
-          <button
-            type="button"
-            onClick={handleNewClient}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-on-sidebar)_75%,transparent)] hover:bg-[var(--bg-hover)] transition-colors"
-          >
-            <Plus size={16} /> New Client
-          </button>
-        )
-      )}
+          <>
+             {user?.role !== 'department_head' && user?.role !== 'employee' && (
+               <button
+                 type="button"
+                 onClick={() => setAddingBusiness(true)}
+                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-on-sidebar)_75%,transparent)] hover:bg-[var(--bg-hover)] transition-colors"
+               >
+                 <Plus size={16} /> New Business
+               </button>
+             )}
+             {clientBizPicker ? (
+               <div className="space-y-1">
+                 <p className="px-1 pb-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                   Select an Business
+                 </p>
+                 <div className="max-h-44 overflow-y-auto space-y-0.5 scrollbar-none">
+                   {businesses.map((b) => (
+                     <button
+                       key={b.id}
+                       type="button"
+                       onClick={() => {
+                         setClientBizPicker(false);
+                         setClientDeptPicker(b.id);
+                       }}
+                       className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[color-mix(in_srgb,var(--text-on-sidebar)_80%,transparent)] hover:bg-[var(--bg-hover)] transition-colors"
+                     >
+                       <Building2 size={14} className="shrink-0" />
+                       <span className="flex-1 truncate text-left">{highlight(b.name, q)}</span>
+                     </button>
+                   ))}
+                 </div>
+                 <button
+                   type="button"
+                   onClick={() => setClientBizPicker(false)}
+                   className="mt-1 w-full rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-on-sidebar)] transition-colors"
+                 >
+                   Cancel
+                 </button>
+               </div>
+              ) : clientDeptPicker ? (
+                <div className="space-y-1">
+                  <p className="px-1 pb-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                    Select a Department *
+                  </p>
+                  <div className="max-h-44 overflow-y-auto space-y-0.5 scrollbar-none">
+                    {departments.length === 0 && (
+                      <p className="px-3 py-1 text-xs text-[var(--text-muted)]">No departments available</p>
+                    )}
+                    {departments.map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => {
+                          setAddingClientBiz(clientDeptPicker);
+                          setAddingClientDeptId(d.id);
+                          setClientDeptPicker(null);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[color-mix(in_srgb,var(--text-on-sidebar)_80%,transparent)] hover:bg-[var(--bg-hover)] transition-colors"
+                      >
+                        <Building2 size={14} className="shrink-0" />
+                        <span className="flex-1 truncate text-left">{d.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setClientDeptPicker(null)}
+                    className="mt-1 w-full rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-on-sidebar)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+              <button
+                type="button"
+                onClick={handleNewClient}
+                className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-on-sidebar)_75%,transparent)] hover:bg-[var(--bg-hover)] transition-colors"
+              >
+                <Plus size={16} /> New Client
+              </button>
+            )}
+          </>
+        )}
       </div>
 
       <ConfirmationDialog

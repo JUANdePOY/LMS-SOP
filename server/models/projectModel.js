@@ -85,10 +85,14 @@ async function findByClientBusiness(clientBusinessId) {
 async function getTree() {
   const [rows] = await db.query(
     `SELECT c.id AS client_id, c.client_name, c.color AS client_color,
+            c.business_id AS client_business_id,
+            c.department_id AS client_department_id,
+            b.business_name AS client_business_name,
             cb.id AS business_id, cb.business_name,
             p.id AS project_id, p.name AS project_name, p.status AS project_status,
             p.color AS project_color, p.due_date AS project_due_date
      FROM clients c
+     LEFT JOIN businesses b ON b.id = c.business_id
      LEFT JOIN client_businesses cb ON cb.client_id = c.id
      LEFT JOIN projects p ON p.client_business_id = cb.id
      ORDER BY c.client_name ASC, cb.business_name ASC, p.name ASC`
@@ -100,6 +104,9 @@ async function getTree() {
       clientsMap.set(row.client_id, {
         id: row.client_id,
         client_name: row.client_name,
+        business_id: row.client_business_id != null ? Number(row.client_business_id) : null,
+        department_id: row.client_department_id != null ? Number(row.client_department_id) : null,
+        business_name: row.client_business_name || null,
         color: row.client_color || null,
         businesses: new Map(),
       });
@@ -130,6 +137,10 @@ async function getTree() {
   return Array.from(clientsMap.values()).map((client) => ({
     id: client.id,
     client_name: client.client_name,
+    business_id: client.business_id,
+    department_id: client.department_id,
+    business_name: client.business_name,
+    color: client.color,
     businesses: Array.from(client.businesses.values()),
   }));
 }

@@ -51,20 +51,33 @@ function validateClientPayload(body, requireAll = true) {
     }
   }
 
-  if (body.color !== undefined) {
-    if (body.color === null || body.color === '') {
-      value.color = null;
-    } else {
-      const hex = String(body.color).trim();
-      if (!/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
-        errors.push('Color must be a valid hex value (e.g. #C14E08)');
-      } else {
-        value.color = hex;
-      }
-    }
-  }
+   if (body.color !== undefined) {
+     if (body.color === null || body.color === '') {
+       value.color = null;
+     } else {
+       const hex = String(body.color).trim();
+       if (!/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) {
+         errors.push('Color must be a valid hex value (e.g. #C14E08)');
+       } else {
+         value.color = hex;
+       }
+     }
+   }
 
-  return { valid: errors.length === 0, value, errors };
+   if (body.department_id !== undefined) {
+     if (body.department_id === null || body.department_id === '') {
+       value.department_id = null;
+     } else {
+       const id = Number(body.department_id);
+       if (!Number.isInteger(id) || id <= 0) {
+         errors.push('Department ID must be a positive integer');
+       } else {
+         value.department_id = id;
+       }
+     }
+   }
+
+   return { valid: errors.length === 0, value, errors };
 }
 
 module.exports = { validateClientPayload };

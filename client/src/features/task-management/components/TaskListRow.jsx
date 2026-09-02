@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, Copy, FolderInput, Trash2, MoreHorizontal, Calendar, ExternalLink, UserPlus, Link2, ListTodo } from 'lucide-react';
+import { Check, ChevronDown, Copy, FolderInput, Trash2, MoreHorizontal, Calendar, ExternalLink, UserPlus, Link2, ListTodo, Building2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { TASK_PRIORITIES, TASK_PRIORITY_DOT } from '../constants/taskConstants';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { getUsersForAssignment } from '../api/assignment.api';
+import { getUsersForAssignment, getDepartmentsForAssignment, getAssignmentScope } from '../api/assignment.api';
 import { formatDate } from '../utils/taskDateUtils';
 import { useToast } from '@/shared/components/ui/Toast';
 import { duplicateTask } from '../services/taskService';
@@ -40,19 +40,34 @@ function StatusDot({ status }) {
 function StatusDropdown({ status, onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useClickOutside(() => setOpen(false));
+  const triggerRef = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 4, left: rect.left });
+  }, [open]);
+
   return (
     <span ref={ref} className="relative inline-block">
-      <button type="button" onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} className="rounded px-1 py-0.5 hover:bg-[var(--bg-surface-hover)]">
+      <button ref={triggerRef} type="button" onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} className="rounded px-1 py-0.5 hover:bg-[var(--bg-surface-hover)]">
         {status ? <StatusDot status={status} /> : <span className="text-xs text-[var(--text-muted)]">Set status</span>}
       </button>
-      {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-36 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-xl">
+      {open && createPortal(
+        <div
+          ref={ref}
+          onClick={(e) => e.stopPropagation()}
+          style={{ position: 'fixed', top: coords.top, left: coords.left, zIndex: 60 }}
+          className="w-36 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-xl"
+        >
           {Object.keys(STATUS_TOKENS).map((s) => (
             <button key={s} type="button" onClick={(e) => { e.stopPropagation(); onChange?.(s); setOpen(false); }} className="flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-[var(--bg-surface-hover)]">
               <StatusDot status={s} />
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </span>
   );
@@ -61,22 +76,37 @@ function StatusDropdown({ status, onChange }) {
 function PriorityDropdown({ priority, onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useClickOutside(() => setOpen(false));
+  const triggerRef = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 4, left: rect.left });
+  }, [open]);
+
   return (
     <span ref={ref} className="relative inline-block">
-      <button type="button" onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]">
+      <button ref={triggerRef} type="button" onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]">
         <span className={cn('h-2 w-2 rounded-full', TASK_PRIORITY_DOT[priority] || TASK_PRIORITY_DOT.Medium)} />
         {priority || 'None'}
         <ChevronDown size={10} className="text-[var(--text-muted)]" />
       </button>
-      {open && (
-        <div className="absolute left-0 top-full z-30 mt-1 w-32 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-xl">
+      {open && createPortal(
+        <div
+          ref={ref}
+          onClick={(e) => e.stopPropagation()}
+          style={{ position: 'fixed', top: coords.top, left: coords.left, zIndex: 60 }}
+          className="w-32 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-xl"
+        >
           {TASK_PRIORITIES.map((p) => (
             <button key={p} type="button" onClick={(e) => { e.stopPropagation(); onChange?.(p); setOpen(false); }} className={cn('flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-[var(--bg-surface-hover)]', p === priority && 'font-semibold')}>
               <span className={cn('h-2 w-2 rounded-full', TASK_PRIORITY_DOT[p])} />
               {p}
             </button>
           ))}
-        </div>
+        </div>,
+        document.body
       )}
     </span>
   );
@@ -171,6 +201,8 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
   const [query, setQuery] = useState('');
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState('people');
+  const [scope, setScope] = useState(null);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 224 });
   const [maxHeight, setMaxHeight] = useState(null);
   const triggerRef = useRef(null);
@@ -178,11 +210,6 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
 
   const VIEWPORT_MARGIN = 8;
 
-  // Position the popover with fixed coordinates so it renders above scrollable
-  // / overflow containers (the hierarchy table lives inside an overflow-x-auto
-  // wrapper) that would otherwise clip an absolutely-positioned dropdown. It
-  // also flips upward and clamps its height when there isn't enough room below
-  // the trigger, so it never overflows the bottom of the viewport.
   const updatePosition = useCallback(() => {
     const el = triggerRef.current;
     if (!el) return;
@@ -231,8 +258,13 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const results = await getUsersForAssignment(query);
-        if (active) setOptions(results);
+        if (tab === 'people') {
+          const results = await getUsersForAssignment(query);
+          if (active) setOptions(results);
+        } else {
+          const results = await getDepartmentsForAssignment(query);
+          if (active) setOptions(results);
+        }
       } catch {
         if (active) setOptions([]);
       } finally {
@@ -240,49 +272,75 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
       }
     }, 200);
     return () => { active = false; clearTimeout(timer); };
-  }, [open, query]);
+  }, [open, query, tab]);
+
+  useEffect(() => {
+    if (open && !scope) {
+      getAssignmentScope().then((s) => setScope(s)).catch(() => {});
+    }
+  }, [open, scope]);
 
   const currentUsers = (assignments || []).filter((a) => a.assignment_type === 'User');
-  const assignedIds = new Set(currentUsers.map((u) => String(u.reference_id)));
-  const selectableOptions = options.filter((u) => !assignedIds.has(String(u.id)));
+  const currentDepts = (assignments || []).filter((a) => a.assignment_type === 'Department');
+  const assignedUserIds = new Set(currentUsers.map((u) => String(u.reference_id)));
+  const assignedDeptIds = new Set(currentDepts.map((d) => String(d.reference_id)));
+  const selectableOptions = tab === 'people'
+    ? options.filter((u) => !assignedUserIds.has(String(u.id)))
+    : options.filter((d) => !assignedDeptIds.has(String(d.id)));
 
-  const select = (user) => {
+  const selectUser = (user) => {
     const userId = String(user.id);
-    // Prevent assigning the same employee more than once.
     if (currentUsers.some((a) => String(a.reference_id) === userId)) {
       setQuery('');
       return;
     }
-    const next = [...currentUsers, { assignment_type: 'User', reference_id: userId, reference_name: user.full_name, avatar_url: user.avatar_url }];
+    const next = [...currentUsers, ...currentDepts, { assignment_type: 'User', reference_id: userId, reference_name: user.full_name, avatar_url: user.avatar_url }];
     onSave(next);
     setQuery('');
   };
 
-  const remove = (refId) => {
-    const next = currentUsers.filter((a) => String(a.reference_id) !== String(refId));
+  const selectDepartment = (dept) => {
+    const deptId = String(dept.id);
+    if (currentDepts.some((d) => String(d.reference_id) === deptId)) {
+      setQuery('');
+      return;
+    }
+    const next = [...currentUsers, ...currentDepts, { assignment_type: 'Department', reference_id: deptId, reference_name: dept.name }];
+    onSave(next);
+    setQuery('');
+  };
+
+  const removeAssignment = (refId) => {
+    const next = (assignments || []).filter((a) => String(a.reference_id) !== String(refId));
     onSave(next);
   };
 
-  // Asana-style assignee cell: a stack of overlapping profile pictures with a
-  // "+N" overflow chip. When empty it shows a dashed "add" placeholder; when
-  // populated an add control fades in on hover. Clicking opens the people
-  // picker (which lists every assigned employee with picture + name). A title
-  // tooltip keeps all names readable. Fixed sizes + max-w-full keep it inside
-  // the 120px column without overflowing neighbours.
+  const switchTab = (newTab) => {
+    setTab(newTab);
+    setQuery('');
+    setOptions([]);
+  };
+
+  const totalAssigned = currentUsers.length + currentDepts.length;
   const MAX_VISIBLE = 3;
-  const visible = currentUsers.slice(0, MAX_VISIBLE);
-  const extra = currentUsers.length - visible.length;
-  const allNames = currentUsers.map((u) => u.reference_name).join(', ');
-  const nameLabel = currentUsers.length === 0
+  const visibleUsers = currentUsers.slice(0, MAX_VISIBLE);
+  const extra = totalAssigned - MAX_VISIBLE;
+  const allNames = [...currentDepts.map((d) => d.reference_name), ...currentUsers.map((u) => u.reference_name)].join(', ');
+  const nameLabel = totalAssigned === 0
     ? ''
-    : currentUsers.length === 1
-      ? currentUsers[0].reference_name
-      : `${currentUsers[0].reference_name} +${currentUsers.length - 1}`;
+    : totalAssigned === 1
+      ? (currentDepts[0]?.reference_name || currentUsers[0]?.reference_name)
+      : `${currentDepts[0]?.reference_name || currentUsers[0]?.reference_name} +${totalAssigned - 1}`;
 
   const avatarStack = (
     <span className="flex items-center -space-x-2">
-      {visible.map((u) => (
-        <span key={u.reference_id} className="relative overflow-hidden rounded-full ring-2 ring-[var(--bg-surface)]">
+      {currentDepts.slice(0, MAX_VISIBLE).map((d) => (
+        <span key={`dept-${d.reference_id}`} className="relative flex items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[9px] font-medium text-[var(--color-primary)] ring-2 ring-[var(--bg-surface)]" style={{ width: 22, height: 22 }}>
+          <Building2 size={12} />
+        </span>
+      ))}
+      {currentUsers.slice(0, MAX_VISIBLE - currentDepts.length).map((u) => (
+        <span key={`user-${u.reference_id}`} className="relative overflow-hidden rounded-full ring-2 ring-[var(--bg-surface)]">
           <Avatar name={u.reference_name} avatarUrl={u.avatar_url} size={22} />
         </span>
       ))}
@@ -314,20 +372,20 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
       <button
         ref={triggerRef}
         type="button"
-        title={currentUsers.length ? allNames : 'Assign'}
+        title={totalAssigned ? allNames : 'Assign'}
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
         className={cn(
           'group/asn inline-flex max-w-full items-center gap-1 overflow-hidden rounded-md py-0.5 pl-0.5 pr-1 transition-colors hover:bg-[var(--bg-surface-hover)]',
           buttonClassName
         )}
       >
-        {alwaysAdd ? addControl : currentUsers.length === 0 ? emptyState : (
+        {alwaysAdd ? addControl : totalAssigned === 0 ? emptyState : (
           <>
             {avatarStack}
             <span className="ml-1 min-w-0 truncate text-xs text-[var(--text-secondary)]">{nameLabel}</span>
           </>
         )}
-        {!alwaysAdd && currentUsers.length > 0 && (
+        {!alwaysAdd && totalAssigned > 0 && (
           <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[var(--text-muted)] opacity-0 ring-1 ring-[var(--border)] transition-opacity group-hover/asn:opacity-100">
             <UserPlus size={13} />
           </span>
@@ -339,12 +397,38 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
           className="fixed z-50 flex max-h-full flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-2 shadow-xl"
           style={{ top: coords.top, left: coords.left, width: coords.width, maxHeight }}
         >
-          <div className="shrink-0 px-2 pb-1">
+          <div className="flex shrink-0 gap-1 border-b border-[var(--border)] px-2 pb-2">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); switchTab('people'); }}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                tab === 'people' ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
+              )}
+            >
+              <Users size={12} />
+              People
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); switchTab('departments'); }}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                tab === 'departments' ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
+              )}
+            >
+              <Building2 size={12} />
+              Departments
+            </button>
+          </div>
+          <div className="shrink-0 px-2 pt-2 pb-1">
             <input
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search users..."
+              placeholder={tab === 'people'
+                ? (scope?.role === 'department_head' ? 'Search people in your department...' : 'Search people...')
+                : 'Search departments...'}
               className="w-full rounded border border-[var(--border)] bg-[var(--bg-page)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
             />
           </div>
@@ -352,25 +436,47 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
             {loading && <p className="px-2 py-1 text-xs text-[var(--text-muted)]">Searching...</p>}
             {!loading && selectableOptions.length === 0 && (
               <p className="px-2 py-1 text-xs text-[var(--text-muted)]">
-                {options.length === 0 ? 'No results' : 'All matched employees already assigned'}
+                {options.length === 0 ? 'No results' : (tab === 'people' ? 'All matched employees already assigned' : 'All matched departments already assigned')}
               </p>
             )}
-            {selectableOptions.map((u) => (
-              <button key={u.id} type="button" onClick={(e) => { e.stopPropagation(); select(u); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--bg-surface-hover)]">
+            {tab === 'people' && selectableOptions.map((u) => (
+              <button key={u.id} type="button" onClick={(e) => { e.stopPropagation(); selectUser(u); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--bg-surface-hover)]">
                 <Avatar name={u.full_name} avatarUrl={u.avatar_url} />
                 <span className="truncate text-[var(--text-primary)]">{u.full_name}</span>
               </button>
             ))}
+            {tab === 'departments' && selectableOptions.map((d) => (
+              <button key={d.id} type="button" onClick={(e) => { e.stopPropagation(); selectDepartment(d); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--bg-surface-hover)]">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
+                  <Building2 size={12} />
+                </span>
+                <span className="truncate text-[var(--text-primary)]">{d.name}</span>
+                {d.code && <span className="ml-auto shrink-0 text-[10px] text-[var(--text-muted)]">{d.code}</span>}
+              </button>
+            ))}
           </div>
-          {currentUsers.length > 0 && (
+          {totalAssigned > 0 && (
             <div className="mt-1 shrink-0 border-t border-[var(--border)] px-2 pt-1">
+              {currentDepts.map((a) => (
+                <div key={`dept-${a.reference_id}`} className="flex items-center justify-between gap-2 py-0.5">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
+                      <Building2 size={12} />
+                    </span>
+                    <span className="truncate text-xs text-[var(--text-secondary)]">{a.reference_name}</span>
+                  </span>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); removeAssignment(a.reference_id); }} className="shrink-0 text-[var(--text-muted)] hover:text-red-500" aria-label={`Remove ${a.reference_name}`}>
+                    <span className="text-xs">×</span>
+                  </button>
+                </div>
+              ))}
               {currentUsers.map((a) => (
-                <div key={a.reference_id} className="flex items-center justify-between gap-2 py-0.5">
+                <div key={`user-${a.reference_id}`} className="flex items-center justify-between gap-2 py-0.5">
                   <span className="flex min-w-0 items-center gap-2">
                     <Avatar name={a.reference_name} avatarUrl={a.avatar_url} />
                     <span className="truncate text-xs text-[var(--text-secondary)]">{a.reference_name}</span>
                   </span>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); remove(a.reference_id); }} className="shrink-0 text-[var(--text-muted)] hover:text-red-500" aria-label={`Remove ${a.reference_name}`}>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); removeAssignment(a.reference_id); }} className="shrink-0 text-[var(--text-muted)] hover:text-red-500" aria-label={`Remove ${a.reference_name}`}>
                     <span className="text-xs">×</span>
                   </button>
                 </div>
@@ -386,17 +492,25 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
 
 function ReadOnlyAssignees({ assignments }) {
   const currentUsers = (assignments || []).filter((a) => a.assignment_type === 'User');
-  if (currentUsers.length === 0) {
+  const currentDepts = (assignments || []).filter((a) => a.assignment_type === 'Department');
+  if (currentUsers.length === 0 && currentDepts.length === 0) {
     return <span className="text-xs text-[var(--text-muted)]">—</span>;
   }
   const MAX_VISIBLE = 3;
-  const visible = currentUsers.slice(0, MAX_VISIBLE);
-  const extra = currentUsers.length - visible.length;
-  const allNames = currentUsers.map((u) => u.reference_name).join(', ');
+  const total = currentUsers.length + currentDepts.length;
+  const visibleDepts = currentDepts.slice(0, MAX_VISIBLE);
+  const visibleUsers = currentUsers.slice(0, MAX_VISIBLE - currentDepts.length);
+  const extra = total - Math.min(total, MAX_VISIBLE);
+  const allNames = [...currentDepts.map((d) => d.reference_name), ...currentUsers.map((u) => u.reference_name)].join(', ');
   return (
     <span className="flex items-center -space-x-2" title={allNames}>
-      {visible.map((u) => (
-        <span key={u.reference_id} className="relative overflow-hidden rounded-full ring-2 ring-[var(--bg-surface)]">
+      {visibleDepts.map((d) => (
+        <span key={`dept-${d.reference_id}`} className="relative flex items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[9px] font-medium text-[var(--color-primary)] ring-2 ring-[var(--bg-surface)]" style={{ width: 22, height: 22 }}>
+          <Building2 size={12} />
+        </span>
+      ))}
+      {visibleUsers.map((u) => (
+        <span key={`user-${u.reference_id}`} className="relative overflow-hidden rounded-full ring-2 ring-[var(--bg-surface)]">
           <Avatar name={u.reference_name} avatarUrl={u.avatar_url} size={22} />
         </span>
       ))}
@@ -563,10 +677,30 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
   );
 }
 
-export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects, showCountBadges = false, subtaskCount = 0, isNew = false, tasksById = {}, onAddSubtask, onViewSubtasks }) {
+export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects, showCountBadges = false, subtaskCount = 0, isNew = false, tasksById = {}, onAddSubtask, onViewSubtasks, userDepartmentId = null, userDepartmentClientIds = null }) {
   const { toast } = useToast();
 
   const overdue = isOverdue(task);
+
+  // Department Heads can edit all tasks in their department. If userDepartmentId
+  // is provided, restrict canManage to tasks that have a Department-type
+  // assignment matching it, OR tasks associated with a client in the department
+  // (via userDepartmentClientIds). Admins/super_admins (no userDepartmentId passed)
+  // retain full canManage.
+  const taskDeptIds = new Set(
+    (task.assignments || [])
+      .filter((a) => a.assignment_type === 'Department')
+      .map((a) => String(a.reference_id))
+  );
+  // Resolve the task's client ID to check against userDepartmentClientIds
+  const taskClientId = String(
+    task.client_id ?? (() => {
+      const pid = task.project_id ?? task.projectId ?? task.project?.id;
+      const proj = pid != null ? projects?.[String(pid)] : null;
+      return proj?.client_id ?? null;
+    })() ?? null
+  );
+  const canEditThisTask = canManage && (userDepartmentId == null || taskDeptIds.has(String(userDepartmentId)) || (userDepartmentClientIds != null && userDepartmentClientIds.has(taskClientId)));
 
   // A sub-task is one with a parent_task_id. Resolve the parent's title from
   // the sibling map so the employee can see which task this one belongs to.
@@ -625,13 +759,14 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
       )}
     >
       <span
-        className="relative z-10 flex min-w-0 items-center gap-1.5 pr-2 border-r border-[var(--border-subtle)]/30"
+        className="relative z-10 flex min-w-0 items-center justify-between gap-1.5 pr-2 border-r border-[var(--border-subtle)]/30"
         style={{ paddingLeft: '4px' }}
       >
+        <span className="flex min-w-0 items-center gap-1.5">
         <button
           type="button"
           onClick={handleCompleteToggle}
-          disabled={!canManage}
+          disabled={!canEditThisTask}
           aria-pressed={task.status === 'Completed'}
           onClick={(e) => e.stopPropagation()}
           className={cn(
@@ -639,7 +774,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
             task.status === 'Completed'
               ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
               : 'border-[var(--border)] hover:border-[var(--color-primary)]',
-            !canManage && 'cursor-not-allowed opacity-60'
+            !canEditThisTask && 'cursor-not-allowed opacity-60'
           )}
           title={task.status === 'Completed' ? 'Mark incomplete' : 'Mark complete'}
           aria-label={task.status === 'Completed' ? 'Mark incomplete' : 'Mark complete'}
@@ -656,7 +791,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
         <span className="inline-flex min-w-0 max-w-full items-center" data-no-nav>
           <InlineEditableName
             value={task.title}
-            canEdit={canManage}
+            canEdit={canEditThisTask}
             onCommit={(next) => onRenameTask?.(task.id, next)}
             className="truncate text-[var(--text-primary)] hover:underline cursor-text"
             ariaLabel="Rename task"
@@ -676,6 +811,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
             </span>
           )}
         </span>
+        </span>
         <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
           <button
             type="button"
@@ -689,7 +825,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
           <MoreActionsMenu
             task={task}
             projects={projects}
-            canManage={canManage}
+            canManage={canEditThisTask}
             onOpen={(t) => onViewTask?.(t)}
             onMoveProject={handleMoveProject}
             onDelete={handleDelete}
@@ -715,7 +851,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
       </span>
 
       <span className="hidden min-w-0 items-center justify-center overflow-hidden sm:flex px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
-        {canManage ? (
+        {canEditThisTask ? (
           <AssigneePicker assignments={task.assignments} onSave={handleAssigneeSave} />
         ) : (
           <ReadOnlyAssignees assignments={task.assignments} />
@@ -723,7 +859,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
       </span>
 
       <span className="flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
-        {canManage ? (
+        {canEditThisTask ? (
           <StatusDropdown status={task.status} onChange={(s) => onStatusChange?.(task, s)} />
         ) : (
           <StatusDot status={task.status} />
@@ -731,7 +867,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
       </span>
 
       <span className="hidden sm:flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
-        {canManage ? (
+        {canEditThisTask ? (
           <PriorityDropdown priority={task.priority} onChange={(p) => onInlineUpdate?.(task, { priority: p })} />
         ) : (
           <span className="text-xs text-[var(--text-secondary)]">{task.priority || 'None'}</span>
@@ -739,7 +875,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
       </span>
 
       <span className="hidden sm:flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
-        {canManage ? (
+        {canEditThisTask ? (
           <DueDateCell value={task.deadline_datetime} overdue={overdue} onChange={(d) => onInlineUpdate?.(task, { deadline_datetime: d })} />
         ) : (
           <span className={cn('text-xs tabular-nums', overdue ? 'text-red-600 dark:text-red-400' : 'text-[var(--text-secondary)]')}>{formatDate(task.deadline_datetime)}</span>

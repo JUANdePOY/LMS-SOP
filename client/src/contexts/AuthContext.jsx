@@ -21,6 +21,7 @@ function normalizeUser(userData) {
     scoped_department_ids: Array.isArray(userData.scoped_department_ids) ? userData.scoped_department_ids : [],
     business_id: userData.business_id || null,
     department_id: userData.department_id || null,
+    department_business_id: userData.department_business_id || null,
   };
 }
 

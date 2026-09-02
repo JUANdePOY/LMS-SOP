@@ -9,7 +9,7 @@ const TYPE_ICONS = {
   Department: Building2,
 };
 
-export default function AssignmentInput({ assignment, onUpdate, onRemove, canRemove = true }) {
+export default function AssignmentInput({ assignment, onUpdate, onRemove, canRemove = true, departmentId = null }) {
   const [type, setType] = useState(assignment?.assignment_type || 'User');
   const [selectedId, setSelectedId] = useState(assignment?.reference_id || '');
   const [query, setQuery] = useState('');
@@ -43,7 +43,7 @@ export default function AssignmentInput({ assignment, onUpdate, onRemove, canRem
       try {
         let results = [];
         if (type === 'User') {
-          results = await getUsersForAssignment(query);
+          results = await getUsersForAssignment(query, departmentId);
         } else if (type === 'Department') {
           results = await getDepartmentsForAssignment(query);
         }

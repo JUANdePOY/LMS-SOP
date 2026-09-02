@@ -9,7 +9,7 @@ const STATUS_ACCENT = {
   'In Progress': 'bg-blue-500',
   Completed: 'bg-emerald-500',
   Overdue: 'bg-red-500',
-  Cancelled: 'bg-neutral-400',
+  Cancellededed: 'bg-neutral-400',
 };
 
 function DraggableCard({ task, onEdit, onDelete, onView, canManage, canManageTask }) {

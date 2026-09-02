@@ -1,5 +1,19 @@
 const db = require('../config/database');
 
+function normalizeDate(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (value instanceof Date) {
+    if (isNaN(value.getTime())) return null;
+    return value.toISOString().slice(0, 10);
+  }
+  const str = String(value).trim();
+  if (!str) return null;
+  if (str.length >= 10) return str.slice(0, 10);
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
 async function findByEmail(email) {
   const [rows] = await db.query(
     'SELECT * FROM users WHERE email = ?',
@@ -46,7 +60,7 @@ async function create(userData) {
   const [result] = await db.query(
     `INSERT INTO users (full_name, email, password_hash, role, department_id, business_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address, is_active)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)`,
-    [full_name, email, password_hash, role, department_id ?? null, business_id ?? null, position_title ?? null, employee_id ?? null, contact_number ?? null, employment_status ?? 'Regular', date_hired ?? null, birthdate ?? null, address ?? null]
+    [full_name, email, password_hash, role, department_id ?? null, business_id ?? null, position_title ?? null, employee_id ?? null, contact_number ?? null, employment_status ?? 'Regular', normalizeDate(date_hired), normalizeDate(birthdate), address ?? null]
   );
   // Assign default onboarding SOPs to the new user
   const onboardingService = getOnboardingService();
@@ -68,7 +82,11 @@ async function update(id, updates) {
   for (const key of allowed) {
     if (Object.prototype.hasOwnProperty.call(updates, key)) {
       sets.push(`${key} = ?`);
-      params.push(updates[key]);
+      if (key === 'date_hired' || key === 'birthdate') {
+        params.push(normalizeDate(updates[key]));
+      } else {
+        params.push(updates[key]);
+      }
     }
   }
   if (!sets.length) return 0;

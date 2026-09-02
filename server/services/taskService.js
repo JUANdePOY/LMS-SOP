@@ -21,8 +21,9 @@ async function listTasks(filters = {}, actorId) {
     const assignedTaskIds = await getAssignedTaskIdsForUser(actorId);
     filters.task_ids = assignedTaskIds;
   } else {
-    const businessTaskIds = await getBusinessScopedTaskIdsForAdmin(actorId);
-    filters.task_ids = businessTaskIds;
+    // Department Heads see only tasks assigned to their department.
+    // Admins and super_admins see all tasks in their business scope.
+    filters.task_ids = await getAdminScopedTaskIds(actorId);
   }
 
   const result = await taskModel.findAll(filters);
@@ -252,11 +253,22 @@ async function getTask(id, actorId) {
   }
 
   if (isAdmin) {
-    const businessTaskIds = await getBusinessScopedTaskIdsForAdmin(actorId);
-    if (!businessTaskIds.includes(id)) {
-      const error = new Error('Access denied: task is outside your business scope');
-      error.code = 'FORBIDDEN';
-      throw error;
+    // Department Heads can only view tasks assigned to their department.
+    // Admins and super_admins can view any task in their business scope.
+    if (await isUserDepartmentHead(actorId)) {
+      const deptTaskIds = await getDepartmentScopedTaskIdsForDeptHead(actorId);
+      if (!deptTaskIds.includes(id)) {
+        const error = new Error('Access denied: task is outside your department scope');
+        error.code = 'FORBIDDEN';
+        throw error;
+      }
+    } else {
+      const businessTaskIds = await getAdminScopedTaskIds(actorId);
+      if (!businessTaskIds.includes(id)) {
+        const error = new Error('Access denied: task is outside your business scope');
+        error.code = 'FORBIDDEN';
+        throw error;
+      }
     }
   }
 
@@ -466,7 +478,7 @@ async function updateTask(id, payload, actorId) {
   }
 
   if (isAdmin) {
-    const businessTaskIds = await getBusinessScopedTaskIdsForAdmin(actorId);
+    const businessTaskIds = await getAdminScopedTaskIds(actorId);
     if (!businessTaskIds.includes(id)) {
       const error = new Error('Access denied: task is outside your business scope');
       error.code = 'FORBIDDEN';
@@ -508,23 +520,34 @@ async function updateTask(id, payload, actorId) {
       }
     }
 
-    for (const [key, assignment] of newMap) {
-      if (!currentMap.has(key)) {
-        const assignmentValidation = validateAssignmentPayload({ ...assignment, task_id: id });
-        if (!assignmentValidation.valid) {
-          const error = new Error('Invalid assignment in update payload');
-          error.code = 'VALIDATION_ERROR';
-          error.details = assignmentValidation.errors;
-          throw error;
-        }
-        await taskAssignmentModel.create({
-          task_id: id,
-          assignment_type: assignmentValidation.value.assignment_type,
-          reference_id: assignmentValidation.value.reference_id,
-          assigned_by: actorId,
-        });
-      }
-    }
+     for (const [key, assignment] of newMap) {
+       if (!currentMap.has(key)) {
+         const assignmentValidation = validateAssignmentPayload({ ...assignment, task_id: id });
+         if (!assignmentValidation.valid) {
+           const error = new Error('Invalid assignment in update payload');
+           error.code = 'VALIDATION_ERROR';
+           error.details = assignmentValidation.errors;
+           throw error;
+         }
+         // Enforce assignment scope on each new assignment.
+         const scopeCheck = await validateAssignmentScope(
+           actorId,
+           assignmentValidation.value.assignment_type,
+           assignmentValidation.value.reference_id
+         );
+         if (!scopeCheck.valid) {
+           const error = new Error(scopeCheck.message);
+           error.code = 'FORBIDDEN';
+           throw error;
+         }
+         await taskAssignmentModel.create({
+           task_id: id,
+           assignment_type: assignmentValidation.value.assignment_type,
+           reference_id: assignmentValidation.value.reference_id,
+           assigned_by: actorId,
+         });
+       }
+     }
   }
 
   if (Array.isArray(payload.custom_fields) && payload.custom_fields.length > 0) {
@@ -552,7 +575,7 @@ async function deleteTask(id, actorId) {
   }
 
   if (isAdmin) {
-    const businessTaskIds = await getBusinessScopedTaskIdsForAdmin(actorId);
+    const businessTaskIds = await getAdminScopedTaskIds(actorId);
     if (!businessTaskIds.includes(id)) {
       const error = new Error('Access denied: task is outside your business scope');
       error.code = 'FORBIDDEN';
@@ -603,16 +626,29 @@ async function assignTask(payload, actorId) {
     throw error;
   }
 
-  if (isAdmin) {
-    const businessTaskIds = await getBusinessScopedTaskIdsForAdmin(actorId);
-    if (!businessTaskIds.includes(task.id)) {
-      const error = new Error('Access denied: task is outside your business scope');
-      error.code = 'FORBIDDEN';
-      throw error;
-    }
-  }
+   if (isAdmin) {
+     const businessTaskIds = await getAdminScopedTaskIds(actorId);
+     if (!businessTaskIds.includes(task.id)) {
+       const error = new Error('Access denied: task is outside your business scope');
+       error.code = 'FORBIDDEN';
+       throw error;
+     }
+   }
 
-  const existing = await taskAssignmentModel.findByTaskAndRef(
+   // Enforce assignment scope: department_head can only assign within their
+   // department; admin can only assign within their business.
+   const scopeCheck = await validateAssignmentScope(
+     actorId,
+     validation.value.assignment_type,
+     validation.value.reference_id
+   );
+   if (!scopeCheck.valid) {
+     const error = new Error(scopeCheck.message);
+     error.code = 'FORBIDDEN';
+     throw error;
+   }
+
+   const existing = await taskAssignmentModel.findByTaskAndRef(
     validation.value.task_id,
     validation.value.assignment_type,
     validation.value.reference_id
@@ -656,7 +692,7 @@ async function unassignTask(taskId, assignmentType, referenceId, actorId) {
   }
 
   if (isAdmin) {
-    const businessTaskIds = await getBusinessScopedTaskIdsForAdmin(actorId);
+    const businessTaskIds = await getAdminScopedTaskIds(actorId);
     if (!businessTaskIds.includes(taskId)) {
       const error = new Error('Access denied: task is outside your business scope');
       error.code = 'FORBIDDEN';
@@ -1155,20 +1191,21 @@ async function getMyTaskHierarchy(userId) {
     }
   }
 
-  // Also seed the clientTree with ALL businesses in the clients where the
-  // user has tasks (not just businesses with tasks), so the hierarchy shows
-  // the full client -> business structure.
+  // Seed the clientTree with ONLY the businesses where the user has task
+  // assignments — not every business in the client. Employees see only the
+  // business units they are assigned to. Businesses with projects are already
+  // seeded above from projRows; this covers businesses with tasks but no
+  // projects (so they still appear in the tree).
   if (businessIds.length > 0) {
-    const [allBizRows] = await db.query(
+    const [taskBizRows] = await db.query(
       `SELECT cb.id AS business_id, cb.business_name, cb.client_id,
               c.client_name, c.color AS client_color
        FROM client_businesses cb
        LEFT JOIN clients c ON cb.client_id = c.id
-       WHERE cb.id IN (?)
-          OR cb.client_id IN (SELECT DISTINCT client_id FROM client_businesses WHERE id IN (?))`,
-      [businessIds, businessIds]
+       WHERE cb.id IN (?)`,
+      [businessIds]
     );
-    for (const b of allBizRows) {
+    for (const b of taskBizRows) {
       if (b.client_id == null) continue;
       if (!clientsMap.has(b.client_id)) {
         clientsMap.set(b.client_id, {
@@ -1243,7 +1280,7 @@ async function getTaskStats(filters = {}, actorId) {
   if (!isAdmin) {
     filters.task_ids = await getAssignedTaskIdsForUser(actorId);
   } else {
-    filters.task_ids = await getBusinessScopedTaskIdsForAdmin(actorId);
+    filters.task_ids = await getAdminScopedTaskIds(actorId);
   }
   return await taskModel.getStats(filters);
 }
@@ -1257,12 +1294,101 @@ async function isUserAdmin(userId) {
   return user && ['super_admin', 'admin', 'department_head'].includes(user.role);
 }
 
+// Validates that an actor (assigner) is allowed to assign the given
+// assignment_type + reference_id target. Enforces department-level isolation
+// for department_head and business-level isolation for admin.
+// Returns { valid: true } or { valid: false, message: '...' }.
+async function validateAssignmentScope(actorId, assignmentType, referenceId) {
+  const [actors] = await db.query(
+    'SELECT id, role, business_id, department_id FROM users WHERE id = ? LIMIT 1',
+    [actorId]
+  );
+  const actor = actors[0];
+  if (!actor) return { valid: false, message: 'Actor not found' };
+
+  // super_admin: unrestricted
+  if (actor.role === 'super_admin') return { valid: true };
+
+  if (assignmentType === 'Department') {
+    const [depts] = await db.query(
+      'SELECT id, business_id FROM departments WHERE id = ? LIMIT 1',
+      [referenceId]
+    );
+    const dept = depts[0];
+    if (!dept) return { valid: false, message: 'Department not found' };
+
+    if (actor.role === 'admin') {
+      if (dept.business_id !== actor.business_id) {
+        return { valid: false, message: 'Cannot assign a department outside your business' };
+      }
+      return { valid: true };
+    }
+    if (actor.role === 'department_head') {
+      if (String(dept.id) !== String(actor.department_id)) {
+        return { valid: false, message: 'You can only assign your own department' };
+      }
+      return { valid: true };
+    }
+    return { valid: false, message: 'Your role cannot assign departments' };
+  }
+
+  if (assignmentType === 'User') {
+    const [targets] = await db.query(
+      'SELECT id, business_id, department_id FROM users WHERE id = ? LIMIT 1',
+      [referenceId]
+    );
+    const target = targets[0];
+    if (!target) return { valid: false, message: 'User not found' };
+
+    if (actor.role === 'admin') {
+      if (target.business_id !== actor.business_id) {
+        return { valid: false, message: 'Cannot assign a user outside your business' };
+      }
+      return { valid: true };
+    }
+    if (actor.role === 'department_head') {
+      if (String(target.department_id) !== String(actor.department_id)) {
+        return { valid: false, message: 'You can only assign users within your department' };
+      }
+      return { valid: true };
+    }
+    return { valid: false, message: 'Your role cannot assign users' };
+  }
+
+  // Position type: only admins can assign by position
+  if (assignmentType === 'Position') {
+    if (actor.role === 'admin') return { valid: true };
+    return { valid: false, message: 'Only admins can assign by position' };
+  }
+
+  return { valid: false, message: 'Unknown assignment type' };
+}
+
 async function getUser(userId) {
   const [rows] = await db.query(
     'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
     [userId]
   );
   return rows[0] || null;
+}
+
+async function isUserDepartmentHead(userId) {
+  const [users] = await db.query(
+    'SELECT role FROM users WHERE id = ? LIMIT 1',
+    [userId]
+  );
+  const user = users[0];
+  return user && user.role === 'department_head';
+}
+
+// Returns the set of task IDs an admin-role user is allowed to access.
+// Department Heads get department-scoped IDs; admins/super_admins get
+// business-scoped IDs. Used by every mutating operation to enforce scope.
+async function getAdminScopedTaskIds(actorId) {
+  if (await isUserDepartmentHead(actorId)) {
+    return await getDepartmentScopedTaskIdsForDeptHead(actorId);
+  }
+  return await getBusinessScopedTaskIdsForAdmin(actorId);
 }
 
 async function isUserAssignedToTaskById(userId, taskId) {
@@ -1359,6 +1485,42 @@ async function getBusinessScopedTaskIdsForAdmin(userId) {
   return rows.map(r => r.task_id);
 }
 
+// Returns task IDs scoped to a Department Head's department. Includes tasks
+// that are:
+//   - assigned directly to the department, OR
+//   - assigned to a user who belongs to the department
+// This ensures Department Heads see every task touching their department.
+async function getDepartmentScopedTaskIdsForDeptHead(userId) {
+  const [users] = await db.query(
+    'SELECT department_id, business_id FROM users WHERE id = ? LIMIT 1',
+    [userId]
+  );
+  const user = users[0];
+  if (!user || !user.department_id) return [];
+
+  const deptId = user.department_id;
+
+  const [rows] = await db.query(
+    `SELECT DISTINCT t.id AS task_id
+     FROM tasks t
+     LEFT JOIN task_assignments ta ON ta.task_id = t.id
+     LEFT JOIN clients c ON t.client_id = c.id
+     WHERE (
+       (ta.assignment_type = 'Department' AND ta.reference_id = ?)
+       OR (
+         ta.assignment_type = 'User'
+         AND ta.reference_id IN (
+           SELECT u.id FROM users u WHERE u.department_id = ?
+         )
+       )
+       OR (c.department_id = ?)
+     )`,
+    [deptId, deptId, deptId]
+  );
+
+  return rows.map(r => r.task_id);
+}
+
 async function getMyTaskCount(userId) {
   const isAdmin = await isUserAdmin(userId);
   if (isAdmin) {
@@ -1414,7 +1576,7 @@ async function batchUpdateTasks(ids, changes, actorId) {
     throw error;
   }
 
-  const businessTaskIds = await getBusinessScopedTaskIdsForAdmin(actorId);
+  const businessTaskIds = await getAdminScopedTaskIds(actorId);
   const scoped = new Set(businessTaskIds);
   for (const id of ids) {
     if (!scoped.has(id)) {
@@ -1473,7 +1635,7 @@ async function batchDeleteTasks(ids, actorId) {
     throw error;
   }
 
-  const businessTaskIds = await getBusinessScopedTaskIdsForAdmin(actorId);
+  const businessTaskIds = await getAdminScopedTaskIds(actorId);
   const scoped = new Set(businessTaskIds);
   for (const id of ids) {
     if (!scoped.has(id)) {

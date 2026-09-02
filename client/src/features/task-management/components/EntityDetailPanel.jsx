@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { X, User as UserIcon, MessageSquare, Paperclip, TrendingUp, Loader2 } from 'lucide-react';
 import Drawer from '@/shared/components/ui/Drawer';
 import { useAuth } from '@/contexts/AuthContext';
@@ -91,7 +92,7 @@ function isUserAssigned(assignments, user) {
 
 function TaskBody({ taskId, open, onUpdated, onOpenTask, focusSubtasks = false, readOnly = false }) {
   const { toast } = useToast();
-  const { user, isAnyAdmin } = useAuth();
+  const { user, isAnyAdmin, isDepartmentHead } = useAuth();
   const [local, setLocal] = useState(null);
   const [showProgress, setShowProgress] = useState(false);
   const [pendingAttachmentId, setPendingAttachmentId] = useState(null);
@@ -184,11 +185,11 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask, focusSubtasks = false, 
   // drawer and the table agree. The <select> below still edits the stored status.
   const displayStatus = local.auto_status ?? local.status;
 
-  // Only admins may edit task details (title, status, priority, dates,
-  // description, assignees, sub-tasks). Regular assignees can still message,
-  // upload attachments, and update progress — but only when they are assigned to
-  // the task itself. When readOnly is forced (employee viewing an unassigned
-  // task), everything is view-only.
+  // Only admins and Department Heads may edit task details (title, status,
+  // priority, dates, description, assignees, sub-tasks). Regular assignees can
+  // still message, upload attachments, and update progress — but only when they
+  // are assigned to the task itself. When readOnly is forced (employee viewing
+  // an unassigned task), everything is view-only.
   const canEdit = !readOnly && isAnyAdmin;
   const isAssigned = !readOnly && (isAnyAdmin || isUserAssigned(local.assignments, user));
 
@@ -761,6 +762,11 @@ export default function EntityDetailPanel({ open, onClose, type = 'task', taskId
             </div>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-4">
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15, duration: 0.25, ease: "easeOut" }}
+            >
             {type === 'task'
               ? <TaskBody taskId={taskId} open={open} onClose={onClose} onUpdated={onUpdated} onOpenTask={onOpenTask} focusSubtasks={focusSubtasks} readOnly={readOnly} />
               : type === 'project'
@@ -770,6 +776,7 @@ export default function EntityDetailPanel({ open, onClose, type = 'task', taskId
                   : type === 'business'
                     ? <BusinessBody businessId={businessId} entity={entity} open={open} onUpdated={onUpdated} onDeleted={onDeleted} />
                     : <GenericBody entity={entity} type={type} />}
+            </motion.div>
           </div>
           <ConfirmationDialog
             isOpen={pendingDelete}

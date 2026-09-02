@@ -68,8 +68,9 @@ export default function ProjectTaskViews({
   scopeBusinessId,
   scopeProjectId,
   newTaskIds,
-  hideTabs = false,
-}) {
+   hideTabs = false,
+   userDepartmentId = null,
+  }) {
   const [internalView, setInternalView] = useState(() => {
     const validKeys = activeViews || TASK_VIEW_KEYS;
     const initial = storageKey ? localStorage.getItem(storageKey) : null;
@@ -104,6 +105,7 @@ export default function ProjectTaskViews({
               tasks={tasks}
               projectsById={projectsById}
               clientTree={clientTree}
+              loading={loading}
               search={search || ''}
               onViewTask={onViewTask}
               onViewSubtasks={onViewSubtasks}
@@ -112,11 +114,12 @@ export default function ProjectTaskViews({
               onStatusChange={onStatusChange}
               onInlineUpdate={onInlineUpdate}
               onQuickCreate={onQuickCreate}
-              canManage={canManage}
-              scopeClientId={scopeClientId}
-              scopeBusinessId={scopeBusinessId}
-              scopeProjectId={scopeProjectId}
-              onAddProjectTask={onAddProjectTask}
+               canManage={canManage}
+               scopeClientId={scopeClientId}
+               scopeBusinessId={scopeBusinessId}
+                 scopeProjectId={scopeProjectId}
+                 userDepartmentId={userDepartmentId}
+                onAddProjectTask={onAddProjectTask}
               onEditProject={onEditProject}
               onDeleteImmediate={onDeleteImmediate}
               onDuplicated={onDuplicated}

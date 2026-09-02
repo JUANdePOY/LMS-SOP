@@ -6,7 +6,7 @@ import AssignmentInput from './AssignmentInput';
 import { getBusinesses } from '../../organization-management/api/business.api';
 import { getClientOptions } from '../api/client.api';
 
-function TaskForm({ show, onClose, onSubmit, saving, initialData, defaultValues }) {
+function TaskForm({ show, onClose, onSubmit, saving, initialData, defaultValues, userDepartmentId = null }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('Medium');
@@ -317,6 +317,7 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData, defaultValues 
                   assignment={a}
                   onUpdate={(updated) => updateAssignment(idx, updated)}
                   onRemove={() => removeAssignment(idx)}
+                  departmentId={userDepartmentId}
                 />
               ))}
             </div>

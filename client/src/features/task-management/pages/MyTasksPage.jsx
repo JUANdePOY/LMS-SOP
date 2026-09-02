@@ -16,7 +16,7 @@ function getProjectId(task) {
 }
 
 export default function MyTasksPage() {
-  const { isAnyAdmin, user } = useAuth();
+  const { isAnyAdmin, isDepartmentHead, user } = useAuth();
   const { toast } = useToast();
   const { notifications, markRead } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -106,12 +106,14 @@ export default function MyTasksPage() {
   // allowed so they can move their own tasks between columns).
   // Uses the backend-computed is_assigned flag (which covers User, Department,
   // and Position assignments) so the UI matches the actual access rules.
+  // Department Heads can manage ALL tasks in their department.
   const isAssignedTask = useCallback((task) => {
     if (task.is_assigned != null) return task.is_assigned;
+    if (isDepartmentHead) return true;
     return (task.assignments || []).some(
       (a) => a.assignment_type === 'User' && String(a.reference_id) === String(user?.id)
     );
-  }, [user]);
+  }, [user, isDepartmentHead]);
 
   // Opening a task clears its unread assignment notification so its red "new"
   // badge disappears and the header count decrements.
@@ -206,17 +208,18 @@ export default function MyTasksPage() {
   }, [tasks, displayedTasks, scope]);
 
   const statItems = useMemo(() => {
-    const total = tasks.length;
-    const overdue = tasks.filter((t) => t.status === 'Overdue').length;
-    const completed = tasks.filter((t) => t.status === 'Completed').length;
-    const pending = tasks.filter((t) => t.status === 'Pending' || t.status === 'In Progress').length;
+    const list = scopedTasks || [];
+    const total = list.length;
+    const overdue = list.filter((t) => t.status === 'Overdue').length;
+    const completed = list.filter((t) => t.status === 'Completed').length;
+    const pending = list.filter((t) => t.status === 'Pending' || t.status === 'In Progress').length;
     return [
       { label: 'Total', value: total, icon: ClipboardList },
       { label: 'Active', value: pending, icon: Clock },
       { label: 'Completed', value: completed, icon: CheckCircle },
       { label: 'Overdue', value: overdue, icon: AlertTriangle },
     ];
-  }, [tasks]);
+  }, [scopedTasks]);
 
   if (isAnyAdmin) {
     return <div className="text-sm text-[var(--ppm-text-muted)]">Use the Tasks page to manage all tasks.</div>;
@@ -295,7 +298,7 @@ export default function MyTasksPage() {
           loading={loading}
           projectsById={scopedProjectsById}
           clientTree={scopedClientTree}
-          canManage={false}
+          canManage={isDepartmentHead}
           canManageTask={isAssignedTask}
           storageKey="ppm:mytasks:view"
           activeViews={TASK_VIEW_KEYS.filter((k) => k !== 'portfolio')}
@@ -308,6 +311,7 @@ export default function MyTasksPage() {
           onView={handleViewTask}
           scopeClientId={scope?.clientId}
           scopeBusinessId={scope?.businessId}
+          userDepartmentId={isDepartmentHead ? (user?.department_id ?? null) : null}
           showCountBadges={true}
           newTaskIds={newTaskIds}
         />
