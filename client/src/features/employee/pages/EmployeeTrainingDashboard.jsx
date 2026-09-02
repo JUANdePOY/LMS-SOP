@@ -120,7 +120,7 @@ export default function EmployeeTrainingDashboard() {
   }
 
   return (
-    <div className="w-full max-w-none space-y-6 bg-slate-50 dark:bg-neutral-950">
+    <div className="w-full max-w-none space-y-6 bg-[#f6f4f0] dark:bg-[#1E1C19]">
       {/* Page Header */}
       <div>
         <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100 sm:text-[28px]">Dashboard</h1>

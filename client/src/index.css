@@ -163,11 +163,11 @@ select option {
 
   /* ── Boxed app shell ────────────────────────────────────────────
       The whole shell (sidebar + header + content) floats as one
-      rounded card on a deeper warm canvas. Depth comes from a 4-step
-      tonal ramp (canvas → shell → card → inset) plus a layered soft
-      shadow and a hairline border. Radius/shadow/margin only apply
+      rounded card on a light cool steel-gray canvas. Depth comes from
+      a 4-step tonal ramp (canvas → shell → card → inset) plus a layered
+      soft shadow and a hairline border. Radius/shadow/margin only apply
       from `lg` up — mobile & tablet stay full-bleed. */
-  --app-canvas:        #E9E5DE;            /* deeper warm greige — recedes */
+  --app-canvas:        #DCE4EA;            /* soft cool steel gray — light, recedes behind warm shell */
   --app-shell-bg:      #F6F4F0;            /* warm off-white — floats */
   --app-shell-radius:  18px;
   --app-shell-inset:   20px;
@@ -290,7 +290,7 @@ select option {
   --scrollbar-border-radius: 999px;
 
   /* ── Boxed app shell (dark) ─────────────────────────────────── */
-  --app-canvas:        #16140F;
+  --app-canvas:        #0E0D0B;            /* warm near-black — recedes behind dark shell */
   --app-shell-bg:      #1E1C19;
   --app-shell-radius:  18px;
   --app-shell-border:  1px solid rgba(255,255,255,0.07);
