@@ -563,7 +563,7 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
   );
 }
 
-export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects, showCountBadges = false, subtaskCount = 0, isNew = false, tasksById = {}, onAddSubtask, onViewSubtasks }) {
+export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects, showCountBadges = false, subtaskCount = 0, isNew = false, tasksById = {}, onAddSubtask, onViewSubtasks }) {
   const { toast } = useToast();
 
   const overdue = isOverdue(task);
@@ -618,21 +618,24 @@ export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, on
         onViewTask?.(task);
       }}
       className={cn(
-        'group grid cursor-pointer items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-2 text-sm transition-colors',
+        'group grid h-10 gap-0 cursor-pointer overflow-hidden border-t border-b border-[var(--border-subtle)]/30 px-2 text-sm transition-colors',
         HIERARCHY_GRID,
         'hover:bg-[var(--bg-surface-hover)]',
-        selected && 'bg-[var(--color-primary)]/5',
         dimmed && 'opacity-40'
       )}
     >
-      <span className="flex items-center" onClick={(e) => e.stopPropagation()}>
+      <span
+        className="relative z-10 flex min-w-0 items-center gap-1.5 pr-2 border-r border-[var(--border-subtle)]/30"
+        style={{ paddingLeft: '4px' }}
+      >
         <button
           type="button"
           onClick={handleCompleteToggle}
           disabled={!canManage}
           aria-pressed={task.status === 'Completed'}
+          onClick={(e) => e.stopPropagation()}
           className={cn(
-            'grid h-4 w-4 place-items-center rounded-full border-[1.5px] transition-colors duration-150 ease-out motion-reduce:transition-none',
+            'grid h-4 w-4 shrink-0 place-items-center rounded-full border-[1.5px] transition-colors duration-150 ease-out motion-reduce:transition-none',
             task.status === 'Completed'
               ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
               : 'border-[var(--border)] hover:border-[var(--color-primary)]',
@@ -650,12 +653,6 @@ export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, on
             <Check size={10} strokeWidth={3} />
           </span>
         </button>
-      </span>
-
-      <span
-        className="relative z-10 flex min-w-0 items-center gap-1.5"
-        style={{ paddingLeft: '4px' }}
-      >
         <span className="inline-flex min-w-0 max-w-full items-center" data-no-nav>
           <InlineEditableName
             value={task.title}
@@ -717,7 +714,7 @@ export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, on
         </span>
       </span>
 
-      <span className="hidden min-w-0 items-center overflow-hidden sm:flex" onClick={(e) => e.stopPropagation()}>
+      <span className="hidden min-w-0 items-center justify-center overflow-hidden sm:flex px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
         {canManage ? (
           <AssigneePicker assignments={task.assignments} onSave={handleAssigneeSave} />
         ) : (
@@ -725,7 +722,7 @@ export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, on
         )}
       </span>
 
-      <span onClick={(e) => e.stopPropagation()}>
+      <span className="flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
         {canManage ? (
           <StatusDropdown status={task.status} onChange={(s) => onStatusChange?.(task, s)} />
         ) : (
@@ -733,7 +730,7 @@ export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, on
         )}
       </span>
 
-      <span className="hidden sm:block" onClick={(e) => e.stopPropagation()}>
+      <span className="hidden sm:flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
         {canManage ? (
           <PriorityDropdown priority={task.priority} onChange={(p) => onInlineUpdate?.(task, { priority: p })} />
         ) : (
@@ -741,7 +738,7 @@ export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, on
         )}
       </span>
 
-       <span className="hidden sm:block" onClick={(e) => e.stopPropagation()}>
+      <span className="hidden sm:flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
         {canManage ? (
           <DueDateCell value={task.deadline_datetime} overdue={overdue} onChange={(d) => onInlineUpdate?.(task, { deadline_datetime: d })} />
         ) : (
@@ -749,26 +746,8 @@ export function TaskRow({ task, dimmed, selected, onToggleSelect, onViewTask, on
         )}
       </span>
 
-      <span className="hidden items-center justify-end tabular-nums text-xs text-[var(--text-secondary)] sm:flex">
+      <span className="hidden items-center justify-center tabular-nums text-xs text-[var(--text-secondary)] sm:flex px-2">
         {Math.round(Math.max(0, Math.min(100, Number(task.progress_rate ?? task.completion_rate ?? 0))))}%
-      </span>
-
-      <span className="hidden lg:block" />
-
-      <span className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={() => onToggleSelect?.(task.id)}
-          aria-label={selected ? 'Deselect task' : 'Select task'}
-          className={cn(
-            'grid h-4 w-4 place-items-center rounded border-2 transition-colors',
-            selected
-              ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-              : 'border-[var(--border)] hover:border-[var(--color-primary)]'
-          )}
-        >
-          {selected && <Check size={10} strokeWidth={3} />}
-        </button>
       </span>
     </div>
   );

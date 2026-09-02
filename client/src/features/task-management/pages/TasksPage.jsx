@@ -747,9 +747,6 @@ export default function TasksPage() {
               onCreateProject={handleCreateProject}
               onCreateClient={handleCreateClient}
           onDeleteEntity={handleDeleteEntity}
-          selectedIds={selectedIds}
-          onToggleSelect={toggleSelect}
-          onSelectAll={selectAllIds}
         />
       )}
 

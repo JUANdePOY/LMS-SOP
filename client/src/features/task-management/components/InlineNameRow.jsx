@@ -33,7 +33,7 @@ export default function InlineNameRow({ placeholder, indent = 0, onCommit, onCan
 
   return (
     <div
-      className="flex items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-2 text-sm"
+      className="flex items-center gap-2 border-b border-[var(--border-subtle)]/40 px-2 py-2.5 text-sm h-10"
       style={{ paddingLeft: `${indent + 8}px` }}
     >
       <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-primary)] opacity-40" aria-hidden="true" />

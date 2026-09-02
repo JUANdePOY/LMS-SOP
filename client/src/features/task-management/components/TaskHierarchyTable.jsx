@@ -1,7 +1,6 @@
 import { useMemo, useState, useCallback, useEffect, useRef, useLayoutEffect, Fragment } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
-import { ChevronRight, ExternalLink, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2, Inbox, Building2, Briefcase, FolderKanban, Filter } from 'lucide-react';
+import { ChevronRight, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2, Inbox, Building2, Briefcase, FolderKanban, Filter } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { getBusinesses } from '../api/business.api';
@@ -20,14 +19,13 @@ import InlineNameRow from './InlineNameRow';
 // cells in order and apply the matching visibility classes below. The trailing
 // 28px column is the selection checkbox (bulk actions on task rows).
 export const HIERARCHY_GRID =
-  'grid-cols-[36px_minmax(150px,1fr)_minmax(90px,120px)_28px] ' +
-  'sm:grid-cols-[36px_minmax(160px,1fr)_minmax(120px,160px)_minmax(100px,130px)_minmax(70px,90px)_minmax(60px,80px)_minmax(80px,100px)_28px] ' +
-  'lg:grid-cols-[36px_minmax(160px,1fr)_minmax(120px,160px)_minmax(100px,130px)_minmax(70px,90px)_minmax(60px,80px)_minmax(80px,100px)_minmax(36px,40px)_28px]';
+  'grid-cols-[minmax(150px,1fr)_minmax(90px,120px)] ' +
+  'sm:grid-cols-[minmax(200px,1fr)_140px_120px_100px_110px_90px] ' +
+  'lg:grid-cols-[minmax(220px,1fr)_150px_130px_110px_120px_100px]';
 
 // Visibility classes that must be applied to the corresponding grid cell so the
 // number of visible cells always matches the active HIERARCHY_GRID column count.
 const CELL_HIDE_SM = 'hidden sm:block'; // assignees / priority / due / progress
-const CELL_HIDE_LG = 'hidden lg:block'; // open icon
 
 /**
  * Inline "add client" form. Beyond a name it lets the user assign the new client
@@ -69,7 +67,7 @@ function AddClientForm({ onCommit, onCancel }) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-subtle)] px-2 py-2 text-sm" style={{ paddingLeft: '8px' }}>
+    <div className="flex flex-wrap items-center gap-2 px-2 py-2 text-sm" style={{ paddingLeft: '8px' }}>
       <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-primary)] opacity-40" aria-hidden="true" />
       <input
         ref={inputRef}
@@ -357,15 +355,9 @@ export default function TaskHierarchyTable({
   onCreateProject,
   onCreateClient,
   onDeleteEntity,
-  selectedIds,
-  onToggleSelect,
-  onSelectAll,
-  showCountBadges = false,
   newTaskIds = null,
   onViewSubtasks,
 }) {
-  const navigate = useNavigate();
-
   const tasksById = useMemo(() => {
     const map = {};
     for (const t of tasks || []) {
@@ -413,19 +405,6 @@ export default function TaskHierarchyTable({
   // Opens an inline "add sub-task" row directly under the clicked task so the
   // new sub-task inherits the parent's context (client/business/project).
   const startAddSubtask = (taskId) => startAdd('task', taskId);
-
-  const visibleTaskIds = useMemo(
-    () => (tasks || []).map((t) => String(t.id)),
-    [tasks]
-  );
-  const selectedVisibleCount = visibleTaskIds.filter((id) => selectedIds?.has(id)).length;
-  const allSelected = visibleTaskIds.length > 0 && selectedVisibleCount === visibleTaskIds.length;
-  const someSelected = selectedVisibleCount > 0 && !allSelected;
-
-  const handleSelectAll = () => {
-    if (allSelected) onSelectAll?.([]);
-    else onSelectAll?.(visibleTaskIds);
-  };
 
   const toggle = useCallback((key) => {
     setExpanded((prev) => {
@@ -503,35 +482,14 @@ export default function TaskHierarchyTable({
       {/* Header row */}
       <div
         role="row"
-        className={cn('grid gap-2 border-b border-[var(--border-subtle)] px-2 py-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)]', HIERARCHY_GRID)}
+        className={cn('grid gap-0 border-t border-b border-[var(--border-subtle)]/30 px-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)] h-10', HIERARCHY_GRID)}
       >
-        <span className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            onClick={handleSelectAll}
-            aria-label="Select all tasks"
-            className={cn(
-              'grid h-4 w-4 place-items-center rounded border-2 transition-colors',
-              (allSelected || someSelected)
-                ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                : 'border-[var(--border)] hover:border-[var(--color-primary)]'
-            )}
-          >
-            {allSelected ? (
-              <Check size={10} strokeWidth={3} />
-            ) : someSelected ? (
-              <span className="h-0.5 w-2 rounded bg-white" />
-            ) : null}
-          </button>
-        </span>
-        <span>Name</span>
-        <span className={CELL_HIDE_SM}>Assignees</span>
-        <span>Status</span>
-        <span className={CELL_HIDE_SM}>Priority</span>
-        <span className={CELL_HIDE_SM}>Due</span>
-        <span className={CELL_HIDE_SM}>Progress</span>
-        <span className={CELL_HIDE_LG} />
-        <span />
+        <span className="flex items-center justify-center py-2 pr-2 border-r border-[var(--border-subtle)]/30 text-center">Name</span>
+        <span className="flex items-center justify-center py-2 px-2 border-r border-[var(--border-subtle)]/30 text-center">Assignees</span>
+        <span className="flex items-center justify-center py-2 px-2 border-r border-[var(--border-subtle)]/30 text-center">Status</span>
+        <span className="flex items-center justify-center py-2 px-2 border-r border-[var(--border-subtle)]/30 text-center">Priority</span>
+        <span className="flex items-center justify-center py-2 px-2 border-r border-[var(--border-subtle)]/30 text-center">Due</span>
+        <span className="flex items-center justify-center py-2 px-2 text-center">Progress</span>
       </div>
 
       {clients.map((client) => {
@@ -539,60 +497,50 @@ export default function TaskHierarchyTable({
         const clientKey = `client-${client.id}`;
         const open = isExpanded(clientKey, 'client', client);
 return (
-           <div key={clientKey} className="mt-2 first:mt-0">
-             <Row
-               depth={0}
-               kind="client"
-               id={client.id}
-               name={client.name}
-               open={open}
-               onToggle={() => toggle(clientKey)}
-               rollupText={null}
-               dueDate={client.rollup.earliestDue}
-               progress={client.rollup.avgProgress}
-               dimmed={dimmed}
-               onOpenPage={() => navigate(`/clients/${client.id}`)}
-                colorDot
-                color={client.color}
-                canEdit={canManage}
-               onRename={onRenameClient}
-               onAddChild={startAdd}
-               onDeleteEntity={onDeleteEntity}
-               onHideEmptyGroups={hideEmptyGroups}
-                hideDue
-                showCountBadges={showCountBadges}
-          count={client.rollup.total}
-                taskIds={client.businesses.flatMap((b) => b.tasks.map((t) => String(t.id)))}
-                selectedIds={selectedIds}
-                onSelectAll={onSelectAll}
-              />
+           <div key={clientKey}>
+              <Row
+                depth={0}
+                kind="client"
+                id={client.id}
+                name={client.name}
+                open={open}
+                 onToggle={() => toggle(clientKey)}
+                 dueDate={client.rollup.earliestDue}
+                progress={client.rollup.avgProgress}
+                dimmed={dimmed}
+                 canEdit={canManage}
+                 onRename={onRenameClient}
+                 onAddChild={startAdd}
+                onDeleteEntity={onDeleteEntity}
+                 onHideEmptyGroups={hideEmptyGroups}
+                 hideDue
+                 taller
+                 noBorder
+               />
             {open && client.businesses.map((business) => {
               const bDimmed = search && !subtreeMatches(business, 'business', search);
               const businessKey = `business-${business.id}`;
               const bOpen = isExpanded(businessKey, 'business', business);
               return (
                 <div key={businessKey}>
-                   <Row
-                    depth={1}
-                    kind="business"
-                    id={business.id}
-                    name={business.name}
-                    open={bOpen}
-                    onToggle={() => toggle(businessKey)}
-                    rollupText={business.rollup.summary}
-                    dueDate={business.rollup.earliestDue}
-                    progress={business.rollup.avgProgress}
-                    dimmed={bDimmed}
-                    onOpenPage={() => navigate(`/clients/${client.id}/businesses/${business.id}`)}
-                          canEdit={canManage}
-                          onRename={onRenameBusiness}
-                           onAddChild={startAdd}
-                           onDeleteEntity={onDeleteEntity}
-                           onHideEmptyGroups={hideEmptyGroups}
-                    taskIds={business.tasks.map((t) => String(t.id))}
-                            selectedIds={selectedIds}
-                            onSelectAll={onSelectAll}
-                          />
+                    <Row
+                     depth={1}
+                     kind="business"
+                     id={business.id}
+                     name={business.name}
+                     open={bOpen}
+                     onToggle={() => toggle(businessKey)}
+                     dueDate={business.rollup.earliestDue}
+                     progress={business.rollup.avgProgress}
+                     dimmed={bDimmed}
+                     canEdit={canManage}
+                     onRename={onRenameBusiness}
+                            onAddChild={startAdd}
+                            onDeleteEntity={onDeleteEntity}
+                        onHideEmptyGroups={hideEmptyGroups}
+                        hideDue
+                        noBorder
+                      />
                   {bOpen && business.tasks.map((task) => {
                     const tDimmed = search && !subtreeMatches(task, 'task', search);
                     return (
@@ -600,8 +548,6 @@ return (
                         <TaskRow
                           task={task}
                           dimmed={tDimmed}
-                          selected={selectedIds?.has(String(task.id))}
-                          onToggleSelect={onToggleSelect}
                           onViewTask={onViewTask}
                           onViewSubtasks={onViewSubtasks}
                           onStatusChange={onStatusChange}
@@ -614,7 +560,6 @@ return (
                           projects={projects}
                           tasksById={tasksById}
                           onAddSubtask={(t) => startAdd('task', t.id)}
-                          showCountBadges={showCountBadges}
                           subtaskCount={subtaskCountMap[task.id] || 0}
                           isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
                         />
@@ -650,7 +595,7 @@ return (
                       <button
                         type="button"
                         onClick={() => startAdd('task', business.id)}
-                        className="flex w-full cursor-pointer items-center gap-1.5 border-b border-[var(--border-subtle)] py-2 pl-[44px] text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)]"
+                        className="flex w-full cursor-pointer items-center gap-1.5 py-3 pl-[44px] text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)] h-10"
                       >
                         <Plus size={13} className="shrink-0" />
                         Add task
@@ -726,11 +671,11 @@ const KIND_META = {
 // Centralized per-kind typography. Hierarchy reads through size/weight/spacing
 // only — no per-level color, background, or border.
 const LEVEL_STYLE = {
-  client:   { font: 'font-semibold', size: 'text-[15px]', py: 'py-3.5', tracking: 'tracking-[0.01em]', leading: 'leading-relaxed' },
-  business: { font: 'font-medium',   size: 'text-sm',     py: 'py-3',   tracking: '', leading: '' },
+   client:   { font: 'font-semibold', size: 'text-sm', tracking: 'tracking-[0.01em]', leading: '' },
+   business: { font: 'font-medium',   size: 'text-sm', tracking: '', leading: '' },
 };
 
-function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progress, dimmed, onOpenPage, colorDot, color, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, showCountBadges, count, taskIds, selectedIds, onSelectAll, onFilter }) {
+function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false }) {
   const level = LEVEL_STYLE[kind] || LEVEL_STYLE.business;
   const meta = KIND_META[kind];
   const [menuOpen, setMenuOpen] = useState(false);
@@ -797,21 +742,6 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
   menuItems.push({ label: 'Delete', icon: Trash2, danger: true, onClick: () => { setMenuOpen(false); setConfirmDelete(true); } });
   menuItems.push({ label: 'Hide all empty groups', icon: EyeOff, onClick: () => { setMenuOpen(false); onHideEmptyGroups?.(); } });
 
-  // Per-row "select all" for the subtree under this client/business/project.
-  // Toggling adds/removes only this branch's task ids from the shared selection
-  // so an admin can accumulate selections across multiple rows, then bulk-manage.
-  const subIds = Array.isArray(taskIds) ? taskIds : [];
-  const selectedInSub = subIds.filter((id) => selectedIds?.has(id));
-  const allSubSelected = subIds.length > 0 && selectedInSub.length === subIds.length;
-  const someSubSelected = selectedInSub.length > 0 && !allSubSelected;
-  // Selecting a row's checkbox replaces the selection with exactly that
-  // branch's tasks, so it scopes management (bulk delete / filter) to the row
-  // the user clicked — never an unrelated task.
-  const toggleSubtree = () => {
-    if (!subIds.length) return;
-    onSelectAll?.(allSubSelected ? [] : subIds);
-  };
-
   return (
     <div
       role="row"
@@ -823,28 +753,18 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
         onToggle();
       }}
       className={cn(
-        'group grid cursor-pointer items-center gap-2 border-b border-[var(--border-subtle)] px-2 text-sm transition-colors duration-150 ease-out motion-reduce:transition-none',
-        level.py,
-        'hover:bg-[var(--bg-surface-hover)]',
+        'group grid gap-0 px-2 text-sm transition-colors duration-150 ease-out motion-reduce:transition-none',
+        taller ? 'h-14' : 'h-10',
+        noBorder ? '' : 'border-b border-[var(--border-subtle)]/30',
         dimmed && 'opacity-40',
         HIERARCHY_GRID
       )}
     >
-      <span className="flex items-center">
-        {colorDot && (
-          <span
-            className="h-2 w-2 shrink-0 rounded-full"
-            style={{ backgroundColor: color || 'var(--color-primary)' }}
-            aria-hidden="true"
-          />
-        )}
-      </span>
-
       <span
-        className="relative z-10 min-w-0"
+        className="relative z-10 min-w-0 h-full flex items-center pr-2"
         style={{ paddingLeft: `${depth * DEPTH_INDENT_PX}px` }}
       >
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <div className="flex items-center gap-x-2 whitespace-nowrap overflow-hidden">
            <button
              type="button"
              onClick={(e) => { e.stopPropagation(); onToggle(); }}
@@ -879,7 +799,7 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
               onCommit={(next) => onRename?.(id, next)}
               renameSignal={renameSignal}
               className={cn(
-                'whitespace-normal break-words text-[var(--text-primary)]',
+                'truncate text-[var(--text-primary)]',
                 level.font,
                 level.size,
                 level.tracking,
@@ -887,14 +807,9 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
               )}
               inputClassName={cn(level.font, level.size, level.tracking, level.leading)}
               ariaLabel={`Rename ${kind}`}
-            />
-           </span>
-           {showCountBadges && kind === 'client' && count != null && (
-             <span className="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--bg-surface-hover)] px-1.5 text-[11px] font-medium tabular-nums text-[var(--text-secondary)]">
-               {count}
-             </span>
-           )}
-           {canEdit && !hideAdd && (
+             />
+            </span>
+            {canEdit && !hideAdd && (
             <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 motion-reduce:transition-none group-hover:opacity-100">
               <button
                 type="button"
@@ -918,12 +833,7 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
               </button>
             </span>
           )}
-          {rollupText && (
-            <span className="ml-auto hidden text-xs text-[var(--text-muted)] sm:inline">
-              {rollupText}
-            </span>
-          )}
-        </div>
+          </div>
 
         {(menuOpen || confirmDelete) && createPortal(
           <div
@@ -972,46 +882,14 @@ function Row({ depth, kind, id, name, open, onToggle, rollupText, dueDate, progr
         )}
       </span>
 
-      <span className={CELL_HIDE_SM} />
-      <span />
-      <span className={CELL_HIDE_SM} />
-      <span className={cn('text-xs tabular-nums text-[var(--text-secondary)]', CELL_HIDE_SM)}>{hideDue ? '' : formatDue(dueDate)}</span>
-      <span className={cn('flex items-center justify-end tabular-nums text-xs text-[var(--text-secondary)]', CELL_HIDE_SM)}>
+      <span className={cn(CELL_HIDE_SM, 'px-2')} />
+      <span className="px-2" />
+      <span className={cn(CELL_HIDE_SM, 'px-2')} />
+      <span className={cn('text-xs tabular-nums text-[var(--text-secondary)] px-2 text-center', CELL_HIDE_SM)}>{hideDue ? '' : formatDue(dueDate)}</span>
+      <span className={cn('flex items-center justify-center tabular-nums text-xs text-[var(--text-secondary)] px-2 text-center', CELL_HIDE_SM)}>
         {Math.round(progress || 0)}%
       </span>
-      <span className={cn('flex items-center justify-end', CELL_HIDE_LG)} onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onOpenPage?.(); }}
-          title="Open full page"
-          className="rounded p-1 text-[var(--text-muted)] opacity-0 transition-opacity duration-150 motion-reduce:transition-none hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)] group-hover:opacity-100"
-        >
-          <ExternalLink size={13} />
-        </button>
-      </span>
-      <span className="flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-        {subIds.length > 0 && (
-          <button
-            type="button"
-            onClick={toggleSubtree}
-            aria-label={allSubSelected ? `Deselect all tasks in ${name}` : `Select all tasks in ${name}`}
-            aria-checked={allSubSelected}
-            className={cn(
-              'grid h-4 w-4 place-items-center rounded border-2 transition-colors duration-150 ease-out motion-reduce:transition-none',
-              allSubSelected || someSubSelected
-                ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-                : 'border-[var(--border)] hover:border-[var(--color-primary)]'
-            )}
-          >
-            {allSubSelected ? (
-              <Check size={10} strokeWidth={3} />
-            ) : someSubSelected ? (
-              <span className="h-0.5 w-2 rounded bg-white" />
-            ) : null}
-          </button>
-        )}
-      </span>
-      </div>
+    </div>
   );
 }
 

@@ -67,11 +67,7 @@ export default function ProjectTaskViews({
   scopeClientId,
   scopeBusinessId,
   scopeProjectId,
-  showCountBadges = false,
   newTaskIds,
-  selectedIds,
-  onToggleSelect,
-  onSelectAll,
   hideTabs = false,
 }) {
   const [internalView, setInternalView] = useState(() => {
@@ -135,10 +131,6 @@ export default function ProjectTaskViews({
               onCreateBusiness={onCreateBusiness}
               onCreateProject={onCreateProject}
               onCreateClient={onCreateClient}
-              selectedIds={selectedIds}
-              onToggleSelect={onToggleSelect}
-              onSelectAll={onSelectAll}
-              showCountBadges={showCountBadges}
               newTaskIds={newTaskIds}
             />
           )}
