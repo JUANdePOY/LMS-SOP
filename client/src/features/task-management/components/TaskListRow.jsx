@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, Copy, FolderInput, Trash2, MoreHorizontal, Calendar, ExternalLink, UserPlus, Link2, ListTodo, Building2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -43,11 +43,39 @@ function StatusDropdown({ status, onChange }) {
   const triggerRef = useRef(null);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
 
+  const updatePosition = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 4, left: rect.left });
+  }, []);
+
   useEffect(() => {
     if (!open || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    setCoords({ top: rect.bottom + 4, left: rect.left });
-  }, [open]);
+    updatePosition();
+    // The status/priority cells live inside a horizontally-scrolling table.
+    // Without a scroll listener the dropdown stays pinned to the viewport
+    // position it was opened at, so it detaches from its trigger ("stuck" on
+    // screen) as soon as the user scrolls. Recompute on every scroll; if the
+    // trigger has scrolled out of the viewport, close instead of floating.
+    const onScroll = (e) => {
+      if (ref.current && e.target && ref.current.contains(e.target)) return;
+      const el = triggerRef.current;
+      if (!el) { setOpen(false); return; }
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+        setOpen(false);
+        return;
+      }
+      setCoords({ top: rect.bottom + 4, left: rect.left });
+    };
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [open, updatePosition]);
 
   return (
     <span ref={ref} className="relative inline-block">
@@ -79,11 +107,37 @@ function PriorityDropdown({ priority, onChange }) {
   const triggerRef = useRef(null);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
 
+  const updatePosition = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 4, left: rect.left });
+  }, []);
+
   useEffect(() => {
     if (!open || !triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    setCoords({ top: rect.bottom + 4, left: rect.left });
-  }, [open]);
+    updatePosition();
+    // Same scroll-repositioning as StatusDropdown — these cells live inside a
+    // horizontally-scrolling table, so a one-shot position capture leaves the
+    // dropdown "stuck" at a stale viewport spot once the table scrolls.
+    const onScroll = (e) => {
+      if (ref.current && e.target && ref.current.contains(e.target)) return;
+      const el = triggerRef.current;
+      if (!el) { setOpen(false); return; }
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+        setOpen(false);
+        return;
+      }
+      setCoords({ top: rect.bottom + 4, left: rect.left });
+    };
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [open, updatePosition]);
 
   return (
     <span ref={ref} className="relative inline-block">
@@ -229,9 +283,21 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
   useEffect(() => {
     if (!open) return;
     updatePosition();
+    // Re-derive the fixed position on every scroll so the picker stays
+    // attached to its trigger even when the table scrolls horizontally
+    // (the assignee cell lives inside the same overflow-x-auto container as
+    // the status/priority cells). If the trigger has scrolled out of the
+    // viewport, close instead of leaving a floating picker.
     const handleScroll = (e) => {
       if (dropdownRef.current && e.target && dropdownRef.current.contains(e.target)) return;
-      setOpen(false);
+      const el = triggerRef.current;
+      if (!el) { setOpen(false); return; }
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+        setOpen(false);
+        return;
+      }
+      updatePosition();
     };
     window.addEventListener('scroll', handleScroll, true);
     window.addEventListener('resize', updatePosition);
@@ -526,12 +592,17 @@ function ReadOnlyAssignees({ assignments }) {
   );
 }
 
-function MoveToProjectPicker({ projects, onSelect, onClose }) {
+// Move-to-business picker. Tasks live directly under a client business unit
+// (the project layer has been removed), so "moving" a task means reassigning
+// its client_id + client_business_id to a different business unit. The options
+// are the full Client -> Business skeleton flattened from the org tree, which
+// is exactly what the hierarchy table groups by.
+function MoveToBusinessPicker({ businesses, onSelect, onClose }) {
   const [query, setQuery] = useState('');
   const ref = useClickOutside(onClose);
 
-  const filtered = projects.filter((p) =>
-    !query || (p.name || '').toLowerCase().includes(query.toLowerCase())
+  const filtered = businesses.filter((b) =>
+    !query || (b.name || '').toLowerCase().includes(query.toLowerCase())
   );
 
   return (
@@ -541,16 +612,16 @@ function MoveToProjectPicker({ projects, onSelect, onClose }) {
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search projects..."
+          placeholder="Search businesses..."
           className="w-full rounded border border-[var(--border)] bg-[var(--bg-page)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
         />
       </div>
       <div className="max-h-36 overflow-y-auto px-1">
-        {filtered.length === 0 && <p className="px-2 py-1 text-xs text-[var(--text-muted)]">No projects</p>}
-        {filtered.map((p) => (
-          <button key={p.id} type="button" onClick={(e) => { e.stopPropagation(); onSelect(p); onClose(); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--bg-surface-hover)]">
-            <FolderInput size={12} className="shrink-0 text-[var(--text-muted)]" />
-            <span className="truncate text-[var(--text-primary)]">{p.name}</span>
+        {filtered.length === 0 && <p className="px-2 py-1 text-xs text-[var(--text-muted)]">No businesses</p>}
+        {filtered.map((b) => (
+          <button key={b.id} type="button" onClick={(e) => { e.stopPropagation(); onSelect(b); onClose(); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--bg-surface-hover)]">
+            <Building2 size={12} className="shrink-0 text-[var(--text-muted)]" />
+            <span className="truncate text-[var(--text-primary)]">{b.name}</span>
           </button>
         ))}
       </div>
@@ -618,11 +689,11 @@ export function AddTaskRow({ businessId, clientId, canManage = true, projects = 
     <div
       role="row"
       className={cn(
-        'grid h-10 gap-0 border-b border-[var(--border-subtle)]/40 bg-[var(--bg-surface)] px-2 text-sm',
+        'grid h-10 gap-0 border-b-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 bg-[var(--bg-surface)] px-2 text-sm',
         HIERARCHY_GRID
       )}
     >
-      <span className="relative z-10 flex min-w-0 items-center justify-between gap-1.5 pr-2 border-r border-[var(--border-subtle)]/30" style={{ paddingLeft: '4px' }}>
+      <span className="relative z-10 flex min-w-0 items-center justify-between gap-1.5 pr-2 border-r-[0.5px] border-neutral-500/60 dark:border-neutral-700/60" style={{ paddingLeft: '4px' }}>
         <span className="flex min-w-0 items-center gap-1.5">
           <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-primary)] opacity-40" aria-hidden="true" />
           <input
@@ -646,7 +717,7 @@ export function AddTaskRow({ businessId, clientId, canManage = true, projects = 
         </span>
       </span>
 
-      <span className="hidden min-w-0 items-center justify-center overflow-hidden sm:flex px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
+      <span className="hidden min-w-0 items-center justify-center overflow-hidden sm:flex px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
         {canManage ? (
           <AssigneePicker assignments={assignments} onSave={handleAssigneeSave} alwaysAdd />
         ) : (
@@ -654,15 +725,15 @@ export function AddTaskRow({ businessId, clientId, canManage = true, projects = 
         )}
       </span>
 
-      <span className="flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
+      <span className="flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
         <StatusDropdown status={status} onChange={(s) => setStatus(s)} />
       </span>
 
-      <span className="hidden sm:flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
+      <span className="hidden sm:flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
         <PriorityDropdown priority={priority} onChange={(p) => setPriority(p)} />
       </span>
 
-      <span className="hidden sm:flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
+      <span className="hidden sm:flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
         <DueDateCell value={deadline} onChange={(d) => setDeadline(d)} />
       </span>
 
@@ -673,7 +744,7 @@ export function AddTaskRow({ businessId, clientId, canManage = true, projects = 
   );
 }
 
-function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDuplicate, onAddSubtask, canManage = true }) {
+function MoreActionsMenu({ task, businesses, onOpen, onMoveBusiness, onDelete, onDuplicate, onAddSubtask, canManage = true }) {
   const [open, setOpen] = useState(false);
   const [subview, setSubview] = useState(null); // null | 'move' | 'delete'
   const [coords, setCoords] = useState({ top: 0, left: 0 });
@@ -756,7 +827,7 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
             <Copy size={13} /> Duplicate
           </button>
           <button type="button" onClick={(e) => { e.stopPropagation(); setSubview('move'); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]">
-            <FolderInput size={13} /> Move to project
+            <Building2 size={13} /> Move to business
           </button>
           <div className="my-1 border-t border-[var(--border)]" />
           <button type="button" onClick={(e) => { e.stopPropagation(); setSubview('delete'); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40">
@@ -768,7 +839,7 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
   );
 
   const panel = (children) => (
-    <div ref={dropdownRef} data-portal="task-row-actions" className="fixed z-50" style={{ top: coords.top, left: rect => rect?.left ?? coords.left }}>
+    <div ref={dropdownRef} data-portal="task-row-actions" className="fixed z-50" style={{ top: coords.top, left: coords.left }}>
       {children}
     </div>
   );
@@ -778,7 +849,7 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
       {trigger}
       {createPortal(
         subview === 'delete' ? panel(<InlineDeleteConfirm onConfirm={() => { onDelete(task); close(); }} onCancel={() => setSubview(null)} />)
-          : subview === 'move' ? panel(<MoveToProjectPicker projects={projects} onSelect={(p) => onMoveProject(task, p)} onClose={() => setSubview(null)} />)
+          : subview === 'move' ? panel(<MoveToBusinessPicker businesses={businesses} onSelect={(b) => onMoveBusiness(task, b)} onClose={() => setSubview(null)} />)
             : menu,
         document.body
       )}
@@ -790,6 +861,30 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
   const { toast } = useToast();
 
   const overdue = isOverdue(task);
+
+  // Flattened Client -> Business list for the "Move to business" picker. Tasks
+  // live directly under a client business unit (the project layer has been
+  // removed), so every business option is built from the projects already
+  // loaded by TasksPage — each project carries its owning client + business.
+  // This is the same Client -> Business skeleton the hierarchy table groups by.
+  const businesses = useMemo(() => {
+    const seen = new Set();
+    const list = [];
+    for (const p of Object.values(projects || {})) {
+      const bid = p.client_business_id ?? p.business_id;
+      if (bid == null) continue;
+      const key = String(bid);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      list.push({
+        id: bid,
+        name: p.client_business_name || p.business_name || `Business ${bid}`,
+        clientId: p.client_id ?? null,
+        clientName: p.client_name ?? null,
+      });
+    }
+    return list;
+  }, [projects]);
 
   // Department Heads can edit all tasks in their department. If userDepartmentId
   // is provided, restrict canManage to tasks that have a Department-type
@@ -829,8 +924,16 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
     onInlineUpdate?.(task, { assignments: next });
   };
 
-  const handleMoveProject = (t, project) => {
-    onInlineUpdate?.(t, { project_id: project.id });
+  const handleMoveBusiness = (t, business) => {
+    onInlineUpdate?.(t, {
+      client_id: business.clientId,
+      client_business_id: business.id,
+      client_name: business.clientName,
+      client_business_name: business.name,
+      // The project layer has been removed, so moving a task off its project
+      // keeps it in the same client/business branch.
+      project_id: null,
+    });
   };
 
   // Prefer the direct (modal-free) delete when available (List tab); fall back
@@ -865,14 +968,14 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
         onViewTask?.(task);
       }}
       className={cn(
-        'group grid h-10 gap-0 cursor-pointer overflow-hidden border-t border-b border-[var(--border-subtle)]/30 px-2 text-sm transition-colors',
+        'group grid h-10 gap-0 cursor-pointer overflow-hidden border-t-[0.5px] border-b-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 px-2 text-sm transition-colors',
         HIERARCHY_GRID,
         'hover:bg-[var(--bg-surface-hover)]',
         dimmed && 'opacity-40'
       )}
     >
       <span
-        className="relative z-10 flex min-w-0 items-center justify-between gap-1.5 pr-2 border-r border-[var(--border-subtle)]/30"
+        className="relative z-10 flex min-w-0 items-center justify-between gap-1.5 pr-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75"
         style={{ paddingLeft: '4px' }}
       >
         <span className="flex min-w-0 items-center gap-1.5">
@@ -936,12 +1039,13 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
           </button>
           <MoreActionsMenu
             task={task}
-            projects={projects}
+            businesses={businesses}
             canManage={canEditThisTask}
             onOpen={(t) => onViewTask?.(t)}
-            onMoveProject={handleMoveProject}
+            onMoveBusiness={handleMoveBusiness}
             onDelete={handleDelete}
             onDuplicate={handleDuplicate}
+            onAddSubtask={onAddSubtask}
           />
           {subtaskCount > 0 && (
             <button
@@ -962,7 +1066,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
         </span>
       </span>
 
-      <span className="hidden min-w-0 items-center justify-center overflow-hidden sm:flex px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
+      <span className="hidden min-w-0 items-center justify-center overflow-hidden sm:flex px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
         {canEditThisTask ? (
           <AssigneePicker assignments={task.assignments} onSave={handleAssigneeSave} />
         ) : (
@@ -970,7 +1074,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
         )}
       </span>
 
-      <span className="flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
+      <span className="flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
         {canEditThisTask ? (
           <StatusDropdown status={task.status} onChange={(s) => onStatusChange?.(task, s)} />
         ) : (
@@ -978,7 +1082,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
         )}
       </span>
 
-      <span className="hidden sm:flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
+      <span className="hidden sm:flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
         {canEditThisTask ? (
           <PriorityDropdown priority={task.priority} onChange={(p) => onInlineUpdate?.(task, { priority: p })} />
         ) : (
@@ -986,7 +1090,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
         )}
       </span>
 
-      <span className="hidden sm:flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
+      <span className="hidden sm:flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
         {canEditThisTask ? (
           <DueDateCell value={task.deadline_datetime} overdue={overdue} onChange={(d) => onInlineUpdate?.(task, { deadline_datetime: d })} />
         ) : (

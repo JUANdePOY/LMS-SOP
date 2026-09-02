@@ -206,8 +206,8 @@ router.post('/', [
       return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
     }
 
-    if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
-      return res.status(403).json({ status: 'error', message: 'Admin access required', code: 'ADMIN_REQUIRED' });
+    if (req.user.role !== 'super_admin') {
+      return res.status(403).json({ status: 'error', message: 'Only super admins can create businesses', code: 'SUPER_ADMIN_REQUIRED' });
     }
 
     const { business_code } = req.body;
@@ -217,10 +217,6 @@ router.post('/', [
     }
 
     const businessId = await businessModel.create(req.body, req.user.id);
-
-    if (req.user.role === 'admin' && req.user.business_id) {
-      await db.query('UPDATE users SET business_id = ? WHERE id = ?', [businessId, req.user.id]);
-    }
 
     logAudit({
       user_id: req.user.id,

@@ -137,8 +137,13 @@ export default function SecondarySidebar() {
    const [clientDeptPicker, setClientDeptPicker] = useState(null);
    // Departments list for the department picker.
    const [departments, setDepartments] = useState([]);
-   // When true, show the inline "New Business" form with code + name fields.
-   const [addingBusiness, setAddingBusiness] = useState(false);
+// When true, show the inline "New Business" form with code + name fields.
+    const [addingBusiness, setAddingBusiness] = useState(false);
+    // Third step of the "New Client" flow: after a business + department are
+    // chosen, show the inline name input. Without this the flow bounced back
+    // to the "New Client" button after the department was picked, forcing the
+    // user to reopen the picker to type the name.
+    const [clientNamePicker, setClientNamePicker] = useState(false);
 
   // Open an inline "add client" row under the given SOP business (or the
   // Unassigned group) and expand it so the input is visible.
@@ -147,15 +152,35 @@ export default function SecondarySidebar() {
     setExpandedBiz((p) => ({ ...p, [bizKey]: true }));
   };
 
-   // "New Client" must be created under a chosen SOP business. If none exist yet,
-   // steer the user to create one first; otherwise reveal the business picker.
-   const handleNewClient = () => {
-     if (!businesses || businesses.length === 0) {
-       toast.error('Create an SOP business first');
-       return;
-     }
-     setClientBizPicker(true);
-   };
+// "New Client" must be created under a chosen SOP business. The flow is
+    // role-aware so each role only sees the steps it needs:
+    //   super_admin:  choose business → choose department → type name
+    //   admin:        choose department (business is locked to the actor's
+    //                 own, so it's skipped) → type name
+    //   department_head: type name only (business + department are pre-filled
+    //                 from the actor's own scope)
+    const handleNewClient = () => {
+      if (!businesses || businesses.length === 0) {
+        toast.error('Create an SOP business first');
+        return;
+      }
+      if (user?.role === 'super_admin') {
+        setClientBizPicker(true);
+      } else if (user?.role === 'admin') {
+        // Admins are locked to their own SOP business; pre-select it and go
+        // straight to the department picker.
+        setAddingClientBiz(String(user?.business_id ?? ''));
+        setAddingClientDeptId(null);
+        setClientDeptPicker(String(user?.business_id ?? ''));
+        setClientNamePicker(false);
+      } else {
+        // Department Head: business + department come from the actor's own
+        // scope, so only the name field is needed.
+        setAddingClientBiz(String(user?.department_business_id ?? user?.business_id ?? ''));
+        setAddingClientDeptId(String(user?.department_id ?? ''));
+        setClientNamePicker(true);
+      }
+    };
 
    // Load departments once for the department picker.
    useEffect(() => {
@@ -288,6 +313,26 @@ export default function SecondarySidebar() {
       setExpandedBiz((prev) => (prev[b] ? prev : { ...prev, [b]: true }));
     }
   }, [open, scopeKey]);
+
+  // When the "New Client" flow has chosen a business (and optionally a
+  // department), the inline name input is rendered inside that SOP business's
+  // tree row — but only when the row is expanded. Auto-expanding here keeps
+  // the name field visible without the user having to open the business first.
+  useEffect(() => {
+    if (addingClientBiz == null || addingClientBiz === "unassigned") return;
+    if (clientBizPicker || clientDeptPicker) return;
+    setExpandedBiz((prev) => (prev[addingClientBiz] ? prev : { ...prev, [addingClientBiz]: true }));
+  }, [addingClientBiz, clientBizPicker, clientDeptPicker]);
+
+  // Departments filtered to the SOP business chosen in the "New Client"
+  // flow. The `departments` table has a `business_id` column, so a client
+  // created under a given business can only be assigned to one of that
+  // business's departments — the picker must reflect that scope.
+  const departmentsForBusiness = useMemo(() => {
+    const bizId = clientDeptPicker;
+    if (bizId == null || bizId === '') return departments;
+    return departments.filter((d) => String(d.business_id) === String(bizId));
+  }, [departments, clientDeptPicker]);
 
   const q = query.trim().toLowerCase();
   const searching = q.length > 0;
@@ -654,15 +699,15 @@ export default function SecondarySidebar() {
           />
         ) : (
           <>
-             {user?.role !== 'department_head' && user?.role !== 'employee' && (
-               <button
-                 type="button"
-                 onClick={() => setAddingBusiness(true)}
-                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-on-sidebar)_75%,transparent)] hover:bg-[var(--bg-hover)] transition-colors"
-               >
-                 <Plus size={16} /> New Business
-               </button>
-             )}
+{user?.role === 'super_admin' && (
+                <button
+                  type="button"
+                  onClick={() => setAddingBusiness(true)}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-on-sidebar)_75%,transparent)] hover:bg-[var(--bg-hover)] transition-colors"
+                >
+                  <Plus size={16} /> New Business
+                </button>
+              )}
              {clientBizPicker ? (
                <div className="space-y-1">
                  <p className="px-1 pb-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
@@ -692,30 +737,32 @@ export default function SecondarySidebar() {
                    Cancel
                  </button>
                </div>
-              ) : clientDeptPicker ? (
+) : clientDeptPicker ? (
                 <div className="space-y-1">
                   <p className="px-1 pb-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
                     Select a Department *
                   </p>
                   <div className="max-h-44 overflow-y-auto space-y-0.5 scrollbar-none">
-                    {departments.length === 0 && (
-                      <p className="px-3 py-1 text-xs text-[var(--text-muted)]">No departments available</p>
+                    {departmentsForBusiness.length === 0 ? (
+                      <p className="px-3 py-1 text-xs text-[var(--text-muted)]">No departments available for this business</p>
+                    ) : (
+                      departmentsForBusiness.map((d) => (
+                        <button
+                          key={d.id}
+                          type="button"
+                          onClick={() => {
+                            setAddingClientBiz(clientDeptPicker);
+                            setAddingClientDeptId(d.id);
+                            setClientDeptPicker(null);
+                            setClientNamePicker(true);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[color-mix(in_srgb,var(--text-on-sidebar)_80%,transparent)] hover:bg-[var(--bg-hover)] transition-colors"
+                        >
+                          <Building2 size={14} className="shrink-0" />
+                          <span className="flex-1 truncate text-left">{d.name}</span>
+                        </button>
+                      ))
                     )}
-                    {departments.map((d) => (
-                      <button
-                        key={d.id}
-                        type="button"
-                        onClick={() => {
-                          setAddingClientBiz(clientDeptPicker);
-                          setAddingClientDeptId(d.id);
-                          setClientDeptPicker(null);
-                        }}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[color-mix(in_srgb,var(--text-on-sidebar)_80%,transparent)] hover:bg-[var(--bg-hover)] transition-colors"
-                      >
-                        <Building2 size={14} className="shrink-0" />
-                        <span className="flex-1 truncate text-left">{d.name}</span>
-                      </button>
-                    ))}
                   </div>
                   <button
                     type="button"
@@ -725,6 +772,12 @@ export default function SecondarySidebar() {
                     Cancel
                   </button>
                 </div>
+              ) : clientNamePicker ? (
+                <InlineNameRow
+                  placeholder="New client name…"
+                  onCommit={commitAddClient}
+                  onCancel={() => { setClientNamePicker(false); setAddingClientBiz(null); setAddingClientDeptId(null); }}
+                />
               ) : (
               <button
                 type="button"

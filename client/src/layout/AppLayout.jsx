@@ -382,10 +382,10 @@ export default function AppLayout() {
                       </button>
                       {!isEmployee && (
                         <button
-                          onClick={() => { setProfileOpen(false); navigate(isDepartmentHead ? '/employee/settings' : '/settings'); }}
+                          onClick={() => { setProfileOpen(false); navigate(isDepartmentHead || user?.role === 'admin' ? '/employee/settings' : '/settings'); }}
                           className="flex w-full items-center gap-3 px-3 py-2 text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
                         >
-                          Settings
+                          <Settings size={14} /> Settings
                         </button>
                       )}
                       <button

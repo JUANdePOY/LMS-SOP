@@ -67,6 +67,7 @@ select option {
   --btn-bg-hover:   #322f2d;
 
   --border:         #E6E0D8;            /* warm hairline */
+  --border-subtle:  #ECE6DD;           /* subtler warm hairline for grid dividers */
   --border-light:   #F0EBE3;
   --border-sidebar: #ECE6DD;
 
@@ -232,6 +233,7 @@ select option {
   --btn-bg-hover:   #e08d6f;
 
   --border:         rgba(255,255,255,0.09);
+  --border-subtle:  rgba(255,255,255,0.07);
   --border-light:   rgba(255,255,255,0.05);
   --border-sidebar: rgba(255,255,255,0.07);
 
@@ -1258,4 +1260,14 @@ select option {
   --priority-high: #FBBF24;
   --priority-critical: #F87171;
   --card-shadow: 0 1px 3px rgba(0,0,0,0.40), 0 1px 2px rgba(0,0,0,0.30);
+}
+
+/* Hierarchy table scroll container. The table header is `sticky top-0`, but
+   `position: sticky` only pins when its scroll container has a bounded height.
+   Without this the header scrolls away with the rows. Cap the container to the
+   remaining viewport space (below the pinned app header + page chrome) so the
+   header pins at the top while the body scrolls vertically and horizontally. */
+.ppm-hierarchy-scroll {
+  max-height: calc(100dvh - var(--page-sticky-top, 120px) - 140px);
+  overflow: auto;
 }

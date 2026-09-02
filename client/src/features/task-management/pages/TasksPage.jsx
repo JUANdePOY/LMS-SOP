@@ -400,6 +400,24 @@ export default function TasksPage() {
       }
       return null;
     };
+    // Admins are scoped to their own business — drop any task whose client
+    // belongs to a different business. Super admins see everything. A task is
+    // in scope when its owning client lives in the admin's business, or the
+    // task carries the business id directly.
+    if (user?.role === 'admin' && user?.business_id != null) {
+      const adminBizId = String(user.business_id);
+      const adminClientIds = new Set(
+        (clientTree || [])
+          .filter((c) => c.business_id != null && String(c.business_id) === adminBizId)
+          .map((c) => String(c.id))
+      );
+      result = result.filter((t) => {
+        if (t.business_id != null && String(t.business_id) === adminBizId) return true;
+        const scope = taskClientId(t);
+        if (scope?.clientId != null && adminClientIds.has(String(scope.clientId))) return true;
+        return false;
+      });
+    }
     // Department Heads see tasks that belong to their department. This includes:
     // 1. Tasks with a Department-type assignment matching their department ID
     // 2. Tasks associated with a client that belongs to their department
@@ -503,6 +521,23 @@ export default function TasksPage() {
   // that scope so the Client -> Business -> Project tree still renders (even
   // with no tasks) for the selected business/client.
   const scopedProjectsById = useMemo(() => {
+    // Admins are scoped to their own business — they must not see clients or
+    // projects that belong to other businesses. Super admins see everything.
+    if (user?.role === 'admin' && user?.business_id != null && !clientParam && !businessParam && !projectParam) {
+      const adminBizId = String(user.business_id);
+      const validClientIds = new Set(
+        (clientTree || [])
+          .filter((c) => c.business_id != null && String(c.business_id) === adminBizId)
+          .map((c) => String(c.id))
+      );
+      const scoped = {};
+      for (const p of Object.values(projectsById)) {
+        if (p.client_id != null && validClientIds.has(String(p.client_id))) {
+          scoped[String(p.id)] = p;
+        }
+      }
+      return scoped;
+    }
     // Department Heads see only projects belonging to clients in their SOP
     // business (derived from their department's business_id) AND within their
     // department.
@@ -565,6 +600,14 @@ export default function TasksPage() {
   //   - With clientParam set  -> it's a client_business_id (a unit click)
   //   - Without clientParam    -> it's an SOP business_id (a business click)
   const scopedClientTree = useMemo(() => {
+    // Admins are scoped to their own business — the hierarchy tree must not
+    // render clients that belong to other businesses.
+    if (user?.role === 'admin' && user?.business_id != null) {
+      const adminBizId = String(user.business_id);
+      return (clientTree || []).filter(
+        (c) => c.business_id != null && String(c.business_id) === adminBizId
+      );
+    }
     // Department Heads see only clients that belong to their SOP business
     // (derived from their department's business_id) AND within their department.
     if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null)) {
@@ -813,7 +856,7 @@ export default function TasksPage() {
 
       {/* Summary — condensed strip, not a competing block of tiles */}
       {stats && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--ppm-border)] pb-3 text-xs text-[var(--ppm-text-muted)]">
+        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--ppm-border)]/5 pb-3 text-xs text-[var(--ppm-text-muted)]">
           {statItems.map((stat) => {
             const Icon = stat.icon;
             return (
@@ -836,6 +879,7 @@ export default function TasksPage() {
       </div>
 
       <FilterBar
+        className="mb-3"
         search={search}
         onSearch={setSearch}
         statusFilter={statusFilter}
@@ -870,9 +914,12 @@ export default function TasksPage() {
           loading={loading}
           projectsById={scopedProjectsById}
            clientTree={scopedClientTree}
-            canManage
-            userDepartmentId={user?.department_id ?? null}
-            scopeClientId={clientParam}
+canManage
+             userDepartmentId={user?.department_id ?? null}
+             userRole={user?.role ?? ''}
+             userBusinessId={user?.business_id ?? null}
+             userDepartmentBusinessId={user?.department_business_id ?? null}
+             scopeClientId={clientParam}
           scopeBusinessId={businessParam}
           scopeProjectId={projectParam}
           viewProp={view}

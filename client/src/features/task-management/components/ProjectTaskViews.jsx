@@ -68,8 +68,11 @@ export default function ProjectTaskViews({
   scopeBusinessId,
   scopeProjectId,
   newTaskIds,
-   hideTabs = false,
-   userDepartmentId = null,
+hideTabs = false,
+    userDepartmentId = null,
+    userRole = '',
+    userBusinessId = null,
+    userDepartmentBusinessId = null,
   }) {
   const [internalView, setInternalView] = useState(() => {
     const validKeys = activeViews || TASK_VIEW_KEYS;
@@ -133,9 +136,12 @@ export default function ProjectTaskViews({
               onDeleteEntity={onDeleteEntity}
               onCreateBusiness={onCreateBusiness}
               onCreateProject={onCreateProject}
-              onCreateClient={onCreateClient}
-              newTaskIds={newTaskIds}
-            />
+onCreateClient={onCreateClient}
+               newTaskIds={newTaskIds}
+               userRole={userRole}
+               userBusinessId={userBusinessId}
+               userDepartmentBusinessId={userDepartmentBusinessId}
+             />
           )}
           {view === 'board' && (
             <TaskBoard

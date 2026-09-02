@@ -31,11 +31,18 @@ const CELL_HIDE_SM = 'hidden sm:block'; // assignees / priority / due / progress
 
 /**
  * Inline "add client" form. Beyond a name it lets the user assign the new client
- * to an existing SOP business (clients.business_id). The business choice is
- * required — a client cannot be created without a business, so the form stays
- * open and surfaces a prompt until one is chosen.
+ * to an existing SOP business (clients.business_id) and a department. Access is
+ * role-based:
+ *   - super_admin: full choice — pick any business, then departments are
+ *     filtered to that business.
+ *   - admin: business is locked to the actor's own business; departments are
+ *     filtered to that business.
+ *   - department_head: business + department are pre-filled from the actor's
+ *     own scope and the pickers are hidden (no manual override).
+ * A client cannot be created without a business, so the form stays open and
+ * surfaces a prompt until one is chosen.
  */
-function AddClientForm({ onCommit, onCancel }) {
+function AddClientForm({ onCommit, onCancel, onExpandBusiness, userRole = '', userBusinessId = null, userDepartmentBusinessId = null, userDepartmentId = null }) {
   const [name, setName] = useState('');
   const [businessId, setBusinessId] = useState('');
   const [departmentId, setDepartmentId] = useState('');
@@ -45,6 +52,27 @@ function AddClientForm({ onCommit, onCancel }) {
   const [submitting, setSubmitting] = useState(false);
   const [touched, setTouched] = useState(false);
   const inputRef = useRef(null);
+
+  const isSuperAdmin = userRole === 'super_admin';
+  const isDepartmentHead = userRole === 'department_head';
+
+  // Sequential stepper state. Super admins walk business → department → name;
+  // admins skip business (locked to their own) and go department → name.
+  const [step, setStep] = useState(isSuperAdmin ? 'business' : 'department');
+  const nextStep = () => {
+    setStep((s) => (s === 'business' ? 'department' : s === 'department' ? 'name' : s));
+  };
+  const prevStep = () => {
+    setStep((s) => (s === 'department' ? 'business' : s === 'name' ? 'department' : s));
+  };
+
+  // Department Heads are scoped to their SOP business (derived from their
+  // department's business_id, falling back to their own business_id) and their
+  // own department. Pre-fill and lock the pickers — no manual override.
+  const deptHeadBizId = isDepartmentHead
+    ? String(userDepartmentBusinessId ?? userBusinessId ?? '')
+    : null;
+  const deptHeadDeptId = isDepartmentHead ? String(userDepartmentId ?? '') : null;
 
   useEffect(() => {
     let active = true;
@@ -57,6 +85,11 @@ function AddClientForm({ onCommit, onCancel }) {
         if (!active) return;
         setBusinesses(Array.isArray(bizList) ? bizList : []);
         setDepartments(Array.isArray(deptList) ? deptList : []);
+        // Pre-fill the department head's scope now that the lists are loaded.
+        if (isDepartmentHead) {
+          if (deptHeadBizId) setBusinessId(deptHeadBizId);
+          if (deptHeadDeptId) setDepartmentId(deptHeadDeptId);
+        }
       })
       .catch(() => {
         if (active) { setBusinesses([]); setDepartments([]); }
@@ -64,101 +97,271 @@ function AddClientForm({ onCommit, onCancel }) {
       .finally(() => { if (active) setLoading(false); });
     inputRef.current?.focus();
     return () => { active = false; };
-  }, []);
+  }, [isDepartmentHead, deptHeadBizId, deptHeadDeptId]);
 
-   const canCommit = name.trim() && businessId !== '' && departmentId !== '';
+  // Departments filtered to the selected business (super_admin + admin).
+  const departmentsForBusiness = useMemo(() => {
+    if (!businessId) return [];
+    return departments.filter((d) => String(d.business_id) === String(businessId));
+  }, [departments, businessId]);
 
-   const commit = async () => {
-     setTouched(true);
-     const trimmed = name.trim();
-     if (!trimmed || businessId === '' || departmentId === '') return;
-     setSubmitting(true);
-     try {
-       await onCommit(trimmed, Number(businessId), Number(departmentId));
-       setName('');
-       setBusinessId('');
-       setDepartmentId('');
-       setTouched(false);
-     } catch {
-       // Parent surfaces its own error toast; keep the form open so the user can retry.
-     } finally {
-       setSubmitting(false);
-     }
-   };
+  // For admins the business is locked to their own; departments are filtered to
+  // that business automatically. Re-derive the admin's department list whenever
+  // the actor's business changes (it can't, but keep it explicit).
+  useEffect(() => {
+    if (userRole === 'admin' && userBusinessId) {
+      setBusinessId(String(userBusinessId));
+    }
+  }, [userRole, userBusinessId]);
+
+  const canCommit = name.trim() && businessId !== '' && departmentId !== '';
+
+  const commit = async () => {
+    setTouched(true);
+    const trimmed = name.trim();
+    if (!trimmed || businessId === '' || departmentId === '') return;
+    setSubmitting(true);
+    try {
+      await onCommit(trimmed, Number(businessId), Number(departmentId));
+      // After creating the client under a chosen SOP business, expand that
+      // business's tree row so the new client (and its units) are visible
+      // without the user having to open the business first.
+      if (businessId !== '') onExpandBusiness?.(Number(businessId));
+      setName('');
+      setBusinessId('');
+      setDepartmentId('');
+      setTouched(false);
+    } catch {
+      // Parent surfaces its own error toast; keep the form open so the user can retry.
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Department Head: no pickers — the client is auto-assigned to the head's own
+  // business + department. Only the name field + Add/Cancel buttons show,
+  // matching the SecondarySidebar's "New Client" control styling.
+  if (isDepartmentHead) {
+    return (
+      <div className="space-y-1.5 px-2 py-2">
+        <div className="relative">
+          <input
+            ref={inputRef}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commit(); }
+              if (e.key === 'Escape') { e.preventDefault(); onCancel?.(); }
+            }}
+            placeholder="New client name…"
+            className="w-full rounded-lg border border-[var(--border-sidebar)] bg-[var(--bg-surface)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--accent-amber)_50%,transparent)]"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-muted)]">
+            Your SOP business &middot; your department
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={commit}
+            disabled={!canCommit || submitting}
+            className={cn(
+              'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-150 ease-out motion-reduce:transition-none',
+              canCommit && !submitting
+                ? 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]'
+                : 'cursor-not-allowed bg-[var(--border-subtle)] text-[var(--text-muted)]'
+            )}
+          >
+            {submitting ? 'Adding…' : 'Add'}
+          </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={submitting}
+            className="rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Stepped, one-step-at-a-time picker matching the SecondarySidebar's "New
+  // Client" control. Each step renders alone and advances with a "Next" button:
+  //   super_admin:  choose business → choose department → type name
+  //   admin:        choose department (business is locked to the actor's own)
+  //   department_head: handled above — name only, auto-assigned.
+  const businessStep = (
+    <div className="space-y-1">
+      <p className="px-1 pb-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
+        Select a Business
+      </p>
+      <div className="max-h-44 overflow-y-auto space-y-0.5 scrollbar-none">
+        {loading ? (
+          <p className="px-3 py-1 text-xs text-[var(--text-muted)]">Loading businesses…</p>
+        ) : businesses.length === 0 ? (
+          <p className="px-3 py-1 text-xs text-[var(--text-muted)]">No businesses available</p>
+        ) : (
+          businesses.map((b) => {
+            const selected = String(b.id) === String(businessId);
+            return (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => { setBusinessId(String(b.id)); setDepartmentId(''); setTouched(true); nextStep(); }}
+                className={cn(
+                  'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[color-mix(in_srgb,var(--text-on-sidebar)_80%,transparent)] transition-colors duration-150 ease-out motion-reduce:transition-none',
+                  selected
+                    ? 'bg-[var(--bg-active)] text-[var(--text-on-sidebar)]'
+                    : 'hover:bg-[var(--bg-hover)]'
+                )}
+              >
+                <Building2 size={14} className="shrink-0" />
+                <span className="flex-1 truncate text-left">{b.business_name}</span>
+                {selected && <Check size={14} className="shrink-0" />}
+              </button>
+            );
+          })
+        )}
+      </div>
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={submitting}
+          className="rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+
+  const departmentStep = (
+    <div className="space-y-1">
+      <p className="px-1 pb-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
+        Select a Department *
+      </p>
+      <div className="max-h-44 overflow-y-auto space-y-0.5 scrollbar-none">
+        {departmentsForBusiness.length === 0 ? (
+          <p className="px-3 py-1 text-xs text-[var(--text-muted)]">No departments available</p>
+        ) : (
+          departmentsForBusiness.map((d) => {
+            const selected = String(d.id) === String(departmentId);
+            return (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => { setDepartmentId(String(d.id)); setTouched(true); nextStep(); }}
+                className={cn(
+                  'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[color-mix(in_srgb,var(--text-on-sidebar)_80%,transparent)] transition-colors duration-150 ease-out motion-reduce:transition-none',
+                  selected
+                    ? 'bg-[var(--bg-active)] text-[var(--text-on-sidebar)]'
+                    : 'hover:bg-[var(--bg-hover)]'
+                )}
+              >
+                <Building2 size={14} className="shrink-0" />
+                <span className="flex-1 truncate text-left">{d.name}</span>
+                {selected && <Check size={14} className="shrink-0" />}
+              </button>
+            );
+          })
+        )}
+      </div>
+      <div className="flex items-center gap-2 pt-1">
+        {isSuperAdmin && (
+          <button
+            type="button"
+            onClick={prevStep}
+            disabled={submitting}
+            className="rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+          >
+            Back
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={submitting}
+          className="rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+
+  const nameStep = (
+    <div className="space-y-1.5">
+      <div className="relative">
+        <input
+          ref={inputRef}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commit(); }
+            if (e.key === 'Escape') { e.preventDefault(); onCancel?.(); }
+          }}
+          placeholder="New client name…"
+          className="w-full rounded-lg border border-[var(--border-sidebar)] bg-[var(--bg-surface)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[color-mix(in_srgb,var(--accent-amber)_50%,transparent)]"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        {isSuperAdmin && (
+          <button
+            type="button"
+            onClick={prevStep}
+            disabled={submitting}
+            className="rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+          >
+            Back
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={commit}
+          disabled={!canCommit || submitting}
+          className={cn(
+            'rounded-lg px-3 py-1.5 text-xs font-medium transition-colors duration-150 ease-out motion-reduce:transition-none',
+            canCommit && !submitting
+              ? 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]'
+              : 'cursor-not-allowed bg-[var(--border-subtle)] text-[var(--text-muted)]'
+          )}
+        >
+          {submitting ? 'Adding…' : 'Add'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={submitting}
+          className="rounded-lg px-3 py-1.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-hover)]"
+        >
+          Cancel
+        </button>
+      </div>
+      {touched && departmentId === '' && (
+        <p className="text-[11px] text-red-500">Select a department to assign this client to.</p>
+      )}
+    </div>
+  );
+
+  // Super admin: business → department → name. Admin: department → name
+  // (business is locked to the actor's own, so it's skipped).
+  const currentStep = step === 'business'
+    ? businessStep
+    : step === 'department'
+      ? departmentStep
+      : nameStep;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 px-2 py-2 text-sm" style={{ paddingLeft: '8px' }}>
-      <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-primary)] opacity-40" aria-hidden="true" />
-      <input
-        ref={inputRef}
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); commit(); }
-          if (e.key === 'Escape') { e.preventDefault(); onCancel?.(); }
-        }}
-        placeholder="New client name…"
-        className="min-w-[160px] flex-1 rounded border border-[var(--color-primary)] bg-[var(--bg-surface)] px-2 py-1 text-sm outline-none"
-      />
-      <select
-        value={businessId}
-        onChange={(e) => { setBusinessId(e.target.value); setTouched(true); }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); commit(); }
-          if (e.key === 'Escape') { e.preventDefault(); onCancel?.(); }
-        }}
-        disabled={loading}
-        className={cn(
-          'rounded border bg-[var(--bg-surface)] px-2 py-1 text-sm outline-none transition-colors duration-150 ease-out motion-reduce:transition-none',
-          touched && businessId === ''
-            ? 'border-red-400 text-red-600 focus:border-red-500'
-            : 'border-[var(--border)] text-[var(--text-secondary)] focus:border-[var(--color-primary)]'
-        )}
-      >
-        <option value="">{loading ? 'Loading businesses…' : '— Select SOP business * —'}</option>
-        {businesses.map((b) => (
-          <option key={b.id} value={b.id}>{b.business_name}</option>
-        ))}
-      </select>
-      <select
-        value={departmentId}
-        onChange={(e) => { setDepartmentId(e.target.value); setTouched(true); }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); commit(); }
-          if (e.key === 'Escape') { e.preventDefault(); onCancel?.(); }
-        }}
-        disabled={loading}
-        className={cn(
-          'rounded border bg-[var(--bg-surface)] px-2 py-1 text-sm outline-none transition-colors duration-150 ease-out motion-reduce:transition-none',
-          touched && departmentId === ''
-            ? 'border-red-400 text-red-600 focus:border-red-500'
-            : 'border-[var(--border)] text-[var(--text-secondary)] focus:border-[var(--color-primary)]'
-        )}
-      >
-        <option value="">{loading ? 'Loading departments…' : '— Select department * —'}</option>
-        {departments.map((d) => (
-          <option key={d.id} value={d.id}>{d.name}</option>
-        ))}
-      </select>
-      <button
-        type="button"
-        onClick={commit}
-        disabled={!canCommit || submitting}
-        className={cn(
-          'rounded px-2.5 py-1 text-xs font-medium transition-colors duration-150 ease-out motion-reduce:transition-none',
-          canCommit && !submitting
-            ? 'bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]'
-            : 'cursor-not-allowed bg-[var(--border-subtle)] text-[var(--text-muted)]'
-        )}
-      >
-        {submitting ? 'Adding…' : 'Add'}
-      </button>
-      {touched && businessId === '' && (
-        <span className="w-full text-[11px] text-red-500">Select a business to assign this client to.</span>
+    <div className="space-y-1.5 px-2 py-2">
+      {isSuperAdmin && step !== 'business' && (
+        <p className="px-1 text-[11px] text-[var(--text-muted)]">
+          Step {step === 'department' ? 2 : 3} of 3
+        </p>
       )}
-      {touched && departmentId === '' && (
-        <span className="w-full text-[11px] text-red-500">Select a department to assign this client to.</span>
-      )}
+      {currentStep}
     </div>
   );
 }
@@ -420,6 +623,9 @@ onQuickAddTask,
   newTaskIds = null,
   onViewSubtasks,
   userDepartmentId = null,
+  userRole = '',
+  userBusinessId = null,
+  userDepartmentBusinessId = null,
   }) {
   const tasksById = useMemo(() => {
     const map = {};
@@ -484,10 +690,6 @@ onQuickAddTask,
     }
   }, []);
 
-  // Opens an inline "add sub-task" row directly under the clicked task so the
-  // new sub-task inherits the parent's context (client/business/project).
-  const startAddSubtask = (taskId) => startAdd('task', taskId);
-
   const toggle = useCallback((key) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -512,9 +714,6 @@ onQuickAddTask,
     });
   }, [clients]);
 
-  // When a client/business scope is active (e.g. opened from the sidebar),
-  // seed the expansion state so the relevant branches start open. The user
-  // can still collapse them afterwards because this only runs on scope change.
   // When a client/business/project scope is active (e.g. chosen in the secondary
   // panel), collapse everything and open ONLY that branch. We must include the
   // branch's ancestors (client/business) so the chosen row is actually visible.
@@ -523,7 +722,18 @@ onQuickAddTask,
   // scopeBusinessId is overloaded:
   //   - a client_business_id (unit click) -> expand owning client + that business
   //   - an SOP business_id (business click) -> expand all scoped clients
+  //
+  // Keyed on the scope signature only — NOT on `clients`/`projectsById`. Those
+  // references change whenever tasks are created/refreshed, which would
+  // re-run this effect and collapse the very branch the user is working in
+  // (e.g. adding a task under a scoped business). The branch lookup inside
+  // reads the latest `clients` at run time, so a scope change still opens the
+  // correct branch even if the data arrives later.
+  const lastScopeRef = useRef(null);
+  const scopeSignature = `${scopeClientId ?? ''}|${scopeBusinessId ?? ''}|${scopeProjectId ?? ''}`;
   useEffect(() => {
+    if (scopeSignature === lastScopeRef.current) return;
+    lastScopeRef.current = scopeSignature;
     const forced = new Set();
     if (scopeProjectId) {
       const p = projectsById[String(scopeProjectId)];
@@ -550,7 +760,7 @@ onQuickAddTask,
     }
     if (forced.size === 0) return;
     setExpanded(forced);
-  }, [scopeClientId, scopeBusinessId, scopeProjectId, projectsById, clients]);
+  }, [scopeSignature, scopeClientId, scopeBusinessId, scopeProjectId, projectsById, clients]);
 
   // Auto-expand branches that match an active search term.
   const isExpanded = useCallback((key, kind, node) => {
@@ -564,17 +774,17 @@ onQuickAddTask,
       <p className="text-sm text-[var(--text-muted)]">No tasks found</p>
     </div>
   ) : (
-    <div role="table" aria-label="Client to task hierarchy" className="w-full overflow-x-auto">
+    <div role="table" aria-label="Client to task hierarchy" className="w-full overflow-x-auto ppm-hierarchy-scroll">
       {/* Header row */}
       <div
         role="row"
-        className={cn('sticky top-0 z-20 grid gap-0 border-t border-b border-[var(--border-subtle)]/30 bg-[var(--bg-surface)] px-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)] h-10', HIERARCHY_GRID)}
+        className={cn('sticky top-0 z-20 grid gap-0 border-t-[0.5px] border-b-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 bg-[var(--bg-surface)] px-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)] h-10', HIERARCHY_GRID)}
       >
-        <span className="flex items-center justify-center py-2 pr-2 border-r border-[var(--border-subtle)]/30 text-center">Name</span>
-        <span className="flex items-center justify-center py-2 px-2 border-r border-[var(--border-subtle)]/30 text-center">Assignees</span>
-        <span className="flex items-center justify-center py-2 px-2 border-r border-[var(--border-subtle)]/30 text-center">Status</span>
-        <span className="flex items-center justify-center py-2 px-2 border-r border-[var(--border-subtle)]/30 text-center">Priority</span>
-        <span className="flex items-center justify-center py-2 px-2 border-r border-[var(--border-subtle)]/30 text-center">Due</span>
+        <span className="flex items-center justify-center py-2 pr-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 text-center">Name</span>
+        <span className="flex items-center justify-center py-2 px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 text-center">Assignees</span>
+        <span className="flex items-center justify-center py-2 px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 text-center">Status</span>
+        <span className="flex items-center justify-center py-2 px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 text-center">Priority</span>
+        <span className="flex items-center justify-center py-2 px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 text-center">Due</span>
         <span className="flex items-center justify-center py-2 px-2 text-center">Progress</span>
       </div>
 
@@ -662,15 +872,15 @@ return (
                                        onDeleteImmediate={onDeleteImmediate}
                                        onDuplicated={onDuplicated}
                                        onRenameTask={onRenameTask}
-                                       canManage={canManage}
-                                       projects={projects}
-                                       tasksById={tasksById}
-                                       userDepartmentId={userDepartmentId}
-                                       userDepartmentClientIds={userDepartmentClientIds}
-                                      onAddSubtask={(t) => startAdd('task', t.id)}
-                                      subtaskCount={subtaskCountMap[task.id] || 0}
-                                      isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
-                                    />
+canManage={canManage}
+                                        projects={projects}
+                                        tasksById={tasksById}
+                                        userDepartmentId={userDepartmentId}
+                                        userDepartmentClientIds={userDepartmentClientIds}
+                                       onAddSubtask={(t) => startAdd('task', t.id)}
+                                       subtaskCount={subtaskCountMap[task.id] || 0}
+                                       isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
+                                     />
                                     {addingFor?.kind === 'subtask' && addingFor.parentId === task.id && (
                                       <InlineNameRow
                                         key="__add-subtask"
@@ -767,11 +977,15 @@ return (
       {canManage && (
         <div className="px-2 pt-3">
           {addingClient ? (
-             <AddClientForm
-               key="__add-client"
-               onCommit={async (name, businessId, departmentId) => { await onCreateClient?.(name, businessId, departmentId); setAddingClient(false); }}
-               onCancel={() => setAddingClient(false)}
-             />
+<AddClientForm
+                key="__add-client"
+                userRole={userRole}
+                userBusinessId={userBusinessId}
+                userDepartmentBusinessId={userDepartmentBusinessId}
+                userDepartmentId={userDepartmentId}
+                onCommit={async (name, businessId, departmentId) => { await onCreateClient?.(name, businessId, departmentId); setAddingClient(false); }}
+                onCancel={() => setAddingClient(false)}
+              />
           ) : (
             <button
               type="button"
@@ -812,8 +1026,8 @@ const KIND_META = {
 // Centralized per-kind typography. Hierarchy reads through size/weight/spacing
 // only — no per-level color, background, or border.
 const LEVEL_STYLE = {
-   client:   { font: 'font-semibold', size: 'text-sm', tracking: 'tracking-[0.01em]', leading: '' },
-   business: { font: 'font-medium',   size: 'text-sm', tracking: '', leading: '' },
+   client:   { font: 'font-medium', size: 'text-sm', tracking: 'tracking-[0.01em]', leading: '' },
+   business: { font: 'font-normal',  size: 'text-sm', tracking: '', leading: '' },
 };
 
 function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false }) {
@@ -896,7 +1110,7 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
       className={cn(
         'group grid gap-0 px-2 text-sm transition-colors duration-150 ease-out motion-reduce:transition-none',
         taller ? 'h-14' : 'h-10',
-        noBorder ? '' : 'border-b border-[var(--border-subtle)]/30',
+        noBorder ? '' : 'border-b-[0.5px] border-neutral-300/70 dark:border-neutral-600/75',
         dimmed && 'opacity-40',
         HIERARCHY_GRID
       )}

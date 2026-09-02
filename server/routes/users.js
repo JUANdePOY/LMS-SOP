@@ -9,6 +9,10 @@ const departmentModel = require('../models/departmentModel');
 
 const router = express.Router();
 
+// Only these roles are tied to a department (SOP). Admins and super admins are
+// business-level and must not be assigned to any department.
+const DEPARTMENT_SCOPED_ROLES = ['department_head', 'employee'];
+
 router.use(authenticateToken);
 
 router.get('/', async (req, res) => {
@@ -157,6 +161,28 @@ router.post('/', requireAdmin, [
 
     const { full_name, email, password, role, department_id, business_id, position_title, employee_id, contact_number, employment_status, date_hired, birthdate, address } = req.body;
 
+    // Only department-scoped roles (department_head, employee) may carry a
+    // department_id. Admins and super admins are business-level and must not be
+    // assigned to any department — reject the request rather than silently
+    // storing a meaningless department reference.
+    if (department_id && !DEPARTMENT_SCOPED_ROLES.includes(role)) {
+      return res.status(400).json({ status: 'error', message: 'Admin and super admin roles cannot be assigned to a department', code: 'DEPARTMENT_NOT_ALLOWED' });
+    }
+
+    // Department Heads are scoped to their own department(s) — they can only
+    // create users in the departments they own, within their business.
+    if (req.user.role === 'department_head') {
+      const actorDeptIds = req.user?.scoped_department_ids?.length
+        ? req.user.scoped_department_ids
+        : (req.user.department_id ? [req.user.department_id] : []);
+      if (actorDeptIds.length === 0) {
+        return res.status(403).json({ status: 'error', message: 'Your account is not assigned to a department', code: 'NO_DEPARTMENT_SCOPE' });
+      }
+      if (department_id && !actorDeptIds.includes(parseInt(department_id, 10))) {
+        return res.status(403).json({ status: 'error', message: 'Cannot create users in another department', code: 'DEPARTMENT_SCOPE_DENIED' });
+      }
+    }
+
     if (req.user.role !== 'super_admin') {
       if (!req.user.business_id) {
         return res.status(403).json({ status: 'error', message: 'Your account is not assigned to a business', code: 'NO_BUSINESS_SCOPE' });
@@ -164,8 +190,13 @@ router.post('/', requireAdmin, [
       if (business_id && parseInt(business_id) !== req.user.business_id) {
         return res.status(403).json({ status: 'error', message: 'Cannot create users in another business', code: 'BUSINESS_SCOPE_DENIED' });
       }
+      // Admins can only create department_head and employee users — they cannot
+      // create other admin or super_admin accounts.
       if (role === 'super_admin') {
         return res.status(403).json({ status: 'error', message: 'Cannot assign super_admin role', code: 'ROLE_ASSIGN_DENIED' });
+      }
+      if (role === 'admin') {
+        return res.status(403).json({ status: 'error', message: 'Cannot assign admin role', code: 'ROLE_ASSIGN_DENIED' });
       }
     }
 
@@ -256,12 +287,58 @@ router.put('/:id', [
       }
     }
 
+    // Only department-scoped roles may carry a department_id. The effective
+    // role is the one being updated to (if provided) or the target user's
+    // existing role — admins/super admins must not be assigned to a department.
+    const effectiveRole = updates.role !== undefined ? updates.role : targetUser.role;
+    if (updates.department_id && !DEPARTMENT_SCOPED_ROLES.includes(effectiveRole)) {
+      return res.status(400).json({ status: 'error', message: 'Admin and super admin roles cannot be assigned to a department', code: 'DEPARTMENT_NOT_ALLOWED' });
+    }
+    // When the effective role is business-level, never store a department_id
+    // (even if a stale value was already on the record).
+    if (!DEPARTMENT_SCOPED_ROLES.includes(effectiveRole)) {
+      updates.department_id = null;
+    }
+
+    // Admins cannot manage other admin/super_admin accounts, and they cannot
+    // promote anyone to an admin or super_admin role. Super admins keep full
+    // control; the actor's own admin account can still be edited by themselves.
+    if (req.user.role === 'admin') {
+      if (!isSelf && (targetUser.role === 'admin' || targetUser.role === 'super_admin')) {
+        return res.status(403).json({ status: 'error', message: 'Cannot edit other admin accounts', code: 'ADMIN_SCOPE_DENIED' });
+      }
+      if (updates.role === 'admin' || updates.role === 'super_admin') {
+        return res.status(403).json({ status: 'error', message: 'Cannot assign admin or super_admin role', code: 'ROLE_ASSIGN_DENIED' });
+      }
+    }
+
+    // Department Heads are scoped to their own department(s) — they cannot
+    // manage users outside their departments, and cannot promote anyone to an
+    // admin or super_admin role.
+    if (req.user.role === 'department_head') {
+      const actorDeptIds = req.user?.scoped_department_ids?.length
+        ? req.user.scoped_department_ids
+        : (req.user.department_id ? [req.user.department_id] : []);
+      if (actorDeptIds.length === 0) {
+        return res.status(403).json({ status: 'error', message: 'Your account is not assigned to a department', code: 'NO_DEPARTMENT_SCOPE' });
+      }
+      if (!actorDeptIds.includes(targetUser.department_id)) {
+        return res.status(403).json({ status: 'error', message: 'Cannot edit users outside your department', code: 'DEPARTMENT_SCOPE_DENIED' });
+      }
+      if (updates.department_id && !actorDeptIds.includes(parseInt(updates.department_id, 10))) {
+        return res.status(403).json({ status: 'error', message: 'Cannot reassign users to another department', code: 'DEPARTMENT_SCOPE_DENIED' });
+      }
+      if (updates.role === 'admin' || updates.role === 'super_admin') {
+        return res.status(403).json({ status: 'error', message: 'Cannot assign admin or super_admin role', code: 'ROLE_ASSIGN_DENIED' });
+      }
+      if (updates.role === 'department_head' && targetUser.role !== 'department_head') {
+        return res.status(403).json({ status: 'error', message: 'Cannot assign department_head role', code: 'ROLE_ASSIGN_DENIED' });
+      }
+    }
+
     if (req.user.role !== 'super_admin') {
       if (updates.business_id !== undefined && updates.business_id !== null && updates.business_id !== req.user.business_id) {
         return res.status(403).json({ status: 'error', message: 'Cannot reassign users to another business', code: 'BUSINESS_SCOPE_DENIED' });
-      }
-      if (updates.role === 'super_admin') {
-        return res.status(403).json({ status: 'error', message: 'Cannot assign super_admin role', code: 'ROLE_ASSIGN_DENIED' });
       }
       updates.business_id = req.user.business_id;
     }
@@ -311,6 +388,13 @@ router.put('/:id/password', [
       return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
     }
 
+    // Admins cannot manage other admin/super_admin accounts — including
+    // password resets — even though they can otherwise manage other users.
+    if (req.user.role === 'admin' && !isSelfPw &&
+        (targetUser.role === 'admin' || targetUser.role === 'super_admin')) {
+      return res.status(403).json({ status: 'error', message: 'Cannot edit other admin accounts', code: 'ADMIN_SCOPE_DENIED' });
+    }
+
     const isCurrentValid = await require('../app/auth').comparePassword(current_password, targetUser.password_hash);
     if (!isCurrentValid) {
       return res.status(401).json({ status: 'error', message: 'Current password is incorrect', code: 'INVALID_PASSWORD' });
@@ -334,17 +418,22 @@ router.put('/:id/password', [
 });
 
 router.delete('/:id', requireAdmin, async (req, res) => {
-  try {
-    const userId = parseInt(req.params.id);
+    try {
+      const userId = parseInt(req.params.id);
 
-    const targetUser = await authModel.findById(userId);
-    if (!targetUser) {
-      return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
-    }
+      const targetUser = await authModel.findById(userId);
+      if (!targetUser) {
+        return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
+      }
 
-    if (targetUser.role === 'super_admin') {
-      return res.status(403).json({ status: 'error', message: 'Cannot deactivate super admin users', code: 'CANNOT_DEACTIVATE_ADMIN' });
-    }
+      if (targetUser.role === 'super_admin') {
+        return res.status(403).json({ status: 'error', message: 'Cannot deactivate super admin users', code: 'CANNOT_DEACTIVATE_ADMIN' });
+      }
+      // Admins cannot deactivate other admin accounts (or their own admin
+      // account — only super admins can manage admin roles).
+      if (req.user.role === 'admin' && targetUser.role === 'admin') {
+        return res.status(403).json({ status: 'error', message: 'Cannot deactivate admin users', code: 'CANNOT_DEACTIVATE_ADMIN' });
+      }
 
     await authModel.update(userId, { is_active: false });
 
@@ -487,7 +576,12 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
 
         const employeeId = get('Employee ID') || null;
         const deptName = get('Department');
-        const departmentId = deptName ? (deptMap[deptName.toLowerCase()] || null) : null;
+        let departmentId = deptName ? (deptMap[deptName.toLowerCase()] || null) : null;
+        // Admins / super admins are business-level and must not be assigned to
+        // a department — drop any department column from the upload for them.
+        if (departmentId && !DEPARTMENT_SCOPED_ROLES.includes(cleanRole)) {
+          departmentId = null;
+        }
         const businessName = get('Business') || get('Business Name') || get('business_name');
         const businessId = businessName ? (businessMap[businessName.toLowerCase()] || null) : null;
         const positionTitle = get('Position/Job Title') || get('Position Title') || get('Position') || null;

@@ -129,8 +129,7 @@ function AdminProtectedWrapper(Component) {
 }
 
 // Allows super_admin, admin, and department_head. Used for pages a department
-// head may access (SOP dashboard view-only, department-scoped SOP/Files
-// management, and department-scoped quiz management).
+// head may access — scoped to their own department(s) by the backend.
 function DeptHeadProtectedWrapper(Component) {
   return (
     <ProtectedRoute allowedRoles={['super_admin', 'admin', 'department_head']}>
@@ -196,6 +195,11 @@ const router = createBrowserRouter([
       { path: "settings/users", element: SuperAdminProtectedWrapper(UsersPanel), handle: { title: "Users" } },
       { path: "settings/roles", element: SuperAdminProtectedWrapper(RolesPanel), handle: { title: "Roles & Permissions" } },
       { path: "audit-logs", element: SuperAdminProtectedWrapper(AuditLogs), handle: { title: "Audit Logs" } },
+      // Standalone User Management page for admins and department heads. Scoped to
+      // the actor's own business/department by the backend; admins cannot
+      // create/edit other admin or super_admin accounts — see
+      // server/routes/users.js.
+      { path: "users", element: DeptHeadProtectedWrapper(UsersPanel), handle: { title: "User Management" } },
       { path: "notifications", element: LMSProtectedWrapper(NotificationsPage), handle: { title: "Notifications" } },
       { path: "sops", element: DeptHeadProtectedWrapper(SOPListPage), handle: { title: "SOP Library" } },
       { path: "courses", element: LMSProtectedWrapper(Courses), handle: { title: "Course Catalog" } },
@@ -240,7 +244,7 @@ const router = createBrowserRouter([
       { path: "clients/:clientId/businesses/:businessId/projects/:projectId", element: LMSProtectedWrapper(ProjectWorkspacePage), handle: { title: "Project" } },
       { path: "projects/:projectId", element: LMSProtectedWrapper(ProjectWorkspacePage), handle: { title: "Project" } },
       { path: "employee/settings", element: (
-        <ProtectedRoute allowedRoles={['employee', 'department_head']}>
+        <ProtectedRoute allowedRoles={['employee', 'department_head', 'admin']}>
           <Suspense fallback={<PageLoader />}>
             <EmployeeSettingsPage />
           </Suspense>

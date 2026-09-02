@@ -81,6 +81,14 @@ async function findAll(filters = {}) {
   } = filters;
   const offset = (page - 1) * limit;
 
+  // An explicit empty task_ids list means "scope resolved to nothing" (e.g. an
+  // admin whose business has no tasks). Without this guard the `length > 0`
+  // check below skips the filter entirely and the model returns EVERY task,
+  // leaking cross-scope data. Short-circuit to an empty result instead.
+  if (Array.isArray(task_ids) && task_ids.length === 0) {
+    return { rows: [], total: 0, page, limit, totalPages: 0 };
+  }
+
   let sql = `
     SELECT t.*, u.full_name AS created_by_name,
            cl.client_name,
@@ -213,6 +221,16 @@ async function remove(id) {
 
 async function getStats(filters = {}) {
   const { task_ids } = filters;
+
+  // An explicit empty task_ids list means the caller's scope resolved to
+  // nothing. Return zeroed stats instead of counting every task in the table
+  // (the `length > 0` guard below would otherwise skip the filter entirely).
+  if (Array.isArray(task_ids) && task_ids.length === 0) {
+    return {
+      total: 0, pending: 0, in_progress: 0, completed: 0,
+      overdue: 0, cancelled: 0, by_priority: {},
+    };
+  }
 
   // Restrict to the same set of tasks the table renders for this user
   // (business-scoped for admins, assigned for regular users).

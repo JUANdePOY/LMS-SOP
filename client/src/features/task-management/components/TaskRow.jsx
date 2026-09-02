@@ -281,7 +281,7 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
 
   return (
     <div
-      className="group grid items-center gap-3 border-b border-[var(--border)] px-4 py-2.5 last:border-b-0 hover:bg-[var(--bg-hover)] transition-colors"
+      className="group grid items-center gap-3 border-b border-neutral-200/60 dark:border-neutral-700/60 px-4 py-2.5 last:border-b-0 hover:bg-[var(--bg-hover)] transition-colors"
       style={{ gridTemplateColumns: TASK_TABLE_GRID_COLS, paddingLeft: 16 }}
     >
       {depth > 0 ? (
@@ -336,7 +336,7 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
              className="min-w-0 truncate rounded-md px-1.5 py-0.5 -mx-1.5 text-left text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-page)]"
            />
          ) : (
-           <span className="min-w-0 truncate text-sm font-medium text-[var(--text-primary)]">{task.title}</span>
+           <span className="min-w-0 truncate text-sm font-normal text-[var(--text-primary)]">{task.title}</span>
          )}
          {task.category && (
            <span className="hidden md:inline shrink-0 text-xs text-[var(--text-muted)] bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full">

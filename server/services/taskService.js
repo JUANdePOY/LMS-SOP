@@ -1429,13 +1429,34 @@ async function isUserDepartmentHead(userId) {
 }
 
 // Returns the set of task IDs an admin-role user is allowed to access.
-// Department Heads get department-scoped IDs; admins/super_admins get
-// business-scoped IDs. Used by every mutating operation to enforce scope.
+// Super admins get ALL tasks (they own every business); Department Heads get
+// department-scoped IDs; admins get business-scoped IDs. Used by every
+// mutating operation and the task list to enforce scope.
 async function getAdminScopedTaskIds(actorId) {
+  if (await isUserSuperAdmin(actorId)) {
+    return await getSuperAdminScopedTaskIds();
+  }
   if (await isUserDepartmentHead(actorId)) {
     return await getDepartmentScopedTaskIdsForDeptHead(actorId);
   }
   return await getBusinessScopedTaskIdsForAdmin(actorId);
+}
+
+// Super admins are not tied to a single business, so their scope is the entire
+// tasks table. Returning every id here keeps the list, stats, and bulk
+// operations consistent for the role that is supposed to see everything.
+async function getSuperAdminScopedTaskIds() {
+  const [rows] = await db.query('SELECT id AS task_id FROM tasks');
+  return rows.map((r) => r.task_id);
+}
+
+async function isUserSuperAdmin(userId) {
+  const [users] = await db.query(
+    'SELECT role FROM users WHERE id = ? LIMIT 1',
+    [userId]
+  );
+  const user = users[0];
+  return user && user.role === 'super_admin';
 }
 
 async function isUserAssignedToTaskById(userId, taskId) {
@@ -1512,23 +1533,56 @@ async function getBusinessScopedTaskIdsForAdmin(userId) {
 
   const businessId = user.business_id;
 
+  // Tasks visible to an admin/super_admin within their business scope:
+  //  1. Tasks created by any user whose business_id matches the admin's business
+  //  2. Tasks created by department heads whose department belongs to this
+  //     business (department heads often have a NULL business_id themselves)
+  //  3. Tasks assigned to a department that belongs to this business
+  //  4. Tasks whose client belongs to this business
+  //
+  // The four branches are combined with UNION so each branch is evaluated
+  // independently — a LEFT JOIN + OR approach can silently drop tasks that
+  // have no assignments or no client because the OR conditions on the joined
+  // columns evaluate to NULL (not TRUE).
   const [rows] = await db.query(
-    `SELECT DISTINCT t.id AS task_id
-     FROM tasks t
-     LEFT JOIN users u ON t.created_by = u.id
-     LEFT JOIN task_assignments ta ON ta.task_id = t.id
-     LEFT JOIN clients c ON t.client_id = c.id
-     WHERE (
-       u.business_id = ?
-       OR (
-         ta.assignment_type = 'Department'
+    `SELECT task_id FROM (
+       -- 1. Created by a user in this business
+       SELECT DISTINCT t.id AS task_id
+       FROM tasks t
+       INNER JOIN users u ON t.created_by = u.id
+       WHERE u.business_id = ?
+
+       UNION
+
+       -- 2. Created by a department head whose department is in this business
+       SELECT DISTINCT t.id AS task_id
+       FROM tasks t
+       INNER JOIN users u ON t.created_by = u.id
+       WHERE u.role = 'department_head'
+         AND u.department_id IN (
+           SELECT d.id FROM departments d WHERE d.business_id = ?
+         )
+
+       UNION
+
+       -- 3. Assigned to a department in this business
+       SELECT DISTINCT t.id AS task_id
+       FROM tasks t
+       INNER JOIN task_assignments ta ON ta.task_id = t.id
+       WHERE ta.assignment_type = 'Department'
          AND ta.reference_id IN (
            SELECT d.id FROM departments d WHERE d.business_id = ?
          )
-       )
-       OR (c.business_id = ?)
-     )`,
-    [businessId, businessId, businessId]
+
+       UNION
+
+       -- 4. Client belongs to this business
+       SELECT DISTINCT t.id AS task_id
+       FROM tasks t
+       INNER JOIN clients c ON t.client_id = c.id
+       WHERE c.business_id = ?
+     ) scoped`,
+    [businessId, businessId, businessId, businessId]
   );
 
   return rows.map(r => r.task_id);
@@ -1573,30 +1627,11 @@ async function getDepartmentScopedTaskIdsForDeptHead(userId) {
 async function getMyTaskCount(userId) {
   const isAdmin = await isUserAdmin(userId);
   if (isAdmin) {
-    const [userRows] = await db.query(
-      'SELECT role, business_id FROM users WHERE id = ? LIMIT 1',
-      [userId]
-    );
-    const user = userRows[0];
-
-    if (user && user.role === 'admin' && user.business_id) {
-      const [countRow] = await db.query(
-        `SELECT COUNT(DISTINCT t.id) AS total
-         FROM tasks t
-         LEFT JOIN users u ON t.created_by = u.id
-         LEFT JOIN task_assignments ta ON ta.task_id = t.id
-         WHERE (u.business_id = ?
-           OR (ta.assignment_type = 'Department'
-             AND ta.reference_id IN (SELECT d.id FROM departments d WHERE d.business_id = ?)))`,
-         [user.business_id, user.business_id]
-      );
-      return countRow[0]?.total ?? 0;
-    }
-
-    const [countRow] = await db.query(
-        "SELECT COUNT(*) AS total FROM tasks"
-    );
-    return countRow[0]?.total ?? 0;
+    // Count the exact same scope set the task list uses (super_admin = all,
+    // department_head = department-scoped, admin = business-scoped) so the
+    // badge never disagrees with the rendered rows.
+    const scopedIds = await getAdminScopedTaskIds(userId);
+    return scopedIds.length;
   }
 
   const [users] = await db.query('SELECT department_id, position_title FROM users WHERE id = ? LIMIT 1', [userId]);
@@ -1611,7 +1646,7 @@ async function getMyTaskCount(userId) {
        OR ta.assignment_type = 'Department' AND ta.reference_id = ?
        OR ta.assignment_type = 'Position' AND ta.reference_id = ?
      )`,
-     [userId, user.department_id, user.position_title]
+    [userId, user.department_id, user.position_title]
   );
 
   return countRow[0]?.total ?? 0;

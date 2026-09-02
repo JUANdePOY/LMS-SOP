@@ -22,6 +22,22 @@ const ROLE_META = {
 
 const EMPLOYMENT_STATUSES = ['Regular', 'Probationary', 'Contractual', 'Resigned/Terminated', 'Retired', 'On Leave'];
 
+// Only these roles are tied to a department (SOP). Admins and super admins are
+// business-level — they must not be assigned to any department, so the
+// Department field is hidden for them and any stale department_id is cleared.
+const DEPARTMENT_SCOPED_ROLES = ['department_head', 'employee'];
+
+// Roles an actor is allowed to assign when creating/editing users. Admins and
+// department heads can only create department-scoped users — they can never
+// create another admin or super_admin account.
+function allowedRolesForActor(user) {
+  if (!user) return ['department_head', 'employee', 'admin', 'super_admin'];
+  if (user.role === 'super_admin') return ['department_head', 'employee', 'admin', 'super_admin'];
+  if (user.role === 'admin') return ['department_head', 'employee'];
+  if (user.role === 'department_head') return ['employee'];
+  return [];
+}
+
 function getInitials(name) {
   if (!name) return '?';
   const parts = String(name).trim().split(/\s+/);
@@ -220,7 +236,10 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       full_name: u.full_name || '',
       email: u.email || '',
       role: u.role || '',
-      department_id: u.department_id || '',
+      // Admins / super admins are business-level and must not be assigned to a
+      // department — never carry a department_id for them, even if the record
+      // has a stale value.
+      department_id: DEPARTMENT_SCOPED_ROLES.includes(u.role) ? (u.department_id || '') : '',
       business_id: u.business_id || '',
       position_title: u.position_title || '',
       employee_id: u.employee_id || '',
@@ -237,6 +256,56 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
     setDeletingUser(u);
     setShowDeleteConfirm(true);
   };
+
+  // When a department head adds a user, default the new user's business and
+  // department to the head's own scope — they can only create users in the
+  // departments they own anyway, so this just removes the friction.
+  const openAddModal = () => {
+    const seed = {};
+    if (deptHeadScope) {
+      seed.business_id = deptHeadScope.businessId || '';
+      seed.department_id = deptHeadScope.departmentIds[0] || '';
+    }
+    setFormData(seed);
+    setShowAddModal(true);
+  };
+
+  // Whether the current actor can manage (create/edit/delete) a given user.
+
+  // Whether the current actor can manage (create/edit/delete) a given user.
+  // Super admins have full control; admins are scoped to their own business;
+  // department heads are scoped to their own department(s). Admin and
+  // department_head actors cannot manage other admin or super_admin accounts.
+  const canManageUser = (u) => {
+    if (user?.role === 'super_admin') return true;
+    if (!user) return false;
+    if (u.role === 'super_admin') return false;
+    if (u.role === 'admin') return user.role === 'super_admin';
+    if (user.role === 'department_head') {
+      const actorDeptIds = user?.scoped_department_ids?.length
+        ? user.scoped_department_ids
+        : (user.department_id ? [user.department_id] : []);
+      return actorDeptIds.length > 0 && actorDeptIds.includes(u.department_id);
+    }
+    if (user.role === 'admin') {
+      return String(u.business_id) === String(user.business_id);
+    }
+return false;
+  };
+
+  // Department Head scope — the business + department(s) they own. Used to
+  // restrict the Business/Department pickers when a department head creates
+  // or edits a user.
+  const deptHeadScope = (() => {
+    if (user?.role !== 'department_head') return null;
+    const deptIds = user?.scoped_department_ids?.length
+      ? user.scoped_department_ids
+      : (user.department_id ? [user.department_id] : []);
+    return {
+      businessId: user?.business_id || null,
+      departmentIds: deptIds,
+    };
+  })();
 
   const filteredUsers = users.filter((u) => {
     if (u.is_active === false) return false;
@@ -347,7 +416,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
               <Upload size={16} className="mr-2" />
               Bulk Upload
             </Button>
-            <Button onClick={() => { setFormData({}); setShowAddModal(true); }} className="shadow-sm hover:shadow-md transition-all">
+            <Button onClick={openAddModal} className="shadow-sm hover:shadow-md transition-all">
               <Plus size={16} className="mr-2" />
               Add User
             </Button>
@@ -543,14 +612,16 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                       </td>
                       <td className="px-3 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); openEdit(u); }}
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 dark:hover:text-indigo-300 transition-all"
-                            title="Edit user"
-                          >
-                            <Edit2 size={15} />
-                          </button>
-                          {u.role !== 'super_admin' && (
+                          {canManageUser(u) && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); openEdit(u); }}
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 dark:hover:text-indigo-300 transition-all"
+                              title="Edit user"
+                            >
+                              <Edit2 size={15} />
+                            </button>
+                          )}
+                          {canManageUser(u) && u.role !== 'super_admin' && u.role !== 'admin' && (
                             <button
                               onClick={(e) => { e.stopPropagation(); openDelete(u); }}
                               className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15 dark:hover:text-red-300 transition-all"
@@ -629,40 +700,55 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
-                </div>
+</div>
               </div>
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                <div>
-                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
-                 <Select value={formData.business_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                   <option value="">Select business…</option>
-                   {businesses.map((b) => (
-                     <option key={b.id} value={b.id}>{b.business_name}</option>
-                   ))}
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
-                  <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} disabled={!formData.business_id} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                    <option value="">Select department…</option>
-                    {modalDepartments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </Select>
-                </div>
+                   <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role <span className="text-red-500">*</span></label>
+                   <Select value={formData.role || ''} onChange={(e) => {
+                     const nextRole = e.target.value;
+                     setFormData((prev) => {
+                       const next = { ...prev, role: nextRole };
+                       // Admins / super admins are business-level and must not be
+                       // assigned to any department — drop any stale department_id.
+                       if (!DEPARTMENT_SCOPED_ROLES.includes(nextRole)) {
+                         next.department_id = '';
+                       }
+                       return next;
+                     });
+                   }} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                     <option value="">Select role…</option>
+{Object.entries(ROLE_META).map(([key, meta]) => {
+                        if (!allowedRolesForActor(user).includes(key)) return null;
+                        return <option key={key} value={key}>{meta.label}</option>;
+                      })}
+                    </Select>
+                  </div>
                </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role <span className="text-red-500">*</span></label>
-                   <Select value={formData.role || ''} onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                    <option value="">Select role…</option>
-                    {Object.entries(ROLE_META).map(([key, meta]) => {
-                      if (user?.role === 'admin' && !['department_head', 'employee'].includes(key)) return null;
-                      return <option key={key} value={key}>{meta.label}</option>;
-                    })}
-                  </Select>
-               </div>
-             </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
+                    <Select value={deptHeadScope ? (deptHeadScope.businessId || '') : (formData.business_id || '')} disabled={!!deptHeadScope} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                      <option value="">Select business…</option>
+                      {businesses.map((b) => (
+                        (!deptHeadScope || String(b.id) === String(deptHeadScope.businessId)) && (
+                          <option key={b.id} value={b.id}>{b.business_name}</option>
+                        )
+                      ))}
+                    </Select>
+                  </div>
+                  {DEPARTMENT_SCOPED_ROLES.includes(formData.role) && (
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
+                      <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} disabled={!formData.business_id || !!deptHeadScope} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                        <option value="">Select department…</option>
+                        {modalDepartments.filter((d) => !deptHeadScope || deptHeadScope.departmentIds.includes(d.id)).map((d) => (
+                          <option key={d.id} value={d.id}>{d.name}</option>
+                        ))}
+                      </Select>
+                    </div>
+                  )}
+                </div>
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                <div>
                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Position Title</label>
@@ -726,25 +812,50 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
                 <Input type="email" value={formData.email || ''} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
               </div>
             </div>
-             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-               <div>
-                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
-                 <Select value={formData.business_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                   <option value="">Select business…</option>
-                   {businesses.map((b) => (
-                     <option key={b.id} value={b.id}>{b.business_name}</option>
-                   ))}
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role</label>
+                  <Select value={formData.role || ''} onChange={(e) => {
+                    const nextRole = e.target.value;
+                    setFormData((prev) => {
+                      const next = { ...prev, role: nextRole };
+                      // Admins / super admins are business-level and must not be
+                      // assigned to any department — drop any stale department_id.
+                      if (!DEPARTMENT_SCOPED_ROLES.includes(nextRole)) {
+                        next.department_id = '';
+                      }
+                      return next;
+                    });
+                  }} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                    <option value="">Select role…</option>
+{Object.entries(ROLE_META).map(([key, meta]) => {
+                        if (!allowedRolesForActor(user).includes(key)) return null;
+                        return <option key={key} value={key}>{meta.label}</option>;
+                      })}
                   </Select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
-                  <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} disabled={!formData.business_id} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                    <option value="">Select department…</option>
-                    {modalDepartments.map((d) => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
+                  <Select value={deptHeadScope ? (deptHeadScope.businessId || '') : (formData.business_id || '')} disabled={!!deptHeadScope} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                    <option value="">Select business…</option>
+                    {businesses.map((b) => (
+                      (!deptHeadScope || String(b.id) === String(deptHeadScope.businessId)) && (
+                        <option key={b.id} value={b.id}>{b.business_name}</option>
+                      )
                     ))}
                   </Select>
                 </div>
+                {DEPARTMENT_SCOPED_ROLES.includes(formData.role || editingUser?.role) && (
+                  <div>
+                    <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
+                    <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} disabled={!formData.business_id || !!deptHeadScope} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                      <option value="">Select department…</option>
+                      {modalDepartments.filter((d) => !deptHeadScope || deptHeadScope.departmentIds.includes(d.id)).map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </Select>
+                  </div>
+                )}
               </div>
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                <div>
