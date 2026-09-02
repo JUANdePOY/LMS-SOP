@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X } from 'lucide-react';
 import { TASK_PRIORITIES, TASK_STATUSES } from '../constants/taskConstants';
 import { validateTaskPayload } from '../utils/taskValidation';
@@ -26,8 +26,13 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData, defaultValues,
   const [businessOptions, setBusinessOptions] = useState([]);
   const [clientOptions, setClientOptions] = useState([]);
 
-  const selectedClientBusinesses =
-    clientOptions.find((c) => String(c.id) === String(clientId))?.businesses || [];
+  // Department Heads may only create tasks for clients in their own department,
+  // so the client dropdown is restricted to those clients (and the server
+  // enforces the same rule independently).
+  const clientOptionsForRole = useMemo(() => {
+    if (!userDepartmentId) return clientOptions;
+    return clientOptions.filter((c) => String(c.department_id) === String(userDepartmentId));
+  }, [clientOptions, userDepartmentId]);
 
   useEffect(() => {
     if (show) {
@@ -67,6 +72,19 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData, defaultValues,
     setProjectId(source.project_id || null);
     setErrors({});
   }, [initialData, show, defaultValues]);
+
+  // When a Department Head opens the form, drop any client/business prefill
+  // that falls outside their department so the dropdowns stay consistent with
+  // the (already restricted) option list.
+  useEffect(() => {
+    if (userDepartmentId && clientId && !clientOptionsForRole.some((c) => String(c.id) === String(clientId))) {
+      setClientId('');
+      setClientBusinessId('');
+    }
+  }, [userDepartmentId, clientId, clientOptionsForRole]);
+
+  const selectedClientBusinesses =
+    clientOptionsForRole.find((c) => String(c.id) === String(clientId))?.businesses || [];
 
   const handleClientChange = (value) => {
     setClientId(value);
@@ -169,7 +187,7 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData, defaultValues,
                 className={fieldClass(errors.client_name)}
               >
                 <option value="">Select client</option>
-                {clientOptions.map((c) => (
+                {clientOptionsForRole.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.client_name}
                   </option>

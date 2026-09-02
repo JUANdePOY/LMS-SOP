@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { getBusinesses } from '../api/business.api';
 import { getDepartmentsForAssignment } from '../api/assignment.api';
-import { TaskRow } from './TaskListRow';
+import { TaskRow, AddTaskRow } from './TaskListRow';
 import InlineEditableName from './InlineEditableName';
 import InlineNameRow from './InlineNameRow';
 
@@ -407,7 +407,7 @@ export default function TaskHierarchyTable({
   onEditProject,
   onDeleteImmediate,
   onDuplicated,
-  onQuickAddTask,
+onQuickAddTask,
   onQuickAddSubtask,
   onRenameClient,
   onRenameBusiness,
@@ -417,9 +417,9 @@ export default function TaskHierarchyTable({
   onCreateProject,
   onCreateClient,
   onDeleteEntity,
-   newTaskIds = null,
-   onViewSubtasks,
-   userDepartmentId = null,
+  newTaskIds = null,
+  onViewSubtasks,
+  userDepartmentId = null,
   }) {
   const tasksById = useMemo(() => {
     const map = {};
@@ -687,22 +687,25 @@ return (
                                 );
                               })}
                               {(
-                                addingFor?.kind === 'subtask' && addingFor.parentId === business.id ? (
-                                  <InlineNameRow
+                                addingFor?.kind === 'task' && addingFor.parentId === business.id ? (
+                                  <AddTaskRow
                                     key="__add-task"
-                                    placeholder="New task name…"
-                                    indent={DEPTH_INDENT_PX * 2}
-                                    onCommit={async (name) => {
-                                      if (onQuickAddTask) await onQuickAddTask(business.id, client.id, name);
-                                      else onAddProjectTask?.(business.id);
+                                    businessId={business.id}
+                                    clientId={client.id}
+                                    canManage={canManage}
+                                    projects={projects}
+                                    onCommit={async (payload) => {
+                                      await onQuickAddTask(business.id, client.id, payload);
                                       setAddingFor(null);
                                     }}
                                     onCancel={() => setAddingFor(null)}
+                                    userDepartmentId={userDepartmentId}
+                                    userDepartmentClientIds={userDepartmentClientIds}
                                   />
                                 ) : canManage && (
                                   <button
                                     type="button"
-                                    onClick={() => startAdd('task', business.id)}
+                                    onClick={() => startAdd('business', business.id)}
                                     className="flex w-full cursor-pointer items-center gap-1.5 py-3 pl-[44px] text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)] h-10"
                                   >
                                     <Plus size={13} className="shrink-0" />

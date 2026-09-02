@@ -36,7 +36,7 @@ export default function Drawer({ open, onClose, children, title, size = "sm", sh
         <div className="fixed inset-0 z-50 flex justify-end">
           {showBackdrop && (
             <motion.div
-              className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+              className="fixed inset-0 bg-black/40 dark:bg-black/60"
               onClick={onClose}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}

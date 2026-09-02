@@ -9,13 +9,13 @@ import { updateTask, getTask, createTask, deleteTask } from '../services/taskSer
 import { getProject, updateProject, deleteProject } from '../services/projectService';
 import { getClient, updateClient, deleteClient } from '../api/client.api';
 import { getBusiness, updateBusiness, deleteBusiness } from '../api/business.api';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useTaskDetails } from '../hooks/useTaskDetails';
 import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
 import { formatDateTime, toLocalInputValue } from '../utils/taskDateUtils';
 import AttachmentSection from './AttachmentSection';
 import CommentSection from './CommentSection';
-import ProgressModal from './ProgressModal';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import SubtaskList from './SubtaskList';
 import { AssigneePicker } from './TaskListRow';
@@ -90,18 +90,35 @@ function isUserAssigned(assignments, user) {
   });
 }
 
-function TaskBody({ taskId, open, onUpdated, onOpenTask, focusSubtasks = false, readOnly = false }) {
+function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks = false, readOnly = false }) {
   const { toast } = useToast();
   const { user, isAnyAdmin, isDepartmentHead } = useAuth();
   const [local, setLocal] = useState(null);
-  const [showProgress, setShowProgress] = useState(false);
   const [pendingAttachmentId, setPendingAttachmentId] = useState(null);
   const [pendingSubtaskId, setPendingSubtaskId] = useState(null);
   const { task, loading, error, saving, load, updateProgress, addComment: postComment, uploadFile, removeAttachment } = useTaskDetails(taskId);
+  const [inlineCompletionRate, setInlineCompletionRate] = useState(0);
+  const [inlineStatus, setInlineStatus] = useState('In Progress');
+  const [inlineNotes, setInlineNotes] = useState('');
 
   useEffect(() => { if (open) load(); }, [open, load]);
 
-  useEffect(() => { if (task) setLocal(task); }, [task]);
+  // If the task was deleted (or otherwise no longer exists), close the panel
+  // instead of lingering on a phantom row that shows "Task not found."
+  useEffect(() => {
+    if (open && !loading && !task && error) {
+      onClose?.();
+    }
+  }, [open, loading, task, error, onClose]);
+
+  useEffect(() => {
+    if (task) {
+      setLocal(task);
+      const latest = Array.isArray(task.progress) && task.progress.length > 0 ? task.progress[0] : null;
+      setInlineCompletionRate(latest ? Number(latest.completion_rate || 0) : Number(task.completion_rate || 0));
+      setInlineStatus(latest?.status || task.status || 'In Progress');
+    }
+  }, [task]);
 
   const patch = async (payload) => {
     try {
@@ -310,14 +327,75 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask, focusSubtasks = false, 
       )}
 
       <div className="border-t border-[var(--border)] px-2 pt-4">
-        <div className="mb-2 flex items-center justify-between">
-          <h4 className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><TrendingUp size={15} /> Progress</h4>
-          {isAssigned && (
-            <button type="button" onClick={() => setShowProgress(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-1.5 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]">
-              <TrendingUp size={12} /> Update
+        <h4 className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><TrendingUp size={15} /> Update Progress</h4>
+        {isAssigned ? (
+          <div className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--bg-page)] p-3">
+            <div>
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Completion Rate</label>
+              <div className="flex flex-wrap gap-1.5">
+                {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((rate) => (
+                  <button
+                    key={rate}
+                    type="button"
+                    onClick={() => setInlineCompletionRate(rate)}
+                    className={cn(
+                      'h-7 w-12 rounded-md text-xs font-medium transition-colors',
+                      inlineCompletionRate === rate
+                        ? 'bg-[var(--color-primary)] text-white'
+                        : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] ring-1 ring-[var(--border)] hover:ring-[var(--color-primary)] hover:text-[var(--color-primary)]'
+                    )}
+                  >
+                    {rate}%
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Status</label>
+              <select
+                value={inlineStatus}
+                onChange={(e) => setInlineStatus(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
+              >
+                {TASK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Notes</label>
+              <textarea
+                value={inlineNotes}
+                onChange={(e) => setInlineNotes(e.target.value)}
+                placeholder="Progress notes..."
+                rows={2}
+                className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-xs outline-none focus:border-[var(--color-primary)] placeholder:text-[var(--text-muted)]"
+              />
+            </div>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={async () => {
+                await updateProgress({
+                  task_id: taskId,
+                  completion_rate: Number(inlineCompletionRate),
+                  status: inlineStatus,
+                  notes: inlineNotes || null,
+                });
+                setInlineNotes('');
+                await load();
+                onUpdated?.(await getTask(taskId));
+              }}
+              className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Saving...' : 'Save Progress'}
             </button>
-          )}
-        </div>
+          </div>
+        ) : (
+          <p className="text-xs text-[var(--text-muted)]">You must be assigned to this task to update progress.</p>
+        )}
+      </div>
+
+      <div className="border-t border-[var(--border)] px-2 pt-4">
+        <h4 className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><TrendingUp size={15} /> Progress History</h4>
         {local.progress && local.progress.length > 0 ? (
           <div className="space-y-2">
             {local.progress.slice(0, 4).map((p) => (
@@ -330,6 +408,7 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask, focusSubtasks = false, 
                   <div className="h-2 flex-1 rounded-full bg-neutral-200 dark:bg-neutral-700"><div className="h-full rounded-full bg-blue-500" style={{ width: `${p.completion_rate}%` }} /></div>
                   <span className="text-xs font-medium text-[var(--text-secondary)]">{p.completion_rate}%</span>
                 </div>
+                {p.notes && <p className="mt-1 text-xs text-[var(--text-muted)]">{p.notes}</p>}
               </div>
             ))}
           </div>
@@ -353,7 +432,6 @@ function TaskBody({ taskId, open, onUpdated, onOpenTask, focusSubtasks = false, 
           onAddComment={(c, parentId, files, mentions) => postComment(taskId, c, parentId, files, mentions)} />
       </div>
 
-      <ProgressModal open={showProgress} onClose={() => setShowProgress(false)} onSubmit={updateProgress} saving={saving} taskId={taskId} initialProgress={local.progress?.[0]} />
       <ConfirmationDialog
         isOpen={pendingAttachmentId !== null}
         onClose={() => setPendingAttachmentId(null)}

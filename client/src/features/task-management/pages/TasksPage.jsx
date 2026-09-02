@@ -279,29 +279,34 @@ export default function TasksPage() {
   // Opens an inline "add task" row under a business unit. Since the project layer
   // has been removed from the table, `parentId` is a client_business_id, not a
   // project id — resolve the owning project (if any) to inherit its client scope.
-  const handleQuickAddTask = useCallback(async (businessId, clientId, title) => {
-    // New tasks default to "Not Started" (status = 'Pending'); priority, due
-    // date, and assignee are left empty so they can be set afterwards. Omit
-    // empty client/business values rather than sending "" — the server rejects
-    // empty strings as invalid FKs.
-    const payload = {
-      title,
-      status: 'Pending',
-      assignments: [],
+  const handleQuickAddTask = useCallback(async (businessId, clientId, payload) => {
+    // The inline AddTaskRow hands a complete payload (title, status, priority,
+    // deadline, assignees, client/business scope) so the new task can be
+    // specified cell-for-cell without a modal. Sub-tasks inherit their parent's
+    // client/business scope so they stay in the same tree branch.
+    const base = {
+      title: payload.title,
+      status: payload.status || 'Pending',
+      priority: payload.priority || 'Medium',
+      assignments: Array.isArray(payload.assignments) ? payload.assignments : [],
     };
-    if (clientId !== undefined && clientId !== '' && clientId !== null) {
-      payload.client_id = Number(clientId);
+    if (payload.deadline_datetime != null && payload.deadline_datetime !== '') {
+      base.deadline_datetime = payload.deadline_datetime;
     }
-    if (businessId !== undefined && businessId !== '' && businessId !== null) {
-      payload.client_business_id = Number(businessId);
+    if (payload.client_id != null && payload.client_id !== '' && payload.client_id !== undefined) {
+      base.client_id = Number(payload.client_id);
+    }
+    if (payload.client_business_id != null && payload.client_business_id !== '' && payload.client_business_id !== undefined) {
+      base.client_business_id = Number(payload.client_business_id);
     }
     try {
-      await create(payload);
+      await create(base);
+      await refreshTasks();
       await refreshStats();
     } catch (err) {
       toast.error(err.message || 'Failed to create task');
     }
-  }, [create, refreshStats, toast]);
+  }, [create, refreshTasks, refreshStats, toast]);
 
   // Add a sub-task under an existing task. Sub-tasks inherit their parent's
   // client/business scope so they stay in the same tree branch.
@@ -317,11 +322,12 @@ export default function TasksPage() {
     if (parent?.client_business_id != null) payload.client_business_id = Number(parent.client_business_id);
     try {
       await create(payload);
+      await refreshTasks();
       await refreshStats();
     } catch (err) {
       toast.error(err.message || 'Failed to create sub-task');
     }
-  }, [tasks, create, refreshStats, toast]);
+  }, [tasks, create, refreshTasks, refreshStats, toast]);
 
   const handleProjectCreated = (project) => {
     if (project?.id && project?.client_id) {
@@ -642,7 +648,19 @@ export default function TasksPage() {
 
   const confirmDelete = async () => {
     if (pendingDeleteId == null) return;
-    await remove(pendingDeleteId);
+    try {
+      await remove(pendingDeleteId);
+      // Close the detail drawer if it was showing the deleted task so the
+      // panel doesn't linger on a row that no longer exists.
+      if (viewingTaskId != null && String(viewingTaskId) === String(pendingDeleteId)) {
+        setViewingTaskId(null);
+        setFocusSubtasks(false);
+      }
+      setPendingDeleteId(null);
+      // `remove()` surfaces its own success/error toast; don't double-up.
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete task');
+    }
   };
 
   // Direct delete used by the List tab's inline "Delete?" confirm so it never
@@ -650,12 +668,17 @@ export default function TasksPage() {
   const deleteTaskNow = useCallback(async (id) => {
     try {
       await remove(id);
-      await refreshStats();
-      toast.success('Task deleted');
+      // Close the detail drawer if it was showing the deleted task so the
+      // panel doesn't linger on a row that no longer exists.
+      if (viewingTaskId != null && String(viewingTaskId) === String(id)) {
+        setViewingTaskId(null);
+        setFocusSubtasks(false);
+      }
+      // `remove()` surfaces its own success/error toast; don't double-up.
     } catch (err) {
       toast.error(err.message || 'Failed to delete task');
     }
-  }, [remove, refreshStats, toast]);
+  }, [remove, toast, viewingTaskId]);
 
   const runBulk = useCallback(async (fn, successMsg) => {
     const ids = [...selectedIds];

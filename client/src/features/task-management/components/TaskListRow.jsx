@@ -568,6 +568,111 @@ function InlineDeleteConfirm({ onConfirm, onCancel }) {
   );
 }
 
+/**
+ * Inline "add task" row rendered directly under a business unit. It mirrors a
+ * real TaskRow cell-for-cell (name · assignees · status · priority · due ·
+ * progress) so the new task can be fully specified inline — no modal. On
+ * commit it hands the parent the complete payload (title, status, priority,
+ * deadline, assignees, client/business scope) to create.
+ */
+export function AddTaskRow({ businessId, clientId, canManage = true, projects = {}, onCommit, onCancel, userDepartmentId = null, userDepartmentClientIds = null }) {
+  const [title, setTitle] = useState('');
+  const [status, setStatus] = useState('Pending');
+  const [priority, setPriority] = useState('Medium');
+  const [deadline, setDeadline] = useState(null);
+  const [assignments, setAssignments] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const commit = async () => {
+    const next = title.trim();
+    if (!next) { onCancel?.(); return; }
+    setSubmitting(true);
+    try {
+      await onCommit({
+        title: next,
+        status,
+        priority,
+        deadline_datetime: deadline,
+        assignments,
+        client_id: clientId ?? null,
+        client_business_id: businessId ?? null,
+      });
+      setTitle('');
+      setStatus('Pending');
+      setPriority('Medium');
+      setDeadline(null);
+      setAssignments([]);
+    } catch {
+      // Parent surfaces its own error toast; keep the row open so the user can retry.
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAssigneeSave = (next) => setAssignments(next);
+
+  return (
+    <div
+      role="row"
+      className={cn(
+        'grid h-10 gap-0 border-b border-[var(--border-subtle)]/40 bg-[var(--bg-surface)] px-2 text-sm',
+        HIERARCHY_GRID
+      )}
+    >
+      <span className="relative z-10 flex min-w-0 items-center justify-between gap-1.5 pr-2 border-r border-[var(--border-subtle)]/30" style={{ paddingLeft: '4px' }}>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-primary)] opacity-40" aria-hidden="true" />
+          <input
+            ref={inputRef}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commit(); }
+              if (e.key === 'Escape') { e.preventDefault(); onCancel?.(); }
+            }}
+            onBlur={() => { if (title.trim()) commit(); else onCancel?.(); }}
+            placeholder="New task name…"
+            className="min-w-0 flex-1 rounded border border-[var(--color-primary)] bg-[var(--bg-page)] px-2 py-1 text-sm outline-none"
+          />
+        </span>
+        <span className="flex shrink-0 items-center gap-1">
+          <button type="button" onClick={commit} disabled={!title.trim() || submitting} className="rounded bg-[var(--color-primary)] px-2 py-0.5 text-xs font-medium text-white hover:bg-[var(--color-primary-hover)] disabled:cursor-not-allowed disabled:opacity-50">
+            {submitting ? 'Adding…' : 'Add'}
+          </button>
+          <button type="button" onClick={() => onCancel?.()} className="rounded px-1.5 py-0.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)]">Cancel</button>
+        </span>
+      </span>
+
+      <span className="hidden min-w-0 items-center justify-center overflow-hidden sm:flex px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
+        {canManage ? (
+          <AssigneePicker assignments={assignments} onSave={handleAssigneeSave} alwaysAdd />
+        ) : (
+          <ReadOnlyAssignees assignments={assignments} />
+        )}
+      </span>
+
+      <span className="flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
+        <StatusDropdown status={status} onChange={(s) => setStatus(s)} />
+      </span>
+
+      <span className="hidden sm:flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
+        <PriorityDropdown priority={priority} onChange={(p) => setPriority(p)} />
+      </span>
+
+      <span className="hidden sm:flex items-center justify-center px-2 border-r border-[var(--border-subtle)]/30" onClick={(e) => e.stopPropagation()}>
+        <DueDateCell value={deadline} onChange={(d) => setDeadline(d)} />
+      </span>
+
+      <span className="hidden items-center justify-center tabular-nums text-xs text-[var(--text-secondary)] sm:flex px-2">
+        0%
+      </span>
+    </div>
+  );
+}
+
 function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDuplicate, onAddSubtask, canManage = true }) {
   const [open, setOpen] = useState(false);
   const [subview, setSubview] = useState(null); // null | 'move' | 'delete'
@@ -588,12 +693,16 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
       const MENU_W = 176;
       const MARGIN = 8;
       const dd = dropdownRef.current;
+      const ddWidth = dd ? dd.offsetWidth : MENU_W;
       const ddHeight = dd ? dd.offsetHeight : 200;
       const spaceBelow = window.innerHeight - rect.bottom;
       const flipUp = ddHeight > spaceBelow && rect.top > spaceBelow;
       let top = flipUp ? rect.top - ddHeight - 4 : rect.bottom + 4;
       top = Math.max(MARGIN, Math.min(top, window.innerHeight - ddHeight - MARGIN));
-      setCoords({ top, left: rect.right - MENU_W });
+      // Right-anchor the subview (delete/move) so it sits flush against the
+      // trigger. `right` is the distance from the viewport's right edge to the
+      // trigger's right edge; the dropdown keeps its left-anchored positioning.
+      setCoords({ top, right: window.innerWidth - rect.right, left: rect.right - MENU_W });
     };
     update();
     const onScroll = (e) => {
@@ -634,7 +743,7 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
   if (!open) return trigger;
 
   const menu = (
-    <div ref={dropdownRef} className="fixed z-50 w-44 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-xl" style={{ top: coords.top, left: coords.left }}>
+    <div ref={dropdownRef} data-portal="task-row-actions" className="fixed z-50 w-44 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-xl" style={{ top: coords.top, left: coords.left }}>
       <button type="button" onClick={(e) => { e.stopPropagation(); onOpen(task); close(); }} className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]">
         Open
       </button>
@@ -659,7 +768,7 @@ function MoreActionsMenu({ task, projects, onOpen, onMoveProject, onDelete, onDu
   );
 
   const panel = (children) => (
-    <div ref={dropdownRef} className="fixed z-50" style={{ top: coords.top, left: coords.left }}>
+    <div ref={dropdownRef} data-portal="task-row-actions" className="fixed z-50" style={{ top: coords.top, left: rect => rect?.left ?? coords.left }}>
       {children}
     </div>
   );
@@ -745,10 +854,14 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
     <div
       role="row"
       onClick={(e) => {
-        // Don't navigate when the click lands on the name (it renames) or any
-        // interactive control — those stop propagation themselves, but this is a
-        // safety net so the row never both renames and opens the detail view.
+        // Don't open the detail panel when the click lands on the action
+        // menu/inline confirm. Those controls are rendered through a portal to
+        // document.body, so their DOM ancestors have no [data-no-nav] — the
+        // React synthetic event still bubbles up to this row. Mark the portal
+        // containers with [data-portal] so the guard can find them regardless
+        // of where they live in the DOM.
         if (e.target.closest('[data-no-nav]')) return;
+        if (e.target.closest('[data-portal="task-row-actions"]')) return;
         onViewTask?.(task);
       }}
       className={cn(
@@ -768,7 +881,6 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
           onClick={handleCompleteToggle}
           disabled={!canEditThisTask}
           aria-pressed={task.status === 'Completed'}
-          onClick={(e) => e.stopPropagation()}
           className={cn(
             'grid h-4 w-4 shrink-0 place-items-center rounded-full border-[1.5px] transition-colors duration-150 ease-out motion-reduce:transition-none',
             task.status === 'Completed'
@@ -812,7 +924,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
           )}
         </span>
         </span>
-        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100" data-no-nav>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onViewTask?.(task); }}

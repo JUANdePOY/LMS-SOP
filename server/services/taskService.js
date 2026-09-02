@@ -342,6 +342,12 @@ async function createTask(payload, actorId) {
     throw error;
   }
 
+  // Department Heads may only create tasks for clients in their own department.
+  // Sub-tasks inherit their parent's scope, so they are exempt.
+  if (!parent_task_id) {
+    await assertClientScopeForTaskCreate(actorId, client_id, client_business_id);
+  }
+
   const actor = await getUser(actorId);
   const assignments = Array.isArray(payload.assignments) ? payload.assignments : [];
   // Tasks may be created unassigned; assignees can be added afterwards.
@@ -1372,6 +1378,47 @@ async function getUser(userId) {
   return rows[0] || null;
 }
 
+// Department Heads may only create tasks against clients that belong to their
+// own department. Resolves the effective client (directly, or via a
+// client_business_id) and throws FORBIDDEN when it sits outside the head's
+// department. Admins / super_admins are unrestricted.
+async function assertClientScopeForTaskCreate(actorId, client_id, client_business_id) {
+  const actor = await getUser(actorId);
+  if (!actor || actor.role !== 'department_head') return;
+
+  let effectiveClientId = client_id ?? null;
+  if (client_business_id != null) {
+    const [bizRows] = await db.query(
+      'SELECT client_id FROM client_businesses WHERE id = ? LIMIT 1',
+      [client_business_id]
+    );
+    const biz = bizRows[0];
+    if (!biz) {
+      const error = new Error('Client business not found');
+      error.code = 'NOT_FOUND';
+      throw error;
+    }
+    effectiveClientId = biz.client_id;
+  }
+  if (effectiveClientId == null) return;
+
+  const [rows] = await db.query(
+    'SELECT id, department_id FROM clients WHERE id = ? LIMIT 1',
+    [effectiveClientId]
+  );
+  const client = rows[0];
+  if (!client) {
+    const error = new Error('Client not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+  if (actor.department_id == null || String(client.department_id) !== String(actor.department_id)) {
+    const error = new Error('You can only create tasks for clients in your department');
+    error.code = 'FORBIDDEN';
+    throw error;
+  }
+}
+
 async function isUserDepartmentHead(userId) {
   const [users] = await db.query(
     'SELECT role FROM users WHERE id = ? LIMIT 1',
@@ -1470,6 +1517,7 @@ async function getBusinessScopedTaskIdsForAdmin(userId) {
      FROM tasks t
      LEFT JOIN users u ON t.created_by = u.id
      LEFT JOIN task_assignments ta ON ta.task_id = t.id
+     LEFT JOIN clients c ON t.client_id = c.id
      WHERE (
        u.business_id = ?
        OR (
@@ -1478,8 +1526,9 @@ async function getBusinessScopedTaskIdsForAdmin(userId) {
            SELECT d.id FROM departments d WHERE d.business_id = ?
          )
        )
+       OR (c.business_id = ?)
      )`,
-    [businessId, businessId]
+    [businessId, businessId, businessId]
   );
 
   return rows.map(r => r.task_id);

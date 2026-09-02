@@ -15,6 +15,12 @@ const TASK_MANAGEMENT_MIGRATIONS = [
   `ALTER TABLE tasks MODIFY COLUMN status ENUM('Pending','In Progress','Completed','Overdue','Cancelled') NULL DEFAULT 'Pending'`,
   `ALTER TABLE tasks MODIFY COLUMN start_datetime DATETIME NULL`,
   `ALTER TABLE tasks MODIFY COLUMN deadline_datetime DATETIME NULL`,
+  // Progress notes: the task_progress.notes column is part of the base table
+  // definition (database.js), but an older table may predate it. CREATE TABLE
+  // IF NOT EXISTS never adds a missing column to an existing table, so without
+  // this migration notes typed in "Update Progress" are silently dropped and the
+  // progress history renders nothing for them.
+  `ALTER TABLE task_progress ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT NULL AFTER status`,
 ];
 
 async function runTaskMigrations() {

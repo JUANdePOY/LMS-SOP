@@ -17,6 +17,9 @@ export function useTaskDetails(taskId) {
       const data = await getTask(taskId);
       setTask(data);
     } catch (err) {
+      // Clear the stale task so callers (e.g. the detail drawer) can react to a
+      // missing row — a failed fetch must not keep showing a phantom task.
+      setTask(null);
       setError(err.message || 'Failed to load task');
     } finally {
       setLoading(false);
