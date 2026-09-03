@@ -829,7 +829,7 @@ onQuickAddTask,
       <p className="text-sm text-[var(--text-muted)]">No tasks found</p>
     </div>
   ) : (
-    <div role="table" aria-label="Client to task hierarchy" className="w-full overflow-x-auto ppm-hierarchy-scroll">
+    <div role="table" aria-label="Client to task hierarchy" className="w-full overflow-x-auto">
       {/* Header row */}
       <div
         role="row"

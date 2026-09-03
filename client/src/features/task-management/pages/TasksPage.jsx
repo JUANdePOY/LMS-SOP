@@ -22,6 +22,7 @@ import FilterBar from '@/shared/components/ui/FilterBar';
 import Breadcrumb from '../components/Breadcrumb';
 import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
 import { notifyOrgTreeChanged, useOrgTreeVersion } from '@/shared/store/orgTreeBus';
+import ClientFormModal from '../components/ClientFormModal';
 
 const VIEW_STORAGE_KEY = 'ppm:tasks:view';
 
@@ -62,6 +63,7 @@ export default function TasksPage() {
   const [view, setView] = useState(() => localStorage.getItem(VIEW_STORAGE_KEY) || 'list');
   const [taskDefaults, setTaskDefaults] = useState(undefined);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [showAddClient, setShowAddClient] = useState(false);
 
   const toggleSelect = useCallback((id) => {
     const key = String(id);
@@ -855,7 +857,6 @@ export default function TasksPage() {
           onEditProject={handleEditProject}
           search={search}
           hideTabs
-          activeViews={TASK_VIEW_KEYS.filter((k) => k !== 'portfolio')}
           onQuickAddTask={handleQuickAddTask}
           onQuickAddSubtask={handleQuickAddSubtask}
           onRenameClient={renameClient}

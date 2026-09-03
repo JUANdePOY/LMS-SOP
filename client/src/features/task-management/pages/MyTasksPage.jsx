@@ -304,7 +304,6 @@ export default function MyTasksPage() {
           canManage={isDepartmentHead}
           canManageTask={isAssignedTask}
           storageKey="ppm:mytasks:view"
-          activeViews={TASK_VIEW_KEYS.filter((k) => k !== 'portfolio')}
           onEdit={handleEditTask}
           onDelete={handleDeleteTask}
           onStatusChange={handleStatusChange}

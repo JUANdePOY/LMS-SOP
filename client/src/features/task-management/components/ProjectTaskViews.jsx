@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { List, KanbanSquare, GanttChart, CalendarDays, Users, FolderKanban, PenTool } from 'lucide-react';
+import { List, KanbanSquare, GanttChart, CalendarDays, Users, PenTool } from 'lucide-react';
 import TaskBoard from './TaskBoard';
 import TaskTimeline from './TaskTimeline';
 import TaskCalendar from './TaskCalendar';
@@ -9,7 +9,7 @@ import TaskHierarchyTable from './TaskHierarchyTable';
 import ViewTabs from './ViewTabs';
 import TaskListTableSkeleton from './TaskListTableSkeleton';
 
-export const TASK_VIEW_KEYS = ['list', 'board', 'timeline', 'calendar', 'workload', 'portfolio', 'whiteboard'];
+export const TASK_VIEW_KEYS = ['list', 'board', 'timeline', 'calendar', 'workload', 'whiteboard'];
 
 export const TASK_VIEWS = [
   { key: 'list', label: 'List', icon: List },
@@ -17,12 +17,11 @@ export const TASK_VIEWS = [
   { key: 'timeline', label: 'Timeline', icon: GanttChart },
   { key: 'calendar', label: 'Calendar', icon: CalendarDays },
   { key: 'workload', label: 'Workload', icon: Users },
-  { key: 'portfolio', label: 'Portfolio', icon: FolderKanban },
   { key: 'whiteboard', label: 'Whiteboard', icon: PenTool },
 ];
 
 /**
- * Shared 7-view engine used by both the flat admin Tasks page (portfolio scope)
+ * Shared 6-view engine used by both the flat admin Tasks page
  * and the per-project Project Workspace. Renders the view switcher + active view.
  * Pass `storageKey` to remember the last view (e.g. per-project).
  */

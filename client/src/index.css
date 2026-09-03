@@ -1262,12 +1262,9 @@ select option {
   --card-shadow: 0 1px 3px rgba(0,0,0,0.40), 0 1px 2px rgba(0,0,0,0.30);
 }
 
-/* Hierarchy table scroll container. The table header is `sticky top-0`, but
-   `position: sticky` only pins when its scroll container has a bounded height.
-   Without this the header scrolls away with the rows. Cap the container to the
-   remaining viewport space (below the pinned app header + page chrome) so the
-   header pins at the top while the body scrolls vertically and horizontally. */
-.ppm-hierarchy-scroll {
-  max-height: calc(100dvh - var(--page-sticky-top, 120px) - 140px);
-  overflow: auto;
-}
+/* Hierarchy table header pinning is handled by the app layout's main scroll
+   container (`<main>` in AppLayout, which already has a bounded, scrollable
+   viewport). The table itself is a normal flow element — no per-component
+   max-height cap is needed, so the header `sticky top-0` pins to the top of
+   the main scroll container and the body scrolls vertically and horizontally
+   with it. */
