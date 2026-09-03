@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Modal } from '@/shared/components/ui/Modal';
+import { Modal } from '@/shared/components/ui/modal';
 import { Button } from '@/shared/components/ui/button';
 import api from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
