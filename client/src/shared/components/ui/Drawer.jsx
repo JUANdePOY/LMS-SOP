@@ -18,11 +18,11 @@ export default function Drawer({ open, onClose, children, title, size = "sm", sh
   }, [open, onClose]);
 
   const sizeClass =
-    size === "lg"
-      ? "w-[42vw] min-w-[480px] max-w-[720px]"
-      : size === "md"
-        ? "w-[320px] max-w-md"
-        : "max-w-sm";
+    size === 'lg'
+      ? 'w-full sm:w-[42vw] sm:min-w-[480px] sm:max-w-[720px]'
+      : size === 'md'
+        ? 'w-full sm:w-[320px] sm:max-w-md'
+        : 'w-full sm:max-w-sm';
 
   if (!mounted && !open) return null;
 

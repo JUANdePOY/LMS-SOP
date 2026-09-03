@@ -226,7 +226,7 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
         className="w-full rounded-lg border border-transparent bg-transparent px-2 py-1 text-base font-semibold text-[var(--text-primary)] hover:border-[var(--border)] focus:border-[var(--color-primary)] focus:outline-none disabled:cursor-default disabled:opacity-100 disabled:hover:border-transparent"
       />
 
-      <div className="grid grid-cols-2 gap-3 px-2">
+      <div className="grid grid-cols-1 gap-3 px-2 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Status</label>
           <div className="flex items-center gap-2">
@@ -329,26 +329,26 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
         <h4 className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><TrendingUp size={15} /> Update Progress</h4>
         {isAssigned ? (
           <div className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--bg-page)] p-3">
-            <div>
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Completion Rate</label>
-              <div className="flex flex-wrap gap-1.5">
-                {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((rate) => (
-                  <button
-                    key={rate}
-                    type="button"
-                    onClick={() => setInlineCompletionRate(rate)}
-                    className={cn(
-                      'h-7 w-12 rounded-md text-xs font-medium transition-colors',
-                      inlineCompletionRate === rate
-                        ? 'bg-[var(--color-primary)] text-white'
-                        : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] ring-1 ring-[var(--border)] hover:ring-[var(--color-primary)] hover:text-[var(--color-primary)]'
-                    )}
-                  >
-                    {rate}%
-                  </button>
-                ))}
-              </div>
-            </div>
+<div>
+               <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Completion Rate</label>
+               <div className="flex flex-wrap gap-1.5">
+                 {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((rate) => (
+                   <button
+                     key={rate}
+                     type="button"
+                     onClick={() => setInlineCompletionRate(rate)}
+                     className={cn(
+                       'h-7 w-10 rounded-md text-xs font-medium transition-colors sm:w-12',
+                       inlineCompletionRate === rate
+                         ? 'bg-[var(--color-primary)] text-white'
+                         : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] ring-1 ring-[var(--border)] hover:ring-[var(--color-primary)] hover:text-[var(--color-primary)]'
+                     )}
+                   >
+                     {rate}%
+                   </button>
+                 ))}
+               </div>
+             </div>
             <div>
               <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Status</label>
               <select
@@ -471,7 +471,7 @@ function GenericBody({ entity }) {
           <p className="whitespace-pre-wrap text-sm text-[var(--text-secondary)]">{entity.description}</p>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3 px-2">
+      <div className="grid grid-cols-1 gap-3 px-2 sm:grid-cols-2">
         {fields.slice(0, 6).map(([k, v]) => (
           <Field key={k} label={k.replace(/_/g, ' ')}>{String(v)}</Field>
         ))}
@@ -572,7 +572,7 @@ function ClientBody({ clientId, entity, open, onUpdated }) {
         )}
       </div>
       {(local.created_by_name || local.created_at) && (
-        <div className="grid grid-cols-2 gap-3 px-2">
+        <div className="grid grid-cols-1 gap-3 px-2 sm:grid-cols-2">
           {local.created_by_name && <Field label="Created by">{local.created_by_name}</Field>}
           {local.created_at && <Field label="Created">{formatDateTime(local.created_at)}</Field>}
         </div>
@@ -644,7 +644,7 @@ function BusinessBody({ businessId, entity, open, onUpdated }) {
           className="w-full resize-y rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
         />
       </div>
-      <div className="grid grid-cols-2 gap-3 px-2">
+      <div className="grid grid-cols-1 gap-3 px-2 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Status</label>
           <select
@@ -658,7 +658,7 @@ function BusinessBody({ businessId, entity, open, onUpdated }) {
           </select>
         </div>
         <Field label="Code">{local.business_code || '—'}</Field>
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Email</label>
           <input
             value={local.email || ''}
@@ -751,7 +751,7 @@ function ProjectBody({ projectId, open, onUpdated }) {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3 px-2">
+      <div className="grid grid-cols-1 gap-3 px-2 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Status</label>
           <select

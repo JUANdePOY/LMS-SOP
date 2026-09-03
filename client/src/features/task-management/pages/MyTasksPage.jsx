@@ -240,15 +240,22 @@ export default function MyTasksPage() {
       </div>
 
       {statItems && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--ppm-border)] pb-3 text-xs text-[var(--ppm-text-muted)]">
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
           {statItems.map((stat) => {
             const Icon = stat.icon;
             return (
-              <span key={stat.label} className="inline-flex items-center gap-1.5">
-                <Icon size={13} className="text-[var(--ppm-text-muted)]" />
-                <span className="font-semibold tabular-nums text-[var(--ppm-text)]">{stat.value}</span>
-                <span>{stat.label}</span>
-              </span>
+              <div
+                key={stat.label}
+                className="flex items-center gap-2.5 rounded-lg border border-[var(--ppm-border)] bg-[var(--ppm-surface)] px-3 py-2.5 shadow-[var(--card-shadow)]"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--ppm-surface-hover)] text-[var(--ppm-text-2)]">
+                  <Icon size={16} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-semibold tabular-nums text-[var(--ppm-text)]">{stat.value}</span>
+                  <span className="block text-[11px] text-[var(--ppm-text-muted)]">{stat.label}</span>
+                </span>
+              </div>
             );
           })}
         </div>
@@ -270,7 +277,7 @@ export default function MyTasksPage() {
       )}
 
       {scope?.projectId && (
-        <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-[var(--ppm-border)] bg-[var(--bg-surface)] px-3 py-2 text-xs">
+        <div className="mb-3 flex flex-col gap-2 rounded-lg border border-[var(--ppm-border)] bg-[var(--bg-surface)] px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
           <span className="min-w-0 truncate text-[var(--ppm-text-muted)]">
             Showing the task tree for{' '}
             <span className="font-medium text-[var(--text-primary)]">

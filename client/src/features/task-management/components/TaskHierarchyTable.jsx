@@ -13,23 +13,20 @@ import InlineNameRow from './InlineNameRow';
 import { useToast } from '@/shared/components/ui/Toast';
 
 // Shared responsive grid template for the hierarchy table. Column order is
-// always: [toggle, name, assignees, status, priority, due, progress, open, select].
-// Less-critical columns are dropped on smaller screens so the table reflows
-// instead of forcing horizontal scroll:
-//   base (<640px):  toggle · name · status · select   (4 cols)
-//   sm   (>=640px): + assignees · priority · due · progress (8 cols)
-//   lg   (>=1024px): + open icon                       (9 cols)
-// Every row (header, task rows, hierarchy rows) must render exactly these 9
-// cells in order and apply the matching visibility classes below. The trailing
-// 28px column is the selection checkbox (bulk actions on task rows).
+// always: [name, assignees, status, priority, due, progress]. Less-critical
+// columns are dropped on smaller screens so the table reflows instead of
+// forcing horizontal scroll. Every row (header, task rows, hierarchy rows)
+// must render exactly these 6 cells in order and apply the matching visibility
+// classes below so the visible cell count always matches the active grid.
+//   base (<640px):  name · status · due                 (3 cols)
+//   sm   (>=640px): + assignees · priority · progress   (6 cols)
 export const HIERARCHY_GRID =
-  'grid-cols-[minmax(150px,1fr)_minmax(90px,120px)] ' +
-  'sm:grid-cols-[minmax(200px,1fr)_140px_120px_100px_110px_90px] ' +
-  'lg:grid-cols-[minmax(220px,1fr)_150px_130px_110px_120px_100px]';
+  'grid-cols-[minmax(150px,1fr)_minmax(88px,104px)_minmax(76px,96px)] ' +
+  'sm:grid-cols-[minmax(200px,1fr)_140px_120px_100px_110px_90px]';
 
 // Visibility classes that must be applied to the corresponding grid cell so the
 // number of visible cells always matches the active HIERARCHY_GRID column count.
-const CELL_HIDE_SM = 'hidden sm:block'; // assignees / priority / due / progress
+const CELL_HIDE_SM = 'hidden sm:flex'; // assignees / priority / progress
 
 /**
  * Inline "add client" form. Beyond a name it lets the user assign the new client
@@ -836,11 +833,11 @@ onQuickAddTask,
         className={cn('sticky top-0 z-20 grid gap-0 border-t-[0.5px] border-b-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 bg-[var(--bg-surface)] px-2 text-[11px] font-medium uppercase tracking-wide text-[var(--text-secondary)] h-10', HIERARCHY_GRID)}
       >
         <span className="flex items-center justify-center py-2 pr-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 text-center">Name</span>
-        <span className="flex items-center justify-center py-2 px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 text-center">Assignees</span>
+        <span className={cn('flex items-center justify-center py-2 px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 text-center', CELL_HIDE_SM)}>Assignees</span>
         <span className="flex items-center justify-center py-2 px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 text-center">Status</span>
-        <span className="flex items-center justify-center py-2 px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 text-center">Priority</span>
-        <span className="flex items-center justify-center py-2 px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 text-center">Due</span>
-        <span className="flex items-center justify-center py-2 px-2 text-center">Progress</span>
+        <span className={cn('flex items-center justify-center py-2 px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75 text-center', CELL_HIDE_SM)}>Priority</span>
+        <span className="flex items-center justify-center py-2 px-2 text-center">Due</span>
+        <span className={cn('flex items-center justify-center py-2 px-2 text-center', CELL_HIDE_SM)}>Progress</span>
       </div>
 
       {clients.map((client) => {
@@ -1257,7 +1254,7 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
                </span>
              )}
              {canEdit && !hideAdd && (
-            <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 motion-reduce:transition-none group-hover:opacity-100">
+            <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 motion-reduce:transition-none group-hover:opacity-100 ppm-touch-actions">
               <button
                 type="button"
                 onClick={(e) => {
@@ -1349,8 +1346,10 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
       </span>
       <span className="px-2" />
       <span className={cn(CELL_HIDE_SM, 'px-2')} />
-      <span className={cn('text-xs tabular-nums text-[var(--text-secondary)] px-2 text-center', CELL_HIDE_SM)}>{hideDue ? '' : formatDue(dueDate)}</span>
-      <span className="flex items-center justify-center tabular-nums text-xs text-[var(--text-secondary)] text-center hidden sm:flex">
+      <span className="flex items-center justify-center tabular-nums text-xs text-[var(--text-secondary)] text-center px-2">
+        {hideDue ? '' : formatDue(dueDate)}
+      </span>
+      <span className={cn('flex items-center justify-center tabular-nums text-xs text-[var(--text-secondary)] text-center px-2', CELL_HIDE_SM)}>
         {Math.round(progress || 0)}%
       </span>
     </div>

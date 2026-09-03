@@ -76,6 +76,31 @@ function SecondaryNavRouteSync() {
   return null;
 }
 
+/**
+ * Mobile trigger for the Businesses sidebar. Rendered inside the
+ * NavigationProvider (AppLayout itself sits above it), so it can read the
+ * current panel state and toggle it. Hidden on desktop, where the panel
+ * opens itself from the nav rail.
+ */
+function SecondaryNavMobileTrigger() {
+  const { secondaryNav, openSecondaryNav, closeSecondaryNav } = useNavigation();
+  const location = useLocation();
+  const isTasksRoute = location.pathname === "/tasks" || location.pathname.startsWith("/tasks/my");
+  const secondaryOpen = secondaryNav === "clients";
+  if (!isTasksRoute) return null;
+  return (
+    <button
+      onClick={() => (secondaryOpen ? closeSecondaryNav() : openSecondaryNav("clients"))}
+      aria-label={secondaryOpen ? "Close businesses panel" : "Open businesses panel"}
+      aria-expanded={secondaryOpen}
+      className="flex lg:hidden h-9 items-center gap-1.5 rounded-xl px-2.5 text-[var(--header-fg)] hover:bg-[var(--header-hover-bg)] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-amber)_60%,transparent)]"
+    >
+      <Building2 size={18} />
+      <span className="text-xs font-medium">Businesses</span>
+    </button>
+  );
+}
+
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -299,6 +324,8 @@ export default function AppLayout() {
               >
                 <Menu size={20} />
               </button>
+
+              <SecondaryNavMobileTrigger />
 
               {/* Greeting — only on the dashboard, no blue fill. */}
               {location.pathname === "/" && (

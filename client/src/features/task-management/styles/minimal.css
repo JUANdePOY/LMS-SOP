@@ -238,7 +238,15 @@
   gap: 2px;
   border-bottom: 1px solid var(--ppm-border);
   margin-bottom: 16px;
+  /* On narrow screens the full tab set overflows; let it scroll horizontally
+     instead of clipping or pushing the layout wider. */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
 }
+.ppm-tabs::-webkit-scrollbar { display: none; }
 .ppm-tab {
   display: inline-flex;
   align-items: center;
@@ -249,12 +257,24 @@
   color: var(--ppm-text-muted);
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
+  /* Minimum touch target on mobile so tabs stay tappable when the row is
+     scrolled to its edge. */
+  min-width: 2.5rem;
+  scroll-snap-align: start;
   transition: color var(--ppm-dur) var(--ppm-ease), border-color var(--ppm-dur) var(--ppm-ease);
 }
 .ppm-tab:hover { color: var(--ppm-text); }
 .ppm-tab--active {
   color: var(--ppm-accent);
   border-bottom-color: var(--ppm-accent);
+}
+
+/* Touch devices never fire :hover, so the row action buttons (Open / Add task /
+   More) that are normally revealed on hover would stay invisible on a phone.
+   The action containers carry `.ppm-touch-actions`; on coarse-pointer devices
+   force them visible so they're tappable. */
+@media (hover: none) and (pointer: coarse) {
+  .ppm-touch-actions { opacity: 1 !important; }
 }
 
 /* ── Misc ──────────────────────────────────────────────────────────────────── */

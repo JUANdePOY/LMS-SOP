@@ -925,7 +925,7 @@ export function AddTaskRow({ businessId, clientId, canManage = true, projects = 
         <PriorityDropdown priority={priority} onChange={(p) => setPriority(p)} />
       </span>
 
-      <span className="hidden sm:flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
+      <span className="flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
         <DueDateCell value={deadline} onChange={(d) => setDeadline(d)} />
       </span>
 
@@ -1230,7 +1230,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
           )}
         </span>
         </span>
-        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100" data-no-nav>
+        <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 ppm-touch-actions" data-no-nav>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onViewTask?.(task); }}
@@ -1293,7 +1293,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
         )}
       </span>
 
-      <span className="hidden sm:flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
+      <span className="flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
         {canEditThisTask ? (
           <DueDateCell value={task.deadline_datetime} overdue={overdue} onChange={(d) => onInlineUpdate?.(task, { deadline_datetime: d })} />
         ) : (

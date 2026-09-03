@@ -606,16 +606,34 @@ export default function SecondarySidebar() {
   return (
     <div
       className={cn(
-        "hidden lg:flex lg:sticky lg:top-0 lg:self-start lg:z-20 lg:flex-col",
+        "lg:sticky lg:top-0 lg:self-start lg:z-20 lg:flex lg:flex-col",
         "shrink-0 transition-[width,opacity] duration-300 ease-out lg:overflow-hidden",
         open ? "lg:w-[260px] lg:opacity-100" : "lg:w-0 lg:opacity-0 lg:pointer-events-none",
         "lg:h-[calc(100dvh-var(--app-shell-inset,20px))]",
-        "min-[1280px]:h-[calc(100dvh-var(--app-shell-inset-lg,28px))]",
+        "min-[1280px]:lg:h-[calc(100dvh-var(--app-shell-inset-lg,28px))]",
         "bg-[var(--bg-sidebar)] text-[var(--text-on-sidebar)]",
-        "border-r border-[var(--border-sidebar)]"
+        "border-r border-[var(--border-sidebar)]",
+        // Desktop: inline sticky panel. Mobile: a slide-over drawer that sits
+        // above the page content and closes on backdrop click / Escape.
+        open
+          ? "fixed inset-0 z-50 flex lg:static lg:inset-auto"
+          : "hidden lg:flex"
       )}
       aria-label="Businesses"
     >
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 lg:hidden"
+          onClick={closeSecondaryNav}
+          aria-hidden="true"
+        />
+      )}
+      <div
+        className={cn(
+          "relative flex h-full w-[86vw] max-w-[320px] flex-col border-r border-[var(--border-sidebar)] bg-[var(--bg-sidebar)] shadow-xl transition-transform duration-250 ease-out lg:translate-x-0 lg:w-full lg:max-w-none lg:shadow-none",
+          open ? "translate-x-0" : "translate-x-full"
+        )}
+      >
       <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-[var(--header-border)] px-4">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[color-mix(in_srgb,var(--text-on-sidebar)_60%,transparent)]">
           Businesses
@@ -802,6 +820,7 @@ export default function SecondarySidebar() {
         confirmText={pendingDelete?.kind === "business" ? "Hide" : "Delete"}
         variant="destructive"
       />
+      </div>
     </div>
   );
 }
