@@ -45,6 +45,36 @@ function getBannerPriority(entry) {
   return PRIORITY_ORDER[entry.type] ?? 0;
 }
 
+/**
+ * Collapses banners that are the "same" banner into a single entry. A banner's
+ * identity is its (type, title) pair — e.g. five "New SOP assigned to you"
+ * notifications all collapse to one banner instead of stacking five copies.
+ * When several collapse, the count is folded into the message so the user still
+ * sees how many items the banner represents.
+ */
+function dedupeBanners(list) {
+  const groups = new Map();
+  for (const b of list) {
+    const key = `${b.type}::${b.title || ""}`;
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, { ...b, __count: 1 });
+      continue;
+    }
+    existing.__count += 1;
+  }
+  return Array.from(groups.values()).map((b) => {
+    const count = b.__count || 1;
+    if (count <= 1) {
+      const { __count, ...rest } = b;
+      return rest;
+    }
+    const suffix = ` (${count} items)`;
+    const { __count, ...rest } = b;
+    return { ...rest, message: rest.message ? `${rest.message}${suffix}` : suffix };
+  });
+}
+
 function sortQueue(entries) {
   return [...entries].sort((a, b) => {
     const priorityDiff = getBannerPriority(b) - getBannerPriority(a);
@@ -186,7 +216,7 @@ export default function BannerSection({ items = [], onDismiss }) {
     const itemMap = new Map();
     normalizedItems.forEach((item) => itemMap.set(item.id, item));
     pendingBanners.forEach((item) => itemMap.set(item.id, item));
-    return sortQueue(Array.from(itemMap.values()));
+    return sortQueue(dedupeBanners(Array.from(itemMap.values())));
   }, [normalizedItems, pendingBanners]);
 
   const visibleBanners = useMemo(

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getBusinesses, createBusiness, updateBusiness, deleteBusiness } from '../api/business.api';
 import { validatePagination, sanitizeSearchQuery } from '../utils/validation';
+import { notifyOrgTreeChanged } from '@/shared/store/orgTreeBus';
 
 function getErrorMessage(err, fallback) {
   return err?.response?.data?.message || err?.message || fallback;
@@ -45,6 +46,9 @@ export function useBusinesses(initialParams = {}) {
     const created = payload?.data || payload;
     if (payload?.status === 'success') {
       setBusinesses((prev) => [created, ...prev]);
+      // SOP businesses feed the SecondarySidebar's org tree — broadcast so
+      // the panel refreshes alongside this list.
+      notifyOrgTreeChanged();
     }
     return created;
   }, []);
@@ -54,6 +58,7 @@ export function useBusinesses(initialParams = {}) {
     const payload = response.data;
     if (payload?.status === 'success') {
       setBusinesses((prev) => prev.map((b) => (b.id === id ? { ...b, ...data } : b)));
+      notifyOrgTreeChanged();
     }
     return payload;
   }, []);
@@ -61,6 +66,7 @@ export function useBusinesses(initialParams = {}) {
   const remove = useCallback(async (id) => {
     await deleteBusiness(id);
     setBusinesses((prev) => prev.filter((b) => b.id !== id));
+    notifyOrgTreeChanged();
   }, []);
 
   useEffect(() => {

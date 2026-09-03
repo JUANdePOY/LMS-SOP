@@ -4,7 +4,6 @@ import TaskBoard from './TaskBoard';
 import TaskTimeline from './TaskTimeline';
 import TaskCalendar from './TaskCalendar';
 import TaskWorkload from './TaskWorkload';
-import TaskPortfolio from './TaskPortfolio';
 import TaskWhiteboard from './TaskWhiteboard';
 import TaskHierarchyTable from './TaskHierarchyTable';
 import ViewTabs from './ViewTabs';
@@ -159,7 +158,6 @@ onCreateClient={onCreateClient}
           {view === 'timeline' && <TaskTimeline tasks={tasks} onView={onView || onViewTask} />}
           {view === 'calendar' && <TaskCalendar tasks={tasks} onView={onView || onViewTask} />}
           {view === 'workload' && <TaskWorkload tasks={tasks} />}
-          {view === 'portfolio' && <TaskPortfolio tasks={tasks} projectsById={projectsById} />}
           {view === 'whiteboard' && <TaskWhiteboard tasks={tasks} onView={onView || onViewTask} />}
         </>
       )}

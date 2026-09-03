@@ -207,11 +207,16 @@ router.post('/', requireAdmin, [
 
     const passwordHash = await require('../app/auth').hashPassword(password);
 
-    const finalBusinessId = req.user.role === 'super_admin' ? (business_id ? parseInt(business_id) : null) : req.user.business_id;
+    // A super admin is not tied to any business (SOP) or department — the
+    // account is business-less by design, so drop any business_id/department_id
+    // that was sent for that role regardless of what the UI shows.
+    const isCreatingSuperAdmin = role === 'super_admin';
+    const finalBusinessId = isCreatingSuperAdmin ? null : (req.user.role === 'super_admin' ? (business_id ? parseInt(business_id) : null) : req.user.business_id);
+    const finalDepartmentId = isCreatingSuperAdmin ? null : (department_id ? parseInt(department_id) : null);
 
     const userId = await authModel.create({
       full_name, email, password_hash: passwordHash, role,
-      department_id: department_id ? parseInt(department_id) : null,
+      department_id: finalDepartmentId,
       business_id: finalBusinessId,
       position_title, employee_id, contact_number, employment_status,
       date_hired: date_hired || null, birthdate: birthdate || null, address: address || null,

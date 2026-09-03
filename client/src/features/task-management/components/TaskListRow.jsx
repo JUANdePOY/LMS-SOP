@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { TASK_PRIORITIES, TASK_PRIORITY_DOT } from '../constants/taskConstants';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { getUsersForAssignment, getDepartmentsForAssignment, getAssignmentScope } from '../api/assignment.api';
+import api from '@/services/api';
 import { formatDate } from '../utils/taskDateUtils';
 import { useToast } from '@/shared/components/ui/Toast';
 import { duplicateTask } from '../services/taskService';
@@ -219,7 +220,7 @@ function DueDateCell({ value, onChange, overdue = false }) {
   );
 }
 
-function Avatar({ name, avatarUrl, size = 20, className = '' }) {
+export function Avatar({ name, avatarUrl, size = 20, className = '' }) {
   const initials = (name || '?')
     .split(/\s+/)
     .filter(Boolean)
@@ -592,6 +593,197 @@ function ReadOnlyAssignees({ assignments }) {
   );
 }
 
+// Business-manager picker. A "business manager" is granted management access
+// to every task in a client business unit (see /api/client-businesses/:id/managers).
+// This picker lets an admin pick users to grant that access to the business
+// row the assignees column belongs to.
+export function BusinessManagerPicker({ businessId, businessName, managers, onSave, canManage = true }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [justSelected, setJustSelected] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 224 });
+  const [maxHeight, setMaxHeight] = useState(null);
+  const triggerRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const VIEWPORT_MARGIN = 8;
+
+  const updatePosition = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const width = Math.max(rect.width, 224);
+    const ddHeight = dropdownRef.current ? dropdownRef.current.offsetHeight : 360;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const flipUp = ddHeight > spaceBelow && spaceAbove > spaceBelow;
+    let top = flipUp ? rect.top - ddHeight - 4 : rect.bottom + 4;
+    top = Math.max(VIEWPORT_MARGIN, Math.min(top, window.innerHeight - ddHeight - VIEWPORT_MARGIN));
+    setCoords({ top, left: rect.left, width });
+    const available = (flipUp ? rect.top : window.innerHeight - rect.bottom) - VIEWPORT_MARGIN;
+    setMaxHeight(available > 160 ? available : 160);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    const handleScroll = (e) => {
+      if (dropdownRef.current && e.target && dropdownRef.current.contains(e.target)) return;
+      const el = triggerRef.current;
+      if (!el) { setOpen(false); return; }
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+        setOpen(false);
+        return;
+      }
+      updatePosition();
+    };
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [open, updatePosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(event) {
+      if (triggerRef.current && triggerRef.current.contains(event.target)) return;
+      if (dropdownRef.current && dropdownRef.current.contains(event.target)) return;
+      setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  useEffect(() => {
+    if (justSelected) { setJustSelected(false); return; }
+    let active = true;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await api.get(`/client-businesses/${businessId}/managers/available`, {
+          params: { search: query, limit: 100 },
+        });
+        if (active) setOptions(Array.isArray(res.data?.data) ? res.data.data : []);
+      } catch {
+        if (active) setOptions([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }, 200);
+    return () => { active = false; clearTimeout(timer); };
+  }, [businessId, query, justSelected]);
+
+  const grantedIds = new Set((managers || []).map((m) => String(m.user_id)));
+  const selectable = options.filter((u) => !grantedIds.has(String(u.id)));
+
+  const grant = (user) => {
+    setJustSelected(true);
+    setQuery('');
+    setOptions([]);
+    onSave?.(user);
+  };
+
+  const totalGranted = (managers || []).length;
+  const emptyState = (
+    <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full border border-dashed border-[var(--border)] text-[var(--text-muted)]">
+      <UserPlus size={13} />
+    </span>
+  );
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        title={totalGranted ? `${totalGranted} manager${totalGranted === 1 ? '' : 's'}` : 'Assign manager'}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        disabled={!canManage}
+        className={cn(
+          'group/bm inline-flex max-w-full items-center gap-1 overflow-hidden rounded-md py-0.5 pl-0.5 pr-1 transition-colors hover:bg-[var(--bg-surface-hover)]',
+          !canManage && 'cursor-not-allowed opacity-60'
+        )}
+      >
+        {totalGranted === 0 ? emptyState : (
+          <span className="flex items-center -space-x-2">
+            {managers.slice(0, 3).map((m) => (
+              <span key={m.user_id} className="relative overflow-hidden rounded-full ring-2 ring-[var(--bg-surface)]">
+                <Avatar name={m.full_name} avatarUrl={m.avatar_url} size={22} />
+              </span>
+            ))}
+            {totalGranted > 3 && (
+              <span
+                className="flex items-center justify-center rounded-full bg-[var(--bg-surface-hover)] text-[10px] font-medium text-[var(--text-secondary)] ring-2 ring-[var(--bg-surface)]"
+                style={{ width: 22, height: 22 }}
+              >
+                +{totalGranted - 3}
+              </span>
+            )}
+          </span>
+        )}
+        {canManage && totalGranted > 0 && (
+          <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[var(--text-muted)] opacity-0 ring-1 ring-[var(--border)] transition-opacity group-hover/bm:opacity-100">
+            <UserPlus size={13} />
+          </span>
+        )}
+      </button>
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          onClick={(e) => e.stopPropagation()}
+          style={{ position: 'fixed', top: coords.top, left: coords.left, width: coords.width, maxHeight, zIndex: 60 }}
+          className="flex max-h-full flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-2 shadow-xl"
+        >
+          <div className="shrink-0 px-2 pb-1">
+            <p className="truncate text-xs font-medium text-[var(--text-primary)]">{businessName || 'Business'}</p>
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search users to grant manager access..."
+              className="mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg-page)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
+            />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-1">
+            {loading && <p className="px-2 py-1 text-xs text-[var(--text-muted)]">Searching...</p>}
+            {!loading && selectable.length === 0 && (
+              <p className="px-2 py-1 text-xs text-[var(--text-muted)]">
+                {options.length === 0 ? 'No users found' : 'All matched users already granted'}
+              </p>
+            )}
+            {selectable.map((u) => (
+              <button key={u.id} type="button" onClick={(e) => { e.stopPropagation(); grant(u); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--bg-surface-hover)]">
+                <Avatar name={u.full_name} avatarUrl={u.avatar_url} size={22} />
+                <span className="truncate text-[var(--text-primary)]">{u.full_name}</span>
+              </button>
+            ))}
+          </div>
+          {totalGranted > 0 && (
+            <div className="mt-1 shrink-0 border-t border-[var(--border)] px-2 pt-1">
+              <p className="px-1 pb-1 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Granted access</p>
+              {managers.map((m) => (
+                <div key={m.user_id} className="flex items-center justify-between gap-2 py-0.5">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Avatar name={m.full_name} avatarUrl={m.avatar_url} size={20} />
+                    <span className="truncate text-xs text-[var(--text-secondary)]">{m.full_name}</span>
+                  </span>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); onSave?.({ revoke: true, user_id: m.user_id }); }} className="shrink-0 text-[var(--text-muted)] hover:text-red-500" aria-label={`Revoke ${m.full_name}`}>
+                    <span className="text-xs">×</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 // Move-to-business picker. Tasks live directly under a client business unit
 // (the project layer has been removed), so "moving" a task means reassigning
 // its client_id + client_business_id to a different business unit. The options
@@ -904,7 +1096,18 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
       return proj?.client_id ?? null;
     })() ?? null
   );
-  const canEditThisTask = canManage && (userDepartmentId == null || taskDeptIds.has(String(userDepartmentId)) || (userDepartmentClientIds != null && userDepartmentClientIds.has(taskClientId)));
+  const baseManage = canManage && (userDepartmentId == null || taskDeptIds.has(String(userDepartmentId)) || (userDepartmentClientIds != null && userDepartmentClientIds.has(taskClientId)));
+  // Inline field edits (status, priority, due date, title, complete toggle)
+  // are allowed for admins, department heads, task creators, direct assignees,
+  // OR any user granted business-manager access to this task's business. The
+  // server flags that grant on the task payload as `can_edit`, so an employee
+  // assigned to the business (client) can edit these cells inline even when
+  // they aren't individually assigned to the task.
+  const canEditThisTask = baseManage || Boolean(task.can_edit);
+  // Administration (assignees, delete, move, duplicate, add sub-task) stays with
+  // admins / department heads only — a business manager cannot reassign or
+  // remove tasks, even for the business they manage.
+  const canAdminister = baseManage;
 
   // A sub-task is one with a parent_task_id. Resolve the parent's title from
   // the sibling map so the employee can see which task this one belongs to.
@@ -1040,7 +1243,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
           <MoreActionsMenu
             task={task}
             businesses={businesses}
-            canManage={canEditThisTask}
+            canManage={canAdminister}
             onOpen={(t) => onViewTask?.(t)}
             onMoveBusiness={handleMoveBusiness}
             onDelete={handleDelete}
@@ -1067,7 +1270,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
       </span>
 
       <span className="hidden min-w-0 items-center justify-center overflow-hidden sm:flex px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
-        {canEditThisTask ? (
+        {canAdminister ? (
           <AssigneePicker assignments={task.assignments} onSave={handleAssigneeSave} />
         ) : (
           <ReadOnlyAssignees assignments={task.assignments} />

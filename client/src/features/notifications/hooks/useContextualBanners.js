@@ -27,6 +27,36 @@ const ENTITY_BANNER_TYPE = {
   onboarding: "announcement",
 };
 
+/**
+ * Collapses banners that are the "same" banner into a single entry. A banner's
+ * identity is its (type, title) pair — e.g. five "New SOP assigned to you"
+ * notifications all collapse to one banner instead of stacking five copies.
+ * When several collapse, the count is folded into the message so the user still
+ * sees how many items the banner represents.
+ */
+function dedupeBanners(list) {
+  const groups = new Map();
+  for (const b of list) {
+    const key = `${b.type}::${b.title || ""}`;
+    const existing = groups.get(key);
+    if (!existing) {
+      groups.set(key, { ...b, __count: 1 });
+      continue;
+    }
+    existing.__count += 1;
+  }
+  return Array.from(groups.values()).map((b) => {
+    const count = b.__count || 1;
+    if (count <= 1) {
+      const { __count, ...rest } = b;
+      return rest;
+    }
+    const suffix = ` (${count} items)`;
+    const { __count, ...rest } = b;
+    return { ...rest, message: rest.message ? `${rest.message}${suffix}` : suffix };
+  });
+}
+
 export function useContextualBanners({ enabled = true } = {}) {
   const { user, isAnyAdmin } = useAuth();
   const userId = user?.id;
@@ -137,8 +167,10 @@ export function useContextualBanners({ enabled = true } = {}) {
 
   const banners = useMemo(
     () =>
-      [...adminOverdueBanners, ...overdueBanners, ...notificationBanners].sort(
-        (a, b) => (b.priority || 0) - (a.priority || 0)
+      dedupeBanners(
+        [...adminOverdueBanners, ...overdueBanners, ...notificationBanners].sort(
+          (a, b) => (b.priority || 0) - (a.priority || 0)
+        )
       ),
     [adminOverdueBanners, overdueBanners, notificationBanners]
   );

@@ -257,7 +257,7 @@ export default function SecondarySidebar() {
         toast.success("Client deleted");
       } else if (kind === "business") {
         await api.delete(`/businesses/${id}`);
-        toast.success("Business deleted");
+        toast.success("Business hidden from all users");
       } else {
         await api.delete(`/clients/${clientId}/businesses/${id}`);
         toast.success("Business deleted");
@@ -390,7 +390,7 @@ export default function SecondarySidebar() {
         )}
       >
         <Link
-          to={`/tasks?view=list&business=${unit.id}&client=${client.id}`}
+          to={`/tasks?business=${unit.id}&client=${client.id}`}
           className="flex min-w-0 flex-1 items-center gap-2 py-2 text-[13px]"
         >
           <Briefcase size={14} className="shrink-0" />
@@ -444,7 +444,7 @@ export default function SecondarySidebar() {
           >
             {cOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </button>
-          <Link to={`/tasks?view=list&client=${client.id}`} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-sm">
+          <Link to={`/tasks?client=${client.id}`} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-sm">
             <Building2
               size={16}
               className={cn(
@@ -533,7 +533,7 @@ export default function SecondarySidebar() {
             {bOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </button>
           <Link
-            to={`/tasks?view=list&business=${key}`}
+            to={`/tasks?business=${key}`}
             onClick={(e) => e.stopPropagation()}
             className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left text-sm font-medium focus:outline-none"
           >
@@ -795,9 +795,11 @@ export default function SecondarySidebar() {
         isOpen={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
         onConfirm={confirmDelete}
-        title={`Delete ${pendingDelete?.kind === "client" ? "Client" : "Business"}`}
-        message={`Are you sure you want to delete "${pendingDelete?.name || ""}"? This may also affect its business units, projects, and tasks.`}
-        confirmText="Delete"
+        title={pendingDelete?.kind === "business" ? "Hide business from all users" : `Delete ${pendingDelete?.kind === "client" ? "Client" : "Business"}`}
+        message={pendingDelete?.kind === "business"
+          ? `Are you sure you want to hide "${pendingDelete?.name || ""}"? The business, its clients, and its business units will stay in the system — they'll just stop appearing for every user. You can restore it later from the organization page.`
+          : `Are you sure you want to delete "${pendingDelete?.name || ""}"? This may also affect its business units, projects, and tasks.`}
+        confirmText={pendingDelete?.kind === "business" ? "Hide" : "Delete"}
         variant="destructive"
       />
     </div>

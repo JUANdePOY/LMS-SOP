@@ -80,15 +80,8 @@ function EditableDate({ label, value, disabled, onChange }) {
 // Returns true when the given user is allowed to update progress, attach files,
 // and comment on a task: they must be assigned (directly, or via a department /
 // position assignment) or be an admin.
-function isUserAssigned(assignments, user) {
-  if (!Array.isArray(assignments) || !user) return false;
-  return assignments.some((a) => {
-    if (a.assignment_type === 'User') return String(a.reference_id) === String(user.id);
-    if (a.assignment_type === 'Department') return String(a.reference_id) === String(user.department_id);
-    if (a.assignment_type === 'Position') return Boolean(a.reference_id) && a.reference_id === user.position_title;
-    return false;
-  });
-}
+// (Retained for reference — the detail drawer now reads the server-side
+// `can_interact` flag, which already folds in the business-manager grant.)
 
 function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks = false, readOnly = false }) {
   const { toast } = useToast();
@@ -207,8 +200,14 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
   // still message, upload attachments, and update progress — but only when they
   // are assigned to the task itself. When readOnly is forced (employee viewing
   // an unassigned task), everything is view-only.
-  const canEdit = !readOnly && isAnyAdmin;
-  const isAssigned = !readOnly && (isAnyAdmin || isUserAssigned(local.assignments, user));
+  //
+  // A granted business manager is treated like an assignee for the whole
+  // business: the server flags `can_edit` / `can_interact` on the task detail
+  // payload, so a manager can edit this task's title, description, status,
+  // priority, start/due dates, update progress, attach files, and comment —
+  // even when they are not individually assigned to it.
+  const canEdit = !readOnly && (isAnyAdmin || local.can_edit);
+  const isAssigned = !readOnly && (isAnyAdmin || local.can_interact);
 
   // Save only the user picks, but preserve any team/department assignments that
   // the picker doesn't manage so they aren't lost on update.

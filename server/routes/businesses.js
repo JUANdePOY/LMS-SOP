@@ -301,6 +301,11 @@ router.put('/:id', [
 });
 
 // DELETE /api/businesses/:id
+// Hides the SOP business from every user by flipping its status to
+// `inactive`. The row (and its departments, clients, tasks) is intentionally
+// NOT dropped — a "delete" here is a visibility toggle, not a purge, so the
+// org structure stays intact and can be restored. A real purge is still
+// available via the legacy `businessModel.remove` (force) path.
 router.delete('/:id', async (req, res) => {
   try {
     const businessId = parseInt(req.params.id);
@@ -314,24 +319,26 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Business not found', code: 'NOT_FOUND' });
     }
 
-    const force = req.query.force === 'true' || req.body?.force === true;
-    await businessModel.remove(businessId, force);
+    const hidden = await businessModel.softRemove(businessId, req.user.id);
+    if (!hidden) {
+      return res.status(409).json({ status: 'error', message: 'Business is already hidden', code: 'ALREADY_INACTIVE' });
+    }
 
     logAudit({
       user_id: req.user.id,
-      action: 'business.deleted',
+      action: 'business.hidden',
       entity_type: 'business',
       entity_id: businessId,
-      metadata: { business_code: target.business_code, business_name: target.business_name, forced: force },
+      metadata: { business_code: target.business_code, business_name: target.business_name },
     });
 
-    res.json({ status: 'success', message: 'Business deleted successfully' });
+    res.json({ status: 'success', message: 'Business hidden from all users' });
   } catch (err) {
-    if (err.statusCode === 409) {
-      return res.status(409).json({ status: 'error', message: err.message, code: 'HAS_DEPARTMENTS' });
+    if (err.statusCode === 404) {
+      return res.status(404).json({ status: 'error', message: 'Business not found', code: 'NOT_FOUND' });
     }
-    console.error('Business delete error:', err);
-    res.status(500).json({ status: 'error', message: 'Failed to delete business', code: 'DB_ERROR' });
+    console.error('Business hide error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to hide business', code: 'DB_ERROR' });
   }
 });
 

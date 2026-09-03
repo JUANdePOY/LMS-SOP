@@ -211,6 +211,38 @@ async function notifyAdminsTaskStatus(task, statusLabel) {
   return Promise.all(promises);
 }
 
+// Notify the employee who was just granted business-manager access to a client
+// business unit. This is the banner that surfaces on their My Tasks page
+// ("You've been assigned to a business") so they know they can now edit every
+// task in that business. Push/sound are sent only to non-admin assignees.
+async function notifyBusinessManagerGranted(businessId, userId, grantedBy) {
+  if (!businessId || !userId) return [];
+  const [users] = await db.query(
+    'SELECT id, role FROM users WHERE id = ? AND is_active = 1 LIMIT 1',
+    [userId]
+  );
+  const user = users[0];
+  if (!user) return [];
+  const [bizRows] = await db.query(
+    'SELECT id, business_name, client_id FROM client_businesses WHERE id = ? LIMIT 1',
+    [businessId]
+  );
+  const business = bizRows[0];
+  const shouldPush = !isAdminRole(user.role);
+  return notificationService.createNotification({
+    userId: user.id,
+    title: 'You have been assigned to a business',
+    body: business ? business.business_name : 'A client business unit',
+    type: 'info',
+    link: '/tasks/my',
+    entityType: 'business',
+    entityId: businessId,
+    category: 'business_manager',
+    disablePush: !shouldPush,
+    disableSound: !shouldPush,
+  });
+}
+
 module.exports = {
   ADMIN_ROLES,
   resolveAssignedUsers,
@@ -220,5 +252,6 @@ module.exports = {
   notifyNewAssignments,
   notifyMentioned,
   notifyAdminsTaskStatus,
+  notifyBusinessManagerGranted,
   isAdminRole,
 };

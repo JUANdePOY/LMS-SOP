@@ -6,9 +6,11 @@ import { cn } from '@/lib/utils';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { getBusinesses } from '../api/business.api';
 import { getDepartmentsForAssignment } from '../api/assignment.api';
-import { TaskRow, AddTaskRow } from './TaskListRow';
+import api from '@/services/api';
+import { TaskRow, AddTaskRow, BusinessManagerPicker, Avatar } from './TaskListRow';
 import InlineEditableName from './InlineEditableName';
 import InlineNameRow from './InlineNameRow';
+import { useToast } from '@/shared/components/ui/Toast';
 
 // Shared responsive grid template for the hierarchy table. Column order is
 // always: [toggle, name, assignees, status, priority, due, progress, open, select].
@@ -626,7 +628,8 @@ onQuickAddTask,
   userRole = '',
   userBusinessId = null,
   userDepartmentBusinessId = null,
-  }) {
+}) {
+  const { toast } = useToast();
   const tasksById = useMemo(() => {
     const map = {};
     for (const t of tasks || []) {
@@ -673,6 +676,58 @@ onQuickAddTask,
   const [addingFor, setAddingFor] = useState(null);
   // Whether the inline "add client" row at the bottom of the table is open.
   const [addingClient, setAddingClient] = useState(false);
+
+  // Business managers: { [client_business_id]: manager[] }. Each business row
+  // shows its granted managers in the Assignees column and lets an admin grant
+  // / revoke access directly from the row.
+  const [businessManagers, setBusinessManagers] = useState({});
+
+  const loadBusinessManagers = useCallback(async (businessId) => {
+    if (businessId == null) return;
+    try {
+      const res = await api.get(`/client-businesses/${businessId}/managers`);
+      const list = Array.isArray(res.data?.data) ? res.data.data : [];
+      setBusinessManagers((prev) => ({ ...prev, [String(businessId)]: list }));
+    } catch {
+      setBusinessManagers((prev) => ({ ...prev, [String(businessId)]: [] }));
+    }
+  }, []);
+
+  const handleAssignBusinessManager = useCallback(async (businessId, user) => {
+    try {
+      await api.post(`/client-businesses/${businessId}/managers`, { user_id: user.id });
+      await loadBusinessManagers(businessId);
+      toast.success(`${user.full_name} can now manage all tasks in this business`);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to grant business access');
+    }
+  }, [loadBusinessManagers, toast]);
+
+  const handleRevokeBusinessManager = useCallback(async (businessId, userId) => {
+    try {
+      await api.delete(`/client-businesses/${businessId}/managers/${userId}`);
+      await loadBusinessManagers(businessId);
+      toast.success('Business access revoked');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to revoke business access');
+    }
+  }, [loadBusinessManagers, toast]);
+
+  // Load the granted-manager list for every business in the hierarchy once.
+  // Each business row reads from this map; without it the picker would always
+  // start empty and the read-only view would never render.
+  useEffect(() => {
+    const ids = new Set();
+    for (const client of clients) {
+      for (const business of client.businesses) {
+        if (business.id != null) ids.add(String(business.id));
+      }
+    }
+    for (const id of ids) loadBusinessManagers(id);
+    // Intentionally keyed on the business-id set only — re-running on every
+    // `clients` reference change (e.g. after creating a task) would re-fetch
+    // managers for rows the admin is actively working in.
+  }, [clients, loadBusinessManagers]);
 
   // Opens an inline "add" row directly under the clicked parent (no modal):
   // a client reveals a business row, a business reveals a task row.
@@ -800,19 +855,21 @@ return (
                 id={client.id}
                 name={client.name}
                 open={open}
-                 onToggle={() => toggle(clientKey)}
-                 dueDate={client.rollup.earliestDue}
-                progress={client.rollup.avgProgress}
-                dimmed={dimmed}
-                 canEdit={canManage}
-                 onRename={onRenameClient}
-                 onAddChild={startAdd}
-                onDeleteEntity={onDeleteEntity}
-                 onHideEmptyGroups={hideEmptyGroups}
-                 hideDue
-                 taller
-                 noBorder
-                />
+onToggle={() => toggle(clientKey)}
+                  dueDate={client.rollup.earliestDue}
+                 progress={client.rollup.avgProgress}
+                 dimmed={dimmed}
+                  canEdit={canManage}
+                  onRename={onRenameClient}
+                  onAddChild={startAdd}
+                 onDeleteEntity={onDeleteEntity}
+                  onHideEmptyGroups={hideEmptyGroups}
+                  hideDue
+                  taller
+                  noBorder
+                 count={client.businesses.length}
+                 countLabel="businesses"
+                 />
             <AnimatePresence initial={false}>
               {open && (
                 <motion.div
@@ -835,18 +892,23 @@ return (
                           id={business.id}
                           name={business.name}
                           open={bOpen}
-                          onToggle={() => toggle(businessKey)}
-                          dueDate={business.rollup.earliestDue}
-                          progress={business.rollup.avgProgress}
-                          dimmed={bDimmed}
-                          canEdit={canManage}
-                          onRename={onRenameBusiness}
-                          onAddChild={startAdd}
-                          onDeleteEntity={onDeleteEntity}
-                          onHideEmptyGroups={hideEmptyGroups}
-                          hideDue
-                          noBorder
-                        />
+onToggle={() => toggle(businessKey)}
+                           dueDate={business.rollup.earliestDue}
+                           progress={business.rollup.avgProgress}
+                           dimmed={bDimmed}
+                           canEdit={canManage}
+                           onRename={onRenameBusiness}
+                           onAddChild={startAdd}
+                           onDeleteEntity={onDeleteEntity}
+                           onHideEmptyGroups={hideEmptyGroups}
+                           hideDue
+                           noBorder
+                           onAssignBusiness={handleAssignBusinessManager}
+                           businessManagers={businessManagers[String(business.id)]}
+                           onRevokeBusinessManager={handleRevokeBusinessManager}
+                           count={business.rollup.total}
+                           countLabel="tasks"
+                           />
                         <AnimatePresence initial={false}>
                           {bOpen && (
                             <motion.div
@@ -1004,6 +1066,28 @@ canManage={canManage}
 
 const DEPTH_INDENT_PX = 20;
 
+// Read-only view of granted business managers (shown in the Assignees column
+// of a business row when the viewer cannot manage the business).
+function ReadOnlyBusinessManagers({ managers }) {
+  return (
+    <span className="flex items-center -space-x-2" title={(managers || []).map((m) => m.full_name).join(', ')}>
+      {(managers || []).slice(0, 3).map((m) => (
+        <span key={m.user_id} className="relative overflow-hidden rounded-full ring-2 ring-[var(--bg-surface)]">
+          <Avatar name={m.full_name} avatarUrl={m.avatar_url} size={22} />
+        </span>
+      ))}
+      {(managers || []).length > 3 && (
+        <span
+          className="flex items-center justify-center rounded-full bg-[var(--bg-surface-hover)] text-[10px] font-medium text-[var(--text-secondary)] ring-2 ring-[var(--bg-surface)]"
+          style={{ width: 22, height: 22 }}
+        >
+          +{(managers || []).length - 3}
+        </span>
+      )}
+    </span>
+  );
+}
+
 // Per-kind visual identity. Each hierarchy level (client / business) gets a
 // subtle, premium accent so a row's type is obvious at a glance — a tinted
 // chip (icon + label) and a matching accent on the expand caret. Colors are
@@ -1030,7 +1114,7 @@ const LEVEL_STYLE = {
    business: { font: 'font-normal',  size: 'text-sm', tracking: '', leading: '' },
 };
 
-function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false }) {
+function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false, onAssignBusiness, businessManagers = null, onRevokeBusinessManager, count = null, countLabel = '' }) {
   const level = LEVEL_STYLE[kind] || LEVEL_STYLE.business;
   const meta = KIND_META[kind];
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1147,24 +1231,32 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
                {meta.label}
              </span>
            )}
-           <span className="flex min-w-0 items-center" data-no-nav>
-            <InlineEditableName
-              value={name}
-              canEdit={canEdit}
-              onCommit={(next) => onRename?.(id, next)}
-              renameSignal={renameSignal}
-              className={cn(
-                'truncate text-[var(--text-primary)]',
-                level.font,
-                level.size,
-                level.tracking,
-                level.leading
-              )}
-              inputClassName={cn(level.font, level.size, level.tracking, level.leading)}
-              ariaLabel={`Rename ${kind}`}
-             />
-            </span>
-            {canEdit && !hideAdd && (
+<span className="flex min-w-0 items-center" data-no-nav>
+             <InlineEditableName
+               value={name}
+               canEdit={canEdit}
+               onCommit={(next) => onRename?.(id, next)}
+               renameSignal={renameSignal}
+               className={cn(
+                 'truncate text-[var(--text-primary)]',
+                 level.font,
+                 level.size,
+                 level.tracking,
+                 level.leading
+               )}
+               inputClassName={cn(level.font, level.size, level.tracking, level.leading)}
+               ariaLabel={`Rename ${kind}`}
+              />
+             </span>
+             {count != null && (
+               <span
+                 title={`${count} ${countLabel}`}
+                 className="flex shrink-0 items-center rounded-full bg-[var(--bg-surface-hover)] px-2 py-0.5 text-[10px] font-medium tabular-nums text-[var(--text-secondary)]"
+               >
+                 {count}
+               </span>
+             )}
+             {canEdit && !hideAdd && (
             <span className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 motion-reduce:transition-none group-hover:opacity-100">
               <button
                 type="button"
@@ -1237,7 +1329,24 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
         )}
       </span>
 
-      <span className={cn(CELL_HIDE_SM, 'px-2')} />
+      <span className="hidden sm:flex items-center justify-center px-2" onClick={(e) => e.stopPropagation()}>
+        {kind === 'business' ? (
+          canEdit ? (
+            <BusinessManagerPicker
+              businessId={id}
+              businessName={name}
+              managers={businessManagers}
+              canManage={canEdit}
+              onSave={(user) => {
+                if (user?.revoke) onRevokeBusinessManager?.(id, user.user_id);
+                else onAssignBusiness?.(id, user);
+              }}
+            />
+          ) : (businessManagers || []).length > 0 ? (
+            <ReadOnlyBusinessManagers managers={businessManagers} />
+          ) : null
+        ) : null}
+      </span>
       <span className="px-2" />
       <span className={cn(CELL_HIDE_SM, 'px-2')} />
       <span className={cn('text-xs tabular-nums text-[var(--text-secondary)] px-2 text-center', CELL_HIDE_SM)}>{hideDue ? '' : formatDue(dueDate)}</span>

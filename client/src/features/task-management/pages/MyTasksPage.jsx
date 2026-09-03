@@ -116,13 +116,16 @@ export default function MyTasksPage() {
   }, [user, isDepartmentHead]);
 
   // Opening a task clears its unread assignment notification so its red "new"
-  // badge disappears and the header count decrements.
+  // badge disappears and the header count decrements. A task is read-only when
+  // the employee is not assigned to it — UNLESS they're a granted business
+  // manager of its business, in which case the server's `can_edit` flag (which
+  // folds in the business-manager grant) entitles them to edit it.
   const handleViewTask = useCallback((task) => {
     setViewingTaskId(task.id);
-    setViewingTaskReadOnly(!isAssignedTask(task));
+    setViewingTaskReadOnly(!task.is_assigned && !task.can_edit);
     const notif = unreadTaskNotifications.find((n) => String(n.entity_id) === String(task.id));
     if (notif) markRead(notif.id);
-  }, [unreadTaskNotifications, markRead, isAssignedTask]);
+  }, [unreadTaskNotifications, markRead]);
 
   const handleEditTask = useCallback((task) => {
     setViewingTaskId(task.id);

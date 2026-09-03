@@ -5,6 +5,7 @@ import api from '@/services/api';
 import { Button } from '@/shared/components/ui/button';
 import { Modal } from '@/shared/components/ui/modal';
 import { useToast } from '@/shared/components/ui/Toast';
+import { notifyOrgTreeChanged } from '@/shared/store/orgTreeBus';
 import Breadcrumb from '../components/Breadcrumb';
 
 export default function ClientDetailPage() {
@@ -111,6 +112,7 @@ export default function ClientDetailPage() {
                 setNewBiz('');
                 const res = await api.get(`/clients/${client.id}`);
                 setClient(res.data?.data || null);
+                notifyOrgTreeChanged();
               } catch (err) {
                 toast.error(err.response?.data?.message || 'Failed to add business');
               } finally {

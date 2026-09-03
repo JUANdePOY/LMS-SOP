@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Modal } from '@/shared/components/ui/modal';
+import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/button';
 import api from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
+import { notifyOrgTreeChanged } from '@/shared/store/orgTreeBus';
 
 export default function BusinessFormModal({ open, clientId, clientName, onClose, onCreated }) {
   const { toast } = useToast();
@@ -25,6 +26,7 @@ export default function BusinessFormModal({ open, clientId, clientName, onClose,
       });
       const business = res.data?.data;
       toast.success('Business created');
+      notifyOrgTreeChanged();
       onCreated?.(business);
       setName('');
       onClose();

@@ -29,7 +29,7 @@ export function useBusinessClientTree() {
       // list being unavailable for a given role) must not blank the other list,
       // otherwise the whole secondary panel renders empty.
       const [bizRes, clientRes, projectRes] = await Promise.allSettled([
-        api.get('/businesses', { params: { limit: 1000 } }),
+        api.get('/businesses', { params: { limit: 1000, status: 'active' } }),
         api.get('/clients'),
         api.get('/projects', { params: { limit: 1000 } }),
       ]);

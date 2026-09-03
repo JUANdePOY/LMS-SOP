@@ -51,6 +51,9 @@ let cachedSnapshot = null;
 // Tracks which task-assignment notifications we've already surfaced as a banner
 // so each assignment only produces one banner (across polls/WS refreshes).
 let seenTaskNotificationIds = new Set();
+// Tracks which business-manager grant notifications we've already surfaced as
+// a banner, so each grant only produces one banner.
+let seenBusinessManagerNotificationIds = new Set();
 let taskNotificationsInitialized = false;
 
 function sortBanners(entries) {
@@ -152,6 +155,31 @@ export const NotificationStore = {
         taskNotificationsInitialized = true;
       }
       taskNotifications.forEach((n) => seenTaskNotificationIds.add(n.id));
+
+      // Surface a banner when an admin grants an employee business-manager
+      // access to a client business unit. This is the "you've been assigned to
+      // a business" banner that lands on the employee's My Tasks page — it
+      // tells them they can now edit every task in that business. The store
+      // only banners genuinely new notifications, so a re-grant doesn't spam.
+      const businessManagerNotifications = notifications.filter(
+        (n) => n.entity_type === 'business' && n.category === 'business_manager'
+      );
+      if (businessManagerNotifications.length) {
+        businessManagerNotifications
+          .filter((n) => !seenBusinessManagerNotificationIds.has(n.id))
+          .forEach((n) => {
+            enqueueBanner({
+              id: `business-manager-${n.id}`,
+              type: 'announcement',
+              title: n.title || 'You have been assigned to a business',
+              message: n.body || '',
+              link: n.link || '/tasks/my',
+              ctaLabel: 'View tasks',
+              priority: 2,
+            });
+          });
+        businessManagerNotifications.forEach((n) => seenBusinessManagerNotificationIds.add(n.id));
+      }
 
       emitChange();
       return serverNotifications;

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Modal } from '@/shared/components/ui/modal';
+import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/button';
 import api from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
+import { notifyOrgTreeChanged } from '@/shared/store/orgTreeBus';
 
 export default function ClientFormModal({ open, onClose, onCreated, businessId }) {
   const { toast } = useToast();
@@ -46,6 +47,7 @@ export default function ClientFormModal({ open, onClose, onCreated, businessId }
       });
       const client = res.data?.data;
       toast.success('Client created');
+      notifyOrgTreeChanged();
       onCreated?.(client);
       setName('');
       setBusinesses('');

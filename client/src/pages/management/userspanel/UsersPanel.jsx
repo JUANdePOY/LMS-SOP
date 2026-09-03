@@ -240,7 +240,9 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       // department — never carry a department_id for them, even if the record
       // has a stale value.
       department_id: DEPARTMENT_SCOPED_ROLES.includes(u.role) ? (u.department_id || '') : '',
-      business_id: u.business_id || '',
+      // Super admins are not tied to any business (SOP) — clear any business_id
+      // so the account stays business-less.
+      business_id: u.role === 'super_admin' ? '' : (u.business_id || ''),
       position_title: u.position_title || '',
       employee_id: u.employee_id || '',
       contact_number: u.contact_number || '',
@@ -707,15 +709,15 @@ return false;
                    <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role <span className="text-red-500">*</span></label>
                    <Select value={formData.role || ''} onChange={(e) => {
                      const nextRole = e.target.value;
-                     setFormData((prev) => {
-                       const next = { ...prev, role: nextRole };
-                       // Admins / super admins are business-level and must not be
-                       // assigned to any department — drop any stale department_id.
-                       if (!DEPARTMENT_SCOPED_ROLES.includes(nextRole)) {
-                         next.department_id = '';
-                       }
-                       return next;
-                     });
+setFormData((prev) => {
+                        const next = { ...prev, role: nextRole };
+                        // Admins / super admins are business-level and must not be
+                        // assigned to any department — drop any stale department_id.
+                        if (!DEPARTMENT_SCOPED_ROLES.includes(nextRole)) {
+                          next.department_id = '';
+                        }
+                        return next;
+                      });
                    }} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
                      <option value="">Select role…</option>
 {Object.entries(ROLE_META).map(([key, meta]) => {
@@ -728,7 +730,7 @@ return false;
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
-                    <Select value={deptHeadScope ? (deptHeadScope.businessId || '') : (formData.business_id || '')} disabled={!!deptHeadScope} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                    <Select value={deptHeadScope ? (deptHeadScope.businessId || '') : (formData.business_id || '')} disabled={!!deptHeadScope || formData.role === 'super_admin'} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
                       <option value="">Select business…</option>
                       {businesses.map((b) => (
                         (!deptHeadScope || String(b.id) === String(deptHeadScope.businessId)) && (
@@ -834,17 +836,17 @@ return false;
                       })}
                   </Select>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
-                  <Select value={deptHeadScope ? (deptHeadScope.businessId || '') : (formData.business_id || '')} disabled={!!deptHeadScope} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                    <option value="">Select business…</option>
-                    {businesses.map((b) => (
-                      (!deptHeadScope || String(b.id) === String(deptHeadScope.businessId)) && (
-                        <option key={b.id} value={b.id}>{b.business_name}</option>
-                      )
-                    ))}
-                  </Select>
-                </div>
+<div>
+                    <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
+                    <Select value={deptHeadScope ? (deptHeadScope.businessId || '') : (formData.business_id || '')} disabled={!!deptHeadScope || (formData.role || editingUser?.role) === 'super_admin'} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
+                      <option value="">Select business…</option>
+                      {businesses.map((b) => (
+                        (!deptHeadScope || String(b.id) === String(deptHeadScope.businessId)) && (
+                          <option key={b.id} value={b.id}>{b.business_name}</option>
+                        )
+                      ))}
+                    </Select>
+                  </div>
                 {DEPARTMENT_SCOPED_ROLES.includes(formData.role || editingUser?.role) && (
                   <div>
                     <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>

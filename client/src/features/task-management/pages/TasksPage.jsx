@@ -18,7 +18,6 @@ import { deleteProject } from '../services/projectService';
 import api from '@/services/api';
 import ProjectTaskViews, { TASK_VIEWS, TASK_VIEW_KEYS } from '../components/ProjectTaskViews';
 import ViewTabs from '../components/ViewTabs';
-import SavedViewChips from '../components/SavedViewChips';
 import FilterBar from '@/shared/components/ui/FilterBar';
 import Breadcrumb from '../components/Breadcrumb';
 import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
@@ -26,13 +25,6 @@ import { notifyOrgTreeChanged, useOrgTreeVersion } from '@/shared/store/orgTreeB
 
 const VIEW_STORAGE_KEY = 'ppm:tasks:view';
 
-const SAVED_VIEWS = [
-  { key: 'all', label: 'All' },
-  { key: 'overdue', label: 'Overdue', status: 'Overdue' },
-  { key: 'high', label: 'High Priority', priority: 'High' },
-  { key: 'critical', label: 'Critical', priority: 'Critical' },
-  { key: 'my', label: 'My Tasks', assignee: '__me__' },
-];
 
 export default function TasksPage() {
   const { isAnyAdmin, isDepartmentHead, user } = useAuth();
@@ -48,7 +40,6 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
-  const [activeViewKey, setActiveViewKey] = useState('all');
 
   useEffect(() => {
     markEntityTypeRead('task');
@@ -88,9 +79,6 @@ export default function TasksPage() {
 
   const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
 
-  // All projects, keyed by id, used for hierarchy grouping and scope prefill.
-  // clientTree holds the full Client -> Business skeleton (including businesses
-  // that have no projects yet) so newly created ones still appear in the table.
   const [projectsById, setProjectsById] = useState({});
   const [clientTree, setClientTree] = useState([]);
   const orgVersion = useOrgTreeVersion();
@@ -148,9 +136,6 @@ export default function TasksPage() {
     }
   }, [update, toast]);
 
-  // Inline create handlers for the hierarchy table's "+" buttons (client -> business,
-  // business -> project). These create the entity by name only and refresh the tree;
-  // no modal is opened.
   const handleCreateBusiness = useCallback(async (clientId, name) => {
     try {
       await api.post(`/clients/${clientId}/businesses`, { business_name: name.trim() });
@@ -190,9 +175,6 @@ export default function TasksPage() {
     }
   }, [toast, loadProjects]);
 
-  // The hierarchy's "business" node is a client_businesses row (built from the
-  // project tree), so deleting it must hit the client-business endpoint, not the
-  // unrelated `businesses` table endpoint. Resolve the owning client id here.
   const findClientIdForBusiness = useCallback((id) => {
     for (const client of clientTree || []) {
       const match = (client.businesses || []).find((b) => String(b.id) === String(id));
@@ -222,11 +204,6 @@ export default function TasksPage() {
     }
   }, [toast, loadProjects, refreshTasks, findClientIdForBusiness]);
 
-  // When a client/business scope is active, seed new-task forms with those
-  // values so the user doesn't have to pick them manually. businessParam is a
-  // client_business_id only when clientParam is also set (unit click); when it's
-  // an SOP business scope (business click, no client) we can't prefill a specific
-  // client_business_id, so leave it unset.
   const scopeDefaults = useMemo(() => {
     if (!clientParam && !businessParam) return undefined;
     const defaults = {};
@@ -240,7 +217,6 @@ export default function TasksPage() {
     localStorage.setItem(VIEW_STORAGE_KEY, next);
   }, []);
 
-  // Honour an incoming ?view= query param (e.g. opened from the sidebar panel).
   useEffect(() => {
     if (viewParam && TASK_VIEW_KEYS.includes(viewParam) && viewParam !== view) {
       setView(viewParam);
@@ -276,14 +252,7 @@ export default function TasksPage() {
     setShowForm(true);
   }, [scopeDefaults]);
 
-  // Opens an inline "add task" row under a business unit. Since the project layer
-  // has been removed from the table, `parentId` is a client_business_id, not a
-  // project id — resolve the owning project (if any) to inherit its client scope.
   const handleQuickAddTask = useCallback(async (businessId, clientId, payload) => {
-    // The inline AddTaskRow hands a complete payload (title, status, priority,
-    // deadline, assignees, client/business scope) so the new task can be
-    // specified cell-for-cell without a modal. Sub-tasks inherit their parent's
-    // client/business scope so they stay in the same tree branch.
     const base = {
       title: payload.title,
       status: payload.status || 'Pending',
@@ -308,8 +277,6 @@ export default function TasksPage() {
     }
   }, [create, refreshTasks, refreshStats, toast]);
 
-  // Add a sub-task under an existing task. Sub-tasks inherit their parent's
-  // client/business scope so they stay in the same tree branch.
   const handleQuickAddSubtask = useCallback(async (parentTaskId, title) => {
     const parent = tasks.find((t) => String(t.id) === String(parentTaskId));
     const payload = {
@@ -335,8 +302,6 @@ export default function TasksPage() {
     }
   };
 
-  // Keyboard shortcut: N opens the quick-add task form (Cmd/Ctrl+K palette is
-  // now global, owned by the app shell).
   useEffect(() => {
     const onKey = (e) => {
       const tag = (e.target?.tagName || '').toLowerCase();
@@ -375,9 +340,6 @@ export default function TasksPage() {
     return [...seen].sort();
   }, [tasks]);
 
-  // When businessParam is an SOP business scope (no clientParam), the set of
-  // client IDs belonging to that business — used to scope tasks to just the SOP
-  // business's clients instead of treating businessParam as a client_business_id.
   const scopedClientIdsForBusiness = useMemo(() => {
     if (!businessParam || clientParam || projectParam) return null;
     return new Set(
@@ -393,17 +355,11 @@ export default function TasksPage() {
       const pid = t.project_id ?? t.projectId ?? t.project?.id;
       const proj = pid != null ? projectsById[String(pid)] : null;
       if (proj) return { clientId: proj.client_id, businessId: proj.client_business_id };
-      // Fall back to client/business IDs stored directly on the task so tasks
-      // created without a project still respect the scope filter.
       if (t.client_id != null || t.client_business_id != null) {
         return { clientId: t.client_id ?? null, businessId: t.client_business_id ?? null };
       }
       return null;
     };
-    // Admins are scoped to their own business — drop any task whose client
-    // belongs to a different business. Super admins see everything. A task is
-    // in scope when its owning client lives in the admin's business, or the
-    // task carries the business id directly.
     if (user?.role === 'admin' && user?.business_id != null) {
       const adminBizId = String(user.business_id);
       const adminClientIds = new Set(
@@ -418,15 +374,11 @@ export default function TasksPage() {
         return false;
       });
     }
-    // Department Heads see tasks that belong to their department. This includes:
-    // 1. Tasks with a Department-type assignment matching their department ID
-    // 2. Tasks associated with a client that belongs to their department
     if (isDepartmentHead && user?.department_id != null) {
       const deptId = String(user.department_id);
       const sopBizId = user?.department_business_id != null || user?.business_id != null
         ? String(user.department_business_id ?? user.business_id)
         : null;
-      // Build set of client IDs in the department head's department
       const deptClientIds = new Set(
         (clientTree || [])
           .filter((c) => {
@@ -437,11 +389,9 @@ export default function TasksPage() {
           .map((c) => String(c.id))
       );
       result = result.filter((t) => {
-        // Task has a Department-type assignment matching the department
         if ((t.assignments || []).some(
           (a) => a.assignment_type === 'Department' && String(a.reference_id) === deptId
         )) return true;
-        // Task is associated with a client in the department
         const scope = taskClientId(t);
         if (scope?.clientId != null && deptClientIds.has(String(scope.clientId))) return true;
         return false;
@@ -451,9 +401,6 @@ export default function TasksPage() {
       result = result.filter((t) => String(taskClientId(t)?.clientId) === String(clientParam));
     }
     if (businessParam) {
-      // SOP business scope (no clientParam): match any task whose client belongs
-      // to this business — not tasks by client_business_id, since businessParam
-      // here is the top-level business PK, not a client_businesses row PK.
       if (!clientParam && !projectParam && scopedClientIdsForBusiness) {
         result = result.filter((t) => {
           const scope = taskClientId(t);
@@ -466,6 +413,19 @@ export default function TasksPage() {
     if (projectParam) {
       result = result.filter((t) => String(t.project_id ?? t.projectId ?? t.project?.id) === String(projectParam));
     }
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter((t) =>
+        (t.title || '').toLowerCase().includes(q) ||
+        (t.description || '').toLowerCase().includes(q)
+      );
+    }
+    if (statusFilter) {
+      result = result.filter((t) => t.status === statusFilter);
+    }
+    if (priorityFilter) {
+      result = result.filter((t) => t.priority === priorityFilter);
+    }
     if (assigneeFilter) {
       if (assigneeFilter === '__me__') {
         const uid = String(user?.id);
@@ -475,7 +435,16 @@ export default function TasksPage() {
       }
     }
     return result;
-  }, [tasks, assigneeFilter, user, clientParam, businessParam, projectsById, scopedClientIdsForBusiness, isDepartmentHead, clientTree]);
+  }, [tasks, search, statusFilter, priorityFilter, assigneeFilter, user, clientParam, businessParam, projectsById, scopedClientIdsForBusiness, isDepartmentHead, clientTree]);
+
+  const STAT_ACCENTS = {
+    Total: 'var(--ppm-text)',
+    Pending: '#3b82f6',
+    'In Progress': '#3b82f6',
+    Completed: '#10b981',
+    Overdue: '#ef4444',
+    Cancelled: '#94a3b8',
+  };
 
   const statItems = useMemo(() => {
     const list = displayedTasks || [];
@@ -486,12 +455,12 @@ export default function TasksPage() {
     const overdue = list.filter((t) => t.status === 'Overdue').length;
     const cancelled = list.filter((t) => t.status === 'Cancelled').length;
     return [
-      { label: 'Total', value: total, icon: ClipboardList },
-      { label: 'Pending', value: pending, icon: Clock },
-      { label: 'In Progress', value: inProgress, icon: RefreshCw },
-      { label: 'Completed', value: completed, icon: CheckCircle },
-      { label: 'Overdue', value: overdue, icon: AlertTriangle },
-      { label: 'Cancelled', value: cancelled, icon: XCircle },
+      { label: 'Total', value: total, icon: ClipboardList, accent: STAT_ACCENTS.Total },
+      { label: 'Pending', value: pending, icon: Clock, accent: STAT_ACCENTS.Pending },
+      { label: 'In Progress', value: inProgress, icon: RefreshCw, accent: STAT_ACCENTS['In Progress'] },
+      { label: 'Completed', value: completed, icon: CheckCircle, accent: STAT_ACCENTS.Completed },
+      { label: 'Overdue', value: overdue, icon: AlertTriangle, accent: STAT_ACCENTS.Overdue },
+      { label: 'Cancelled', value: cancelled, icon: XCircle, accent: STAT_ACCENTS.Cancelled },
     ];
   }, [displayedTasks]);
 
@@ -505,24 +474,17 @@ export default function TasksPage() {
 
   const filteredBusinessName = useMemo(() => {
     if (!businessParam) return null;
-    // SOP business scope (no clientParam): the name comes from the client tree.
     if (!clientParam) {
       const match = (clientTree || []).find(
         (c) => c.business_id != null && String(c.business_id) === String(businessParam)
       );
       return match?.business_name || null;
     }
-    // Unit click (clientParam set): businessParam is a client_business_id.
     const p = Object.values(projectsById).find((x) => String(x.client_business_id) === String(businessParam));
     return p?.client_business_name || null;
   }, [businessParam, clientParam, projectsById, clientTree, projectParam]);
 
-  // When a client/business scope is active, restrict the hierarchy source to
-  // that scope so the Client -> Business -> Project tree still renders (even
-  // with no tasks) for the selected business/client.
   const scopedProjectsById = useMemo(() => {
-    // Admins are scoped to their own business — they must not see clients or
-    // projects that belong to other businesses. Super admins see everything.
     if (user?.role === 'admin' && user?.business_id != null && !clientParam && !businessParam && !projectParam) {
       const adminBizId = String(user.business_id);
       const validClientIds = new Set(
@@ -538,9 +500,6 @@ export default function TasksPage() {
       }
       return scoped;
     }
-    // Department Heads see only projects belonging to clients in their SOP
-    // business (derived from their department's business_id) AND within their
-    // department.
     if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null) && !clientParam && !businessParam && !projectParam) {
       const sopBizId = String(user.department_business_id ?? user.business_id);
       const deptId = user?.department_id != null ? String(user.department_id) : null;
@@ -563,8 +522,6 @@ export default function TasksPage() {
     }
     if (!clientParam && !businessParam && !projectParam) return projectsById;
     const scoped = {};
-    // SOP business scope: gather all client_business_ids belonging to clients
-    // of this business so projects can be matched by client_business_id.
     const clientBusinessIdsForSopBusiness = (() => {
       if (!businessParam || clientParam || projectParam) return null;
       const ids = new Set();
@@ -591,25 +548,13 @@ export default function TasksPage() {
     return scoped;
   }, [projectsById, clientParam, businessParam, projectParam, clientTree, isDepartmentHead, user]);
 
-  // When a client or business scope is active, restrict the Client -> Business
-  // skeleton so the hierarchy tree renders only the selected branch (matching the
-  // scoped tasks/projects). Without this the tree still seeded every client from
-  // the full org tree, so the scope only auto-expanded instead of filtering.
-  //
-  // businessParam is overloaded:
-  //   - With clientParam set  -> it's a client_business_id (a unit click)
-  //   - Without clientParam    -> it's an SOP business_id (a business click)
   const scopedClientTree = useMemo(() => {
-    // Admins are scoped to their own business — the hierarchy tree must not
-    // render clients that belong to other businesses.
     if (user?.role === 'admin' && user?.business_id != null) {
       const adminBizId = String(user.business_id);
       return (clientTree || []).filter(
         (c) => c.business_id != null && String(c.business_id) === adminBizId
       );
     }
-    // Department Heads see only clients that belong to their SOP business
-    // (derived from their department's business_id) AND within their department.
     if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null)) {
       const sopBizId = String(user.department_business_id ?? user.business_id);
       const deptId = user?.department_id != null ? String(user.department_id) : null;
@@ -621,20 +566,14 @@ export default function TasksPage() {
     }
     if (!clientParam && !businessParam && !projectParam) return clientTree;
     const targetClient = clientParam ?? (projectParam ? projectsById[String(projectParam)]?.client_id : null);
-    // A project scope resolves to its owning client/business, so the tree still
-    // renders only the branch that contains the selected project.
     const targetBusiness = projectParam ? projectsById[String(projectParam)]?.client_business_id : null;
     return (clientTree || [])
       .map((client) => {
         if (targetClient && String(client.id) !== String(targetClient)) return null;
-        // SOP business scope (no clientParam): keep only clients whose
-        // business_id matches — show all their business units.
         if (businessParam && !clientParam && !projectParam) {
           if (client.business_id == null || String(client.business_id) !== String(businessParam)) return null;
           return client;
         }
-        // client_business_id scope (unit click or project scope): narrow the
-        // client's business units to just the matching one.
         if (targetBusiness) {
           const businesses = (client.businesses || []).filter(
             (b) => String(b.id) === String(targetBusiness)
@@ -645,15 +584,6 @@ export default function TasksPage() {
       })
       .filter(Boolean);
   }, [clientTree, clientParam, businessParam, projectParam, projectsById, isDepartmentHead, user]);
-
-  const applySavedView = useCallback((key) => {
-    const v = SAVED_VIEWS.find((x) => x.key === key);
-    if (!v) return;
-    setActiveViewKey(key);
-    setStatusFilter(v.status || '');
-    setPriorityFilter(v.priority || '');
-    setAssigneeFilter(v.assignee || '');
-  }, []);
 
   const handleSubmit = async (payload) => {
     setSaving(true);
@@ -693,31 +623,23 @@ export default function TasksPage() {
     if (pendingDeleteId == null) return;
     try {
       await remove(pendingDeleteId);
-      // Close the detail drawer if it was showing the deleted task so the
-      // panel doesn't linger on a row that no longer exists.
       if (viewingTaskId != null && String(viewingTaskId) === String(pendingDeleteId)) {
         setViewingTaskId(null);
         setFocusSubtasks(false);
       }
       setPendingDeleteId(null);
-      // `remove()` surfaces its own success/error toast; don't double-up.
     } catch (err) {
       toast.error(err.message || 'Failed to delete task');
     }
   };
 
-  // Direct delete used by the List tab's inline "Delete?" confirm so it never
-  // opens the centered ConfirmationDialog modal.
   const deleteTaskNow = useCallback(async (id) => {
     try {
       await remove(id);
-      // Close the detail drawer if it was showing the deleted task so the
-      // panel doesn't linger on a row that no longer exists.
       if (viewingTaskId != null && String(viewingTaskId) === String(id)) {
         setViewingTaskId(null);
         setFocusSubtasks(false);
       }
-      // `remove()` surfaces its own success/error toast; don't double-up.
     } catch (err) {
       toast.error(err.message || 'Failed to delete task');
     }
@@ -755,7 +677,7 @@ export default function TasksPage() {
   const handleBulkDelete = useCallback(() => runBulk(
     (ids) => bulkDeleteTasks(ids),
     `${selectedIds.size} task(s) deleted`
-  ), [runBulk, selectedIds.size]);
+  ), [runBulk]);
 
   const handleStatusChange = useCallback(async (task, newStatus) => {
     const changes = { status: newStatus };
@@ -823,7 +745,6 @@ export default function TasksPage() {
 
   return (
     <div className="ppm max-w-6xl mx-auto">
-      {/* Page Header */}
       <div className="flex flex-col gap-4 mb-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-[var(--text-primary)]">
@@ -854,7 +775,6 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* Summary — condensed strip, not a competing block of tiles */}
       {stats && (
         <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--ppm-border)]/5 pb-3 text-xs text-[var(--ppm-text-muted)]">
           {statItems.map((stat) => {
@@ -870,13 +790,7 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* View type — a distinct control from filters/saved views */}
       <ViewTabs views={TASK_VIEWS} active={view} onChange={changeView} />
-
-      {/* Saved filter presets — visually separate from view type */}
-      <div className="mb-3">
-        <SavedViewChips views={SAVED_VIEWS} activeKey={activeViewKey} onApply={applySavedView} />
-      </div>
 
       <FilterBar
         className="mb-3"
@@ -913,13 +827,13 @@ export default function TasksPage() {
           tasks={displayedTasks}
           loading={loading}
           projectsById={scopedProjectsById}
-           clientTree={scopedClientTree}
-canManage
-             userDepartmentId={user?.department_id ?? null}
-             userRole={user?.role ?? ''}
-             userBusinessId={user?.business_id ?? null}
-             userDepartmentBusinessId={user?.department_business_id ?? null}
-             scopeClientId={clientParam}
+          clientTree={scopedClientTree}
+          canManage
+          userDepartmentId={user?.department_id ?? null}
+          userRole={user?.role ?? ''}
+          userBusinessId={user?.business_id ?? null}
+          userDepartmentBusinessId={user?.department_business_id ?? null}
+          scopeClientId={clientParam}
           scopeBusinessId={businessParam}
           scopeProjectId={projectParam}
           viewProp={view}
@@ -948,9 +862,9 @@ canManage
           onRenameBusiness={renameBusiness}
           onRenameProject={renameProject}
           onRenameTask={renameTask}
-              onCreateBusiness={handleCreateBusiness}
-              onCreateProject={handleCreateProject}
-              onCreateClient={handleCreateClient}
+          onCreateBusiness={handleCreateBusiness}
+          onCreateProject={handleCreateProject}
+          onCreateClient={handleCreateClient}
           onDeleteEntity={handleDeleteEntity}
         />
       )}

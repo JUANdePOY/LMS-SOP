@@ -21,6 +21,23 @@ const TASK_MANAGEMENT_MIGRATIONS = [
   // this migration notes typed in "Update Progress" are silently dropped and the
   // progress history renders nothing for them.
   `ALTER TABLE task_progress ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT NULL AFTER status`,
+
+  // Business managers: a user granted management access to a SOP business
+  // (client_businesses) can manage every task in that business. Distinct from
+  // per-task assignments so the grant is one row per (business, user) rather
+  // than one assignment per task.
+  `CREATE TABLE IF NOT EXISTS business_managers (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     business_id INT NOT NULL,
+     user_id INT NOT NULL,
+     granted_by INT NULL,
+     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+     UNIQUE KEY uq_business_manager (business_id, user_id),
+     INDEX idx_business_managers_business (business_id),
+     INDEX idx_business_managers_user (user_id),
+     CONSTRAINT fk_business_managers_business FOREIGN KEY (business_id) REFERENCES client_businesses(id) ON DELETE CASCADE,
+     CONSTRAINT fk_business_managers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+   )`,
 ];
 
 async function runTaskMigrations() {

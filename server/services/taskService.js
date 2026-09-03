@@ -177,6 +177,13 @@ async function enrichAssignmentRows(assignments) {
       );
       return { ...assignment, reference_name: depts[0]?.name || null };
     }
+    if (assignment.assignment_type === 'Business') {
+      const [biz] = await db.query(
+        'SELECT id, business_name, business_code FROM client_businesses WHERE id = ? LIMIT 1',
+        [assignment.reference_id]
+      );
+      return { ...assignment, reference_name: biz[0]?.business_name || null };
+    }
     if (assignment.assignment_type === 'Position') {
       return { ...assignment, reference_name: assignment.reference_id };
     }
@@ -307,6 +314,17 @@ async function getTask(id, actorId) {
 
   const subtasks = await buildSubtree(id);
 
+  // Capability flags consumed by the task-detail drawer so it enables exactly
+  // the controls the actor is allowed to perform:
+  //   can_edit    — updateTask gate: admin, creator, or a granted business
+  //                  manager of this task's business. Gates title, description,
+  //                  status, priority, start/due dates, and assignees.
+  //   can_interact — progress / attachments / comments gate: admin, a direct
+  //                  (User/Department/Position) assignee, or a granted business
+  //                  manager of this task's business.
+  const canEdit = isAdmin || task.created_by === actorId || await isTaskEditableByManager(actorId, id);
+  const canInteract = isAdmin || await isUserAssignedToTaskById(actorId, id);
+
   return {
     ...task,
     auto_status: autoStatus,
@@ -317,6 +335,8 @@ async function getTask(id, actorId) {
     attachments: enrichedTaskAttachments,
     custom_fields: customFields,
     subtasks,
+    can_edit: canEdit,
+    can_interact: canInteract,
   };
 }
 
@@ -361,7 +381,7 @@ async function createTask(payload, actorId) {
       error.details = assignmentValidation.errors;
       throw error;
     }
-        if (assignmentValidation.value.assignment_type === 'Department' && actor && actor.business_id && actor.role !== 'super_admin') {
+    if (assignmentValidation.value.assignment_type === 'Department' && actor && actor.business_id && actor.role !== 'super_admin') {
       const [[dept]] = await db.query(
         'SELECT business_id FROM departments WHERE id = ?',
         [assignmentValidation.value.reference_id]
@@ -468,6 +488,31 @@ async function duplicateTask(id, actorId) {
   return await getTask(newId, actorId);
 }
 
+// Fields a granted business manager (a non-admin user) may edit on a task in
+// their business. Admins / super admins / department heads are unaffected —
+// they keep full edit rights via the existing `isAdmin` branch in updateTask.
+// This is the capability set granted when an admin assigns an employee to the
+// business row: update progress, attach files, comment, change status, change
+// priority, change the start and due date, and edit the description. Managers
+// cannot reassign the task to another client/business, change assignees, or
+// touch fields outside this set.
+const MANAGER_ALLOWED_FIELDS = new Set([
+  'title', 'description', 'status', 'priority',
+  'start_datetime', 'deadline_datetime',
+]);
+
+async function isTaskEditableByManager(actorId, taskId) {
+  const [rows] = await db.query(
+    `SELECT 1
+     FROM tasks t
+     INNER JOIN business_managers bm ON bm.business_id = t.client_business_id
+     WHERE t.id = ? AND bm.user_id = ? AND t.client_business_id IS NOT NULL
+     LIMIT 1`,
+    [taskId, actorId]
+  );
+  return rows.length > 0;
+}
+
 async function updateTask(id, payload, actorId) {
   const task = await taskModel.findById(id);
   if (!task) {
@@ -477,10 +522,25 @@ async function updateTask(id, payload, actorId) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  if (task.created_by !== actorId && !isAdmin) {
+  // A granted business manager may edit any task in their business, even
+  // tasks created by other users — that's the whole point of the grant. They
+  // are restricted to the MANAGER_ALLOWED_FIELDS set below.
+  const isManager = !isAdmin && await isTaskEditableByManager(actorId, id);
+  if (task.created_by !== actorId && !isAdmin && !isManager) {
     const error = new Error('You are not authorized to update this task');
     error.code = 'FORBIDDEN';
     throw error;
+  }
+  if (isManager) {
+    const attempted = Object.keys(payload).filter((k) => payload[k] !== undefined);
+    const disallowed = attempted.filter((k) => !MANAGER_ALLOWED_FIELDS.has(k));
+    if (disallowed.length) {
+      const error = new Error(
+        `Business managers can only edit title, description, status, priority, start date, and due date. Cannot modify: ${disallowed.join(', ')}`
+      );
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
   }
 
   if (isAdmin) {
@@ -1016,6 +1076,16 @@ async function getMyTaskHierarchy(userId) {
   );
   const businessIds = bizRows.map((r) => r.client_business_id);
 
+  // Businesses the user manages via a business-manager grant — they see every
+  // task in those businesses too, not just the ones they're directly assigned to.
+  const [managedBizRows] = await db.query(
+    `SELECT DISTINCT business_id FROM business_managers WHERE user_id = ?`,
+    [userId]
+  );
+  for (const r of managedBizRows) {
+    if (!businessIds.includes(r.business_id)) businessIds.push(r.business_id);
+  }
+
   // Also find tasks assigned directly to the user (or via dept/position) that
   // have no client_business_id — these still belong in "My Tasks".
   const [directRows] = await db.query(
@@ -1142,6 +1212,19 @@ async function getMyTaskHierarchy(userId) {
     assignments: assignmentsMap[task.id] || [],
     is_assigned: assignedTaskIds.has(String(task.id)),
   }));
+
+  // Capability flag for granted business managers. A manager is not directly
+  // assigned to every task in their business, but the grant entitles them to
+  // edit them (title, description, status, priority, start/due dates, update
+  // progress, attach files, comment). Without this flag the employee task
+  // drawer would force read-only for tasks the manager isn't individually
+  // assigned to — even though they own the whole business.
+  const managerBusinessIds = new Set(
+    (await db.query('SELECT business_id FROM business_managers WHERE user_id = ?', [userId]))[0].map((r) => String(r.business_id))
+  );
+  for (const task of tasks) {
+    task.can_edit = task.is_assigned || (task.client_business_id != null && managerBusinessIds.has(String(task.client_business_id)));
+  }
 
   // Build projectsById + clientTree from business linkage. Include ALL
   // projects in the businesses where the user has tasks, and ALL businesses
@@ -1460,7 +1543,8 @@ async function isUserSuperAdmin(userId) {
 }
 
 async function isUserAssignedToTaskById(userId, taskId) {
-  const [assignments] = await db.query(
+  // 1. Direct assignment on this task (User / Department / Position)
+  const [direct] = await db.query(
     `SELECT ta.id FROM task_assignments ta
      WHERE ta.task_id = ?
      AND (
@@ -1475,7 +1559,19 @@ async function isUserAssignedToTaskById(userId, taskId) {
      LIMIT 1`,
     [taskId, userId, userId, userId]
   );
-  return assignments.length > 0;
+  if (direct.length > 0) return true;
+
+  // 2. Business manager: a user granted management access to the business this
+  //    task belongs to can manage every task in that business.
+  const [biz] = await db.query(
+    `SELECT 1
+     FROM tasks t
+     INNER JOIN business_managers bm ON bm.business_id = t.client_business_id
+     WHERE t.id = ? AND bm.user_id = ?
+     LIMIT 1`,
+    [taskId, userId]
+  );
+  return biz.length > 0;
 }
 
 async function getAssignedTaskIdsForUser(userId) {
@@ -1494,8 +1590,14 @@ async function getAssignedTaskIdsForUser(userId) {
        ta.assignment_type = 'User' AND ta.reference_id = ?
        OR ta.assignment_type = 'Department' AND ta.reference_id = ?
        OR ta.assignment_type = 'Position' AND ta.reference_id = ?
-     )`,
-     [userId, user.department_id, user.position_title]
+     )
+     UNION
+     -- Every task in a business this user manages
+     SELECT DISTINCT t.id AS task_id
+     FROM tasks t
+     INNER JOIN business_managers bm ON bm.business_id = t.client_business_id
+     WHERE bm.user_id = ?`,
+    [userId, user.department_id, user.position_title, userId]
   );
 
   return rows.map(r => r.task_id);
@@ -1786,12 +1888,18 @@ module.exports = {
   batchUpdateTasks,
   batchDeleteTasks,
   isUserAssignedToTask,
+  isUserAssignedToTaskById,
+  grantBusinessManager,
+  listBusinessManagers,
+  revokeBusinessManager,
+  isUserBusinessManagerOfTask,
 };
 
 // Returns true when the given user is allowed to interact with a task's progress,
 // attachments, and comments. Admins (super_admin/admin/department_head) are
 // always allowed; otherwise the user must be assigned to the task — directly, or
-// via a department/position assignment that resolves to them.
+// via a department/position assignment that resolves to them, or via a
+// business-manager grant covering the task's business.
 const ADMIN_ROLES = ['super_admin', 'admin', 'department_head'];
 async function isUserAssignedToTask(taskId, user) {
   if (!user) return false;
@@ -1800,7 +1908,7 @@ async function isUserAssignedToTask(taskId, user) {
     `SELECT assignment_type, reference_id FROM task_assignments WHERE task_id = ?`,
     [taskId]
   );
-  return rows.some((a) => {
+  const direct = rows.some((a) => {
     if (a.assignment_type === 'User') return String(a.reference_id) === String(user.id);
     if (a.assignment_type === 'Department') {
       return user.department_id != null && String(a.reference_id) === String(user.department_id);
@@ -1810,4 +1918,60 @@ async function isUserAssignedToTask(taskId, user) {
     }
     return false;
   });
+  if (direct) return true;
+  return await isUserBusinessManagerOfTask(user.id, taskId);
+}
+
+// Grant/revoke management access to every task in a business. A business
+// manager can create, edit, delete, assign, and update progress on any task
+// whose client_business_id matches the granted business.
+async function grantBusinessManager(businessId, userId, grantedBy) {
+  await db.query(
+    `INSERT INTO business_managers (business_id, user_id, granted_by)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE granted_by = VALUES(granted_by), created_at = CURRENT_TIMESTAMP`,
+    [businessId, userId, grantedBy]
+  );
+  const [rows] = await db.query(
+    `SELECT bm.*, u.full_name, cb.business_name
+     FROM business_managers bm
+     INNER JOIN users u ON u.id = bm.user_id
+     INNER JOIN client_businesses cb ON cb.id = bm.business_id
+     WHERE bm.business_id = ? AND bm.user_id = ? LIMIT 1`,
+    [businessId, userId]
+  );
+  return rows[0] || null;
+}
+
+async function listBusinessManagers(businessId) {
+  const [rows] = await db.query(
+    `SELECT bm.*, u.full_name, u.email, u.role, cb.business_name
+     FROM business_managers bm
+     INNER JOIN users u ON u.id = bm.user_id
+     INNER JOIN client_businesses cb ON cb.id = bm.business_id
+     WHERE bm.business_id = ?
+     ORDER BY bm.created_at DESC`,
+    [businessId]
+  );
+  return rows;
+}
+
+async function revokeBusinessManager(businessId, userId) {
+  const [result] = await db.query(
+    'DELETE FROM business_managers WHERE business_id = ? AND user_id = ?',
+    [businessId, userId]
+  );
+  return result.affectedRows > 0;
+}
+
+async function isUserBusinessManagerOfTask(userId, taskId) {
+  const [rows] = await db.query(
+    `SELECT 1
+     FROM tasks t
+     INNER JOIN business_managers bm ON bm.business_id = t.client_business_id
+     WHERE t.id = ? AND bm.user_id = ?
+     LIMIT 1`,
+    [taskId, userId]
+  );
+  return rows.length > 0;
 }

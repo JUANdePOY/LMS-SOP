@@ -205,6 +205,43 @@ async function remove(id, force = false) {
   }
 }
 
+// Soft-delete: hide the SOP business from every user without touching the row
+// or its departments. Deleting an SOP business used to physically remove it
+// (and, with `force`, its departments too) — that nuked the org structure for
+// everyone. "Hiding" is a status flip to `inactive`; the data stays intact so
+// it can be restored by re-setting status = 'active' and no departments or
+// clients are orphaned. The `status` column already exists and is filtered on
+// by getHierarchy() and the status-aware list queries.
+async function softRemove(id, userId = null) {
+  const [target] = await db.query('SELECT id, status FROM businesses WHERE id = ?', [id]);
+  if (!target.length) {
+    const err = new Error('Business not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (target[0].status === 'inactive') return 0;
+  const [result] = await db.query(
+    `UPDATE businesses SET status = 'inactive', updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [userId, id]
+  );
+  return result.affectedRows;
+}
+
+async function restore(id, userId = null) {
+  const [target] = await db.query('SELECT id, status FROM businesses WHERE id = ?', [id]);
+  if (!target.length) {
+    const err = new Error('Business not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  if (target[0].status === 'active') return 0;
+  const [result] = await db.query(
+    `UPDATE businesses SET status = 'active', updated_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [userId, id]
+  );
+  return result.affectedRows;
+}
+
 async function getHierarchy() {
   const [businesses] = await db.query(
     `SELECT b.*,
@@ -412,6 +449,8 @@ module.exports = {
   create,
   update,
   remove,
+  softRemove,
+  restore,
   saveLogo,
   getLogo,
   clearLogo,
