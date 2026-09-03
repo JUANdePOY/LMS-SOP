@@ -439,15 +439,6 @@ export default function TasksPage() {
     return result;
   }, [tasks, search, statusFilter, priorityFilter, assigneeFilter, user, clientParam, businessParam, projectsById, scopedClientIdsForBusiness, isDepartmentHead, clientTree]);
 
-  const STAT_ACCENTS = {
-    Total: 'var(--ppm-text)',
-    Pending: '#3b82f6',
-    'In Progress': '#3b82f6',
-    Completed: '#10b981',
-    Overdue: '#ef4444',
-    Cancelled: '#94a3b8',
-  };
-
   const statItems = useMemo(() => {
     const list = displayedTasks || [];
     const total = list.length;
@@ -457,12 +448,12 @@ export default function TasksPage() {
     const overdue = list.filter((t) => t.status === 'Overdue').length;
     const cancelled = list.filter((t) => t.status === 'Cancelled').length;
     return [
-      { label: 'Total', value: total, icon: ClipboardList, accent: STAT_ACCENTS.Total },
-      { label: 'Pending', value: pending, icon: Clock, accent: STAT_ACCENTS.Pending },
-      { label: 'In Progress', value: inProgress, icon: RefreshCw, accent: STAT_ACCENTS['In Progress'] },
-      { label: 'Completed', value: completed, icon: CheckCircle, accent: STAT_ACCENTS.Completed },
-      { label: 'Overdue', value: overdue, icon: AlertTriangle, accent: STAT_ACCENTS.Overdue },
-      { label: 'Cancelled', value: cancelled, icon: XCircle, accent: STAT_ACCENTS.Cancelled },
+      { label: 'Total', value: total, icon: ClipboardList },
+      { label: 'Pending', value: pending, icon: Clock },
+      { label: 'In Progress', value: inProgress, icon: RefreshCw },
+      { label: 'Completed', value: completed, icon: CheckCircle },
+      { label: 'Overdue', value: overdue, icon: AlertTriangle },
+      { label: 'Cancelled', value: cancelled, icon: XCircle },
     ];
   }, [displayedTasks]);
 
@@ -778,15 +769,22 @@ export default function TasksPage() {
       )}
 
       {stats && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-[var(--ppm-border)]/5 pb-3 text-xs text-[var(--ppm-text-muted)]">
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-6">
           {statItems.map((stat) => {
             const Icon = stat.icon;
             return (
-              <span key={stat.label} className="inline-flex items-center gap-1.5">
-                <Icon size={13} className="text-[var(--ppm-text-muted)]" />
-                <span className="font-semibold tabular-nums text-[var(--ppm-text)]">{stat.value}</span>
-                <span>{stat.label}</span>
-              </span>
+              <div
+                key={stat.label}
+                className="flex items-center gap-2.5 rounded-lg border border-[var(--ppm-border)] bg-[var(--ppm-surface)] px-3 py-2.5 shadow-[var(--card-shadow)]"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[var(--ppm-surface-hover)] text-[var(--ppm-text-2)]">
+                  <Icon size={16} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-semibold tabular-nums text-[var(--ppm-text)]">{stat.value}</span>
+                  <span className="block text-[11px] text-[var(--ppm-text-muted)]">{stat.label}</span>
+                </span>
+              </div>
             );
           })}
         </div>
