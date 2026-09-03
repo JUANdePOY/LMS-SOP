@@ -56,14 +56,14 @@ export default function Dashboard() {
     ? buildTrainingCompletionData(data.training?.avg_progress)
     : buildTrainingCompletionData(0);
 
-  const statCards = data ? [
-    { label: 'Total Users', value: String(data.users?.total || 0), delta: '+12%', icon: Users, color: 'blue' },
-    { label: 'Active Users', value: String(data.users?.active || 0), delta: '+8%', icon: UserCheck, color: 'emerald' },
-    { label: 'SOPs Published', value: String(data.sops?.published || 0), delta: '+5%', icon: FileText, color: 'blue' },
-    { label: 'Training Completion', value: `${data.training?.avg_progress || 0}%`, delta: '+10%', icon: BookOpen, color: 'blue' },
-    { label: 'Assessments Passed', value: '85%', delta: '+7%', icon: ClipboardCheck, color: 'blue' },
-    { label: 'Certificates Issued', value: String(data.certificatesIssued || 0), delta: '+15%', icon: Award, color: 'blue' },
-  ] : [];
+const statCards = data ? [
+      { label: 'Total Users', value: String(data.users?.total || 0), delta: '+12%', icon: Users, color: 'blue' },
+      { label: 'Active Users', value: String(data.users?.active || 0), delta: '+8%', icon: UserCheck, color: 'emerald' },
+      { label: 'SOPs Published', value: String(data.sops?.published || 0), delta: '+5%', icon: FileText, color: 'blue' },
+      { label: 'Training Completion', value: `${data.training?.avg_progress || 0}%`, delta: '+10%', icon: BookOpen, color: 'blue' },
+      { label: 'Assessments Passed', value: `${data.assessments?.pass_rate || 0}%`, delta: '', icon: ClipboardCheck, color: 'blue' },
+      { label: 'Certificates Issued', value: String(data.certificatesIssued || 0), delta: '+15%', icon: Award, color: 'blue' },
+    ] : [];
 
   const announcements = data?.announcements || [];
   const events = data?.events || [];

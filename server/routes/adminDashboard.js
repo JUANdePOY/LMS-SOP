@@ -41,6 +41,7 @@ router.get('/', authenticateToken, async (req, res) => {
       recentMessages,
       announcements,
       events,
+      assessmentStats,
     ] = await Promise.all([
       authModel.getStats(),
       taskService.getTaskStats({}, req.user.id).catch(() => ({ total: 0, pending: 0, in_progress: 0, completed: 0, overdue: 0 })),
@@ -49,9 +50,22 @@ router.get('/', authenticateToken, async (req, res) => {
       messageModel.listConversations(req.user.id).catch(() => []),
       announcementModel.findAll({ business_id: businessId || undefined, status: 'active', limit: 5 }).catch(() => []),
       eventModel.findAll({ business_id: businessId || undefined, status: 'active', limit: 5 }).catch(() => []),
+      db.query(
+        `SELECT
+           COUNT(*) AS total_attempts,
+           COUNT(CASE WHEN passed = 1 THEN 1 END) AS passed_attempts
+         FROM quiz_results`
+      ).catch(() => [[{ total_attempts: 0, passed_attempts: 0 }]]),
     ]);
 
     const departments = departmentRows.rows || departmentRows || [];
+
+    const assessmentRow = assessmentStats[0] || {};
+    const totalAttempts = Number(assessmentRow.total_attempts) || 0;
+    const passedAttempts = Number(assessmentRow.passed_attempts) || 0;
+    const assessmentsPassedPct = totalAttempts > 0
+      ? Math.round((passedAttempts / totalAttempts) * 100)
+      : 0;
 
     const departmentPerformance = departments.map((dept) => {
       const totalUsers = Number(dept.user_count) || 0;
@@ -155,6 +169,11 @@ router.get('/', authenticateToken, async (req, res) => {
           completed_courses: completedEnrollments,
           avg_progress: avgProgress,
           total_enrollments: recentEnrollments.length,
+        },
+        assessments: {
+          total_attempts: totalAttempts,
+          passed_attempts: passedAttempts,
+          pass_rate: assessmentsPassedPct,
         },
         departments: {
           total: departments.length,
