@@ -15,6 +15,7 @@ import {
   Shield,
   LogOut,
   User,
+  Users,
    ChevronDown,
    Building2,
    FileText,
@@ -128,6 +129,10 @@ const MENU_ITEMS = [
     name: "SYSTEM",
     group: true,
     items: [
+      // User Management is a standalone page for admins and department heads
+      // (scoped to their own business/department by the backend). Super
+      // admins reach the same panel through Settings > Users.
+      { name: "Users", path: "/users", icon: Users, roles: ['super_admin', 'admin', 'department_head'] },
       { name: "Settings", path: "/settings", icon: Settings, sub: ["Users", "Roles"], roles: ['super_admin'] },
       { name: "Audit Logs", path: "/audit-logs", icon: Shield, roles: ['super_admin'] },
     ],
@@ -448,7 +453,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
                 onNavClick={handleNavClick}
                 isActive={isActive(item.path)}
                 badgeCount={getBadgeCount(item.path)}
-                onActivate={isDesktop && (item.path === "/tasks" || item.path === "/tasks/my") ? () => { openSecondaryNav("clients"); navigate(item.path); handleNavClick(); onCollapseSidebar?.(); } : undefined}
+                onActivate={isDesktop && (item.path === "/tasks" || item.path === "/tasks/my") ? () => { openSecondaryNav("clients"); navigate(item.path); handleNavClick(); } : undefined}
               />
             </li>
           );

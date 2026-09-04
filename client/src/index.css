@@ -567,6 +567,32 @@ select option {
     position: absolute;
   }
 
+  /* The SecondarySidebar is also a direct child of .app-shell. On mobile it
+     stays a viewport-fixed drawer (slides in from the left). On desktop we
+     promote it to `position: sticky` so it scrolls with the page inside the
+     shell like the main Sidebar, and offset its `left` by the shell's left
+     padding + the main sidebar's width -- otherwise the panel would be
+     pinned to the viewport edge and overlap the inset margin + main rail. */
+  @media (min-width: 1024px) {
+    .app-shell > .secondary-sidebar {
+      position: sticky;
+      top: 0;
+      align-self: flex-start;
+      height: calc(100dvh - var(--app-shell-inset, 16px));
+      /* Push past the app-shell's left padding (so the panel aligns with the
+         shell's inner edge) and past the main sidebar's width (so it sits
+         flush beside it). */
+      left: calc(var(--app-shell-inset, 16px) + var(--sidebar-width, 260px));
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .app-shell > .secondary-sidebar {
+      height: calc(100dvh - var(--app-shell-inset-lg, 28px));
+      left: calc(var(--app-shell-inset-lg, 28px) + var(--sidebar-width, 260px));
+    }
+  }
+
   /*
     On desktop the shell grows with content and the page scrolls naturally.
     The aside is a STICKY PANEL pinned at the viewport top (`top: 0`) with a

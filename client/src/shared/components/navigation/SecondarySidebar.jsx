@@ -39,7 +39,7 @@ function highlight(text, q) {
   );
 }
 
-export default function SecondarySidebar() {
+export default function SecondarySidebar({ collapsed = false }) {
    const { secondaryNav, closeSecondaryNav } = useNavigation();
    const { user, isAnyAdmin, isDepartmentHead } = useAuth();
   const location = useLocation();
@@ -606,18 +606,27 @@ export default function SecondarySidebar() {
   return (
     <div
       className={cn(
-        "lg:sticky lg:top-0 lg:self-start lg:z-20 lg:flex lg:flex-col",
-        "shrink-0 transition-[width,opacity] duration-300 ease-out lg:overflow-hidden",
-        open ? "lg:w-[260px] lg:opacity-100" : "lg:w-0 lg:opacity-0 lg:pointer-events-none",
-        "lg:h-[calc(100dvh-var(--app-shell-inset,20px))]",
-        "min-[1280px]:lg:h-[calc(100dvh-var(--app-shell-inset-lg,28px))]",
+        // On mobile this is a fixed drawer sliding in from the left edge of
+        // the viewport. On desktop (≥lg) the styles in index.css promote it
+        // to `position: sticky` inside `.app-shell` so it sits flush beside
+        // the main Sidebar and tracks its collapse/expand via
+        // --sidebar-width. The `secondary-sidebar` class is the hook those
+        // rules use to target this element.
+        "secondary-sidebar",
+        "fixed top-0 left-0 z-50 flex flex-col lg:top-0",
+        "shrink-0 transition-[width,opacity] duration-300 ease-out",
+        open
+          ? "lg:w-[260px] lg:opacity-100"
+          : "lg:w-0 lg:opacity-0 lg:pointer-events-none",
+        "h-[calc(100dvh-var(--header-height)-var(--app-shell-inset,20px))]",
+        "min-[1280px]:h-[calc(100dvh-var(--header-height)-var(--app-shell-inset-lg,28px))]",
         "bg-[var(--bg-sidebar)] text-[var(--text-on-sidebar)]",
         "border-r border-[var(--border-sidebar)]",
-        // Desktop: inline sticky panel. Mobile: a slide-over drawer that sits
-        // above the page content and closes on backdrop click / Escape.
+        // Mobile: a slide-over drawer that sits above the page content and
+        // closes on backdrop click / Escape.
         open
-          ? "fixed inset-0 z-50 flex lg:static lg:inset-auto"
-          : "hidden lg:flex"
+          ? "translate-x-0"
+          : "translate-x-full lg:translate-x-0"
       )}
       aria-label="Businesses"
     >

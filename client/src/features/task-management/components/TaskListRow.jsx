@@ -11,6 +11,7 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { duplicateTask } from '../services/taskService';
 import { HIERARCHY_GRID } from './TaskHierarchyTable';
 import InlineEditableName from './InlineEditableName';
+import { resolveFileUrl } from '@/lib/fileUrl';
 
 const STATUS_TOKENS = {
   Pending: { var: '--ppm-st-pending', label: 'Not Started' },
@@ -221,6 +222,7 @@ function DueDateCell({ value, onChange, overdue = false }) {
 }
 
 export function Avatar({ name, avatarUrl, size = 20, className = '' }) {
+  const [imgError, setImgError] = useState(false);
   const initials = (name || '?')
     .split(/\s+/)
     .filter(Boolean)
@@ -228,12 +230,20 @@ export function Avatar({ name, avatarUrl, size = 20, className = '' }) {
     .slice(0, 2)
     .join('')
     .toUpperCase();
-  if (avatarUrl) {
+  // Avatars are stored as /uploads/... paths, which the host does not serve
+  // statically — they must go through the authenticated /api/files/stream
+  // route (see resolveFileUrl). Without this every assignee avatar 404s and
+  // silently falls back to initials. Reset the error flag whenever the source
+  // changes so a newly uploaded image is actually attempted.
+  const resolvedUrl = avatarUrl ? resolveFileUrl(avatarUrl) : null;
+  useEffect(() => { setImgError(false); }, [resolvedUrl]);
+  if (resolvedUrl && !imgError) {
     return (
       <img
-        src={avatarUrl}
+        src={resolvedUrl}
         alt={name}
         style={{ width: size, height: size }}
+        onError={() => setImgError(true)}
         className={cn('rounded-full object-cover', className)}
       />
     );

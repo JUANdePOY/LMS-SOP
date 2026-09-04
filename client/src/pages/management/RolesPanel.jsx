@@ -9,6 +9,7 @@ import { ConfirmDialog } from '@/shared/components/ui/ConfirmDialog';
 import { Search, Plus, Edit2, Trash2, Shield, Users, Briefcase, Loader2, ChevronDown, ChevronRight, Lock } from 'lucide-react';
 import { useToast } from '@/shared/components/ui/Toast';
 import { cn } from '@/lib/utils';
+import { resolveFileUrl } from '@/lib/fileUrl';
 import { StaggerList, MotionItem } from "@/shared/motion";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -609,9 +610,17 @@ export default function RolesPanel({ activeTab = 'roles' }) {
                   }).map((u) => (
                     <div key={u.id} className="flex items-center justify-between p-3 rounded-lg bg-neutral-50 dark:bg-neutral-700/50 border border-neutral-200 dark:border-neutral-700/80">
                       <div className="flex items-center gap-3">
-                        <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold ${getAvatarColor(u.full_name || u.email)} ring-1 ring-white dark:ring-neutral-700 shadow-sm`}>
-                          {getInitials(u.full_name || u.email)}
-                        </div>
+                        {u.avatar_url ? (
+                          <img
+                            src={resolveFileUrl(u.avatar_url)}
+                            alt={u.full_name || u.email || 'User'}
+                            className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-white dark:ring-neutral-700 shadow-sm"
+                          />
+                        ) : (
+                          <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold ${getAvatarColor(u.full_name || u.email)} ring-1 ring-white dark:ring-neutral-700 shadow-sm`}>
+                            {getInitials(u.full_name || u.email)}
+                          </div>
+                        )}
                         <div>
                           <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100">{u.full_name || '—'}</p>
                           <p className="text-xs text-neutral-500 dark:text-neutral-400">{u.email || '—'}</p>

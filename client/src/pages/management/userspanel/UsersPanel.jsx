@@ -11,6 +11,7 @@ import { Search, Plus, Edit2, Trash2, Shield, Users, Briefcase, Loader2, Upload,
 import { useToast } from '@/shared/components/ui/Toast';
 import BulkUploadModal from './BulkUploadModal';
 import { cn } from '@/lib/utils';
+import { resolveFileUrl } from '@/lib/fileUrl';
 import { StaggerList, MotionItem } from "@/shared/motion";
 
 const ROLE_META = {
@@ -582,15 +583,23 @@ return false;
                   return (
                     <tr key={u.id} onClick={() => setDetailUser(u)} className={`group cursor-pointer transition-all duration-150 hover:bg-blue-50/70 dark:hover:bg-neutral-700/60 ${idx % 2 === 0 ? 'bg-white dark:bg-neutral-800' : 'bg-neutral-50/40 dark:bg-neutral-800/60'}`}>
                       <td className="px-3 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${avatarColor} ring-2 ring-white dark:ring-neutral-700 shadow-sm`}>
-                            {getInitials(u.full_name || u.email)}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-neutral-900 dark:text-white truncate">{u.full_name || '—'}</p>
-                          </div>
+                    <div className="flex items-center gap-3">
+                      {u.avatar_url ? (
+                        <img
+                          src={resolveFileUrl(u.avatar_url)}
+                          alt={u.full_name || u.email || 'User'}
+                          className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-white dark:ring-neutral-700 shadow-sm"
+                        />
+                      ) : (
+                        <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${avatarColor} ring-2 ring-white dark:ring-neutral-700 shadow-sm`}>
+                          {getInitials(u.full_name || u.email)}
                         </div>
-                      </td>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-neutral-900 dark:text-white truncate">{u.full_name || '—'}</p>
+                      </div>
+                    </div>
+                  </td>
                       <td className="px-3 py-3 text-sm text-neutral-700 dark:text-neutral-200 truncate max-w-[220px]">
                         {u.email || '—'}
                       </td>
@@ -917,9 +926,17 @@ setFormData((prev) => {
         <Modal open={!!detailUser} title="User Details" onClose={() => setDetailUser(null)}>
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-4">
-              <div className={`h-14 w-14 rounded-full flex items-center justify-center text-lg font-bold ${getAvatarColor(detailUser.full_name || detailUser.email)} ring-2 ring-white dark:ring-neutral-700 shadow-sm`}>
-                {getInitials(detailUser.full_name || detailUser.email)}
-              </div>
+              {detailUser.avatar_url ? (
+                <img
+                  src={resolveFileUrl(detailUser.avatar_url)}
+                  alt={detailUser.full_name || detailUser.email || 'User'}
+                  className="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-white dark:ring-neutral-700 shadow-sm"
+                />
+              ) : (
+                <div className={`h-14 w-14 rounded-full flex items-center justify-center text-lg font-bold ${getAvatarColor(detailUser.full_name || detailUser.email)} ring-2 ring-white dark:ring-neutral-700 shadow-sm`}>
+                  {getInitials(detailUser.full_name || detailUser.email)}
+                </div>
+              )}
               <div>
                 <p className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">{detailUser.full_name || '—'}</p>
                 <p className="text-sm text-neutral-500 dark:text-neutral-400">{detailUser.email || '—'}</p>

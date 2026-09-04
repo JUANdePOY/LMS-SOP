@@ -197,6 +197,7 @@ export default function AppLayout() {
       { id: 'nav-events', label: 'Go to Events', group: 'Navigate', icon: Calendar, run: () => navigate('/events'), roles: ['super_admin'] },
       { id: 'nav-profile', label: 'Go to Profile', group: 'Navigate', icon: User, run: () => navigate('/profile') },
       { id: 'nav-settings', label: 'Go to Settings', group: 'Navigate', icon: Settings, run: () => navigate(isDepartmentHead ? '/employee/settings' : '/settings'), roles: ['admin', 'super_admin', 'department_head'] },
+      { id: 'nav-users', label: 'Go to User Management', group: 'Navigate', icon: Users, run: () => navigate('/users'), roles: ['admin', 'super_admin', 'department_head'] },
     ].filter((c) => !c.roles || c.roles.includes(role));
     const createCmds = [
       { id: 'qc-task', label: 'Create new task', group: 'Create', icon: CheckSquare, run: () => window.dispatchEvent(new CustomEvent('app:quick-create', { detail: { type: 'task' } })) },
@@ -289,6 +290,11 @@ export default function AppLayout() {
           "text-[var(--text-primary)]",
           "transition-colors duration-300"
         )}
+        // Drive --sidebar-width from the main sidebar's real width so the
+        // SecondarySidebar's `left` offset tracks it: when the main sidebar
+        // collapses to 72px the secondary panel slides in beside it instead of
+        // staying pinned at 260px and overlapping the collapsed rail.
+        style={{ '--sidebar-width': collapsed ? '72px' : '260px' }}
       >
         {mobileOpen && (
           <div
@@ -306,7 +312,7 @@ export default function AppLayout() {
           onCollapseSidebar={() => setCollapsed(true)}
         />
         )}
-        <SecondarySidebar />
+        <SecondarySidebar collapsed={collapsed} />
         <div className="flex-1 min-w-0 flex flex-col">
           <header
             className={cn(

@@ -1946,7 +1946,7 @@ async function grantBusinessManager(businessId, userId, grantedBy) {
     [businessId, userId, grantedBy]
   );
   const [rows] = await db.query(
-    `SELECT bm.*, u.full_name, cb.business_name
+    `SELECT bm.*, u.full_name, u.email, u.role, u.avatar_url, cb.business_name
      FROM business_managers bm
      INNER JOIN users u ON u.id = bm.user_id
      INNER JOIN client_businesses cb ON cb.id = bm.business_id
@@ -1958,7 +1958,7 @@ async function grantBusinessManager(businessId, userId, grantedBy) {
 
 async function listBusinessManagers(businessId) {
   const [rows] = await db.query(
-    `SELECT bm.*, u.full_name, u.email, u.role, cb.business_name
+    `SELECT bm.*, u.full_name, u.email, u.role, u.avatar_url, cb.business_name
      FROM business_managers bm
      INNER JOIN users u ON u.id = bm.user_id
      INNER JOIN client_businesses cb ON cb.id = bm.business_id
