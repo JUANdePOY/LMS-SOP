@@ -64,17 +64,25 @@ async function getAdminUsers() {
 // Notify every employee assigned to a task. Push is sent only to non-admin
 // assignees — admins are pushed exclusively when a task is done/overdue (see
 // notifyAdminsTaskStatus), per the notification rules.
+//
+// The click target is role-aware: employees open the task from their My Tasks
+// page (which focuses it via ?task= and scopes the tree to it); admins open it
+// directly on the Tasks board. Without this, clicking an assignment
+// notification in the panel sent employees to the admin board instead.
 async function notifyTaskAssigned(task, { push = true } = {}) {
   if (!task || !task.id) return [];
   const users = await resolveAssignedUsers(task.id);
   const promises = users.map((user) => {
     const shouldPush = push && !isAdminRole(user.role);
+    const link = isAdminRole(user.role)
+      ? `/tasks/${task.id}`
+      : `/tasks/my?task=${task.id}`;
     return notificationService.createNotification({
       userId: user.id,
       title: 'You have been assigned a task',
       body: task.title,
       type: 'info',
-      link: `/tasks/${task.id}`,
+      link,
       entityType: 'task',
       entityId: task.id,
       category: 'task',
@@ -116,12 +124,18 @@ async function notifyAssignmentAdded(taskId, assignment) {
 
   const promises = users.map((user) => {
     const shouldPush = !isAdminRole(user.role);
+    // Role-aware click target, same as notifyTaskAssigned: employees open the
+    // task from their My Tasks page (which scopes the tree to it via ?task=);
+    // admins open it directly on the Tasks board.
+    const link = isAdminRole(user.role)
+      ? `/tasks/${task.id}`
+      : `/tasks/my?task=${task.id}`;
     return notificationService.createNotification({
       userId: user.id,
       title: 'You have been assigned a task',
       body: task.title,
       type: 'info',
-      link: `/tasks/${task.id}`,
+      link,
       entityType: 'task',
       entityId: task.id,
       category: 'task',

@@ -370,8 +370,15 @@ function listenWithRetry(port, retries) {
     });
   }, 30000);
 
+  // Periodic due-date reminders: scans every 5 min and push-notifies + banners
+  // every assigned employee, the owning department head, and the owning
+  // business's admins when a task is due soon (48h / 24h) or overdue.
+  const { startTaskDueScheduler } = require('./services/taskDueScheduler');
+  const taskDueScheduler = startTaskDueScheduler();
+
   server.on('close', () => {
     clearInterval(heartbeatInterval);
+    if (taskDueScheduler) clearInterval(taskDueScheduler);
   });
 
   setInterval(() => {

@@ -16,9 +16,7 @@ export default function BusinessPage() {
   const [editData, setEditData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [query, setQuery] = useState('');
-  // Default to active only: a "delete" is a soft-hide (status -> inactive),
-  // so hidden businesses must not resurface in the default list on refresh.
-  const [statusFilter, setStatusFilter] = useState('active');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, business: null });
 
   const safeQuery = sanitizeSearchQuery(query);
@@ -39,7 +37,7 @@ export default function BusinessPage() {
     return result;
   }, [safeQuery, businesses, statusFilter]);
 
-  const hasActiveFilters = safeQuery || statusFilter !== 'active';
+  const hasActiveFilters = safeQuery || statusFilter !== 'all';
 
   const kpiCards = useMemo(() => {
     const list = businesses || [];
@@ -104,7 +102,10 @@ export default function BusinessPage() {
     const business = deleteConfirm.business;
     if (!business) return;
     try {
-      await remove(business.id);
+      // Hard purge: the Businesses management page means "this entity is gone
+      // for good", so force the DELETE through businessModel.remove's cascade
+      // instead of the soft-hide (status -> inactive) the default path does.
+      await remove(business.id, { force: true });
       toast.success('Business deleted successfully');
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete business');
@@ -209,7 +210,7 @@ export default function BusinessPage() {
         onClose={() => setDeleteConfirm({ open: false, business: null })}
         onConfirm={confirmDelete}
         title="Delete Business"
-        message={`Are you sure you want to delete "${deleteConfirm.business?.business_name}"? This action cannot be undone.`}
+        message={`Are you sure you want to permanently delete "${deleteConfirm.business?.business_name}"? The business and its departments will be removed from the database. This action cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         variant="destructive"

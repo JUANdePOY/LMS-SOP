@@ -9,6 +9,7 @@ const projectModel = require('../models/projectModel');
 const { logAudit } = require('../utils/auditLogger');
 const { computeAutoStatus, deriveParentStatus } = require('../utils/taskStatus');
 const { validateTaskPayload, validateAssignmentPayload, validateProgressPayload, validateCommentPayload } = require('../validators/taskValidator');
+const taskDueReminder = require('./taskDueReminderService');
 
 async function listTasks(filters = {}, actorId) {
   const isAdmin = await isUserAdmin(actorId);
@@ -433,7 +434,13 @@ async function createTask(payload, actorId) {
 
   logAudit('task.create', actorId, { task_id: taskId, title });
 
-  return await getTask(taskId, actorId);
+  const created = await getTask(taskId, actorId);
+  // If the new task's deadline is already imminent, notify the relevant
+  // recipients immediately instead of waiting up to 5 minutes for the
+  // periodic due-date scan.
+  taskDueReminder.notifyIfDue(created).catch(() => {});
+
+  return created;
 }
 
 async function duplicateTask(id, actorId) {
@@ -622,7 +629,13 @@ async function updateTask(id, payload, actorId) {
 
   logAudit('task.update', actorId, { task_id: id, changes: validation.value });
 
-  return await getTask(id, actorId);
+  const updated = await getTask(id, actorId);
+  // If the deadline was moved up into an imminent window (or the task was
+  // re-dated past its deadline), notify the relevant recipients right away
+  // instead of waiting for the next periodic scan.
+  taskDueReminder.notifyIfDue(updated).catch(() => {});
+
+  return updated;
 }
 
 async function deleteTask(id, actorId) {

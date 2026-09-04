@@ -899,6 +899,13 @@ async function runMigrations() {
   } catch (err) {
     console.error('Project management migration error:', err.message);
   }
+
+  try {
+    const { runTaskDueReminderMigrations } = require('../migrations/taskDueReminders');
+    await runTaskDueReminderMigrations();
+  } catch (err) {
+    console.error('Task due-reminder migration error:', err.message);
+  }
 }
 
 async function initDatabase() {

@@ -63,8 +63,9 @@ export function useBusinesses(initialParams = {}) {
     return payload;
   }, []);
 
-  const remove = useCallback(async (id) => {
-    await deleteBusiness(id);
+  const remove = useCallback(async (id, options = {}) => {
+    const force = options && options.force === true;
+    await deleteBusiness(id, force);
     setBusinesses((prev) => prev.filter((b) => b.id !== id));
     notifyOrgTreeChanged();
   }, []);

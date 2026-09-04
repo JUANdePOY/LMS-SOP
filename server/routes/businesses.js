@@ -301,11 +301,15 @@ router.put('/:id', [
 });
 
 // DELETE /api/businesses/:id
-// Hides the SOP business from every user by flipping its status to
-// `inactive`. The row (and its departments, clients, tasks) is intentionally
-// NOT dropped — a "delete" here is a visibility toggle, not a purge, so the
-// org structure stays intact and can be restored. A real purge is still
-// available via the legacy `businessModel.remove` (force) path.
+//
+// Two modes, chosen by the `force` query param:
+//   force=false (default) — soft-hide: flip status to `inactive`. The row and
+//     its departments/clients/tasks stay intact so the org structure survives
+//     and can be restored. Used by the SecondarySidebar, where "delete" means
+//     "hide from all users".
+//   force=true — hard purge: physically DELETE the row and (with it, via
+//     businessModel.remove's cascade) its departments. Used by the Businesses
+//     management page, where "delete" means the entity is gone for good.
 router.delete('/:id', async (req, res) => {
   try {
     const businessId = parseInt(req.params.id);
@@ -317,6 +321,25 @@ router.delete('/:id', async (req, res) => {
     const target = await businessModel.findById(businessId);
     if (!target) {
       return res.status(404).json({ status: 'error', message: 'Business not found', code: 'NOT_FOUND' });
+    }
+
+    const force = req.query.force === 'true';
+
+    if (force) {
+      const affected = await businessModel.remove(businessId, true);
+      if (!affected) {
+        return res.status(404).json({ status: 'error', message: 'Business not found', code: 'NOT_FOUND' });
+      }
+
+      logAudit({
+        user_id: req.user.id,
+        action: 'business.deleted',
+        entity_type: 'business',
+        entity_id: businessId,
+        metadata: { business_code: target.business_code, business_name: target.business_name, forced: true },
+      });
+
+      return res.json({ status: 'success', message: 'Business deleted successfully' });
     }
 
     const hidden = await businessModel.softRemove(businessId, req.user.id);
@@ -337,8 +360,11 @@ router.delete('/:id', async (req, res) => {
     if (err.statusCode === 404) {
       return res.status(404).json({ status: 'error', message: 'Business not found', code: 'NOT_FOUND' });
     }
-    console.error('Business hide error:', err);
-    res.status(500).json({ status: 'error', message: 'Failed to hide business', code: 'DB_ERROR' });
+    if (err.code === 'HAS_DEPENDENCIES') {
+      return res.status(409).json({ status: 'error', message: err.message, code: 'HAS_DEPENDENCIES' });
+    }
+    console.error('Business delete error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to delete business', code: 'DB_ERROR' });
   }
 });
 

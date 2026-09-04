@@ -81,6 +81,21 @@ function computeSnapshot() {
   };
 }
 
+// Task-assignment notifications are created server-side with a click target
+// (`/tasks/<id>`) that lands on the admin Tasks board. For employees that's the
+// wrong page — they should land on their own My Tasks page, scoped to the
+// task's tree. The banner already rewrites this at surface time, but the
+// notification panel navigates using the stored link, so normalize it here on
+// every fetch. This also fixes notifications created before the server-side
+// fix. Employees -> /tasks/my?task=<id>; admins -> /tasks/<id> unchanged.
+function normalizeTaskNotificationLink(n) {
+  if (!n || n.entity_type !== 'task' || !n.entity_id) return n;
+  const link = n.link || '';
+  // Already pointing at the employee My Tasks tree — leave it alone.
+  if (link === `/tasks/my?task=${n.entity_id}`) return n;
+  return { ...n, link: `/tasks/my?task=${n.entity_id}` };
+}
+
 function getSnapshot() {
   if (!cachedSnapshot) {
     cachedSnapshot = computeSnapshot();
@@ -124,6 +139,7 @@ export const NotificationStore = {
         notifications = notifications[0];
       }
       serverNotifications = Array.isArray(notifications) ? notifications : prevNotifications;
+      serverNotifications = serverNotifications.map(normalizeTaskNotificationLink);
       unreadServerCount = data.unread_count || 0;
       if (unreadServerCount > previousUnreadServerCount && !isQuietHours(preferences) && preferences?.channels?.sound !== false) {
         playNotificationSound();

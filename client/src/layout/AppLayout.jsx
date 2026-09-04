@@ -37,6 +37,7 @@ import { PageTransition } from "@/shared/motion";
 import { useWebSocket } from "@/features/notifications/hooks/useWebSocket";
 import { useActiveBanners } from "@/features/notifications/hooks/useActiveBanners";
 import { useContextualBanners } from "@/features/notifications/hooks/useContextualBanners";
+import { useAutoPushSubscribe } from "@/features/notifications/hooks/useAutoPushSubscribe";
 import { useTabNotificationBadge } from "@/hooks/useTabNotificationBadge";
 import { isQuietHours } from "@/shared/utils/quietHours";
 import { NavigationProvider, useNavigation } from "@/shared/contexts/NavigationContext";
@@ -129,6 +130,11 @@ export default function AppLayout() {
   const isDashboard = location.pathname === '/';
   const notificationData = useNotifications();
   const { fetchPreferences } = notificationData;
+  // Auto-subscribe every logged-in user to web push on first load (opt-out
+  // instead of opt-in) so due-date reminders actually reach them outside the
+  // app. Respects the user's own push-channel preference and a denied browser
+  // permission — never throws.
+  useAutoPushSubscribe();
   const { banners: activeBanners } = useActiveBanners({ enabled: isDashboard });
   const { banners: contextualBanners } = useContextualBanners({ enabled: isDashboard });
   const messageBadgeCount = notificationData.unreadMessageCount || 0;
