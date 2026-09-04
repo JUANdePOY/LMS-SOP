@@ -16,7 +16,9 @@ export default function BusinessPage() {
   const [editData, setEditData] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [query, setQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  // Default to active only: a "delete" is a soft-hide (status -> inactive),
+  // so hidden businesses must not resurface in the default list on refresh.
+  const [statusFilter, setStatusFilter] = useState('active');
   const [deleteConfirm, setDeleteConfirm] = useState({ open: false, business: null });
 
   const safeQuery = sanitizeSearchQuery(query);
@@ -37,7 +39,7 @@ export default function BusinessPage() {
     return result;
   }, [safeQuery, businesses, statusFilter]);
 
-  const hasActiveFilters = safeQuery || statusFilter !== 'all';
+  const hasActiveFilters = safeQuery || statusFilter !== 'active';
 
   const kpiCards = useMemo(() => {
     const list = businesses || [];
@@ -177,7 +179,7 @@ export default function BusinessPage() {
           </select>
           {hasActiveFilters && (
             <button
-              onClick={() => { setQuery(''); setStatusFilter('all'); }}
+              onClick={() => { setQuery(''); setStatusFilter('active'); }}
               className="text-sm text-blue-600 hover:underline"
             >
               Clear

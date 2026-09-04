@@ -634,7 +634,7 @@ export default function SecondarySidebar() {
           open ? "translate-x-0" : "translate-x-full"
         )}
       >
-      <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-[var(--header-border)] px-4">
+      <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-[var(--header-border)] px-4 bg-[var(--bg-sidebar)] sticky top-0 z-10">
         <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[color-mix(in_srgb,var(--text-on-sidebar)_60%,transparent)]">
           Businesses
         </p>
@@ -648,7 +648,7 @@ export default function SecondarySidebar() {
         </button>
       </div>
 
-      <div className="px-3 py-2.5">
+      <div className="px-3 py-2.5 sticky top-[var(--header-height)] z-10 bg-[var(--bg-sidebar)]">
         <div className="relative">
           <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
