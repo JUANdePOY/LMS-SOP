@@ -21,6 +21,17 @@ const STATUS_TOKENS = {
   Cancelled: { var: '--ppm-st-cancelled', label: 'Cancelled' },
 };
 
+function useEscToClose(open, onClose) {
+  useEffect(() => {
+    if (!open) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [open, onClose]);
+}
+
 function StatusDot({ status }) {
   if (!status) {
     return (
@@ -44,6 +55,8 @@ function StatusDropdown({ status, onChange }) {
   const ref = useClickOutside(() => setOpen(false));
   const triggerRef = useRef(null);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+  useEscToClose(open, () => setOpen(false));
 
   const updatePosition = useCallback(() => {
     const el = triggerRef.current;
@@ -108,6 +121,8 @@ function PriorityDropdown({ priority, onChange }) {
   const ref = useClickOutside(() => setOpen(false));
   const triggerRef = useRef(null);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+  useEscToClose(open, () => setOpen(false));
 
   const updatePosition = useCallback(() => {
     const el = triggerRef.current;
@@ -271,6 +286,8 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
   const [maxHeight, setMaxHeight] = useState(null);
   const triggerRef = useRef(null);
   const dropdownRef = useRef(null);
+
+  useEscToClose(open, () => setOpen(false));
 
   const VIEWPORT_MARGIN = 8;
 
@@ -553,6 +570,8 @@ export function BusinessManagerPicker({ businessId, businessName, managers, onSa
   const dropdownRef = useRef(null);
   const VIEWPORT_MARGIN = 8;
 
+  useEscToClose(open, () => setOpen(false));
+
   const updatePosition = useCallback(() => {
     const el = triggerRef.current;
     if (!el) return;
@@ -743,6 +762,8 @@ export function BusinessDepartmentPicker({ businessId, businessName, departments
   const triggerRef = useRef(null);
   const dropdownRef = useRef(null);
   const VIEWPORT_MARGIN = 8;
+
+  useEscToClose(open, () => setOpen(false));
 
   const updatePosition = useCallback(() => {
     const el = triggerRef.current;
@@ -972,6 +993,8 @@ export function BusinessAssigneePicker({ businessId, businessName, managers = []
   const triggerRef = useRef(null);
   const dropdownRef = useRef(null);
   const VIEWPORT_MARGIN = 8;
+
+  useEscToClose(open, () => setOpen(false));
 
   const updatePosition = useCallback(() => {
     const el = triggerRef.current;
@@ -1485,7 +1508,7 @@ function MoreActionsMenu({ task, businesses, onOpen, onMoveBusiness, onDelete, o
   );
 }
 
-export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects, showCountBadges = false, subtaskCount = 0, isNew = false, tasksById = {}, onAddSubtask, onViewSubtasks, userDepartmentId = null, userDepartmentClientIds = null }) {
+export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects, showCountBadges = false, subtaskCount = 0, isNew = false, tasksById = {}, onAddSubtask, onViewSubtasks, userDepartmentId = null, userDepartmentClientIds = null, depth = 0 }) {
   const { toast } = useToast();
 
   const overdue = isOverdue(task);
@@ -1551,6 +1574,10 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
   const parentTask = isSubtask ? tasksById[String(task.parent_task_id)] : null;
   const parentTitle = parentTask?.title || null;
 
+  const displayStatus = overdue
+    ? 'Overdue'
+    : task.auto_status || task.status || 'Pending';
+
   const handleCompleteToggle = () => {
     if (task.status === 'Completed') {
       onStatusChange?.(task, 'In Progress');
@@ -1615,7 +1642,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
     >
       <span
         className="relative z-10 flex min-w-0 items-center justify-between gap-1.5 pr-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75"
-        style={{ paddingLeft: '4px' }}
+        style={{ paddingLeft: depth > 0 ? `${depth * 20}px` : '4px' }}
       >
         <span className="flex min-w-0 items-center gap-1.5">
         <button
@@ -1715,9 +1742,9 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
 
       <span className="flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
         {canEditThisTask ? (
-          <StatusDropdown status={task.status} onChange={(s) => onStatusChange?.(task, s)} />
+          <StatusDropdown status={displayStatus} onChange={(s) => onStatusChange?.(task, s)} />
         ) : (
-          <StatusDot status={task.status} />
+          <StatusDot status={displayStatus} />
         )}
       </span>
 

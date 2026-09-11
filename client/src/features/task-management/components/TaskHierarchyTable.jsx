@@ -897,29 +897,29 @@ onQuickAddTask,
         const dimmed = search && !subtreeMatches(client, 'client', search);
         const clientKey = `client-${client.id}`;
         const open = isExpanded(clientKey, 'client', client);
-return (
-           <div key={clientKey}>
-              <Row
-                depth={0}
-                kind="client"
-                id={client.id}
-                name={client.name}
-                open={open}
-onToggle={() => toggle(clientKey)}
-                  dueDate={client.rollup.earliestDue}
-                 progress={client.rollup.avgProgress}
-                 dimmed={dimmed}
-                  canEdit={canManage}
-                  onRename={onRenameClient}
-                  onAddChild={startAdd}
-                 onDeleteEntity={onDeleteEntity}
-                  onHideEmptyGroups={hideEmptyGroups}
-                  hideDue
-                  taller
-                  noBorder
-                 count={client.businesses.length}
-                 countLabel="businesses"
-                 />
+        return (
+          <div key={clientKey}>
+            <Row
+              depth={0}
+              kind="client"
+              id={client.id}
+              name={client.name}
+              open={open}
+              onToggle={() => toggle(clientKey)}
+              dueDate={client.rollup.earliestDue}
+              progress={client.rollup.avgProgress}
+              dimmed={dimmed}
+              canEdit={canManage}
+              onRename={onRenameClient}
+              onAddChild={startAdd}
+              onDeleteEntity={onDeleteEntity}
+              onHideEmptyGroups={hideEmptyGroups}
+              hideDue
+              taller
+              noBorder
+              count={client.businesses.length}
+              countLabel="businesses"
+            />
             <AnimatePresence initial={false}>
               {open && (
                 <motion.div
@@ -936,32 +936,32 @@ onToggle={() => toggle(clientKey)}
                     const bOpen = isExpanded(businessKey, 'business', business);
                     return (
                       <div key={businessKey}>
-                         <Row
-                           depth={1}
-                           kind="business"
-                           id={business.id}
-                           name={business.name}
-                           open={bOpen}
- onToggle={() => toggle(businessKey)}
-                            dueDate={business.rollup.earliestDue}
-                            progress={business.rollup.avgProgress}
-                            dimmed={bDimmed}
-                             canEdit={canManage}
-                             onRename={onRenameBusiness}
-                             onAddChild={startAdd}
-                             onDeleteEntity={onDeleteEntity}
-                             onHideEmptyGroups={hideEmptyGroups}
-                             hideDue
-                             noBorder
-                             businessManagers={businessManagers[String(business.id)]}
-                             businessDepartments={businessDepartments[String(business.id)]}
-                             onBusinessAssigneeSave={handleBusinessAssigneeSave}
-                             userRole={userRole}
-                             userDepartmentId={userDepartmentId}
-                             userBusinessId={userBusinessId}
-                             count={business.rollup.total}
-                             countLabel="tasks"
-                             />
+                        <Row
+                          depth={1}
+                          kind="business"
+                          id={business.id}
+                          name={business.name}
+                          open={bOpen}
+                          onToggle={() => toggle(businessKey)}
+                          dueDate={business.rollup.earliestDue}
+                          progress={business.rollup.avgProgress}
+                          dimmed={bDimmed}
+                          canEdit={canManage}
+                          onRename={onRenameBusiness}
+                          onAddChild={startAdd}
+                          onDeleteEntity={onDeleteEntity}
+                          onHideEmptyGroups={hideEmptyGroups}
+                          hideDue
+                          noBorder
+                          businessManagers={businessManagers[String(business.id)]}
+                          businessDepartments={businessDepartments[String(business.id)]}
+                          onBusinessAssigneeSave={handleBusinessAssigneeSave}
+                          userRole={userRole}
+                          userDepartmentId={userDepartmentId}
+                          userBusinessId={userBusinessId}
+                          count={business.rollup.total}
+                          countLabel="tasks"
+                        />
                         <AnimatePresence initial={false}>
                           {bOpen && (
                             <motion.div
@@ -976,26 +976,27 @@ onToggle={() => toggle(clientKey)}
                                 const tDimmed = search && !subtreeMatches(task, 'task', search);
                                 return (
                                   <Fragment key={task.id}>
-                                     <TaskRow
-                                       task={task}
-                                       dimmed={tDimmed}
-                                       onViewTask={onViewTask}
-                                       onViewSubtasks={onViewSubtasks}
-                                       onStatusChange={onStatusChange}
-                                       onInlineUpdate={onInlineUpdate}
-                                       onDelete={onDelete}
-                                       onDeleteImmediate={onDeleteImmediate}
-                                       onDuplicated={onDuplicated}
-                                       onRenameTask={onRenameTask}
-canManage={canManage}
-                                        projects={projects}
-                                        tasksById={tasksById}
-                                        userDepartmentId={userDepartmentId}
-                                        userDepartmentClientIds={userDepartmentClientIds}
-                                       onAddSubtask={(t) => startAdd('task', t.id)}
-                                       subtaskCount={subtaskCountMap[task.id] || 0}
-                                       isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
-                                     />
+                                    <TaskRow
+                                      task={task}
+                                      depth={2}
+                                      dimmed={tDimmed}
+                                      onViewTask={onViewTask}
+                                      onViewSubtasks={onViewSubtasks}
+                                      onStatusChange={onStatusChange}
+                                      onInlineUpdate={onInlineUpdate}
+                                      onDelete={onDelete}
+                                      onDeleteImmediate={onDeleteImmediate}
+                                      onDuplicated={onDuplicated}
+                                      onRenameTask={onRenameTask}
+                                      canManage={canManage}
+                                      projects={projects}
+                                      tasksById={tasksById}
+                                      userDepartmentId={userDepartmentId}
+                                      userDepartmentClientIds={userDepartmentClientIds}
+                                      onAddSubtask={(t) => startAdd('task', t.id)}
+                                      subtaskCount={subtaskCountMap[task.id] || 0}
+                                      isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
+                                    />
                                     {addingFor?.kind === 'subtask' && addingFor.parentId === task.id && (
                                       <InlineNameRow
                                         key="__add-subtask"
@@ -1011,32 +1012,30 @@ canManage={canManage}
                                   </Fragment>
                                 );
                               })}
-                              {(
-                                addingFor?.kind === 'task' && addingFor.parentId === business.id ? (
-                                  <AddTaskRow
-                                    key="__add-task"
-                                    businessId={business.id}
-                                    clientId={client.id}
-                                    canManage={canManage}
-                                    projects={projects}
-                                    onCommit={async (payload) => {
-                                      await onQuickAddTask(business.id, client.id, payload);
-                                      setAddingFor(null);
-                                    }}
-                                    onCancel={() => setAddingFor(null)}
-                                    userDepartmentId={userDepartmentId}
-                                    userDepartmentClientIds={userDepartmentClientIds}
-                                  />
-                                ) : canManage && (
-                                  <button
-                                    type="button"
-                                    onClick={() => startAdd('business', business.id)}
-                                    className="flex w-full cursor-pointer items-center gap-1.5 py-3 pl-[44px] text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)] h-10"
-                                  >
-                                    <Plus size={13} className="shrink-0" />
-                                    Add task
-                                  </button>
-                                )
+                              {addingFor?.kind === 'task' && addingFor.parentId === business.id ? (
+                                <AddTaskRow
+                                  key="__add-task"
+                                  businessId={business.id}
+                                  clientId={client.id}
+                                  canManage={canManage}
+                                  projects={projects}
+                                  onCommit={async (payload) => {
+                                    await onQuickAddTask(business.id, client.id, payload);
+                                    setAddingFor(null);
+                                  }}
+                                  onCancel={() => setAddingFor(null)}
+                                  userDepartmentId={userDepartmentId}
+                                  userDepartmentClientIds={userDepartmentClientIds}
+                                />
+                              ) : canManage && (
+                                <button
+                                  type="button"
+                                  onClick={() => startAdd('business', business.id)}
+                                  className="flex w-full cursor-pointer items-center gap-1.5 py-3 pl-[44px] text-xs font-medium text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)] hover:text-[var(--color-primary)] h-10"
+                                >
+                                  <Plus size={13} className="shrink-0" />
+                                  Add task
+                                </button>
                               )}
                             </motion.div>
                           )}

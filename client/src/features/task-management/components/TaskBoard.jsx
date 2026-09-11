@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { TASK_STATUSES, TASK_STATUS_LABELS, STATUS_STYLES } from '../constants/taskConstants';
 import { cn } from '@/lib/utils';
 import TaskCard from './TaskCard';
+import { isOverdue } from '../utils/taskDateUtils';
 
 const STATUS_ACCENT = {
   Pending: 'bg-slate-400',
@@ -96,7 +97,7 @@ function TaskBoard({ tasks, onEdit, onDelete, onView, onStatusChange, canManage,
   const byId = {};
   TASK_STATUSES.forEach((s) => { grouped[s] = []; });
   (tasks || []).forEach((t) => {
-    const key = TASK_STATUSES.includes(t.status) ? t.status : 'Pending';
+    const key = isOverdue(t) ? 'Overdue' : (TASK_STATUSES.includes(t.status) ? t.status : 'Pending');
     grouped[key].push(t);
     byId[String(t.id)] = t;
   });

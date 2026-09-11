@@ -21,7 +21,13 @@ export default function ViewAttachmentModal({ isOpen, onClose, file, fileName, f
     } else if (typeof file === 'string') {
       setObjectUrl(file);
     }
-  }, [isOpen, file]);
+
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [isOpen, file, onClose, objectUrl]);
 
   if (!isOpen) return null;
 

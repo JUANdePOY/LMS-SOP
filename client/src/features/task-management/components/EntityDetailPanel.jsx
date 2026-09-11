@@ -9,7 +9,6 @@ import { updateTask, getTask, createTask, deleteTask } from '../services/taskSer
 import { getProject, updateProject, deleteProject } from '../services/projectService';
 import { getClient, updateClient, deleteClient } from '../api/client.api';
 import { getBusiness, updateBusiness, deleteBusiness } from '../api/business.api';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useTaskDetails } from '../hooks/useTaskDetails';
 import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
@@ -92,9 +91,31 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
   const { task, loading, error, saving, load, updateProgress, addComment: postComment, uploadFile, removeAttachment } = useTaskDetails(taskId);
   const [inlineCompletionRate, setInlineCompletionRate] = useState(0);
   const [inlineStatus, setInlineStatus] = useState('In Progress');
-  const [inlineNotes, setInlineNotes] = useState('');
+
+  const isTaskOverdue = (task) => {
+    if (!task) return false;
+    if (task.status === 'Completed' || task.status === 'Cancelled') return false;
+    const dl = task.deadline_datetime || task.due_date || null;
+    if (!dl) return false;
+    return new Date(dl) < new Date();
+  };
 
   useEffect(() => { if (open) load(); }, [open, load]);
+
+  // Sync status with completion rate and overdue state.
+  useEffect(() => {
+    if (!local) return;
+    const rate = Number(inlineCompletionRate || 0);
+    if (rate >= 100) {
+      setInlineStatus('Completed');
+    } else if (isTaskOverdue(local)) {
+      setInlineStatus('Overdue');
+    } else if (rate === 0) {
+      setInlineStatus('Pending');
+    } else {
+      setInlineStatus('In Progress');
+    }
+  }, [local, inlineCompletionRate]);
 
   // If the task was deleted (or otherwise no longer exists), close the panel
   // instead of lingering on a phantom row that shows "Task not found."
@@ -108,8 +129,13 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
     if (task) {
       setLocal(task);
       const latest = Array.isArray(task.progress) && task.progress.length > 0 ? task.progress[0] : null;
-      setInlineCompletionRate(latest ? Number(latest.completion_rate || 0) : Number(task.completion_rate || 0));
-      setInlineStatus(latest?.status || task.status || 'In Progress');
+      const rate = latest ? Number(latest.completion_rate || 0) : Number(task.completion_rate || 0);
+      setInlineCompletionRate(rate);
+      let status = latest?.status || task.status || 'In Progress';
+      if (rate >= 100) status = 'Completed';
+      else if (isTaskOverdue(task)) status = 'Overdue';
+      else if (rate === 0) status = 'Pending';
+      setInlineStatus(status);
     }
   }, [task]);
 
@@ -193,7 +219,9 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
   // Mirror the hierarchy/list: show the derived auto status (e.g. "Overdue" for a
   // Pending task past its deadline) rather than the raw stored value, so the
   // drawer and the table agree. The <select> below still edits the stored status.
-  const displayStatus = local.auto_status ?? local.status;
+  const displayStatus = isTaskOverdue(local) ? 'Overdue' : (local.auto_status || local.status || 'Pending');
+
+  const statusSelectValue = displayStatus;
 
   // Only admins and Department Heads may edit task details (title, status,
   // priority, dates, description, assignees, sub-tasks). Regular assignees can
@@ -232,7 +260,7 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
           <div className="flex items-center gap-2">
             <Pill label={displayStatus} color={STATUS_COLORS[displayStatus]} bg={STATUS_BG[displayStatus]} />
             <select
-              value={local.status}
+              value={statusSelectValue}
               disabled={!canEdit || saving}
               onChange={(e) => patch({ status: e.target.value })}
               className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)] disabled:opacity-60"
@@ -326,92 +354,52 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
       )}
 
       <div className="border-t border-[var(--border)] px-2 pt-4">
-        <h4 className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><TrendingUp size={15} /> Update Progress</h4>
+        <h4 className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><TrendingUp size={15} /> Progress</h4>
         {isAssigned ? (
-          <div className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--bg-page)] p-3">
-<div>
-               <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Completion Rate</label>
-               <div className="flex flex-wrap gap-1.5">
-                 {[10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((rate) => (
-                   <button
-                     key={rate}
-                     type="button"
-                     onClick={() => setInlineCompletionRate(rate)}
-                     className={cn(
-                       'h-7 w-10 rounded-md text-xs font-medium transition-colors sm:w-12',
-                       inlineCompletionRate === rate
-                         ? 'bg-[var(--color-primary)] text-white'
-                         : 'bg-[var(--bg-surface)] text-[var(--text-secondary)] ring-1 ring-[var(--border)] hover:ring-[var(--color-primary)] hover:text-[var(--color-primary)]'
-                     )}
-                   >
-                     {rate}%
-                   </button>
-                 ))}
-               </div>
-             </div>
-            <div>
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Status</label>
+          <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-3">
+            <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+              <span>Completion</span>
+              <span className="tabular-nums text-[var(--text-secondary)]">{inlineCompletionRate}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="100"
+              step="5"
+              value={inlineCompletionRate}
+              onChange={(e) => setInlineCompletionRate(Number(e.target.value))}
+              className="w-full"
+            />
+            <div className="flex flex-wrap gap-2">
               <select
                 value={inlineStatus}
                 onChange={(e) => setInlineStatus(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-xs outline-none focus:border-[var(--color-primary)]"
+                className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
               >
                 {TASK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={async () => {
+                  await updateProgress({
+                    task_id: taskId,
+                    completion_rate: Number(inlineCompletionRate),
+                    status: inlineStatus,
+                    notes: null,
+                  });
+                  await load();
+                  onUpdated?.(await getTask(taskId));
+                }}
+                className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50 transition-colors"
+              >
+                {saving ? 'Saving...' : 'Save Progress'}
+              </button>
             </div>
-            <div>
-              <label className="mb-1.5 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Notes</label>
-              <textarea
-                value={inlineNotes}
-                onChange={(e) => setInlineNotes(e.target.value)}
-                placeholder="Progress notes..."
-                rows={2}
-                className="w-full resize-none rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-xs outline-none focus:border-[var(--color-primary)] placeholder:text-[var(--text-muted)]"
-              />
-            </div>
-            <button
-              type="button"
-              disabled={saving}
-              onClick={async () => {
-                await updateProgress({
-                  task_id: taskId,
-                  completion_rate: Number(inlineCompletionRate),
-                  status: inlineStatus,
-                  notes: inlineNotes || null,
-                });
-                setInlineNotes('');
-                await load();
-                onUpdated?.(await getTask(taskId));
-              }}
-              className="rounded-lg bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50 transition-colors"
-            >
-              {saving ? 'Saving...' : 'Save Progress'}
-            </button>
           </div>
         ) : (
           <p className="text-xs text-[var(--text-muted)]">You must be assigned to this task to update progress.</p>
         )}
-      </div>
-
-      <div className="border-t border-[var(--border)] px-2 pt-4">
-        <h4 className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><TrendingUp size={15} /> Progress History</h4>
-        {local.progress && local.progress.length > 0 ? (
-          <div className="space-y-2">
-            {local.progress.slice(0, 4).map((p) => (
-              <div key={p.id} className="rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="font-medium text-[var(--text-primary)]">{p.user_name}</span>
-                  <span className="text-xs text-[var(--text-muted)]">{formatDateTime(p.updated_at)}</span>
-                </div>
-                <div className="mt-1 flex items-center gap-2">
-                  <div className="h-2 flex-1 rounded-full bg-neutral-200 dark:bg-neutral-700"><div className="h-full rounded-full bg-blue-500" style={{ width: `${p.completion_rate}%` }} /></div>
-                  <span className="text-xs font-medium text-[var(--text-secondary)]">{p.completion_rate}%</span>
-                </div>
-                {p.notes && <p className="mt-1 text-xs text-[var(--text-muted)]">{p.notes}</p>}
-              </div>
-            ))}
-          </div>
-        ) : <p className="text-xs text-[var(--text-muted)]">No progress updates yet.</p>}
       </div>
 
       <div className="px-2">

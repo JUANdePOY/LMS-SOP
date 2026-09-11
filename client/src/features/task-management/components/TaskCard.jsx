@@ -1,15 +1,9 @@
 import { memo } from 'react';
 import { PRIORITY_STYLES, STATUS_STYLES, TASK_STATUS_LABELS } from '../constants/taskConstants';
-import { formatDate } from '../utils/taskDateUtils';
+import { formatDate, isOverdue } from '../utils/taskDateUtils';
 import { cn } from '@/lib/utils';
 import { Calendar } from 'lucide-react';
 import Avatar from '@/shared/components/ui/Avatar';
-
-function isOverdue(task) {
-  if (!task.deadline_datetime) return false;
-  if (task.status === 'Completed' || task.status === 'Cancelled') return false;
-  return new Date(task.deadline_datetime) < new Date();
-}
 
 /**
  * Asana-style board card: title + minimal status line (priority/status pills,
@@ -21,6 +15,7 @@ function TaskCard({ task, onEdit, onDelete, onView, canManage }) {
     .filter((a) => a.assignment_type === 'User')
     .map((a) => ({ name: a.reference_name, avatarUrl: a.avatar_url }));
   const overdue = isOverdue(task);
+  const displayStatus = overdue ? 'Overdue' : task.status;
 
   return (
     <div
@@ -33,8 +28,8 @@ function TaskCard({ task, onEdit, onDelete, onView, canManage }) {
         <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.Medium)}>
           {task.priority}
         </span>
-        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', STATUS_STYLES[task.status] || STATUS_STYLES.Pending)}>
-          {TASK_STATUS_LABELS[task.status] || task.status}
+        <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium', STATUS_STYLES[displayStatus] || STATUS_STYLES.Pending)}>
+          {TASK_STATUS_LABELS[displayStatus] || displayStatus}
         </span>
         {task.deadline_datetime && (
           <span

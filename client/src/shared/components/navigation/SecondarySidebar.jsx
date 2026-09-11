@@ -8,6 +8,7 @@ import { useNavigation } from "@/shared/contexts/NavigationContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBusinessClientTree } from "@/features/task-management/hooks/useBusinessClientTree";
 import { notifyOrgTreeChanged } from "@/shared/store/orgTreeBus";
+import { useOrgTreeVersion } from "@/shared/store/orgTreeBus";
 import InlineNameRow from "@/features/task-management/components/InlineNameRow";
 import InlineBusinessForm from "@/features/task-management/components/InlineBusinessForm";
 import ConfirmationDialog from "@/shared/components/ui/ConfirmationDialog";
@@ -45,7 +46,9 @@ export default function SecondarySidebar({ collapsed = false }) {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { businesses, unassigned, loading, refresh } = useBusinessClientTree();
+   const { businesses, unassigned, loading, refresh } = useBusinessClientTree();
+   const orgVersion = useOrgTreeVersion();
+   const [hasUnassignedTasks, setHasUnassignedTasks] = useState(false);
 
   // Employees (non-admins) only ever see the single SOP business linked to their
   // account — the task tree in the My Tasks page is scoped to it, so this panel
@@ -62,6 +65,7 @@ export default function SecondarySidebar({ collapsed = false }) {
     if (isAnyAdmin || employeeBusinessId == null) {
       setEmployeeClientIds(null);
       setEmployeeBusinessIds(null);
+      setHasUnassignedTasks(false);
       return;
     }
     let active = true;
@@ -77,12 +81,32 @@ export default function SecondarySidebar({ collapsed = false }) {
         }
         setEmployeeClientIds(clientIds);
         setEmployeeBusinessIds(bizIds);
+        const hasUnassigned = (data?.tasks || []).some((t) => t.client_business_id == null);
+        setHasUnassignedTasks(hasUnassigned);
       })
       .catch(() => {
-        if (active) { setEmployeeClientIds(new Set()); setEmployeeBusinessIds(new Set()); }
+        if (active) { setEmployeeClientIds(new Set()); setEmployeeBusinessIds(new Set()); setHasUnassignedTasks(false); }
       });
     return () => { active = false; };
   }, [isAnyAdmin, employeeBusinessId]);
+
+  useEffect(() => {
+    if (!isAnyAdmin) {
+      setHasUnassignedTasks(false);
+      return;
+    }
+    let active = true;
+    api.get('/tasks', { params: { page: 1, limit: 100 } })
+      .then(({ data }) => {
+        if (!active) return;
+        const tasks = data?.data?.rows || [];
+        setHasUnassignedTasks(tasks.some((t) => t.client_business_id == null));
+      })
+      .catch(() => {
+        if (active) setHasUnassignedTasks(false);
+      });
+    return () => { active = false; };
+  }, [isAnyAdmin, orgVersion]);
 
   const visibleBusinesses = useMemo(() => {
     // Department Heads see their SOP business (derived from their department's
@@ -120,7 +144,7 @@ export default function SecondarySidebar({ collapsed = false }) {
         })),
     }));
   }, [businesses, employeeBusinessId, isAnyAdmin, isDepartmentHead, user, employeeClientIds, employeeBusinessIds]);
-  const showUnassigned = isAnyAdmin;
+  const showUnassigned = isAnyAdmin && hasUnassignedTasks;
   const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [expandedBiz, setExpandedBiz] = useState({});
@@ -603,44 +627,43 @@ export default function SecondarySidebar({ collapsed = false }) {
     );
   };
 
-  return (
-    <div
-      className={cn(
-        // On mobile this is a fixed drawer sliding in from the left edge of
-        // the viewport. On desktop (≥lg) the styles in index.css promote it
-        // to `position: sticky` inside `.app-shell` so it sits flush beside
-        // the main Sidebar and tracks its collapse/expand via
-        // --sidebar-width. The `secondary-sidebar` class is the hook those
-        // rules use to target this element.
-        "secondary-sidebar",
-        "fixed top-0 left-0 z-50 flex flex-col lg:top-0",
-        "shrink-0 transition-[width,opacity] duration-300 ease-out",
-        open
-          ? "lg:w-[260px] lg:opacity-100"
-          : "lg:w-0 lg:opacity-0 lg:pointer-events-none",
-        "h-[calc(100dvh-var(--header-height)-var(--app-shell-inset,20px))]",
-        "min-[1280px]:h-[calc(100dvh-var(--header-height)-var(--app-shell-inset-lg,28px))]",
-        "bg-[var(--bg-sidebar)] text-[var(--text-on-sidebar)]",
-        "border-r border-[var(--border-sidebar)]",
-        // Mobile: a slide-over drawer that sits above the page content and
-        // closes on backdrop click / Escape.
-        open
-          ? "translate-x-0"
-          : "translate-x-full lg:translate-x-0"
-      )}
-      aria-label="Businesses"
-    >
-      {open && (
-        <div
-          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-200 lg:hidden"
-          onClick={closeSecondaryNav}
-          aria-hidden="true"
-        />
-      )}
-      <div
+   return (
+     <div
+       className={cn(
+         // On mobile this is a fixed drawer sliding in from the left edge of
+         // the viewport. On desktop (≥lg) the styles in index.css promote it
+         // to `position: sticky` inside `.app-shell` so it sits flush beside
+         // the main Sidebar and tracks its collapse/expand via
+         // --sidebar-width. The `secondary-sidebar` class is the hook those
+         // rules use to target this element.
+         "secondary-sidebar",
+         "fixed top-0 left-0 z-50 flex flex-col lg:top-0",
+         "shrink-0 transition-[width,opacity,transform] duration-300 ease-out",
+         open
+           ? "w-[86vw] max-w-[320px] lg:w-[260px] opacity-100"
+           : "w-0 opacity-0 pointer-events-none lg:w-0",
+         "h-[calc(100dvh-var(--header-height)-var(--app-shell-inset,20px))]",
+         "min-[1280px]:h-[calc(100dvh-var(--header-height)-var(--app-shell-inset-lg,28px))]",
+         "bg-[var(--bg-sidebar)] text-[var(--text-on-sidebar)]",
+         "border-r border-[var(--border-sidebar)]",
+         // Mobile: a slide-over drawer that sits above the page content and
+         // closes on backdrop click / Escape.
+         open
+           ? "translate-x-0"
+           : "-translate-x-full"
+       )}
+       aria-label="Businesses"
+     >
+       {open && (
+         <div
+           className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-300 lg:hidden"
+           onClick={closeSecondaryNav}
+           aria-hidden="true"
+         />
+       )}
+       <div
         className={cn(
-          "relative flex h-full w-[86vw] max-w-[320px] flex-col border-r border-[var(--border-sidebar)] bg-[var(--bg-sidebar)] shadow-xl transition-transform duration-250 ease-out lg:translate-x-0 lg:w-full lg:max-w-none lg:shadow-none",
-          open ? "translate-x-0" : "translate-x-full"
+          "relative flex h-full w-full flex-col bg-[var(--bg-sidebar)] shadow-xl lg:w-full lg:max-w-none lg:shadow-none z-50"
         )}
       >
       <div className="flex h-[var(--header-height)] shrink-0 items-center justify-between border-b border-[var(--header-border)] px-4 bg-[var(--bg-sidebar)] sticky top-0 z-10">

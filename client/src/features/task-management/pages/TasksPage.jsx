@@ -23,6 +23,7 @@ import Breadcrumb from '../components/Breadcrumb';
 import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
 import { notifyOrgTreeChanged, useOrgTreeVersion } from '@/shared/store/orgTreeBus';
 import ClientFormModal from '../components/ClientFormModal';
+import { isOverdue } from '../utils/taskDateUtils';
 
 const VIEW_STORAGE_KEY = 'ppm:tasks:view';
 
@@ -445,7 +446,7 @@ export default function TasksPage() {
     const pending = list.filter((t) => t.status === 'Pending').length;
     const inProgress = list.filter((t) => t.status === 'In Progress').length;
     const completed = list.filter((t) => t.status === 'Completed').length;
-    const overdue = list.filter((t) => t.status === 'Overdue').length;
+    const overdue = list.filter((t) => isOverdue(t)).length;
     const cancelled = list.filter((t) => t.status === 'Cancelled').length;
     return [
       { label: 'Total', value: total, icon: ClipboardList },

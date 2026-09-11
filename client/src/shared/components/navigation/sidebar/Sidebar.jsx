@@ -132,7 +132,7 @@ const MENU_ITEMS = [
       // User Management is a standalone page for admins and department heads
       // (scoped to their own business/department by the backend). Super
       // admins reach the same panel through Settings > Users.
-      { name: "Users", path: "/users", icon: Users, roles: ['super_admin', 'admin', 'department_head'] },
+      { name: "Users", path: "/users", icon: Users, roles: ['admin', 'department_head'] },
       { name: "Settings", path: "/settings", icon: Settings, sub: ["Users", "Roles"], roles: ['super_admin'] },
       { name: "Audit Logs", path: "/audit-logs", icon: Shield, roles: ['super_admin'] },
     ],

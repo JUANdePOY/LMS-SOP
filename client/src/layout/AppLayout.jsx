@@ -67,14 +67,33 @@ function SecondaryNavRouteSync() {
   const { openSecondaryNav, closeSecondaryNav } = useNavigation();
   const location = useLocation();
   useEffect(() => {
-    if (location.pathname.startsWith("/clients")) {
-      openSecondaryNav("clients");
-    } else if (location.pathname !== "/tasks" && location.pathname !== "/tasks/my") {
-      // Navigated via any other sidebar item — collapse the panel.
+    const isTaskRoute = location.pathname === '/tasks' || location.pathname.startsWith('/tasks/my') || location.pathname.startsWith('/clients');
+    if (isTaskRoute) {
+      openSecondaryNav('clients');
+    } else {
       closeSecondaryNav();
     }
   }, [location.pathname, openSecondaryNav, closeSecondaryNav]);
   return null;
+}
+
+function BurgerButton({ onOpenMainSidebar }) {
+  const { closeSecondaryNav } = useNavigation();
+  const handleClick = () => {
+    onOpenMainSidebar?.();
+    closeSecondaryNav();
+  };
+  return (
+    <button
+      onClick={handleClick}
+      aria-label="Open menu"
+      className={cn(
+        "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[var(--header-fg)] hover:text-[var(--header-fg)] hover:bg-[var(--header-hover-bg)] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[var(--header-focus-ring)] lg:hidden"
+      )}
+    >
+      <Menu size={20} />
+    </button>
+  );
 }
 
 /**
@@ -108,6 +127,9 @@ export default function AppLayout() {
   const [showSearchMobile, setShowSearchMobile] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(
+    typeof window !== "undefined" ? window.matchMedia("(min-width: 1024px)").matches : true
+  );
   const { user, logout, isDepartmentHead, isAnyAdmin } = useAuth();
   const { toggleTheme, isDark } = useTheme();
   const location = useLocation();
@@ -135,6 +157,18 @@ export default function AppLayout() {
   // app. Respects the user's own push-channel preference and a denied browser
   // permission — never throws.
   useAutoPushSubscribe();
+  const isTaskRoute = location.pathname === '/tasks' || location.pathname.startsWith('/tasks/my') || location.pathname.startsWith('/clients');
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const handler = (e) => {
+      setIsDesktop(e.matches);
+      if (e.matches) setMobileOpen(false);
+    };
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   const { banners: activeBanners } = useActiveBanners({ enabled: isDashboard });
   const { banners: contextualBanners } = useContextualBanners({ enabled: isDashboard });
   const messageBadgeCount = notificationData.unreadMessageCount || 0;
@@ -312,7 +346,9 @@ export default function AppLayout() {
           onCollapseSidebar={() => setCollapsed(true)}
         />
         )}
-        <SecondarySidebar collapsed={collapsed} />
+        {(location.pathname === '/tasks' || location.pathname.startsWith('/tasks/my') || location.pathname.startsWith('/clients')) && (
+          <SecondarySidebar collapsed={collapsed} />
+        )}
         <div className="flex-1 min-w-0 flex flex-col">
           <header
             className={cn(
@@ -327,15 +363,7 @@ export default function AppLayout() {
             )}
           >
             <div className="flex items-center gap-2 px-3 sm:px-4 h-full min-w-0">
-              <button
-                onClick={() => setMobileOpen(true)}
-                aria-label="Open menu"
-                className={cn(
-                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[var(--header-fg)] hover:text-[var(--header-fg)] hover:bg-[var(--header-hover-bg)] transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-[var(--header-focus-ring)] lg:hidden"
-                )}
-              >
-                <Menu size={20} />
-              </button>
+              <BurgerButton onOpenMainSidebar={() => setMobileOpen(true)} />
 
               <SecondaryNavMobileTrigger />
 

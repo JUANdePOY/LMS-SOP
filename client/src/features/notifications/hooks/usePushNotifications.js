@@ -20,8 +20,6 @@ export function usePushNotifications() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  console.log('[push] Hook mounted, browser support:', 'serviceWorker' in navigator && 'PushManager' in window);
-
   const checkExisting = useCallback(async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.log('[push] Push not supported in this browser');

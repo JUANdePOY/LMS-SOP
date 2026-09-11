@@ -10,6 +10,7 @@ import ProjectTaskViews, { TASK_VIEW_KEYS } from '../components/ProjectTaskViews
 import EntityDetailPanel from '../components/EntityDetailPanel';
 import FilterBar from '@/shared/components/ui/FilterBar';
 import { ClipboardList, AlertTriangle, CheckCircle, Clock, X } from 'lucide-react';
+import { isOverdue } from '../utils/taskDateUtils';
 
 function getProjectId(task) {
   return task?.project_id ?? task?.projectId ?? task?.project?.id ?? null;
@@ -213,7 +214,7 @@ export default function MyTasksPage() {
   const statItems = useMemo(() => {
     const list = scopedTasks || [];
     const total = list.length;
-    const overdue = list.filter((t) => t.status === 'Overdue').length;
+    const overdue = list.filter((t) => isOverdue(t)).length;
     const completed = list.filter((t) => t.status === 'Completed').length;
     const pending = list.filter((t) => t.status === 'Pending' || t.status === 'In Progress').length;
     return [
