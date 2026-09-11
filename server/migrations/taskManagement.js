@@ -38,6 +38,22 @@ const TASK_MANAGEMENT_MIGRATIONS = [
      CONSTRAINT fk_business_managers_business FOREIGN KEY (business_id) REFERENCES client_businesses(id) ON DELETE CASCADE,
      CONSTRAINT fk_business_managers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
    )`,
+
+  // Business departments: a department granted access to a SOP business
+  // (client_businesses) lets every member of that department manage every task
+  // in that business. Distinct from per-task department assignments.
+  `CREATE TABLE IF NOT EXISTS business_departments (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     business_id INT NOT NULL,
+     department_id INT NOT NULL,
+     granted_by INT NULL,
+     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+     UNIQUE KEY uq_business_department (business_id, department_id),
+     INDEX idx_business_departments_business (business_id),
+     INDEX idx_business_departments_department (department_id),
+     CONSTRAINT fk_business_departments_business FOREIGN KEY (business_id) REFERENCES client_businesses(id) ON DELETE CASCADE,
+     CONSTRAINT fk_business_departments_department FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
+   )`,
 ];
 
 async function runTaskMigrations() {

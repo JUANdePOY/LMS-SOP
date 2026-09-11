@@ -7,7 +7,7 @@ import { useClickOutside } from '../hooks/useClickOutside';
 import { getBusinesses } from '../api/business.api';
 import { getDepartmentsForAssignment } from '../api/assignment.api';
 import api from '@/services/api';
-import { TaskRow, AddTaskRow, BusinessManagerPicker, Avatar } from './TaskListRow';
+import { TaskRow, AddTaskRow, Avatar, BusinessAssigneePicker } from './TaskListRow';
 import InlineEditableName from './InlineEditableName';
 import InlineNameRow from './InlineNameRow';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -710,6 +710,56 @@ onQuickAddTask,
     }
   }, [loadBusinessManagers, toast]);
 
+  // Business departments: { [client_business_id]: department[] }. Each business
+  // row shows its granted departments in the Assignees column and lets an admin
+  // grant / revoke access directly from the row.
+  const [businessDepartments, setBusinessDepartments] = useState({});
+
+  const loadBusinessDepartments = useCallback(async (businessId) => {
+    if (businessId == null) return;
+    try {
+      const res = await api.get(`/client-businesses/${businessId}/departments`);
+      const list = Array.isArray(res.data?.data) ? res.data.data : [];
+      setBusinessDepartments((prev) => ({ ...prev, [String(businessId)]: list }));
+    } catch {
+      setBusinessDepartments((prev) => ({ ...prev, [String(businessId)]: [] }));
+    }
+  }, []);
+
+  const handleGrantBusinessDepartment = useCallback(async (businessId, dept) => {
+    try {
+      if (dept?.revoke) {
+        await api.delete(`/client-businesses/${businessId}/departments/${dept.department_id}`);
+      } else {
+        await api.post(`/client-businesses/${businessId}/departments`, { department_id: dept.id });
+      }
+      await loadBusinessDepartments(businessId);
+      toast.success(dept?.revoke ? 'Department access revoked' : 'Department can now manage all tasks in this business');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update department access');
+    }
+  }, [loadBusinessDepartments, toast]);
+
+  const handleBusinessAssigneeSave = useCallback(async (businessId, action) => {
+    try {
+      if (action.action === 'grant') {
+        if (action.kind === 'user') {
+          await handleAssignBusinessManager(businessId, action.user);
+        } else if (action.kind === 'department') {
+          await handleGrantBusinessDepartment(businessId, { id: action.dept.id });
+        }
+      } else if (action.action === 'revoke') {
+        if (action.kind === 'user') {
+          await handleRevokeBusinessManager(businessId, action.user_id);
+        } else if (action.kind === 'department') {
+          await handleGrantBusinessDepartment(businessId, { revoke: true, department_id: action.department_id });
+        }
+      }
+    } catch {
+      // Parent surfaces its own error toast
+    }
+  }, [handleAssignBusinessManager, handleRevokeBusinessManager, handleGrantBusinessDepartment]);
+
   // Load the granted-manager list for every business in the hierarchy once.
   // Each business row reads from this map; without it the picker would always
   // start empty and the read-only view would never render.
@@ -720,11 +770,14 @@ onQuickAddTask,
         if (business.id != null) ids.add(String(business.id));
       }
     }
-    for (const id of ids) loadBusinessManagers(id);
+    for (const id of ids) {
+      loadBusinessManagers(id);
+      loadBusinessDepartments(id);
+    }
     // Intentionally keyed on the business-id set only — re-running on every
     // `clients` reference change (e.g. after creating a task) would re-fetch
-    // managers for rows the admin is actively working in.
-  }, [clients, loadBusinessManagers]);
+    // managers/ departments for rows the admin is actively working in.
+  }, [clients, loadBusinessManagers, loadBusinessDepartments]);
 
   // Opens an inline "add" row directly under the clicked parent (no modal):
   // a client reveals a business row, a business reveals a task row.
@@ -883,29 +936,32 @@ onToggle={() => toggle(clientKey)}
                     const bOpen = isExpanded(businessKey, 'business', business);
                     return (
                       <div key={businessKey}>
-                        <Row
-                          depth={1}
-                          kind="business"
-                          id={business.id}
-                          name={business.name}
-                          open={bOpen}
-onToggle={() => toggle(businessKey)}
-                           dueDate={business.rollup.earliestDue}
-                           progress={business.rollup.avgProgress}
-                           dimmed={bDimmed}
-                           canEdit={canManage}
-                           onRename={onRenameBusiness}
-                           onAddChild={startAdd}
-                           onDeleteEntity={onDeleteEntity}
-                           onHideEmptyGroups={hideEmptyGroups}
-                           hideDue
-                           noBorder
-                           onAssignBusiness={handleAssignBusinessManager}
-                           businessManagers={businessManagers[String(business.id)]}
-                           onRevokeBusinessManager={handleRevokeBusinessManager}
-                           count={business.rollup.total}
-                           countLabel="tasks"
-                           />
+                         <Row
+                           depth={1}
+                           kind="business"
+                           id={business.id}
+                           name={business.name}
+                           open={bOpen}
+ onToggle={() => toggle(businessKey)}
+                            dueDate={business.rollup.earliestDue}
+                            progress={business.rollup.avgProgress}
+                            dimmed={bDimmed}
+                             canEdit={canManage}
+                             onRename={onRenameBusiness}
+                             onAddChild={startAdd}
+                             onDeleteEntity={onDeleteEntity}
+                             onHideEmptyGroups={hideEmptyGroups}
+                             hideDue
+                             noBorder
+                             businessManagers={businessManagers[String(business.id)]}
+                             businessDepartments={businessDepartments[String(business.id)]}
+                             onBusinessAssigneeSave={handleBusinessAssigneeSave}
+                             userRole={userRole}
+                             userDepartmentId={userDepartmentId}
+                             userBusinessId={userBusinessId}
+                             count={business.rollup.total}
+                             countLabel="tasks"
+                             />
                         <AnimatePresence initial={false}>
                           {bOpen && (
                             <motion.div
@@ -1063,22 +1119,34 @@ canManage={canManage}
 
 const DEPTH_INDENT_PX = 20;
 
-// Read-only view of granted business managers (shown in the Assignees column
-// of a business row when the viewer cannot manage the business).
-function ReadOnlyBusinessManagers({ managers }) {
+function ReadOnlyBusinessAssignees({ managers, departments }) {
+  const mgrs = managers || [];
+  const depts = departments || [];
+  if (mgrs.length === 0 && depts.length === 0) return <span className="text-xs text-[var(--text-muted)]">—</span>;
+  const total = mgrs.length + depts.length;
+  const MAX_VISIBLE = 3;
+  const visibleDepts = depts.slice(0, MAX_VISIBLE);
+  const visibleMgrs = mgrs.slice(0, Math.max(0, MAX_VISIBLE - depts.length));
+  const extra = total - Math.min(total, MAX_VISIBLE);
+  const allNames = [...depts.map(d => d.department_name), ...mgrs.map(m => m.full_name)].join(', ');
   return (
-    <span className="flex items-center -space-x-2" title={(managers || []).map((m) => m.full_name).join(', ')}>
-      {(managers || []).slice(0, 3).map((m) => (
-        <span key={m.user_id} className="relative overflow-hidden rounded-full ring-2 ring-[var(--bg-surface)]">
+    <span className="flex items-center -space-x-2" title={allNames}>
+      {visibleDepts.map((d) => (
+        <span key={`dept-${d.department_id}`} className="relative flex items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[9px] font-medium text-[var(--color-primary)] ring-2 ring-[var(--bg-surface)]" style={{ width: 22, height: 22 }} title={d.department_name}>
+          <Building2 size={12} />
+        </span>
+      ))}
+      {visibleMgrs.map((m) => (
+        <span key={`mgr-${m.user_id}`} className="relative overflow-hidden rounded-full ring-2 ring-[var(--bg-surface)]">
           <Avatar name={m.full_name} avatarUrl={m.avatar_url} size={22} />
         </span>
       ))}
-      {(managers || []).length > 3 && (
+      {extra > 0 && (
         <span
           className="flex items-center justify-center rounded-full bg-[var(--bg-surface-hover)] text-[10px] font-medium text-[var(--text-secondary)] ring-2 ring-[var(--bg-surface)]"
           style={{ width: 22, height: 22 }}
         >
-          +{(managers || []).length - 3}
+          +{extra}
         </span>
       )}
     </span>
@@ -1111,7 +1179,7 @@ const LEVEL_STYLE = {
    business: { font: 'font-normal',  size: 'text-sm', tracking: '', leading: '' },
 };
 
-function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false, onAssignBusiness, businessManagers = null, onRevokeBusinessManager, count = null, countLabel = '' }) {
+function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false, businessManagers = null, businessDepartments = null, onBusinessAssigneeSave, count = null, countLabel = '', userRole = '', userDepartmentId = null, userBusinessId = null }) {
   const level = LEVEL_STYLE[kind] || LEVEL_STYLE.business;
   const meta = KIND_META[kind];
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1326,22 +1394,23 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
         )}
       </span>
 
-      <span className="hidden sm:flex items-center justify-center px-2" onClick={(e) => e.stopPropagation()}>
+      <span className="hidden sm:flex items-center justify-center gap-1 px-2" onClick={(e) => e.stopPropagation()}>
         {kind === 'business' ? (
           canEdit ? (
-            <BusinessManagerPicker
+            <BusinessAssigneePicker
               businessId={id}
               businessName={name}
               managers={businessManagers}
+              departments={businessDepartments}
               canManage={canEdit}
-              onSave={(user) => {
-                if (user?.revoke) onRevokeBusinessManager?.(id, user.user_id);
-                else onAssignBusiness?.(id, user);
-              }}
+              userRole={userRole}
+              userDepartmentId={userDepartmentId}
+              userBusinessId={userBusinessId}
+              onSave={(action) => onBusinessAssigneeSave?.(id, action)}
             />
-          ) : (businessManagers || []).length > 0 ? (
-            <ReadOnlyBusinessManagers managers={businessManagers} />
-          ) : null
+          ) : (
+            <ReadOnlyBusinessAssignees managers={businessManagers} departments={businessDepartments} />
+          )
         ) : null}
       </span>
       <span className="px-2" />

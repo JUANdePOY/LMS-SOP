@@ -90,6 +90,7 @@ const tasksRoutes = require('./routes/tasks');
 const clientsRoutes = require('./routes/clients');
 const projectsRoutes = require('./routes/projects');
 const businessManagersRoutes = require('./routes/businessManagers');
+const businessDepartmentsRoutes = require('./routes/businessDepartments');
 const taskAttachmentPublicFile = require('./services/taskAttachmentPublicFile');
 const employeeRoutes = require('./routes/employee');
 const notificationsRoutes = require('./routes/notifications');
@@ -170,6 +171,7 @@ app.use('/api/tasks', tasksRoutes);
 app.use('/api/clients', clientsRoutes);
 app.use('/api/projects', projectsRoutes);
 app.use('/api/client-businesses', businessManagersRoutes);
+app.use('/api/client-businesses', businessDepartmentsRoutes);
 app.use('/api/notifications', notificationsRoutes);
 app.use('/api/banners', bannersRoutes);
 

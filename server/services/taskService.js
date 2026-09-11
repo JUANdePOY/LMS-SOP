@@ -512,10 +512,13 @@ async function isTaskEditableByManager(actorId, taskId) {
   const [rows] = await db.query(
     `SELECT 1
      FROM tasks t
-     INNER JOIN business_managers bm ON bm.business_id = t.client_business_id
-     WHERE t.id = ? AND bm.user_id = ? AND t.client_business_id IS NOT NULL
+     LEFT JOIN business_managers bm ON bm.business_id = t.client_business_id AND bm.user_id = ?
+     LEFT JOIN business_departments bd ON bd.business_id = t.client_business_id
+       INNER JOIN department_members dm ON dm.department_id = bd.department_id AND dm.user_id = ?
+     WHERE t.id = ? AND t.client_business_id IS NOT NULL
+       AND (bm.user_id IS NOT NULL OR dm.user_id IS NOT NULL)
      LIMIT 1`,
-    [taskId, actorId]
+    [actorId, actorId, taskId]
   );
   return rows.length > 0;
 }
@@ -1099,6 +1102,19 @@ async function getMyTaskHierarchy(userId) {
     if (!businessIds.includes(r.business_id)) businessIds.push(r.business_id);
   }
 
+  // Businesses where any of the user's departments are granted access — same
+  // visibility as a personal business-manager grant.
+  const [deptManagedBizRows] = await db.query(
+    `SELECT DISTINCT bd.business_id
+     FROM business_departments bd
+     INNER JOIN department_members dm ON dm.department_id = bd.department_id
+     WHERE dm.user_id = ?`,
+    [userId]
+  );
+  for (const r of deptManagedBizRows) {
+    if (!businessIds.includes(r.business_id)) businessIds.push(r.business_id);
+  }
+
   // Also find tasks assigned directly to the user (or via dept/position) that
   // have no client_business_id — these still belong in "My Tasks".
   const [directRows] = await db.query(
@@ -1235,8 +1251,18 @@ async function getMyTaskHierarchy(userId) {
   const managerBusinessIds = new Set(
     (await db.query('SELECT business_id FROM business_managers WHERE user_id = ?', [userId]))[0].map((r) => String(r.business_id))
   );
+  const departmentBusinessIds = new Set(
+    (await db.query(
+      `SELECT DISTINCT bd.business_id
+       FROM business_departments bd
+       INNER JOIN department_members dm ON dm.department_id = bd.department_id
+       WHERE dm.user_id = ?`,
+      [userId]
+    ))[0].map((r) => String(r.business_id))
+  );
   for (const task of tasks) {
-    task.can_edit = task.is_assigned || (task.client_business_id != null && managerBusinessIds.has(String(task.client_business_id)));
+    const bizId = task.client_business_id != null ? String(task.client_business_id) : null;
+    task.can_edit = task.is_assigned || (bizId != null && (managerBusinessIds.has(bizId) || departmentBusinessIds.has(bizId)));
   }
 
   // Build projectsById + clientTree from business linkage. Include ALL
@@ -1574,15 +1600,18 @@ async function isUserAssignedToTaskById(userId, taskId) {
   );
   if (direct.length > 0) return true;
 
-  // 2. Business manager: a user granted management access to the business this
-  //    task belongs to can manage every task in that business.
+  // 2. Business manager or department grant: a user (or any member of a granted
+  //    department) can manage every task in that business.
   const [biz] = await db.query(
     `SELECT 1
      FROM tasks t
-     INNER JOIN business_managers bm ON bm.business_id = t.client_business_id
-     WHERE t.id = ? AND bm.user_id = ?
+     LEFT JOIN business_managers bm ON bm.business_id = t.client_business_id AND bm.user_id = ?
+     LEFT JOIN business_departments bd ON bd.business_id = t.client_business_id
+       INNER JOIN department_members dm ON dm.department_id = bd.department_id AND dm.user_id = ?
+     WHERE t.id = ? AND t.client_business_id IS NOT NULL
+       AND (bm.user_id IS NOT NULL OR dm.user_id IS NOT NULL)
      LIMIT 1`,
-    [taskId, userId]
+    [userId, userId, taskId]
   );
   return biz.length > 0;
 }
@@ -1605,12 +1634,19 @@ async function getAssignedTaskIdsForUser(userId) {
        OR ta.assignment_type = 'Position' AND ta.reference_id = ?
      )
      UNION
-     -- Every task in a business this user manages
+     -- Every task in a business this user manages directly
      SELECT DISTINCT t.id AS task_id
      FROM tasks t
      INNER JOIN business_managers bm ON bm.business_id = t.client_business_id
-     WHERE bm.user_id = ?`,
-    [userId, user.department_id, user.position_title, userId]
+     WHERE bm.user_id = ?
+     UNION
+     -- Every task in a business whose departments include this user
+     SELECT DISTINCT t.id AS task_id
+     FROM tasks t
+     INNER JOIN business_departments bd ON bd.business_id = t.client_business_id
+     INNER JOIN department_members dm ON dm.department_id = bd.department_id
+     WHERE dm.user_id = ?`,
+    [userId, user.department_id, user.position_title, userId, userId]
   );
 
   return rows.map(r => r.task_id);
@@ -1906,6 +1942,10 @@ module.exports = {
   listBusinessManagers,
   revokeBusinessManager,
   isUserBusinessManagerOfTask,
+  listBusinessDepartments,
+  grantBusinessDepartment,
+  revokeBusinessDepartment,
+  isUserDepartmentAssignedToBusiness,
 };
 
 // Returns true when the given user is allowed to interact with a task's progress,
@@ -1981,10 +2021,64 @@ async function isUserBusinessManagerOfTask(userId, taskId) {
   const [rows] = await db.query(
     `SELECT 1
      FROM tasks t
-     INNER JOIN business_managers bm ON bm.business_id = t.client_business_id
-     WHERE t.id = ? AND bm.user_id = ?
+     LEFT JOIN business_managers bm ON bm.business_id = t.client_business_id AND bm.user_id = ?
+     LEFT JOIN business_departments bd ON bd.business_id = t.client_business_id
+       INNER JOIN department_members dm ON dm.department_id = bd.department_id AND dm.user_id = ?
+     WHERE t.id = ? AND t.client_business_id IS NOT NULL
+       AND (bm.user_id IS NOT NULL OR dm.user_id IS NOT NULL)
      LIMIT 1`,
-    [taskId, userId]
+    [userId, userId, taskId]
+  );
+  return rows.length > 0;
+}
+
+async function listBusinessDepartments(businessId) {
+  const [rows] = await db.query(
+    `SELECT bd.*, d.name AS department_name, d.code AS department_code, d.business_id AS department_business_id, cb.business_name
+     FROM business_departments bd
+     INNER JOIN departments d ON d.id = bd.department_id
+     INNER JOIN client_businesses cb ON cb.id = bd.business_id
+     WHERE bd.business_id = ?
+     ORDER BY d.name ASC`,
+    [businessId]
+  );
+  return rows;
+}
+
+async function grantBusinessDepartment(businessId, departmentId, grantedBy) {
+  await db.query(
+    `INSERT INTO business_departments (business_id, department_id, granted_by)
+     VALUES (?, ?, ?)
+     ON DUPLICATE KEY UPDATE granted_by = VALUES(granted_by), created_at = CURRENT_TIMESTAMP`,
+    [businessId, departmentId, grantedBy]
+  );
+  const [rows] = await db.query(
+    `SELECT bd.*, d.name AS department_name, d.code AS department_code, d.business_id AS department_business_id, cb.business_name
+     FROM business_departments bd
+     INNER JOIN departments d ON d.id = bd.department_id
+     INNER JOIN client_businesses cb ON cb.id = bd.business_id
+     WHERE bd.business_id = ? AND bd.department_id = ? LIMIT 1`,
+    [businessId, departmentId]
+  );
+  return rows[0] || null;
+}
+
+async function revokeBusinessDepartment(businessId, departmentId) {
+  const [result] = await db.query(
+    'DELETE FROM business_departments WHERE business_id = ? AND department_id = ?',
+    [businessId, departmentId]
+  );
+  return result.affectedRows > 0;
+}
+
+async function isUserDepartmentAssignedToBusiness(userId, businessId) {
+  const [rows] = await db.query(
+    `SELECT 1
+     FROM business_departments bd
+     INNER JOIN department_members dm ON dm.department_id = bd.department_id
+     WHERE bd.business_id = ? AND dm.user_id = ?
+     LIMIT 1`,
+    [businessId, userId]
   );
   return rows.length > 0;
 }

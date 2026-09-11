@@ -14,7 +14,7 @@ router.use(authenticateToken);
 async function requireClientBusinessScope(req, res, next) {
   try {
     if (req.user.role === 'super_admin') return next();
-    if (req.user.role !== 'admin') {
+    if (!['super_admin', 'admin', 'department_head'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'Access denied', code: 'FORBIDDEN' });
     }
     const businessId = parseInt(req.params.businessId, 10);

@@ -4,7 +4,7 @@ import { Check, ChevronDown, Copy, FolderInput, Trash2, MoreHorizontal, Calendar
 import { cn } from '@/lib/utils';
 import { TASK_PRIORITIES, TASK_PRIORITY_DOT } from '../constants/taskConstants';
 import { useClickOutside } from '../hooks/useClickOutside';
-import { getUsersForAssignment, getDepartmentsForAssignment, getAssignmentScope } from '../api/assignment.api';
+import { getUsersForAssignment, getAssignmentScope } from '../api/assignment.api';
 import api from '@/services/api';
 import { formatDate } from '../utils/taskDateUtils';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -266,7 +266,6 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
   const [query, setQuery] = useState('');
   const [options, setOptions] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState('people');
   const [scope, setScope] = useState(null);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 224 });
   const [maxHeight, setMaxHeight] = useState(null);
@@ -294,11 +293,6 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
   useEffect(() => {
     if (!open) return;
     updatePosition();
-    // Re-derive the fixed position on every scroll so the picker stays
-    // attached to its trigger even when the table scrolls horizontally
-    // (the assignee cell lives inside the same overflow-x-auto container as
-    // the status/priority cells). If the trigger has scrolled out of the
-    // viewport, close instead of leaving a floating picker.
     const handleScroll = (e) => {
       if (dropdownRef.current && e.target && dropdownRef.current.contains(e.target)) return;
       const el = triggerRef.current;
@@ -335,13 +329,8 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        if (tab === 'people') {
-          const results = await getUsersForAssignment(query);
-          if (active) setOptions(results);
-        } else {
-          const results = await getDepartmentsForAssignment(query);
-          if (active) setOptions(results);
-        }
+        const results = await getUsersForAssignment(query);
+        if (active) setOptions(results);
       } catch {
         if (active) setOptions([]);
       } finally {
@@ -349,7 +338,7 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
       }
     }, 200);
     return () => { active = false; clearTimeout(timer); };
-  }, [open, query, tab]);
+  }, [open, query]);
 
   useEffect(() => {
     if (open && !scope) {
@@ -360,10 +349,7 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
   const currentUsers = (assignments || []).filter((a) => a.assignment_type === 'User');
   const currentDepts = (assignments || []).filter((a) => a.assignment_type === 'Department');
   const assignedUserIds = new Set(currentUsers.map((u) => String(u.reference_id)));
-  const assignedDeptIds = new Set(currentDepts.map((d) => String(d.reference_id)));
-  const selectableOptions = tab === 'people'
-    ? options.filter((u) => !assignedUserIds.has(String(u.id)))
-    : options.filter((d) => !assignedDeptIds.has(String(d.id)));
+  const selectableOptions = options.filter((u) => !assignedUserIds.has(String(u.id)));
 
   const selectUser = (user) => {
     const userId = String(user.id);
@@ -376,26 +362,9 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
     setQuery('');
   };
 
-  const selectDepartment = (dept) => {
-    const deptId = String(dept.id);
-    if (currentDepts.some((d) => String(d.reference_id) === deptId)) {
-      setQuery('');
-      return;
-    }
-    const next = [...currentUsers, ...currentDepts, { assignment_type: 'Department', reference_id: deptId, reference_name: dept.name }];
-    onSave(next);
-    setQuery('');
-  };
-
   const removeAssignment = (refId) => {
     const next = (assignments || []).filter((a) => String(a.reference_id) !== String(refId));
     onSave(next);
-  };
-
-  const switchTab = (newTab) => {
-    setTab(newTab);
-    setQuery('');
-    setOptions([]);
   };
 
   const totalAssigned = currentUsers.length + currentDepts.length;
@@ -474,38 +443,12 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
           className="fixed z-50 flex max-h-full flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-2 shadow-xl"
           style={{ top: coords.top, left: coords.left, width: coords.width, maxHeight }}
         >
-          <div className="flex shrink-0 gap-1 border-b border-[var(--border)] px-2 pb-2">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); switchTab('people'); }}
-              className={cn(
-                'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors',
-                tab === 'people' ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
-              )}
-            >
-              <Users size={12} />
-              People
-            </button>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); switchTab('departments'); }}
-              className={cn(
-                'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors',
-                tab === 'departments' ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
-              )}
-            >
-              <Building2 size={12} />
-              Departments
-            </button>
-          </div>
           <div className="shrink-0 px-2 pt-2 pb-1">
             <input
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={tab === 'people'
-                ? (scope?.role === 'department_head' ? 'Search people in your department...' : 'Search people...')
-                : 'Search departments...'}
+              placeholder={scope?.role === 'department_head' ? 'Search people in your department...' : 'Search people...'}
               className="w-full rounded border border-[var(--border)] bg-[var(--bg-page)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
             />
           </div>
@@ -513,22 +456,13 @@ export function AssigneePicker({ assignments, onSave, alwaysAdd = false, buttonC
             {loading && <p className="px-2 py-1 text-xs text-[var(--text-muted)]">Searching...</p>}
             {!loading && selectableOptions.length === 0 && (
               <p className="px-2 py-1 text-xs text-[var(--text-muted)]">
-                {options.length === 0 ? 'No results' : (tab === 'people' ? 'All matched employees already assigned' : 'All matched departments already assigned')}
+                {options.length === 0 ? 'No results' : 'All matched employees already assigned'}
               </p>
             )}
-            {tab === 'people' && selectableOptions.map((u) => (
+            {selectableOptions.map((u) => (
               <button key={u.id} type="button" onClick={(e) => { e.stopPropagation(); selectUser(u); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--bg-surface-hover)]">
                 <Avatar name={u.full_name} avatarUrl={u.avatar_url} />
                 <span className="truncate text-[var(--text-primary)]">{u.full_name}</span>
-              </button>
-            ))}
-            {tab === 'departments' && selectableOptions.map((d) => (
-              <button key={d.id} type="button" onClick={(e) => { e.stopPropagation(); selectDepartment(d); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--bg-surface-hover)]">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
-                  <Building2 size={12} />
-                </span>
-                <span className="truncate text-[var(--text-primary)]">{d.name}</span>
-                {d.code && <span className="ml-auto shrink-0 text-[10px] text-[var(--text-muted)]">{d.code}</span>}
               </button>
             ))}
           </div>
@@ -781,6 +715,498 @@ export function BusinessManagerPicker({ businessId, businessName, managers, onSa
                     <span className="truncate text-xs text-[var(--text-secondary)]">{m.full_name}</span>
                   </span>
                   <button type="button" onClick={(e) => { e.stopPropagation(); onSave?.({ revoke: true, user_id: m.user_id }); }} className="shrink-0 text-[var(--text-muted)] hover:text-red-500" aria-label={`Revoke ${m.full_name}`}>
+                    <span className="text-xs">×</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+
+// Department picker for business rows. Mirrors BusinessManagerPicker but for
+// departments instead of users. Lets an admin grant/revoke department access
+// to a client business unit.
+export function BusinessDepartmentPicker({ businessId, businessName, departments, onSave, canManage = true }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [justSelected, setJustSelected] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 224 });
+  const [maxHeight, setMaxHeight] = useState(null);
+  const triggerRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const VIEWPORT_MARGIN = 8;
+
+  const updatePosition = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const width = Math.max(rect.width, 224);
+    const ddHeight = dropdownRef.current ? dropdownRef.current.offsetHeight : 360;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const flipUp = ddHeight > spaceBelow && spaceAbove > spaceBelow;
+    let top = flipUp ? rect.top - ddHeight - 4 : rect.bottom + 4;
+    top = Math.max(VIEWPORT_MARGIN, Math.min(top, window.innerHeight - ddHeight - VIEWPORT_MARGIN));
+    setCoords({ top, left: rect.left, width });
+    const available = (flipUp ? rect.top : window.innerHeight - rect.bottom) - VIEWPORT_MARGIN;
+    setMaxHeight(available > 160 ? available : 160);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    const handleScroll = (e) => {
+      if (dropdownRef.current && e.target && dropdownRef.current.contains(e.target)) return;
+      const el = triggerRef.current;
+      if (!el) { setOpen(false); return; }
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+        setOpen(false);
+        return;
+      }
+      updatePosition();
+    };
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [open, updatePosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(event) {
+      if (triggerRef.current && triggerRef.current.contains(event.target)) return;
+      if (dropdownRef.current && dropdownRef.current.contains(event.target)) return;
+      setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  useEffect(() => {
+    if (justSelected) { setJustSelected(false); return; }
+    let active = true;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const res = await api.get('/departments', {
+          params: { search: query, page: 1, limit: 100 },
+        });
+        if (active) setOptions(Array.isArray(res.data?.data?.rows) ? res.data.data.rows : []);
+      } catch {
+        if (active) setOptions([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }, 200);
+    return () => { active = false; clearTimeout(timer); };
+  }, [businessId, query, justSelected]);
+
+  const grantedIds = new Set((departments || []).map((d) => String(d.department_id)));
+  const selectable = options.filter((d) => !grantedIds.has(String(d.id)));
+
+  const grant = (dept) => {
+    setJustSelected(true);
+    setQuery('');
+    setOptions([]);
+    onSave?.(dept);
+  };
+
+  const totalGranted = (departments || []).length;
+  const emptyState = (
+    <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full border border-dashed border-[var(--border)] text-[var(--text-muted)]">
+      <Building2 size={13} />
+    </span>
+  );
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        title={totalGranted ? `${totalGranted} department${totalGranted === 1 ? '' : 's'}` : 'Assign department'}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        disabled={!canManage}
+        className={cn(
+          'group/dd inline-flex max-w-full items-center gap-1 overflow-hidden rounded-md py-0.5 pl-0.5 pr-1 transition-colors hover:bg-[var(--bg-surface-hover)]',
+          !canManage && 'cursor-not-allowed opacity-60'
+        )}
+      >
+        {totalGranted === 0 ? emptyState : (
+          <span className="flex items-center -space-x-2">
+            {(departments || []).slice(0, 3).map((d) => (
+              <span key={d.department_id} className="relative flex items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[9px] font-medium text-[var(--color-primary)] ring-2 ring-[var(--bg-surface)]" style={{ width: 22, height: 22 }} title={d.department_name}>
+                <Building2 size={12} />
+              </span>
+            ))}
+            {totalGranted > 3 && (
+              <span
+                className="flex items-center justify-center rounded-full bg-[var(--bg-surface-hover)] text-[10px] font-medium text-[var(--text-secondary)] ring-2 ring-[var(--bg-surface)]"
+                style={{ width: 22, height: 22 }}
+              >
+                +{totalGranted - 3}
+              </span>
+            )}
+          </span>
+        )}
+        {canManage && totalGranted > 0 && (
+          <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[var(--text-muted)] opacity-0 ring-1 ring-[var(--border)] transition-opacity group-hover/dd:opacity-100">
+            <Building2 size={13} />
+          </span>
+        )}
+      </button>
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          onClick={(e) => e.stopPropagation()}
+          style={{ position: 'fixed', top: coords.top, left: coords.left, width: coords.width, maxHeight, zIndex: 60 }}
+          className="flex max-h-full flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-2 shadow-xl"
+        >
+          <div className="shrink-0 px-2 pb-1">
+            <p className="truncate text-xs font-medium text-[var(--text-primary)]">{businessName || 'Business'}</p>
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search departments..."
+              className="mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg-page)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
+            />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-1">
+            {loading && <p className="px-2 py-1 text-xs text-[var(--text-muted)]">Searching...</p>}
+            {!loading && selectable.length === 0 && (
+              <p className="px-2 py-1 text-xs text-[var(--text-muted)]">
+                {options.length === 0 ? 'No departments found' : 'All matched departments already granted'}
+              </p>
+            )}
+            {selectable.map((d) => (
+              <button key={d.id} type="button" onClick={(e) => { e.stopPropagation(); grant(d); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--bg-surface-hover)]">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
+                  <Building2 size={12} />
+                </span>
+                <span className="truncate text-[var(--text-primary)]">{d.name}</span>
+                {d.code && <span className="ml-auto shrink-0 text-[10px] text-[var(--text-muted)]">{d.code}</span>}
+              </button>
+            ))}
+          </div>
+          {totalGranted > 0 && (
+            <div className="mt-1 shrink-0 border-t border-[var(--border)] px-2 pt-1">
+              <p className="px-1 pb-1 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Granted access</p>
+              {(departments || []).map((d) => (
+                <div key={d.department_id} className="flex items-center justify-between gap-2 py-0.5">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
+                      <Building2 size={12} />
+                    </span>
+                    <span className="truncate text-xs text-[var(--text-secondary)]">{d.department_name}</span>
+                  </span>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); onSave?.({ revoke: true, department_id: d.department_id }); }} className="shrink-0 text-[var(--text-muted)] hover:text-red-500" aria-label={`Revoke ${d.department_name}`}>
+                    <span className="text-xs">×</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// Read-only view of granted departments for a business row.
+export function ReadOnlyBusinessDepartments({ departments }) {
+  const total = (departments || []).length;
+  if (total === 0) return <span className="text-xs text-[var(--text-muted)]">—</span>;
+  const MAX_VISIBLE = 3;
+  const visible = (departments || []).slice(0, MAX_VISIBLE);
+  const extra = total - Math.min(total, MAX_VISIBLE);
+  const allNames = (departments || []).map((d) => d.department_name).join(', ');
+  return (
+    <span className="flex items-center -space-x-2" title={allNames}>
+      {visible.map((d) => (
+        <span key={d.department_id} className="relative flex items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[9px] font-medium text-[var(--color-primary)] ring-2 ring-[var(--bg-surface)]" style={{ width: 22, height: 22 }} title={d.department_name}>
+          <Building2 size={12} />
+        </span>
+      ))}
+      {extra > 0 && (
+        <span
+          className="flex items-center justify-center rounded-full bg-[var(--bg-surface-hover)] text-[10px] font-medium text-[var(--text-secondary)] ring-2 ring-[var(--bg-surface)]"
+          style={{ width: 22, height: 22 }}
+        >
+          +{extra}
+        </span>
+      )}
+    </span>
+  );
+}
+
+
+// Unified business assignee picker. A single button (mirrors the task-level
+// AssigneePicker) that grants and revokes both user managers and departments
+// for a client business unit. Previously the business row rendered two separate
+// buttons (BusinessManagerPicker + BusinessDepartmentPicker), and the department
+// picker never actually returned results because it mis-parsed the /departments
+// response as a bare array instead of the { status, data: { rows } } envelope
+// the route returns — so every department was silently dropped. This merge
+// fixes the parsing bug and collapses both controls into one tabbed picker.
+export function BusinessAssigneePicker({ businessId, businessName, managers = [], departments = [], onSave, canManage = true, userRole = '', userDepartmentId = null, userBusinessId = null }) {
+  const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState('people');
+  const [query, setQuery] = useState('');
+  const [options, setOptions] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [justSelected, setJustSelected] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 224 });
+  const [maxHeight, setMaxHeight] = useState(null);
+  const triggerRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const VIEWPORT_MARGIN = 8;
+
+  const updatePosition = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const width = Math.max(rect.width, 224);
+    const ddHeight = dropdownRef.current ? dropdownRef.current.offsetHeight : 360;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const flipUp = ddHeight > spaceBelow && spaceAbove > spaceBelow;
+    let top = flipUp ? rect.top - ddHeight - 4 : rect.bottom + 4;
+    top = Math.max(VIEWPORT_MARGIN, Math.min(top, window.innerHeight - ddHeight - VIEWPORT_MARGIN));
+    setCoords({ top, left: rect.left, width });
+    const available = (flipUp ? rect.top : window.innerHeight - rect.bottom) - VIEWPORT_MARGIN;
+    setMaxHeight(available > 160 ? available : 160);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    updatePosition();
+    const handleScroll = (e) => {
+      if (dropdownRef.current && e.target && dropdownRef.current.contains(e.target)) return;
+      const el = triggerRef.current;
+      if (!el) { setOpen(false); return; }
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+        setOpen(false);
+        return;
+      }
+      updatePosition();
+    };
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [open, updatePosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(event) {
+      if (triggerRef.current && triggerRef.current.contains(event.target)) return;
+      if (dropdownRef.current && dropdownRef.current.contains(event.target)) return;
+      setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  useEffect(() => {
+    if (justSelected) { setJustSelected(false); return; }
+    let active = true;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      try {
+        if (tab === 'people') {
+          const res = await api.get(`/client-businesses/${businessId}/managers/available`, {
+            params: { search: query, limit: 100 },
+          });
+          if (active) setOptions(Array.isArray(res.data?.data) ? res.data.data : []);
+        } else {
+          const res = await api.get('/departments', {
+            params: { search: query, page: 1, limit: 100 },
+          });
+          if (active) setOptions(Array.isArray(res.data?.data?.rows) ? res.data.data.rows : []);
+        }
+      } catch {
+        if (active) setOptions([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }, 200);
+    return () => { active = false; clearTimeout(timer); };
+  }, [businessId, tab, query, justSelected]);
+
+  const grantedUserIds = new Set((managers || []).map((m) => String(m.user_id)));
+  const grantedDeptIds = new Set((departments || []).map((d) => String(d.department_id)));
+
+  const filteredOptions = useMemo(() => {
+    if (!options.length) return options;
+    if (userRole === 'department_head' && userDepartmentId != null) {
+      return options.filter((u) => String(u.department_id) === String(userDepartmentId));
+    }
+    if (userRole === 'admin' && userBusinessId != null) {
+      return options.filter((u) => String(u.business_id) === String(userBusinessId));
+    }
+    return options;
+  }, [options, userRole, userDepartmentId, userBusinessId]);
+
+  const selectable = tab === 'people'
+    ? filteredOptions.filter((u) => !grantedUserIds.has(String(u.id)))
+    : options.filter((d) => !grantedDeptIds.has(String(d.id)));
+
+  const grantUser = (user) => { setJustSelected(true); setQuery(''); setOptions([]); onSave?.({ action: 'grant', kind: 'user', user }); };
+  const grantDept = (dept) => { setJustSelected(true); setQuery(''); setOptions([]); onSave?.({ action: 'grant', kind: 'department', dept }); };
+
+  const totalGranted = (managers || []).length + (departments || []).length;
+  const allNames = [
+    ...(departments || []).map((d) => d.department_name),
+    ...(managers || []).map((m) => m.full_name),
+  ].join(', ');
+  const firstDept = (departments || [])[0]?.department_name;
+  const firstMgr = (managers || [])[0]?.full_name;
+  const nameLabel = totalGranted === 0
+    ? ''
+    : totalGranted === 1
+      ? (firstDept || firstMgr)
+      : `${(firstDept || firstMgr)} +${totalGranted - 1}`;
+
+  const avatarStack = (
+    <span className="flex items-center -space-x-2">
+      {(departments || []).slice(0, 3).map((d) => (
+        <span key={`dept-${d.department_id}`} className="relative flex items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[9px] font-medium text-[var(--color-primary)] ring-2 ring-[var(--bg-surface)]" style={{ width: 22, height: 22 }} title={d.department_name}>
+          <Building2 size={12} />
+        </span>
+      ))}
+      {(managers || []).slice(0, Math.max(0, 3 - (departments || []).length)).map((m) => (
+        <span key={`mgr-${m.user_id}`} className="relative overflow-hidden rounded-full ring-2 ring-[var(--bg-surface)]">
+          <Avatar name={m.full_name} avatarUrl={m.avatar_url} size={22} />
+        </span>
+      ))}
+      {totalGranted > 3 && (
+        <span
+          className="flex items-center justify-center rounded-full bg-[var(--bg-surface-hover)] text-[10px] font-medium text-[var(--text-secondary)] ring-2 ring-[var(--bg-surface)]"
+          style={{ width: 22, height: 22 }}
+        >
+          +{totalGranted - 3}
+        </span>
+      )}
+    </span>
+  );
+
+  const emptyState = (
+    <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full border border-dashed border-[var(--border)] text-[var(--text-muted)]">
+      <UserPlus size={13} />
+    </span>
+  );
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        title={totalGranted ? allNames : 'Assign business access'}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        disabled={!canManage}
+        className={cn(
+          'group/ba inline-flex max-w-full items-center gap-1 overflow-hidden rounded-md py-0.5 pl-0.5 pr-1 transition-colors hover:bg-[var(--bg-surface-hover)]',
+          !canManage && 'cursor-not-allowed opacity-60'
+        )}
+      >
+        {totalGranted === 0 ? emptyState : (
+          <>
+            {avatarStack}
+            <span className="ml-1 min-w-0 truncate text-xs text-[var(--text-secondary)]">{nameLabel}</span>
+          </>
+        )}
+        {canManage && totalGranted > 0 && (
+          <span className="flex h-[22px] w-[22px] items-center justify-center rounded-full text-[var(--text-muted)] opacity-0 ring-1 ring-[var(--border)] transition-opacity group-hover/ba:opacity-100">
+            <UserPlus size={13} />
+          </span>
+        )}
+      </button>
+      {open && createPortal(
+        <div
+          ref={dropdownRef}
+          onClick={(e) => e.stopPropagation()}
+          style={{ position: 'fixed', top: coords.top, left: coords.left, width: coords.width, maxHeight, zIndex: 60 }}
+          className="flex max-h-full flex-col overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-2 shadow-xl"
+        >
+          <div className="shrink-0 px-2 pt-2 pb-1">
+            <p className="truncate text-xs font-medium text-[var(--text-primary)]">{businessName || 'Business'}</p>
+            <div className="mt-1 flex shrink-0 gap-1">
+              <button type="button" onClick={(e) => { e.stopPropagation(); setTab('people'); setQuery(''); setOptions([]); }} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors', tab === 'people' ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]')}>
+                <Users size={12} /> People
+              </button>
+              <button type="button" onClick={(e) => { e.stopPropagation(); setTab('departments'); setQuery(''); setOptions([]); }} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-colors', tab === 'departments' ? 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]')}>
+                <Building2 size={12} /> Departments
+              </button>
+            </div>
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={tab === 'people' ? 'Search users to grant manager access...' : 'Search departments...'}
+              className="mt-1 w-full rounded border border-[var(--border)] bg-[var(--bg-page)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
+            />
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-1">
+            {loading && <p className="px-2 py-1 text-xs text-[var(--text-muted)]">Searching...</p>}
+            {!loading && selectable.length === 0 && (
+              <p className="px-2 py-1 text-xs text-[var(--text-muted)]">
+                {options.length === 0 ? (tab === 'people' ? 'No users found' : 'No departments found') : (tab === 'people' ? 'All matched users already granted' : 'All matched departments already granted')}
+              </p>
+            )}
+            {tab === 'people' && selectable.map((u) => (
+              <button key={u.id} type="button" onClick={(e) => { e.stopPropagation(); grantUser(u); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--bg-surface-hover)]">
+                <Avatar name={u.full_name} avatarUrl={u.avatar_url} size={22} />
+                <span className="truncate text-[var(--text-primary)]">{u.full_name}</span>
+              </button>
+            ))}
+            {tab === 'departments' && selectable.map((d) => (
+              <button key={d.id} type="button" onClick={(e) => { e.stopPropagation(); grantDept(d); }} className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--bg-surface-hover)]">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
+                  <Building2 size={12} />
+                </span>
+                <span className="truncate text-[var(--text-primary)]">{d.name}</span>
+                {d.code && <span className="ml-auto shrink-0 text-[10px] text-[var(--text-muted)]">{d.code}</span>}
+              </button>
+            ))}
+          </div>
+          {totalGranted > 0 && (
+            <div className="mt-1 shrink-0 border-t border-[var(--border)] px-2 pt-1">
+              <p className="px-1 pb-1 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Granted access</p>
+              {(departments || []).map((d) => (
+                <div key={`gd-${d.department_id}`} className="flex items-center justify-between gap-2 py-0.5">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
+                      <Building2 size={12} />
+                    </span>
+                    <span className="truncate text-xs text-[var(--text-secondary)]">{d.department_name}</span>
+                  </span>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); onSave?.({ action: 'revoke', kind: 'department', department_id: d.department_id }); }} className="shrink-0 text-[var(--text-muted)] hover:text-red-500" aria-label={`Revoke ${d.department_name}`}>
+                    <span className="text-xs">×</span>
+                  </button>
+                </div>
+              ))}
+              {(managers || []).map((m) => (
+                <div key={`gm-${m.user_id}`} className="flex items-center justify-between gap-2 py-0.5">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Avatar name={m.full_name} avatarUrl={m.avatar_url} size={20} />
+                    <span className="truncate text-xs text-[var(--text-secondary)]">{m.full_name}</span>
+                  </span>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); onSave?.({ action: 'revoke', kind: 'user', user_id: m.user_id }); }} className="shrink-0 text-[var(--text-muted)] hover:text-red-500" aria-label={`Revoke ${m.full_name}`}>
                     <span className="text-xs">×</span>
                   </button>
                 </div>
