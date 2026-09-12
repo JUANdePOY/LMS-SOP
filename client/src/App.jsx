@@ -4,6 +4,7 @@ import { lazy, Suspense } from "react";
 import "@/features/task-management/styles/minimal.css";
 
 import { ToastProvider } from "@/shared/components/Toast";
+import { NavigationProvider } from "@/shared/contexts/NavigationContext";
 import ErrorBoundary from "@/shared/components/ErrorBoundary";
 import ProtectedRoute from "@/shared/components/ProtectedRoute";
 import { MotionProvider } from "@/shared/motion";
@@ -175,7 +176,9 @@ const router = createBrowserRouter([
       <AuthRoute>
         <ErrorBoundary>
           <ToastProvider>
-            <AppLayout />
+            <NavigationProvider>
+              <AppLayout />
+            </NavigationProvider>
           </ToastProvider>
         </ErrorBoundary>
       </AuthRoute>

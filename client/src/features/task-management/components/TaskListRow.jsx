@@ -1647,7 +1647,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
         <span className="flex min-w-0 items-center gap-1.5">
         <button
           type="button"
-          onClick={handleCompleteToggle}
+          onClick={(e) => { e.stopPropagation(); handleCompleteToggle(); }}
           disabled={!canEditThisTask}
           aria-pressed={task.status === 'Completed'}
           className={cn(
@@ -1765,7 +1765,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
       </span>
 
       <span className="hidden items-center justify-center tabular-nums text-xs text-[var(--text-secondary)] sm:flex px-2">
-        {Math.round(Math.max(0, Math.min(100, Number(task.progress_rate ?? task.completion_rate ?? 0))))}%
+        {Math.round(Math.max(0, Math.min(100, Number(task.status === 'Completed' ? 100 : (task.progress_rate ?? task.completion_rate ?? 0)))))}%
       </span>
     </div>
   );

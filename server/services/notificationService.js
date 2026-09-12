@@ -161,9 +161,9 @@ async function broadcastSystemChange({ title, body, type = 'info', link, entityT
 
     const promises = userIds
       .filter((id) => Number.isInteger(id) && id > 0)
-      .map((id) =>
+      .map((userId) =>
         deduplicatedCreate({
-          userId: id,
+          userId,
           title,
           body,
           type,
@@ -178,13 +178,15 @@ async function broadcastSystemChange({ title, body, type = 'info', link, entityT
           actionLabel,
           actionUrl,
           soundEnabled,
-        }).catch(() => null)
+        })
+          .then((notificationId) => ({ userId, notificationId }))
+          .catch(() => null)
       );
 
     const results = await Promise.all(promises);
-    const createdIds = results.filter((id) => id != null);
+    const createdEntries = results.filter((entry) => entry != null);
 
-    if (createdIds.length > 0) {
+    if (createdEntries.length > 0) {
       const payload = {
         type: 'notification',
         action: 'created',
@@ -204,15 +206,16 @@ async function broadcastSystemChange({ title, body, type = 'info', link, entityT
         },
       };
 
-      for (const id of createdIds) {
-        broadcastToUser(id, payload).catch(() => {});
-        const { suppressPush, suppressSound } = await shouldSuppressChannels(id, category);
-        if (!suppressPush) triggerDevicePush(id, payload.data).catch(() => {});
-        if (!suppressSound && soundEnabled) triggerSound(id).catch(() => {});
+      for (const entry of createdEntries) {
+        const { userId, notificationId } = entry;
+        broadcastToUser(userId, payload).catch(() => {});
+        const { suppressPush, suppressSound } = await shouldSuppressChannels(userId, category);
+        if (!suppressPush) triggerDevicePush(userId, payload.data).catch(() => {});
+        if (!suppressSound && soundEnabled) triggerSound(userId).catch(() => {});
       }
     }
 
-    return createdIds;
+    return createdEntries.map((entry) => entry.notificationId);
   } catch {
     return [];
   }

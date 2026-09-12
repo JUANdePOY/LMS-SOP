@@ -14,6 +14,8 @@ import {
   GraduationCap,
   Shield,
   Megaphone,
+  UserCheck,
+  Building2,
   Loader2,
   Save,
 } from "lucide-react";
@@ -40,6 +42,8 @@ const ICONS = {
   GraduationCap,
   Shield,
   Megaphone,
+  UserCheck,
+  Building2,
 };
 
 const DEFAULT_PREFS = {

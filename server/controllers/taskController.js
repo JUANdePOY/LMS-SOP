@@ -1,7 +1,10 @@
 const taskService = require('../services/taskService');
 const taskModel = require('../models/taskModel');
+const clientModel = require('../models/clientModel');
 const { validateFilters, validateBatchIds, validateBatchUpdatePayload } = require('../validators/taskValidator');
 const taskNotifications = require('../services/taskNotificationService');
+const notificationService = require('../services/notificationService');
+const db = require('../config/database');
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
@@ -155,12 +158,105 @@ const taskController = {
         ? await taskService.getTask(taskId, req.user.id).catch(() => null)
         : null;
 
-      // Admins are pushed only when a task is marked done or becomes overdue.
+      // Department heads are pushed when a task is marked done or becomes overdue.
+      // Admin and super_admin are excluded from task-level status notifications.
       if (after) {
-        if (after.status === 'Completed' && before && before.status !== 'Completed') {
-          taskNotifications.notifyAdminsTaskStatus(after, 'Completed').catch(() => {});
-        } else if (after.status === 'Overdue' && before && before.status !== 'Overdue') {
-          taskNotifications.notifyAdminsTaskStatus(after, 'Overdue').catch(() => {});
+        if ((after.status === 'Completed' && before && before.status !== 'Completed') ||
+            (after.status === 'Overdue' && before && before.status !== 'Overdue')) {
+          taskNotifications.notifyAdminsTaskStatus(after, after.status).catch(() => {});
+        }
+      }
+
+      // If the task just became completed and its client is now fully completed,
+      // notify the admin (if scoped to the client's business) and the superadmin.
+      if (after && after.status === 'Completed' && before && before.status !== 'Completed') {
+        let clientId = after.client_id;
+        if (!clientId && after.client_business_id) {
+          const [[biz]] = await db.query(
+            'SELECT client_id FROM client_businesses WHERE id = ? LIMIT 1',
+            [after.client_business_id]
+          );
+          clientId = biz ? biz.client_id : null;
+        }
+
+        if (clientId) {
+          const clientFullyDone = await clientModel.isFullyCompleted(clientId);
+          if (clientFullyDone) {
+            const [clientRows] = await db.query(
+              'SELECT business_id, client_name FROM clients WHERE id = ? LIMIT 1',
+              [clientId]
+            );
+            const clientBusinessId = clientRows[0]?.business_id || null;
+            const clientName = clientRows[0]?.client_name || '';
+
+            const [adminRows] = await db.query(
+              `SELECT id FROM users WHERE is_active = 1 AND role = ? AND business_id = ?`,
+              ['admin', clientBusinessId]
+            );
+
+            const [superAdminRows] = await db.query(
+              'SELECT id FROM users WHERE is_active = 1 AND role = ?',
+              ['super_admin']
+            );
+
+            const targets = [
+              ...adminRows.map((u) => u.id),
+              ...superAdminRows.map((u) => u.id),
+            ];
+
+            if (targets.length > 0) {
+              notificationService.broadcastSystemChange({
+                title: 'Client Progress Completed',
+                body: clientName ? `All tasks for client "${clientName}" are now completed` : 'All tasks for this client are now completed',
+                type: 'success',
+                link: `/tasks?client=${clientId}&view=list`,
+                entityType: 'client',
+                entityId: clientId,
+                category: 'client_completed',
+                targetUserIds: targets,
+              }).catch(() => {});
+            }
+          }
+
+          // Notify admin when a specific business unit reaches 100%.
+          if (after.client_business_id) {
+            const bizFullyDone = await clientModel.isBusinessFullyCompleted(after.client_business_id);
+            if (bizFullyDone) {
+              const [clientRows] = await db.query(
+                'SELECT business_id, client_name FROM clients WHERE id = ? LIMIT 1',
+                [clientId]
+              );
+              const clientBusinessId = clientRows[0]?.business_id || null;
+              const clientName = clientRows[0]?.client_name || '';
+
+              const [bizRows] = await db.query(
+                'SELECT business_name FROM client_businesses WHERE id = ? LIMIT 1',
+                [after.client_business_id]
+              );
+              const businessName = bizRows[0]?.business_name || '';
+
+              const [adminRows] = await db.query(
+                `SELECT id FROM users WHERE is_active = 1 AND role = ? AND business_id = ?`,
+                ['admin', clientBusinessId]
+              );
+
+              if (adminRows.length > 0) {
+                const body = businessName
+                  ? `All tasks in business unit "${businessName}"${clientName ? ` for client "${clientName}"` : ''} are now completed`
+                  : 'All tasks in this business unit are now completed';
+                notificationService.broadcastSystemChange({
+                  title: 'Business Progress Completed',
+                  body,
+                  type: 'success',
+                  link: `/tasks?client=${clientId}&business=${after.client_business_id}&view=list`,
+                  entityType: 'client',
+                  entityId: clientId,
+                  category: 'business_completed',
+                  targetUserIds: adminRows.map((u) => u.id),
+                }).catch(() => {});
+              }
+            }
+          }
         }
       }
 

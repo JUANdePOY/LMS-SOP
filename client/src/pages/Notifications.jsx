@@ -296,13 +296,14 @@ export default function Notifications() {
         </div>
       )}
       <ConfirmationDialog
-        open={deleteAllOpen}
+        isOpen={deleteAllOpen}
         title="Delete all notifications"
         message="This will permanently delete all your notifications. This action cannot be undone."
         confirmLabel="Delete all"
         cancelLabel="Cancel"
         onConfirm={handleDeleteAll}
         onCancel={() => setDeleteAllOpen(false)}
+        onClose={() => setDeleteAllOpen(false)}
         loading={deleting}
         variant="destructive"
       />

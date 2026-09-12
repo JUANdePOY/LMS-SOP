@@ -48,8 +48,8 @@ export default function TasksPage() {
   }, [markEntityTypeRead]);
 
   const filters = useMemo(
-    () => ({ search, status: statusFilter, priority: priorityFilter }),
-    [search, statusFilter, priorityFilter]
+    () => ({ search, priority: priorityFilter, assignee: assigneeFilter }),
+    [search, priorityFilter, assigneeFilter]
   );
 
   const { tasks, loading, error, stats, refreshTasks, refreshStats, patchTask, create, update, remove } = useTasks(filters);
@@ -333,7 +333,7 @@ export default function TasksPage() {
     if (!isAnyAdmin) return;
     const timeout = setTimeout(() => refreshTasks(), 300);
     return () => clearTimeout(timeout);
-  }, [filters, isAnyAdmin, refreshTasks]);
+  }, [filters, isAnyAdmin, refreshTasks, statusFilter]);
 
   const assigneeOptions = useMemo(() => {
     const seen = new Set();
@@ -424,7 +424,11 @@ export default function TasksPage() {
       );
     }
     if (statusFilter) {
-      result = result.filter((t) => t.status === statusFilter);
+      if (statusFilter === 'Overdue') {
+        result = result.filter((t) => isOverdue(t));
+      } else {
+        result = result.filter((t) => (t.status || '') === statusFilter && !isOverdue(t));
+      }
     }
     if (priorityFilter) {
       result = result.filter((t) => t.priority === priorityFilter);
@@ -439,6 +443,21 @@ export default function TasksPage() {
     }
     return result;
   }, [tasks, search, statusFilter, priorityFilter, assigneeFilter, user, clientParam, businessParam, projectsById, scopedClientIdsForBusiness, isDepartmentHead, clientTree]);
+
+  const matchingBusinessIds = useMemo(() => {
+    const ids = new Set();
+    for (const task of displayedTasks || []) {
+      if (task.client_business_id != null) {
+        ids.add(String(task.client_business_id));
+      } else if (task.project_id != null) {
+        const proj = projectsById[String(task.project_id)];
+        if (proj?.client_business_id != null) {
+          ids.add(String(proj.client_business_id));
+        }
+      }
+    }
+    return ids;
+  }, [displayedTasks, projectsById]);
 
   const statItems = useMemo(() => {
     const list = displayedTasks || [];
@@ -543,41 +562,49 @@ export default function TasksPage() {
   }, [projectsById, clientParam, businessParam, projectParam, clientTree, isDepartmentHead, user]);
 
   const scopedClientTree = useMemo(() => {
+    let result = clientTree || [];
+    if (clientParam || businessParam || projectParam) {
+      const targetClient = clientParam ?? (projectParam ? projectsById[String(projectParam)]?.client_id : null);
+      result = result.map((client) => {
+        if (targetClient && String(client.id) !== String(targetClient)) return null;
+        if (businessParam && !clientParam && !projectParam) {
+          if (String(client.business_id) !== String(businessParam)) return null;
+          return client;
+        }
+        if (businessParam) {
+          const businesses = (client.businesses || []).filter(
+            (b) => String(b.id) === String(businessParam)
+          );
+          return { ...client, businesses };
+        }
+        return client;
+      }).filter(Boolean);
+    }
     if (user?.role === 'admin' && user?.business_id != null) {
       const adminBizId = String(user.business_id);
-      return (clientTree || []).filter(
-        (c) => c.business_id != null && String(c.business_id) === adminBizId
-      );
+      result = result.filter((c) => {
+        if (c.business_id != null && String(c.business_id) === adminBizId) return true;
+        return (c.businesses || []).some((b) => String(b.id) === adminBizId);
+      });
     }
     if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null)) {
       const sopBizId = String(user.department_business_id ?? user.business_id);
       const deptId = user?.department_id != null ? String(user.department_id) : null;
-      return (clientTree || []).filter((c) => {
+      result = result.filter((c) => {
         if (String(c.business_id) !== sopBizId) return false;
         if (deptId != null && String(c.department_id) !== deptId) return false;
         return true;
       });
     }
-    if (!clientParam && !businessParam && !projectParam) return clientTree;
-    const targetClient = clientParam ?? (projectParam ? projectsById[String(projectParam)]?.client_id : null);
-    const targetBusiness = projectParam ? projectsById[String(projectParam)]?.client_business_id : null;
-    return (clientTree || [])
-      .map((client) => {
-        if (targetClient && String(client.id) !== String(targetClient)) return null;
-        if (businessParam && !clientParam && !projectParam) {
-          if (client.business_id == null || String(client.business_id) !== String(businessParam)) return null;
-          return client;
-        }
-        if (targetBusiness) {
-          const businesses = (client.businesses || []).filter(
-            (b) => String(b.id) === String(targetBusiness)
-          );
-          return { ...client, businesses };
-        }
-        return client;
-      })
-      .filter(Boolean);
-  }, [clientTree, clientParam, businessParam, projectParam, projectsById, isDepartmentHead, user]);
+    const filtersActive = search || statusFilter || priorityFilter || assigneeFilter;
+    if (!clientParam && !businessParam && !projectParam && filtersActive && matchingBusinessIds.size > 0) {
+      result = result.map((c) => ({
+        ...c,
+        businesses: (c.businesses || []).filter((b) => matchingBusinessIds.has(String(b.id))),
+      })).filter((c) => c.businesses.length > 0);
+    }
+    return result;
+  }, [clientTree, clientParam, businessParam, projectParam, projectsById, isDepartmentHead, user, matchingBusinessIds, search, statusFilter, priorityFilter, assigneeFilter]);
 
   const handleSubmit = async (payload) => {
     setSaving(true);
@@ -677,6 +704,7 @@ export default function TasksPage() {
     const changes = { status: newStatus };
     if (newStatus === 'Completed') {
       changes.completion_rate = 100;
+      changes.progress_rate = 100;
     }
     const rollback = patchTask(task.id, changes);
     try {
@@ -866,6 +894,7 @@ export default function TasksPage() {
           onCreateProject={handleCreateProject}
           onCreateClient={handleCreateClient}
           onDeleteEntity={handleDeleteEntity}
+          autoExpand={!!hasActiveFilters}
         />
       )}
 

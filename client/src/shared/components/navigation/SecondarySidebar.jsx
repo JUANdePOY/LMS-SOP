@@ -532,7 +532,9 @@ export default function SecondarySidebar({ collapsed = false }) {
             {units.length === 0 && addingUnitClient !== client.id ? (
               <p className="px-3 py-1 text-xs text-[var(--text-muted)]">No business units</p>
             ) : (
-              units.map((unit) => renderUnit(client, unit))
+              units.map((unit) => (
+                <span key={unit.id}>{renderUnit(client, unit)}</span>
+              ))
             )}
           </div>
         )}
@@ -598,7 +600,7 @@ export default function SecondarySidebar({ collapsed = false }) {
                       onClick={() => requestDelete("business", Number(key), null, label)}
                       className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
                     >
-                      <Trash2 size={13} /> Delete
+                      <Trash2 size={13} /> Hide business
                     </button>
                   </div>
                 )}
@@ -845,11 +847,11 @@ export default function SecondarySidebar({ collapsed = false }) {
         isOpen={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
         onConfirm={confirmDelete}
-        title={pendingDelete?.kind === "business" ? "Hide business from all users" : `Delete ${pendingDelete?.kind === "client" ? "Client" : "Business"}`}
+        title={pendingDelete?.kind === "business" ? "Hide business from all users" : `Deletesss ${pendingDelete?.kind === "client" ? "Client" : "Business"}`}
         message={pendingDelete?.kind === "business"
           ? `Are you sure you want to hide "${pendingDelete?.name || ""}"? The business, its clients, and its business units will stay in the system — they'll just stop appearing for every user. You can restore it later from the organization page.`
           : `Are you sure you want to delete "${pendingDelete?.name || ""}"? This may also affect its business units, projects, and tasks.`}
-        confirmText={pendingDelete?.kind === "business" ? "Hide" : "Delete"}
+        confirmText={pendingDelete?.kind === "business" ? "Hide" : "Deletes"}
         variant="destructive"
       />
       </div>

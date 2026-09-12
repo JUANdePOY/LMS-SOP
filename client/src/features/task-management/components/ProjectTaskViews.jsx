@@ -53,13 +53,13 @@ export default function ProjectTaskViews({
   onQuickAddSubtask,
   onRenameClient,
   onRenameBusiness,
-  onCreateClient,
   onRenameProject,
   onRenameTask,
   onAddChild,
   onDeleteEntity,
   onCreateBusiness,
   onCreateProject,
+  onCreateClient,
   canManageTask,
   search,
   scopeClientId,
@@ -71,6 +71,7 @@ hideTabs = false,
     userRole = '',
     userBusinessId = null,
     userDepartmentBusinessId = null,
+    autoExpand,
   }) {
   const [internalView, setInternalView] = useState(() => {
     const validKeys = activeViews || TASK_VIEW_KEYS;
@@ -132,14 +133,15 @@ hideTabs = false,
                onRenameTask={onRenameTask}
               onAddChild={onAddChild}
               onDeleteEntity={onDeleteEntity}
-              onCreateBusiness={onCreateBusiness}
-              onCreateProject={onCreateProject}
-onCreateClient={onCreateClient}
-               newTaskIds={newTaskIds}
-               userRole={userRole}
-               userBusinessId={userBusinessId}
-               userDepartmentBusinessId={userDepartmentBusinessId}
-             />
+               onCreateBusiness={onCreateBusiness}
+               onCreateProject={onCreateProject}
+               onCreateClient={onCreateClient}
+                 newTaskIds={newTaskIds}
+                 userRole={userRole}
+                 userBusinessId={userBusinessId}
+                 userDepartmentBusinessId={userDepartmentBusinessId}
+                 autoExpand={autoExpand}
+              />
           )}
           {view === 'board' && (
             <TaskBoard

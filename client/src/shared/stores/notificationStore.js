@@ -91,9 +91,13 @@ function computeSnapshot() {
 function normalizeTaskNotificationLink(n) {
   if (!n || n.entity_type !== 'task' || !n.entity_id) return n;
   const link = n.link || '';
-  // Already pointing at the employee My Tasks tree — leave it alone.
+  if (link.includes('client=') && link.includes('business=')) return n;
   if (link === `/tasks/my?task=${n.entity_id}`) return n;
-  return { ...n, link: `/tasks/my?task=${n.entity_id}` };
+  if (link.startsWith(`/tasks/`)) {
+    const id = link.split('/tasks/')[1]?.split('?')[0];
+    if (id && id !== 'my') return { ...n, link: `/tasks/my?task=${id}` };
+  }
+  return n;
 }
 
 function getSnapshot() {
@@ -162,7 +166,9 @@ export const NotificationStore = {
               type: 'announcement',
               title: n.title || 'New task assigned',
               message: n.body || '',
-              link: n.entity_id ? `/tasks/my?task=${n.entity_id}` : (n.link || null),
+              link: n.link && (n.link.includes('client=') && n.link.includes('business='))
+                ? n.link
+                : (n.entity_id ? `/tasks/my?task=${n.entity_id}` : (n.link || null)),
               ctaLabel: 'View',
               priority: 2,
             });
@@ -355,7 +361,7 @@ export const NotificationStore = {
   },
 
   getSystemNotificationCount() {
-    return serverNotifications.filter((n) => ['sop', 'course', 'task'].includes(n.entity_type) && !n.is_read).length;
+    return serverNotifications.filter((n) => ['sop', 'course', 'task', 'client', 'business'].includes(n.entity_type) && !n.is_read).length;
   },
 };
 

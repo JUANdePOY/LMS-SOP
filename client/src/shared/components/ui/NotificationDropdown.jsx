@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { Bell, Info, AlertCircle, Check, BookOpen, FileText, HelpCircle, Award, BookMarked, UserPlus, Filter, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -6,6 +6,7 @@ import ConfirmationDialog from "@/shared/components/ui/ConfirmationDialog";
 import NotificationBadge from "@/shared/components/ui/NotificationBadge";
 import { useNotifications } from "@/shared/stores/notificationStore.js";
 import { deleteNotifications } from "@/services/api.js";
+import { useToast } from "@/shared/components/ui/Toast";
 
 const TYPE_ICON = {
   info: Info,
@@ -82,6 +83,7 @@ export default function NotificationDropdown({ showBadge = true, onFetch, count 
   const dropdownRef = useRef(null);
   const { unreadCount, notifications, loading, fetched, fetch, markRead, markAllRead, clearAll } = useNotifications();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const categories = useMemo(() => {
     const present = new Set((notifications || []).map((n) => n.category || "system"));
@@ -112,8 +114,8 @@ export default function NotificationDropdown({ showBadge = true, onFetch, count 
     try {
       await deleteNotifications([]);
       clearAll();
-    } catch {
-      /* error silently ignored; store retains data on failure */
+    } catch (err) {
+      toast.error(err?.response?.data?.message || err?.message || 'Failed to delete notifications');
     } finally {
       setDeleting(false);
       setDeleteAllOpen(false);
@@ -141,11 +143,29 @@ export default function NotificationDropdown({ showBadge = true, onFetch, count 
 
   const handleBellClick = () => setOpen((v) => !v);
 
+  const resolveNotificationTarget = useCallback((notification) => {
+    if (!notification) return null;
+    if (notification.category === 'client_completed' || notification.category === 'business_completed') {
+      const clientId = notification.entity_id || (() => {
+        const match = (notification.link || '').match(/[?&]client=(\d+)/);
+        return match ? match[1] : null;
+      })();
+      if (!clientId) return notification.action_url || notification.link || null;
+      if (notification.category === 'business_completed') {
+        const businessMatch = (notification.link || '').match(/[?&]business=(\d+)/);
+        const businessId = businessMatch ? businessMatch[1] : null;
+        return businessId ? `/tasks?client=${clientId}&business=${businessId}&view=list` : `/tasks?client=${clientId}&view=list`;
+      }
+      return `/tasks?client=${clientId}&view=list`;
+    }
+    return notification.action_url || notification.link || null;
+  }, []);
+
   const handleNotificationClick = (notification) => {
     if (!notification.is_read) {
       markRead(notification.id);
     }
-    const target = notification.action_url || notification.link;
+    const target = resolveNotificationTarget(notification);
     if (target) {
       navigate(target);
     }
@@ -342,13 +362,14 @@ export default function NotificationDropdown({ showBadge = true, onFetch, count 
       )}
 
       <ConfirmationDialog
-        open={deleteAllOpen}
+        isOpen={deleteAllOpen}
         title="Delete all notifications"
         message="This will permanently delete all your notifications. This action cannot be undone."
         confirmLabel="Delete all"
         cancelLabel="Cancel"
         onConfirm={handleDeleteAll}
         onCancel={() => setDeleteAllOpen(false)}
+        onClose={() => setDeleteAllOpen(false)}
         loading={deleting}
         variant="destructive"
       />

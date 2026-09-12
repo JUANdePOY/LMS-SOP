@@ -2,7 +2,7 @@ const db = require('../config/database');
 
 async function getSubscriptions(userId) {
   const [rows] = await db.query(
-    `SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ? AND is_active = TRUE`,
+    `SELECT DISTINCT endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ? AND is_active = TRUE`,
     [userId]
   );
   return rows;

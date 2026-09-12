@@ -84,7 +84,10 @@ export default function ProjectWorkspacePage() {
 
   const handleStatusChange = useCallback(async (task, newStatus) => {
     const changes = { status: newStatus };
-    if (newStatus === 'Completed') changes.completion_rate = 100;
+    if (newStatus === 'Completed') {
+      changes.completion_rate = 100;
+      changes.progress_rate = 100;
+    }
     try {
       await updateProgress({ task_id: task.id, ...changes });
       setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, ...changes } : t)));

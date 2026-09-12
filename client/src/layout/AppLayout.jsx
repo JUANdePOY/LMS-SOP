@@ -40,7 +40,7 @@ import { useContextualBanners } from "@/features/notifications/hooks/useContextu
 import { useAutoPushSubscribe } from "@/features/notifications/hooks/useAutoPushSubscribe";
 import { useTabNotificationBadge } from "@/hooks/useTabNotificationBadge";
 import { isQuietHours } from "@/shared/utils/quietHours";
-import { NavigationProvider, useNavigation } from "@/shared/contexts/NavigationContext";
+import { useNavigation } from "@/shared/contexts/NavigationContext";
 import SecondarySidebar from "@/shared/components/navigation/SecondarySidebar";
 
 const MOBILE_BOTTOM_NAV_ADMIN = [
@@ -158,6 +158,18 @@ export default function AppLayout() {
   // permission — never throws.
   useAutoPushSubscribe();
   const isTaskRoute = location.pathname === '/tasks' || location.pathname.startsWith('/tasks/my') || location.pathname.startsWith('/clients');
+  const { secondaryNav, closeSecondaryNav } = useNavigation();
+
+  useEffect(() => {
+    if (!isDesktop) return;
+    if (secondaryNav) {
+      setCollapsed(true);
+      setMobileOpen(false);
+    } else {
+      setCollapsed(false);
+      setMobileOpen(true);
+    }
+  }, [secondaryNav, isDesktop]);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
@@ -301,33 +313,22 @@ export default function AppLayout() {
   }, []);
 
   return (
-    <NavigationProvider>
-    {/* Canvas — light gray plate the boxed app shell floats on. */}
-    <div
+    <>
+      {/* Canvas — light gray plate the boxed app shell floats on. */}
+      <div
       className={cn(
         "app-canvas",
         "flex w-full min-h-[100dvh]",
         "transition-colors duration-300"
       )}
     >
-      {/* Boxed app shell — sidebar + header + content inside one rounded card. */}
       <div
         className={cn(
-          /* overflow-clip removed: it made .app-shell the clip/scroll context
-             and broke `position: sticky` for the header (content bled through),
-             while also clipping the card to a fixed box. Rounded corners are now
-             applied per-edge on the outer elements instead (see Sidebar's
-             border-radius via .app-shell > aside, the header's rounded-tr, and
-             the footer's rounded-br). */
           "app-shell",
           "relative flex min-h-full flex-1 min-w-0",
           "text-[var(--text-primary)]",
           "transition-colors duration-300"
         )}
-        // Drive --sidebar-width from the main sidebar's real width so the
-        // SecondarySidebar's `left` offset tracks it: when the main sidebar
-        // collapses to 72px the secondary panel slides in beside it instead of
-        // staying pinned at 260px and overlapping the collapsed rail.
         style={{ '--sidebar-width': collapsed ? '72px' : '260px' }}
       >
         {mobileOpen && (
@@ -563,6 +564,6 @@ export default function AppLayout() {
       </div>
     </div>
     <SecondaryNavRouteSync />
-    </NavigationProvider>
+    </>
   );
 }

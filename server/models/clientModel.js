@@ -248,6 +248,55 @@ async function addBusiness(clientId, businessName) {
   return result.insertId;
 }
 
+async function isFullyCompleted(clientId) {
+  if (!clientId) return false;
+
+  const [businesses] = await db.query(
+    'SELECT id FROM client_businesses WHERE client_id = ?',
+    [clientId]
+  );
+  const businessIds = businesses.map((b) => b.id);
+
+  let sql = `
+    SELECT COUNT(*) AS total,
+           SUM(CASE WHEN t.status = 'Completed' THEN 1 ELSE 0 END) AS completed
+    FROM tasks t
+    WHERE t.status NOT IN ('Cancelled')
+      AND (t.client_id = ?`;
+  const params = [clientId];
+
+  if (businessIds.length > 0) {
+    const bizPlaceholders = businessIds.map(() => '?').join(',');
+    sql += ` OR t.project_id IN (SELECT id FROM projects WHERE client_business_id IN (${bizPlaceholders}))`;
+    sql += ` OR t.client_business_id IN (${bizPlaceholders})`;
+    params.push(...businessIds, ...businessIds);
+  }
+
+  sql += `)`;
+
+  const [[stats]] = await db.query(sql, params);
+  if (!stats || !Number(stats.total)) return false;
+  return Number(stats.total) === Number(stats.completed);
+}
+
+async function isBusinessFullyCompleted(businessId) {
+  if (!businessId) return false;
+
+  const sql = `
+    SELECT COUNT(*) AS total,
+           SUM(CASE WHEN t.status = 'Completed' THEN 1 ELSE 0 END) AS completed
+    FROM tasks t
+    WHERE t.status NOT IN ('Cancelled')
+      AND (t.client_business_id = ? OR t.project_id IN (
+        SELECT id FROM projects WHERE client_business_id = ?
+      ))
+  `;
+
+  const [[stats]] = await db.query(sql, [businessId, businessId]);
+  if (!stats || !Number(stats.total)) return false;
+  return Number(stats.total) === Number(stats.completed);
+}
+
 async function getClient(id) {
    const [clients] = await db.query(
      `SELECT c.id, c.client_name, c.business_id, c.color, c.created_by,
@@ -385,4 +434,6 @@ module.exports = {
   updateClient,
   removeBusiness,
   remove,
+  isFullyCompleted,
+  isBusinessFullyCompleted,
 };

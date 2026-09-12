@@ -609,7 +609,7 @@ export default function TaskHierarchyTable({
   onEditProject,
   onDeleteImmediate,
   onDuplicated,
-onQuickAddTask,
+  onQuickAddTask,
   onQuickAddSubtask,
   onRenameClient,
   onRenameBusiness,
@@ -625,6 +625,7 @@ onQuickAddTask,
   userRole = '',
   userBusinessId = null,
   userDepartmentBusinessId = null,
+  autoExpand,
 }) {
   const { toast } = useToast();
   const tasksById = useMemo(() => {
@@ -657,7 +658,7 @@ onQuickAddTask,
      );
    }, [filteredClientTree, userDepartmentId]);
 
-   const [expanded, setExpanded] = useState(loadExpanded);
+    const [expanded, setExpanded] = useState(loadExpanded);
 
   const subtaskCountMap = useMemo(() => {
     const counts = {};
@@ -818,6 +819,28 @@ onQuickAddTask,
       return next;
     });
   }, [clients]);
+
+  const autoExpandedRef = useRef(false);
+  useEffect(() => {
+    if (!autoExpand) {
+      autoExpandedRef.current = false;
+      return;
+    }
+    if (autoExpandedRef.current) return;
+    const forced = new Set();
+    for (const client of clients) {
+      forced.add(`client-${client.id}`);
+      for (const business of client.businesses) {
+        if (business.tasks.length > 0 || business.rollup.total > 0) {
+          forced.add(`business-${business.id}`);
+        }
+      }
+    }
+    if (forced.size > 0) {
+      autoExpandedRef.current = true;
+      setExpanded(forced);
+    }
+  }, [autoExpand, clients]);
 
   // When a client/business/project scope is active (e.g. chosen in the secondary
   // panel), collapse everything and open ONLY that branch. We must include the

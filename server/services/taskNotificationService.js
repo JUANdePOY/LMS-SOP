@@ -204,17 +204,74 @@ async function notifyMentioned(task, mentionedUserIds = [], actorId = null) {
 }
 
 // Push-notify admins when a task becomes done or overdue.
+// Only department heads whose department matches the task's department
+// are notified. Admin and super_admin roles are excluded.
 async function notifyAdminsTaskStatus(task, statusLabel) {
   if (!task || !task.id) return [];
-  const admins = await getAdminUsers();
+
+  let taskDepartmentId = null;
+
+  if (task.client_id) {
+    const [[client]] = await db.query(
+      'SELECT department_id FROM clients WHERE id = ? LIMIT 1',
+      [task.client_id]
+    );
+    taskDepartmentId = client ? client.department_id : null;
+  }
+
+  if (!taskDepartmentId) {
+    const [deptAssignments] = await db.query(
+      `SELECT reference_id FROM task_assignments WHERE task_id = ? AND assignment_type = 'Department' LIMIT 1`,
+      [task.id]
+    );
+    if (deptAssignments.length > 0) {
+      taskDepartmentId = deptAssignments[0].reference_id;
+    }
+  }
+
+  if (!taskDepartmentId) return [];
+
+  const [deptHeads] = await db.query(
+    `SELECT DISTINCT u.id FROM users u
+     WHERE u.is_active = 1 AND u.role = ?
+     AND (u.department_id = ? OR EXISTS (
+       SELECT 1 FROM department_scope_grants dsg
+       WHERE dsg.user_id = u.id AND dsg.department_id = ?
+     ))`,
+    ['department_head', taskDepartmentId, taskDepartmentId]
+  );
+
   const type = statusLabel === 'Overdue' ? 'warning' : 'success';
-  const promises = admins.map((admin) =>
+  const taskClientId = task.client_id != null ? String(task.client_id) : null;
+  const taskBusinessId = task.client_business_id != null ? String(task.client_business_id) : null;
+  const link = taskClientId
+    ? `/tasks?client=${taskClientId}${taskBusinessId ? `&business=${taskBusinessId}` : ''}&view=list`
+    : `/tasks/${task.id}`;
+  let body = task.title;
+  if (taskClientId && taskBusinessId) {
+    const [[bizRow]] = await db.query(
+      'SELECT cb.business_name, c.client_name FROM client_businesses cb JOIN clients c ON c.id = cb.client_id WHERE cb.id = ? LIMIT 1',
+      [taskBusinessId]
+    );
+    if (bizRow) {
+      body = `${task.title} — ${bizRow.client_name} / ${bizRow.business_name}`;
+    }
+  } else if (taskClientId) {
+    const [[clientRow]] = await db.query(
+      'SELECT client_name FROM clients WHERE id = ? LIMIT 1',
+      [taskClientId]
+    );
+    if (clientRow?.client_name) {
+      body = `${task.title} — ${clientRow.client_name}`;
+    }
+  }
+  const promises = deptHeads.map((admin) =>
     notificationService.createNotification({
       userId: admin.id,
       title: `Task ${statusLabel}`,
-      body: task.title,
+      body,
       type,
-      link: `/tasks/${task.id}`,
+      link,
       entityType: 'task',
       entityId: task.id,
       category: 'task_admin',

@@ -66,23 +66,58 @@ export default function MyTasksPage() {
     [unreadTaskNotifications]
   );
 
-  const scopedClientTree = useMemo(() => {
-    if (!scope) return hierarchy.clientTree;
-    return (hierarchy.clientTree || [])
-      .filter((c) => !scope.clientId || String(c.id) === String(scope.clientId))
-      .map((c) => ({
-        ...c,
-        businesses: (c.businesses || []).filter(
-          (b) => !scope.businessId || String(b.id) === String(scope.businessId)
-        ),
-      }));
-  }, [hierarchy.clientTree, scope]);
-
   const scopedProjectsById = useMemo(() => {
     if (!scope || !scope.projectId) return hierarchy.projectsById;
     const p = hierarchy.projectsById[String(scope.projectId)];
     return p ? { [scope.projectId]: p } : {};
   }, [hierarchy.projectsById, scope]);
+
+  const matchingBusinessIds = useMemo(() => {
+    const ids = new Set();
+    for (const task of scopedTasks || []) {
+      if (task.client_business_id != null) {
+        ids.add(String(task.client_business_id));
+      } else if (task.project_id != null) {
+        const proj = hierarchy.projectsById[String(task.project_id)];
+        if (proj?.client_business_id != null) {
+          ids.add(String(proj.client_business_id));
+        }
+      }
+    }
+    return ids;
+  }, [scopedTasks, hierarchy.projectsById]);
+
+  const scopedClientTree = useMemo(() => {
+    const filtersActive = search || statusFilter || priorityFilter;
+    if (scope) {
+      const base = (hierarchy.clientTree || [])
+        .filter((c) => !scope.clientId || String(c.id) === String(scope.clientId))
+        .map((c) => ({
+          ...c,
+          businesses: (c.businesses || []).filter(
+            (b) => !scope.businessId || String(b.id) === String(scope.businessId)
+          ),
+        }));
+      if (filtersActive && matchingBusinessIds.size > 0) {
+        return base
+          .map((c) => ({
+            ...c,
+            businesses: (c.businesses || []).filter((b) => matchingBusinessIds.has(String(b.id))),
+          }))
+          .filter((c) => c.businesses.length > 0);
+      }
+      return base;
+    }
+    if (filtersActive && matchingBusinessIds.size > 0) {
+      return (hierarchy.clientTree || [])
+        .map((c) => ({
+          ...c,
+          businesses: (c.businesses || []).filter((b) => matchingBusinessIds.has(String(b.id))),
+        }))
+        .filter((c) => c.businesses.length > 0);
+    }
+    return hierarchy.clientTree;
+  }, [hierarchy.clientTree, scope, matchingBusinessIds, search, statusFilter, priorityFilter]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -144,7 +179,10 @@ export default function MyTasksPage() {
 
   const handleStatusChange = useCallback(async (task, newStatus) => {
     const changes = { status: newStatus };
-    if (newStatus === 'Completed') changes.completion_rate = 100;
+    if (newStatus === 'Completed') {
+      changes.completion_rate = 100;
+      changes.progress_rate = 100;
+    }
     try {
       await updateProgress({ task_id: task.id, ...changes });
       await load();
@@ -192,7 +230,11 @@ export default function MyTasksPage() {
   const displayedTasks = useMemo(() => {
     let result = tasks || [];
     if (statusFilter) {
-      result = result.filter((t) => (t.status || '') === statusFilter);
+      if (statusFilter === 'Overdue') {
+        result = result.filter((t) => isOverdue(t));
+      } else {
+        result = result.filter((t) => (t.status || '') === statusFilter && !isOverdue(t));
+      }
     }
     if (priorityFilter) {
       result = result.filter((t) => (t.priority || '') === priorityFilter);
@@ -234,7 +276,7 @@ export default function MyTasksPage() {
   return (
     <div className="ppm max-w-6xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-[var(--text-primary)]">My Tasks &amp; Projects</h1>
+        <h1 className="text-2xl font-semibold text-[var(--text-primary)]">My Tasks</h1>
         <p className="text-xs text-[var(--ppm-text-muted)] mt-0.5">
           Projects you're assigned to and the progress of every task within them
         </p>
@@ -324,6 +366,7 @@ export default function MyTasksPage() {
           userDepartmentId={isDepartmentHead ? (user?.department_id ?? null) : null}
           showCountBadges={true}
           newTaskIds={newTaskIds}
+          autoExpand={!!(search || statusFilter || priorityFilter)}
         />
       )}
 

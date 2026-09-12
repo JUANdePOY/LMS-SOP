@@ -23,6 +23,18 @@ export const NOTIFICATION_CATEGORIES = [
     icon: 'AlertTriangle',
   },
   {
+    key: 'client_completed',
+    label: 'Client Progress Completed',
+    description: 'When all tasks for a client are completed',
+    icon: 'UserCheck',
+  },
+  {
+    key: 'business_completed',
+    label: 'Business Progress Completed',
+    description: 'When all tasks in a business unit are completed',
+    icon: 'Building2',
+  },
+  {
     key: 'system',
     label: 'System',
     description: 'Account, maintenance and general system messages',
