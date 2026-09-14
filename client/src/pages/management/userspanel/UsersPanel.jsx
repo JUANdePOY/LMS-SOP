@@ -162,6 +162,17 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   }, [isAuthenticated]);
 
   const handleAddUser = async () => {
+    const missing = [];
+    if (!formData.full_name?.trim()) missing.push('Full Name');
+    if (!formData.email?.trim()) missing.push('Email');
+    if (!formData.password) missing.push('Password');
+    if (!formData.role) missing.push('Role');
+
+    if (missing.length > 0) {
+      toast.error(`Please fill in the following required field${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}`);
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await createUser(cleanPayload(formData));
