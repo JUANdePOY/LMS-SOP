@@ -411,6 +411,7 @@ return false;
             <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">Manage user accounts, roles, and assignments</p>
           </div>
           <div className="flex items-center justify-end gap-2">
+          {user?.role !== 'admin' && user?.role !== 'department_head' && (
             <Button
               variant="outline"
               onClick={() => setShowBulkUploadModal(true)}
@@ -419,6 +420,7 @@ return false;
               <Upload size={16} className="mr-2" />
               Bulk Upload
             </Button>
+          )}
             <Button onClick={openAddModal} className="shadow-sm hover:shadow-md transition-all">
               <Plus size={16} className="mr-2" />
               Add User

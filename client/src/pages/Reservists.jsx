@@ -434,7 +434,7 @@ const handleSubmit = async () => {
       {!loading && (
           <>
             <div className="flex items-center gap-2 flex-wrap">
-              {canMutate && (
+              {canMutate && user?.role === 'admin_arsen' && (
                 <PrimaryButton icon={Upload} onClick={() => setBulkUploadModal(true)} variant="secondary" className="flex-1 sm:flex-none">
                   <span className="hidden sm:inline">Bulk Upload</span>
                   <span className="sm:hidden">Upload</span>
