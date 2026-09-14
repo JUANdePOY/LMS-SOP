@@ -41,7 +41,7 @@ function ToolbarButton({ onClick, active, disabled, title, children }) {
   );
 }
 
-function EditorToolbar({ editor, onPickImage, uploadEnabled }) {
+function EditorToolbar({ editor, onPickImage, uploadEnabled, theme }) {
   return (
     <div className="flex flex-wrap items-center gap-1 border border-neutral-200 dark:border-neutral-700 border-b-0 rounded-t-lg bg-neutral-50 dark:bg-neutral-800/50 px-2 py-1.5">
       <EditorToolbarContent
@@ -49,7 +49,7 @@ function EditorToolbar({ editor, onPickImage, uploadEnabled }) {
         Button={ToolbarButton}
         onPickImage={onPickImage}
         uploadEnabled={uploadEnabled}
-        theme="light"
+        theme={theme}
       />
     </div>
   );
@@ -65,8 +65,9 @@ function EditorToolbar({ editor, onPickImage, uploadEnabled }) {
  *   servable URL. If omitted, the image toolbar button is disabled and
  *   pasted/dropped images are inserted as local-only previews (flagged as
  *   failed so it's obvious they won't survive a reload).
+ * @param {string} [props.theme] - 'light' | 'dark'. Defaults to light when omitted.
  */
-function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Enter module content...', onImageUpload }) {
+function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Enter module content...', onImageUpload, theme = 'light' }) {
   const fileInputRef = useRef(null);
 
   // Keep the latest callbacks in refs. Tiptap's `useEditor` captures the
@@ -172,6 +173,7 @@ function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Ente
         editor={editor}
         uploadEnabled={!!onImageUpload}
         onPickImage={() => fileInputRef.current?.click()}
+        theme={theme}
       />
       {showTableMenu && <TableMenu editor={editor} />}
       <input

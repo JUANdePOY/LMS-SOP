@@ -483,7 +483,6 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
     }
 
     const defaultPassword = (req.body.password || '').trim();
-    const defaultRole = (req.body.role || 'employee').trim();
 
     if (!defaultPassword || defaultPassword.length < 8) {
       return res.status(400).json({ status: 'error', message: 'Default password must be at least 8 characters', code: 'INVALID_PASSWORD' });
@@ -539,12 +538,14 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
       }
     });
 
-    const get = (name) => {
+    console.log('[BulkUpload] Loaded workbook rows:', raw.length, 'headers:', headers);
+
+    const get = (row, name) => {
       const k = String(name).trim().toLowerCase();
       const idx = headerLookup[k] ?? headerLookup[k.replace(/[\s/()]+/g, '')];
       if (idx == null) return '';
-      const val = rows.map(r => r[idx]).filter(v => v != null);
-      return val.length ? String(val[0]).trim() : '';
+      const val = row[idx];
+      return val != null ? String(val).trim() : '';
     };
 
     const formatDate = (val) => {
@@ -557,18 +558,31 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
       return s;
     };
 
-    const cleanRole = ['super_admin', 'admin', 'department_head', 'employee'].includes(defaultRole) ? defaultRole : 'employee';
+    const ALLOWED_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
+    console.log('[BulkUpload] Dept map:', deptMap);
+    console.log('[BulkUpload] Business map:', businessMap);
 
     let success = 0, failed = 0;
     const results = [];
 
     for (const row of rows) {
       try {
-        const fullName = get('Full Name') || get('Fullname') || get('Name');
-        const email = get('Email Address') || get('Email');
+        const fullName = get(row, 'Full Name') || get(row, 'Fullname') || get(row, 'Name');
+        const email = get(row, 'Email Address') || get(row, 'Email');
+        const rowRole = get(row, 'Role');
+        console.log('[BulkUpload] Row raw:', row, 'parsed=>', { fullName, email, rowRole });
         if (!fullName || !email) {
           failed++;
           results.push({ row, error: 'Missing full name or email' });
+          console.log('[BulkUpload] Row skipped: missing full name or email');
+          continue;
+        }
+
+        const cleanRole = ALLOWED_ROLES.includes(rowRole) ? rowRole : null;
+        if (!cleanRole) {
+          failed++;
+          results.push({ row, error: 'Missing or invalid role. Allowed: employee, department_head, admin, super_admin' });
+          console.log('[BulkUpload] Row skipped: invalid role', rowRole);
           continue;
         }
 
@@ -576,25 +590,74 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
         if (existing.length > 0) {
           failed++;
           results.push({ row, error: `Email ${email} already exists` });
+          console.log('[BulkUpload] Row skipped: duplicate email', email);
           continue;
         }
 
-        const employeeId = get('Employee ID') || null;
-        const deptName = get('Department');
-        let departmentId = deptName ? (deptMap[deptName.toLowerCase()] || null) : null;
-        // Admins / super admins are business-level and must not be assigned to
-        // a department — drop any department column from the upload for them.
-        if (departmentId && !DEPARTMENT_SCOPED_ROLES.includes(cleanRole)) {
+        const employeeId = get(row, 'Employee ID') || null;
+        const deptName = get(row, 'Department');
+        const businessName = get(row, 'Business') || get(row, 'Business Name') || get(row, 'business_name');
+
+        let departmentId = null;
+        let businessId = null;
+
+        if (cleanRole === 'super_admin') {
           departmentId = null;
+          businessId = null;
+          console.log('[BulkUpload] Role=super_admin, forcing dept/business null');
+        } else {
+          if (deptName && DEPARTMENT_SCOPED_ROLES.includes(cleanRole)) {
+            departmentId = deptMap[deptName.toLowerCase()] || null;
+            console.log('[BulkUpload] dept lookup', deptName, '=>', departmentId);
+          }
+          if (businessName) {
+            businessId = businessMap[businessName.toLowerCase()] || null;
+            console.log('[BulkUpload] business lookup', businessName, '=>', businessId);
+          }
         }
-        const businessName = get('Business') || get('Business Name') || get('business_name');
-        const businessId = businessName ? (businessMap[businessName.toLowerCase()] || null) : null;
-        const positionTitle = get('Position/Job Title') || get('Position Title') || get('Position') || null;
-        const contactNumber = get('Contact Number') || get('Contact') || null;
-        const employmentStatus = get('Employment Status') || 'Regular';
-        const dateHired = formatDate(get('Date Hired') || get('DateHired'));
-        const birthdate = formatDate(get('Birthdate') || get('Birth Date'));
-        const address = get('Address') || null;
+
+        if (cleanRole === 'admin' && !businessId) {
+          failed++;
+          results.push({ row, error: 'Admin users require a valid Business value' });
+          console.log('[BulkUpload] Row skipped: admin missing business');
+          continue;
+        }
+
+        if (cleanRole === 'department_head') {
+          if (!departmentId) {
+            failed++;
+            results.push({ row, error: 'Department head users require a valid Department value' });
+            console.log('[BulkUpload] Row skipped: dept_head missing department');
+            continue;
+          }
+          if (!businessId) {
+            failed++;
+            results.push({ row, error: 'Department head users require a valid Business value' });
+            console.log('[BulkUpload] Row skipped: dept_head missing business');
+            continue;
+          }
+        }
+        const positionTitle = get(row, 'Position/Job Title') || get(row, 'Position Title') || get(row, 'Position') || null;
+        const contactNumber = get(row, 'Contact Number') || get(row, 'Contact') || null;
+        const employmentStatus = get(row, 'Employment Status') || 'Regular';
+        const dateHired = formatDate(get(row, 'Date Hired') || get(row, 'DateHired'));
+        const birthdate = formatDate(get(row, 'Birthdate') || get(row, 'Birth Date'));
+        const address = get(row, 'Address') || null;
+
+        console.log('[BulkUpload] Creating user:', {
+          full_name: fullName,
+          email: email.toLowerCase(),
+          role: cleanRole,
+          department_id: departmentId,
+          business_id: businessId,
+          position_title: positionTitle,
+          employee_id: employeeId,
+          contact_number: contactNumber,
+          employment_status: employmentStatus,
+          date_hired: dateHired,
+          birthdate: birthdate,
+          address,
+        });
 
         const userId = await authModel.create({
           full_name: fullName,
@@ -620,11 +683,12 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
           new_values: { email: email.toLowerCase(), role: cleanRole, full_name: fullName }
         });
 
+        console.log('[BulkUpload] Created user id=', userId, 'email=', email);
         success++;
       } catch (err) {
         failed++;
         results.push({ row, error: err.message });
-        console.error('Bulk user upload row error:', err);
+        console.error('[BulkUpload] Row error:', err);
       }
     }
 

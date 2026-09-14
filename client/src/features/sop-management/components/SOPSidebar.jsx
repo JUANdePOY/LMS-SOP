@@ -8,7 +8,7 @@ import AuditTimeline from '@/features/sop-management/components/AuditTimeline';
 import ShareLinkDrawer from '@/features/sop-management/components/ShareLinkDrawer';
 import { useVersions } from '@/features/sop-management/hooks/useVersions';
 import { createVersion } from '@/features/sop-management/services/versionService';
-import { getWorkflow, getAuditLogs, approveSop, rejectSop } from '@/features/sop-management/services/sopService';
+import { getWorkflow, getAuditLogs, approveSop, rejectSop, submitSop, publishSop, archiveSop, unarchiveSop } from '@/features/sop-management/services/sopService';
 
 function SidebarCard({ title, children, className }) {
   return (
@@ -47,6 +47,58 @@ export default function SOPSidebar({ sopId, sop, workflow, setWorkflow, auditLog
               toast.success('SOP approved successfully');
             } catch (err) {
               const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Approve failed';
+              toast.error(message);
+            }
+          }}
+          onSubmitForReview={async ({ sopId, comments }) => {
+            try {
+              await submitSop(sopId);
+              const { data } = await getWorkflow(sopId);
+              setWorkflow(data?.data || null);
+              if (onAuditRefresh) onAuditRefresh();
+              if (onSopRefresh) onSopRefresh();
+              toast.success('SOP submitted for review');
+            } catch (err) {
+              const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Submit failed';
+              toast.error(message);
+            }
+          }}
+          onPublish={async ({ sopId, comments }) => {
+            try {
+              await publishSop(sopId);
+              const { data } = await getWorkflow(sopId);
+              setWorkflow(data?.data || null);
+              if (onAuditRefresh) onAuditRefresh();
+              if (onSopRefresh) onSopRefresh();
+              toast.success('SOP published successfully');
+            } catch (err) {
+              const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Publish failed';
+              toast.error(message);
+            }
+          }}
+          onArchive={async ({ sopId, comments }) => {
+            try {
+              await archiveSop(sopId);
+              const { data } = await getWorkflow(sopId);
+              setWorkflow(data?.data || null);
+              if (onAuditRefresh) onAuditRefresh();
+              if (onSopRefresh) onSopRefresh();
+              toast.success('SOP archived successfully');
+            } catch (err) {
+              const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Archive failed';
+              toast.error(message);
+            }
+          }}
+          onRestore={async ({ sopId }) => {
+            try {
+              await unarchiveSop(sopId);
+              const { data } = await getWorkflow(sopId);
+              setWorkflow(data?.data || null);
+              if (onAuditRefresh) onAuditRefresh();
+              if (onSopRefresh) onSopRefresh();
+              toast.success('SOP restored to Draft');
+            } catch (err) {
+              const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Restore failed';
               toast.error(message);
             }
           }}

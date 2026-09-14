@@ -8,12 +8,12 @@ import {
   Megaphone, Trophy, ChevronDown, ArrowRight,
 } from "lucide-react";
 
-import DashboardStatCard from "../components/dashboard/DashboardStatCard";
 import PanelCard from "../components/dashboard/PanelCard";
 import ProgressBar from "../components/dashboard/ProgressBar";
 import DonutChart from "../components/dashboard/DonutChart";
 import TrainingLineChart from "../components/dashboard/TrainingLineChart";
 import LeaderboardPodium from "../components/dashboard/LeaderboardPodium";
+import KPIStatsGrid from "@/shared/components/dashboard/KPIStatsGrid";
 import useEmployeeTrainingDashboard from "../hooks/useEmployeeTrainingDashboard";
 import { useNotifications } from "@/shared/stores/notificationStore.js";
 import { StaggerList, MotionItem, FadeIn } from "@/shared/motion";
@@ -128,51 +128,63 @@ export default function EmployeeTrainingDashboard() {
       </div>
 
       {/* Stat Cards Row */}
-      <StaggerList className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MotionItem>
-          <DashboardStatCard
-            label="SOPs Assigned"
-            value={`${dashboard.stats.sopsAssigned} SOPs`}
-            icon={BookOpen}
-            color="blue"
-            caption={dashboard.stats.sopsAssigned > 0 ? `${dashboard.sopHighlights.filter(s => s.status === 'Completed').length} completed` : 'No SOPs assigned yet'}
-            progress={dashboard.stats.sopsAssigned > 0 ? Math.round((dashboard.sopHighlights.filter(s => s.status === 'Completed').length / dashboard.stats.sopsAssigned) * 100) : 0}
-            trend="up"
-          />
-        </MotionItem>
-        <MotionItem>
-          <DashboardStatCard
-            label="Training Progress"
-            value={`${dashboard.stats.trainingProgress}%`}
-            icon={GraduationCap}
-            color="emerald"
-            caption="Keep learning!"
-            progress={dashboard.stats.trainingProgress}
-            trend="up"
-          />
-        </MotionItem>
-        <MotionItem>
-          <DashboardStatCard
-            label="Assessments Passed"
-            value={dashboard.stats.assessmentsPassed}
-            icon={ClipboardCheck}
-            color="purple"
-            caption={dashboard.stats.assessmentsTotal > 0 ? `${Math.round((Number(dashboard.stats.assessmentsPassed) / dashboard.stats.assessmentsTotal) * 100)}% pass rate` : 'No assessments yet'}
-            progress={dashboard.stats.assessmentsTotal > 0 ? Math.round((Number(dashboard.stats.assessmentsPassed) / dashboard.stats.assessmentsTotal) * 100) : 0}
-            trend="up"
-          />
-        </MotionItem>
-        <MotionItem>
-          <DashboardStatCard
-            label="Certificates Earned"
-            value={dashboard.stats.certificatesEarned}
-            icon={Award}
-            color="amber"
-            link={{ label: "View all certificates", href: "/certificates/my-certificates" }}
-            trend="up"
-          />
-        </MotionItem>
-      </StaggerList>
+      <KPIStatsGrid
+        items={[
+          {
+            id: "sops-assigned",
+            label: "SOPs Assigned",
+            value: `${dashboard.stats.sopsAssigned} SOPs`,
+            sub: `${dashboard.sopHighlights.filter((s) => s.status === "Completed").length} completed`,
+            icon: "BookOpen",
+            trend: null,
+            color: "blue",
+          },
+          {
+            id: "training-progress",
+            label: "Training Progress",
+            value: `${dashboard.stats.trainingProgress}%`,
+            sub: "Keep learning",
+            icon: "GraduationCap",
+            trend: null,
+            color: "emerald",
+          },
+          {
+            id: "assessments-passed",
+            label: "Assessments Passed",
+            value: String(dashboard.stats.assessmentsPassed),
+            sub: `${
+              dashboard.stats.assessmentsTotal > 0
+                ? Math.round(
+                    (Number(dashboard.stats.assessmentsPassed) /
+                      Number(dashboard.stats.assessmentsTotal)) *
+                      100
+                  )
+                : 0
+            }% pass rate`,
+            icon: "ClipboardCheck",
+            trend: null,
+            color: "indigo",
+          },
+          {
+            id: "certificates-earned",
+            label: "Certificates Earned",
+            value: String(dashboard.stats.certificatesEarned),
+            sub: "Total earned",
+            icon: "Award",
+            trend: null,
+            color: "amber",
+          },
+          {
+            id: "total-average-progress",
+            label: "Total Average Progress",
+            value: `${dashboard.stats.avgTaskProgress}%`,
+            sub: "Based on assigned tasks",
+            icon: "TrendingUp",
+            trend: null,
+            color: "violet",
+          },
+        ]}
+      />
 
       {/* Training Progress + SOPs by Status */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -206,12 +218,12 @@ export default function EmployeeTrainingDashboard() {
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-blue-500/10 dark:text-blue-400">
                       <Megaphone size={16} />
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">{item.title}</p>
-                      <p className="mt-0.5 text-xs text-slate-400 dark:text-neutral-500">
-                        {item.created_at ? new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''} &middot; {item.author || 'Admin'}
-                      </p>
-                    </div>
+                     <div className="min-w-0">
+                       <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 line-clamp-2 break-words">{item.title}</p>
+                       <p className="mt-0.5 text-xs text-slate-400 dark:text-neutral-500">
+                         {item.created_at ? new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''} &middot; {item.author || 'Admin'}
+                       </p>
+                     </div>
                   </li>
                 ))}
               </ul>
@@ -231,7 +243,7 @@ export default function EmployeeTrainingDashboard() {
                 {dashboard.sopHighlights.map((sop, i) => (
                   <li key={i} className="group">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-100">{sop.title}</p>
+                       <p className="line-clamp-2 break-words text-sm font-medium text-neutral-900 dark:text-neutral-100">{sop.title}</p>
                       <span
                         className={
                           "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition-transform duration-300 group-hover:scale-105 " +

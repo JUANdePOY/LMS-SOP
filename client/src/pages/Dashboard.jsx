@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
 import {
-  Users, UserCheck, FileText, BookOpen,
-  ClipboardCheck, Award, TrendingUp,
   Calendar, Megaphone,
 } from 'lucide-react';
 import {
@@ -10,7 +8,7 @@ import {
 } from 'recharts';
 import { Card } from '@/shared/components/ui/card';
 import { cn } from '@/lib/utils';
-import { StaggerList, MotionItem } from '@/shared/motion';
+import KPIStatsGrid from '@/shared/components/dashboard/KPIStatsGrid';
 import useAdminDashboard from './hooks/useAdminDashboard';
 import { useNotifications } from '@/shared/stores/notificationStore.js';
 
@@ -18,14 +16,6 @@ const SOP_CATEGORY_COLORS = [
   '#F25C05', '#da7756', '#d97a6c', '#1D3067', '#32667F',
   '#5b8c5a', '#8a6d3b', '#7d5ba6', '#c05621', '#2c7a7b',
 ];
-
-const CARD_COLORS = {
-  blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', darkBg: 'dark:bg-blue-500/10', darkBorder: 'dark:border-blue-500/30', darkText: 'dark:text-blue-300' },
-  emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', darkBg: 'dark:bg-emerald-500/10', darkBorder: 'dark:border-emerald-500/30', darkText: 'dark:text-emerald-300' },
-  amber: { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', darkBg: 'dark:bg-amber-500/10', darkBorder: 'dark:border-amber-500/30', darkText: 'dark:text-amber-300' },
-  purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', darkBg: 'dark:bg-purple-500/10', darkBorder: 'dark:border-purple-500/30', darkText: 'dark:text-purple-300' },
-  rose: { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', darkBg: 'dark:bg-rose-500/10', darkBorder: 'dark:border-rose-500/30', darkText: 'dark:text-rose-300' },
-};
 
 function buildTrainingCompletionData(avgProgress) {
   const base = Number(avgProgress) || 0;
@@ -55,15 +45,6 @@ export default function Dashboard() {
   const trainingCompletionData = data
     ? buildTrainingCompletionData(data.training?.avg_progress)
     : buildTrainingCompletionData(0);
-
-const statCards = data ? [
-      { label: 'Total Users', value: String(data.users?.total || 0), delta: '+12%', icon: Users, color: 'blue' },
-      { label: 'Active Users', value: String(data.users?.active || 0), delta: '+8%', icon: UserCheck, color: 'emerald' },
-      { label: 'SOPs Published', value: String(data.sops?.published || 0), delta: '+5%', icon: FileText, color: 'blue' },
-      { label: 'Training Completion', value: `${data.training?.avg_progress || 0}%`, delta: '+10%', icon: BookOpen, color: 'blue' },
-      { label: 'Assessments Passed', value: `${data.assessments?.pass_rate || 0}%`, delta: '', icon: ClipboardCheck, color: 'blue' },
-      { label: 'Certificates Issued', value: String(data.certificatesIssued || 0), delta: '+15%', icon: Award, color: 'blue' },
-    ] : [];
 
   const announcements = data?.announcements || [];
   const events = data?.events || [];
@@ -126,45 +107,8 @@ const statCards = data ? [
         </div>
       </div>
 
-      {/* Stat Cards - fluid grid */}
-      <StaggerList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 sm:gap-4">
-        {statCards.map((card) => {
-          const Icon = card.icon;
-          const colors = CARD_COLORS[card.color] || CARD_COLORS.blue;
-          return (
-            <MotionItem key={card.label}>
-              <div className={cn(
-                "group relative overflow-hidden rounded-xl border bg-white p-3 sm:p-4 shadow-sm transition-all duration-300 ease-out hover:-translate-y-0.5 hover:shadow-md dark:bg-neutral-900",
-                colors.border, colors.darkBorder
-              )}>
-                <div className={cn("absolute left-0 top-0 h-full w-1 opacity-80 transition-all duration-300 group-hover:w-1.5", colors.bg, colors.darkBg)} />
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-neutral-800/50" />
-                
-                <div className="relative">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                      <div className={cn(
-                        "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-sm transition-all duration-300 group-hover:scale-110",
-                        colors.bg, colors.text, colors.darkBg, colors.darkText
-                      )}>
-                        <Icon size={18} />
-                      </div>
-                      <div className="min-w-0">
-                         <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate">{card.label}</p>
-                        <p className="text-lg sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 leading-tight">{card.value}</p>
-                      </div>
-                    </div>
-                     <span className="flex items-center gap-0.5 text-[10px] sm:text-xs font-medium text-[var(--color-success)] dark:text-[var(--color-success)] shrink-0">
-                      <TrendingUp size={12} />
-                      {card.delta}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </MotionItem>
-          );
-        })}
-      </StaggerList>
+      {/* Stat Cards */}
+      <KPIStatsGrid data={data} />
 
       {/* Training Completion Overview */}
       <Card className="overflow-hidden p-0">
@@ -269,12 +213,12 @@ const statCards = data ? [
                 <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]">
                   <Megaphone size={14} />
                 </div>
-                <div className="flex-1 min-w-0">
-                   <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{item.title}</p>
-                   <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
-                     {item.created_at ? new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''} · {item.author || 'Admin'}
-                   </p>
-                </div>
+                 <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 line-clamp-2 break-words">{item.title}</p>
+                    <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-0.5">
+                      {item.created_at ? new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''} · {item.author || 'Admin'}
+                    </p>
+                  </div>
               </div>
             )) : (
               <p className="text-xs text-neutral-400 dark:text-neutral-500">No announcements yet.</p>
@@ -329,41 +273,75 @@ const statCards = data ? [
           </div>
         </Card>
 
-        {/* User Activity */}
-        <Card className="p-3 sm:p-4">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">User Activity</h2>
-            <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-[rgba(242,92,5,0.20)]"
-            >
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
-            {[
-              { label: 'Logged In Users', value: String(data?.users?.active || 0), icon: UserCheck },
-              { label: 'Completed Training', value: String(data?.training?.completed_courses || 0), icon: BookOpen },
-              { label: 'Active Learners', value: String(data?.training?.active_learners || 0), icon: ClipboardCheck },
-              { label: 'Certificates Issued', value: String(data?.certificatesIssued || 0), icon: Award },
-            ].map((item) => (
-              <div key={item.label} className="group relative overflow-hidden rounded-xl border border-slate-100 bg-white p-3 text-center shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md dark:border-neutral-800 dark:bg-neutral-900 dark:hover:border-neutral-700">
-                <div className="absolute inset-0 bg-gradient-to-br from-slate-50/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-neutral-800/50" />
-                <div className="relative flex flex-col items-center gap-1.5 sm:gap-2">
-                  <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]">
-                    <item.icon size={16} />
-                  </div>
-                  <div>
-                    <p className="text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100">{item.value}</p>
-                    <p className="text-[10px] sm:text-xs text-neutral-500">{item.label}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
+        {/* Activity & Task KPIs */}
+        <KPIStatsGrid
+          data={data}
+          items={[
+            {
+              id: 'total-tasks',
+              label: 'Total Tasks',
+              value: String(data?.tasks?.total || 0),
+              sub: 'All tasks',
+              icon: 'ClipboardCheck',
+              trend: null,
+              color: 'blue',
+            },
+            {
+              id: 'completed-tasks',
+              label: 'Completed Tasks',
+              value: String(data?.tasks?.completed || 0),
+              sub: 'Done',
+              icon: 'Award',
+              trend: null,
+              color: 'emerald',
+            },
+            {
+              id: 'overdue-tasks',
+              label: 'Overdue Tasks',
+              value: String(data?.tasks?.overdue || 0),
+              sub: 'Needs attention',
+              icon: 'AlertTriangle',
+              trend: null,
+              color: 'red',
+            },
+            {
+              id: 'active-learners',
+              label: 'Active Learners',
+              value: String(data?.training?.active_learners || 0),
+              sub: 'Currently learning',
+              icon: 'Users',
+              trend: null,
+              color: 'indigo',
+            },
+            {
+              id: 'completed-courses',
+              label: 'Completed Courses',
+              value: String(data?.training?.completed_courses || 0),
+              sub: 'Finished',
+              icon: 'BookOpen',
+              trend: null,
+              color: 'amber',
+            },
+            {
+              id: 'total-enrollments',
+              label: 'Total Enrollments',
+              value: String(data?.training?.total_enrollments || 0),
+              sub: 'All time',
+              icon: 'GraduationCap',
+              trend: null,
+              color: 'orange',
+            },
+            {
+              id: 'total-average-progress',
+              label: 'Total Average Progress',
+              value: `${data?.training?.avg_progress || 0}%`,
+              sub: 'Based on assigned clients & tasks',
+              icon: 'TrendingUp',
+              trend: null,
+              color: 'violet',
+            },
+          ]}
+        />
       </div>
 
       {/* Internal Tasks + Department Performance */}
@@ -478,10 +456,10 @@ const statCards = data ? [
                   <div className="flex h-8 w-8 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-[rgba(242,92,5,0.08)] text-[var(--color-primary)] shadow-sm transition-transform duration-300 group-hover:scale-110 dark:bg-[rgba(242,92,5,0.16)] dark:text-[var(--color-primary)]">
                     <Calendar size={14} />
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{event.title}</p>
-                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{formatted.date} · {formatted.time}</p>
-                  </div>
+                   <div className="min-w-0">
+                     <p className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 line-clamp-2 break-words">{event.title}</p>
+                      <p className="text-[11px] text-neutral-500 dark:text-neutral-400">{formatted.date} · {formatted.time}</p>
+                   </div>
                 </div>
               );
             }) : (
@@ -506,9 +484,9 @@ const statCards = data ? [
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">{msg.subject || 'No subject'}</span>
+                      <span className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 line-clamp-2 break-words">{msg.subject || 'No subject'}</span>
                     </div>
-                    <p className="text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400 truncate">{msg.last_message_body || ''}</p>
+                    <p className="text-[11px] sm:text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2 break-words">{msg.last_message_body || ''}</p>
                     <p className="text-[10px] text-neutral-400 dark:text-neutral-500 mt-0.5">{formatted.date} {formatted.time ? `· ${formatted.time}` : ''}</p>
                   </div>
                 </div>

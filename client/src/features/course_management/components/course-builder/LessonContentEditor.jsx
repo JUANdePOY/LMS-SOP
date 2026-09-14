@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTheme } from "@/hooks/useTheme";
 import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichTextEditor";
 
 const LESSON_TYPES = [
@@ -11,6 +12,7 @@ const LESSON_TYPES = [
 ];
 
 export default function LessonContentEditor({ lesson, onChange, onClose }) {
+  const { currentTheme } = useTheme();
   const [local, setLocal] = useState({
     title: lesson?.title || "",
     type: lesson?.type || "reading",
@@ -35,7 +37,7 @@ export default function LessonContentEditor({ lesson, onChange, onClose }) {
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">Lesson Content</span>
         {typeof onClose === "function" && (
-          <button type="button" onClick={onClose} className="text-xs text-neutral-500 hover:text-neutral-700">Close</button>
+          <button type="button" onClick={onClose} className="text-xs text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200">Close</button>
         )}
       </div>
       <input
@@ -57,6 +59,7 @@ export default function LessonContentEditor({ lesson, onChange, onClose }) {
             value={local.content}
             onChange={(html) => update({ content: html, url: html })}
             placeholder="Lesson text content..."
+            theme={currentTheme}
           />
         ) : (
           <textarea
@@ -74,6 +77,7 @@ export default function LessonContentEditor({ lesson, onChange, onClose }) {
             value={local.content}
             onChange={(html) => update({ content: html, url: html })}
             placeholder="Quiz instructions or link..."
+            theme={currentTheme}
           />
           <label className="flex items-center gap-2 text-xs text-neutral-700 dark:text-neutral-300">
             <input

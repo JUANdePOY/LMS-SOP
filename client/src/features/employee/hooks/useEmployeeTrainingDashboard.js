@@ -130,6 +130,10 @@ export default function useEmployeeTrainingDashboard() {
   const assessmentsPassed = Number(assessmentSummary.passed) || 0;
   const assessmentsTotal = Number(assessmentSummary.total) || 0;
 
+  const avgTaskProgress = myTasks.length > 0
+    ? Math.round(myTasks.reduce((sum, t) => sum + Number(t.progress_rate || 0), 0) / myTasks.length)
+    : 0;
+
   const sopHighlights = assignedItems.slice(0, 4).map((sop) => {
     const status = sop.acknowledged ? 'Completed' : 'In Progress';
     return {
@@ -160,6 +164,7 @@ export default function useEmployeeTrainingDashboard() {
       assessmentsPassed: String(assessmentsPassed),
       assessmentsTotal,
       certificatesEarned: String(certificatesEarned),
+      avgTaskProgress,
     },
     announcements: announcements.slice(0, 4),
     events: formattedEvents,

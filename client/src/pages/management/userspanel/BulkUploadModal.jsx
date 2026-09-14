@@ -2,13 +2,15 @@ import { useState, useRef, useEffect } from "react";
 import { X, Upload, AlertCircle, CheckCircle, Loader, FileText, ChevronRight, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
-import { bulkUploadUsers } from "@/services/api";
+import { bulkUploadUsers, getDepartments, getBusinesses } from "@/services/api";
 
 const USER_COLUMNS = [
   'Full Name', 'Employee ID', 'Department', 'Business', 'Position/Job Title',
   'Email Address', 'Contact Number', 'Employment Status',
-  'Date Hired', 'Birthdate', 'Address'
+  'Date Hired', 'Birthdate', 'Address', 'Role'
 ];
+
+const VALID_ROLES = ['employee', 'department_head', 'admin', 'super_admin'];
 
 export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
   const fileInputRef = useRef(null);
@@ -19,7 +21,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
   const [successMessage, setSuccessMessage] = useState("");
   const [previewData, setPreviewData] = useState([]);
   const [defaultPassword, setDefaultPassword] = useState('');
-  const [defaultRole, setDefaultRole] = useState('employee');
+  const [sampleLoading, setSampleLoading] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -29,8 +31,8 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
       setSuccessMessage("");
       setPreviewData([]);
       setDefaultPassword('');
-      setDefaultRole('employee');
       setLoading(false);
+      setSampleLoading(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -98,6 +100,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
           const parsed = dataRows.map((row, idx) => {
             const fullName = getVal(row, 'Full Name', 'Fullname', 'Name');
             const email = getVal(row, 'Email Address', 'Email');
+            const role = getVal(row, 'Role');
             const employeeId = getVal(row, 'Employee ID', 'EmployeeID');
             const department = getVal(row, 'Department');
             const business = getVal(row, 'Business', 'Business Name', 'business_name');
@@ -107,21 +110,23 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
             const dateHired = getVal(row, 'Date Hired', 'DateHired');
             const birthdate = getVal(row, 'Birthdate', 'Birth Date');
             const address = getVal(row, 'Address');
+            const validRole = role && VALID_ROLES.includes(role.toLowerCase());
 
             return {
               rowIndex: idx + headerRowIndex + 2,
               fullName,
-               email,
-               employeeId,
-               department,
-               business,
-               positionTitle,
+              email,
+              role: role || '—',
+              employeeId,
+              department,
+              business,
+              positionTitle,
               contactNumber,
               employmentStatus,
               dateHired,
               birthdate,
               address,
-              valid: !!fullName && !!email,
+              valid: !!fullName && !!email && validRole,
             };
           }).filter(p => p.fullName || p.email);
 
@@ -162,6 +167,41 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
     fileInputRef.current?.click();
   };
 
+  const downloadSampleExcel = async () => {
+    setSampleLoading(true);
+    try {
+      const [deptRes, bizRes] = await Promise.all([
+        getDepartments({ status: 'active', limit: 200 }),
+        getBusinesses({ status: 'active', limit: 200 }),
+      ]);
+
+      const departments = (deptRes.data?.data?.rows || []).map(d => d.name);
+      const businesses = (bizRes.data?.data?.rows || []).map(b => b.business_name);
+
+      const sampleDept = departments[0] || '';
+      const sampleBiz = businesses[0] || '';
+      const sampleDeptHeadDept = departments[0] || departments[1] || '';
+
+      const headers = USER_COLUMNS;
+      const sampleRows = [
+        [sampleDept ? 'Sample Employee' : 'Jane Cooper', 'EMP-1001', sampleDept, sampleBiz, 'Software Engineer', 'sample.employee@example.com', '09171234567', 'Regular', '2024-01-15', '1992-05-20', 'Quezon City', 'employee'],
+        [sampleDeptHeadDept ? 'Sample Dept Head' : 'John Reyes', 'EMP-1002', sampleDeptHeadDept, sampleBiz, 'Tech Lead', 'sample.depthead@example.com', '09181234567', 'Regular', '2023-08-01', '1990-11-03', 'Makati City', 'department_head'],
+        [sampleBiz ? 'Sample Admin' : 'Maria Santos', 'EMP-1003', '', sampleBiz, 'HR Manager', 'sample.admin@example.com', '09191234567', 'Regular', '2022-04-10', '1988-02-14', 'Taguig City', 'admin'],
+        ['Super Admin', 'SUP-0001', '', '', 'System Administrator', 'super.admin@example.com', '-', 'Regular', '2021-01-01', '1985-07-07', '', 'super_admin'],
+      ];
+
+      const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Users');
+      XLSX.writeFile(wb, 'user_bulk_upload_sample.xlsx');
+    } catch (err) {
+      console.error('[BulkUpload] Failed to fetch sample data:', err);
+      setError('Failed to load departments and businesses for sample file. Please check your connection.');
+    } finally {
+      setSampleLoading(false);
+    }
+  };
+
   const handleUpload = async () => {
     if (!file) {
       setError("Please select a file first");
@@ -181,9 +221,10 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("password", defaultPassword);
-      formData.append("role", defaultRole);
 
+      console.log('[BulkUpload] Uploading file:', file.name, 'size:', file.size);
       const response = await bulkUploadUsers(formData);
+      console.log('[BulkUpload] Response:', response.data);
 
       if (response.data.status === "success") {
         setSuccessMessage(
@@ -203,6 +244,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
         setStage("preview");
       }
     } catch (err) {
+      console.error('[BulkUpload] Upload error:', err);
       setError(err.response?.data?.message || err.message || "Upload failed. Please try again.");
       setStage("preview");
     } finally {
@@ -217,7 +259,6 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
     setSuccessMessage("");
     setPreviewData([]);
     setDefaultPassword('');
-    setDefaultRole('employee');
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -262,8 +303,8 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
         <div className="px-6 py-4 flex flex-col gap-4 max-h-[70vh] overflow-y-auto">
           {stage === "upload" && (
             <>
-              {/* Default Settings */}
-              <div className="grid grid-cols-2 gap-4">
+               {/* Default Settings */}
+               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
                     Default Password <span className="text-red-500">*</span>
@@ -278,32 +319,45 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                 </div>
                 <div className="space-y-2">
                   <label className="block text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
-                    Default Role <span className="text-red-500">*</span>
+                    File Column Notes
                   </label>
-                  <select
-                    value={defaultRole}
-                    onChange={(e) => setDefaultRole(e.target.value)}
-                    className="w-full rounded-lg border px-2.5 py-1.5 text-sm border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200 outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-400"
-                  >
-                    <option value="employee">Employee</option>
-                    <option value="admin">Admin</option>
-                    <option value="department_head">Department Head</option>
-                    <option value="super_admin">Super Admin</option>
-                  </select>
+                  <p className="text-[11px] text-neutral-600 dark:text-neutral-400">
+                  Provide a <span className="font-semibold">Role</span> column in your Excel file for each user. Valid values: <span className="font-mono text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">employee</span>, <span className="font-mono text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">department_head</span>, <span className="font-mono text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">admin</span>, <span className="font-mono text-[10px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">super_admin</span>. <span className="text-red-500 font-medium">super_admin:</span> leave Department and Business empty. <span className="text-red-500 font-medium">admin:</span> leave Department empty, Business required. <span className="text-red-500 font-medium">department_head:</span> Department and Business required.
+                  </p>
                 </div>
               </div>
 
-              {/* Instructions */}
-              <div className="rounded-lg bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 p-4">
-                <h3 className="text-[11px] font-semibold text-neutral-900 dark:text-neutral-300 mb-2 uppercase tracking-wide">
-                  Expected Columns
-                </h3>
+               {/* Instructions */}
+               <div className="rounded-lg bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200 dark:border-neutral-700 p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[11px] font-semibold text-neutral-900 dark:text-neutral-300 uppercase tracking-wide">
+                    Expected Columns
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={downloadSampleExcel}
+                    disabled={sampleLoading}
+                    className="inline-flex items-center gap-1 rounded-md border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-2.5 py-1 text-[11px] font-medium text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50"
+                  >
+                    {sampleLoading ? (
+                      <>
+                        <Loader className="h-3.5 w-3.5 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-3.5 w-3.5" />
+                        Download Sample Excel
+                      </>
+                    )}
+                  </button>
+                </div>
                 <p className="text-[11px] text-neutral-600 dark:text-neutral-400 mb-2">
-                  The Excel file should contain the following columns. Column headers are case-insensitive.
+                  The Excel file should contain the following columns. Column headers are case-insensitive. <span className="text-red-500 font-medium">Role is required per row.</span>
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {USER_COLUMNS.map((col) => (
-                    <span key={col} className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/20">
+                    <span key={col} className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${col === 'Role' ? 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-300 border border-red-200 dark:border-red-500/20' : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-500/20'}`}>
                       {col}
                     </span>
                   ))}
@@ -369,7 +423,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                   Preview ({previewData.length} shown)
                 </p>
                 <p className="text-[10px] text-blue-700 dark:text-blue-400">
-                  Default Role: <span className="font-semibold">{defaultRole}</span>
+                  Each user role is read from the <span className="font-semibold">Role</span> column in the Excel file.
                 </p>
               </div>
 
@@ -393,8 +447,8 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
                         <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.email}</td>
                         <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.employeeId || '—'}</td>
                         <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.department || '—'}</td>
-                        <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.business || '—'}</td>
-                        <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{defaultRole}</td>
+                       <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.business || '—'}</td>
+                        <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap">{item.role}</td>
                         <td className="px-3 py-2 text-center">
                           {item.valid ? (
                             <span className="text-emerald-600 dark:text-emerald-400">&#10003;</span>

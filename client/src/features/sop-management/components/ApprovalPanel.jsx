@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { SOP_STATUSES } from '@/features/sop-management/constants/sopConstants';
 
-function ApprovalPanel({ sop, onApprove, onReject, loading = false }) {
+function ApprovalPanel({ sop, onApprove, onReject, onSubmitForReview, onPublish, onArchive, onRestore, loading = false }) {
   const [actionLoading, setActionLoading] = useState(null);
   const [actionError, setActionError] = useState(null);
   const { user } = useAuth();
@@ -12,7 +13,15 @@ function ApprovalPanel({ sop, onApprove, onReject, loading = false }) {
     setActionLoading('approve');
     setActionError(null);
     try {
-      await onApprove({ sopId: sop.id, comments: '' });
+      if (sop?.status === SOP_STATUSES.DRAFT && onSubmitForReview) {
+        await onSubmitForReview({ sopId: sop.id, comments: '' });
+      } else if (sop?.status === SOP_STATUSES.APPROVED && onPublish) {
+        await onPublish({ sopId: sop.id, comments: '' });
+      } else if (sop?.status === SOP_STATUSES.PUBLISHED && onArchive) {
+        await onArchive({ sopId: sop.id, comments: '' });
+      } else if (onApprove) {
+        await onApprove({ sopId: sop.id, comments: '' });
+      }
     } catch (err) {
       const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Approve failed';
       setActionError(message);
@@ -28,6 +37,19 @@ function ApprovalPanel({ sop, onApprove, onReject, loading = false }) {
       await onReject({ sopId: sop.id, comments: 'Rejected by admin' });
     } catch (err) {
       const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Reject failed';
+      setActionError(message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRestore = async () => {
+    setActionLoading('restore');
+    setActionError(null);
+    try {
+      await onRestore({ sopId: sop.id });
+    } catch (err) {
+      const message = err?.response?.data?.error?.message || err?.response?.data?.message || err?.message || 'Restore failed';
       setActionError(message);
     } finally {
       setActionLoading(null);
@@ -64,20 +86,36 @@ function ApprovalPanel({ sop, onApprove, onReject, loading = false }) {
         </div>
       )}
       <div className="space-y-2">
-        <button
-          onClick={handleApprove}
-          disabled={actionLoading === 'approve'}
-          className="w-full px-3 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {actionLoading === 'approve' ? 'Approving...' : 'Approve SOP'}
-        </button>
-        <button
-          onClick={handleReject}
-          disabled={actionLoading === 'reject'}
-          className="w-full px-3 py-2 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {actionLoading === 'reject' ? 'Rejecting...' : 'Reject SOP'}
-        </button>
+        {sop?.status === SOP_STATUSES.ARCHIVED ? (
+          <button
+            onClick={handleRestore}
+            disabled={actionLoading === 'restore'}
+            className="w-full px-3 py-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {actionLoading === 'restore' ? 'Restoring...' : 'Restore to Draft'}
+          </button>
+        ) : (
+          <>
+            <button
+              onClick={handleApprove}
+              disabled={actionLoading === 'approve'}
+              className="w-full px-3 py-2 bg-green-600 text-white rounded text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {actionLoading === 'approve'
+                ? (sop?.status === SOP_STATUSES.DRAFT ? 'Submitting...' : sop?.status === SOP_STATUSES.APPROVED ? 'Publishing...' : sop?.status === SOP_STATUSES.PUBLISHED ? 'Archiving...' : 'Approving...')
+                : (sop?.status === SOP_STATUSES.DRAFT ? 'Submit for Review' : sop?.status === SOP_STATUSES.APPROVED ? 'Publish SOP' : sop?.status === SOP_STATUSES.PUBLISHED ? 'Archive SOP' : 'Approve SOP')}
+            </button>
+            {sop?.status !== SOP_STATUSES.APPROVED && sop?.status !== SOP_STATUSES.PUBLISHED && (
+              <button
+                onClick={handleReject}
+                disabled={actionLoading === 'reject'}
+                className="w-full px-3 py-2 bg-red-600 text-white rounded text-sm font-medium hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {actionLoading === 'reject' ? 'Rejecting...' : 'Reject SOP'}
+              </button>
+            )}
+          </>
+        )}
       </div>
     </div>
   );

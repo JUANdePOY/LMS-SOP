@@ -400,9 +400,9 @@ export default function LessonEditor({
 
   return (
     <div className="flex h-full flex-col p-4">
-      <div className="flex flex-1 min-h-0 flex-col rounded-2xl border border-neutral-200 bg-white overflow-hidden">
+      <div className="flex flex-1 min-h-0 flex-col rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden">
         {/* Header (inside the unified card) */}
-        <div className="bg-white border-b border-neutral-200 px-4 py-3">
+        <div className="bg-white dark:bg-neutral-900 border-b border-neutral-200 dark:border-neutral-700 px-4 py-3">
           <div className="max-w-4xl mx-auto">
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
@@ -561,9 +561,9 @@ export default function LessonEditor({
                               Select SOP
                             </label>
                             {loadingSops ? (
-                              <div className="flex items-center gap-2 border border-neutral-200 bg-white rounded-md px-3 py-2">
-                                <Loader2 size={16} className="animate-spin text-neutral-500" />
-                                <span className="text-sm text-neutral-500">Loading...</span>
+                              <div className="flex items-center gap-2 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 rounded-md px-3 py-2">
+                                <Loader2 size={16} className="animate-spin text-neutral-500 dark:text-neutral-400" />
+                                <span className="text-sm text-neutral-500 dark:text-neutral-400">Loading...</span>
                               </div>
                             ) : (
                               <SopPicker
@@ -629,7 +629,7 @@ export default function LessonEditor({
                               Certificate Template
                             </label>
                             {loadingCertificates ? (
-                              <div className="flex items-center gap-2 border border-neutral-200 bg-white rounded-md px-3 py-2">
+                              <div className="flex items-center gap-2 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 rounded-md px-3 py-2">
                                 <Loader2 size={16} className="animate-spin text-neutral-500" />
                                 <span className="text-sm text-neutral-500">Loading templates...</span>
                               </div>
@@ -709,7 +709,7 @@ export default function LessonEditor({
                               className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 py-8 text-center transition-colors ${
                                 documentFile
                                   ? "border-neutral-200 bg-neutral-50 hover:border-neutral-300"
-                                  : "border-neutral-300 bg-white hover:border-[var(--color-primary)] hover:bg-[rgba(242,92,5,0.08)]/40"
+                                   : "border-neutral-300 bg-white dark:bg-neutral-800 hover:border-[var(--color-primary)] hover:bg-[rgba(242,92,5,0.08)]/40 dark:hover:bg-blue-900/20"
                               }`}
                             >
                               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
@@ -763,7 +763,7 @@ export default function LessonEditor({
                                 emitPatch({ linkTitle: e.target.value });
                               }}
                               placeholder="e.g. Safety Manual v3"
-                              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
+                               className="w-full rounded-md border border-neutral-200 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                             />
                             <p className="mt-1.5 text-xs text-neutral-500">
                               Shown in the course outline when set; otherwise the file name is used.
@@ -794,7 +794,7 @@ export default function LessonEditor({
                               }}
                               placeholder="https://youtube.com/watch?v=..."
                               aria-invalid={!!url && !parseVideoUrl(url)}
-                              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
+                               className="w-full rounded-md border border-neutral-200 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                             />
                             {url && parseVideoUrl(url) && (
                               <p className="mt-1.5 text-xs text-neutral-500">
@@ -822,7 +822,7 @@ export default function LessonEditor({
                                     emitPatch({ bunnyLibraryId: e.target.value, url: e.target.value ? "" : url });
                                   }}
                                   placeholder="e.g. 123456"
-                                  className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
+                                  className="w-full rounded-md border border-neutral-200 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                                 />
                               </div>
                               <div>
@@ -838,7 +838,7 @@ export default function LessonEditor({
                                     emitPatch({ bunnyVideoId: e.target.value, url: e.target.value ? "" : url });
                                   }}
                                   placeholder="e.g. abcd1234-5678-90ef"
-                                  className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
+                                  className="w-full rounded-md border border-neutral-200 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                                 />
                               </div>
                             </div>
@@ -907,7 +907,7 @@ export default function LessonEditor({
                                   }}
                                   placeholder="https://example.com"
                                   aria-invalid={!!url.trim() && !isValidUrl(url)}
-                                  className={`w-full rounded-md border bg-white pl-9 pr-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-1 transition-colors ${
+                                  className={`w-full rounded-md border bg-white dark:bg-neutral-800 pl-9 pr-3 py-2 text-sm text-neutral-900 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:ring-1 transition-colors ${
                                     url.trim() && !isValidUrl(url)
                                       ? "border-red-300 focus:border-red-600 focus:ring-red-600"
                                       : "border-neutral-200 focus:border-[var(--color-primary)] focus:ring-blue-600"
@@ -922,7 +922,7 @@ export default function LessonEditor({
                                 title="Open link in a new tab"
                                 className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
                                   isValidUrl(url)
-                                    ? "border-neutral-200 bg-white text-neutral-700 hover:bg-neutral-100"
+                                    ? "border-neutral-200 bg-white dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700"
                                     : "cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-300"
                                 }`}
                               >
@@ -946,7 +946,7 @@ export default function LessonEditor({
                                 emitPatch({ linkTitle: e.target.value });
                               }}
                               placeholder="e.g. Company Handbook"
-                              className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
+                               className="w-full rounded-md border border-neutral-200 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                             />
                             <p className="mt-1.5 text-xs text-neutral-500">Shown in the course outline when set; otherwise the link host is used.</p>
                           </div>
@@ -989,7 +989,7 @@ export default function LessonEditor({
                           </button>
                         </div>
                         {loadingQuizzes ? (
-                          <div className="flex items-center gap-2 border border-neutral-200 bg-white rounded-md px-3 py-2">
+                           <div className="flex items-center gap-2 border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 rounded-md px-3 py-2">
                             <Loader2 size={16} className="animate-spin text-neutral-500" />
                             <span className="text-sm text-neutral-500">Loading...</span>
                           </div>
@@ -1002,7 +1002,7 @@ export default function LessonEditor({
                             id="quiz-select"
                             value={selectedQuizId || ""}
                             onChange={(e) => handleQuizChange(e.target.value ? Number(e.target.value) : null)}
-                            className="w-full rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
+                             className="w-full rounded-md border border-neutral-200 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-200 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                           >
                             <option value="">Select a quiz...</option>
                             {quizzes.map((q) => (
@@ -1097,7 +1097,7 @@ export default function LessonEditor({
                                 placeholder="e.g. 70"
                                 min="0"
                                 max="100"
-                                className="w-full rounded-md border border-neutral-200 bg-white pl-3 pr-8 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
+                                 className="w-full rounded-md border border-neutral-200 bg-white dark:bg-neutral-800 pl-3 pr-8 py-2 text-sm text-neutral-900 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                               />
                               <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-neutral-500">%</span>
                             </div>
@@ -1162,7 +1162,7 @@ export default function LessonEditor({
                              }}
                              placeholder="Custom minutes"
                              min="0"
-                             className="w-full rounded-md border border-neutral-200 bg-white pl-3 pr-10 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
+                              className="w-full rounded-md border border-neutral-200 bg-white dark:bg-neutral-800 pl-3 pr-10 py-2 text-sm text-neutral-900 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
                            />
                            <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-xs text-neutral-500">min</span>
                          </div>
@@ -1198,7 +1198,7 @@ export default function LessonEditor({
       </div>
 
       {/* Footer with navigation + delete */}
-      <footer className="border-t border-neutral-200 bg-white px-5 py-3">
+      <footer className="border-t border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-5 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <button
             type="button"
