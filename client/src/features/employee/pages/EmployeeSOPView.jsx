@@ -13,8 +13,11 @@ import {
   BookOpen,
   CheckCircle2,
   AlertCircle,
+  ExternalLink,
+  Download,
 } from "lucide-react";
 import { StaggerList, MotionItem } from "@/shared/motion";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 const STATUS_STYLES = {
   Draft: "bg-gray-100 text-gray-700 dark:bg-neutral-700 dark:text-neutral-300",
@@ -88,7 +91,7 @@ export default function EmployeeSOPView() {
             {error || "SOP not found"}
           </p>
           <Link
-            to="/my-learning"
+            to="/my-learning/sops"
             className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm"
           >
             <ArrowLeft size={16} />
@@ -105,7 +108,7 @@ export default function EmployeeSOPView() {
     <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <Link
-          to="/my-learning"
+          to="/my-learning/sops"
           className="inline-flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 mb-4 transition-colors"
         >
           <ArrowLeft size={16} />
@@ -214,21 +217,49 @@ export default function EmployeeSOPView() {
                 <p className="text-xs text-neutral-400 dark:text-neutral-500 mt-1">This SOP has no published modules.</p>
               </div>
             ) : (
-              <StaggerList className="space-y-4">
-                {modules.map((mod, idx) => (
-                  <MotionItem key={mod.id} className="rounded-xl border border-neutral-200 dark:border-neutral-700 p-5">
-                    <div className="flex items-center gap-2 mb-3">
-                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-bold">
-                        {idx + 1}
-                      </span>
-                      <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">{mod.title}</h3>
-                    </div>
-                     {mod.content && (
-                        <div className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed ml-8" dangerouslySetInnerHTML={{ __html: mod.content }} />
-                      )}
-                  </MotionItem>
-                ))}
-              </StaggerList>
+               <StaggerList className="space-y-4">
+                 {modules.map((mod, idx) => (
+                   <MotionItem key={mod.id} className="rounded-xl border border-neutral-200 dark:border-neutral-700 p-5">
+                     <div className="flex items-center gap-2 mb-3">
+                       <span className="flex items-center justify-center w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-bold">
+                         {idx + 1}
+                       </span>
+                       <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">{mod.title}</h3>
+                     </div>
+                      {mod.content && (
+                         <div className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed ml-8" dangerouslySetInnerHTML={{ __html: mod.content }} />
+                       )}
+                       {mod.attachments?.length > 0 && (
+                         <div className="mt-3 ml-8 space-y-2">
+                           <p className="text-[11px] font-medium text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Attachments</p>
+                           <div className="space-y-2">
+                              {mod.attachments.map((att) => {
+                                const isLink = !!att.link_url;
+                                const fileUrl = isLink ? att.link_url : resolveFileUrl(att.file_name, { download: true });
+                                const label = att.original_name || att.file_name || (isLink ? 'Link' : 'File');
+                                return (
+                                  <a
+                                    key={att.id}
+                                    href={fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    download={!isLink ? true : undefined}
+                                    className="flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-3 py-2 text-xs font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
+                                  >
+                                    {isLink ? <ExternalLink size={14} className="text-blue-600 dark:text-blue-400" /> : <Download size={14} className="text-amber-600 dark:text-amber-400" />}
+                                    <span className="flex-1 truncate">{label}</span>
+                                    {!isLink && att.file_extension && (
+                                      <span className="text-[10px] text-neutral-400 dark:text-neutral-500 uppercase">{att.file_extension}</span>
+                                    )}
+                                  </a>
+                                );
+                              })}
+                           </div>
+                         </div>
+                       )}
+                   </MotionItem>
+                 ))}
+               </StaggerList>
             )}
           </div>
         </div>

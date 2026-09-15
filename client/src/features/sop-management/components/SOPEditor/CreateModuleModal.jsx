@@ -35,7 +35,8 @@ function CreateModuleModal({ open, onClose, onSave, loading = false }) {
           </button>
         </div>
         <form onSubmit={handleSubmit}>
-          <div className="p-4 sm:p-6">
+          <div className="p-4 sm:p-6 space-y-4">
+          <div>
             <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-2">
               Module Title <span className="text-red-500">*</span>
             </label>
@@ -49,6 +50,7 @@ function CreateModuleModal({ open, onClose, onSave, loading = false }) {
               autoFocus
               className="w-full border border-neutral-200 dark:border-neutral-700 rounded-lg px-3 py-2 text-sm bg-white dark:bg-neutral-800/50 text-neutral-800 dark:text-neutral-200 placeholder:text-neutral-500 dark:placeholder:text-neutral-500 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 disabled:opacity-50"
             />
+          </div>
           </div>
           <div className="flex justify-end gap-2 p-4 sm:p-6 border-t border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800/50 rounded-b-xl">
             <button

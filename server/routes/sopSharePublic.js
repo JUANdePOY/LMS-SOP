@@ -4,6 +4,7 @@ const sopShareService = require('../services/sopShareService');
 const sopModel = require('../models/sopModel');
 const sopModuleService = require('../services/sopModuleService');
 const sopVersionModel = require('../models/sopVersionModel');
+const sopModuleAttachmentModel = require('../models/sopModuleAttachmentModel');
 
 const router = express.Router();
 
@@ -26,6 +27,11 @@ router.get('/:token/modules', async (req, res) => {
       : await sopVersionModel.getCurrentVersionId(share.sop_id);
 
     const result = await sopModuleService.listModules(share.sop_id, versionId);
+    
+    for (const module of result) {
+      module.attachments = await sopModuleAttachmentModel.listByModule(module.id, versionId);
+    }
+    
     res.json({ success: true, data: result });
   } catch (error) {
     const code = error.code || 'INTERNAL_ERROR';

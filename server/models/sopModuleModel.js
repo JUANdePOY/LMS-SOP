@@ -19,6 +19,7 @@ async function getModulesColumns() {
       hasUpdatedBy: cols.has('updated_by'),
       hasSortOrder: cols.has('sort_order'),
       hasVersionId: cols.has('sop_version_id'),
+      hasTimeLimit: cols.has('time_limit'),
     };
   }
   return modulesColumns;
@@ -56,11 +57,9 @@ async function listModules(sopId, versionId = null) {
       // Version-scoped query: only show modules for this version
       versionClause = ' AND m.sop_version_id = ?';
       params.push(versionId);
-    } else {
-      // No version specified: show legacy modules (NULL version) — these are modules
-      // created before version scoping was introduced
-      versionClause = ' AND m.sop_version_id IS NULL';
     }
+    // When no version is specified, return all modules for this SOP
+    // regardless of version_id, so list views still work for versioned SOPs.
   }
 
   const [rows] = await db.query(`
@@ -93,7 +92,7 @@ async function getModuleByIdIncludingDeleted(moduleId) {
 }
 
 async function createModule(data) {
-  const { sop_id, title, content, sort_order, created_by, sop_version_id } = data;
+  const { sop_id, title, content, sort_order, created_by, sop_version_id, time_limit } = data;
   const cols = await getModulesColumns();
 
   const insertCols = ['sop_id', 'title', 'content', 'sort_order', 'created_by'];
@@ -110,8 +109,13 @@ async function createModule(data) {
     insertVals.push(created_by || null);
   }
 
+  if (cols.hasTimeLimit && time_limit !== undefined) {
+    insertCols.push('time_limit');
+    insertVals.push(time_limit ? Number(time_limit) : null);
+  }
+
   const [result] = await db.query(
-    `INSERT INTO sop_modules (${insertCols.join(', ')}) VALUES (${insertCols.map(() => '?').join(', ')})`,
+    `INSERT INTO sop_modules (${insertCols.join(', ')}) VALUES (${insertVals.map(() => '?').join(', ')})`,
     insertVals
   );
   return result.insertId;
@@ -126,6 +130,7 @@ async function updateModule(moduleId, data) {
   if (data.content !== undefined) { sets.push('content = ?'); params.push(data.content); }
   if (data.sort_order !== undefined) { sets.push('sort_order = ?'); params.push(data.sort_order); }
   if (data.updated_by !== undefined && cols.hasUpdatedBy) { sets.push('updated_by = ?'); params.push(data.updated_by); }
+  if (cols.hasTimeLimit && data.time_limit !== undefined) { sets.push('time_limit = ?'); params.push(data.time_limit ? Number(data.time_limit) : null); }
 
   if (!sets.length) return 0;
 

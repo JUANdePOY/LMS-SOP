@@ -13,13 +13,16 @@ const API_BASE = (import.meta.env.VITE_API_URL || "/api").replace(/\/api\/?$/, "
  * Pass `authenticated=false` for public signed routes (e.g. SOP/task
  * attachments that already carry their own token).
  */
-export function resolveFileUrl(storedUrl, { authenticated = true } = {}) {
+export function resolveFileUrl(storedUrl, { authenticated = true, download = false } = {}) {
   if (!storedUrl) return null;
   if (/^https?:\/\//i.test(storedUrl)) return storedUrl;
   if (storedUrl.startsWith("/uploads/")) {
     if (!authenticated) return `${API_BASE}${storedUrl}`;
     const token = encodeURIComponent(session.getCurrentToken() || "");
-    return `${API_BASE}/api/files/stream?path=${encodeURIComponent(storedUrl)}&token=${token}`;
+    const params = new URLSearchParams({ path: storedUrl, token });
+    if (download) params.set("download", "1");
+    if (download) params.set("fileName", session.getCurrentUser()?.name || "download");
+    return `${API_BASE}/api/files/stream?${params.toString()}`;
   }
   return storedUrl;
 }

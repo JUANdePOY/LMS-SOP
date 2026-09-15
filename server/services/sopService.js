@@ -114,7 +114,7 @@ async function enforceSopWriteScope(sopOrDeptId, user) {
 }
 
 async function createSop(data, actorId) {
-  const { title, description, department_id, category_id, status, restriction_type, is_default_onboarding } = data;
+  const { title, description, department_id, category_id, status, restriction_type, is_default_onboarding, min_time_limit } = data;
   const code = data.code || generateSopCode(title);
 
   const existing = await sopModel.findByCode(code);
@@ -140,6 +140,7 @@ async function createSop(data, actorId) {
     version: '1.0',
     restriction_type,
     is_default_onboarding: is_default_onboarding ? 1 : 0,
+    min_time_limit: min_time_limit || null,
   });
 
   await sopVersionModel.createVersion({
@@ -223,7 +224,7 @@ async function updateSop(id, data, actorId) {
   }
 
   const updates = {};
-    ['title', 'description', 'department_id', 'category_id', 'status', 'restriction_type', 'is_default_onboarding'].forEach((field) => {
+    ['title', 'description', 'department_id', 'category_id', 'status', 'restriction_type', 'is_default_onboarding', 'min_time_limit'].forEach((field) => {
     if (data[field] !== undefined) updates[field] = data[field];
   });
 

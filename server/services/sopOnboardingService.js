@@ -33,13 +33,12 @@ async function getDefaultOnboardingSops(actorId) {
   return rows;
 }
 
-async function assignOnboardingSopsToUser(userId, actorId) {
-  const defaultSops = await getDefaultOnboardingSops(actorId);
-  if (defaultSops.length === 0) return { assigned: 0 };
+async function assignOnboardingSopsToUser(userId, versionIds, actorId) {
+  if (!versionIds || versionIds.length === 0) return { assigned: 0 };
 
-  const values = defaultSops.map(sop => [sop.version_id, userId, 'Pending']);
+  const values = versionIds.map(versionId => [versionId, userId, 'Pending']);
   const [result] = await db.query(
-    `INSERT INTO sop_acknowledgements (sop_version_id, user_id, status)
+    `INSERT IGNORE INTO sop_acknowledgements (sop_version_id, user_id, status)
      VALUES ?`,
     [values]
   );
@@ -55,6 +54,14 @@ async function assignOnboardingSopsToUser(userId, actorId) {
   }
 
   return { assigned: result.affectedRows };
+}
+
+async function assignDefaultOnboardingSopsToUser(userId, actorId) {
+  const defaultSops = await getDefaultOnboardingSops(actorId);
+  if (defaultSops.length === 0) return { assigned: 0 };
+
+  const versionIds = defaultSops.map(sop => sop.version_id);
+  return assignOnboardingSopsToUser(userId, versionIds, actorId);
 }
 
 async function getPendingOnboardingSops(userId, actorId) {
@@ -84,19 +91,30 @@ async function getPendingOnboardingSops(userId, actorId) {
            a.status,
            a.acknowledged_at,
            a.created_at AS assigned_at,
+           s.min_time_limit,
            m.id AS module_id,
            m.title AS module_title,
            m.content AS module_content,
-           m.sort_order AS module_sort_order
-    FROM sop_acknowledgements a
-    JOIN sop_versions v ON v.id = a.sop_version_id
-    JOIN sops s ON s.id = v.sop_id
-    LEFT JOIN sop_modules m ON m.sop_id = s.id AND m.sop_version_id = v.id AND (m.deleted_at IS NULL OR m.is_deleted = 0)
-    WHERE a.user_id = ?
-      AND a.status = 'Pending'
-      AND s.deleted_at IS NULL
-      ${businessFilter}
-    ORDER BY a.created_at ASC, m.sort_order ASC, m.id ASC
+           m.sort_order AS module_sort_order,
+           m.time_limit AS module_time_limit,
+           att.id AS attachment_id,
+           att.file_name AS attachment_file_name,
+           att.original_name AS attachment_original_name,
+           att.mime_type AS attachment_mime_type,
+           att.file_size AS attachment_file_size,
+           att.file_extension AS attachment_file_extension,
+           att.link_url AS attachment_link_url,
+           att.download_count AS attachment_download_count
+     FROM sop_acknowledgements a
+     JOIN sop_versions v ON v.id = a.sop_version_id
+     JOIN sops s ON s.id = v.sop_id
+     LEFT JOIN sop_modules m ON m.sop_id = s.id AND m.sop_version_id = v.id AND (m.deleted_at IS NULL OR m.is_deleted = 0)
+     LEFT JOIN sop_module_attachments att ON att.module_id = m.id AND att.is_deleted = FALSE
+     WHERE a.user_id = ?
+       AND a.status = 'Pending'
+       AND s.deleted_at IS NULL
+       ${businessFilter}
+     ORDER BY a.created_at ASC, m.sort_order ASC, m.id ASC, att.created_at ASC
   `, params);
 
   // Group modules by SOP
@@ -114,16 +132,32 @@ async function getPendingOnboardingSops(userId, actorId) {
         status: row.status,
         acknowledged_at: row.acknowledged_at,
         assigned_at: row.assigned_at,
+        min_time_limit: row.min_time_limit || null,
         modules: [],
       });
     }
     if (row.module_id) {
-      sopsMap.get(row.acknowledgement_id).modules.push({
+      const moduleEntry = {
         id: row.module_id,
         title: row.module_title,
         content: row.module_content,
         sort_order: row.module_sort_order,
-      });
+        time_limit: row.module_time_limit || null,
+        attachments: [],
+      };
+      if (row.attachment_id) {
+        moduleEntry.attachments.push({
+          id: row.attachment_id,
+          file_name: row.attachment_file_name,
+          original_name: row.attachment_original_name,
+          mime_type: row.attachment_mime_type,
+          file_size: row.attachment_file_size,
+          file_extension: row.attachment_file_extension,
+          link_url: row.attachment_link_url,
+          download_count: row.attachment_download_count,
+        });
+      }
+      sopsMap.get(row.acknowledgement_id).modules.push(moduleEntry);
     }
   }
 
@@ -146,8 +180,11 @@ async function isOnboardingComplete(userId) {
 
 async function acknowledgeOnboardingSop(ackId, userId) {
   const [rows] = await db.query(
-    `SELECT id, status FROM sop_acknowledgements
-     WHERE id = ? AND user_id = ? AND status = 'Pending'
+    `SELECT a.id, a.status, v.id AS version_id, s.min_time_limit
+     FROM sop_acknowledgements a
+     JOIN sop_versions v ON v.id = a.sop_version_id
+     JOIN sops s ON s.id = v.sop_id
+     WHERE a.id = ? AND a.user_id = ? AND a.status = 'Pending'
      FOR UPDATE`,
     [ackId, userId]
   );
@@ -158,12 +195,43 @@ async function acknowledgeOnboardingSop(ackId, userId) {
     throw err;
   }
 
+  const acknowledgement = rows[0];
+  const minTime = acknowledgement.min_time_limit || null;
+
+  if (minTime && minTime > 0) {
+    const [sessionRows] = await db.query(
+      `SELECT id, total_seconds, min_time_met
+       FROM sop_onboarding_sessions
+       WHERE user_id = ? AND sop_version_id = ? AND completed_at IS NULL
+       ORDER BY id DESC LIMIT 1`,
+      [userId, acknowledgement.version_id]
+    );
+
+    const session = sessionRows[0] || null;
+    const met = session && (session.min_time_met === 1 || session.total_seconds >= minTime);
+
+    if (!met) {
+      const err = new Error(`Minimum completion time of ${minTime} seconds has not been met yet`);
+      err.code = 'MIN_TIME_NOT_MET';
+      throw err;
+    }
+  }
+
   await db.query(
     `UPDATE sop_acknowledgements
      SET status = 'Acknowledged', acknowledged_at = NOW()
      WHERE id = ?`,
     [ackId]
   );
+
+  if (minTime && minTime > 0) {
+    await db.query(
+      `UPDATE sop_onboarding_sessions
+       SET completed_at = NOW(), min_time_met = 1
+       WHERE user_id = ? AND sop_version_id = ? AND completed_at IS NULL`,
+      [userId, acknowledgement.version_id]
+    );
+  }
 
   logAudit({
     user_id: userId,
@@ -178,6 +246,7 @@ async function acknowledgeOnboardingSop(ackId, userId) {
 module.exports = {
   getDefaultOnboardingSops,
   assignOnboardingSopsToUser,
+  assignDefaultOnboardingSopsToUser,
   getPendingOnboardingSops,
   isOnboardingComplete,
   acknowledgeOnboardingSop,

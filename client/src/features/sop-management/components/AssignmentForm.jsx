@@ -1,12 +1,35 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAssignmentCascade } from '@/features/sop-management/hooks/useAssignmentCascade';
 import { createAssignment } from '@/features/sop-management/services/assignmentService';
 import CheckboxList from './CheckboxList';
 import GroupedCheckboxList from './GroupedCheckboxList';
 
-export default function AssignmentForm({ sopId, onCreated }) {
+export default function AssignmentForm({ sopId, onCreated, existingAssignments = [] }) {
   const cascade = useAssignmentCascade();
   const [submitting, setSubmitting] = useState(false);
+
+  const {
+    setSelectedDeptIds,
+    setSelectedPositions,
+    setSelectedUserIds,
+  } = cascade;
+
+  useEffect(() => {
+    if (!Array.isArray(existingAssignments) || existingAssignments.length === 0) return;
+    const deptIds = new Set();
+    const positions = new Set();
+    const userIds = new Set();
+    for (const assignment of existingAssignments) {
+      for (const dept of assignment.departments || []) {
+        deptIds.add(dept.id);
+      }
+      for (const pos of assignment.positions || []) positions.add(pos);
+      for (const user of assignment.users || []) userIds.add(user.id);
+    }
+    setSelectedDeptIds(Array.from(deptIds));
+    setSelectedPositions(Array.from(positions));
+    setSelectedUserIds(Array.from(userIds));
+  }, [existingAssignments, setSelectedDeptIds, setSelectedPositions, setSelectedUserIds]);
 
   const handleSubmit = async () => {
     if (!cascade.selectedDeptIds.length || submitting) return;

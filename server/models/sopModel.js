@@ -29,6 +29,7 @@ async function getSopsColumns() {
       hasIsArchived: cols.has('is_archived'),
       hasRestrictionType: cols.has('restriction_type'),
       hasDefaultOnboarding: cols.has('is_default_onboarding'),
+      hasMinTimeLimit: cols.has('min_time_limit'),
     };
   }
   return sopsColumns;
@@ -441,12 +442,14 @@ async function create(data) {
     version,
     restriction_type,
     is_default_onboarding,
+    min_time_limit,
   } = data;
 
   const insertCols = ['title', cols.code, 'description', 'department_id', 'category_id', cols.owner, 'status'];
   const insertVals = [title, code || null, description || null, department_id || null, category_id || null, owner_user_id || null, status || 'Draft'];
   if (cols.hasRestrictionType) { insertCols.push('restriction_type'); insertVals.push(restriction_type || 'public'); }
   if (cols.hasDefaultOnboarding) { insertCols.push('is_default_onboarding'); insertVals.push(is_default_onboarding ? 1 : 0); }
+  if (cols.hasMinTimeLimit) { insertCols.push('min_time_limit'); insertVals.push(min_time_limit || null); }
 
   // The real table has BOTH owner_user_id (nullable) and owner_id
   // (NOT NULL, no default). getSopsColumns() only detects/writes whichever
@@ -494,6 +497,7 @@ async function update(id, data) {
   const allowedFields = ['title', cols.code, 'description', 'department_id', 'category_id', 'status'];
   if (cols.hasRestrictionType) { allowedFields.push('restriction_type'); }
   if (cols.hasDefaultOnboarding) { allowedFields.push('is_default_onboarding'); }
+  if (cols.hasMinTimeLimit) { allowedFields.push('min_time_limit'); }
   for (const field of allowedFields) {
     if (data[field] !== undefined) {
       sets.push(`${field} = ?`);

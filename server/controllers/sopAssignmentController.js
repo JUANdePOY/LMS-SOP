@@ -16,7 +16,7 @@ const assignmentController = {
   },
 
   async remove(req, res) {
-    const result = await sopAssignmentService.deleteAssignment(parseInt(req.params.id, 10));
+    const result = await sopAssignmentService.deleteAssignment(parseInt(req.params.id, 10), req.user);
     res.json({ success: true, data: result, message: 'Assignment deleted successfully' });
   },
 };

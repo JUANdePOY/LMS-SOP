@@ -40,10 +40,10 @@ async function authenticateFile(req, res, next) {
 router.get('/stream', authenticateFile, async (req, res) => {
   try {
     const storedUrl = req.query.path;
+    const forceDownload = req.query.download === '1';
     if (!storedUrl || typeof storedUrl !== 'string') {
       return res.status(400).json({ status: 'error', message: 'Missing path', code: 'BAD_REQUEST' });
     }
-    // Only allow stored upload URLs (local /uploads/... or absolute http(s)).
     if (!storedUrl.startsWith('/uploads/') && !/^https?:\/\//i.test(storedUrl)) {
       return res.status(400).json({ status: 'error', message: 'Invalid path', code: 'BAD_PATH' });
     }
@@ -53,6 +53,10 @@ router.get('/stream', authenticateFile, async (req, res) => {
     }
     res.setHeader('Content-Type', result.contentType);
     res.setHeader('Cache-Control', 'private, max-age=31536000, immutable');
+    if (forceDownload) {
+      const fileName = req.query.fileName || 'download';
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    }
     return res.send(result.buffer);
   } catch (error) {
     console.error('File stream error:', error);

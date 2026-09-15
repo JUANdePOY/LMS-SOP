@@ -102,6 +102,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   const [sortDirection, setSortDirection] = useState('asc');
   const [modalDepartments, setModalDepartments] = useState([]);
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     if (formData.business_id) {
@@ -133,6 +134,8 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       const res = await getUsers(params);
       if (res.data?.status === 'success') {
         setUsers(res.data.data?.rows || []);
+      } else {
+        toast.error(res.data?.message || 'Failed to load users');
       }
     } catch {
       toast.error('Failed to load users');
@@ -145,6 +148,8 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       const res = await getUserStats();
       if (res.data?.status === 'success') {
         setStats(res.data.data);
+      } else {
+        toast.error(res.data?.message || 'Failed to load stats');
       }
     } catch { /* ignore */ }
   }, [isAuthenticated]);
@@ -155,6 +160,8 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       const res = await getDepartments({ status: 'active', limit: 100 });
       if (res.data?.status === 'success') {
         setDepartments(res.data.data?.rows || []);
+      } else {
+        toast.error(res.data?.message || 'Failed to load departments');
       }
     } catch { /* ignore */ }
   }, [isAuthenticated]);
@@ -165,21 +172,14 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       const res = await getBusinesses({ status: 'active', limit: 100 });
       if (res.data?.status === 'success') {
         setBusinesses(res.data.data?.rows || []);
+      } else {
+        toast.error(res.data?.message || 'Failed to load businesses');
       }
     } catch { /* ignore */ }
   }, [isAuthenticated]);
 
   const handleAddUser = async () => {
-    const missing = [];
-    if (!formData.full_name?.trim()) missing.push('Full Name');
-    if (!formData.email?.trim()) missing.push('Email');
-    if (!formData.password) missing.push('Password');
-    if (!formData.role) missing.push('Role');
-
-    if (missing.length > 0) {
-      toast.error(`Please fill in the following required field${missing.length > 1 ? 's' : ''}: ${missing.join(', ')}`);
-      return;
-    }
+    if (!validateUserForm()) return;
 
     setSaving(true);
     try {
@@ -191,8 +191,8 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
         fetchUsers();
         fetchStats();
       }
-    } catch {
-      const message = 'Failed to create user';
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Failed to create user';
       toast.error(message);
     } finally {
       setSaving(false);
@@ -208,7 +208,27 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
     return out;
   };
 
+  const validateUserForm = () => {
+    const errs = {};
+    if (!formData.full_name?.trim()) errs.full_name = 'Full name is required';
+    if (!formData.email?.trim()) errs.email = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) errs.email = 'Enter a valid email address';
+    if (!editingUser && !formData.password) errs.password = 'Password is required';
+    else if (!editingUser && formData.password && formData.password.length < 8) errs.password = 'Password must be at least 8 characters';
+    if (!formData.role) errs.role = 'Role is required';
+    if (formData.role && DEPARTMENT_SCOPED_ROLES.includes(formData.role) && !formData.department_id) errs.department_id = 'Department is required for this role';
+    if (formData.role === 'admin' && !formData.business_id) errs.business_id = 'Business is required for admin role';
+    if (formData.role === 'super_admin') {
+      if (formData.department_id) errs.department_id = 'Super admin cannot be assigned to a department';
+      if (formData.business_id) errs.business_id = 'Super admin cannot be assigned to a business';
+    }
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
   const handleEditUser = async () => {
+    if (!validateUserForm()) return;
+
     setSaving(true);
     try {
       const res = await updateUser(editingUser.id, cleanPayload(formData));
@@ -220,8 +240,8 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
         fetchUsers();
         fetchStats();
       }
-    } catch {
-      const message = 'Failed to update user';
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Failed to update user';
       toast.error(message);
     } finally {
       setSaving(false);
@@ -251,6 +271,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   };
 
   const openEdit = (u) => {
+    setErrors({});
     setEditingUser(u);
     setFormData({
       full_name: u.full_name || '',
@@ -283,6 +304,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   // department to the head's own scope — they can only create users in the
   // departments they own anyway, so this just removes the friction.
   const openAddModal = () => {
+    setErrors({});
     const seed = {};
     if (deptHeadScope) {
       seed.business_id = deptHeadScope.businessId || '';
@@ -711,85 +733,98 @@ return false;
       )}
 
       {showAddModal && (
-        <Modal open={showAddModal} title="Add New User" onClose={() => { setShowAddModal(false); setFormData({}); }}>
+        <Modal open={showAddModal} title="Add New User" onClose={() => { setShowAddModal(false); setFormData({}); setErrors({}); }}>
           <div className="flex flex-col gap-4 sm:gap-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Full Name <span className="text-red-500">*</span></label>
-                <Input value={formData.full_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))} placeholder="Enter full name" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Email <span className="text-red-500">*</span></label>
-                <Input type="email" value={formData.email || ''} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="user@organization.com" className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
-              </div>
-            </div>
-             <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Password <span className="text-red-500">*</span></label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? 'text' : 'password'}
-                    value={formData.password || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                    placeholder="Min 8 characters"
-                    className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((prev) => !prev)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
-                    title={showPassword ? 'Hide password' : 'Show password'}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-</div>
-              </div>
-<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                <div>
-                   <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role <span className="text-red-500">*</span></label>
-                   <Select value={formData.role || ''} onChange={(e) => {
-                     const nextRole = e.target.value;
-setFormData((prev) => {
+                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Full Name <span className="text-red-500">*</span></label>
+                 <Input value={formData.full_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))} placeholder="Enter full name" className={`border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 ${errors.full_name ? 'border-red-500' : ''}`} />
+                 {errors.full_name && <p className="mt-1 text-xs text-red-500">{errors.full_name}</p>}
+               </div>
+               <div>
+                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Email <span className="text-red-500">*</span></label>
+                 <Input type="email" value={formData.email || ''} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} placeholder="user@organization.com" className={`border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 ${errors.email ? 'border-red-500' : ''}`} />
+                 {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email}</p>}
+               </div>
+            </div>
+              <div>
+                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Password <span className="text-red-500">*</span></label>
+                 <div className="relative">
+                   <Input
+                     type={showPassword ? 'text' : 'password'}
+                     value={formData.password || ''}
+                     onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                     placeholder="Min 8 characters"
+                     className={`border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pr-10 ${errors.password ? 'border-red-500' : ''}`}
+                   />
+                   <button
+                     type="button"
+                     onClick={() => setShowPassword((prev) => !prev)}
+                     className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-md text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                     title={showPassword ? 'Hide password' : 'Show password'}
+                     aria-label={showPassword ? 'Hide password' : 'Show password'}
+                   >
+                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                   </button>
+                 </div>
+                 {errors.password && <p className="mt-1 text-xs text-red-500">{errors.password}</p>}
+               </div>
+<div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                    <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role <span className="text-red-500">*</span></label>
+                    <Select value={formData.role || ''} onChange={(e) => {
+                      const nextRole = e.target.value;
+                      setFormData((prev) => {
                         const next = { ...prev, role: nextRole };
                         // Admins / super admins are business-level and must not be
                         // assigned to any department — drop any stale department_id.
                         if (!DEPARTMENT_SCOPED_ROLES.includes(nextRole)) {
                           next.department_id = '';
                         }
+                        setErrors((prev) => {
+                          const nextErr = { ...prev };
+                          delete nextErr.role;
+                          delete nextErr.department_id;
+                          delete nextErr.business_id;
+                          return nextErr;
+                        });
                         return next;
                       });
-                   }} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                     <option value="">Select role…</option>
-{Object.entries(ROLE_META).map(([key, meta]) => {
-                        if (!allowedRolesForActor(user).includes(key)) return null;
-                        return <option key={key} value={key}>{meta.label}</option>;
-                      })}
-                    </Select>
-                  </div>
+                    }} className={`border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 ${errors.role ? 'border-red-500' : ''}`}>
+                      <option value="">Select role…</option>
+ {Object.entries(ROLE_META).map(([key, meta]) => {
+                         if (!allowedRolesForActor(user).includes(key)) return null;
+                         return <option key={key} value={key}>{meta.label}</option>;
+                       })}
+                     </Select>
+                     {errors.role && <p className="mt-1 text-xs text-red-500">{errors.role}</p>}
+                   </div>
                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
-                    <Select value={deptHeadScope ? (deptHeadScope.businessId || '') : (formData.business_id || '')} disabled={!!deptHeadScope || formData.role === 'super_admin'} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                      <option value="">Select business…</option>
-                      {businesses.map((b) => (
-                        (!deptHeadScope || String(b.id) === String(deptHeadScope.businessId)) && (
-                          <option key={b.id} value={b.id}>{b.business_name}</option>
-                        )
-                      ))}
-                    </Select>
-                  </div>
-                  {DEPARTMENT_SCOPED_ROLES.includes(formData.role) && (
-                    <div>
-                      <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
-                      <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} disabled={!formData.business_id || !!deptHeadScope} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                        <option value="">Select department…</option>
-                        {modalDepartments.filter((d) => !deptHeadScope || deptHeadScope.departmentIds.includes(d.id)).map((d) => (
-                          <option key={d.id} value={d.id}>{d.name}</option>
-                        ))}
-                      </Select>
-                    </div>
-                  )}
+                   <div>
+                     <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
+                     <Select value={deptHeadScope ? (deptHeadScope.businessId || '') : (formData.business_id || '')} disabled={!!deptHeadScope || formData.role === 'super_admin'} onChange={(e) => { setFormData(prev => ({ ...prev, business_id: e.target.value })); setErrors(prev => { const next = { ...prev }; delete next.business_id; return next; }); }} className={`border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 ${errors.business_id ? 'border-red-500' : ''}`}>
+                       <option value="">Select business…</option>
+                       {businesses.map((b) => (
+                         (!deptHeadScope || String(b.id) === String(deptHeadScope.businessId)) && (
+                           <option key={b.id} value={b.id}>{b.business_name}</option>
+                         )
+                       ))}
+                     </Select>
+                     {errors.business_id && <p className="mt-1 text-xs text-red-500">{errors.business_id}</p>}
+                   </div>
+                   {DEPARTMENT_SCOPED_ROLES.includes(formData.role) && (
+                     <div>
+                       <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
+                       <Select value={formData.department_id || ''} onChange={(e) => { setFormData(prev => ({ ...prev, department_id: e.target.value })); setErrors(prev => { const next = { ...prev }; delete next.department_id; return next; }); }} disabled={!formData.business_id || !!deptHeadScope} className={`border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 ${errors.department_id ? 'border-red-500' : ''}`}>
+                         <option value="">Select department…</option>
+                         {modalDepartments.filter((d) => !deptHeadScope || deptHeadScope.departmentIds.includes(d.id)).map((d) => (
+                           <option key={d.id} value={d.id}>{d.name}</option>
+                         ))}
+                       </Select>
+                       {errors.department_id && <p className="mt-1 text-xs text-red-500">{errors.department_id}</p>}
+                     </div>
+                   )}
                 </div>
              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                <div>
@@ -842,60 +877,72 @@ setFormData((prev) => {
       )}
 
       {showEditModal && editingUser && (
-        <Modal open={showEditModal} title="Edit User" onClose={() => { setShowEditModal(false); setEditingUser(null); setFormData({}); }}>
+        <Modal open={showEditModal} title="Edit User" onClose={() => { setShowEditModal(false); setEditingUser(null); setFormData({}); setErrors({}); }}>
           <div className="flex flex-col gap-4 sm:gap-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Full Name</label>
-                <Input value={formData.full_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Email</label>
-                <Input type="email" value={formData.email || ''} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800" />
-              </div>
+               <div>
+                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Full Name</label>
+                 <Input value={formData.full_name || ''} onChange={(e) => setFormData(prev => ({ ...prev, full_name: e.target.value }))} className={`border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 ${errors.full_name ? 'border-red-500' : ''}`} />
+                 {errors.full_name && <p className="mt-1 text-xs text-red-500">{errors.full_name}</p>}
+               </div>
+               <div>
+                 <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Email</label>
+                 <Input type="email" value={formData.email || ''} onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))} className={`border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 ${errors.email ? 'border-red-500' : ''}`} />
+                 {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email}</p>}
+               </div>
             </div>
 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role</label>
-                  <Select value={formData.role || ''} onChange={(e) => {
-                    const nextRole = e.target.value;
-                    setFormData((prev) => {
-                      const next = { ...prev, role: nextRole };
-                      // Admins / super admins are business-level and must not be
-                      // assigned to any department — drop any stale department_id.
-                      if (!DEPARTMENT_SCOPED_ROLES.includes(nextRole)) {
-                        next.department_id = '';
-                      }
-                      return next;
-                    });
-                  }} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                    <option value="">Select role…</option>
-{Object.entries(ROLE_META).map(([key, meta]) => {
-                        if (!allowedRolesForActor(user).includes(key)) return null;
-                        return <option key={key} value={key}>{meta.label}</option>;
-                      })}
-                  </Select>
-                </div>
-<div>
-                    <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
-                    <Select value={deptHeadScope ? (deptHeadScope.businessId || '') : (formData.business_id || '')} disabled={!!deptHeadScope || (formData.role || editingUser?.role) === 'super_admin'} onChange={(e) => setFormData(prev => ({ ...prev, business_id: e.target.value }))} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                      <option value="">Select business…</option>
-                      {businesses.map((b) => (
-                        (!deptHeadScope || String(b.id) === String(deptHeadScope.businessId)) && (
-                          <option key={b.id} value={b.id}>{b.business_name}</option>
-                        )
-                      ))}
-                    </Select>
-                  </div>
+                 <div>
+                   <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Role</label>
+                   <Select value={formData.role || ''} onChange={(e) => {
+                     const nextRole = e.target.value;
+                     setFormData((prev) => {
+                       const next = { ...prev, role: nextRole };
+                       // Admins / super admins are business-level and must not be
+                       // assigned to any department — drop any stale department_id.
+                       if (!DEPARTMENT_SCOPED_ROLES.includes(nextRole)) {
+                         next.department_id = '';
+                       }
+                       setErrors((prev) => {
+                         const nextErr = { ...prev };
+                         delete nextErr.role;
+                         delete nextErr.department_id;
+                         delete nextErr.business_id;
+                         return nextErr;
+                       });
+                       return next;
+                     });
+                   }} className={`border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 ${errors.role ? 'border-red-500' : ''}`}>
+                     <option value="">Select role…</option>
+ {Object.entries(ROLE_META).map(([key, meta]) => {
+                         if (!allowedRolesForActor(user).includes(key)) return null;
+                         return <option key={key} value={key}>{meta.label}</option>;
+                       })}
+                   </Select>
+                   {errors.role && <p className="mt-1 text-xs text-red-500">{errors.role}</p>}
+                 </div>
+                   <div>
+                     <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Business</label>
+                     <Select value={deptHeadScope ? (deptHeadScope.businessId || '') : (formData.business_id || '')} disabled={!!deptHeadScope || (formData.role || editingUser?.role) === 'super_admin'} onChange={(e) => { setFormData(prev => ({ ...prev, business_id: e.target.value })); setErrors(prev => { const next = { ...prev }; delete next.business_id; return next; }); }} className={`border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 ${errors.business_id ? 'border-red-500' : ''}`}>
+                       <option value="">Select business…</option>
+                       {businesses.map((b) => (
+                         (!deptHeadScope || String(b.id) === String(deptHeadScope.businessId)) && (
+                           <option key={b.id} value={b.id}>{b.business_name}</option>
+                         )
+                       ))}
+                     </Select>
+                     {errors.business_id && <p className="mt-1 text-xs text-red-500">{errors.business_id}</p>}
+                   </div>
                 {DEPARTMENT_SCOPED_ROLES.includes(formData.role || editingUser?.role) && (
                   <div>
                     <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Department</label>
-                    <Select value={formData.department_id || ''} onChange={(e) => setFormData(prev => ({ ...prev, department_id: e.target.value }))} disabled={!formData.business_id || !!deptHeadScope} className="border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800">
-                      <option value="">Select department…</option>
-                      {modalDepartments.filter((d) => !deptHeadScope || deptHeadScope.departmentIds.includes(d.id)).map((d) => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </Select>
+                     <Select value={formData.department_id || ''} onChange={(e) => { setFormData(prev => ({ ...prev, department_id: e.target.value })); setErrors(prev => { const next = { ...prev }; delete next.department_id; return next; }); }} disabled={!formData.business_id || !!deptHeadScope} className={`border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 ${errors.department_id ? 'border-red-500' : ''}`}>
+                       <option value="">Select department…</option>
+                       {modalDepartments.filter((d) => !deptHeadScope || deptHeadScope.departmentIds.includes(d.id)).map((d) => (
+                         <option key={d.id} value={d.id}>{d.name}</option>
+                       ))}
+                     </Select>
+                     {errors.department_id && <p className="mt-1 text-xs text-red-500">{errors.department_id}</p>}
                   </div>
                 )}
               </div>

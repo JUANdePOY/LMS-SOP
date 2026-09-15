@@ -135,6 +135,7 @@ function SOPListPage() {
     newTitle, setNewTitle, newDescription, setNewDescription, newLink, setNewLink,
     newCategoryId, setNewCategoryId, loadingCategories, filteredCategories,
     newIsDefaultOnboarding, setNewIsDefaultOnboarding,
+    newMinTimeLimit, setNewMinTimeLimit,
     editIsDefaultOnboarding, setEditIsDefaultOnboarding,
     editingSopId, editTitle, setEditTitle, editDescription, setEditDescription,
     editStatus, setEditStatus, editCategoryId, setEditCategoryId, handleCreate, fetchSops,
@@ -281,6 +282,8 @@ function SOPListPage() {
             onCreate={handleCreate}
             newIsDefaultOnboarding={newIsDefaultOnboarding}
             setNewIsDefaultOnboarding={setNewIsDefaultOnboarding}
+            newMinTimeLimit={newMinTimeLimit}
+            setNewMinTimeLimit={setNewMinTimeLimit}
           />
 
           <div className="flex flex-col sm:flex-row gap-3">
@@ -350,19 +353,15 @@ function SOPListPage() {
                 <X size={20} className="text-neutral-500 dark:text-neutral-400" />
               </button>
             </div>
-            <SOPEditForm
-              sop={editingSop}
-              editTitle={editTitle} setEditTitle={setEditTitle}
-              editDescription={editDescription} setEditDescription={setEditDescription}
-              editStatus={editStatus} setEditStatus={setEditStatus}
-              editCategoryId={editCategoryId} setEditCategoryId={setEditCategoryId}
-              filteredCategories={filteredCategories} loadingCategories={loadingCategories}
-              cascade={cascade}
-              onCancel={handleEditCancel}
-              onSave={handleEditSave}
-              editIsDefaultOnboarding={editIsDefaultOnboarding}
-              setEditIsDefaultOnboarding={setEditIsDefaultOnboarding}
-            />
+               <SOPEditForm
+                 sop={editingSop}
+                 editTitle={editTitle} setEditTitle={setEditTitle}
+                 editDescription={editDescription} setEditDescription={setEditDescription}
+                 onCancel={handleEditCancel}
+                 onSave={handleEditSave}
+                 editIsDefaultOnboarding={editIsDefaultOnboarding}
+                 setEditIsDefaultOnboarding={setEditIsDefaultOnboarding}
+               />
           </div>
         </div>
       )}

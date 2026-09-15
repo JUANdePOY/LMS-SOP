@@ -57,7 +57,7 @@ export function useAssignmentCascade() {
 
   const loadPositions = useCallback(
     async (deptIds) => {
-      if (!deptIds.length) {
+      if (!deptIds || !deptIds.length) {
         setPositions([]);
         setSelectedPositions([]);
         return;
@@ -65,6 +65,7 @@ export function useAssignmentCascade() {
       setLoading((p) => ({ ...p, positions: true }));
       const allPositions = new Set();
       for (const deptId of deptIds) {
+        if (!deptId) continue;
         try {
           const r = await fetchPositions(deptId);
           const positionsList = Array.isArray(r?.data?.data) ? r.data.data : (r.data?.data?.rows || []);
@@ -82,7 +83,7 @@ export function useAssignmentCascade() {
 
   const loadUsers = useCallback(
     async (deptIds) => {
-      if (!deptIds.length) {
+      if (!deptIds || !deptIds.length) {
         setUsers([]);
         setTotalUsers(0);
         setSelectedUserIds([]);
@@ -93,6 +94,7 @@ export function useAssignmentCascade() {
         const allUsers = [];
         const seenIds = new Set();
         for (const deptId of deptIds) {
+          if (!deptId) continue;
           try {
             const r = await fetchUsers(deptId, {
               search: userSearch || undefined,
@@ -136,7 +138,7 @@ export function useAssignmentCascade() {
     }
   }, [selectedDeptIds, loadUsers]);
 
-  const toggleBusiness = (id) =>
+  const toggleBusiness = useCallback((id) =>
     setSelectedBusinessIds((prev) => {
       const next = prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id];
       setSelectedDeptIds([]);
@@ -144,22 +146,22 @@ export function useAssignmentCascade() {
       setUsers([]);
       setSelectedUserIds([]);
       return next;
-    });
+    }), []);
 
-  const toggleDepartment = (id) =>
+  const toggleDepartment = useCallback((id) =>
     setSelectedDeptIds((prev) =>
       prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
-    );
+    ), []);
 
-  const togglePosition = (name) =>
+  const togglePosition = useCallback((name) =>
     setSelectedPositions((prev) =>
       prev.includes(name) ? prev.filter((p) => p !== name) : [...prev, name]
-    );
+    ), []);
 
-  const toggleUser = (id) =>
+  const toggleUser = useCallback((id) =>
     setSelectedUserIds((prev) =>
       prev.includes(id) ? prev.filter((u) => u !== id) : [...prev, id]
-    );
+    ), []);
 
   const toggleUsers = useCallback((ids) => {
     setSelectedUserIds((prev) => {
@@ -172,7 +174,7 @@ export function useAssignmentCascade() {
     });
   }, []);
 
-  return {
+  return useMemo(() => ({
     businesses,
     filteredDepartments,
     groupedDepartments,
@@ -196,7 +198,26 @@ export function useAssignmentCascade() {
     loading,
     userSearch,
     setUserSearch,
-  };
+  }), [
+    businesses,
+    filteredDepartments,
+    groupedDepartments,
+    departments,
+    positions,
+    users,
+    totalUsers,
+    selectedBusinessIds,
+    selectedDeptIds,
+    selectedPositions,
+    selectedUserIds,
+    toggleBusiness,
+    toggleDepartment,
+    togglePosition,
+    toggleUser,
+    toggleUsers,
+    loading,
+    userSearch,
+  ]);
 }
 
 export default useAssignmentCascade;

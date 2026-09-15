@@ -221,13 +221,6 @@ router.post('/', requireAdmin, [
       position_title, employee_id, contact_number, employment_status,
       date_hired: date_hired || null, birthdate: birthdate || null, address: address || null,
     });
-        // Assign default onboarding SOPs
-        try {
-          const onboardingService = require('../services/sopOnboardingService');
-          await onboardingService.assignOnboardingSopsToUser(userId);
-        } catch (onboardingErr) {
-          console.error('[Bulk Upload] Onboarding assignment failed for', email, onboardingErr);
-        }
 
     logAudit({
       user_id: req.user.id,
@@ -454,6 +447,36 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   } catch (err) {
     console.error('User deactivate error:', err);
     res.status(500).json({ status: 'error', message: 'Failed to deactivate user', code: 'DB_ERROR' });
+  }
+});
+
+router.post('/:userId/onboarding-sops', requireAdmin, async (req, res) => {
+  try {
+    const targetUserId = parseInt(req.params.userId, 10);
+    if (isNaN(targetUserId)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid user id', code: 'VALIDATION_ERROR' });
+    }
+
+    const targetUser = await authModel.findById(targetUserId);
+    if (!targetUser) {
+      return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
+    }
+
+    if (req.user.role !== 'super_admin' && targetUser.business_id !== req.user.business_id) {
+      return res.status(403).json({ status: 'error', message: 'Access denied to this user', code: 'BUSINESS_SCOPE_DENIED' });
+    }
+
+    const onboardingService = require('../services/sopOnboardingService');
+    const result = await onboardingService.assignDefaultOnboardingSopsToUser(targetUserId, req.user.id);
+
+    res.json({
+      status: 'success',
+      message: `Assigned ${result.assigned} onboarding SOP(s) to user`,
+      data: result
+    });
+  } catch (err) {
+    console.error('Assign onboarding SOPs error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to assign onboarding SOPs', code: 'DB_ERROR' });
   }
 });
 

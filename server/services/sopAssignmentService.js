@@ -163,10 +163,36 @@ async function createAssignment(sopId, payload, assignedBy) {
     console.error('Failed to send SOP assignment notifications:', notifyErr);
   }
 
+  if (sop.is_default_onboarding) {
+    try {
+      const versionId = await getCurrentVersionId(sopId);
+      if (versionId) {
+        const targets = new Set();
+        for (const deptId of departmentIds) {
+          (await complianceModel.resolveUsersForDepartment(deptId)).forEach((uid) => targets.add(uid));
+        }
+        for (const positionName of positionNames) {
+          (await complianceModel.resolveUsersForPosition(positionName)).forEach((uid) => targets.add(uid));
+        }
+        userIds.forEach((uid) => targets.add(uid));
+
+        if (targets.size > 0) {
+          const values = Array.from(targets).map((uid) => [versionId, uid, 'Pending']);
+          await db.query(
+            `INSERT IGNORE INTO sop_acknowledgements (sop_version_id, user_id, status) VALUES ?`,
+            [values]
+          );
+        }
+      }
+    } catch (ackErr) {
+      console.error('Failed to create onboarding acknowledgements:', ackErr.message);
+    }
+  }
+
   return complianceModel.findAssignmentById(id);
 }
 
-async function deleteAssignment(assignmentId) {
+async function deleteAssignment(assignmentId, user) {
   const assignment = await complianceModel.findAssignmentById(assignmentId);
   if (!assignment) {
     const error = new Error('Assignment not found');
@@ -175,15 +201,19 @@ async function deleteAssignment(assignmentId) {
   }
 
   const sop = await sopModel.findById(assignment.sop_id);
-  if (sop) {
-    const [actor] = await db.query(
-      'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
-      [assignment.assigned_by || null]
-    ).then(([rows]) => rows[0] || null);
-    if (actor && sop.business_id && actor.business_id !== sop.business_id) {
+  if (sop && user) {
+    if (user.role === 'admin' && sop.business_id && user.business_id !== sop.business_id) {
       const error = new Error('Access denied: SOP is outside your business scope');
       error.code = 'FORBIDDEN';
       throw error;
+    }
+    if (user.role === 'department_head' && sop.department_id) {
+      const scopedDeptIds = user.scoped_department_ids || (user.department_id ? [user.department_id] : []);
+      if (!scopedDeptIds.includes(sop.department_id)) {
+        const error = new Error('Access denied: SOP is outside your department scope');
+        error.code = 'FORBIDDEN';
+        throw error;
+      }
     }
   }
 
@@ -226,12 +256,18 @@ async function isAssignedToUser(sopId, userId) {
     SELECT sa.id
     FROM sop_assignments sa
     LEFT JOIN assignment_users au ON au.assignment_id = sa.id AND au.user_id = ?
-    LEFT JOIN assignment_departments ad ON ad.assignment_id = sa.id AND ad.department_id = ?
+    LEFT JOIN assignment_departments ad ON ad.assignment_id = sa.id
+    LEFT JOIN department_members dm ON dm.department_id = ad.department_id AND dm.user_id = ?
     LEFT JOIN assignment_positions ap ON ap.assignment_id = sa.id AND LOWER(ap.position_name) = LOWER(?)
     WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE
-      AND (au.assignment_id IS NOT NULL OR ad.assignment_id IS NOT NULL OR ap.assignment_id IS NOT NULL)
+      AND (
+        au.assignment_id IS NOT NULL
+        OR ad.department_id = ?
+        OR dm.user_id IS NOT NULL
+        OR ap.assignment_id IS NOT NULL
+      )
     LIMIT 1
-  `, [userId, userDept, userPos, versionId]);
+  `, [userId, userId, userPos, versionId, userDept]);
 
   return rows.length > 0;
 }
@@ -268,8 +304,15 @@ async function listAccessibleSops(userId, filters = {}) {
           WHERE sv.sop_id = s.id AND sv.is_current = TRUE AND sv.deleted_at IS NULL
             AND (
               EXISTS (SELECT 1 FROM assignment_users au WHERE au.assignment_id = sa.id AND au.user_id = ?)
-              OR (? IS NOT NULL AND EXISTS (SELECT 1 FROM assignment_departments ad WHERE ad.assignment_id = sa.id AND ad.department_id = ?))
-              OR (? IS NOT NULL AND EXISTS (SELECT 1 FROM assignment_positions ap WHERE ap.assignment_id = sa.id AND LOWER(ap.position_name) = LOWER(?)))
+              OR EXISTS (
+                SELECT 1 FROM assignment_departments ad
+                WHERE ad.assignment_id = sa.id
+                  AND (
+                    ad.department_id = ?
+                    OR EXISTS (SELECT 1 FROM department_members dm WHERE dm.department_id = ad.department_id AND dm.user_id = ?)
+                  )
+              )
+              OR EXISTS (SELECT 1 FROM assignment_positions ap WHERE ap.assignment_id = sa.id AND LOWER(ap.position_name) = LOWER(?))
             )
         )
         OR EXISTS (
@@ -280,7 +323,7 @@ async function listAccessibleSops(userId, filters = {}) {
         )
       )
   `;
-  const params = [userId, userDept, userDept, userPos, userPos, userId];
+  const params = [userId, userDept, userId, userPos, userId];
 
   let finalSql = sql;
   if (search) {
@@ -305,8 +348,15 @@ async function listAccessibleSops(userId, filters = {}) {
           WHERE sv.sop_id = s.id AND sv.is_current = TRUE AND sv.deleted_at IS NULL
             AND (
               EXISTS (SELECT 1 FROM assignment_users au WHERE au.assignment_id = sa.id AND au.user_id = ?)
-              OR (? IS NOT NULL AND EXISTS (SELECT 1 FROM assignment_departments ad WHERE ad.assignment_id = sa.id AND ad.department_id = ?))
-              OR (? IS NOT NULL AND EXISTS (SELECT 1 FROM assignment_positions ap WHERE ap.assignment_id = sa.id AND LOWER(ap.position_name) = LOWER(?)))
+              OR EXISTS (
+                SELECT 1 FROM assignment_departments ad
+                WHERE ad.assignment_id = sa.id
+                  AND (
+                    ad.department_id = ?
+                    OR EXISTS (SELECT 1 FROM department_members dm WHERE dm.department_id = ad.department_id AND dm.user_id = ?)
+                  )
+              )
+              OR EXISTS (SELECT 1 FROM assignment_positions ap WHERE ap.assignment_id = sa.id AND LOWER(ap.position_name) = LOWER(?))
             )
         )
         OR EXISTS (
@@ -317,7 +367,7 @@ async function listAccessibleSops(userId, filters = {}) {
         )
       )
   `;
-  const countParams = [userId, userDept, userDept, userPos, userPos, userId];
+  const countParams = [userId, userDept, userId, userPos, userId];
   if (search) {
     countSql += ' AND (s.title LIKE ? OR s.' + codeCol + ' LIKE ? OR s.description LIKE ?)';
     countParams.push(`%${search}%`, `%${search}%`, `%${search}%`);

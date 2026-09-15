@@ -1,6 +1,4 @@
 import { X } from 'lucide-react';
-import CheckboxList from './CheckboxList';
-import GroupedCheckboxList from './GroupedCheckboxList';
 
 function SOPCreateForm({
   showCreate,
@@ -19,6 +17,8 @@ function SOPCreateForm({
   onCreate,
   newIsDefaultOnboarding,
   setNewIsDefaultOnboarding,
+  newMinTimeLimit,
+  setNewMinTimeLimit,
 }) {
   if (!showCreate) return null;
 
@@ -70,72 +70,36 @@ function SOPCreateForm({
             />
           </div>
 
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-[var(--text-primary)]">Assignments</h4>
-
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Business</label>
-              <CheckboxList
-                items={cascade.businesses}
-                selectedIds={cascade.selectedBusinessIds}
-                onToggle={cascade.toggleBusiness}
-                labelKey="business_name"
-                valueKey="id"
-                placeholder="Select businesses..."
-                loading={cascade.loading.businesses}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Departments</label>
-              <GroupedCheckboxList
-                items={cascade.groupedDepartments}
-                selectedIds={cascade.selectedDeptIds}
-                onToggle={cascade.toggleDepartment}
-                labelKey="name"
-                valueKey="id"
-                loading={cascade.loading.departments}
-                emptyText={cascade.selectedBusinessIds.length ? 'No departments for selected businesses' : 'Select a business first'}
-                className="max-h-40 overflow-y-auto"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Category</label>
-              <select
-                value={newCategoryId}
-                onChange={(e) => setNewCategoryId(e.target.value)}
-                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
-                disabled={loadingCategories || !cascade.selectedDeptIds.length}
-              >
-                <option value="">{
-                  cascade.selectedDeptIds.length
-                    ? 'Select category...'
-                    : 'Select a department first'
-                }</option>
-                {filteredCategories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
-              <div className="flex items-start gap-2 mt-3">
-                <input
-                  type="checkbox"
-                  id="is_default_onboarding"
-                  checked={newIsDefaultOnboarding || false}
-                  onChange={(e) => setNewIsDefaultOnboarding(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-[var(--border)] text-blue-600 focus:ring-blue-500"
-                />
-                <label htmlFor="is_default_onboarding" className="text-sm font-medium text-[var(--text-primary)]">
-                  Required for new employee onboarding
-                </label>
-              </div>
-              <p className="text-xs text-[var(--text-muted)] mt-2">
-                New employees must read and acknowledge this SOP before accessing employee features.
-              </p>
-            </div>
+          <div className="flex items-start gap-2">
+            <input
+              type="checkbox"
+              id="is_default_onboarding"
+              checked={newIsDefaultOnboarding || false}
+              onChange={(e) => setNewIsDefaultOnboarding(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-[var(--border)] text-blue-600 focus:ring-blue-500"
+            />
+            <label htmlFor="is_default_onboarding" className="text-sm font-medium text-[var(--text-primary)]">
+              Required for new employee onboarding
+            </label>
           </div>
+          <p className="text-xs text-[var(--text-muted)] mt-2">
+            New employees must read and acknowledge this SOP before accessing employee features.
+          </p>
+          {(newIsDefaultOnboarding) && (
+            <div className="mt-3">
+              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+                Minimum time to complete (minutes)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={newMinTimeLimit || ''}
+                onChange={(e) => setNewMinTimeLimit(e.target.value)}
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+              />
+            </div>
+          )}
+
         </div>
 
         {/* Footer */}

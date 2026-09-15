@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { getMyOnboarding, acknowledgeOnboardingSop } from "../api/employeeOnboarding.api";
+import { getMyOnboarding, acknowledgeOnboardingSop, getOrCreateOnboardingSession, heartbeatOnboardingSession } from "../api/employeeOnboarding.api";
 
 export function useEmployeeOnboarding() {
   const [data, setData] = useState(null);
@@ -31,9 +31,25 @@ export function useEmployeeOnboarding() {
     await fetchOnboarding();
   }, [fetchOnboarding]);
 
+  const fetchSession = useCallback(async (ackId) => {
+    const res = await getOrCreateOnboardingSession(ackId);
+    if (!res?.success) {
+      throw new Error(res?.message || "Failed to load onboarding session");
+    }
+    return res.data;
+  }, []);
+
+  const heartbeat = useCallback(async (sessionId, elapsedSeconds) => {
+    const res = await heartbeatOnboardingSession(sessionId, elapsedSeconds);
+    if (!res?.success) {
+      throw new Error(res?.message || "Failed to record heartbeat");
+    }
+    return res.data;
+  }, []);
+
   useEffect(() => {
     fetchOnboarding();
   }, [fetchOnboarding]);
 
-  return { data, loading, error, refetch: fetchOnboarding, acknowledge };
+  return { data, loading, error, refetch: fetchOnboarding, acknowledge, fetchSession, heartbeat };
 }

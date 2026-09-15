@@ -1,5 +1,4 @@
-import CheckboxList from './CheckboxList';
-import GroupedCheckboxList from './GroupedCheckboxList';
+import { useState } from 'react';
 
 function SOPEditForm({
   sop,
@@ -7,16 +6,18 @@ function SOPEditForm({
   setEditTitle,
   editDescription,
   setEditDescription,
-  editCategoryId,
-  setEditCategoryId,
-  filteredCategories,
-  loadingCategories,
-  cascade,
   onCancel,
   onSave,
   editIsDefaultOnboarding,
   setEditIsDefaultOnboarding,
 }) {
+  const [timeLimit, setTimeLimit] = useState(sop?.min_time_limit ? String(Number(sop.min_time_limit) / 60) : '');
+
+  const handleSave = () => {
+    onSave(sop.id, {
+      min_time_limit: timeLimit === '' ? null : Number(timeLimit) * 60,
+    });
+  };
   return (
     <div className="space-y-4">
       <div>
@@ -40,56 +41,7 @@ function SOPEditForm({
         />
       </div>
 
-      <h4 className="text-sm font-semibold text-[var(--text-primary)] mt-1">Assignments</h4>
-      <div className="space-y-3">
-        <div>
-          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Business</label>
-          <CheckboxList
-            items={cascade.businesses}
-            selectedIds={cascade.selectedBusinessIds}
-            onToggle={cascade.toggleBusiness}
-            labelKey="business_name"
-            valueKey="id"
-            placeholder="Select businesses..."
-            loading={cascade.loading.businesses}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Departments</label>
-          <GroupedCheckboxList
-            items={cascade.groupedDepartments}
-            selectedIds={cascade.selectedDeptIds}
-            onToggle={cascade.toggleDepartment}
-            labelKey="name"
-            valueKey="id"
-            loading={cascade.loading.departments}
-            emptyText={cascade.selectedBusinessIds.length ? 'No departments for selected businesses' : 'Select a business first'}
-            className="max-h-40 overflow-y-auto"
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Category</label>
-          <select
-            value={editCategoryId}
-            onChange={(e) => setEditCategoryId(e.target.value)}
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
-            disabled={loadingCategories || !cascade.selectedDeptIds.length}
-          >
-            <option value="">{
-              cascade.selectedDeptIds.length
-                ? 'Select category...'
-                : 'Select a department first'
-            }</option>
-            {filteredCategories.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.name}
-              </option>
-            ))}
-          </select> 
-          </div>
-        </div>
-        <div className="flex items-start gap-2">
+      <div className="flex items-start gap-2">
           <input
             type="checkbox"
             id="edit_is_default_onboarding"
@@ -105,6 +57,21 @@ function SOPEditForm({
           New employees must read and acknowledge this SOP before accessing employee features.
         </p>
 
+        {(editIsDefaultOnboarding) && (
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
+              Minimum time to complete (minutes)
+            </label>
+            <input
+              type="number"
+              min="0"
+              value={timeLimit}
+              onChange={(e) => setTimeLimit(e.target.value)}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40"
+            />
+          </div>
+        )}
+
       <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-1">
         <button
           onClick={onCancel}
@@ -113,7 +80,7 @@ function SOPEditForm({
           Cancel
         </button>
         <button
-          onClick={() => onSave(sop.id)}
+          onClick={handleSave}
           className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors disabled:opacity-50"
         >
           Save

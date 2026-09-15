@@ -638,6 +638,8 @@ const MIGRATIONS = [
       ADD COLUMN IF NOT EXISTS sop_version_id INT NULL AFTER sop_id`,
     `CREATE INDEX IF NOT EXISTS idx_sop_modules_version ON sop_modules(sop_version_id)`,
     `CREATE INDEX IF NOT EXISTS idx_sop_modules_sop_version ON sop_modules(sop_id, sop_version_id)`,
+    // --- sop_modules: add per-module time limit for onboarding ---
+    `ALTER TABLE sop_modules ADD COLUMN IF NOT EXISTS time_limit INT DEFAULT NULL AFTER content`,
     // --- sop_module_attachments: add sop_version_id column for version isolation ---
     `ALTER TABLE sop_module_attachments
       ADD COLUMN IF NOT EXISTS sop_version_id INT NULL AFTER module_id`,
@@ -793,6 +795,27 @@ const MIGRATIONS = [
     `ALTER TABLE courses ADD COLUMN business_id INT DEFAULT NULL AFTER id`,
     `ALTER TABLE courses ADD CONSTRAINT fk_courses_business FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE SET NULL`,
     `CREATE INDEX IF NOT EXISTS idx_courses_business ON courses(business_id)`,
+    // Add min_time_limit to sops for onboarding
+    `ALTER TABLE sops ADD COLUMN IF NOT EXISTS min_time_limit INT DEFAULT NULL AFTER is_default_onboarding`,
+    // Onboarding session tracking for minimum-time enforcement
+    `CREATE TABLE IF NOT EXISTS sop_onboarding_sessions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      acknowledgement_id INT DEFAULT NULL,
+      user_id INT NOT NULL,
+      sop_version_id INT NOT NULL,
+      started_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      last_heartbeat_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      total_seconds INT NOT NULL DEFAULT 0,
+      min_time_met TINYINT(1) NOT NULL DEFAULT 0,
+      completed_at DATETIME DEFAULT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (sop_version_id) REFERENCES sop_versions(id) ON DELETE CASCADE,
+      INDEX idx_sop_onboarding_sessions_user (user_id),
+      INDEX idx_sop_onboarding_sessions_version (sop_version_id),
+      INDEX idx_sop_onboarding_sessions_ack (acknowledgement_id)
+    )`,
   ];
 
 async function runMigrations() {

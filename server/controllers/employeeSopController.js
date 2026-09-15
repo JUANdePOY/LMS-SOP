@@ -1,6 +1,7 @@
 const sopModel = require('../models/sopModel');
 const sopVersionModel = require('../models/sopVersionModel');
 const sopModuleModel = require('../models/sopModuleModel');
+const sopModuleAttachmentModel = require('../models/sopModuleAttachmentModel');
 const enrollmentModel = require('../models/enrollmentModel');
 const db = require('../config/database');
 const sopAssignmentService = require('../services/sopAssignmentService');
@@ -97,9 +98,13 @@ async function getEmployeeSop(req, res) {
       throw error;
     }
 
-    // Load modules
+    // Load modules with attachments
     const versionId = await sopVersionModel.getCurrentVersionId(sopId);
     const modules = await sopModuleModel.listModules(sopId, versionId);
+    
+    for (const module of modules) {
+      module.attachments = await sopModuleAttachmentModel.listByModule(module.id, versionId);
+    }
 
     // Log access
     logAudit({

@@ -16,6 +16,7 @@ function BusinessSopCreateForm({ open, onClose, businessId, onCreated }) {
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isDefaultOnboarding, setIsDefaultOnboarding] = useState(false);
+  const [minTimeLimit, setMinTimeLimit] = useState('');
 
   const cascade = useAssignmentCascade();
 
@@ -54,6 +55,7 @@ function BusinessSopCreateForm({ open, onClose, businessId, onCreated }) {
       setDescription('');
       setCategoryId('');
       setIsDefaultOnboarding(false);
+      setMinTimeLimit('');
       cascade.setSelectedBusinessIds([]);
       cascade.setSelectedDeptIds([]);
       cascade.setSelectedPositions([]);
@@ -74,6 +76,7 @@ function BusinessSopCreateForm({ open, onClose, businessId, onCreated }) {
         status: 'Draft',
         restriction_type: cascade.selectedDeptIds.length > 0 ? 'assigned' : 'public',
         is_default_onboarding: isDefaultOnboarding ? 1 : 0,
+        min_time_limit: minTimeLimit ? Number(minTimeLimit) * 60 : null,
       });
 
       const sopId = sopData?.data?.id || sopData?.id;
@@ -129,6 +132,8 @@ function BusinessSopCreateForm({ open, onClose, businessId, onCreated }) {
       onCreate={handleCreate}
       newIsDefaultOnboarding={isDefaultOnboarding}
       setNewIsDefaultOnboarding={setIsDefaultOnboarding}
+      newMinTimeLimit={minTimeLimit}
+      setNewMinTimeLimit={setMinTimeLimit}
     />
   );
 }

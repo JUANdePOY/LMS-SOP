@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { getSops, createSop, updateSop, deleteSop, archiveSop, unarchiveSop } from '@/features/sop-management/services/sopService';
 import { createAssignment, fetchAssigned, deleteAssignment } from '@/features/sop-management/services/assignmentService';
-import { createModule } from '@/features/sop-management/services/moduleService';
+import { createModule, getModules, updateModule } from '@/features/sop-management/services/moduleService';
 import { createLink } from '@/features/sop-management/services/attachmentService';
 import { useAssignmentCascade } from '@/features/sop-management/hooks/useAssignmentCascade';
 import { getCategories } from '@/features/organization-management/api/category.api';
@@ -48,6 +48,7 @@ export function useSOPList() {
   const [editOriginalDeptIds, setEditOriginalDeptIds] = useState([]);
   const [archivedTab, setArchivedTab] = useState(false);
   const [newIsDefaultOnboarding, setNewIsDefaultOnboarding] = useState(false);
+  const [newMinTimeLimit, setNewMinTimeLimit] = useState('');
   const [editIsDefaultOnboarding, setEditIsDefaultOnboarding] = useState(false);
 
   const filteredCategories = useMemo(() => {
@@ -115,6 +116,7 @@ export function useSOPList() {
     cascade.setSelectedUserIds([]);
     cascade.setUserSearch('');
     setNewIsDefaultOnboarding(false);
+    setNewMinTimeLimit('');
   }, [cascade]);
 
   const handleCreate = async () => {
@@ -129,14 +131,17 @@ export function useSOPList() {
         status: SOP_STATUSES.DRAFT,
         restriction_type: resolveRestrictionType(cascade.selectedDeptIds, cascade.selectedPositions, cascade.selectedUserIds),
         is_default_onboarding: newIsDefaultOnboarding ? 1 : 0,
+        min_time_limit: newMinTimeLimit ? Number(newMinTimeLimit) * 60 : null,
       });
       const sopId = sopData?.data?.id || sopData?.id;
       
-      // Create a default module for the SOP
+      const moduleTimeLimit = newMinTimeLimit ? Number(newMinTimeLimit) * 60 : null;
+      
       const moduleResponse = await createModule(sopId, {
         title: 'Main Content',
         content: '',
         sort_order: 1,
+        time_limit: moduleTimeLimit,
       });
       const moduleId = moduleResponse?.data?.id || moduleResponse?.id;
       
@@ -218,7 +223,7 @@ export function useSOPList() {
     setEditIsDefaultOnboarding(false)
   };
 
-  const handleEditSave = async (sopId) => {
+  const handleEditSave = async (sopId, overrides = {}) => {
     if (!editTitle.trim()) return;
     try {
       const currentDeptIds = cascade.selectedDeptIds;
@@ -230,8 +235,27 @@ export function useSOPList() {
         category_id: editCategoryId || null,
         department_id: currentDeptIds.length > 0 ? currentDeptIds[0] : null,
         restriction_type: resolveRestrictionType(currentDeptIds, cascade.selectedPositions, cascade.selectedUserIds),
-        is_default_onboarding: editIsDefaultOnboarding ? 1 : 0, 
+        is_default_onboarding: editIsDefaultOnboarding ? 1 : 0,
+        ...overrides,
       });
+
+      if (overrides.min_time_limit !== undefined) {
+        try {
+          const { data: mods } = await getModules(sopId);
+          const rows = mods?.data || [];
+          await Promise.all(
+            rows.map((m) =>
+              updateModule(m.id, {
+                time_limit: overrides.min_time_limit,
+              }).catch((err) => {
+                console.error('Failed to update module time limit', err);
+              })
+            )
+          );
+        } catch (err) {
+          console.error('Failed to sync module time limits', err);
+        }
+      }
 
       // Only touch the assignment records if the department selection
       // actually changed — avoids churning (and re-auditing) assignments
@@ -337,6 +361,8 @@ export function useSOPList() {
     // Onboarding
     newIsDefaultOnboarding,
     setNewIsDefaultOnboarding,
+    newMinTimeLimit,
+    setNewMinTimeLimit,
     editIsDefaultOnboarding,
     setEditIsDefaultOnboarding,
   };

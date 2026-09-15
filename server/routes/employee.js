@@ -10,6 +10,8 @@ router.use(authenticateToken);
 // Onboarding endpoints (no onboarding gate - employee need these to complete onboarding)
 router.get('/onboarding', employeeOnboardingController.getMyOnboarding);
 router.post('/onboarding/:ackId/acknowledge', employeeOnboardingController.acknowledgeOnboardingSop);
+router.get('/onboarding/:ackId/session', employeeOnboardingController.getOrCreateOnboardingSession);
+router.post('/onboarding/session/:sessionId/heartbeat', employeeOnboardingController.heartbeatOnboardingSession);
 
 // Employee SOP access - gated by onboarding completion
 router.use(requireOnboardingComplete);

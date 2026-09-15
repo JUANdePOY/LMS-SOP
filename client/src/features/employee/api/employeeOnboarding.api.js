@@ -43,3 +43,17 @@ export async function acknowledgeOnboardingSop(ackId) {
   });
   return handle(res);
 }
+
+export async function getOrCreateOnboardingSession(ackId) {
+  const res = await fetch(`${API_BASE}/onboarding/${ackId}/session`, { headers: authHeaders() });
+  return handle(res);
+}
+
+export async function heartbeatOnboardingSession(sessionId, elapsedSeconds) {
+  const res = await fetch(`${API_BASE}/onboarding/session/${sessionId}/heartbeat`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ elapsed_seconds: elapsedSeconds }),
+  });
+  return handle(res);
+}
