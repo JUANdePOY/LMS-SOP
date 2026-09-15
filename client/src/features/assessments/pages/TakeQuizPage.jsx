@@ -117,9 +117,6 @@ function ResultView({ result, quiz, attempt, attemptsRemaining, attemptsAllowed,
                 )}
               </div>
             )}
-            <Button variant="outline" onClick={() => navigate(from.courseId ? `/courses/view/${from.courseId}` : "/courses")}>
-              Back to Course
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -199,14 +196,6 @@ export default function TakeQuizPage() {
       from.nextLessonId = from.nextLessonId || stored.nextLessonId;
     } catch { /* ignore */ }
   }
-
-  const handleBackToCourse = useCallback(() => {
-    if (from.lessonId) {
-      navigate(`/courses/view/${from.courseId}/lesson/${from.lessonId}`);
-    } else {
-      navigate(`/courses/view/${from.courseId}`);
-    }
-  }, [from.courseId, from.lessonId, navigate]);
 
   const handleProceedToNextLesson = useCallback(async () => {
     if (!from.lessonId) return;
@@ -318,7 +307,6 @@ export default function TakeQuizPage() {
         violationCount={violationCount}
         result={result}
         onRetake={handleRetake}
-        onBackToCourse={handleBackToCourse}
         onProceedToNextLesson={result?.passed ? handleProceedToNextLesson : undefined}
       />
     </div>

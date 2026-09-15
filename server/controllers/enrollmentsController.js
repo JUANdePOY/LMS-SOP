@@ -225,8 +225,10 @@ function updateEnrollmentStatus(req, res) {
             if (result.issued) {
               return res.json({ success: true, message: 'Enrollment status updated', certificateIssued: true, certificate: result.issuance });
             }
+            return res.json({ success: true, message: 'Enrollment status updated', certificateIssued: false, certificateIssueReason: result.reason });
           } catch (err) {
             console.error('Auto certificate issuance failed:', err.message);
+            return res.json({ success: true, message: 'Enrollment status updated', certificateIssued: false, certificateIssueReason: err.message });
           }
         }
 

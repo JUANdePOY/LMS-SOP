@@ -50,6 +50,9 @@ export default function LessonPage() {
   const [ sopLoading, setSopLoading ] = useState(false);
   const [ sopError, setSopError ] = useState(null);
 
+  const [sopCompletedModules, setSopCompletedModules] = useState([]);
+  const [sopActiveModuleIndex, setSopActiveModuleIndex] = useState(0);
+
   const modules = data?.modules || [];
   const currentLesson = data?.lessons?.find((l) => String(l.id) === String(lessonId));
   const lessons = data?.lessons || [];
@@ -64,6 +67,27 @@ export default function LessonPage() {
   const latestAttempt = quizAttempts.length
     ? [...quizAttempts].sort((a, b) => (b.attempt_number || 0) - (a.attempt_number || 0))[0]
     : null;
+
+  const isSopLesson = currentLesson?.type === 'sop';
+  const isSopModuleCompleted = (index) => sopCompletedModules.includes(index);
+  const isSopModuleUnlocked = (index) => {
+    if (!isSopLesson) return true;
+    if (index === 0) return true;
+    return sopCompletedModules.includes(index - 1);
+  };
+  const markSopModuleComplete = (index) => {
+    if (!isSopLesson || isSopModuleCompleted(index)) return;
+    const next = [...sopCompletedModules, index];
+    setSopCompletedModules(next);
+    if (index + 1 < (sop?.modules?.length || 0)) {
+      setSopActiveModuleIndex(index + 1);
+    }
+  };
+  const areAllSopModulesComplete = () => {
+    if (!isSopLesson) return true;
+    if (!Array.isArray(sop?.modules) || sop.modules.length === 0) return true;
+    return sop.modules.every((_, idx) => sopCompletedModules.includes(idx));
+  };
 
   useEffect(() => {
     if (message) {
@@ -130,6 +154,28 @@ export default function LessonPage() {
       .finally(() => setSopLoading(false));
   }, [currentLesson?.type, currentLesson?.url]);
 
+  useEffect(() => {
+    setSopActiveModuleIndex(0);
+    if (!isSopLesson) {
+      setSopCompletedModules([]);
+      return;
+    }
+    try {
+      const raw = sessionStorage.getItem(`sop:lesson-modules:${courseId}:${lessonId}`);
+      const parsed = raw ? JSON.parse(raw) : [];
+      setSopCompletedModules(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setSopCompletedModules([]);
+    }
+  }, [courseId, lessonId, isSopLesson]);
+
+  useEffect(() => {
+    if (!isSopLesson) return;
+    try {
+      sessionStorage.setItem(`sop:lesson-modules:${courseId}:${lessonId}`, JSON.stringify(sopCompletedModules));
+    } catch { /* ignore */ }
+  }, [sopCompletedModules, isSopLesson, courseId, lessonId]);
+
   const handleMarkComplete = async () => {
     setMessage(null);
     try {
@@ -141,6 +187,9 @@ export default function LessonPage() {
       if (result?.data?.certificateIssued && result?.data?.certificate) {
         setCelebrationCertificate(result.data.certificate);
         setShowCelebration(true);
+      } else if (result?.data?.certificateIssued === false && result?.data?.certificateIssueReason) {
+        setMessage(result.data.certificateIssueReason);
+        setMessageType("warning");
       }
     } catch (err) {
       setMessage(err.message || "Failed to mark lesson as complete");
@@ -228,7 +277,7 @@ export default function LessonPage() {
       <div className="rounded-xl border border-[var(--border)] bg-white dark:bg-neutral-900 p-4">
         <h2 className="text-sm font-semibold mb-2">Lesson Content</h2>
         {message && (
-          <div className={`mb-3 rounded-lg p-3 text-sm ${messageType === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
+          <div className={`mb-3 rounded-lg p-3 text-sm ${messageType === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : messageType === 'warning' ? 'bg-yellow-50 text-yellow-800 border border-yellow-200' : 'bg-red-50 text-red-800 border border-red-200'}`}>
             {message}
           </div>
         )}
@@ -511,13 +560,27 @@ export default function LessonPage() {
                       )}
                     </div>
 
-                    {Array.isArray(sop.modules) && sop.modules.length > 0 ? (
-                      <div className="space-y-4">
-                        {sop.modules.map((mod, idx) => (
-                          <PublicModuleCard key={mod.id} module={mod} index={idx} />
-                        ))}
-                      </div>
-                    ) : (
+                     {Array.isArray(sop.modules) && sop.modules.length > 0 ? (
+                       <div className="space-y-4">
+                         {sop.modules.map((mod, idx) => {
+                           const isActive = idx === sopActiveModuleIndex;
+                           const isLocked = !isSopModuleUnlocked(idx);
+                           const isCompleted = isSopModuleCompleted(idx);
+                           return (
+                             <PublicModuleCard
+                               key={mod.id}
+                               module={mod}
+                               index={idx}
+                               isActive={isActive}
+                               isLocked={isLocked}
+                               isCompleted={isCompleted}
+                               onActivate={() => setSopActiveModuleIndex(idx)}
+                               onMarkComplete={() => markSopModuleComplete(idx)}
+                             />
+                           );
+                         })}
+                       </div>
+                     ) : (
                       <div className="bg-white dark:bg-neutral-800 rounded-xl border border-dashed border-neutral-300 dark:border-neutral-600 p-10 text-center">
                         <div className="w-14 h-14 rounded-full bg-neutral-50 dark:bg-neutral-750 flex items-center justify-center mx-auto mb-3">
                           <FileText size={24} className="text-neutral-400 dark:text-neutral-500" />
@@ -582,15 +645,28 @@ export default function LessonPage() {
         <div className="mt-4 flex justify-end">
           {currentLesson.status === 'completed' ? (
             <button
-              onClick={() => nextLesson && navigate(`/courses/view/${courseId}/lesson/${nextLesson.id}`)}
-              disabled={!nextLesson}
-              className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-[rgba(242,92,5,0.20)] transition-all hover-brand hover:shadow-md active:bg-[var(--color-primary-active)] disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => {
+                if (nextLesson) {
+                  navigate(`/courses/view/${courseId}/lesson/${nextLesson.id}`);
+                } else {
+                  navigate(`/courses/view/${courseId}`);
+                }
+              }}
+              className="group inline-flex items-center gap-2 rounded-xl bg-[var(--color-primary)] px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-[rgba(242,92,5,0.20)] transition-all hover-brand hover:shadow-md active:bg-[var(--color-primary-active)]"
             >
               {nextLesson ? 'Proceed to Next Lesson' : 'Course Completed'}
               {nextLesson && <ArrowRight size={17} className="transition-transform group-hover:translate-x-0.5" />}
             </button>
           ) : (
-            isVideoOrText && (
+            currentLesson.type === 'sop' ? (
+              <button
+                onClick={handleMarkComplete}
+                disabled={marking || !areAllSopModulesComplete()}
+                className="rounded-lg px-4 py-2 text-sm btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {marking ? 'Saving...' : areAllSopModulesComplete() ? 'Mark Lesson as Complete' : 'Complete All Modules to Proceed'}
+              </button>
+            ) : isVideoOrText && (
               <button
                 onClick={handleMarkComplete}
                 disabled={marking}

@@ -21,16 +21,16 @@ async function shouldAutoIssue(courseId, userId, enrollmentId) {
     return { shouldIssue: false, reason: 'Certificate already issued for this enrollment' };
   }
 
-  const quizzes = await quizModel.listQuizzes(courseId, { status: 'published' });
+  const quizzes = await quizModel.listQuizzes(courseId, { status: 'published', limit: 1000 });
   if (quizzes.length > 0) {
-    const unpublished = await quizModel.listQuizzes(courseId, { status: 'draft' });
+    const unpublished = await quizModel.listQuizzes(courseId, { status: 'draft', limit: 1000 });
     if (unpublished.length > 0) {
       return { shouldIssue: false, reason: 'Course has unpublished quizzes' };
     }
 
     for (const quiz of quizzes) {
       const best = await quizModel.getBestAttempt(quiz.id, userId);
-      if (!best || best.status !== 'completed' || best.passed !== 1) {
+      if (!best || !['completed', 'graded'].includes(best.status) || best.passed !== 1) {
         return { shouldIssue: false, reason: `Quiz "${quiz.title}" not passed` };
       }
     }

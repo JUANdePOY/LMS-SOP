@@ -111,7 +111,6 @@ export default function QuizPlayer({
   saving = false,
   result: resultProp,
   onRetake,
-  onBackToCourse,
   onProceedToNextLesson,
 }) {
   const { user } = useAuth();
@@ -388,11 +387,6 @@ export default function QuizPlayer({
               <Button variant="outline" onClick={onRetake} className="gap-2">
                 <RefreshCw className="h-4 w-4" />
                 Retake Quiz
-              </Button>
-            )}
-            {onBackToCourse && (
-              <Button variant="outline" onClick={onBackToCourse} className="gap-2">
-                Back to Course
               </Button>
             )}
             {resultProp?.passed && onProceedToNextLesson && (

@@ -244,9 +244,14 @@ async function markLessonComplete(req, res) {
           if (result.issued) {
             res.locals.certificateIssued = true;
             res.locals.certificate = result.issuance;
+          } else {
+            res.locals.certificateIssueFailed = true;
+            res.locals.certificateIssueReason = result.reason;
           }
         } catch (autoIssueErr) {
           console.error('Auto certificate issuance failed:', autoIssueErr.message);
+          res.locals.certificateIssueFailed = true;
+          res.locals.certificateIssueReason = autoIssueErr.message;
         }
       }
 
@@ -273,6 +278,9 @@ async function markLessonComplete(req, res) {
           ...(res.locals.certificateIssued ? {
             certificateIssued: true,
             certificate: res.locals.certificate,
+          } : res.locals.certificateIssueFailed ? {
+            certificateIssued: false,
+            certificateIssueReason: res.locals.certificateIssueReason,
           } : {}),
         },
       });

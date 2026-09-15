@@ -1757,7 +1757,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
       </span>
 
       <span className="flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
-        {canEditThisTask ? (
+        {canAdminister ? (
           <DueDateCell value={task.deadline_datetime} overdue={overdue} onChange={(d) => onInlineUpdate?.(task, { deadline_datetime: d })} />
         ) : (
           <span className={cn('text-xs tabular-nums', overdue ? 'text-red-600 dark:text-red-400' : 'text-[var(--text-secondary)]')}>{formatDate(task.deadline_datetime)}</span>

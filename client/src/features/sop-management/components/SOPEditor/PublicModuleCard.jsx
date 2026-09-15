@@ -10,7 +10,7 @@ const SOP_IMAGE_STYLES = `
   .sop-image-figure img { display: block; max-width: 100%; height: auto; }
 `;
 
-function PublicModuleCard({ module, index, isActive = false, isLocked = false, isCompleted = false, onActivate }) {
+function PublicModuleCard({ module, index, isActive = false, isLocked = false, isCompleted = false, onActivate, onMarkComplete }) {
   const [expanded, setExpanded] = useState(isActive);
   const contentRef = useRef(null);
   const hasContent = module.content && module.content.replace(/<[^>]*>/g, '').trim();
@@ -177,6 +177,18 @@ function PublicModuleCard({ module, index, isActive = false, isLocked = false, i
                       );
                     })}
                 </div>
+              </div>
+            )}
+            {onMarkComplete && isActive && !isCompleted && (
+              <div className="mt-5 pt-4 border-t border-neutral-100 dark:border-neutral-700/60">
+                <button
+                  type="button"
+                  onClick={onMarkComplete}
+                  className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-[rgba(242,92,5,0.20)] transition-all hover:shadow-md active:bg-[var(--color-primary-active)]"
+                >
+                  <CheckCircle2 size={16} />
+                  Mark Module Complete
+                </button>
               </div>
             )}
           </div>
