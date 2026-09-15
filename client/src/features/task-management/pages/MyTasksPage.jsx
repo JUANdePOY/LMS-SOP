@@ -72,6 +72,32 @@ export default function MyTasksPage() {
     return p ? { [scope.projectId]: p } : {};
   }, [hierarchy.projectsById, scope]);
 
+  const tasks = hierarchy.tasks;
+
+  const displayedTasks = useMemo(() => {
+    let result = tasks || [];
+    if (statusFilter) {
+      if (statusFilter === 'Overdue') {
+        result = result.filter((t) => isOverdue(t));
+      } else {
+        result = result.filter((t) => (t.status || '') === statusFilter && !isOverdue(t));
+      }
+    }
+    if (priorityFilter) {
+      result = result.filter((t) => (t.priority || '') === priorityFilter);
+    }
+    const q = search.trim().toLowerCase();
+    if (q) {
+      result = result.filter((t) => (t.title || '').toLowerCase().includes(q));
+    }
+    return result;
+  }, [tasks, statusFilter, priorityFilter, search]);
+
+  const scopedTasks = useMemo(() => {
+    if (!scope || !scope.projectId) return displayedTasks;
+    return (tasks || []).filter((t) => String(getProjectId(t)) === String(scope.projectId));
+  }, [tasks, displayedTasks, scope]);
+
   const matchingBusinessIds = useMemo(() => {
     const ids = new Set();
     for (const task of scopedTasks || []) {
@@ -224,34 +250,6 @@ export default function MyTasksPage() {
     const timeout = setTimeout(() => load(), 300);
     return () => clearTimeout(timeout);
   }, [search, statusFilter, priorityFilter, load]);
-
-  const tasks = hierarchy.tasks;
-
-  const displayedTasks = useMemo(() => {
-    let result = tasks || [];
-    if (statusFilter) {
-      if (statusFilter === 'Overdue') {
-        result = result.filter((t) => isOverdue(t));
-      } else {
-        result = result.filter((t) => (t.status || '') === statusFilter && !isOverdue(t));
-      }
-    }
-    if (priorityFilter) {
-      result = result.filter((t) => (t.priority || '') === priorityFilter);
-    }
-    const q = search.trim().toLowerCase();
-    if (q) {
-      result = result.filter((t) => (t.title || '').toLowerCase().includes(q));
-    }
-    return result;
-  }, [tasks, statusFilter, priorityFilter, search]);
-
-  // When scoped to a single task (from the assignment banner), show only the
-  // project tree that contains it.
-  const scopedTasks = useMemo(() => {
-    if (!scope || !scope.projectId) return displayedTasks;
-    return (tasks || []).filter((t) => String(getProjectId(t)) === String(scope.projectId));
-  }, [tasks, displayedTasks, scope]);
 
   const statItems = useMemo(() => {
     const list = scopedTasks || [];

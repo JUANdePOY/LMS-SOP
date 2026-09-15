@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Calendar, Megaphone,
 } from 'lucide-react';
@@ -11,6 +11,9 @@ import { cn } from '@/lib/utils';
 import KPIStatsGrid from '@/shared/components/dashboard/KPIStatsGrid';
 import useAdminDashboard from './hooks/useAdminDashboard';
 import { useNotifications } from '@/shared/stores/notificationStore.js';
+import { useAuth } from '@/contexts/AuthContext';
+import { getTasks } from '@/features/task-management/services/taskService';
+import { isOverdue } from '@/features/task-management/utils/taskDateUtils';
 
 const SOP_CATEGORY_COLORS = [
   '#F25C05', '#da7756', '#d97a6c', '#1D3067', '#32667F',
@@ -40,7 +43,11 @@ function formatEventDate(dateStr) {
 export default function Dashboard() {
   const { data, loading, error, refetch } = useAdminDashboard();
   const { fetch: fetchNotifications } = useNotifications();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'admin' || user?.role === 'department_head';
   const [period, setPeriod] = useState('month');
+  const [dashboardTasks, setDashboardTasks] = useState([]);
+  const [taskStatsLoading, setTaskStatsLoading] = useState(false);
 
   const trainingCompletionData = data
     ? buildTrainingCompletionData(data.training?.avg_progress)
@@ -60,6 +67,42 @@ export default function Dashboard() {
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTaskStatsLoading(true);
+    getTasks({ limit: 1000 })
+      .then((res) => {
+        if (!cancelled) {
+          const rows = Array.isArray(res?.rows) ? res.rows : [];
+          setDashboardTasks(rows);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDashboardTasks([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setTaskStatsLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const effectiveTaskStats = useMemo(() => {
+    const list = dashboardTasks || [];
+    const total = list.length;
+    const pending = list.filter((t) => t.status === 'Pending').length;
+    const in_progress = list.filter((t) => t.status === 'In Progress').length;
+    const completed = list.filter((t) => t.status === 'Completed').length;
+    const overdue = list.filter((t) => isOverdue(t)).length;
+    const cancelled = list.filter((t) => t.status === 'Cancelled').length;
+    return { total, pending, in_progress, completed, overdue, cancelled };
+  }, [dashboardTasks]);
 
   if (loading) {
     return (
@@ -273,170 +316,46 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* Activity & Task KPIs */}
-        <KPIStatsGrid
-          data={data}
-          items={[
-            {
-              id: 'total-tasks',
-              label: 'Total Tasks',
-              value: String(data?.tasks?.total || 0),
-              sub: 'All tasks',
-              icon: 'ClipboardCheck',
-              trend: null,
-              color: 'blue',
-            },
-            {
-              id: 'completed-tasks',
-              label: 'Completed Tasks',
-              value: String(data?.tasks?.completed || 0),
-              sub: 'Done',
-              icon: 'Award',
-              trend: null,
-              color: 'emerald',
-            },
-            {
-              id: 'overdue-tasks',
-              label: 'Overdue Tasks',
-              value: String(data?.tasks?.overdue || 0),
-              sub: 'Needs attention',
-              icon: 'AlertTriangle',
-              trend: null,
-              color: 'red',
-            },
-            {
-              id: 'active-learners',
-              label: 'Active Learners',
-              value: String(data?.training?.active_learners || 0),
-              sub: 'Currently learning',
-              icon: 'Users',
-              trend: null,
-              color: 'indigo',
-            },
-            {
-              id: 'completed-courses',
-              label: 'Completed Courses',
-              value: String(data?.training?.completed_courses || 0),
-              sub: 'Finished',
-              icon: 'BookOpen',
-              trend: null,
-              color: 'amber',
-            },
-            {
-              id: 'total-enrollments',
-              label: 'Total Enrollments',
-              value: String(data?.training?.total_enrollments || 0),
-              sub: 'All time',
-              icon: 'GraduationCap',
-              trend: null,
-              color: 'orange',
-            },
-            {
-              id: 'total-average-progress',
-              label: 'Total Average Progress',
-              value: `${data?.training?.avg_progress || 0}%`,
-              sub: 'Based on assigned clients & tasks',
-              icon: 'TrendingUp',
-              trend: null,
-              color: 'violet',
-            },
-          ]}
-        />
-      </div>
-
-      {/* Internal Tasks + Department Performance */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-5 lg:gap-6">
         {/* Internal Tasks Overview */}
-        <Card className="p-3 sm:p-4 lg:col-span-2">
+        <Card className="p-3 sm:p-4">
           <div className="flex items-center justify-between mb-3 sm:mb-4">
             <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Internal Tasks Overview</h2>
-            <a href="/tasks" className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
+            <a href={isAdmin ? "/tasks" : "/tasks/my"} className="text-[11px] sm:text-xs font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-hover)]">View All</a>
           </div>
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
-            {[
-              { label: 'Total Tasks', value: String(taskStats.total || 0), color: 'blue' },
-              { label: 'In Progress', value: String(taskStats.in_progress || 0), color: 'amber' },
-              { label: 'Completed', value: String(taskStats.completed || 0), color: 'emerald' },
-              { label: 'Overdue', value: String(taskStats.overdue || 0), color: 'red' },
-            ].map((task) => (
-              <div key={task.label} className={cn(
-                "group relative overflow-hidden rounded-xl p-3 text-center transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
-                task.color === 'red' ? 'bg-red-50 dark:bg-red-500/10' :
-                task.color === 'amber' ? 'bg-warning-soft dark:bg-warning-soft0/10' :
-                task.color === 'emerald' ? 'bg-success-soft dark:bg-success-soft' :
-                'bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)]'
-              )}>
-                <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-white/5" />
-                <div className="relative">
-                  <p className={cn(
-                    "text-xl sm:text-2xl font-bold",
-                    task.color === 'red' ? 'text-red-600 dark:text-red-400' :
-                    task.color === 'amber' ? 'text-[var(--color-warning)] dark:text-[var(--color-warning)]' :
-                    task.color === 'emerald' ? 'text-[var(--color-success)] dark:text-[var(--color-success)]' :
-                    'text-[var(--color-primary)] dark:text-[var(--color-primary)]'
-                  )}>{task.value}</p>
-                   <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{task.label}</p>
+          {taskStatsLoading ? (
+            <div className="flex h-24 items-center justify-center">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+              {[
+                { label: 'Total Tasks', value: String(effectiveTaskStats.total || 0), color: 'blue' },
+                { label: 'In Progress', value: String(effectiveTaskStats.in_progress || 0), color: 'amber' },
+                { label: 'Completed', value: String(effectiveTaskStats.completed || 0), color: 'emerald' },
+                { label: 'Overdue', value: String(effectiveTaskStats.overdue || 0), color: 'red' },
+              ].map((task) => (
+                <div key={task.label} className={cn(
+                  "group relative overflow-hidden rounded-xl p-3 text-center transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md",
+                  task.color === 'red' ? 'bg-red-50 dark:bg-red-500/10' :
+                  task.color === 'amber' ? 'bg-warning-soft dark:bg-warning-soft0/10' :
+                  task.color === 'emerald' ? 'bg-success-soft dark:bg-success-soft' :
+                  'bg-[rgba(242,92,5,0.08)] dark:bg-[rgba(242,92,5,0.16)]'
+                )}>
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-white/5" />
+                  <div className="relative">
+                    <p className={cn(
+                      "text-xl sm:text-2xl font-bold",
+                      task.color === 'red' ? 'text-red-600 dark:text-red-400' :
+                      task.color === 'amber' ? 'text-[var(--color-warning)] dark:text-[var(--color-warning)]' :
+                      task.color === 'emerald' ? 'text-[var(--color-success)] dark:text-[var(--color-success)]' :
+                      'text-[var(--color-primary)] dark:text-[var(--color-primary)]'
+                    )}>{task.value}</p>
+                     <p className="text-[10px] sm:text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">{task.label}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Department Performance */}
-        <Card className="p-3 sm:p-4 lg:col-span-3 overflow-x-auto">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <h2 className="text-sm font-bold text-neutral-800 dark:text-neutral-200">Department Performance</h2>
-            <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 px-2 py-1 text-[11px] sm:text-xs text-neutral-700 dark:text-neutral-300 outline-none focus:ring-2 focus:ring-[rgba(242,92,5,0.20)]"
-            >
-              <option value="month">This Month</option>
-              <option value="week">This Week</option>
-            </select>
-          </div>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-neutral-200 dark:border-neutral-800">
-                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap">Department</th>
-                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap">Total Users</th>
-                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap hidden sm:table-cell">Training Completion</th>
-                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap hidden sm:table-cell">Assessments</th>
-                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap hidden md:table-cell">SOPs Read</th>
-                <th className="px-2 sm:px-3 py-2 text-left font-semibold text-neutral-500 dark:text-neutral-400 whitespace-nowrap hidden md:table-cell">Certificates</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {departments.length > 0 ? departments.map((row) => (
-                <tr key={row.department} className="group transition-colors hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30">
-                  <td className="px-2 sm:px-3 py-2.5 font-medium text-neutral-900 dark:text-neutral-100 whitespace-nowrap">{row.department}</td>
-                   <td className="px-2 sm:px-3 py-2.5 text-neutral-600 dark:text-neutral-400 whitespace-nowrap">{row.totalUsers}</td>
-                  <td className="px-2 sm:px-3 py-2.5 hidden sm:table-cell">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 min-w-[60px]">
-                        <div className="h-full rounded-full bg-[rgba(242,92,5,0.08)]0 transition-all duration-500" style={{ width: `${row.trainingCompletion}%` }} />
-                      </div>
-                      <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 w-10 text-right">{row.trainingCompletion}%</span>
-                    </div>
-                  </td>
-                  <td className="px-2 sm:px-3 py-2.5 hidden sm:table-cell">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 h-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 min-w-[60px]">
-                        <div className="h-full rounded-full bg-success-soft0 transition-all duration-500" style={{ width: `${row.assessmentsPassed}%` }} />
-                      </div>
-                      <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 w-10 text-right">{row.assessmentsPassed}%</span>
-                    </div>
-                  </td>
-                   <td className="px-2 sm:px-3 py-2.5 text-neutral-600 dark:text-neutral-400 whitespace-nowrap hidden md:table-cell">{row.sopsRead}</td>
-                   <td className="px-2 sm:px-3 py-2.5 text-neutral-600 dark:text-neutral-400 whitespace-nowrap hidden md:table-cell">{row.certificatesIssued}</td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={6} className="px-3 py-4 text-center text-xs text-neutral-400 dark:text-neutral-500">No departments found.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
 

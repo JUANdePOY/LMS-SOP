@@ -1,15 +1,18 @@
-import { useEffect, useRef, useCallback } from "react";
-import { Loader2, Check, CheckCheck, Users, ChevronLeft } from "lucide-react";
+import { useEffect, useRef, useCallback, useState } from "react";
+import { Loader2, Check, CheckCheck, Users, ChevronLeft, Trash2, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/shared/components/ui/Avatar";
 import AttachmentView from "@/shared/components/ui/AttachmentView";
 import RichComposer from "@/features/task-management/components/RichComposer";
 import { getUsers } from "@/services/api";
+import { addParticipant } from "../api/message.api";
 import {
   getConversationDisplayName,
   getOtherParticipants,
   getDisplayName,
 } from "../utils/conversationDisplay";
+import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
+import AddParticipantsModal from "./AddParticipantsModal";
 
 function escapeRegExp(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -74,7 +77,7 @@ function dayLabel(dateStr) {
   return d.toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" });
 }
 
-function Header({ conversation, onBack }) {
+function Header({ conversation, onBack, isSuperAdmin, onDeleteParticipant, onAddParticipant }) {
   const isGroup = conversation?.type === "group_forum";
   const name = getConversationDisplayName(conversation, conversation?.current_user_id);
   const others = getOtherParticipants(conversation, conversation?.current_user_id);
@@ -119,13 +122,26 @@ function Header({ conversation, onBack }) {
           </p>
         </div>
       </div>
+      {isSuperAdmin && isGroup && onAddParticipant && (
+        <button
+          type="button"
+          onClick={onAddParticipant}
+          className="inline-flex items-center gap-1 rounded-full btn-primary px-3 py-1.5 text-xs font-medium text-white hover-brand"
+        >
+          <UserPlus size={14} />
+          Add Participants
+        </button>
+      )}
     </div>
   );
 }
 
-export default function MessageThread({ conversation, onSend, loading, onMarkAllRead, onBack }) {
+export default function MessageThread({ conversation, onSend, loading, onMarkAllRead, onBack, isSuperAdmin, onDeleteMessage, onDeleteParticipant, onAddParticipant }) {
   const messagesEndRef = useRef(null);
   const lastMessageId = useRef(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingMessageId, setDeletingMessageId] = useState(null);
+  const [showAddParticipants, setShowAddParticipants] = useState(false);
 
   useEffect(() => {
     const msgs = conversation?.messages || [];
@@ -142,6 +158,27 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
     const rows = Array.isArray(payload) ? payload : payload?.rows;
     return Array.isArray(rows) ? rows : [];
   }, []);
+
+  const requestDelete = useCallback((messageId) => {
+    setDeletingMessageId(messageId);
+    setShowDeleteConfirm(true);
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!deletingMessageId || !onDeleteMessage) return;
+    setShowDeleteConfirm(false);
+    await onDeleteMessage(deletingMessageId);
+    setDeletingMessageId(null);
+  }, [deletingMessageId, onDeleteMessage]);
+
+  const handleAddParticipant = useCallback(async (conversationId, userId) => {
+    const res = await addParticipant(conversationId, userId);
+    if (res.data?.success) {
+      onAddParticipant?.(conversationId, userId);
+    } else {
+      throw new Error(res.data?.message || "Failed to add participant");
+    }
+  }, [onAddParticipant]);
 
   const hasUnread = conversation?.messages?.some(
     (m) => !m.read_at && m.sender_id !== conversation.current_user_id
@@ -164,7 +201,7 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
 
   return (
     <div className="flex h-full flex-col">
-      <Header conversation={conversation} onBack={onBack} />
+      <Header conversation={conversation} onBack={onBack} isSuperAdmin={isSuperAdmin} onDeleteParticipant={onDeleteParticipant} onAddParticipant={() => setShowAddParticipants(true)} />
 
       {hasUnread && onMarkAllRead && (
         <div className="flex justify-center pt-2">
@@ -231,15 +268,24 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
                       <AttachmentView attachments={attachments} isOwn={isMine} variant="chat" />
                     )}
 
-                    <div className={cn(
-                      "text-[10px] mt-2 flex items-center gap-1 justify-end",
-                      isMine ? "text-white/85" : "text-neutral-400"
-                    )}>
-                      <span title={msg.sent_at ? new Date(msg.sent_at).toLocaleString() : ""}>
-                        {formatTime(msg.sent_at)}
-                      </span>
-                      {isMine && (isRead ? <CheckCheck size={11} /> : <Check size={11} />)}
-                    </div>
+                     <div className={cn(
+                       "text-[10px] mt-2 flex items-center gap-1 justify-end",
+                       isMine ? "text-white/85" : "text-neutral-400"
+                     )}>
+                       <span title={msg.sent_at ? new Date(msg.sent_at).toLocaleString() : ""}>
+                         {formatTime(msg.sent_at)}
+                       </span>
+                       {isMine && (isRead ? <CheckCheck size={11} /> : <Check size={11} />)}
+                       {isSuperAdmin && (
+                         <button
+                           onClick={() => requestDelete(msg.id)}
+                           className="ml-1 rounded p-0.5 text-white/70 hover:text-red-100 dark:text-neutral-400 dark:hover:text-red-300"
+                           title="Delete message"
+                         >
+                           <Trash2 size={12} />
+                         </button>
+                       )}
+                     </div>
                   </div>
                 </div>
               </div>
@@ -257,6 +303,23 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
           onSend={onSend}
         />
       </div>
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onCancel={() => { setShowDeleteConfirm(false); setDeletingMessageId(null); }}
+        onConfirm={handleConfirmDelete}
+        title="Delete Message"
+        description="Are you sure you want to delete this message? This action cannot be undone."
+        confirmLabel="Delete"
+        destructive
+      />
+
+      <AddParticipantsModal
+        open={showAddParticipants}
+        onClose={() => setShowAddParticipants(false)}
+        conversation={conversation}
+        onAdded={handleAddParticipant}
+      />
     </div>
   );
 }

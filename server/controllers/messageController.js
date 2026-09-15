@@ -233,6 +233,61 @@ function deleteConversation(req, res) {
     .catch((err) => sendError(res, err, 'Failed to delete conversation'));
 }
 
+function deleteMessage(req, res) {
+  const { messageId } = req.params;
+  const role = req.user?.role;
+  if (role !== 'super_admin') {
+    return res.status(403).json({ success: false, message: 'Only Super Admins can delete messages', code: 'FORBIDDEN' });
+  }
+  messageModel.getMessage(messageId)
+    .then((message) => {
+      if (!message) {
+        return res.status(404).json({ success: false, message: 'Message not found', code: 'NOT_FOUND' });
+      }
+      return messageModel.deleteMessage(messageId)
+        .then(() => res.json({ success: true, message: 'Message deleted' }));
+    })
+    .catch((err) => sendError(res, err, 'Failed to delete message'));
+}
+
+function deleteParticipant(req, res) {
+  const { conversationId, userId } = req.params;
+  const role = req.user?.role;
+  if (role !== 'super_admin') {
+    return res.status(403).json({ success: false, message: 'Only Super Admins can remove participants', code: 'FORBIDDEN' });
+  }
+  messageModel.getConversation(conversationId)
+    .then((conversation) => {
+      if (!conversation) {
+        return res.status(404).json({ success: false, message: 'Conversation not found', code: 'NOT_FOUND' });
+      }
+      return messageModel.deleteParticipant(conversationId, userId)
+        .then(() => res.json({ success: true, message: 'Participant removed' }));
+    })
+    .catch((err) => sendError(res, err, 'Failed to remove participant'));
+}
+
+function addParticipant(req, res) {
+  const { conversationId } = req.params;
+  const { userId } = req.body || {};
+  const role = req.user?.role;
+  if (role !== 'super_admin') {
+    return res.status(403).json({ success: false, message: 'Only Super Admins can add participants', code: 'FORBIDDEN' });
+  }
+  if (!userId) {
+    return res.status(400).json({ success: false, message: 'userId is required', code: 'VALIDATION_ERROR' });
+  }
+  messageModel.getConversation(conversationId)
+    .then((conversation) => {
+      if (!conversation) {
+        return res.status(404).json({ success: false, message: 'Conversation not found', code: 'NOT_FOUND' });
+      }
+      return messageModel.addParticipant(conversationId, userId)
+        .then((result) => res.status(result.alreadyAdded ? 200 : 201).json({ success: true, message: result.alreadyAdded ? 'User already in conversation' : 'Participant added', data: result }));
+    })
+    .catch((err) => sendError(res, err, 'Failed to add participant'));
+}
+
 module.exports = {
   listConversations,
   getConversation,
@@ -241,4 +296,7 @@ module.exports = {
   listMessages,
   markAsRead,
   deleteConversation,
+  deleteMessage,
+  deleteParticipant,
+  addParticipant,
 };

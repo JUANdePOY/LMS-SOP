@@ -1,11 +1,11 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
 import { useConversations, useMessages } from "../hooks/useMessages";
-import { getConversation } from "../api/message.api";
+import { getConversation, deleteMessage, deleteConversation, deleteParticipant, addParticipant } from "../api/message.api";
 import { getConversationDisplayName, findExistingDirectConversation } from "../utils/conversationDisplay";
 import { getUser } from "@/services/api";
 import ConversationList from "../components/ConversationList";
@@ -13,6 +13,7 @@ import MessageThread from "../components/MessageThread";
 import NewConversationModal from "../components/NewConversationModal";
 import MessengerHeader from "../components/MessengerHeader";
 import { FadeIn } from "@/shared/motion";
+import { ConfirmDialog } from "@/shared/components/ui/ConfirmDialog";
 
 const FILTER = {
   ALL: "all",
@@ -29,6 +30,8 @@ export default function MessagingPage() {
   const [presetUser, setPresetUser] = useState(null);
   const [filter, setFilter] = useState(FILTER.ALL);
   const [search, setSearch] = useState("");
+  const [deletingMessageId, setDeletingMessageId] = useState(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const canCreateGroup = isSuperAdmin || isAdmin;
 
@@ -188,6 +191,67 @@ export default function MessagingPage() {
     handleSelectConversation(conv);
   };
 
+  const handleDeleteMessage = useCallback(async () => {
+    if (!deletingMessageId) return;
+    try {
+      await deleteMessage(deletingMessageId);
+      toast.success("Message deleted");
+      if (selectedConversation?.id) {
+        const updated = await getConversation(selectedConversation.id);
+        if (updated.data?.success && updated.data.data) {
+          setSelectedConversation({ ...selectedConversation, ...updated.data.data });
+        }
+      }
+      refreshConversations();
+    } catch (err) {
+      toast.error(err.message || "Failed to delete message");
+    } finally {
+      setShowDeleteConfirm(false);
+      setDeletingMessageId(null);
+    }
+  }, [deletingMessageId, selectedConversation, refreshConversations, toast]);
+
+  const requestDeleteMessage = useCallback((messageId) => {
+    setDeletingMessageId(messageId);
+    setShowDeleteConfirm(true);
+  }, []);
+
+  const handleDeleteParticipant = useCallback(async (conversationId, userId, userName) => {
+    try {
+      await deleteParticipant(conversationId, userId);
+      toast.success(`Removed ${userName || 'participant'} from conversation`);
+      const updated = await getConversation(conversationId);
+      if (updated.data?.success && updated.data.data) {
+        setSelectedConversation(prev => prev?.id === conversationId ? { ...prev, ...updated.data.data } : prev);
+      }
+      refreshConversations();
+    } catch (err) {
+      toast.error(err.message || "Failed to remove participant");
+    }
+  }, [refreshConversations, toast]);
+
+  const handleAddParticipant = useCallback(async (conversationId, userId) => {
+    await addParticipant(conversationId, userId);
+    const updated = await getConversation(conversationId);
+    if (updated.data?.success && updated.data.data) {
+      setSelectedConversation(prev => prev?.id === conversationId ? { ...prev, ...updated.data.data } : prev);
+    }
+    refreshConversations();
+  }, [refreshConversations]);
+
+  const handleDeleteConversation = useCallback(async (conversationId) => {
+    try {
+      await deleteConversation(conversationId);
+      toast.success("Conversation deleted");
+      if (selectedConversation?.id === conversationId) {
+        setSelectedConversation(null);
+      }
+      refreshConversations();
+    } catch (err) {
+      toast.error(err.message || "Failed to delete conversation");
+    }
+  }, [selectedConversation, refreshConversations, toast]);
+
   if (error) {
     return <div className="text-sm text-red-600">{error}</div>;
   }
@@ -233,6 +297,9 @@ export default function MessagingPage() {
                   onSelect={handleSelectConversation}
                   selectedId={selectedConversation?.id}
                   currentUserId={user?.id}
+                  isSuperAdmin={isSuperAdmin}
+                  onDeleteParticipant={handleDeleteParticipant}
+                  onDeleteConversation={handleDeleteConversation}
                 />
               </FadeIn>
             )}
@@ -250,6 +317,10 @@ export default function MessagingPage() {
             onMarkAllRead={() => {
               markAllAsRead(user?.id).then(() => refreshConversations()).catch(() => {});
             }}
+            isSuperAdmin={isSuperAdmin}
+            onDeleteMessage={requestDeleteMessage}
+            onDeleteParticipant={handleDeleteParticipant}
+            onAddParticipant={handleAddParticipant}
           />
         </div>
       </div>
@@ -266,6 +337,16 @@ export default function MessagingPage() {
         presetUser={presetUser}
         onCreateSuccess={handleCreateConversation}
         onOpenExisting={handleOpenExisting}
+      />
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onCancel={() => { setShowDeleteConfirm(false); setDeletingMessageId(null); }}
+        onConfirm={handleDeleteMessage}
+        title="Delete Message"
+        description="Are you sure you want to delete this message? This action cannot be undone."
+        confirmLabel="Delete"
+        destructive
       />
     </div>
   );

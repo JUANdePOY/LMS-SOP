@@ -59,6 +59,11 @@ router.post('/conversations', messageController.createConversation);
 router.post('/conversations/:conversationId/messages', messageUploadMiddleware, messageController.sendMessage);
 router.get('/conversations/:conversationId/messages', messageController.listMessages);
 router.patch('/messages/:messageId/read', messageController.markAsRead);
+
 router.delete('/conversations/:id', messageController.deleteConversation);
 
+router.delete('/messages/:messageId', messageController.deleteMessage);
+
+router.delete('/conversations/:conversationId/participants/:userId', messageController.deleteParticipant);
+router.post('/conversations/:conversationId/participants', messageController.addParticipant);
 module.exports = router;

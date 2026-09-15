@@ -22,6 +22,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
   const [previewData, setPreviewData] = useState([]);
   const [defaultPassword, setDefaultPassword] = useState('');
   const [sampleLoading, setSampleLoading] = useState(false);
+  const [detailedErrors, setDetailedErrors] = useState([]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -33,6 +34,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
       setDefaultPassword('');
       setLoading(false);
       setSampleLoading(false);
+      setDetailedErrors([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -147,6 +149,13 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
     }
   };
 
+  const getRowIdentifier = (row) => {
+    if (!row || !Array.isArray(row)) return 'Unknown row';
+    const values = row.filter(v => v != null && String(v).trim()).map(v => String(v).trim());
+    if (values.length === 0) return 'Empty row';
+    return values.slice(0, 3).join(' | ');
+  };
+
   const handleFileChange = (e) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -195,7 +204,6 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
       XLSX.utils.book_append_sheet(wb, ws, 'Users');
       XLSX.writeFile(wb, 'user_bulk_upload_sample.xlsx');
     } catch (err) {
-      console.error('[BulkUpload] Failed to fetch sample data:', err);
       setError('Failed to load departments and businesses for sample file. Please check your connection.');
     } finally {
       setSampleLoading(false);
@@ -215,6 +223,7 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
 
     setLoading(true);
     setError(null);
+    setDetailedErrors([]);
     setStage("uploading");
 
     try {
@@ -222,29 +231,32 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
       formData.append("file", file);
       formData.append("password", defaultPassword);
 
-      console.log('[BulkUpload] Uploading file:', file.name, 'size:', file.size);
       const response = await bulkUploadUsers(formData);
-      console.log('[BulkUpload] Response:', response.data);
 
       if (response.data.status === "success") {
+        const successful = response.data.data?.successful || 0;
+        const failed = response.data.data?.failed || 0;
+        const errors = response.data.data?.errors || [];
+
+        setDetailedErrors(errors);
         setSuccessMessage(
-          `Successfully created ${response.data.data.successful} user(s). ${
-            response.data.data.failed > 0
-              ? `${response.data.data.failed} failed.`
-              : ""
+          `Successfully created ${successful} user(s). ${
+            failed > 0 ? `${failed} failed.` : ""
           }`
         );
         setStage("success");
-        setTimeout(() => {
-          handleClose();
-          onSuccess?.();
-        }, 3000);
+
+        if (failed === 0) {
+          setTimeout(() => {
+            handleClose();
+            onSuccess?.();
+          }, 3000);
+        }
       } else {
         setError(response.data.message || "Upload failed");
         setStage("preview");
       }
     } catch (err) {
-      console.error('[BulkUpload] Upload error:', err);
       setError(err.response?.data?.message || err.message || "Upload failed. Please try again.");
       setStage("preview");
     } finally {
@@ -259,9 +271,11 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
     setSuccessMessage("");
     setPreviewData([]);
     setDefaultPassword('');
+    setDetailedErrors([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    onSuccess?.();
     onClose();
   };
 
@@ -492,9 +506,50 @@ export default function BulkUploadModal({ isOpen, onClose, onSuccess }) {
             <div className="text-center py-8">
               <CheckCircle className="w-12 h-12 text-green-600 dark:text-green-400 mx-auto mb-3" />
               <p className="text-sm text-neutral-700 dark:text-neutral-300">{successMessage}</p>
-              <p className="text-[11px] text-neutral-500 dark:text-neutral-400 mt-1">
-                The modal will close automatically...
-              </p>
+              {detailedErrors.length > 0 && (
+                <div className="mt-4 text-left">
+                  <p className="text-[11px] font-semibold text-neutral-900 dark:text-neutral-300 uppercase tracking-wide mb-2">
+                    Error Details ({detailedErrors.length})
+                  </p>
+                  <div className="border border-neutral-200 dark:border-neutral-700 rounded-lg overflow-hidden">
+                    <table className="w-full text-[11px]">
+                      <thead className="bg-neutral-50 dark:bg-neutral-800">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Row Data</th>
+                          <th className="px-3 py-2 text-left font-semibold text-neutral-600 dark:text-neutral-400">Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                        {detailedErrors.map((item, idx) => (
+                          <tr key={idx} className="bg-white dark:bg-neutral-900">
+                            <td className="px-3 py-2 text-neutral-800 dark:text-neutral-200 whitespace-nowrap max-w-[200px] truncate">
+                              {getRowIdentifier(item.row)}
+                            </td>
+                            <td className="px-3 py-2 text-red-700 dark:text-red-300">
+                              {item.error}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              <div className="mt-4 flex items-center justify-center gap-2">
+                {detailedErrors.length > 0 && (
+                  <button
+                    onClick={handleClose}
+                    className="inline-flex items-center rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 px-4 py-1.5 text-[11px] font-medium text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+                  >
+                    Close
+                  </button>
+                )}
+                {detailedErrors.length === 0 && (
+                  <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
+                    The modal will close automatically...
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </div>

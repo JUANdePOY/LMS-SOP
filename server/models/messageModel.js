@@ -256,6 +256,32 @@ const messageModel = {
     );
     return rows.length > 0;
   },
+
+  async deleteParticipant(conversationId, userId) {
+    const [result] = await db.query(
+      'DELETE FROM conversation_participants WHERE conversation_id = ? AND user_id = ?',
+      [conversationId, userId]
+    );
+    return result.affectedRows > 0 ? { conversationId, userId } : null;
+  },
+
+  async addParticipant(conversationId, userId) {
+    const [existing] = await db.query(
+      'SELECT 1 FROM conversation_participants WHERE conversation_id = ? AND user_id = ? LIMIT 1',
+      [conversationId, userId]
+    );
+    if (existing.length > 0) return { conversationId, userId, alreadyAdded: true };
+    await db.query(
+      'INSERT INTO conversation_participants (conversation_id, user_id) VALUES (?, ?)',
+      [conversationId, userId]
+    );
+    return { conversationId, userId, alreadyAdded: false };
+  },
+
+  async deleteMessage(messageId) {
+    const [result] = await db.query('DELETE FROM messages WHERE id = ?', [messageId]);
+    return result.affectedRows > 0 ? { id: messageId } : null;
+  },
 };
 
 module.exports = messageModel;

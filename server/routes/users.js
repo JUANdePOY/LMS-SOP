@@ -538,8 +538,6 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
       }
     });
 
-    console.log('[BulkUpload] Loaded workbook rows:', raw.length, 'headers:', headers);
-
     const get = (row, name) => {
       const k = String(name).trim().toLowerCase();
       const idx = headerLookup[k] ?? headerLookup[k.replace(/[\s/()]+/g, '')];
@@ -559,8 +557,6 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
     };
 
     const ALLOWED_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
-    console.log('[BulkUpload] Dept map:', deptMap);
-    console.log('[BulkUpload] Business map:', businessMap);
 
     let success = 0, failed = 0;
     const results = [];
@@ -570,11 +566,9 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
         const fullName = get(row, 'Full Name') || get(row, 'Fullname') || get(row, 'Name');
         const email = get(row, 'Email Address') || get(row, 'Email');
         const rowRole = get(row, 'Role');
-        console.log('[BulkUpload] Row raw:', row, 'parsed=>', { fullName, email, rowRole });
         if (!fullName || !email) {
           failed++;
           results.push({ row, error: 'Missing full name or email' });
-          console.log('[BulkUpload] Row skipped: missing full name or email');
           continue;
         }
 
@@ -582,7 +576,6 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
         if (!cleanRole) {
           failed++;
           results.push({ row, error: 'Missing or invalid role. Allowed: employee, department_head, admin, super_admin' });
-          console.log('[BulkUpload] Row skipped: invalid role', rowRole);
           continue;
         }
 
@@ -590,7 +583,6 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
         if (existing.length > 0) {
           failed++;
           results.push({ row, error: `Email ${email} already exists` });
-          console.log('[BulkUpload] Row skipped: duplicate email', email);
           continue;
         }
 
@@ -604,22 +596,18 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
         if (cleanRole === 'super_admin') {
           departmentId = null;
           businessId = null;
-          console.log('[BulkUpload] Role=super_admin, forcing dept/business null');
         } else {
           if (deptName && DEPARTMENT_SCOPED_ROLES.includes(cleanRole)) {
             departmentId = deptMap[deptName.toLowerCase()] || null;
-            console.log('[BulkUpload] dept lookup', deptName, '=>', departmentId);
           }
           if (businessName) {
             businessId = businessMap[businessName.toLowerCase()] || null;
-            console.log('[BulkUpload] business lookup', businessName, '=>', businessId);
           }
         }
 
         if (cleanRole === 'admin' && !businessId) {
           failed++;
           results.push({ row, error: 'Admin users require a valid Business value' });
-          console.log('[BulkUpload] Row skipped: admin missing business');
           continue;
         }
 
@@ -627,13 +615,11 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
           if (!departmentId) {
             failed++;
             results.push({ row, error: 'Department head users require a valid Department value' });
-            console.log('[BulkUpload] Row skipped: dept_head missing department');
             continue;
           }
           if (!businessId) {
             failed++;
             results.push({ row, error: 'Department head users require a valid Business value' });
-            console.log('[BulkUpload] Row skipped: dept_head missing business');
             continue;
           }
         }
@@ -643,21 +629,6 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
         const dateHired = formatDate(get(row, 'Date Hired') || get(row, 'DateHired'));
         const birthdate = formatDate(get(row, 'Birthdate') || get(row, 'Birth Date'));
         const address = get(row, 'Address') || null;
-
-        console.log('[BulkUpload] Creating user:', {
-          full_name: fullName,
-          email: email.toLowerCase(),
-          role: cleanRole,
-          department_id: departmentId,
-          business_id: businessId,
-          position_title: positionTitle,
-          employee_id: employeeId,
-          contact_number: contactNumber,
-          employment_status: employmentStatus,
-          date_hired: dateHired,
-          birthdate: birthdate,
-          address,
-        });
 
         const userId = await authModel.create({
           full_name: fullName,
@@ -683,12 +654,10 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
           new_values: { email: email.toLowerCase(), role: cleanRole, full_name: fullName }
         });
 
-        console.log('[BulkUpload] Created user id=', userId, 'email=', email);
         success++;
       } catch (err) {
         failed++;
         results.push({ row, error: err.message });
-        console.error('[BulkUpload] Row error:', err);
       }
     }
 
@@ -702,7 +671,6 @@ router.post('/bulk-upload', authenticateToken, requireSuperAdmin, userUpload.sin
       }
     });
   } catch (err) {
-    console.error('Bulk user upload error:', err);
     res.status(500).json({ status: 'error', message: 'Bulk upload failed: ' + err.message, code: 'SERVER_ERROR' });
   }
 });

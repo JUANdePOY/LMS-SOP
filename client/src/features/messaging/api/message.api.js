@@ -48,6 +48,21 @@ export async function deleteConversation(id) {
   return request(`${API_BASE}/conversations/${id}`, { method: "DELETE" });
 }
 
+export async function deleteMessage(messageId) {
+  return request(`${API_BASE}/messages/${messageId}`, { method: "DELETE" });
+}
+
+export async function deleteParticipant(conversationId, userId) {
+  return request(`${API_BASE}/conversations/${conversationId}/participants/${userId}`, { method: "DELETE" });
+}
+
+export async function addParticipant(conversationId, userId) {
+  return request(`${API_BASE}/conversations/${conversationId}/participants`, {
+    method: "POST",
+    body: JSON.stringify({ userId }),
+  });
+}
+
 function authHeaders() {
   const token = session.getCurrentToken();
   const headers = { "Content-Type": "application/json" };
