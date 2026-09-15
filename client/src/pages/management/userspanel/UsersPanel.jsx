@@ -82,6 +82,7 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
   const [departments, setDepartments] = useState(initialDepartments);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [deptFilter, setDeptFilter] = useState('');
@@ -113,6 +114,13 @@ export default function UsersPanel({ departments: initialDepartments = [], activ
       setModalDepartments(departments);
     }
   }, [formData.business_id, departments, formData.department_id]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const fetchUsers = useCallback(async () => {
     if (!isAuthenticated) return;
@@ -323,7 +331,7 @@ return false;
 
   const filteredUsers = users.filter((u) => {
     if (u.is_active === false) return false;
-    if (search && !u.full_name?.toLowerCase().includes(search.toLowerCase()) && !u.email?.toLowerCase().includes(search.toLowerCase())) return false;
+    if (searchInput && !u.full_name?.toLowerCase().includes(searchInput.toLowerCase()) && !u.email?.toLowerCase().includes(searchInput.toLowerCase())) return false;
     if (roleFilter && u.role !== roleFilter) return false;
     if (deptFilter && u.department_id !== parseInt(deptFilter)) return false;
     if (businessFilter && u.business_id !== parseInt(businessFilter)) return false;
@@ -397,7 +405,17 @@ return false;
       setLoading(false);
     };
     load();
-  }, [activeTab, fetchUsers, fetchStats, fetchDepartments, fetchBusinesses, isAuthenticated]);
+    // fetchUsers changes when search/filters change; we handle that in a
+    // separate effect below so filter/search changes do NOT trigger a full
+    // page reload / loading spinner.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, fetchStats, fetchDepartments, fetchBusinesses, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (activeTab !== 'users') return;
+    fetchUsers();
+  }, [fetchUsers, activeTab, isAuthenticated]);
 
   if (loading) {
     return (
@@ -502,29 +520,29 @@ return false;
       )}
 
       <div className="flex flex-col lg:flex-row gap-3">
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
           <Input
             placeholder="Search users by name, email, or employee ID…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="pl-9 sm:pl-10 border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/20 dark:focus:ring-blue-400/20 transition-all"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="w-full sm:w-auto border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="w-auto min-w-[130px] border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400">
             <option value="">All Roles</option>
             {Object.entries(ROLE_META).map(([key, meta]) => (
               <option key={key} value={key}>{meta.label}</option>
             ))}
           </Select>
-          <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="w-full sm:w-auto border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400">
+          <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="w-auto min-w-[130px] border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400">
             <option value="">All Departments</option>
             {departments.map((d) => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
           </Select>
-          <Select value={businessFilter} onChange={(e) => setBusinessFilter(e.target.value)} className="w-full sm:w-auto border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400">
+          <Select value={businessFilter} onChange={(e) => setBusinessFilter(e.target.value)} className="w-auto min-w-[130px] border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 focus:border-blue-500 dark:focus:border-blue-400">
             <option value="">All Businesses</option>
             {businesses.map((b) => (
               <option key={b.id} value={b.id}>{b.business_name}</option>
