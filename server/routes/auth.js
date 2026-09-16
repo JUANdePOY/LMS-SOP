@@ -37,7 +37,7 @@ const RESET_TOKEN_EXPIRY_MINUTES = 60;
 router.post('/login', loginLimiter, [
   body('email')
     .isEmail()
-    .normalizeEmail()
+    .normalizeEmail({ all_lowercase: true, gmail_remove_dots: false })
     .withMessage('Valid email is required'),
   body('password')
     .notEmpty()
@@ -45,6 +45,8 @@ router.post('/login', loginLimiter, [
     .withMessage('Password is required')
 ], async (req, res) => {
   const requestId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  console.log(`[login:${requestId}] received`, LOGIN_BODY_SAMPLE(req.body));
 
   const loginTimer = setTimeout(() => {
     console.error(`[login:${requestId}] timeout after ${LOGIN_TIMEOUT_MS}ms`);
