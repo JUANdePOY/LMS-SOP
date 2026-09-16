@@ -66,28 +66,67 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (email, password) => {
     setError(null);
-    setLoading(true);
 
     try {
       const response = await api.post('/auth/login', { email, password }, { skipAuthRedirect: true });
 
-      if (response.data.status === 'success') {
-        const { token, refreshToken, user: userData } = response.data.data;
+      if (response.data?.status === 'success') {
+        const { token, refreshToken, user: userData } = response.data.data || {};
+        if (!token || !userData) {
+          throw new Error('Invalid login response');
+        }
         const normalizedUser = normalizeUser(userData);
-
         session.saveCurrentSession(token, normalizedUser, refreshToken);
-
         setUser(normalizedUser);
         return { success: true, user: normalizedUser };
-      } else {
-        throw new Error(response.data.message || 'Login failed');
       }
+
+      const message = response.data?.message || 'Login failed';
+      throw new Error(message);
     } catch (err) {
-      const message = err.response?.data?.message || err.message || 'Login failed';
+      const data = err.response?.data || {};
+      const code = data.code;
+      let message = data.message || err.message || 'Login failed';
+
+      if (code === 'ACCOUNT_LOCKED') {
+        const retryAfter = data.retryAfter;
+        if (retryAfter) {
+          const minutes = Math.ceil(retryAfter / 60000);
+          message = `Account is locked. Try again in ${minutes} minute${minutes !== 1 ? 's' : ''}.`;
+        }
+      }
+
+      setError(message);
+      return { success: false, error: message, code: code || 'UNKNOWN_ERROR' };
+    }
+  }, []);
+
+  const forgotPassword = useCallback(async (email) => {
+    setError(null);
+
+    try {
+      const response = await api.post('/auth/forgot-password', { email }, { skipAuthRedirect: true });
+      return { success: response.data.status === 'success', message: response.data.message };
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Request failed';
       setError(message);
       return { success: false, error: message };
-    } finally {
-      setLoading(false);
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (token, password) => {
+    setError(null);
+
+    try {
+      const response = await api.post('/auth/reset-password', { token, password }, { skipAuthRedirect: true });
+      if (response.data.status === 'success') {
+        return { success: true, message: response.data.message };
+      }
+      throw new Error(response.data.message || 'Password reset failed');
+    } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Password reset failed';
+      setError(message);
+      return { success: false, error: message };
     }
   }, []);
 
@@ -187,6 +226,8 @@ export function AuthProvider({ children }) {
       businessId,
       hasPermission,
       setError,
+      forgotPassword,
+      resetPassword,
     }}>
       {children}
     </AuthContext.Provider>

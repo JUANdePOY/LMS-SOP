@@ -16,7 +16,7 @@ function normalizeDate(value) {
 
 async function findByEmail(email) {
   const [rows] = await db.query(
-    'SELECT * FROM users WHERE email = ?',
+    'SELECT id, full_name, email, password_hash, role, business_id, department_id, position_title, employee_id, is_active, failed_attempts, locked_at, reset_token, reset_token_expires FROM users WHERE email = ?',
     [email]
   );
   return rows[0] || null;
@@ -252,6 +252,49 @@ async function getUserLeaderboard(filters = {}) {
   return rows;
 }
 
+async function incrementFailedAttempts(id) {
+  await db.query(
+    'UPDATE users SET failed_attempts = failed_attempts + 1 WHERE id = ?',
+    [id]
+  );
+}
+
+async function resetFailedAttempts(id) {
+  await db.query(
+    'UPDATE users SET failed_attempts = 0, locked_at = NULL WHERE id = ?',
+    [id]
+  );
+}
+
+async function lockAccount(id, lockedAt) {
+  await db.query(
+    'UPDATE users SET locked_at = ? WHERE id = ?',
+    [lockedAt, id]
+  );
+}
+
+async function updateResetToken(id, tokenHash, expiresAt) {
+  await db.query(
+    'UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?',
+    [tokenHash, expiresAt, id]
+  );
+}
+
+async function findByResetToken(tokenHash) {
+  const [rows] = await db.query(
+    'SELECT id, email FROM users WHERE reset_token = ? AND reset_token_expires > NOW()',
+    [tokenHash]
+  );
+  return rows[0] || null;
+}
+
+async function clearResetToken(id) {
+  await db.query(
+    'UPDATE users SET reset_token = NULL, reset_token_expires = NULL WHERE id = ?',
+    [id]
+  );
+}
+
 module.exports = {
   findByEmail,
   findById,
@@ -263,4 +306,10 @@ module.exports = {
   listUsers,
   getStats,
   getUserLeaderboard,
+  incrementFailedAttempts,
+  resetFailedAttempts,
+  lockAccount,
+  updateResetToken,
+  findByResetToken,
+  clearResetToken,
 };

@@ -816,6 +816,14 @@ const MIGRATIONS = [
       INDEX idx_sop_onboarding_sessions_version (sop_version_id),
       INDEX idx_sop_onboarding_sessions_ack (acknowledgement_id)
     )`,
+    // Login security: failed attempts and account lockout
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS failed_attempts INT NOT NULL DEFAULT 0 AFTER is_active`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS locked_at DATETIME DEFAULT NULL AFTER failed_attempts`,
+    `CREATE INDEX IF NOT EXISTS idx_users_locked_at ON users(locked_at)`,
+    // Password reset tokens
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255) DEFAULT NULL AFTER locked_at`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires DATETIME DEFAULT NULL AFTER reset_token`,
+    `CREATE INDEX IF NOT EXISTS idx_users_reset_token ON users(reset_token)`,
   ];
 
 async function runMigrations() {

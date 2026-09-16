@@ -1011,6 +1011,69 @@ select option {
     cursor: not-allowed;
   }
 
+  .login-input-error {
+    border-color: var(--accent-danger) !important;
+    box-shadow: 0 0 0 3px rgba(204, 31, 31, 0.08) !important;
+  }
+
+  .login-field-error {
+    font-size: 0.75rem;
+    color: var(--accent-danger);
+    line-height: 1.4;
+  }
+
+  .login-forgot-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    width: 100%;
+    padding: 0.5rem 1rem;
+    border: none;
+    background: none;
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+
+  .login-forgot-btn:hover:not(:disabled) {
+    color: var(--bg-topbar);
+  }
+
+  .login-forgot-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .login-success-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    text-align: center;
+    padding: 1rem 0;
+  }
+
+  .login-success-box p {
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    line-height: 1.5;
+  }
+
+  .login-btn-secondary {
+    background-color: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+
+  .login-btn-secondary:hover:not(:disabled) {
+    background-color: var(--bg-hover);
+    box-shadow: none;
+    transform: none;
+  }
+
   /* ── Card footer (parchment-tint, matches screenshot) ── */
   .login-card-footer {
     background-color: var(--bg-subtle);

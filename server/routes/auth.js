@@ -1,5 +1,4 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
 const fs = require('fs/promises');
 const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
@@ -9,6 +8,17 @@ const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 const loginLimiter = require('../middleware/rateLimiter');
 const { resolveUserPermissions } = require('../middleware/scope');
+const {
+  findByEmail,
+  incrementFailedAttempts,
+  resetFailedAttempts,
+  lockAccount,
+  updateResetToken,
+  findByResetToken,
+  clearResetToken,
+  updatePassword,
+  updateLastLogin,
+} = require('../models/authModel');
 
 const router = express.Router();
 
@@ -20,6 +30,9 @@ const LOGIN_BODY_SAMPLE = (data) => {
 };
 
 const LOGIN_TIMEOUT_MS = 12000;
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MINUTES = 30;
+const RESET_TOKEN_EXPIRY_MINUTES = 60;
 
 router.post('/login', loginLimiter, [
   body('email')
@@ -87,7 +100,7 @@ router.post('/login', loginLimiter, [
 
     if (!results || results.length === 0) {
       clearTimeout(loginTimer);
-      console.warn(`[login:${requestId}] user not found`, { email, dbHost: process.env.DB_HOST, dbName: process.env.DB_NAME });
+      console.warn(`[login:${requestId}] invalid credentials`);
       return res.status(401).json({
         status: 'error',
         message: 'Invalid email or password',
@@ -96,6 +109,24 @@ router.post('/login', loginLimiter, [
     }
 
     const user = results[0];
+
+    if (user.locked_at) {
+      const lockedAt = new Date(user.locked_at);
+      const lockExpiresAt = new Date(lockedAt.getTime() + LOCKOUT_DURATION_MINUTES * 60 * 1000);
+      const now = new Date();
+      if (now < lockExpiresAt) {
+        clearTimeout(loginTimer);
+        const remainingMs = lockExpiresAt.getTime() - now.getTime();
+        const remainingMinutes = Math.ceil(remainingMs / 60000);
+        console.warn(`[login:${requestId}] locked account attempt`, { email, userId: user.id, remainingMinutes });
+        return res.status(403).json({
+          status: 'error',
+          message: `Account is locked due to multiple failed login attempts. Please try again in ${remainingMinutes} minute${remainingMinutes !== 1 ? 's' : ''}.`,
+          code: 'ACCOUNT_LOCKED',
+          retryAfter: remainingMs
+        });
+      }
+    }
 
     if (!user.is_active) {
       clearTimeout(loginTimer);
@@ -109,27 +140,31 @@ router.post('/login', loginLimiter, [
 
     const rawHash = String(user.password_hash);
     const isPasswordValid = await comparePassword(password, rawHash);
-    const hashSelfTest = await bcrypt.compare('password123', rawHash);
 
     if (!isPasswordValid) {
       clearTimeout(loginTimer);
-      console.warn(`[login:${requestId}] invalid password`, {
-        email,
-        userId: user.id,
-        receivedPassword: JSON.stringify(password),
-        receivedPasswordLength: password?.length,
-        hasHash: !!rawHash,
-        hashLength: rawHash.length,
-        hashPrefix: rawHash.slice(0, 30),
-        hashSelfTestMatch: hashSelfTest,
-        hashFull: rawHash
-      });
+      await incrementFailedAttempts(user.id);
+      const newCount = (user.failed_attempts || 0) + 1;
+      console.warn(`[login:${requestId}] invalid password`, { email, userId: user.id, failedAttempts: newCount });
+      if (newCount >= MAX_FAILED_ATTEMPTS) {
+        const lockedAt = new Date();
+        await lockAccount(user.id, lockedAt);
+        console.warn(`[login:${requestId}] account locked`, { email, userId: user.id });
+        return res.status(403).json({
+          status: 'error',
+          message: `Account has been locked due to ${MAX_FAILED_ATTEMPTS} failed login attempts. Please try again in ${LOCKOUT_DURATION_MINUTES} minutes.`,
+          code: 'ACCOUNT_LOCKED',
+          retryAfter: LOCKOUT_DURATION_MINUTES * 60 * 1000
+        });
+      }
       return res.status(401).json({
         status: 'error',
         message: 'Invalid email or password',
         code: 'INVALID_CREDENTIALS'
       });
     }
+
+    await resetFailedAttempts(user.id);
 
     const token = generateToken({
       userId: user.id,
@@ -208,6 +243,119 @@ router.post('/login', loginLimiter, [
         retry: true,
       });
     }
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error',
+      code: 'SERVER_ERROR'
+    });
+  }
+});
+
+router.post('/forgot-password', [
+  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        errors: errors.array()
+      });
+    }
+
+    const { email } = req.body;
+    const user = await findByEmail(email);
+
+    if (!user) {
+      return res.status(200).json({
+        status: 'success',
+        message: 'If an account with that email exists, a password reset link has been sent.'
+      });
+    }
+
+    if (!user.is_active) {
+      return res.status(200).json({
+        status: 'success',
+        message: 'If an account with that email exists, a password reset link has been sent.'
+      });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const expiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MINUTES * 60 * 1000);
+
+    await updateResetToken(user.id, tokenHash, expiresAt);
+
+    logAudit({
+      user_id: user.id,
+      action: 'user.password_reset_requested',
+      entity_type: 'user',
+      entity_id: user.id,
+      metadata: { email: user.email }
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'If an account with that email exists, a password reset link has been sent.'
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Server error',
+      code: 'SERVER_ERROR'
+    });
+  }
+});
+
+router.post('/reset-password', [
+  body('token').notEmpty().withMessage('Reset token is required'),
+  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        errors: errors.array()
+      });
+    }
+
+    const { token, password } = req.body;
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    const user = await findByResetToken(tokenHash);
+    if (!user) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid or expired reset token',
+        code: 'INVALID_RESET_TOKEN'
+      });
+    }
+
+    const passwordHash = await hashPassword(password);
+    await updatePassword(user.id, passwordHash);
+    await resetFailedAttempts(user.id);
+    await clearResetToken(user.id);
+
+    logAudit({
+      user_id: user.id,
+      action: 'user.password_reset',
+      entity_type: 'user',
+      entity_id: user.id,
+      metadata: { email: user.email }
+    });
+
+    res.status(200).json({
+      status: 'success',
+      message: 'Password has been reset successfully'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Server error',

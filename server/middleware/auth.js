@@ -21,7 +21,7 @@ async function authenticateToken(req, res, next) {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     const [users] = await db.query(
-      'SELECT id, role, is_active, department_id, business_id, full_name, email, position_title, employee_id FROM users WHERE id = ?',
+      'SELECT id, role, is_active, locked_at, department_id, business_id, full_name, email, position_title, employee_id FROM users WHERE id = ?',
       [decoded.userId]
     );
 
@@ -40,6 +40,19 @@ async function authenticateToken(req, res, next) {
         message: 'User account is deactivated',
         code: 'ACCOUNT_DEACTIVATED'
       });
+    }
+
+    if (user.locked_at) {
+      const lockedAt = new Date(user.locked_at);
+      const lockExpiresAt = new Date(lockedAt.getTime() + 30 * 60 * 1000);
+      const now = new Date();
+      if (now < lockExpiresAt) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Account is temporarily locked',
+          code: 'ACCOUNT_LOCKED'
+        });
+      }
     }
 
     req.user = {
