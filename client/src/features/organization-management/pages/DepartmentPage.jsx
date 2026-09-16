@@ -176,11 +176,11 @@ export default function DepartmentPage() {
           <select
             value={businessFilter}
             onChange={(e) => setBusinessFilter(e.target.value)}
-            className="rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none"
+            className="rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none max-w-[180px] truncate"
           >
             <option value="all">All businesses</option>
             {(businesses || []).map((b) => (
-              <option key={b.id} value={b.id}>{b.business_name}</option>
+              <option key={b.id} value={b.id} title={b.business_name}>{b.business_name}</option>
             ))}
           </select>
           <select

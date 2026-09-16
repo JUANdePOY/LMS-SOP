@@ -587,11 +587,11 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
                   value={departmentId}
                   onChange={(e) => onFilterChange(e.target.value, role)}
                   aria-label="Filter by department"
-                  className="appearance-none rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-3 pr-9 py-2 text-sm focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] outline-none transition-all min-w-[150px]"
+                  className="appearance-none rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-3 pr-9 py-2 text-sm focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] outline-none transition-all min-w-[150px] max-w-[180px] truncate"
                 >
                   <option value="">All Departments</option>
                   {departments.map((d) => (
-                    <option key={d.id} value={d.id}>
+                    <option key={d.id} value={d.id} title={d.name}>
                       {d.name}
                     </option>
                   ))}
@@ -603,11 +603,11 @@ export default function QuickAssignModal({ open, course, onClose, onAssigned, to
                   value={role}
                   onChange={(e) => onFilterChange(departmentId, e.target.value)}
                   aria-label="Filter by role"
-                  className="appearance-none rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-3 pr-9 py-2 text-sm focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] outline-none transition-all min-w-[140px]"
+                  className="appearance-none rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 pl-3 pr-9 py-2 text-sm focus:border-[var(--color-primary)] focus:ring-2 focus:ring-[rgba(242,92,5,0.20)] outline-none transition-all min-w-[140px] max-w-[180px] truncate"
                 >
                   <option value="">All Roles</option>
                   {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
+                    <option key={value} value={value} title={label}>
                       {label}
                     </option>
                   ))}
