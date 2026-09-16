@@ -202,19 +202,6 @@ export default function Login() {
                   )}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotMode(true);
-                    setError('');
-                    setResetSent(false);
-                  }}
-                  disabled={loading}
-                  className="login-forgot-btn"
-                >
-                  <KeyRound size={14} />
-                  <span>Forgot password?</span>
-                </button>
               </div>
             ) : (
               <div>

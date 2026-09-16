@@ -427,7 +427,6 @@ export default function EmployeeSettings() {
               </p>
             )}
             <p className="text-[11px] text-neutral-500">
-              We will send a confirmation to this email
             </p>
           </div>
 
@@ -470,7 +469,38 @@ export default function EmployeeSettings() {
                 >
                   Cancel
                 </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSaveProfile}
+                  disabled={saving}
+                  className="gap-1.5"
+                >
+                  {saving ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Save size={14} />
+                  )}
+                  {saving ? "Saving..." : "Save"}
+                </Button>
               </div>
+            </div>
+          )}
+          
+          {!showPasswordSection && hasChanges && (
+            <div className="flex justify-end pt-2">
+              <Button
+                size="sm"
+                onClick={handleSaveProfile}
+                disabled={saving}
+                className="gap-1.5"
+              >
+                {saving ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Save size={14} />
+                )}
+                {saving ? "Saving..." : "Save Changes"}
+              </Button>
             </div>
           )}
         </CardContent>
