@@ -34,6 +34,7 @@ export default function MessagingPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const canCreateGroup = isSuperAdmin || isAdmin;
+  const canDelete = isSuperAdmin;
 
   const [searchParams] = useSearchParams();
 
@@ -297,7 +298,7 @@ export default function MessagingPage() {
                   onSelect={handleSelectConversation}
                   selectedId={selectedConversation?.id}
                   currentUserId={user?.id}
-                  isSuperAdmin={isSuperAdmin}
+                  canDelete={canDelete}
                   onDeleteParticipant={handleDeleteParticipant}
                   onDeleteConversation={handleDeleteConversation}
                 />
@@ -318,6 +319,7 @@ export default function MessagingPage() {
               markAllAsRead(user?.id).then(() => refreshConversations()).catch(() => {});
             }}
             isSuperAdmin={isSuperAdmin}
+            canDelete={canDelete}
             onDeleteMessage={requestDeleteMessage}
             onDeleteParticipant={handleDeleteParticipant}
             onAddParticipant={handleAddParticipant}

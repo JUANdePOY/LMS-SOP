@@ -136,7 +136,7 @@ function Header({ conversation, onBack, isSuperAdmin, onDeleteParticipant, onAdd
   );
 }
 
-export default function MessageThread({ conversation, onSend, loading, onMarkAllRead, onBack, isSuperAdmin, onDeleteMessage, onDeleteParticipant, onAddParticipant }) {
+export default function MessageThread({ conversation, onSend, loading, onMarkAllRead, onBack, isSuperAdmin, canDelete, onDeleteMessage, onDeleteParticipant, onAddParticipant }) {
   const messagesEndRef = useRef(null);
   const lastMessageId = useRef(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -276,7 +276,7 @@ export default function MessageThread({ conversation, onSend, loading, onMarkAll
                          {formatTime(msg.sent_at)}
                        </span>
                        {isMine && (isRead ? <CheckCheck size={11} /> : <Check size={11} />)}
-                       {isSuperAdmin && (
+                        {canDelete && (
                          <button
                            onClick={() => requestDelete(msg.id)}
                            className="ml-1 rounded p-0.5 text-white/70 hover:text-red-100 dark:text-neutral-400 dark:hover:text-red-300"

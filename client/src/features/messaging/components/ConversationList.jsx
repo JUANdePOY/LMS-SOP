@@ -38,7 +38,7 @@ function StackedAvatars({ participants, max = 3 }) {
   );
 }
 
-export default function ConversationList({ conversations, onSelect, selectedId, currentUserId, isSuperAdmin, onDeleteParticipant, onDeleteConversation }) {
+export default function ConversationList({ conversations, onSelect, selectedId, currentUserId, canDelete, onDeleteParticipant, onDeleteConversation }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingConversationId, setDeletingConversationId] = useState(null);
   return (
@@ -112,7 +112,7 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
                     </div>
                   </div>
                 </button>
-                {isSuperAdmin && !isGroup && (
+                {canDelete && !isGroup && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -125,7 +125,7 @@ export default function ConversationList({ conversations, onSelect, selectedId, 
                     <Trash2 size={16} />
                   </button>
                 )}
-                {isSuperAdmin && isGroup && (
+                {canDelete && isGroup && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
