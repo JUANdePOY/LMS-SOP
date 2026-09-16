@@ -60,7 +60,7 @@ function SOPEditForm({
         {(editIsDefaultOnboarding) && (
           <div className="mt-3">
             <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-              Minimum time to complete (minutes)
+              Minimum time to complete per modules (minutes)
             </label>
             <input
               type="number"

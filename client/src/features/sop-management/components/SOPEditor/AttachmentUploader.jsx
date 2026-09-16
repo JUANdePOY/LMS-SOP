@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useToast } from '@/shared/components/Toast';
+import { useToast } from '@/shared/components/ui/Toast';
 import AttachmentIcon from '@/shared/components/ui/AttachmentIcon';
 import { formatFileSize } from '@/lib/dateUtils';
 import { Trash2, Link } from 'lucide-react';
@@ -12,7 +12,7 @@ function AttachmentUploader({ attachments, onUpload, onAddLink, onDelete, loadin
   const [linkUrl, setLinkUrl] = useState('');
   const [linkTitle, setLinkTitle] = useState('');
   const [addingLink, setAddingLink] = useState(false);
-  const toast = useToast();
+  const { toast } = useToast();
 
   const handleFileChange = async (e) => {
     const file = e.target.files[0];

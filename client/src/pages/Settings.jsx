@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Settings as SettingsIcon, Users, Plus, Pencil, Save, X, Bell } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/shared/components/Toast";
+import { useToast } from "@/shared/components/ui/Toast";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getSettings, updateSetting, createSetting,
@@ -17,7 +17,7 @@ const TABS = [
 ];
 
 export default function Settings() {
-  const toast = useToast();
+  const { toast } = useToast();
   const { isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState("users");
   const [settings, setSettings] = useState([]);
@@ -406,7 +406,7 @@ function NotificationPreferencesSection() {
 }
 
 function PushNotificationsSection() {
-  const toast = useToast();
+  const { toast } = useToast();
   const { permission, loading, requestPermission, unsubscribe, isSupported, error } = usePushNotifications();
 
   if (!isSupported) {

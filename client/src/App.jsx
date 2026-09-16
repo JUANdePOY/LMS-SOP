@@ -3,7 +3,7 @@ import AppLayout from "@/layout/AppLayout";
 import { lazy, Suspense } from "react";
 import "@/features/task-management/styles/minimal.css";
 
-import { ToastProvider } from "@/shared/components/Toast";
+import { ToastProvider } from "@/shared/components/ui/Toast";
 import { NavigationProvider } from "@/shared/contexts/NavigationContext";
 import ErrorBoundary from "@/shared/components/ErrorBoundary";
 import ProtectedRoute from "@/shared/components/ProtectedRoute";

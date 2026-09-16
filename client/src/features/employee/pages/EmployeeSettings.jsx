@@ -150,7 +150,7 @@ function PasswordStrengthIndicator({ password }) {
 }
 
 export default function EmployeeSettings() {
-  const toast = useToast();
+  const { toast } = useToast();
   const { user, updateUser } = useAuth();
 
   const [profile, setProfile] = useState(null);
