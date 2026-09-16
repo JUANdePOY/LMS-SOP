@@ -20,6 +20,7 @@ import ImageResizable from './ImageResizable';
 import EditorBubbleMenu from './EditorBubbleMenu';
 import EditorToolbarContent from './EditorToolbarContent';
 import TableMenu from './TableMenu';
+import TableControls from './TableControls';
 import { insertImageWithUpload, isImageFile } from './imageUploadHelpers';
 import EDITOR_CONTENT_STYLES from '../../utils/sopContentStyles';
 
@@ -83,7 +84,7 @@ function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Ente
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        link: { openOnClick: false, autolink: true },
+        link: { openOnClick: true, autolink: true },
       }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Placeholder.configure({ placeholder }),
@@ -187,7 +188,10 @@ function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Ente
       <div
         className={`border border-neutral-200 dark:border-neutral-700 ${showTableMenu ? '' : 'rounded-b-lg'} bg-white dark:bg-neutral-800`}
       >
-        <EditorContent editor={editor} />
+        <div className="relative">
+          <EditorContent editor={editor} />
+          {showTableMenu && <TableControls editor={editor} show={showTableMenu} />}
+        </div>
       </div>
       {editor && <EditorBubbleMenu editor={editor} uploadEnabled={!!onImageUpload} />}
       <div className="flex items-center justify-between px-1 pt-1 text-[11px] text-neutral-400 dark:text-neutral-500">
@@ -196,6 +200,12 @@ function RichTextEditor({ value, onChange, disabled = false, placeholder = 'Ente
         </span>
         <span>{wordCount} words · {charCount} characters</span>
       </div>
+      <style>{`
+        .rich-text-editor table { border-collapse: collapse; table-layout: fixed; width: 100%; max-width: 100%; }
+        .rich-text-editor table td, .rich-text-editor table th { word-break: break-word; overflow: hidden; }
+        .rich-text-editor table:hover { outline: 2px solid rgba(79, 70, 229, 0.2); outline-offset: -1px; }
+        .rich-text-editor .tiptap { overflow-x: auto; }
+      `}</style>
     </div>
   );
 }

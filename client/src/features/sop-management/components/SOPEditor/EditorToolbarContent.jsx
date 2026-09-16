@@ -36,14 +36,23 @@ const HIGHLIGHT_SWATCHES = [
 export default function EditorToolbarContent({ editor, Button, onPickImage, uploadEnabled, theme = 'light' }) {
   if (!editor) return null;
 
-  const setLink = () => {
-    const previousUrl = editor.getAttributes('link').href;
-    const url = window.prompt('URL', previousUrl || 'https://');
-    if (url === null) return;
-    if (url === '') {
-      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+  const toggleLink = () => {
+    if (editor.isActive('link')) {
+      editor.chain().focus().unsetLink().run();
       return;
     }
+
+    const selectedText = editor.state.selection.empty
+      ? ''
+      : editor.state.doc.textBetween(editor.state.selection.from, editor.state.selection.to);
+
+    let url = selectedText.trim();
+    if (!url) return;
+
+    if (!/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
+    }
+
     editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
   };
 
@@ -131,7 +140,11 @@ export default function EditorToolbarContent({ editor, Button, onPickImage, uplo
       >
         <Quote className="w-4 h-4" />
       </Button>
-      <Button title="Link" active={editor.isActive('link')} onClick={setLink}>
+      <Button
+        title="Link"
+        active={editor.isActive('link')}
+        onClick={toggleLink}
+      >
         <LinkIcon className="w-4 h-4" />
       </Button>
 
