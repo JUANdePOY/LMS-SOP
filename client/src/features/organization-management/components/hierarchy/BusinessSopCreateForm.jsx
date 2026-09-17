@@ -2,13 +2,14 @@ import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/shared/components/ui/Toast';
 import { createSop } from '@/features/sop-management/services/sopService';
 import { createModule } from '@/features/sop-management/services/moduleService';
-import { createAssignment } from '@/features/sop-management/services/assignmentService';
 import { getCategories } from '@/features/organization-management/api/category.api';
 import { useAssignmentCascade } from '@/features/sop-management/hooks/useAssignmentCascade';
+import { useAuth } from '@/contexts/AuthContext';
 import SOPCreateForm from '@/features/sop-management/components/SOPCreateForm';
 
 function BusinessSopCreateForm({ open, onClose, businessId, onCreated }) {
   const { toast } = useToast();
+  const { isDepartmentHead, scopedDepartmentIds } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -42,6 +43,11 @@ function BusinessSopCreateForm({ open, onClose, businessId, onCreated }) {
       });
     return () => { mounted = false; };
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !isDepartmentHead || !scopedDepartmentIds?.length) return;
+    cascade.setSelectedDeptIds(scopedDepartmentIds);
+  }, [open, isDepartmentHead, scopedDepartmentIds, cascade.setSelectedDeptIds]);
 
   const filteredCategories = useMemo(() => {
     if (!categories.length) return [];
@@ -88,16 +94,6 @@ function BusinessSopCreateForm({ open, onClose, businessId, onCreated }) {
         sort_order: 1,
       });
 
-      if (cascade.selectedDeptIds.length > 0) {
-        await createAssignment(sopId, {
-          department_ids: cascade.selectedDeptIds,
-          position_names: cascade.selectedPositions,
-          user_ids: cascade.selectedUserIds,
-          due_date: null,
-          notes: '',
-        });
-      }
-
       toast.success('SOP created successfully');
       onCreated?.(sopId);
       onClose();
@@ -134,6 +130,7 @@ function BusinessSopCreateForm({ open, onClose, businessId, onCreated }) {
       setNewIsDefaultOnboarding={setIsDefaultOnboarding}
       newMinTimeLimit={minTimeLimit}
       setNewMinTimeLimit={setMinTimeLimit}
+      lockedDepartmentIds={isDepartmentHead ? scopedDepartmentIds : null}
     />
   );
 }

@@ -1,10 +1,29 @@
 const assignmentCascadeService = require('../services/assignmentCascadeService');
+const db = require('../config/database');
 
 async function listDepartments(req, res) {
   try {
     const isSuperAdmin = req.user?.role === 'super_admin';
-    const businessId = isSuperAdmin ? null : (req.user?.business_id || null);
-    const departments = await assignmentCascadeService.getDepartments(true, businessId);
+    const isDepartmentHead = req.user?.role === 'department_head';
+    const isAdmin = req.user?.role === 'admin';
+    let businessId = isSuperAdmin ? null : (req.user?.business_id || null);
+    let departments = await assignmentCascadeService.getDepartments(true, businessId);
+
+    if (isDepartmentHead) {
+      const [grants] = await db.query(
+        'SELECT department_id FROM department_scope_grants WHERE user_id = ?',
+        [req.user.id]
+      );
+      const scoped = new Set(grants.map((g) => g.department_id));
+      if (req.user.department_id != null) {
+        scoped.add(req.user.department_id);
+      }
+      const scopedDeptIds = [...scoped];
+      departments = departments.filter((dept) => scopedDeptIds.includes(dept.id));
+    } else if (isAdmin && businessId) {
+      departments = departments.filter((dept) => dept.business_id === businessId);
+    }
+
     res.json({ success: true, data: departments });
   } catch (error) {
     res.status(500).json({ success: false, error: { code: 'DB_ERROR', message: error.message } });

@@ -40,6 +40,31 @@ function getNormalizedArray(normalized, singularKey, arrayKey) {
   return single != null ? [single] : [];
 }
 
+async function deriveSopBusinessId(sop) {
+  if (!sop) return null;
+  if (sop.business_id) return sop.business_id;
+  if (!sop.department_id) return null;
+  const [[dept]] = await db.query(
+    'SELECT business_id FROM departments WHERE id = ?',
+    [sop.department_id]
+  );
+  return dept ? dept.business_id : null;
+}
+
+async function getActorScopedDepartmentIds(actor) {
+  if (!actor) return [];
+  if (actor.role === 'department_head') {
+    const [grants] = await db.query(
+      'SELECT department_id FROM department_scope_grants WHERE user_id = ?',
+      [actor.id]
+    );
+    const scoped = new Set(grants.map((g) => g.department_id));
+    if (actor.department_id != null) scoped.add(actor.department_id);
+    return [...scoped];
+  }
+  return [];
+}
+
 async function createAssignment(sopId, payload, assignedBy) {
   const sop = await sopModel.findById(sopId);
   if (!sop) {
@@ -58,7 +83,10 @@ async function createAssignment(sopId, payload, assignedBy) {
     'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
     [assignedBy]
   ).then(([rows]) => rows[0] || null);
-  if (actor && sop.business_id && actor.business_id !== sop.business_id) {
+
+  const sopBusinessId = await deriveSopBusinessId(sop);
+
+  if (actor && sopBusinessId && actor.business_id !== sopBusinessId) {
     const error = new Error('Access denied: SOP is outside your business scope');
     error.code = 'FORBIDDEN';
     throw error;
@@ -92,6 +120,78 @@ async function createAssignment(sopId, payload, assignedBy) {
         const error = new Error('Department not found');
         error.code = 'VALIDATION_ERROR';
         throw error;
+      }
+    }
+  }
+
+  // department_head may only assign within their granted departments.
+  if (actor && actor.role === 'department_head' && departmentIds.length > 0) {
+    const [grants] = await db.query(
+      'SELECT department_id FROM department_scope_grants WHERE user_id = ?',
+      [assignedBy]
+    );
+    const scoped = new Set(grants.map((g) => g.department_id));
+    if (actor.department_id != null) {
+      scoped.add(actor.department_id);
+    }
+    const scopedDeptIds = [...scoped];
+    const outsideScope = departmentIds.filter((id) => !scopedDeptIds.includes(id));
+    if (outsideScope.length > 0) {
+      const error = new Error('Access denied: Cannot assign SOP to departments outside your scope');
+      error.code = 'DEPT_SCOPE_DENIED';
+      throw error;
+    }
+  }
+
+  // admin may only assign within their business scope.
+  if (actor && actor.role === 'admin' && departmentIds.length > 0) {
+    if (!actor.business_id) {
+      const error = new Error('Your account has no business scope');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+    for (const deptId of departmentIds) {
+      const [[dept]] = await db.query(
+        'SELECT business_id FROM departments WHERE id = ?',
+        [deptId]
+      );
+      if (!dept || dept.business_id !== actor.business_id) {
+        const error = new Error('Access denied: Cannot assign SOP to departments outside your business scope');
+        error.code = 'BUSINESS_SCOPE_DENIED';
+        throw error;
+      }
+    }
+  }
+
+  // Distribution scope: all targets must fall within the SOP's categorization
+  // business. This prevents cross-business data leaks via assignments.
+  if (sopBusinessId) {
+    for (const deptId of departmentIds) {
+      const [[dept]] = await db.query(
+        'SELECT business_id FROM departments WHERE id = ?',
+        [deptId]
+      );
+      if (!dept || dept.business_id !== sopBusinessId) {
+        const error = new Error('Access denied: Cannot assign SOP outside its business scope');
+        error.code = 'DISTRIBUTION_SCOPE_DENIED';
+        throw error;
+      }
+    }
+    for (const userId of userIds) {
+      const [[user]] = await db.query(
+        'SELECT department_id FROM users WHERE id = ? AND is_active = TRUE',
+        [userId]
+      );
+      if (user && user.department_id) {
+        const [[dept]] = await db.query(
+          'SELECT business_id FROM departments WHERE id = ?',
+          [user.department_id]
+        );
+        if (!dept || dept.business_id !== sopBusinessId) {
+          const error = new Error('Access denied: Cannot assign SOP outside its business scope');
+          error.code = 'DISTRIBUTION_SCOPE_DENIED';
+          throw error;
+        }
       }
     }
   }

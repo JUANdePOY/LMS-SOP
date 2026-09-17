@@ -64,6 +64,39 @@ async function assignDefaultOnboardingSopsToUser(userId, actorId) {
   return assignOnboardingSopsToUser(userId, versionIds, actorId);
 }
 
+async function ensureOnboardingAcknowledgements(userId) {
+  const [onboardingSops] = await db.query(`
+    SELECT v.id AS version_id
+    FROM sops s
+    JOIN sop_versions v ON v.sop_id = s.id AND v.is_current = 1
+    WHERE s.is_default_onboarding = 1
+      AND s.deleted_at IS NULL
+      AND v.status = 'Published'
+  `);
+
+  if (onboardingSops.length === 0) return;
+
+  const [existing] = await db.query(`
+    SELECT DISTINCT a.sop_version_id
+    FROM sop_acknowledgements a
+    JOIN sop_versions v ON v.id = a.sop_version_id
+    WHERE a.user_id = ?
+      AND a.status = 'Pending'
+      AND v.is_current = 1
+  `, [userId]);
+
+  const existingVersionIds = new Set(existing.map((r) => r.sop_version_id));
+  const missing = onboardingSops.filter((s) => !existingVersionIds.has(s.version_id));
+
+  if (missing.length === 0) return;
+
+  const values = missing.map((s) => [s.version_id, userId, 'Pending']);
+  await db.query(
+    `INSERT IGNORE INTO sop_acknowledgements (sop_version_id, user_id, status) VALUES ?`,
+    [values]
+  );
+}
+
 async function getPendingOnboardingSops(userId, actorId) {
   let businessFilter = '';
   const params = [userId];
@@ -105,23 +138,28 @@ async function getPendingOnboardingSops(userId, actorId) {
            att.file_extension AS attachment_file_extension,
            att.link_url AS attachment_link_url,
            att.download_count AS attachment_download_count
-     FROM sop_acknowledgements a
-     JOIN sop_versions v ON v.id = a.sop_version_id
-     JOIN sops s ON s.id = v.sop_id
-     LEFT JOIN sop_modules m ON m.sop_id = s.id AND m.sop_version_id = v.id AND (m.deleted_at IS NULL OR m.is_deleted = 0)
-     LEFT JOIN sop_module_attachments att ON att.module_id = m.id AND att.is_deleted = FALSE
-     WHERE a.user_id = ?
-       AND a.status = 'Pending'
-       AND s.deleted_at IS NULL
-       ${businessFilter}
-     ORDER BY a.created_at ASC, m.sort_order ASC, m.id ASC, att.created_at ASC
-  `, params);
+    FROM sops s
+    JOIN sop_versions v ON v.sop_id = s.id AND v.is_current = 1
+    LEFT JOIN sop_acknowledgements a ON a.sop_version_id = v.id AND a.user_id = ? AND a.status = 'Pending'
+    LEFT JOIN sop_modules m ON m.sop_id = s.id AND m.sop_version_id = v.id AND (m.deleted_at IS NULL OR m.is_deleted = 0)
+    LEFT JOIN sop_module_attachments att ON att.module_id = m.id AND att.is_deleted = FALSE
+    WHERE s.is_default_onboarding = 1
+      AND s.deleted_at IS NULL
+      AND v.status = 'Published'
+      AND (a.id IS NOT NULL OR NOT EXISTS (
+        SELECT 1 FROM sop_acknowledgements a2
+        WHERE a2.sop_version_id = v.id AND a2.user_id = ? AND a2.status != 'Pending' AND a2.is_deleted = FALSE
+      ))
+      ${businessFilter}
+    ORDER BY a.created_at ASC, m.sort_order ASC, m.id ASC, att.created_at ASC
+  `, [userId, userId, ...params.slice(1)]);
 
   // Group modules by SOP
   const sopsMap = new Map();
   for (const row of rows) {
-    if (!sopsMap.has(row.acknowledgement_id)) {
-      sopsMap.set(row.acknowledgement_id, {
+    const key = row.acknowledgement_id || `sop_${row.sop_id}`;
+    if (!sopsMap.has(key)) {
+      sopsMap.set(key, {
         acknowledgement_id: row.acknowledgement_id,
         sop_id: row.sop_id,
         sop_code: row.sop_code,
@@ -137,27 +175,45 @@ async function getPendingOnboardingSops(userId, actorId) {
       });
     }
     if (row.module_id) {
-      const moduleEntry = {
-        id: row.module_id,
-        title: row.module_title,
-        content: row.module_content,
-        sort_order: row.module_sort_order,
-        time_limit: row.module_time_limit || null,
-        attachments: [],
-      };
-      if (row.attachment_id) {
-        moduleEntry.attachments.push({
-          id: row.attachment_id,
-          file_name: row.attachment_file_name,
-          original_name: row.attachment_original_name,
-          mime_type: row.attachment_mime_type,
-          file_size: row.attachment_file_size,
-          file_extension: row.attachment_file_extension,
-          link_url: row.attachment_link_url,
-          download_count: row.attachment_download_count,
-        });
+      const existingModule = sopsMap.get(key).modules.find(
+        (m) => m.id === row.module_id
+      );
+      if (existingModule) {
+        if (row.attachment_id) {
+          existingModule.attachments.push({
+            id: row.attachment_id,
+            file_name: row.attachment_file_name,
+            original_name: row.attachment_original_name,
+            mime_type: row.attachment_mime_type,
+            file_size: row.attachment_file_size,
+            file_extension: row.attachment_file_extension,
+            link_url: row.attachment_link_url,
+            download_count: row.attachment_download_count,
+          });
+        }
+      } else {
+        const moduleEntry = {
+          id: row.module_id,
+          title: row.module_title,
+          content: row.module_content,
+          sort_order: row.module_sort_order,
+          time_limit: row.module_time_limit || null,
+          attachments: [],
+        };
+        if (row.attachment_id) {
+          moduleEntry.attachments.push({
+            id: row.attachment_id,
+            file_name: row.attachment_file_name,
+            original_name: row.attachment_original_name,
+            mime_type: row.attachment_mime_type,
+            file_size: row.attachment_file_size,
+            file_extension: row.attachment_file_extension,
+            link_url: row.attachment_link_url,
+            download_count: row.attachment_download_count,
+          });
+        }
+        sopsMap.get(key).modules.push(moduleEntry);
       }
-      sopsMap.get(row.acknowledgement_id).modules.push(moduleEntry);
     }
   }
 
@@ -166,16 +222,23 @@ async function getPendingOnboardingSops(userId, actorId) {
 
 async function isOnboardingComplete(userId) {
   const [rows] = await db.query(`
-    SELECT COUNT(*) AS pending_count
-    FROM sop_acknowledgements a
-    JOIN sop_versions v ON v.id = a.sop_version_id
-    JOIN sops s ON s.id = v.sop_id
-    WHERE a.user_id = ?
-      AND a.status = 'Pending'
-      AND s.is_default_onboarding = 1
-      AND s.deleted_at IS NULL
+    SELECT
+      (SELECT COUNT(*) FROM sops s
+       JOIN sop_versions v ON v.sop_id = s.id AND v.is_current = 1
+       WHERE s.is_default_onboarding = 1
+         AND s.deleted_at IS NULL
+         AND v.status = 'Published') AS total_onboarding,
+      (SELECT COUNT(DISTINCT s.id) FROM sops s
+       JOIN sop_versions v ON v.sop_id = s.id AND v.is_current = 1
+       JOIN sop_acknowledgements a ON a.sop_version_id = v.id
+         AND a.user_id = ? AND a.status != 'Pending' AND a.is_deleted = FALSE
+       WHERE s.is_default_onboarding = 1
+         AND s.deleted_at IS NULL
+         AND v.status = 'Published') AS completed_onboarding
   `, [userId]);
-  return (rows[0]?.pending_count || 0) === 0;
+  const total = rows[0]?.total_onboarding || 0;
+  const completed = rows[0]?.completed_onboarding || 0;
+  return total === 0 ? true : completed === total;
 }
 
 async function acknowledgeOnboardingSop(ackId, userId) {
@@ -247,6 +310,7 @@ module.exports = {
   getDefaultOnboardingSops,
   assignOnboardingSopsToUser,
   assignDefaultOnboardingSopsToUser,
+  ensureOnboardingAcknowledgements,
   getPendingOnboardingSops,
   isOnboardingComplete,
   acknowledgeOnboardingSop,

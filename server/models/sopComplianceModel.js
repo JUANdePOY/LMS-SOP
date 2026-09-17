@@ -128,40 +128,45 @@ async function findDuplicateAssignment({ sop_id, department_ids, position_names,
   const versionId = await getCurrentVersionId(sop_id);
   if (!versionId) return null;
 
-  const allTargets = [];
+  const [assignments] = await db.query(`
+    SELECT sa.id FROM sop_assignments sa
+    WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE
+  `, [versionId]);
 
-  if (department_ids && department_ids.length) {
-    const [rows] = await db.query(`
-      SELECT sa.id FROM sop_assignments sa
-      INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
-      WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE
-      AND ad.department_id IN (${department_ids.map(() => '?').join(',')})
-    `, [versionId, ...department_ids]);
-    rows.forEach((r) => allTargets.push({ type: 'department', ref: r.id, dept_id: r.department_id }));
+  if (!assignments.length) return null;
+
+  const newDeptIds = (department_ids || []).slice().sort();
+  const newPosNames = (position_names || []).map((p) => p.toLowerCase()).sort();
+  const newUserIds = (user_ids || []).slice().sort();
+
+  for (const assignment of assignments) {
+    const [depts] = await db.query(
+      'SELECT department_id FROM assignment_departments WHERE assignment_id = ?',
+      [assignment.id]
+    );
+    const [positions] = await db.query(
+      'SELECT position_name FROM assignment_positions WHERE assignment_id = ?',
+      [assignment.id]
+    );
+    const [users] = await db.query(
+      'SELECT user_id FROM assignment_users WHERE assignment_id = ?',
+      [assignment.id]
+    );
+
+    const deptIds = depts.map((d) => d.department_id).sort();
+    const posNames = positions.map((p) => p.position_name.toLowerCase()).sort();
+    const userIds = users.map((u) => u.user_id).sort();
+
+    const deptMatch = deptIds.length === newDeptIds.length && deptIds.every((v, i) => v === newDeptIds[i]);
+    const posMatch = posNames.length === newPosNames.length && posNames.every((v, i) => v === newPosNames[i]);
+    const userMatch = userIds.length === newUserIds.length && userIds.every((v, i) => v === newUserIds[i]);
+
+    if (deptMatch && posMatch && userMatch) {
+      return [{ assignment_id: assignment.id }];
+    }
   }
 
-  if (position_names && position_names.length) {
-    const placeholders = position_names.map(() => '?').join(',');
-    const [rows] = await db.query(`
-      SELECT sa.id, ap.position_name FROM sop_assignments sa
-      INNER JOIN assignment_positions ap ON ap.assignment_id = sa.id
-      WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE
-      AND LOWER(ap.position_name) IN (${placeholders})
-    `, [versionId, ...position_names.map((p) => p.toLowerCase())]);
-    rows.forEach((r) => allTargets.push({ type: 'position', ref: r.id, position_name: r.position_name }));
-  }
-
-  if (user_ids && user_ids.length) {
-    const [rows] = await db.query(`
-      SELECT sa.id, au.user_id FROM sop_assignments sa
-      INNER JOIN assignment_users au ON au.assignment_id = sa.id
-      WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE
-      AND au.user_id IN (${user_ids.map(() => '?').join(',')})
-    `, [versionId, ...user_ids]);
-    rows.forEach((r) => allTargets.push({ type: 'user', ref: r.id, user_id: r.user_id }));
-  }
-
-  return allTargets.length ? allTargets : null;
+  return null;
 }
 
 async function createAssignment(data) {

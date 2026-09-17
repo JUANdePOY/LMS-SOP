@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { getSops, createSop, updateSop, deleteSop, archiveSop, unarchiveSop } from '@/features/sop-management/services/sopService';
-import { createAssignment, fetchAssigned, deleteAssignment } from '@/features/sop-management/services/assignmentService';
+import { fetchAssigned } from '@/features/sop-management/services/assignmentService';
 import { createModule, getModules, updateModule } from '@/features/sop-management/services/moduleService';
 import { createLink } from '@/features/sop-management/services/attachmentService';
 import { useAssignmentCascade } from '@/features/sop-management/hooks/useAssignmentCascade';
@@ -40,12 +40,6 @@ export function useSOPList() {
   const [editDescription, setEditDescription] = useState('');
   const [editStatus, setEditStatus] = useState('');
   const [editCategoryId, setEditCategoryId] = useState('');
-  // The assignment row IDs currently persisted for the SOP being edited,
-  // and the department IDs they represent — captured in handleEditStart so
-  // handleEditSave can tell whether the selection actually changed and,
-  // if so, replace the old rows instead of leaving stale ones behind.
-  const [editAssignmentIds, setEditAssignmentIds] = useState([]);
-  const [editOriginalDeptIds, setEditOriginalDeptIds] = useState([]);
   const [archivedTab, setArchivedTab] = useState(false);
   const [newIsDefaultOnboarding, setNewIsDefaultOnboarding] = useState(false);
   const [newMinTimeLimit, setNewMinTimeLimit] = useState('');
@@ -96,7 +90,7 @@ export function useSOPList() {
         }
         const { data } = await getSops(params);
         setSops(data?.data?.rows || []);
-      } catch (err) {
+      } catch {
         toast.error('Failed to fetch SOPs');
       } finally {
         setLoading(false);
@@ -176,8 +170,6 @@ export function useSOPList() {
     setEditStatus(sop.status);
     setEditCategoryId(sop.category_id || '');
     setEditIsDefaultOnboarding(!!sop.is_default_onboarding);
-    setEditAssignmentIds([]);
-    setEditOriginalDeptIds([]);
     cascade.setSelectedPositions([]);
     cascade.setSelectedUserIds([]);
 
@@ -190,14 +182,11 @@ export function useSOPList() {
     try {
       const { data } = await fetchAssigned(sop.id);
       const assignments = data?.data || [];
-      const assignmentIds = assignments.map((a) => a.assignment_id);
       const deptIds = [...new Set(assignments.flatMap((a) => (a.departments || []).map((d) => d.id)))];
       const businessIds = [...new Set(
         cascade.departments.filter((d) => deptIds.includes(d.id)).map((d) => d.business_id)
       )];
 
-      setEditAssignmentIds(assignmentIds);
-      setEditOriginalDeptIds(deptIds);
       cascade.setSelectedBusinessIds(businessIds);
       cascade.setSelectedDeptIds(deptIds);
     } catch {
@@ -218,8 +207,6 @@ export function useSOPList() {
     cascade.setSelectedDeptIds([]);
     cascade.setSelectedPositions([]);
     cascade.setSelectedUserIds([]);
-    setEditAssignmentIds([]);
-    setEditOriginalDeptIds([]);
     setEditIsDefaultOnboarding(false)
   };
 
@@ -234,7 +221,6 @@ export function useSOPList() {
         status: editStatus,
         category_id: editCategoryId || null,
         department_id: currentDeptIds.length > 0 ? currentDeptIds[0] : null,
-        restriction_type: resolveRestrictionType(currentDeptIds, cascade.selectedPositions, cascade.selectedUserIds),
         is_default_onboarding: editIsDefaultOnboarding ? 1 : 0,
         ...overrides,
       });
@@ -254,29 +240,6 @@ export function useSOPList() {
           );
         } catch (err) {
           console.error('Failed to sync module time limits', err);
-        }
-      }
-
-      // Only touch the assignment records if the department selection
-      // actually changed — avoids churning (and re-auditing) assignments
-      // on every save, and avoids a false DUPLICATE_ASSIGNMENT rejection
-      // from re-creating the same assignment the SOP already has.
-      const deptsChanged =
-        currentDeptIds.length !== editOriginalDeptIds.length ||
-        currentDeptIds.some((id) => !editOriginalDeptIds.includes(id));
-
-      if (deptsChanged) {
-        for (const assignmentId of editAssignmentIds) {
-          await deleteAssignment(assignmentId);
-        }
-        if (currentDeptIds.length > 0) {
-          await createAssignment(sopId, {
-            department_ids: currentDeptIds,
-            position_names: cascade.selectedPositions,
-            user_ids: cascade.selectedUserIds,
-            due_date: null,
-            notes: '',
-          });
         }
       }
 

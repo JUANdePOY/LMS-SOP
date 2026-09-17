@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Check } from 'lucide-react';
 
-function CheckboxList({ items, selectedIds, onToggle, labelKey, valueKey, placeholder, loading = false, emptyText = 'No options' }) {
+function CheckboxList({ items, selectedIds, onToggle, labelKey, valueKey, placeholder, loading = false, emptyText = 'No options', disabled = false }) {
   const [open, setOpen] = useState(false);
   const selectedCount = selectedIds.length;
   const resolvedLabel = (item) => (typeof labelKey === 'function' ? labelKey(item) : (labelKey ? item[labelKey] : item));
@@ -11,9 +11,10 @@ function CheckboxList({ items, selectedIds, onToggle, labelKey, valueKey, placeh
     <div className="relative">
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => !disabled && setOpen(!open)}
         aria-expanded={open}
-        className="w-full text-left px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-page)] text-sm text-[var(--text-primary)] hover:border-[var(--border)] transition-colors flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500"
+        disabled={disabled}
+        className="w-full text-left px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-page)] text-sm text-[var(--text-primary)] hover:border-[var(--border)] transition-colors flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 disabled:opacity-50"
       >
         <span className={selectedCount > 0 ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}>
           {selectedCount > 0 ? `${selectedCount} selected` : placeholder}
@@ -38,12 +39,13 @@ function CheckboxList({ items, selectedIds, onToggle, labelKey, valueKey, placeh
               return (
                 <label
                   key={typeof id === 'string' || typeof id === 'number' ? id : JSON.stringify(id)}
-                  className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--bg-hover)] cursor-pointer text-sm"
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm ${disabled ? 'opacity-70 cursor-not-allowed' : 'hover:bg-[var(--bg-hover)] cursor-pointer'}`}
                 >
                   <input
                     type="checkbox"
                     checked={checked}
-                    onChange={() => onToggle(id)}
+                    onChange={() => !disabled && onToggle(id)}
+                    disabled={disabled}
                     className="rounded border-[var(--border)] text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-[var(--text-primary)] truncate">{label}</span>

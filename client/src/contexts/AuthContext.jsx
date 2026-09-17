@@ -205,6 +205,8 @@ export function AuthProvider({ children }) {
     return permissions.includes(permission);
   }, [permissions, isSuperAdmin]);
 
+  const canCreateSops = isSuperAdmin || isAdmin || isDepartmentHead || hasPermission('create_sops');
+
   return (
     <AuthContext.Provider value={{
       user,
@@ -221,6 +223,7 @@ export function AuthProvider({ children }) {
       isDepartmentHead,
       isEmployee,
       isAnyAdmin,
+      canCreateSops,
       permissions,
       scopedDepartmentIds,
       businessId,

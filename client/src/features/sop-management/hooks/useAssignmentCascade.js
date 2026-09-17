@@ -10,6 +10,7 @@ export function useAssignmentCascade() {
   const [selectedDeptIds, setSelectedDeptIds] = useState([]);
   const [selectedPositions, setSelectedPositions] = useState([]);
   const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [userSourceDeptIds, setUserSourceDeptIds] = useState([]);
   const [loading, setLoading] = useState({ businesses: false, departments: false, positions: false, users: false });
   const [totalUsers, setTotalUsers] = useState(0);
   const [userSearch, setUserSearch] = useState('');
@@ -129,14 +130,15 @@ export function useAssignmentCascade() {
   );
 
   useEffect(() => {
-    if (selectedDeptIds.length > 0) {
-      loadUsers(selectedDeptIds);
+    const deptIdsToLoad = selectedDeptIds.length > 0 ? selectedDeptIds : userSourceDeptIds;
+    if (deptIdsToLoad.length > 0) {
+      loadUsers(deptIdsToLoad);
     } else {
       setUsers([]);
       setTotalUsers(0);
       setSelectedUserIds([]);
     }
-  }, [selectedDeptIds, loadUsers]);
+  }, [selectedDeptIds, userSourceDeptIds, loadUsers]);
 
   const toggleBusiness = useCallback((id) =>
     setSelectedBusinessIds((prev) => {
@@ -190,6 +192,8 @@ export function useAssignmentCascade() {
     setSelectedPositions,
     selectedUserIds,
     setSelectedUserIds,
+    userSourceDeptIds,
+    setUserSourceDeptIds,
     toggleBusiness,
     toggleDepartment,
     togglePosition,
@@ -210,6 +214,7 @@ export function useAssignmentCascade() {
     selectedDeptIds,
     selectedPositions,
     selectedUserIds,
+    userSourceDeptIds,
     toggleBusiness,
     toggleDepartment,
     togglePosition,

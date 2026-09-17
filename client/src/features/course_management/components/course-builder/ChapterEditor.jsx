@@ -1,22 +1,39 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { GripVertical, ArrowUp, ArrowDown, Trash2, Plus, Clock } from "lucide-react";
 import { formatTimestamp, parseTimestamp } from "@/features/course_management/utils/videoUrl";
 
 let chapterSeq = 0;
 const newChapterId = () => `ch-${Date.now()}-${chapterSeq++}`;
 
-/**
- * Chapter / timestamp editor for video lessons.
- * Each chapter has a `start` (seconds, integer) and `title`.
- * Reuses the drag-to-reorder pattern from LessonContentBlocks.
- */
 export default function ChapterEditor({ chapters = [], onChange }) {
   const [dragIndex, setDragIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
+  const [rawTimestamps, setRawTimestamps] = useState({});
 
   const list = Array.isArray(chapters) ? chapters : [];
 
   const commit = (next) => onChange(next);
+
+  const syncRawFromProps = () => {
+    setRawTimestamps((prev) => {
+      const next = { ...prev };
+      list.forEach((ch) => {
+        if (next[ch.id] === undefined) {
+          next[ch.id] = formatTimestamp(ch.start);
+        }
+      });
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    syncRawFromProps();
+  }, [list.map((ch) => ch.id).join(",")]);
+
+  const getDisplayValue = (chapter) => {
+    if (rawTimestamps[chapter.id] !== undefined) return rawTimestamps[chapter.id];
+    return formatTimestamp(chapter.start);
+  };
 
   const add = () => {
     const next = [...list, { id: newChapterId(), start: 0, title: "" }];
@@ -43,6 +60,23 @@ export default function ChapterEditor({ chapters = [], onChange }) {
     if (dragIndex !== null && dragIndex !== to) move(dragIndex, to);
     setDragIndex(null);
     setOverIndex(null);
+  };
+
+  const commitTimestamp = (id) => {
+    const raw = rawTimestamps[id];
+    if (raw !== undefined) {
+      const seconds = parseTimestamp(raw) ?? 0;
+      update(id, { start: seconds });
+      setRawTimestamps((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
+  };
+
+  const handleTimestampChange = (id, value) => {
+    setRawTimestamps((prev) => ({ ...prev, [id]: value }));
   };
 
   return (
@@ -85,8 +119,16 @@ export default function ChapterEditor({ chapters = [], onChange }) {
                 <input
                   type="text"
                   inputMode="numeric"
-                  value={formatTimestamp(chapter.start)}
-                  onChange={(e) => update(chapter.id, { start: parseTimestamp(e.target.value) ?? 0 })}
+                  value={getDisplayValue(chapter)}
+                  onChange={(e) => handleTimestampChange(chapter.id, e.target.value)}
+                  onBlur={() => commitTimestamp(chapter.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitTimestamp(chapter.id);
+                      e.target.blur();
+                    }
+                  }}
                   placeholder="0:00"
                   aria-label={`Chapter ${index + 1} start time`}
                   className="w-full rounded-md border border-neutral-200 bg-white py-1.5 pl-7 pr-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600"

@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { getCurrentVersionId } = require('./sopVersionModel');
 
 async function getColumns(table) {
   const [rows] = await db.query(`
@@ -53,15 +54,22 @@ function notDeletedClause(cols, alias = 's') {
 }
 
 function restrictionWhere(user, cols, alias = 's') {
-  if (!user || !cols.hasRestrictionType) return '';
+  if (!user || !cols.hasRestrictionType) return { sql: '', params: [] };
 
   const role = user.role || '';
-  if (role === 'super_admin' || role === 'admin') return '';
+  if (role === 'super_admin' || role === 'admin') return { sql: '', params: [] };
 
   const userDepartmentId = user.department_id || null;
   const userId = user.id || null;
 
-  return `
+  const departmentHeadScope = role === 'department_head'
+    ? (user.scoped_department_ids || (user.department_id ? [user.department_id] : []))
+    : [];
+  const departmentHeadPlaceholders = departmentHeadScope.length > 0
+    ? departmentHeadScope.map(() => '?').join(',')
+    : null;
+
+  const sql = `
     (
       ${alias}.restriction_type = 'public'
       OR (
@@ -91,15 +99,24 @@ function restrictionWhere(user, cols, alias = 's') {
             AND (
               au.user_id = ?
               OR ad.department_id = ?
+              ${departmentHeadPlaceholders ? `OR ${alias}.department_id IN (${departmentHeadPlaceholders})` : ''}
             )
         )
       )
+      ${departmentHeadPlaceholders ? `OR (${alias}.restriction_type = 'assigned' AND ${alias}.department_id IN (${departmentHeadPlaceholders}))` : ''}
       OR (
         ${alias}.restriction_type = 'private'
         AND ${alias}.${cols.owner} = ?
       )
     )
   `;
+
+  const params = [userDepartmentId, userId, userDepartmentId];
+  if (departmentHeadPlaceholders) {
+    params.push(...departmentHeadScope, ...departmentHeadScope);
+  }
+  params.push(userId);
+  return { sql, params };
 }
 
 // Builds an organizational scope filter based on the user's role and assigned
@@ -178,20 +195,10 @@ async function canAccessSop(sop, user) {
 
   if (restriction === 'public') return true;
   if (restriction === 'department') {
-    // Only grant access when the user's department was EXPLICITLY assigned to
-    // the SOP via sop_assignments -> assignment_departments. Merely sharing the
-    // SOP's owner department must NOT auto-grant visibility.
-    if (user.department_id) {
-      const [deptLinks] = await db.query(`
-        SELECT 1
-        FROM sop_assignments sa
-        INNER JOIN assignment_departments ad ON ad.assignment_id = sa.id
-        WHERE sa.sop_version_id = (SELECT current_version_id FROM sops WHERE id = ?)
-          AND sa.is_deleted = FALSE
-          AND ad.department_id = ?
-        LIMIT 1
-      `, [sop.id, user.department_id]);
-      if (deptLinks.length) return true;
+    if (user.department_id && sop.department_id === user.department_id) return true;
+    if (role === 'department_head') {
+      const scopedDeptIds = user.scoped_department_ids || (user.department_id ? [user.department_id] : []);
+      if (scopedDeptIds.includes(sop.department_id)) return true;
     }
     return false;
   }
@@ -200,6 +207,15 @@ async function canAccessSop(sop, user) {
   if (restriction === 'assigned') {
     const versionId = await getCurrentVersionId(sop.id);
     if (!versionId) return false;
+
+    const ownerId = sop.owner_id || sop.owner_user_id || null;
+    if (ownerId && user.id && ownerId === user.id) return true;
+
+    if (role === 'department_head' && sop.department_id) {
+      const scopedDeptIds = user.scoped_department_ids || (user.department_id ? [user.department_id] : []);
+      if (scopedDeptIds.includes(sop.department_id)) return true;
+    }
+
     const [assignments] = await db.query(`
       SELECT sa.id FROM sop_assignments sa
       WHERE sa.sop_version_id = ? AND sa.is_deleted = FALSE
@@ -314,10 +330,10 @@ async function findAll(filters = {}) {
     sql += ' AND s.category_id IS NULL';
   }
 
-  const restrictionSql = restrictionWhere(user, cols, 's');
-  if (restrictionSql) {
-    sql += ' AND ' + restrictionSql;
-    params.push(user.department_id, user.id, user.department_id, user.id);
+  const restriction = restrictionWhere(user, cols, 's');
+  if (restriction.sql) {
+    sql += ' AND ' + restriction.sql;
+    params.push(...restriction.params);
   }
 
   const scope = await businessScopeWhere(user, cols, 's');
@@ -371,10 +387,10 @@ async function findAll(filters = {}) {
     countSql += ' AND s.category_id IS NULL';
   }
 
-  const countRestrictionSql = restrictionWhere(user, cols, 's');
-  if (countRestrictionSql) {
-    countSql += ' AND ' + countRestrictionSql;
-    countParams.push(user.department_id, user.id, user.department_id, user.id);
+  const countRestriction = restrictionWhere(user, cols, 's');
+  if (countRestriction.sql) {
+    countSql += ' AND ' + countRestriction.sql;
+    countParams.push(...countRestriction.params);
   }
 
   const countScope = await businessScopeWhere(user, cols, 's');
@@ -397,7 +413,7 @@ async function findAll(filters = {}) {
 async function findById(id) {
   const cols = await getSopsColumns();
   const [rows] = await db.query(`
-    SELECT s.*, d.name AS department_name, c.name AS category_name, u.full_name AS owner_name
+    SELECT s.*, d.name AS department_name, d.business_id AS business_id, c.name AS category_name, u.full_name AS owner_name
     FROM sops s
     LEFT JOIN departments d ON s.department_id = d.id
     LEFT JOIN categories c ON s.category_id = c.id

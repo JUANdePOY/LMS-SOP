@@ -119,7 +119,7 @@ export default function EmployeeOnboardingPage() {
 
     const currentIdx = currentModuleIndex[activeAckId] || 0;
     const currentModule = sop.modules[currentIdx];
-    const timeLimit = currentModule?.time_limit || null;
+    const timeLimit = sop.min_time_limit || null;
 
     if (!timeLimit) {
       stopModuleTimer();
@@ -239,7 +239,7 @@ export default function EmployeeOnboardingPage() {
           const minTime = sop.min_time_limit || null;
           const remaining = minTime ? Math.max(0, minTime - (session?.total_seconds || 0)) : 0;
           const canAcknowledge = !minTime || session?.can_acknowledge || session?.min_time_met;
-          const moduleTimeLimit = currentModule?.time_limit || null;
+          const moduleTimeLimit = sop.min_time_limit || null;
           const key = `${sop.acknowledgement_id}-${currentIdx}`;
           const modRemaining = moduleTimeLimit ? (moduleTimers[key] ?? moduleTimeLimit) : null;
           const isModuleTimeExpired = modRemaining !== null && modRemaining <= 0;
@@ -272,12 +272,6 @@ export default function EmployeeOnboardingPage() {
                     <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2">
                       {sop.description || "No description available."}
                     </p>
-                    {minTime && session ? (
-                      <p className="mt-1 text-xs text-neutral-500 dark:text-neutral-400">
-                        Time spent: {formatSeconds(session.total_seconds || 0)}
-                        {!canAcknowledge ? ` • ${formatSeconds(remaining)} remaining` : ' • requirement met'}
-                      </p>
-                    ) : null}
                   </div>
                 </div>
 

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { Plus, ArrowUpToLine, ArrowDownToLine, ArrowLeftToLine, ArrowRightToLine } from 'lucide-react';
+import { ArrowUpToLine, ArrowDownToLine, ArrowLeftToLine, ArrowRightToLine } from 'lucide-react';
 
 function TableControls({ editor, show }) {
   const controlsRef = useRef(null);
@@ -10,7 +10,8 @@ function TableControls({ editor, show }) {
     if (!show || !editor) return;
 
     const table = editor.view.dom.querySelector('table');
-    if (!table) return;
+    const controls = controlsRef.current;
+    if (!table || !controls) return;
 
     const updatePosition = () => {
       if (!controlsRef.current) return;
@@ -23,19 +24,31 @@ function TableControls({ editor, show }) {
       });
     };
 
+    const showControls = () => setHovered(true);
+    const hideControls = (event) => {
+      const nextTarget = event.relatedTarget;
+      const isMovingBetweenTableAndControls =
+        nextTarget && (table.contains(nextTarget) || controls.contains(nextTarget));
+
+      if (!isMovingBetweenTableAndControls) {
+        setHovered(false);
+      }
+    };
+
     updatePosition();
 
-    const onMouseEnter = () => setHovered(true);
-    const onMouseLeave = () => setHovered(false);
-
-    table.addEventListener('mouseenter', onMouseEnter);
-    table.addEventListener('mouseleave', onMouseLeave);
+    table.addEventListener('mouseenter', showControls);
+    table.addEventListener('mouseleave', hideControls);
+    controls.addEventListener('mouseenter', showControls);
+    controls.addEventListener('mouseleave', hideControls);
 
     editor.on('transaction', updatePosition);
 
     return () => {
-      table.removeEventListener('mouseenter', onMouseEnter);
-      table.removeEventListener('mouseleave', onMouseLeave);
+      table.removeEventListener('mouseenter', showControls);
+      table.removeEventListener('mouseleave', hideControls);
+      controls.removeEventListener('mouseenter', showControls);
+      controls.removeEventListener('mouseleave', hideControls);
       editor.off('transaction', updatePosition);
     };
   }, [show, editor]);
@@ -45,7 +58,7 @@ function TableControls({ editor, show }) {
   return (
     <div
       ref={controlsRef}
-      className="absolute z-20 flex items-center gap-0.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg px-1 py-0.5 transition-opacity pointer-events-auto"
+      className={`absolute z-20 flex items-center gap-0.5 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg px-1 py-0.5 transition-opacity ${hovered ? 'pointer-events-auto' : 'pointer-events-none'}`}
       style={{
         bottom: position.bottom + 4,
         right: position.right + 4,

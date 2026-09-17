@@ -1,6 +1,5 @@
 import { createSop } from '@/features/sop-management/services/sopService';
 import { createModule } from '@/features/sop-management/services/moduleService';
-import { createAssignment } from '@/features/sop-management/services/assignmentService';
 
 /**
  * quickCreateSop
@@ -40,17 +39,6 @@ export async function quickCreateSop({ title, departmentId = null, categoryId = 
     content: '',
     sort_order: 1,
   });
-
-  // Scope the SOP to its owning department when known (folder -> file).
-  if (departmentId) {
-    await createAssignment(sopId, {
-      department_ids: [departmentId],
-      position_names: [],
-      user_ids: [],
-      due_date: null,
-      notes: '',
-    });
-  }
 
   return sopId;
 }

@@ -4,11 +4,28 @@ import AssignmentForm from './AssignmentForm';
 import AssignmentList from './AssignmentList';
 import { useToast } from '@/shared/components/ui/Toast';
 import { fetchAssigned } from '@/features/sop-management/services/assignmentService';
+import { getSop } from '@/features/sop-management/services/sopService';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function AssignmentModal({ sopId, open, onClose }) {
   const { toast } = useToast();
+  const { isDepartmentHead, scopedDepartmentIds, isAdmin, isSuperAdmin, businessId } = useAuth();
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [existingAssignments, setExistingAssignments] = useState([]);
+  const [sop, setSop] = useState(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    getSop(sopId)
+      .then((r) => {
+        if (!cancelled) setSop(r.data?.data || null);
+      })
+      .catch(() => {
+        if (!cancelled) setSop(null);
+      });
+    return () => { cancelled = true; };
+  }, [open, sopId]);
 
   useEffect(() => {
     if (!open) return;
@@ -30,6 +47,9 @@ export default function AssignmentModal({ sopId, open, onClose }) {
 
   if (!open) return null;
 
+  const allowedBusinessId = isSuperAdmin ? null : (sop?.business_id || businessId);
+  const allowedDepartmentIds = isSuperAdmin ? null : (isDepartmentHead ? scopedDepartmentIds : null);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={onClose} />
@@ -50,7 +70,17 @@ export default function AssignmentModal({ sopId, open, onClose }) {
 
         <div className="mt-5 border-t border-neutral-200 dark:border-neutral-800 pt-4">
           <h4 className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-3">Add assignment</h4>
-          <AssignmentForm sopId={sopId} onCreated={handleCreated} existingAssignments={existingAssignments} />
+          <AssignmentForm
+            sopId={sopId}
+            onCreated={handleCreated}
+            existingAssignments={existingAssignments}
+            lockedDepartmentIds={isDepartmentHead ? scopedDepartmentIds : null}
+            allowedBusinessId={allowedBusinessId}
+            allowedDepartmentIds={allowedDepartmentIds}
+            isDepartmentHead={isDepartmentHead}
+            isAdmin={isAdmin}
+            isSuperAdmin={isSuperAdmin}
+          />
         </div>
       </div>
     </div>

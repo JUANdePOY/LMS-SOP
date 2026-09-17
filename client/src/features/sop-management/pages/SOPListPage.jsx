@@ -126,8 +126,9 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop, onAssi
 }
 
 function SOPListPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, canCreateSops, isDepartmentHead, scopedDepartmentIds, isAdmin, isSuperAdmin, businessId } = useAuth();
   const canManage = hasPermission('manage_sops');
+  const canCreate = canCreateSops || canManage;
 
   const {
     sops, loading, search, setSearch, status, setStatus,
@@ -176,6 +177,11 @@ function SOPListPage() {
   }, [editingSopId, handleEditCancel]);
   const editingSop = sops.find(s => s.id === editingSopId);
 
+  useEffect(() => {
+    if (!showCreate || !isDepartmentHead || !scopedDepartmentIds?.length) return;
+    cascade.setSelectedDeptIds(scopedDepartmentIds);
+  }, [showCreate, isDepartmentHead, scopedDepartmentIds, cascade.setSelectedDeptIds]);
+
   const handleAssignStart = (sop) => setAssignSopId(sop.id);
   const handleAssignClose = () => setAssignSopId(null);
 
@@ -223,7 +229,7 @@ function SOPListPage() {
           <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Files</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">Manage your standard operating procedures</p>
         </div>
-        {activeTab === 'sops' && !archivedTab && canManage && (
+        {activeTab === 'sops' && !archivedTab && canCreate && (
           <button
             onClick={() => setShowCreate(true)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
@@ -284,6 +290,13 @@ function SOPListPage() {
             setNewIsDefaultOnboarding={setNewIsDefaultOnboarding}
             newMinTimeLimit={newMinTimeLimit}
             setNewMinTimeLimit={setNewMinTimeLimit}
+            lockedDepartmentIds={isDepartmentHead ? scopedDepartmentIds : null}
+            lockedBusinessIds={isAdmin || isDepartmentHead ? [businessId] : null}
+            isBusinessLocked={!isSuperAdmin}
+            isDepartmentLocked={isDepartmentHead}
+            isDepartmentHead={isDepartmentHead}
+            isAdmin={isAdmin}
+            isSuperAdmin={isSuperAdmin}
           />
 
           <div className="flex flex-col sm:flex-row gap-3">

@@ -27,7 +27,7 @@ async function seed() {
      { name: 'view_dashboard', display_name: 'View Dashboard', category: 'dashboard' },
      { name: 'manage_users', display_name: 'Manage Users', category: 'users' },
      { name: 'manage_departments', display_name: 'Manage Departments', category: 'departments' },
-     { name: 'manage_sops', display_name: 'Manage SOPs', category: 'sops' },
+      { name: 'manage_sops', display_name: 'Manage SOPs', category: 'sops' },
      { name: 'manage_courses', display_name: 'Manage Courses', category: 'courses' },
      { name: 'manage_assessments', display_name: 'Manage Assessments', category: 'assessments' },
      { name: 'manage_announcements', display_name: 'Manage Announcements', category: 'announcements' },
@@ -56,11 +56,11 @@ async function seed() {
   }
 
    const rolePermissions = [
-     // super_admin: ALL permissions
-     ['super_admin', 'view_dashboard'],
-     ['super_admin', 'manage_users'],
-     ['super_admin', 'manage_departments'],
-     ['super_admin', 'manage_sops'],
+      // super_admin: ALL permissions
+      ['super_admin', 'view_dashboard'],
+      ['super_admin', 'manage_users'],
+      ['super_admin', 'manage_departments'],
+      ['super_admin', 'manage_sops'],
      ['super_admin', 'manage_courses'],
      ['super_admin', 'manage_assessments'],
      ['super_admin', 'view_reports'],
@@ -77,11 +77,11 @@ async function seed() {
      ['super_admin', 'tasks.assign.any'],
      ['super_admin', 'tasks.view.all'],
      ['super_admin', 'projects.manage'],
-     // admin: business-scoped management (no manage_settings, no view_audit_logs)
-     ['admin', 'view_dashboard'],
-     ['admin', 'manage_users'],
-     ['admin', 'manage_departments'],
-     ['admin', 'manage_sops'],
+      // admin: business-scoped management (no manage_settings, no view_audit_logs)
+      ['admin', 'view_dashboard'],
+      ['admin', 'manage_users'],
+      ['admin', 'manage_departments'],
+      ['admin', 'manage_sops'],
      ['admin', 'manage_courses'],
      ['admin', 'manage_assessments'],
      ['admin', 'view_reports'],
@@ -95,10 +95,10 @@ async function seed() {
      ['admin', 'tasks.assign.any'],
      ['admin', 'tasks.view.all'],
      ['admin', 'projects.manage'],
-     // department_head: department-scoped management
-     ['department_head', 'view_dashboard'],
-     ['department_head', 'manage_sops'],
-     ['department_head', 'manage_courses'],
+      // department_head: department-scoped management
+      ['department_head', 'view_dashboard'],
+      ['department_head', 'manage_sops'],
+      ['department_head', 'manage_courses'],
      ['department_head', 'manage_assessments'],
      ['department_head', 'view_reports'],
      ['department_head', 'manage_announcements'],

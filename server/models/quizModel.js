@@ -132,7 +132,7 @@ async function update(id, updates) {
   const params = [];
 
   for (const key of allowed) {
-    if (Object.prototype.hasOwnProperty.call(updates, key)) {
+    if (Object.prototype.hasOwnProperty.call(updates, key) && updates[key] !== undefined) {
       sets.push(`${key} = ?`);
       params.push(updates[key]);
     }
@@ -222,7 +222,7 @@ async function updateQuestion(id, updates) {
   const params = [];
 
   for (const key of allowed) {
-    if (Object.prototype.hasOwnProperty.call(updates, key)) {
+    if (Object.prototype.hasOwnProperty.call(updates, key) && updates[key] !== undefined) {
       let val = updates[key];
       if (key === 'options' || key === 'correct_answer') {
         val = val ? JSON.stringify(val) : null;
@@ -361,7 +361,7 @@ async function updateAttempt(id, updates) {
   const params = [];
 
   for (const key of allowed) {
-    if (Object.prototype.hasOwnProperty.call(updates, key)) {
+    if (Object.prototype.hasOwnProperty.call(updates, key) && updates[key] !== undefined) {
       let val = updates[key];
       if (key === 'answers') val = val ? JSON.stringify(val) : null;
       sets.push(`${key} = ?`);
@@ -759,7 +759,7 @@ async function updateSubmission(id, updates) {
   const params = [];
 
   for (const key of allowed) {
-    if (Object.prototype.hasOwnProperty.call(updates, key)) {
+    if (Object.prototype.hasOwnProperty.call(updates, key) && updates[key] !== undefined) {
       let val = updates[key];
       if (key === 'answers') val = val ? JSON.stringify(val) : null;
       sets.push(`${key} = ?`);

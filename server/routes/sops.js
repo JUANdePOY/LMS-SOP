@@ -1,5 +1,5 @@
 const express = require('express');
-const { authenticateToken, resolveScope } = require('../middleware/auth');
+const { authenticateToken, resolveScope, authorize } = require('../middleware/auth');
 const { requirePermission, requireBusinessScope, requireDepartmentScope } = require('../middleware/scope');
 const { sopController, moduleController, attachmentController, versionController, workflowController, auditController, shareController, assignmentController, acknowledgementController, approvalWorkflowController, exportController } = require('../controllers/sopController');
 const approvalController = require('../controllers/sopApprovalController');
@@ -67,8 +67,20 @@ router.route('/trashed')
 
 router.route('/:id')
   .get(requireSopReadScope, sopController.getById)
-  .put(requireSopWriteScope, sopController.update)
-  .delete(requireSopWriteScope, sopController.remove);
+  .put(authorize('super_admin', 'admin'), requireSopWriteScope, sopController.update)
+  .delete(authorize('super_admin', 'admin'), requireSopWriteScope, sopController.remove);
+
+router.route('/:id/restore')
+  .post(authorize('super_admin', 'admin'), requireSopWriteScope, sopController.restore);
+
+router.route('/:id/permanent')
+  .delete(authorize('super_admin', 'admin'), requireSopWriteScope, sopController.permanentDelete);
+
+router.route('/trashed')
+  .get(authorize('super_admin', 'admin'), sopController.listTrashed);
+
+router.route('/trashed/empty')
+  .delete(authorize('super_admin', 'admin'), sopController.emptyTrash);
 
 router.route('/:id/restore')
   .post(requireSopWriteScope, sopController.restore);
@@ -152,13 +164,13 @@ router.route('/:sopId/submit')
   .post(requireSopWriteScope, workflowController.submit);
 
 router.route('/:sopId/approve')
-  .post(requirePermission('manage_sops'), requireSopWriteScope, workflowController.approve);
+  .post(authorize('super_admin', 'admin'), requirePermission('manage_sops'), requireSopWriteScope, workflowController.approve);
 
 router.route('/:sopId/reject')
-  .post(requirePermission('manage_sops'), requireSopWriteScope, workflowController.reject);
+  .post(authorize('super_admin', 'admin'), requirePermission('manage_sops'), requireSopWriteScope, workflowController.reject);
 
 router.route('/:sopId/publish')
-  .post(requirePermission('manage_sops'), requireSopWriteScope, workflowController.publish);
+  .post(authorize('super_admin', 'admin'), requirePermission('manage_sops'), requireSopWriteScope, workflowController.publish);
 
 router.route('/:sopId/audit')
   .get(requireSopReadScope, auditController.list);
@@ -187,7 +199,7 @@ router.route('/:sopId/assigned')
   .get(requireSopReadScope, assignmentCascadeController.listAssigned);
 
 router.route('/assignments/:id')
-  .delete(requirePermission('manage_sops'), assignmentController.remove);
+  .delete(authorize('super_admin', 'admin'), requirePermission('manage_sops'), assignmentController.remove);
 
 router.route('/acknowledgements/my')
   .get(authenticateToken, acknowledgementController.listByUser);

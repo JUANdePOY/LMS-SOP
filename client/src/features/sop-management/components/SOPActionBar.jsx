@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 const statusActions = {
   Draft: { label: 'Submit for Review', variant: 'indigo', action: 'submit' },
@@ -9,10 +10,19 @@ const statusActions = {
 };
 
 function SOPActionBar({ sop, onAction, loading }) {
+  const { isSuperAdmin, isAdmin, isDepartmentHead } = useAuth();
+  const isApprover = isSuperAdmin || isAdmin;
   const config = statusActions[sop.status];
   if (!config) return null;
 
   const isLoading = loading?.[config.action] || false;
+  const isSubmit = config.action === 'submit';
+  const isApprove = config.action === 'approve';
+  const isPublish = config.action === 'publish';
+  const isArchive = config.action === 'archive';
+  const visible = isSubmit || isApprover || isArchive;
+
+  if (!visible) return null;
 
   return (
     <div className="flex items-center gap-2 mb-4">

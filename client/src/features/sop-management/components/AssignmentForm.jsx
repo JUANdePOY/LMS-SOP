@@ -1,10 +1,22 @@
 import { useState, useEffect } from 'react';
 import { useAssignmentCascade } from '@/features/sop-management/hooks/useAssignmentCascade';
 import { createAssignment } from '@/features/sop-management/services/assignmentService';
+import { useToast } from '@/shared/components/ui/Toast';
 import CheckboxList from './CheckboxList';
 import GroupedCheckboxList from './GroupedCheckboxList';
 
-export default function AssignmentForm({ sopId, onCreated, existingAssignments = [] }) {
+export default function AssignmentForm({
+  sopId,
+  onCreated,
+  existingAssignments = [],
+  lockedDepartmentIds = null,
+  allowedBusinessId = null,
+  allowedDepartmentIds = null,
+  isDepartmentHead = false,
+  isAdmin = false,
+  isSuperAdmin = false,
+}) {
+  const { toast } = useToast();
   const cascade = useAssignmentCascade();
   const [submitting, setSubmitting] = useState(false);
 
@@ -12,27 +24,85 @@ export default function AssignmentForm({ sopId, onCreated, existingAssignments =
     setSelectedDeptIds,
     setSelectedPositions,
     setSelectedUserIds,
+    setSelectedBusinessIds,
+    setUserSourceDeptIds,
+    departments,
+    groupedDepartments,
+    businesses,
   } = cascade;
 
+  const isDepartmentLocked = Boolean(lockedDepartmentIds && lockedDepartmentIds.length > 0);
+  const businessRestricted = allowedBusinessId != null;
+  const departmentsRestricted = allowedDepartmentIds != null;
+
+  const availableBusinesses = businessRestricted
+    ? businesses.filter((b) => b.id === allowedBusinessId)
+    : businesses;
+
+  const availableGroupedDepartments = departmentsRestricted
+    ? groupedDepartments.filter((d) => allowedDepartmentIds.includes(d.id))
+    : businessRestricted
+      ? groupedDepartments.filter((d) => d.business_id === allowedBusinessId)
+      : groupedDepartments;
+
+  const hideBusiness = isDepartmentHead || isAdmin;
+  const hideDepartment = isDepartmentHead;
+
   useEffect(() => {
-    if (!Array.isArray(existingAssignments) || existingAssignments.length === 0) return;
+    if (!isDepartmentLocked) return;
+    if (!Array.isArray(existingAssignments) || existingAssignments.length === 0) {
+      setSelectedDeptIds(lockedDepartmentIds);
+      setUserSourceDeptIds(lockedDepartmentIds);
+      return;
+    }
     const deptIds = new Set();
     const positions = new Set();
     const userIds = new Set();
     for (const assignment of existingAssignments) {
       for (const dept of assignment.departments || []) {
-        deptIds.add(dept.id);
+        if (lockedDepartmentIds.includes(dept.id)) {
+          deptIds.add(dept.id);
+        }
       }
       for (const pos of assignment.positions || []) positions.add(pos);
       for (const user of assignment.users || []) userIds.add(user.id);
     }
-    setSelectedDeptIds(Array.from(deptIds));
+    if (deptIds.size > 0) {
+      setSelectedDeptIds(Array.from(deptIds));
+    } else {
+      setSelectedDeptIds(lockedDepartmentIds);
+    }
+    setUserSourceDeptIds(Array.from(deptIds).length > 0 ? Array.from(deptIds) : lockedDepartmentIds);
     setSelectedPositions(Array.from(positions));
     setSelectedUserIds(Array.from(userIds));
-  }, [existingAssignments, setSelectedDeptIds, setSelectedPositions, setSelectedUserIds]);
+  }, [existingAssignments, lockedDepartmentIds, isDepartmentLocked, setSelectedDeptIds, setSelectedPositions, setSelectedUserIds, setUserSourceDeptIds]);
+
+  useEffect(() => {
+    if (!isDepartmentLocked || !groupedDepartments.length) return;
+    const businessIds = new Set();
+    for (const dept of groupedDepartments) {
+      for (const item of dept.items || []) {
+        if (lockedDepartmentIds.includes(item.id)) {
+          if (item.business_id != null) businessIds.add(item.business_id);
+        }
+      }
+    }
+    if (businessIds.size > 0) {
+      setSelectedBusinessIds(Array.from(businessIds));
+    }
+  }, [isDepartmentLocked, lockedDepartmentIds, groupedDepartments, setSelectedBusinessIds]);
+
+  useEffect(() => {
+    if (isDepartmentLocked) return;
+    if (existingAssignments && existingAssignments.length > 0) return;
+    if (!isDepartmentHead && !isAdmin && !isSuperAdmin) return;
+    if (!departments.length) return;
+    setUserSourceDeptIds(departments.map((d) => d.id));
+  }, [existingAssignments, isDepartmentLocked, isDepartmentHead, isAdmin, isSuperAdmin, departments, setUserSourceDeptIds]);
 
   const handleSubmit = async () => {
-    if (!cascade.selectedDeptIds.length || submitting) return;
+    if (submitting) return;
+    if (!cascade.selectedDeptIds.length && !cascade.selectedUserIds.length) return;
     setSubmitting(true);
     try {
       await createAssignment(sopId, {
@@ -46,43 +116,50 @@ export default function AssignmentForm({ sopId, onCreated, existingAssignments =
       cascade.setSelectedPositions([]);
       cascade.setSelectedUserIds([]);
       cascade.setUserSearch('');
+      cascade.setUserSourceDeptIds([]);
       onCreated?.();
     } catch (err) {
-      console.error('Failed to create assignment', err);
+      toast.error(err?.response?.data?.error?.message || err?.message || 'Failed to create assignment');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const submitDisabled = !cascade.selectedDeptIds.length || submitting;
+  const submitDisabled = submitting || (!cascade.selectedDeptIds.length && !cascade.selectedUserIds.length);
 
   return (
     <div className="space-y-3">
-      <div>
-        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Business</label>
-        <CheckboxList
-          items={cascade.businesses}
-          selectedIds={cascade.selectedBusinessIds}
-          onToggle={cascade.toggleBusiness}
-          labelKey="business_name"
-          valueKey="id"
-          placeholder="Select businesses..."
-          loading={cascade.loading.businesses}
-        />
-      </div>
+      {!hideBusiness && (
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Business</label>
+          <CheckboxList
+            items={availableBusinesses}
+            selectedIds={cascade.selectedBusinessIds}
+            onToggle={cascade.toggleBusiness}
+            labelKey="business_name"
+            valueKey="id"
+            placeholder="Select businesses..."
+            loading={cascade.loading.businesses}
+            disabled={isDepartmentLocked || businessRestricted}
+          />
+        </div>
+      )}
 
-      <div>
-        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Departments</label>
-        <GroupedCheckboxList
-          items={cascade.groupedDepartments}
-          selectedIds={cascade.selectedDeptIds}
-          onToggle={cascade.toggleDepartment}
-          labelKey="name"
-          valueKey="id"
-          loading={cascade.loading.departments}
-          emptyText={cascade.selectedBusinessIds.length ? 'No departments for selected businesses' : 'Select a business first'}
-        />
-      </div>
+      {!hideDepartment && (
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Departments</label>
+          <GroupedCheckboxList
+            items={availableGroupedDepartments}
+            selectedIds={cascade.selectedDeptIds}
+            onToggle={cascade.toggleDepartment}
+            labelKey="name"
+            valueKey="id"
+            loading={cascade.loading.departments}
+            emptyText={cascade.selectedBusinessIds.length ? 'No departments for selected businesses' : 'Select a business first'}
+            disabled={isDepartmentLocked}
+          />
+        </div>
+      )}
 
       <div>
         <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Positions</label>
@@ -135,7 +212,7 @@ export default function AssignmentForm({ sopId, onCreated, existingAssignments =
           subLabelKey="position_title"
           valueKey="id"
           loading={cascade.loading.users}
-          emptyText={cascade.selectedDeptIds.length ? 'No users found' : 'Select a department first'}
+          emptyText={(cascade.selectedDeptIds.length || isAdmin || isDepartmentHead) ? 'No users found' : 'Select a department first'}
         />
       </div>
 

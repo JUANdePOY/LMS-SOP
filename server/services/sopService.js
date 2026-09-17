@@ -1,6 +1,5 @@
 const sopModel = require('../models/sopModel');
 const sopVersionModel = require('../models/sopVersionModel');
-const sopAssignmentService = require('./sopAssignmentService');
 const sopAcknowledgementService = require('./sopAcknowledgementService');
 const { generateSopCode } = require('../utils/sopUtils');
 const { logAudit } = require('../utils/auditLogger');
@@ -26,7 +25,7 @@ async function getSopById(id, user) {
   if (user) {
     const cols = await sopModel.getSopsColumns();
     const restriction = sopModel.restrictionWhere(user, cols, 'sops');
-    if (restriction && !sopModel.canAccessSop(sop, user)) {
+    if (restriction.sql && !sopModel.canAccessSop(sop, user)) {
       const error = new Error('You do not have permission to access this SOP');
       error.code = 'FORBIDDEN';
       throw error;
@@ -125,15 +124,24 @@ async function createSop(data, actorId) {
   }
 
   const actor = await getUser(actorId);
+
+  let finalDepartmentId = department_id;
+  if (actor && actor.role === 'department_head' && !finalDepartmentId) {
+    const scopedDeptIds = actor.scoped_department_ids || (actor.department_id ? [actor.department_id] : []);
+    if (scopedDeptIds.length > 0) {
+      finalDepartmentId = scopedDeptIds[0];
+    }
+  }
+
   if (actor) {
-    await enforceSopWriteScope({ department_id: department_id || null }, actor);
+    await enforceSopWriteScope({ department_id: finalDepartmentId || null }, actor);
   }
 
   const id = await sopModel.create({
     title,
     code,
     description,
-    department_id,
+    department_id: finalDepartmentId,
     category_id,
     owner_user_id: actorId,
     status: status || 'Draft',
@@ -194,6 +202,7 @@ async function createSop(data, actorId) {
       .catch(() => {});
   }
 
+
   return { id, title, code, status: sopStatus };
 }
 
@@ -202,7 +211,21 @@ async function getUser(userId) {
     'SELECT id, role, business_id, department_id FROM users WHERE id = ?',
     [userId]
   );
-  return rows[0] || null;
+  const user = rows[0] || null;
+
+  if (user && user.role === 'department_head') {
+    const [grants] = await db.query(
+      'SELECT department_id FROM department_scope_grants WHERE user_id = ?',
+      [userId]
+    );
+    const scoped = new Set(grants.map((g) => g.department_id));
+    if (user.department_id != null) {
+      scoped.add(user.department_id);
+    }
+    user.scoped_department_ids = [...scoped];
+  }
+
+  return user;
 }
 
 async function updateSop(id, data, actorId) {
@@ -214,6 +237,41 @@ async function updateSop(id, data, actorId) {
   }
 
   const actor = await getUser(actorId);
+
+  // Categorization immutability for department_head and admin
+  if (actor && actor.role === 'department_head') {
+    const forbidden = ['business_id', 'department_id'];
+    for (const field of forbidden) {
+      if (data[field] !== undefined && data[field] !== existing[field]) {
+        const error = new Error('Access denied: Cannot change categorization');
+        error.code = 'FORBIDDEN';
+        throw error;
+      }
+    }
+  } else if (actor && actor.role === 'admin') {
+    if (data.business_id !== undefined && data.business_id !== existing.business_id) {
+      const error = new Error('Access denied: Cannot change business categorization');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+    if (data.department_id !== undefined && data.department_id !== existing.department_id) {
+      if (!actor.business_id) {
+        const error = new Error('Your account has no business scope');
+        error.code = 'FORBIDDEN';
+        throw error;
+      }
+      const [[dept]] = await db.query(
+        'SELECT business_id FROM departments WHERE id = ?',
+        [data.department_id]
+      );
+      if (!dept || dept.business_id !== actor.business_id) {
+        const error = new Error('Access denied: Cannot assign SOP to departments outside your business scope');
+        error.code = 'BUSINESS_SCOPE_DENIED';
+        throw error;
+      }
+    }
+  }
+
   if (actor) {
     await enforceSopScope(existing, actor);
     if (data.department_id !== undefined) {

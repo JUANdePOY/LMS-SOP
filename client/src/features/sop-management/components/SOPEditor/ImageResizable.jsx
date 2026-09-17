@@ -31,7 +31,7 @@ const ImageResizable = Image.extend({
       ...this.parent?.(),
       width: {
         default: null,
-        parseHTML: (el) => el.getAttribute('data-width') || el.style.width || null,
+        parseHTML: (el) => el.getAttribute('data-width') || null,
         // NOTE: intentionally no `style` output here. Tiptap merges every
         // attribute's renderHTML() into one flat HTMLAttributes object
         // before the node's own renderHTML() runs — a `style: width:...`
@@ -68,6 +68,8 @@ const ImageResizable = Image.extend({
 
     const children = [['img', {
       ...imgAttrs,
+      ...(dataWidth ? { 'data-width': dataWidth } : {}),
+      ...(dataAlign ? { 'data-align': dataAlign } : {}),
       style: 'width: 100%; height: auto; display: block;',
     }]];
     if (caption) children.push(['figcaption', {}, caption]);

@@ -13,6 +13,7 @@ function GroupedCheckboxList({
   valueKey = 'id',
   loading = false,
   emptyText = 'No options',
+  disabled = false,
 }) {
   const [collapsed, setCollapsed] = useState({});
 
@@ -105,12 +106,13 @@ function GroupedCheckboxList({
     return (
       <label
         key={id}
-        className="flex items-center gap-2 px-2 py-1 hover:bg-[var(--bg-hover)]/30 cursor-pointer rounded text-sm"
+        className={`flex items-center gap-2 px-2 py-1 text-sm ${disabled ? 'opacity-70 cursor-not-allowed' : 'hover:bg-[var(--bg-hover)]/30 cursor-pointer rounded'}`}
       >
         <input
           type="checkbox"
           checked={checked}
-          onChange={() => onToggle(id)}
+          onChange={() => !disabled && onToggle(id)}
+          disabled={disabled}
           className="rounded border-[var(--border)] text-blue-600 focus:ring-blue-500"
         />
         <span className="text-[var(--text-primary)] truncate">
@@ -164,11 +166,12 @@ function GroupedCheckboxList({
                       {onToggleBulk && (
                         <button
                           type="button"
+                          disabled={disabled}
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleBulkToggle(sub.items);
+                            if (!disabled) handleBulkToggle(sub.items);
                           }}
-                          className="flex items-center justify-center w-4 h-4 rounded border border-[var(--border)] text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors"
+                          className="flex items-center justify-center w-4 h-4 rounded border border-[var(--border)] text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors disabled:opacity-50"
                           aria-label={allSelected ? 'Deselect all in ' + sub.name : 'Select all in ' + sub.name}
                         >
                           {allSelected ? <Check size={12} /> : partial ? <Check size={12} className="text-blue-600" /> : null}

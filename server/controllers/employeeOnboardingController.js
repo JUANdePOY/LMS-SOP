@@ -15,8 +15,9 @@ function sendError(res, err, fallback = 'Request failed') {
 
 async function getMyOnboarding(req, res) {
   try {
+    await sopOnboardingService.ensureOnboardingAcknowledgements(req.user.id);
     const pending = await sopOnboardingService.getPendingOnboardingSops(req.user.id);
-    const isComplete = pending.length === 0;
+    const isComplete = await sopOnboardingService.isOnboardingComplete(req.user.id);
     res.json({
       success: true,
       data: {
