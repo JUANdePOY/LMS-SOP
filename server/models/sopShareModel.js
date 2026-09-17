@@ -35,6 +35,11 @@ async function findByToken(token) {
   return rows[0] || null;
 }
 
+async function findById(id) {
+  const [rows] = await db.query('SELECT * FROM sop_shares WHERE id = ? AND is_deleted = FALSE', [id]);
+  return rows[0] || null;
+}
+
 async function revokeShare(id) {
   await db.query('UPDATE sop_shares SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
 }
@@ -44,5 +49,6 @@ module.exports = {
   createShare,
   createShareLink,
   findByToken,
+  findById,
   revokeShare,
 };

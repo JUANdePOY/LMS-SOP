@@ -1,4 +1,5 @@
 import VideoPlayer from "./VideoPlayer";
+import { resolveBodyImages } from "@/lib/fileUrl";
 
 export default function ContentViewer({ content }) {
   if (!content) return <div className="text-sm text-neutral-500">Select content to view.</div>;
@@ -11,7 +12,7 @@ export default function ContentViewer({ content }) {
         <h3 className="text-lg font-semibold mb-2">{content.title}</h3>
         <div
           className="prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300"
-          dangerouslySetInnerHTML={{ __html: content.description || content.content || "" }}
+          dangerouslySetInnerHTML={{ __html: resolveBodyImages(content.description || content.content || "") }}
         />
       </div>
     );

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/shared/components/ui/Toast";
+import ConfirmationDialog from "@/shared/components/ui/ConfirmationDialog";
 import { ChevronLeft, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, X, Save, Rocket, Clock, CheckCircle2, AlertCircle, Search, Plus, Layers, FileText, HelpCircle, BookOpen, ListChecks } from "lucide-react";
 import CourseOutline from "../components/course-builder/CourseOutline";
 import LessonEditor from "../components/course-builder/LessonEditor";
@@ -190,6 +191,8 @@ export default function CourseBuilderPage() {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [courseCertificates, setCourseCertificates] = useState([]);
   const courseCertificatesRef = useRef([]);
+  const [showExitModal, setShowExitModal] = useState(false);
+  const pendingNavigation = useRef(null);
 
   useEffect(() => {
     setShowRightSidebar(false);
@@ -471,6 +474,39 @@ export default function CourseBuilderPage() {
 
   handleSaveDraftRef.current = handleSaveDraft;
 
+  const confirmExit = useCallback((navFn) => {
+    pendingNavigation.current = navFn;
+    setShowExitModal(true);
+  }, []);
+
+  const handleExitSave = useCallback(async () => {
+    try {
+      await saveNow(buildPayload());
+      pendingNavigation.current?.();
+      pendingNavigation.current = null;
+      setShowExitModal(false);
+    } catch {
+      // error already shown in toast
+    }
+  }, [saveNow, buildPayload]);
+
+  const handleExitSaveDraft = useCallback(async () => {
+    try {
+      await saveNow({ ...buildPayload(), status: "draft" });
+      pendingNavigation.current?.();
+      pendingNavigation.current = null;
+      setShowExitModal(false);
+    } catch {
+      // error already shown in toast
+    }
+  }, [saveNow, buildPayload]);
+
+  const handleExitDiscard = useCallback(() => {
+    pendingNavigation.current?.();
+    pendingNavigation.current = null;
+    setShowExitModal(false);
+  }, []);
+
   const handlePublish = useCallback(async () => {
     const payload = buildPayload();
     payload.status = "published";
@@ -694,7 +730,11 @@ export default function CourseBuilderPage() {
           <button
             onClick={() => {
               window.dispatchEvent(new Event('open-system-sidebar'));
-              navigate("/courses");
+              if (hasUnsavedChanges) {
+                confirmExit(() => navigate("/courses"));
+              } else {
+                navigate("/courses");
+              }
             }}
             title="Back to courses"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
@@ -869,6 +909,7 @@ export default function CourseBuilderPage() {
         <FadeIn as="main" className="flex-1 min-w-0">
           {selectedLesson ? (
             <LessonEditor
+              key={selectedLesson.id}
               lesson={selectedLesson}
               courseId={courseId}
               courseTitle={course?.title}
@@ -1017,6 +1058,24 @@ export default function CourseBuilderPage() {
           </div>
         </aside>
       </div>
+      <ConfirmationDialog
+        isOpen={showExitModal}
+        onClose={handleExitDiscard}
+        onConfirm={handleExitSave}
+        title="Unsaved changes"
+        message="You have unsaved changes. Save before leaving?"
+        confirmText="Save"
+        cancelText="Discard"
+      >
+        <button
+          type="button"
+          onClick={handleExitSaveDraft}
+          disabled={saving}
+          className="mt-2 w-full rounded-md border border-neutral-200 dark:border-neutral-700 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:text-neutral-200 dark:hover:bg-neutral-800 disabled:opacity-50 transition-colors"
+        >
+          Save as Draft
+        </button>
+      </ConfirmationDialog>
     </div>
   );
 }

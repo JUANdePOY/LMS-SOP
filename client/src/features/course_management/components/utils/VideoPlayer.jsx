@@ -1,16 +1,49 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getVideoEmbedInfo } from "@/features/course_management/utils/videoUtils";
 import { parseVideoUrl } from "@/features/course_management/utils/videoUrl";
 
-export default function VideoPlayer({ src, title }) {
+export default function VideoPlayer({ src, title, onEnded }) {
   const parsed = parseVideoUrl(src);
   const isBunny = parsed?.provider === "bunny";
   const bunnyPlayUrl = isBunny ? parsed.playUrl : null;
   const bunnyEmbed = isBunny ? parsed.embedUrl : null;
   const [bunnyFailed, setBunnyFailed] = useState(false);
+  const [ended, setEnded] = useState(false);
 
-  // Bunny Stream: prefer the native <video> play URL for custom controls, but
-  // fall back to the embed iframe if the library isn't publicly streamable.
+  useEffect(() => {
+    setEnded(false);
+  }, [src]);
+
+  useEffect(() => {
+    if (!onEnded) return;
+    if (ended) onEnded();
+  }, [ended, onEnded]);
+
+  useEffect(() => {
+    if (!bunnyEmbed && !parsed?.videoId) return;
+    const handler = (event) => {
+      try {
+        const data = event.data || {};
+        if (typeof data === 'string') {
+          const parsedData = JSON.parse(data);
+          if (parsedData?.event === 'ended' || parsedData?.state === 0) {
+            setEnded(true);
+          }
+        } else if (data?.event === 'ended' || data?.state === 0) {
+          setEnded(true);
+        }
+      } catch {
+        // ignore non-JSON messages
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [bunnyEmbed, parsed?.videoId]);
+
+  const handleNativeEnded = () => {
+    setEnded(true);
+  };
+
   if (isBunny && bunnyPlayUrl && !bunnyFailed) {
     return (
       <div className="w-full rounded-xl border border-[var(--border)] bg-black overflow-hidden">
@@ -18,6 +51,7 @@ export default function VideoPlayer({ src, title }) {
           controls
           className="w-full aspect-video"
           src={bunnyPlayUrl}
+          onEnded={handleNativeEnded}
           onError={() => setBunnyFailed(true)}
         >
           Your browser does not support the video tag.
@@ -54,7 +88,7 @@ export default function VideoPlayer({ src, title }) {
   if (info.type === "file") {
     return (
       <div className={containerClass}>
-        <video controls className="w-full aspect-video" src={info.src}>
+        <video controls className="w-full aspect-video" src={info.src} onEnded={handleNativeEnded}>
           Your browser does not support the video tag.
         </video>
         {title && <p className="px-3 py-2 text-xs text-neutral-400 bg-neutral-900">{title}</p>}

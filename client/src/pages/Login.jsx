@@ -21,7 +21,8 @@ export default function Login() {
 
   useEffect(() => {
     if (isAuthenticated && !authLoading && user?.role) {
-      const redirectPath = LMS_ROLES.includes(user.role) ? '/' : '/profile';
+      const redirectPath = sessionStorage.getItem('sop_share_redirect') || (LMS_ROLES.includes(user.role) ? '/' : '/profile');
+      sessionStorage.removeItem('sop_share_redirect');
       navigate(redirectPath, { replace: true });
     }
   }, [isAuthenticated, authLoading, navigate, user?.role]);
@@ -59,7 +60,8 @@ export default function Login() {
       const result = await login(email.trim(), password);
 
       if (result?.success) {
-        const redirectPath = LMS_ROLES.includes(result.user?.role) ? '/' : '/profile';
+        const redirectPath = sessionStorage.getItem('sop_share_redirect') || (LMS_ROLES.includes(result.user?.role) ? '/' : '/profile');
+        sessionStorage.removeItem('sop_share_redirect');
         navigate(redirectPath, { replace: true });
       } else {
         const message = result?.error || 'Login failed. Please try again.';

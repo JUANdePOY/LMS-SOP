@@ -88,10 +88,17 @@ export default function PublicSOPPage() {
   const [loading, setLoading] = useState(true);
   const [modulesLoading, setModulesLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [errorCode, setErrorCode] = useState(null);
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const [lightboxAlt, setLightboxAlt] = useState("");
   const [modulesError, setModulesError] = useState(null);
   const [activeModuleIndex, setActiveModuleIndex] = useState(0);
+
+  useEffect(() => {
+    if (errorCode === 'AUTH_REQUIRED') {
+      sessionStorage.setItem('sop_share_redirect', window.location.pathname + window.location.search);
+    }
+  }, [errorCode]);
   const [completedModules, setCompletedModules] = useState(() => getCompletedFromStorage(token));
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [timerEnd, setTimerEnd] = useState(null);
@@ -133,9 +140,11 @@ export default function PublicSOPPage() {
         const sopData = response?.data;
         setSop(sopData);
       } catch (err) {
+        const code = err?.response?.data?.error?.code || err?.code || null;
         const message =
           err?.response?.data?.error?.message || "Failed to load SOP";
         setError(message);
+        setErrorCode(code);
       } finally {
         setLoading(false);
       }
@@ -345,13 +354,22 @@ export default function PublicSOPPage() {
           <p className="text-neutral-500 dark:text-neutral-400 mb-6 text-sm leading-relaxed">
             {error}
           </p>
-          <Link
-            href="/sops"
-            className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm"
-          >
-            <ArrowLeft size={16} />
-            Back to SOP Library
-          </Link>
+          {errorCode === 'AUTH_REQUIRED' ? (
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              Login
+            </Link>
+          ) : (
+            <Link
+              to="/sops"
+              className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              <ArrowLeft size={16} />
+              Back to SOP Library
+            </Link>
+          )}
         </div>
       </div>
     );

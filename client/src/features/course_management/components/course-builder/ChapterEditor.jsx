@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { GripVertical, ArrowUp, ArrowDown, Trash2, Plus, Clock } from "lucide-react";
 import { formatTimestamp, parseTimestamp } from "@/features/course_management/utils/videoUrl";
 
@@ -9,12 +9,14 @@ export default function ChapterEditor({ chapters = [], onChange }) {
   const [dragIndex, setDragIndex] = useState(null);
   const [overIndex, setOverIndex] = useState(null);
   const [rawTimestamps, setRawTimestamps] = useState({});
-
-  const list = Array.isArray(chapters) ? chapters : [];
+  const [errors, setErrors] = useState({});
+  const listRef = useRef(null);
+  const list = useMemo(() => (Array.isArray(chapters) ? chapters : []), [chapters]);
+  listRef.current = list;
 
   const commit = (next) => onChange(next);
 
-  const syncRawFromProps = () => {
+  const syncRawFromProps = useCallback(() => {
     setRawTimestamps((prev) => {
       const next = { ...prev };
       list.forEach((ch) => {
@@ -24,11 +26,11 @@ export default function ChapterEditor({ chapters = [], onChange }) {
       });
       return next;
     });
-  };
+  }, [list]);
 
   useEffect(() => {
     syncRawFromProps();
-  }, [list.map((ch) => ch.id).join(",")]);
+  }, [syncRawFromProps]);
 
   const getDisplayValue = (chapter) => {
     if (rawTimestamps[chapter.id] !== undefined) return rawTimestamps[chapter.id];
@@ -65,8 +67,17 @@ export default function ChapterEditor({ chapters = [], onChange }) {
   const commitTimestamp = (id) => {
     const raw = rawTimestamps[id];
     if (raw !== undefined) {
-      const seconds = parseTimestamp(raw) ?? 0;
-      update(id, { start: seconds });
+      const seconds = parseTimestamp(raw);
+      if (seconds !== null) {
+        update(id, { start: seconds });
+        setErrors((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      } else {
+        setErrors((prev) => ({ ...prev, [id]: "Use M:SS or H:MM:SS" }));
+      }
       setRawTimestamps((prev) => {
         const next = { ...prev };
         delete next[id];
@@ -77,6 +88,13 @@ export default function ChapterEditor({ chapters = [], onChange }) {
 
   const handleTimestampChange = (id, value) => {
     setRawTimestamps((prev) => ({ ...prev, [id]: value }));
+    if (errors[id]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    }
   };
 
   return (
@@ -131,9 +149,15 @@ export default function ChapterEditor({ chapters = [], onChange }) {
                   }}
                   placeholder="0:00"
                   aria-label={`Chapter ${index + 1} start time`}
-                  className="w-full rounded-md border border-neutral-200 bg-white py-1.5 pl-7 pr-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600"
+                  aria-invalid={!!errors[chapter.id]}
+                  className={`w-full rounded-md border bg-white py-1.5 pl-7 pr-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:ring-1 focus:ring-blue-600 ${errors[chapter.id] ? "border-red-300 focus:border-red-500" : "border-neutral-200 focus:border-[var(--color-primary)]"}`}
                 />
               </div>
+              {errors[chapter.id] ? (
+                <p className="text-[11px] text-red-600">{errors[chapter.id]}</p>
+              ) : (
+                <p className="text-[11px] text-neutral-400">M:SS or H:MM:SS</p>
+              )}
               <input
                 type="text"
                 value={chapter.title || ""}

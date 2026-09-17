@@ -118,10 +118,12 @@ export function parseTimestamp(input) {
   if (!str) return null;
   const parts = str.split(":").map((p) => parseInt(p, 10));
   if (parts.some((p) => !Number.isFinite(p))) return null;
+  if (parts.length > 3) return null;
   let seconds = 0;
   if (parts.length === 3) seconds = parts[0] * 3600 + parts[1] * 60 + parts[2];
   else if (parts.length === 2) seconds = parts[0] * 60 + parts[1];
   else if (parts.length === 1) seconds = parts[0];
+  if (seconds < 0) return null;
   return seconds;
 }
 

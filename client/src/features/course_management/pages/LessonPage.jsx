@@ -13,6 +13,7 @@ import { listAttempts } from "@/features/assessments/api/attempt.api";
 import { getIssuancesByUser } from "@/features/certificate-management/services/certificateService";
 import SOP_CONTENT_STYLES from "@/features/sop-management/utils/sopContentStyles";
 import PublicModuleCard from "@/features/sop-management/components/SOPEditor/PublicModuleCard";
+import { resolveBodyImages } from "@/lib/fileUrl";
 import { getEmployeeSop } from "@/features/employee/api/employeeSop.api";
 import CertificateCelebrationModal from "@/features/certificate-management/components/CertificateCelebrationModal";
 import { StaggerList, MotionItem } from "@/shared/motion";
@@ -45,6 +46,7 @@ export default function LessonPage() {
   const [lightboxAlt, setLightboxAlt] = useState("");
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationCertificate, setCelebrationCertificate] = useState(null);
+  const [videoWatched, setVideoWatched] = useState(false);
 
   const [ sop, setSop ] = useState(null);
   const [ sopLoading, setSopLoading ] = useState(false);
@@ -153,6 +155,10 @@ export default function LessonPage() {
       })
       .finally(() => setSopLoading(false));
   }, [currentLesson?.type, currentLesson?.url]);
+
+  useEffect(() => {
+    setVideoWatched(false);
+  }, [lessonId]);
 
   useEffect(() => {
     setSopActiveModuleIndex(0);
@@ -291,15 +297,24 @@ export default function LessonPage() {
           }}
         >
           {currentLesson.type === 'video' ? (
-            <div className="p-4">
-              <VideoPlayer src={currentLesson.url} title={currentLesson.title} />
+            <div className="p-4 space-y-3">
+              <VideoPlayer
+                src={currentLesson.url}
+                title={currentLesson.title}
+                onEnded={() => setVideoWatched(true)}
+              />
+              {currentLesson.description && (
+                <div className="prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300">
+                  {currentLesson.description}
+                </div>
+              )}
             </div>
           ) : currentLesson.type === 'reading' ? (
             <div className="p-6">
               <h2 className="text-xl font-bold mb-3">{currentLesson.title}</h2>
               <div
                 className={`prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300 ${LB_PROSE}`}
-                dangerouslySetInnerHTML={{ __html: currentLesson.description || currentLesson.content || "No content available." }}
+                dangerouslySetInnerHTML={{ __html: resolveBodyImages(currentLesson.description || currentLesson.content || "No content available.") }}
               />
             </div>
           ) : currentLesson.type === 'quiz' ? (
@@ -632,6 +647,9 @@ export default function LessonPage() {
           ) : currentLesson.type === 'link' ? (
             <div className="p-6">
               <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
+              {currentLesson.description && (
+                <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">{currentLesson.description}</p>
+              )}
               {currentLesson.url && (
                 <a href={currentLesson.url} target="_blank" rel="noreferrer" className="text-sm text-[var(--color-primary)] hover:underline">
                   {currentLesson.url}
@@ -665,6 +683,14 @@ export default function LessonPage() {
                 className="rounded-lg px-4 py-2 text-sm btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {marking ? 'Saving...' : areAllSopModulesComplete() ? 'Mark Lesson as Complete' : 'Complete All Modules to Proceed'}
+              </button>
+            ) : currentLesson.type === 'video' ? (
+              <button
+                onClick={handleMarkComplete}
+                disabled={marking || !videoWatched}
+                className="rounded-lg px-4 py-2 text-sm btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {marking ? 'Saving...' : videoWatched ? 'Mark as Complete' : 'Watch the full video to continue'}
               </button>
             ) : isVideoOrText && (
               <button

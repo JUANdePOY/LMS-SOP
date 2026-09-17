@@ -13,8 +13,13 @@ import {
   Upload,
   Loader2,
   AlertCircle,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  RefreshCw,
 } from "lucide-react";
 import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichTextEditor";
+import { resolveFileUrl } from "@/lib/fileUrl";
 
 let blockSeq = 0;
 const newBlockId = () => `blk-${Date.now()}-${blockSeq++}`;
@@ -49,7 +54,13 @@ export function parseBlocks(html) {
       if (tag === "figure" && el.querySelector("img")) {
         const img = el.querySelector("img");
         const caption = el.querySelector("figcaption")?.innerHTML || "";
-        return { id: newBlockId(), kind: "image", src: img.getAttribute("src") || "", caption };
+        const style = el.getAttribute("style") || "";
+        const widthMatch = style.match(/width:\s*([^;]+)/);
+        const width = widthMatch ? widthMatch[1].trim() : "100%";
+        let align = "center";
+        if (style.includes("margin-left: 0") && style.includes("margin-right: auto")) align = "left";
+        else if (style.includes("margin-left: auto") && style.includes("margin-right: 0")) align = "right";
+        return { id: newBlockId(), kind: "image", src: img.getAttribute("src") || "", caption, align, width };
       }
       if (tag === "hr" || cls.includes("lb-divider")) return { id: newBlockId(), kind: "divider" };
       if (tag === "blockquote" || cls.includes("lb-quote")) return { id: newBlockId(), kind: "quote", html: el.innerHTML };
@@ -65,8 +76,13 @@ export function serializeBlocks(blocks) {
   return blocks
     .map((b) => {
       switch (b.kind) {
-        case "image":
-          return `<figure class="lb-image">${b.src ? `<img src="${b.src}" alt="${(b.caption || "").replace(/"/g, "&quot;")}" />` : ""}${b.caption?.trim() ? `<figcaption>${b.caption}</figcaption>` : ""}</figure>`;
+        case "image": {
+          const align = b.align || 'center';
+          const width = b.width || '100%';
+          const ALIGN_MARGIN = { left: 'margin-left: 0; margin-right: auto;', center: 'margin-left: auto; margin-right: auto;', right: 'margin-left: auto; margin-right: 0;' };
+          const figureStyle = `width: ${width}; max-width: 100%; ${ALIGN_MARGIN[align] || ALIGN_MARGIN.center}`;
+          return `<figure class="lb-image" style="${figureStyle}">${b.src ? `<img src="${b.src}" alt="${(b.caption || "").replace(/"/g, "&quot;")}" style="width: 100%; height: auto; display: block;" />` : ""}${b.caption?.trim() ? `<figcaption>${b.caption}</figcaption>` : ""}</figure>`;
+        }
         case "divider":
           return `<hr class="lb-divider" />`;
         case "quote":
@@ -127,7 +143,7 @@ export default function LessonContentBlocks({ value, onChange, onImageUpload }) 
   }, [value]);
 
   const addBlock = (kind, atIndex) => {
-    const block = { id: newBlockId(), kind, html: "", src: "", caption: "", variant: "info" };
+    const block = { id: newBlockId(), kind, html: "", src: "", caption: "", variant: "info", align: "center", width: "100%" };
     const next = [...blocks];
     if (atIndex == null) next.push(block);
     else next.splice(atIndex + 1, 0, block);
@@ -177,21 +193,8 @@ export default function LessonContentBlocks({ value, onChange, onImageUpload }) 
     return (
       <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-6 text-center">
         <p className="text-sm text-neutral-500">No content blocks yet.</p>
-        <div className="mt-3 flex items-center justify-center gap-2">
-          <button
-            type="button"
-            onClick={() => addBlock("text")}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 transition-colors"
-          >
-            <Type size={14} /> Add text
-          </button>
-          <button
-            type="button"
-            onClick={() => addBlock("image")}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 transition-colors"
-          >
-            <ImageIcon size={14} /> Add image
-          </button>
+        <div className="mt-3 flex items-center justify-center">
+          <BlockAddMenu onAdd={(kind) => addBlock(kind)} />
         </div>
       </div>
     );
@@ -383,26 +386,79 @@ function ImageBlock({ block, onUpdate, onImageUpload }) {
     }
   };
 
+  const align = block.align || "center";
+  const width = block.width || "100%";
+
+  const alignClass =
+    align === "left" ? "ml-0 mr-auto" : align === "right" ? "ml-auto mr-0" : "mx-auto";
+
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1 text-xs font-medium text-neutral-500">
-        <ImageIcon size={14} /> Image block
-      </div>
-      {block.src ? (
-        <img src={block.src} alt={block.caption || ""} className="max-h-56 rounded-md border border-neutral-200 dark:border-neutral-700" />
-      ) : (
-        <div className="rounded-md border border-dashed border-neutral-300 p-4 text-center text-xs text-neutral-400 dark:border-neutral-600">
-          No image set
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1 text-xs font-medium text-neutral-500">
+          <ImageIcon size={14} /> Image block
         </div>
-      )}
+        {block.src && (
+          <div className="flex items-center gap-1">
+            <ActionButton title="Replace image" onClick={() => document.getElementById(`img-replace-${block.id}`)?.click()}>
+              <RefreshCw size={13} />
+            </ActionButton>
+            <ActionButton title="Remove image" danger onClick={() => onUpdate({ src: "", align: "center", width: "100%" })}>
+              <Trash2 size={13} />
+            </ActionButton>
+            <input
+              id={`img-replace-${block.id}`}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleFile(e.target.files?.[0])}
+            />
+          </div>
+        )}
+      </div>
 
-      <div className="flex gap-1">
-        <button type="button" onClick={() => setTab("url")} className={`rounded-md px-2 py-1 text-xs ${tab === "url" ? "bg-blue-100 text-[var(--color-primary-hover)]" : "text-neutral-500 hover:bg-neutral-100"}`}>
-          URL
-        </button>
-        <button type="button" onClick={() => setTab("upload")} className={`rounded-md px-2 py-1 text-xs ${tab === "upload" ? "bg-blue-100 text-[var(--color-primary-hover)]" : "text-neutral-500 hover:bg-neutral-100"}`}>
-          Upload
-        </button>
+      <div className={`${alignClass}`}>
+        {block.src ? (
+          <img src={resolveFileUrl(block.src)} alt={block.caption || ""} className="max-h-56 rounded-md border border-neutral-200 dark:border-neutral-700" style={{ width }} />
+        ) : (
+          <div className="rounded-md border border-dashed border-neutral-300 p-4 text-center text-xs text-neutral-400 dark:border-neutral-600">
+            No image set
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex gap-1">
+          <button type="button" onClick={() => setTab("url")} className={`rounded-md px-2 py-1 text-xs ${tab === "url" ? "bg-blue-100 text-[var(--color-primary-hover)]" : "text-neutral-500 hover:bg-neutral-100"}`}>
+            URL
+          </button>
+          <button type="button" onClick={() => setTab("upload")} className={`rounded-md px-2 py-1 text-xs ${tab === "upload" ? "bg-blue-100 text-[var(--color-primary-hover)]" : "text-neutral-500 hover:bg-neutral-100"}`}>
+            Upload
+          </button>
+        </div>
+
+        <div className="flex items-center gap-1 rounded-md border border-neutral-200 bg-white px-1 py-0.5 dark:border-neutral-700 dark:bg-neutral-800">
+          <ActionButton title="Align left" active={align === "left"} onClick={() => onUpdate({ align: "left" })}>
+            <AlignLeft size={14} />
+          </ActionButton>
+          <ActionButton title="Align center" active={align === "center"} onClick={() => onUpdate({ align: "center" })}>
+            <AlignCenter size={14} />
+          </ActionButton>
+          <ActionButton title="Align right" active={align === "right"} onClick={() => onUpdate({ align: "right" })}>
+            <AlignRight size={14} />
+          </ActionButton>
+        </div>
+
+        <select
+          value={width}
+          onChange={(e) => onUpdate({ width: e.target.value })}
+          className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+        >
+          <option value="33%">Small</option>
+          <option value="50%">Half</option>
+          <option value="75%">Medium</option>
+          <option value="100%">Full</option>
+        </select>
       </div>
 
       {tab === "url" ? (
@@ -423,10 +479,10 @@ function ImageBlock({ block, onUpdate, onImageUpload }) {
               className="absolute inset-0 w-full cursor-pointer opacity-0"
               disabled={uploading}
             />
-            <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-neutral-300 py-2 text-sm text-neutral-600 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] dark:border-neutral-600">
-              {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-              {uploading ? `Uploading ${progress}%` : "Choose image"}
-            </div>
+             <div className="flex items-center justify-center gap-2 rounded-md border border-dashed border-neutral-300 py-2 text-sm text-neutral-600 hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] dark:border-neutral-600">
+                {uploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                {uploading ? "Uploading..." : "Choose image"}
+              </div>
           </label>
           {uploading && (
             <div className="flex items-center gap-2 text-xs text-[var(--color-primary)]">
@@ -452,7 +508,7 @@ function ImageBlock({ block, onUpdate, onImageUpload }) {
   );
 }
 
-function ActionButton({ children, onClick, title, danger, disabled }) {
+function ActionButton({ children, onClick, title, danger, disabled, active }) {
   return (
     <button
       type="button"
@@ -461,7 +517,7 @@ function ActionButton({ children, onClick, title, danger, disabled }) {
       title={title}
       aria-label={title}
       className={`flex h-6 w-6 items-center justify-center rounded-md transition-colors disabled:cursor-not-allowed disabled:opacity-20 ${
-        danger ? "text-neutral-400 hover:bg-red-50 hover:text-red-600" : "text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800"
+        danger ? "text-neutral-400 hover:bg-red-50 hover:text-red-600" : active ? "text-[var(--color-primary-hover)] bg-[rgba(242,92,5,0.08)]" : "text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700 dark:hover:bg-neutral-800"
       }`}
     >
       {children}

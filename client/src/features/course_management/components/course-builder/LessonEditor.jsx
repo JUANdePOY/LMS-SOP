@@ -234,7 +234,7 @@ export default function LessonEditor({
         .then((res) => {
           const items = res.data || [];
           setQuizzes(items);
-          if (!selectedQuizId && items.length) {
+          if (!selectedQuizId && items.length && !lesson?.isNew) {
             setSelectedQuizId(items[0].id);
           }
         })
