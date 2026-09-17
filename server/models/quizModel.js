@@ -609,7 +609,7 @@ async function getLeaderboard(quizId, limit = 50, scope = {}) {
   const [rows] = await db.query(
     `SELECT u.id AS user_id, u.full_name AS user_name, u.email AS user_email,
             a.score, a.max_score, a.percentage, a.time_taken_sec, a.attempt_number,
-            ROW_NUMBER() OVER (ORDER BY a.score DESC, a.time_taken_sec ASC, a.attempt_number ASC) AS rank
+             ROW_NUMBER() OVER (ORDER BY a.score DESC, a.time_taken_sec ASC, a.attempt_number ASC) AS user_rank
      FROM quiz_attempts a
      JOIN users u ON a.user_id = u.id
      ${whereClause}
@@ -640,7 +640,7 @@ async function getCourseLeaderboard(courseId, limit = 50, scope = {}) {
   const [rows] = await db.query(
     `SELECT u.id AS user_id, u.full_name AS user_name, u.email AS user_email,
             a.score, a.max_score, a.percentage, a.time_taken_sec, a.attempt_number,
-            ROW_NUMBER() OVER (ORDER BY a.score DESC, a.time_taken_sec ASC, a.attempt_number ASC) AS rank
+             ROW_NUMBER() OVER (ORDER BY a.score DESC, a.time_taken_sec ASC, a.attempt_number ASC) AS user_rank
      FROM quiz_attempts a
      JOIN quizzes q ON a.quiz_id = q.id
      JOIN users u ON a.user_id = u.id

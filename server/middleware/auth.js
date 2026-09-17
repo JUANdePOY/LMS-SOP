@@ -5,6 +5,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 
 const LMS_ROLES = ['super_admin', 'admin', 'department_head', 'employee'];
 
+function normalizeRole(role) {
+  if (typeof role !== 'string') return '';
+  return role.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
 async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -57,7 +62,7 @@ async function authenticateToken(req, res, next) {
 
     req.user = {
       id: user.id,
-      role: user.role,
+      role: normalizeRole(user.role),
       department_id: user.department_id,
       business_id: user.business_id,
       full_name: user.full_name,
@@ -102,7 +107,7 @@ async function optionalAuthenticateToken(req, res, next) {
     if (users.length > 0 && users[0].is_active) {
       req.user = {
         id: users[0].id,
-        role: users[0].role,
+        role: normalizeRole(users[0].role),
         department_id: users[0].department_id,
         business_id: users[0].business_id,
         full_name: users[0].full_name,
@@ -182,9 +187,10 @@ async function resolveScope(req, res, next) {
   }
 
   try {
-    const { resolveUserPermissions } = require('./scope');
+    const { resolveUserPermissions, resolveUserPermissionDetails } = require('./scope');
     const permissions = await resolveUserPermissions(req.user.id, req.user.role);
     req.user.permissions = permissions;
+    req.user.permission_details = await resolveUserPermissionDetails(req.user.id, req.user.role);
 
     if (req.user.role === 'department_head') {
       const [grants] = await db.query(

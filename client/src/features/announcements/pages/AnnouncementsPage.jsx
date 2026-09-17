@@ -11,8 +11,11 @@ import { useNotifications } from "@/shared/stores/notificationStore.js";
 import { FadeIn } from "@/shared/motion";
 
 export default function AnnouncementsPage() {
-  const { hasPermission, role, department_id } = useAuth();
-  const canManage = hasPermission('manage_announcements');
+  const { hasPermission, hasPermissionAction, role, department_id } = useAuth();
+  const canCreateAnnouncement = hasPermissionAction('manage_announcements', 'create');
+  const canEditAnnouncement = hasPermissionAction('manage_announcements', 'edit');
+  const canDeleteAnnouncement = hasPermissionAction('manage_announcements', 'delete');
+  const canManage = canCreateAnnouncement || canEditAnnouncement || canDeleteAnnouncement;
   const { toast } = useToast();
   const { markEntityTypeRead } = useNotifications();
   const { items, error, refresh, create, update, remove } = useAnnouncements({ status: "active", target_role: role, target_department: department_id });
@@ -85,7 +88,9 @@ export default function AnnouncementsPage() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onCreate={handleCreate}
-          canManage={canManage}
+          canCreate={canCreateAnnouncement}
+          canEdit={canEditAnnouncement}
+          canDelete={canDeleteAnnouncement}
           onView={(item) => setDetailItem(item)}
         />
       </FadeIn>

@@ -63,7 +63,8 @@ function restrictionWhere(user, cols, alias = 's') {
 
   return `
     (
-      ${alias}.restriction_type = 'public'
+      ${alias}.restriction_type IS NULL
+      OR ${alias}.restriction_type = 'public'
       OR (
         ${alias}.restriction_type = 'department'
         AND EXISTS (

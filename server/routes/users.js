@@ -1,8 +1,8 @@
 const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const db = require('../config/database');
-const { authenticateToken, requireSuperAdmin, requireAdmin, authorize } = require('../middleware/auth');
-const { requireBusinessScope, requireDepartmentScope, requirePermission } = require('../middleware/scope');
+const { authenticateToken, requireSuperAdmin, requireAdmin, authorize, resolveScope } = require('../middleware/auth');
+const { requireBusinessScope, requireDepartmentScope, requirePermission, requirePermissionAction } = require('../middleware/scope');
 const { logAudit } = require('../utils/auditLogger');
 const authModel = require('../models/authModel');
 const departmentModel = require('../models/departmentModel');
@@ -14,6 +14,11 @@ const router = express.Router();
 const DEPARTMENT_SCOPED_ROLES = ['department_head', 'employee'];
 
 router.use(authenticateToken);
+// Resolve permissions + department scope so granular manage_users action checks
+// (edit / manage_roles) and department_head scoping have data to work with.
+// Without this, req.user.permission_details is undefined and every granular
+// check inside these handlers fails closed with a 403.
+router.use(resolveScope);
 
 router.get('/', async (req, res) => {
   try {
@@ -138,7 +143,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', requireAdmin, [
+router.post('/', requireAdmin, requirePermissionAction('manage_users', 'create'), [
   body('full_name').trim().isLength({ min: 2 }).withMessage('Full name is required'),
   body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
@@ -270,6 +275,21 @@ router.put('/:id', [
       return res.status(403).json({ status: 'error', message: 'Can only update your own profile', code: 'FORBIDDEN' });
     }
 
+    if (!isSelf && req.user.role === 'admin') {
+      let details = req.user?.permission_details;
+      if (!Array.isArray(details)) {
+        // Defensive: mirrors requirePermissionAction's lazy resolve so this
+        // check never fails closed just because resolveScope did not run.
+        const { resolveUserPermissionDetails } = require('../middleware/scope');
+        details = await resolveUserPermissionDetails(req.user.id, req.user.role);
+        req.user.permission_details = details;
+      }
+      const permDetail = details.find((d) => d.name === 'manage_users');
+      if (!permDetail || !Array.isArray(permDetail.actions) || !permDetail.actions.includes('edit')) {
+        return res.status(403).json({ status: 'error', message: 'Missing permission action: manage_users.edit', code: 'PERMISSION_ACTION_DENIED' });
+      }
+    }
+
     if (req.body.email && req.body.email !== targetUser.email) {
       const [existing] = await db.query('SELECT id FROM users WHERE email = ? AND id != ?', [req.body.email, userId]);
       if (existing.length > 0) {
@@ -282,6 +302,16 @@ router.put('/:id', [
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
+      }
+    }
+
+    // A role change is a distinct capability from a profile edit. Only enforce
+    // it when the role actually differs, so plain profile edits that echo back
+    // the existing role are unaffected.
+    if (!isSelf && req.user.role === 'admin' && updates.role !== undefined && updates.role !== targetUser.role) {
+      const permDetail = (req.user.permission_details || []).find((d) => d.name === 'manage_users');
+      if (!permDetail || !Array.isArray(permDetail.actions) || !permDetail.actions.includes('manage_roles')) {
+        return res.status(403).json({ status: 'error', message: 'Missing permission action: manage_users.manage_roles', code: 'PERMISSION_ACTION_DENIED' });
       }
     }
 
@@ -415,7 +445,7 @@ router.put('/:id/password', [
   }
 });
 
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', requireAdmin, requirePermissionAction('manage_users', 'delete'), async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
 

@@ -1,18 +1,17 @@
-require('dotenv').config();
 const mysql = require('mysql2');
 const fs = require('fs');
 const path = require('path');
 const net = require('net');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'pafr',
-  port: parseInt(process.env.DB_PORT, 10) || 3306,
+  database: process.env.DB_NAME || 'u607968802_lms_sop',
+  port: parseInt(process.env.DB_PORT, 10) || 3307,
   waitForConnections: true,
   // Hostinger shared MySQL enforces `max_connections_per_hour` (500). That
-  // limit counts *connection attempts* — not concurrent connections — so the
   // cheapest way to stay under it is to open very few connections and keep
   // them alive. We cap the pool small and give idle connections a long life so
   // the same few connections are reused across the whole hour instead of being
@@ -824,10 +823,31 @@ const MIGRATIONS = [
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token VARCHAR(255) DEFAULT NULL AFTER locked_at`,
     `ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_expires DATETIME DEFAULT NULL AFTER reset_token`,
     `CREATE INDEX IF NOT EXISTS idx_users_reset_token ON users(reset_token)`,
+    // Permission actions: add actions JSON to permissions and user_permission_overrides
+    // Handled by addColumnIfMissing in runMigrations() for MySQL versions
+    // that do not support ALTER TABLE ADD COLUMN IF NOT EXISTS.
+    // Backfill permission actions
+    `UPDATE permissions SET actions = '["view"]' WHERE name = 'view_dashboard' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","create","edit","delete","manage_roles"]' WHERE name = 'manage_users' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","create","edit","delete","manage_head"]' WHERE name = 'manage_departments' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","create","edit","delete","approve","publish","assign"]' WHERE name = 'manage_sops' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","create","edit","delete","publish","archive","enroll","grade"]' WHERE name = 'manage_courses' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","create","edit","delete","assign","grade","publish"]' WHERE name = 'manage_assessments' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","create","edit","delete","publish"]' WHERE name = 'manage_announcements' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","create","edit","delete","register","manage_registrations"]' WHERE name = 'manage_events' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","export","schedule"]' WHERE name = 'view_reports' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","edit"]' WHERE name = 'manage_settings' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","export"]' WHERE name = 'view_audit_logs' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["send"]' WHERE name = 'notifications.send' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["broadcast"]' WHERE name = 'notifications.broadcast' AND actions IS NULL`,
   ];
 
 async function runMigrations() {
   const db = getPool();
+
+  await addColumnIfMissing(db, 'permissions', 'actions', 'JSON DEFAULT NULL AFTER category');
+  await addColumnIfMissing(db, 'user_permission_overrides', 'actions', 'JSON DEFAULT NULL AFTER granted');
+
   for (const sql of MIGRATIONS) {
     if (!sql || !sql.trim()) continue;
     try {
@@ -869,74 +889,20 @@ async function runMigrations() {
 
   try {
     const { runCertificateMigrations } = require('../migrations/certificateManagement');
-    await runCertificateMigrations();
-    console.log('Certificate management migrations applied');
+    await runCertificateMigrations(db);
+    console.log('Certificate migrations applied');
   } catch (err) {
-    console.error('Certificate management migration error:', err.message);
+    console.error('Certificate migration error:', err.message);
   }
+}
 
-  try {
-    const { runCertificateCourseLinkMigrations } = require('../migrations/certificateCourseLinks');
-    await runCertificateCourseLinkMigrations();
-    console.log('Certificate course link migrations applied');
-  } catch (err) {
-    console.error('Certificate course link migration error:', err.message);
-  }
-
-  try {
-    const { runPushNotificationMigrations } = require('../migrations/pushNotifications');
-    await runPushNotificationMigrations();
-    console.log('Push notification migrations applied');
-  } catch (err) {
-    console.error('Push notification migration error:', err.message);
-  }
-
-  try {
-    const { runNotificationMigrations } = require('../migrations/notifications');
-    await runNotificationMigrations();
-    console.log('Notification migrations applied');
-  } catch (err) {
-    console.error('Notification migration error:', err.message);
-  }
-
-  try {
-    const { runBannerMigrations } = require('../migrations/banners');
-    await runBannerMigrations();
-    console.log('Banner & notification preference migrations applied');
-  } catch (err) {
-    console.error('Banner migration error:', err.message);
-  }
-
-  try {
-    const { runTaskMigrations } = require('../migrations/taskManagement');
-    await runTaskMigrations();
-    console.log('Task management migrations applied');
-  } catch (err) {
-    console.error('Task management migration error:', err.message);
-  }
-
-  try {
-    const { runClientMigrations } = require('../migrations/clientManagement');
-    await runClientMigrations();
-    console.log('Client management migrations applied');
-  } catch (err) {
-    console.error('Client management migration error:', err.message);
-  }
-
-  try {
-    const { runProjectMigrations } = require('../migrations/projectManagement');
-    await runProjectMigrations();
-    console.log('Project management migrations applied');
-  } catch (err) {
-    console.error('Project management migration error:', err.message);
-  }
-
-  try {
-    const { runTaskDueReminderMigrations } = require('../migrations/taskDueReminders');
-    await runTaskDueReminderMigrations();
-  } catch (err) {
-    console.error('Task due-reminder migration error:', err.message);
-  }
+async function addColumnIfMissing(db, table, column, definition) {
+  const [rows] = await db.query(
+    `SELECT COUNT(*) AS cnt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+    [table, column]
+  );
+  if (rows[0]?.cnt) return;
+  await db.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
 }
 
 async function initDatabase() {

@@ -16,10 +16,12 @@ function HierarchyOverviewPageInner() {
   const navigate = useNavigate();
   const { hierarchy, loading, error, refresh } = useHierarchy();
   const { toast } = useToast();
-  const { isDepartmentHead } = useAuth();
-  // Department heads get a view-only overview: they can see the structure but
-  // must not create/edit businesses, departments, categories, or SOPs here.
-  const readOnly = isDepartmentHead;
+  const { hasPermissionAction, isDepartmentHead } = useAuth();
+  // This page creates businesses, departments and categories — org structure,
+  // governed by manage_departments. SOP creation is a separate capability, so
+  // the inline "new SOP" affordance is gated on manage_sops.create instead.
+  const readOnly = !hasPermissionAction("manage_departments", "create");
+  const canCreateSop = hasPermissionAction("manage_sops", "create");
   const {
     creatingDepartmentFor,
     cancelCreateDepartment,
@@ -175,6 +177,7 @@ function HierarchyOverviewPageInner() {
             searchQuery={safeQuery}
             creating={submitting}
             readOnly={readOnly}
+            canCreateSop={canCreateSop}
             creatingDepartmentFor={creatingDepartmentFor}
             onInlineCreateDepartment={handleInlineCreateDepartment}
             onInlineCreateCategory={handleInlineCreateCategory}

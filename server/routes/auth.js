@@ -7,7 +7,7 @@ const { comparePassword, generateToken, hashPassword, generateRefreshToken, hash
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 const loginLimiter = require('../middleware/rateLimiter');
-const { resolveUserPermissions } = require('../middleware/scope');
+const { resolveUserPermissions, resolveUserPermissionDetails } = require('../middleware/scope');
 const {
   findByEmail,
   incrementFailedAttempts,
@@ -102,7 +102,7 @@ router.post('/login', loginLimiter, [
 
     if (!results || results.length === 0) {
       clearTimeout(loginTimer);
-      console.warn(`[login:${requestId}] invalid credentials`);
+      console.warn(`[login:${requestId}] invalid credentials`, { email, resultsCount: results?.length });
       return res.status(401).json({
         status: 'error',
         message: 'Invalid email or password',
@@ -197,6 +197,7 @@ router.post('/login', loginLimiter, [
     });
 
     const permissions = await resolveUserPermissions(user.id, user.role);
+    const permissionDetails = await resolveUserPermissionDetails(user.id, user.role);
 
     clearTimeout(loginTimer);
     return res.status(200).json({
@@ -217,6 +218,7 @@ router.post('/login', loginLimiter, [
           employee_id: user.employee_id,
           avatar_url: user.avatar_url,
           permissions,
+          permission_details: permissionDetails,
         }
       }
     });
@@ -451,6 +453,7 @@ router.post('/refresh-token', [
     }
 
     const permissions = await resolveUserPermissions(user.id, user.role);
+    const permissionDetails = await resolveUserPermissionDetails(user.id, user.role);
 
     const newAccessToken = generateToken({
       userId: user.id,
@@ -489,6 +492,7 @@ router.post('/refresh-token', [
           employee_id: user.employee_id,
           avatar_url: user.avatar_url,
           permissions,
+          permission_details: permissionDetails,
         }
       }
     });
@@ -564,13 +568,18 @@ router.post('/register', authenticateToken, [
       new_values: { email, role }
     });
 
+    const permissions = await resolveUserPermissions(insertResults.insertId, role);
+    const permissionDetails = await resolveUserPermissionDetails(insertResults.insertId, role);
+
     res.status(201).json({
       status: 'success',
       message: 'User created successfully',
       data: {
         userId: insertResults.insertId,
         email,
-        role
+        role,
+        permissions,
+        permission_details: permissionDetails,
       }
     });
   } catch (error) {
@@ -603,6 +612,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
 
     const user = results[0];
     const permissions = await resolveUserPermissions(req.user.id, req.user.role);
+    const permissionDetails = await resolveUserPermissionDetails(req.user.id, req.user.role);
 
     let scopedDepartmentIds = [];
     if (req.user.role === 'department_head') {
@@ -635,6 +645,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
         cover_photo_url: user.cover_photo_url,
         avatar_url: user.avatar_url,
         permissions,
+        permission_details: permissionDetails,
         scoped_department_ids: scopedDepartmentIds,
       }
     });

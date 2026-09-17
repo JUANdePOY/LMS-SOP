@@ -49,7 +49,7 @@ function RestrictionBadge({ restrictionType }) {
   );
 }
 
-function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop, onAssignSop, canManage }) {
+function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop, onAssignSop, canCreate, canEdit, canDelete, canAssign }) {
 
   if (viewMode === VIEW_MODES.GRID) {
     return (
@@ -69,24 +69,30 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop, onAssi
             )}
           </div>
         </div>
-        {canManage && (
+        {canEdit && (
           <div className="flex gap-2 mt-4 pt-4 border-t border-[var(--border)]">
             <button onClick={() => onEditStart(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
               <ActionIcons.Edit className="h-3.5 w-3.5" />
               Edit
             </button>
-            <button onClick={() => onAssignSop(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
-              <ActionIcons.Assign className="h-3.5 w-3.5" />
-              Assign
-            </button>
-            <button onClick={() => onArchiveSop(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
-              {sop.status === SOP_STATUSES.ARCHIVED ? <ActionIcons.Unarchive className="h-3.5 w-3.5" /> : <ActionIcons.Archive className="h-3.5 w-3.5" />}
-              {sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}
-            </button>
-            <button onClick={() => onDeleteSop(sop.id)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">
-              <ActionIcons.Delete className="h-3.5 w-3.5" />
-              Delete
-            </button>
+            {canAssign && (
+              <button onClick={() => onAssignSop(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
+                <ActionIcons.Assign className="h-3.5 w-3.5" />
+                Assign
+              </button>
+            )}
+            {canEdit && (
+              <button onClick={() => onArchiveSop(sop)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors">
+                {sop.status === SOP_STATUSES.ARCHIVED ? <ActionIcons.Unarchive className="h-3.5 w-3.5" /> : <ActionIcons.Archive className="h-3.5 w-3.5" />}
+                {sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}
+              </button>
+            )}
+            {canDelete && (
+              <button onClick={() => onDeleteSop(sop.id)} className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">
+                <ActionIcons.Delete className="h-3.5 w-3.5" />
+                Delete
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -108,16 +114,18 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop, onAssi
             </span>
           )}
         </div>
-        {canManage && (
+        {canEdit && (
           <div className="flex gap-1 shrink-0">
             <ActionButton action="Edit" label="Edit SOP" onClick={() => onEditStart(sop)} />
-            <ActionButton action="Assign" label="Assign SOP" onClick={() => onAssignSop(sop)} />
-            <ActionButton
-              action={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}
-              label={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive SOP' : 'Archive SOP'}
-              onClick={() => onArchiveSop(sop)}
-            />
-            <ActionButton action="Delete" label="Delete SOP" onClick={() => onDeleteSop(sop.id)} />
+            {canAssign && <ActionButton action="Assign" label="Assign SOP" onClick={() => onAssignSop(sop)} />}
+            {canEdit && (
+              <ActionButton
+                action={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive' : 'Archive'}
+                label={sop.status === SOP_STATUSES.ARCHIVED ? 'Unarchive SOP' : 'Archive SOP'}
+                onClick={() => onArchiveSop(sop)}
+              />
+            )}
+            {canDelete && <ActionButton action="Delete" label="Delete SOP" onClick={() => onDeleteSop(sop.id)} />}
           </div>
         )}
       </div>
@@ -126,8 +134,12 @@ function SOPCard({ sop, viewMode, onEditStart, onDeleteSop, onArchiveSop, onAssi
 }
 
 function SOPListPage() {
-  const { hasPermission } = useAuth();
-  const canManage = hasPermission('manage_sops');
+  const { hasPermission, hasPermissionAction } = useAuth();
+  const canManageSopPage = hasPermission('manage_sops');
+  const canCreate = hasPermissionAction('manage_sops', 'create');
+  const canEdit = hasPermissionAction('manage_sops', 'edit');
+  const canDelete = hasPermissionAction('manage_sops', 'delete');
+  const canAssign = hasPermissionAction('manage_sops', 'assign');
 
   const {
     sops, loading, search, setSearch, status, setStatus,
@@ -209,7 +221,7 @@ function SOPListPage() {
       <StaggerList className={viewMode === VIEW_MODES.GRID ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5' : 'space-y-2'}>
         {sops.map((sop) => (
           <MotionItem key={sop.id}>
-            <SOPCard sop={sop} viewMode={viewMode} onEditStart={handleEditStart} onDeleteSop={handleDeleteSop} onArchiveSop={handleArchiveSop} onAssignSop={handleAssignStart} canManage={canManage} />
+            <SOPCard sop={sop} viewMode={viewMode} onEditStart={handleEditStart} onDeleteSop={handleDeleteSop} onArchiveSop={handleArchiveSop} onAssignSop={handleAssignStart} canCreate={canCreate} canEdit={canEdit} canDelete={canDelete} canAssign={canAssign} />
           </MotionItem>
         ))}
       </StaggerList>
@@ -223,7 +235,7 @@ function SOPListPage() {
           <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Files</h1>
           <p className="mt-1 text-sm text-[var(--text-muted)]">Manage your standard operating procedures</p>
         </div>
-        {activeTab === 'sops' && !archivedTab && canManage && (
+        {activeTab === 'sops' && !archivedTab && canCreate && (
           <button
             onClick={() => setShowCreate(true)}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-neutral-900 dark:bg-neutral-100 px-4 py-2 text-sm font-medium text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors"
