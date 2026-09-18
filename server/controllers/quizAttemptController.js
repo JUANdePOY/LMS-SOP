@@ -196,12 +196,13 @@ function evaluateAttempt(questions, answers) {
     const weight = Number(q.points) || 1;
     const selected = answers[q.id];
     const correct = parseJsonField(q.correct_answer);
-    const isCorrect = isAnswerCorrect(q.type, selected, correct);
-    if (isCorrect) score += weight;
+    const { earned, isCorrect } = scoreAnswer(q.type, selected, correct, weight);
+    score += earned;
     perQuestion.push({
       questionId: q.id,
       isCorrect,
       points: weight,
+      earnedPoints: earned,
       selected,
     });
   }
@@ -210,21 +211,28 @@ function evaluateAttempt(questions, answers) {
   return { score, maxScore, percentage, perQuestion };
 }
 
-function isAnswerCorrect(type, selected, correct) {
+function scoreAnswer(type, selected, correct, weight) {
   const normalize = (v) => String(v ?? '').trim().toLowerCase();
   if (type === 'multiple_choice' || type === 'true_false') {
-    return normalize(selected) === normalize(correct);
+    const isCorrect = normalize(selected) === normalize(correct);
+    return { earned: isCorrect ? weight : 0, isCorrect };
   }
   if (type === 'multi_select' || type === 'multiple_select') {
-    const sel = Array.isArray(selected) ? selected.map(normalize) : [normalize(selected)];
-    const cor = Array.isArray(correct) ? correct.map(normalize) : [normalize(correct)];
-    return sel.length === cor.length && sel.every((v) => cor.includes(v));
+    const sel = Array.isArray(selected) ? selected.map(normalize) : selected ? [normalize(selected)] : [];
+    const cor = Array.isArray(correct) ? correct.map(normalize) : correct ? [normalize(correct)] : [];
+    const totalCorrect = cor.length;
+    if (totalCorrect === 0) return { earned: 0, isCorrect: false };
+    const correctSelected = sel.filter((v) => cor.includes(v)).length;
+    const wrongSelected = sel.filter((v) => !cor.includes(v)).length;
+    const partialCredit = Math.max(0, (correctSelected - wrongSelected) / totalCorrect);
+    const earned = weight * partialCredit;
+    return { earned, isCorrect: partialCredit >= 1.0 };
   }
   if (type === 'short_answer') {
-    return normalize(selected) === normalize(correct);
+    const isCorrect = normalize(selected) === normalize(correct);
+    return { earned: isCorrect ? weight : 0, isCorrect };
   }
-  // essay / manual -> auto-corrected false until manually graded
-  return false;
+  return { earned: 0, isCorrect: false };
 }
 
 function buildResultResponse(attempt, quiz) {

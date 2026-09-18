@@ -4,7 +4,7 @@ import { useQuiz } from "../hooks/useQuiz";
 import { listAttempts, getAttemptResults } from "../api/attempt.api";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/shared/components/ui/card";
 import { formatDuration } from "../utils/formatDuration";
-import { CheckCircle, XCircle, Clock, Trophy, Target, BarChart3 } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Trophy, Target, BarChart3, AlertTriangle } from "lucide-react";
 import { StaggerList, MotionItem } from "@/shared/motion";
 
 function statusBadge(status) {
@@ -218,16 +218,24 @@ function AttemptDetail({ attempt, result, qMap }) {
             const q = qMap.get(item.questionId);
             const selected = item.selected;
             const displaySelected = Array.isArray(selected) ? selected.join(", ") : String(selected ?? "—");
+            const earned = item.earnedPoints ?? (item.isCorrect ? item.points : 0);
+            const isPartial = !item.isCorrect && earned > 0;
             return (
               <div
                 key={item.questionId}
                 className={`rounded-lg border p-3 transition-colors ${
-                  item.isCorrect ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-500/30 dark:bg-emerald-500/5" : "border-rose-200 bg-rose-50/50 dark:border-rose-500/30 dark:bg-rose-500/5"
+                  item.isCorrect
+                    ? "border-emerald-200 bg-emerald-50/50 dark:border-emerald-500/30 dark:bg-emerald-500/5"
+                    : isPartial
+                      ? "border-amber-200 bg-amber-50/50 dark:border-amber-500/30 dark:bg-amber-500/5"
+                      : "border-rose-200 bg-rose-50/50 dark:border-rose-500/30 dark:bg-rose-500/5"
                 }`}
               >
                 <div className="flex items-start gap-2">
                   {item.isCorrect ? (
                     <CheckCircle className="h-5 w-5 text-emerald-600 mt-0.5 shrink-0" />
+                  ) : isPartial ? (
+                    <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
                   ) : (
                     <XCircle className="h-5 w-5 text-rose-600 mt-0.5 shrink-0" />
                   )}
@@ -244,7 +252,7 @@ function AttemptDetail({ attempt, result, qMap }) {
                       Your answer: {displaySelected || <span className="italic text-neutral-400">Not answered</span>}
                     </div>
                     <div className="text-xs text-neutral-400">
-                      Points: {item.points} {item.isCorrect ? "· Correct" : "· Incorrect"}
+                      Points: {earned}/{item.points} {item.isCorrect ? "· Correct" : isPartial ? "· Partial credit" : "· Incorrect"}
                     </div>
                   </div>
                 </div>
