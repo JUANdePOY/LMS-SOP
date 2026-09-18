@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const db = require('../config/database');
 const { authenticateToken, resolveScope } = require('../middleware/auth');
-const { requirePermission } = require('../middleware/scope');
+const { requirePermission, requirePermissionAction } = require('../middleware/scope');
 const { broadcastSystemChange, createSystemNotification } = require('../services/notificationService');
 const { subscribe, unsubscribe } = require('../services/pushNotificationService');
 
@@ -65,7 +65,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/', resolveScope, requirePermission('notifications.send'), async (req, res) => {
+router.post('/', resolveScope, requirePermission('notifications.send'), requirePermissionAction('notifications.send', 'send'), async (req, res) => {
   try {
     let targetUserId = req.body.user_id ? Number(req.body.user_id) : req.user.id;
     const { title, body, type = 'info', link, entity_type, entity_id } = req.body;
@@ -109,7 +109,7 @@ router.post('/', resolveScope, requirePermission('notifications.send'), async (r
   }
 });
 
-router.post('/broadcast', resolveScope, requirePermission('notifications.broadcast'), async (req, res) => {
+router.post('/broadcast', resolveScope, requirePermission('notifications.broadcast'), requirePermissionAction('notifications.broadcast', 'broadcast'), async (req, res) => {
   try {
     const { title, body, type = 'info', link, entity_type, entity_id } = req.body;
 

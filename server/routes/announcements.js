@@ -1,7 +1,7 @@
 const router = require('express').Router();
 const announcementController = require('../controllers/announcementController');
 const { authenticateToken } = require('../middleware/auth');
-const { requirePermission } = require('../middleware/scope');
+const { requirePermission, requirePermissionAction } = require('../middleware/scope');
 const { announcementImageUpload } = require('../middleware/announcementUpload');
 const storage = require('../config/storage');
 
@@ -14,7 +14,7 @@ router.use(authenticateToken);
 // authenticated /api/files/stream URL (see client resolveFileUrl) at render
 // time, so the image renders for every viewer without a stale/expiring token
 // being baked into the stored HTML.
-router.post('/upload-image', requirePermission('manage_announcements'), announcementImageUpload, async (req, res) => {
+router.post('/upload-image', requirePermission('manage_announcements'), requirePermissionAction('manage_announcements', 'create'), announcementImageUpload, async (req, res) => {
   try {
     const url = await storage.dbSave(
       req.file.buffer,
@@ -30,8 +30,8 @@ router.post('/upload-image', requirePermission('manage_announcements'), announce
 
 router.get('/', announcementController.listAnnouncements);
 router.get('/:id', announcementController.getAnnouncement);
-router.post('/', requirePermission('manage_announcements'), announcementController.createAnnouncement);
-router.put('/:id', requirePermission('manage_announcements'), announcementController.updateAnnouncement);
-router.delete('/:id', requirePermission('manage_announcements'), announcementController.deleteAnnouncement);
+router.post('/', requirePermission('manage_announcements'), requirePermissionAction('manage_announcements', 'create'), announcementController.createAnnouncement);
+router.put('/:id', requirePermission('manage_announcements'), requirePermissionAction('manage_announcements', 'edit'), announcementController.updateAnnouncement);
+router.delete('/:id', requirePermission('manage_announcements'), requirePermissionAction('manage_announcements', 'delete'), announcementController.deleteAnnouncement);
 
 module.exports = router;

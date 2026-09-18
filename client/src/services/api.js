@@ -123,6 +123,8 @@ export const updateUserPassword = (id, data) => api.put(`/users/${id}/password`,
 export const deleteUser = (id) => api.delete(`/users/${id}`);
 export const getUserStats = () => api.get('/users/stats');
 export const bulkUploadUsers = (formData) => api.post('/users/bulk-upload', formData);
+export const getUserPermissions = (userId) => api.get(`/roles/users/${userId}/permissions`);
+export const updateUserPermissions = (userId, overrides) => api.put(`/roles/users/${userId}/permissions`, { overrides });
 
 export const getDepartments = (params = {}) => api.get('/departments', { params });
 export const getDepartmentHierarchy = () => api.get('/departments/hierarchy');

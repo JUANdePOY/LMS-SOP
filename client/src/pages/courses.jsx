@@ -47,8 +47,13 @@ const DIFFICULTIES = ["beginner", "intermediate", "advanced", "all_levels"];
 export default function Courses({ departments = [] }) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { hasPermission, isSuperAdmin, isAdmin, isDepartmentHead, isEmployee } = useAuth();
-  const canManageCourses = hasPermission('manage_courses');
+  const { hasPermission, hasPermissionAction, isSuperAdmin, isAdmin, isDepartmentHead, isEmployee } = useAuth();
+  const canManageCoursePage = hasPermission('manage_courses');
+  const canCreateCourse = hasPermissionAction('manage_courses', 'create');
+  const canEditCourse = hasPermissionAction('manage_courses', 'edit');
+  const canDeleteCourse = hasPermissionAction('manage_courses', 'delete');
+  const canPublishCourse = hasPermissionAction('manage_courses', 'publish');
+  const canArchiveCourse = hasPermissionAction('manage_courses', 'archive');
   const [courses, setCourses] = useState([]);
   const [stats, setStats] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -292,7 +297,7 @@ export default function Courses({ departments = [] }) {
               {isSuperAdmin ? "Manage courses across all businesses" : isAdmin ? "Manage courses for your business" : isDepartmentHead ? "Manage courses for your department" : "Browse available courses"}
             </p>
           </div>
-          {canManageCourses && (
+          {canCreateCourse && (
             <button onClick={openAdd} className="btn-primary rounded-lg px-4 py-2 text-sm font-medium shadow-sm hover:shadow-md transition-all">
               + Add Course
             </button>
@@ -399,7 +404,7 @@ export default function Courses({ departments = [] }) {
                        ? "Try adjusting your filters or clear them to see all courses"
                        : "Get started by creating your first course")}
                    </p>
-                   {canManageCourses && !filters.search && !filters.status && !filters.difficulty && !filters.category && (
+                    {canCreateCourse && !filters.search && !filters.status && !filters.difficulty && !filters.category && (
                      <button onClick={openAdd} className="mt-4 rounded-lg border border-neutral-200 px-3 py-2 text-sm hover:border-neutral-300">
                        + Create Course
                      </button>
@@ -464,17 +469,17 @@ export default function Courses({ departments = [] }) {
                       </td>
                       <td className="px-3 py-3.5">
                         <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
-                          {canManageCourses && c.status === "draft" && (
+                          {canPublishCourse && c.status === "draft" && (
                             <ActionButton action="Publish" label={`Publish ${c.title}`} onClick={() => handleQuickAction(c, "publish")} />
                           )}
-                          {canManageCourses && c.status === "published" && (
+                          {canArchiveCourse && c.status === "published" && (
                             <ActionButton action="Archive" label={`Archive ${c.title}`} onClick={() => handleQuickAction(c, "archive")} />
                           )}
-                          {canManageCourses && (
+                          {canEditCourse && (
                             <ActionButton action="Edit" label={`Edit ${c.title}`} onClick={() => openEdit(c)} />
                           )}
                           <ActionButton action="View" label={`Open builder for ${c.title}`} onClick={() => openBuilder(c)} />
-                          {canManageCourses && (
+                          {canDeleteCourse && (
                             <ActionButton action="Delete" label={`Delete ${c.title}`} onClick={() => openDelete(c)} />
                           )}
                         </div>

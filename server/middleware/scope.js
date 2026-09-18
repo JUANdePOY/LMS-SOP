@@ -72,26 +72,6 @@ function requireDepartmentScope(departmentIdParam = 'departmentId') {
   };
 }
 
-function requirePermission(permissionName) {
-  return async (req, res, next) => {
-    const role = req.user?.role || '';
-    if (role === 'super_admin' || role === 'admin' || role === 'department_head') {
-      return next();
-    }
-
-    const perms = req.user?.permissions || [];
-    if (!perms.includes(permissionName)) {
-      return res.status(403).json({
-        status: 'error',
-        message: `Missing permission: ${permissionName}`,
-        code: 'PERMISSION_DENIED',
-      });
-    }
-
-    next();
-  };
-}
-
 async function resolveUserPermissions(userId, role) {
   if (role === 'super_admin') {
     const [allPerms] = await db.query('SELECT name FROM permissions WHERE is_active = TRUE');
@@ -105,9 +85,9 @@ async function resolveUserPermissions(userId, role) {
      LEFT JOIN user_permission_overrides upo
        ON upo.permission_name = p.name
        AND upo.user_id = ?
-       AND upo.granted = TRUE
      WHERE rp.role_name = ?
        AND p.is_active = TRUE
+       AND (upo.permission_name IS NULL OR upo.granted = TRUE)
      GROUP BY p.name`,
     [userId, role]
   );
@@ -115,9 +95,145 @@ async function resolveUserPermissions(userId, role) {
   return rows.map((r) => r.name);
 }
 
+function parseActions(actionsJson, permissionName) {
+  if (actionsJson) {
+    try {
+      const arr = Array.isArray(actionsJson) ? actionsJson : JSON.parse(actionsJson);
+      if (Array.isArray(arr)) return arr.filter((a) => typeof a === 'string');
+    } catch {}
+  }
+  if (permissionName.startsWith('view_')) return ['view'];
+  if (permissionName.startsWith('manage_')) return ['view', 'create', 'edit', 'delete', 'approve', 'publish', 'archive', 'assign'];
+  const dotIndex = permissionName.lastIndexOf('.');
+  if (dotIndex !== -1) {
+    const action = permissionName.substring(dotIndex + 1);
+    return ['view', action];
+  }
+  return [];
+}
+
+async function resolveUserPermissionDetails(userId, role) {
+  if (role === 'super_admin') {
+    const [allPerms] = await db.query('SELECT name, actions FROM permissions WHERE is_active = TRUE');
+    return allPerms.map((p) => ({
+      name: p.name,
+      actions: parseActions(p.actions, p.name),
+    }));
+  }
+
+  const [rolePerms] = await db.query(
+    `SELECT p.name, p.actions
+     FROM permissions p
+     INNER JOIN role_permissions rp ON rp.permission_name = p.name
+     WHERE rp.role_name = ? AND p.is_active = TRUE`,
+    [role]
+  );
+
+  const [overrides] = await db.query(
+    `SELECT permission_name, granted, actions
+     FROM user_permission_overrides
+     WHERE user_id = ?`,
+    [userId]
+  );
+
+  const overrideMap = new Map();
+  for (const o of overrides) {
+    overrideMap.set(o.permission_name, o);
+  }
+
+  const result = [];
+  for (const perm of rolePerms) {
+    const override = overrideMap.get(perm.name);
+    if (override) {
+      if (!override.granted) continue;
+      const definedActions = parseActions(perm.actions, perm.name);
+      let userActions;
+      if (override.actions === null) {
+        userActions = definedActions;
+      } else {
+        userActions = parseActions(override.actions, perm.name);
+        if (userActions.length === 0) continue;
+        userActions = userActions.filter((a) => definedActions.includes(a));
+        if (userActions.length === 0) continue;
+      }
+      result.push({ name: perm.name, actions: userActions });
+    } else {
+      result.push({ name: perm.name, actions: parseActions(perm.actions, perm.name) });
+    }
+  }
+
+  return result;
+}
+
+function requirePermission(permissionName) {
+  return async (req, res, next) => {
+    const role = req.user?.role || '';
+    if (role === 'super_admin') {
+      return next();
+    }
+
+    const perms = req.user?.permissions || [];
+    if (!perms.includes(permissionName)) {
+      return res.status(403).json({
+        status: 'error',
+        message: `Missing permission: ${permissionName}`,
+        code: 'PERMISSION_DENIED',
+      });
+    }
+
+    const details = req.user?.permission_details || [];
+    const permDetail = details.find((d) => d.name === permissionName);
+    if (permDetail && Array.isArray(permDetail.actions) && permDetail.actions.length === 0) {
+      return res.status(403).json({
+        status: 'error',
+        message: `Missing permission: ${permissionName}`,
+        code: 'PERMISSION_DENIED',
+      });
+    }
+
+    next();
+  };
+}
+
+function requirePermissionAction(permissionName, action) {
+  return async (req, res, next) => {
+    if (req.user?.role === 'super_admin') {
+      return next();
+    }
+
+    let details = req.user?.permission_details;
+    if (!Array.isArray(details)) {
+      try {
+        details = await resolveUserPermissionDetails(req.user?.id, req.user?.role);
+        req.user.permission_details = details;
+      } catch (err) {
+        return res.status(403).json({
+          status: 'error',
+          message: `Missing permission action: ${permissionName}.${action}`,
+          code: 'PERMISSION_ACTION_DENIED',
+        });
+      }
+    }
+
+    const permDetail = details.find((d) => d.name === permissionName);
+    if (!permDetail || !Array.isArray(permDetail.actions) || !permDetail.actions.includes(action)) {
+      return res.status(403).json({
+        status: 'error',
+        message: `Missing permission action: ${permissionName}.${action}`,
+        code: 'PERMISSION_ACTION_DENIED',
+      });
+    }
+
+    next();
+  };
+}
+
 module.exports = {
   requireBusinessScope,
   requireDepartmentScope,
   requirePermission,
+  requirePermissionAction,
   resolveUserPermissions,
+  resolveUserPermissionDetails,
+  parseActions,
 };

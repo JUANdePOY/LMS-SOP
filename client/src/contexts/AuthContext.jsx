@@ -4,6 +4,11 @@ import * as session from '@/services/session';
 
 const AuthContext = createContext(null);
 
+function normalizeRole(role) {
+  if (typeof role !== 'string') return '';
+  return role.trim().toLowerCase().replace(/[\s-]+/g, '_');
+}
+
 function normalizeUser(userData) {
   if (!userData || typeof userData !== 'object') {
     return userData;
@@ -11,13 +16,16 @@ function normalizeUser(userData) {
 
   const rawRole = userData.role;
   const normalizedRole = typeof rawRole === 'string'
-    ? rawRole
-    : (rawRole && typeof rawRole === 'object' ? (rawRole.name || rawRole.role || '') : '');
+    ? normalizeRole(rawRole)
+    : (rawRole && typeof rawRole === 'object'
+      ? normalizeRole(rawRole.name || rawRole.role || '')
+      : '');
 
   return {
     ...userData,
     role: normalizedRole,
     permissions: Array.isArray(userData.permissions) ? userData.permissions : [],
+    permission_details: Array.isArray(userData.permission_details) ? userData.permission_details : [],
     scoped_department_ids: Array.isArray(userData.scoped_department_ids) ? userData.scoped_department_ids : [],
     business_id: userData.business_id || null,
     department_id: userData.department_id || null,
@@ -196,6 +204,7 @@ export function AuthProvider({ children }) {
   const isEmployee = user?.role === 'employee';
   const isAnyAdmin = ['super_admin', 'admin', 'department_head'].includes(user?.role);
   const permissions = user?.permissions || [];
+  const permissionDetails = user?.permission_details || [];
   const scopedDepartmentIds = user?.scoped_department_ids || [];
   const businessId = user?.business_id || null;
 
@@ -204,6 +213,14 @@ export function AuthProvider({ children }) {
     if (isSuperAdmin) return true;
     return permissions.includes(permission);
   }, [permissions, isSuperAdmin]);
+
+  const hasPermissionAction = useCallback((permission, action) => {
+    if (!permission || !action || !Array.isArray(permissionDetails)) return false;
+    if (isSuperAdmin) return true;
+    const detail = permissionDetails.find((d) => d.name === permission);
+    if (!detail || !Array.isArray(detail.actions)) return false;
+    return detail.actions.includes(action);
+  }, [permissionDetails, isSuperAdmin]);
 
   const canCreateSops = isSuperAdmin || isAdmin || isDepartmentHead || hasPermission('create_sops');
 
@@ -225,9 +242,11 @@ export function AuthProvider({ children }) {
       isAnyAdmin,
       canCreateSops,
       permissions,
+      permission_details: permissionDetails,
       scopedDepartmentIds,
       businessId,
       hasPermission,
+      hasPermissionAction,
       setError,
       forgotPassword,
       resetPassword,

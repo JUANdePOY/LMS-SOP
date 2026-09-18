@@ -86,20 +86,26 @@ const MENU_ITEMS = [
         name: "SOP Management",
         path: "/admin/organization",
         icon: Building2,
+        // No parent-level `permission`: this node mixes org-structure screens
+        // (governed by manage_departments) with SOP content (manage_sops).
+        // Gating the parent on manage_sops would hide Businesses / Departments
+        // / Categories from anyone without SOP access. Each sub carries its own
+        // permission and the parent is dropped when every sub is filtered out.
         sub: [
-          { name: "Dashboard", roles: ['super_admin', 'admin', 'department_head'] },
-          { name: "Businesses", roles: ['super_admin'] },
-          { name: "Departments", roles: ['super_admin', 'admin'] },
-          { name: "Categories", roles: ['super_admin'] },
-          { name: "Files", roles: ['super_admin', 'admin', 'department_head'] },
+          { name: "Dashboard", roles: ['super_admin', 'admin', 'department_head'], permission: "manage_departments" },
+          { name: "Businesses", roles: ['super_admin'], permission: "manage_departments" },
+          { name: "Departments", roles: ['super_admin', 'admin'], permission: "manage_departments" },
+          { name: "Categories", roles: ['super_admin'], permission: "manage_departments" },
+          { name: "Files", roles: ['super_admin', 'admin', 'department_head'], permission: "manage_sops" },
         ],
       },
-      { name: "Course Management", path: "/courses", icon: BookOpen, roles: ['super_admin', 'admin', 'department_head'] },
-      { name: "Course Library", path: "/courses/library", icon: Library, roles: LMS_ROLES },
+      { name: "Course Management", path: "/courses", icon: BookOpen, roles: ['super_admin', 'admin', 'department_head'], permission: "manage_courses" },
+      { name: "Course Library", path: "/courses/library", icon: Library, roles: LMS_ROLES, permission: "manage_courses" },
       {
         name: "Quizzes",
         path: "/assessments",
         icon: ClipboardCheck,
+        permission: "manage_assessments",
         sub: [
           { name: "Manage", roles: ['super_admin', 'admin', 'department_head'] },
           { name: "Leaderboard", roles: ['super_admin', 'admin', 'department_head'] },
@@ -114,8 +120,8 @@ const MENU_ITEMS = [
     group: true,
     items: [
       { name: "Messaging", path: "/messaging", icon: MessageSquare, roles: LMS_ROLES },
-      { name: "Announcements", path: "/announcements", icon: Megaphone, roles: LMS_ROLES },
-      { name: "Events", path: "/events", icon: Calendar, roles: ['super_admin', 'admin'] },
+      { name: "Announcements", path: "/announcements", icon: Megaphone, roles: LMS_ROLES, permission: "manage_announcements" },
+      { name: "Events", path: "/events", icon: Calendar, roles: ['super_admin', 'admin'], permission: "manage_events" },
     ],
   },
   {
@@ -132,9 +138,9 @@ const MENU_ITEMS = [
       // User Management is a standalone page for admins and department heads
       // (scoped to their own business/department by the backend). Super
       // admins reach the same panel through Settings > Users.
-      { name: "Users", path: "/users", icon: Users, roles: ['admin', 'department_head'] },
-      { name: "Settings", path: "/settings", icon: Settings, sub: ["Users", "Roles"], roles: ['super_admin'] },
-      { name: "Audit Logs", path: "/audit-logs", icon: Shield, roles: ['super_admin'] },
+      { name: "Users", path: "/users", icon: Users, roles: ['admin', 'department_head'], permission: "manage_users" },
+      { name: "Settings", path: "/settings", icon: Settings, sub: ["Users", "Roles"], roles: ['super_admin'], permission: "manage_settings" },
+      { name: "Audit Logs", path: "/audit-logs", icon: Shield, roles: ['super_admin'], permission: "view_audit_logs" },
     ],
   },
 ];
@@ -168,7 +174,7 @@ export default function Sidebar({ collapsed, mobileOpen, onMobileClose, onToggle
   const isEmployee = user?.role === 'employee';
   const isDepartmentHead = user?.role === 'department_head';
   const baseMenuItems = isEmployee ? EMPLOYEE_MENU_ITEMS : MENU_ITEMS;
-  const activeMenuItems = filterMenuByRole(baseMenuItems, user?.role);
+  const activeMenuItems = filterMenuByRole(baseMenuItems, user?.role, user?.permissions || []);
   const notificationStore = useNotificationStore();
   const notifications = useNotifications();
 

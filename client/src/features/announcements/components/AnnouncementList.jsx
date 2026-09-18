@@ -13,9 +13,10 @@ function stripHtml(html) {
   return (html || "").replace(/<[^>]*>/g, "").trim();
 }
 
-export default function AnnouncementList({ items, onEdit, onDelete, onCreate, canManage, onView }) {
+export default function AnnouncementList({ items, onEdit, onDelete, onCreate, canCreate, canEdit, canDelete, onView }) {
   const [deleteItem, setDeleteItem] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const canManage = canCreate || canEdit || canDelete;
 
   const handleDelete = async () => {
     if (!deleteItem) return;
@@ -32,7 +33,7 @@ export default function AnnouncementList({ items, onEdit, onDelete, onCreate, ca
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">Announcements</h2>
-        {canManage && (
+        {canCreate && (
           <button
             onClick={onCreate}
             className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover-brand"
@@ -80,7 +81,7 @@ export default function AnnouncementList({ items, onEdit, onDelete, onCreate, ca
                     <Eye size={14} />
                   </button>
                 )}
-                {canManage && (
+                {canEdit && (
                   <>
                     <button
                       onClick={(e) => { e.stopPropagation(); onEdit(item); }}
@@ -88,12 +89,14 @@ export default function AnnouncementList({ items, onEdit, onDelete, onCreate, ca
                     >
                       <Edit size={14} />
                     </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setDeleteItem(item); }}
-                      className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {canDelete && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteItem(item); }}
+                        className="p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </>
                 )}
               </div>

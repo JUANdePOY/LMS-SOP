@@ -2,7 +2,7 @@ const express = require('express');
 const { body, param, validationResult } = require('express-validator');
 const db = require('../config/database');
 const { authenticateToken, requireSuperAdmin } = require('../middleware/auth');
-const { resolveUserPermissions } = require('../middleware/scope');
+const { resolveUserPermissions, resolveUserPermissionDetails, parseActions } = require('../middleware/scope');
 const { logAudit } = require('../utils/auditLogger');
 
 const router = express.Router();
@@ -13,7 +13,8 @@ router.use(authenticateToken);
 router.get('/my-permissions', authenticateToken, async (req, res) => {
   try {
     const permissions = await resolveUserPermissions(req.user.id, req.user.role);
-    res.json({ status: 'success', data: { permissions, role: req.user.role } });
+    const permissionDetails = await resolveUserPermissionDetails(req.user.id, req.user.role);
+    res.json({ status: 'success', data: { permissions, permission_details: permissionDetails, role: req.user.role } });
   } catch (err) {
     console.error('My permissions error:', err);
     res.status(500).json({ status: 'error', message: 'Failed to fetch permissions', code: 'DB_ERROR' });
@@ -30,7 +31,7 @@ router.get('/users/:userId/permissions', authenticateToken, requireSuperAdmin, a
     }
 
     const [overrides] = await db.query(
-      'SELECT permission_name, granted FROM user_permission_overrides WHERE user_id = ?',
+      'SELECT permission_name, granted, actions FROM user_permission_overrides WHERE user_id = ?',
       [targetUserId]
     );
     res.json({ status: 'success', data: { role: userRows[0].role, overrides } });
@@ -45,6 +46,7 @@ router.put('/users/:userId/permissions', authenticateToken, requireSuperAdmin, [
   body('overrides').isArray().withMessage('overrides must be an array'),
   body('overrides.*.permission_name').notEmpty().withMessage('permission_name is required'),
   body('overrides.*.granted').isBoolean().withMessage('granted must be boolean'),
+  body('overrides.*.actions').optional({ nullable: true }).isArray().withMessage('actions must be an array'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -58,12 +60,43 @@ router.put('/users/:userId/permissions', authenticateToken, requireSuperAdmin, [
       return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
     }
 
+    const [allPerms] = await db.query('SELECT name, actions FROM permissions WHERE is_active = TRUE');
+    const permActionMap = new Map(allPerms.map(p => [p.name, parseActions(p.actions, p.name)]));
+
     const overrides = req.body.overrides || [];
+    for (const o of overrides) {
+      if (!permActionMap.has(o.permission_name)) {
+        return res.status(400).json({
+          status: 'error',
+          message: `Unknown permission: ${o.permission_name}`,
+          code: 'UNKNOWN_PERMISSION',
+        });
+      }
+
+      if (Array.isArray(o.actions)) {
+        const defined = permActionMap.get(o.permission_name);
+        const invalid = o.actions.filter((a) => typeof a !== 'string' || !defined.includes(a));
+        if (invalid.length > 0) {
+          return res.status(400).json({
+            status: 'error',
+            message: `Invalid actions for ${o.permission_name}: ${invalid.join(', ')}`,
+            code: 'INVALID_ACTIONS',
+          });
+        }
+      }
+    }
+
     await db.query('DELETE FROM user_permission_overrides WHERE user_id = ?', [targetUserId]);
 
     if (overrides.length > 0) {
-      const values = overrides.map(o => [targetUserId, o.permission_name, o.granted ? 1 : 0, req.user.id]);
-      await db.query('INSERT INTO user_permission_overrides (user_id, permission_name, granted, granted_by) VALUES ?', [values]);
+      const values = overrides.map(o => {
+        const actionsJson = Array.isArray(o.actions) ? JSON.stringify(o.actions) : null;
+        return [targetUserId, o.permission_name, o.granted ? 1 : 0, actionsJson, req.user.id];
+      });
+      await db.query(
+        'INSERT INTO user_permission_overrides (user_id, permission_name, granted, actions, granted_by) VALUES ?',
+        [values]
+      );
     }
 
     logAudit({
@@ -101,7 +134,7 @@ router.get('/', authenticateToken, requireSuperAdmin, async (req, res) => {
 // GET /api/roles/permissions
 router.get('/permissions', authenticateToken, requireSuperAdmin, async (req, res) => {
   try {
-    const [rows] = await db.query('SELECT id, name, display_name, description, category, is_active FROM permissions ORDER BY category, name');
+    const [rows] = await db.query('SELECT id, name, display_name, description, category, is_active, actions FROM permissions ORDER BY category, name');
     res.json({ status: 'success', data: rows });
   } catch (err) {
     console.error('Permissions fetch error:', err);
@@ -161,7 +194,7 @@ router.get('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Role not found', code: 'NOT_FOUND' });
     }
     const role = rows[0];
-    const [perms] = await db.query('SELECT p.id, p.name, p.display_name, p.category FROM permissions p JOIN role_permissions rp ON p.name = rp.permission_name WHERE rp.role_name = ? ORDER BY p.category, p.name', [role.name]);
+    const [perms] = await db.query('SELECT p.id, p.name, p.display_name, p.category, p.actions FROM permissions p JOIN role_permissions rp ON p.name = rp.permission_name WHERE rp.role_name = ? ORDER BY p.category, p.name', [role.name]);
     role.permissions = perms;
     res.json({ status: 'success', data: role });
   } catch (err) {
