@@ -228,6 +228,97 @@ function requirePermissionAction(permissionName, action) {
   };
 }
 
+async function resolveUserEntityOverrides(userId) {
+  const [overrides] = await db.query(
+    `SELECT id, permission_name, entity_type, entity_id, granted, actions
+     FROM entity_permission_overrides
+     WHERE user_id = ?`,
+    [userId]
+  );
+  return overrides.map((o) => ({
+    id: o.id,
+    permission_name: o.permission_name,
+    entity_type: o.entity_type,
+    entity_id: o.entity_id,
+    granted: !!o.granted,
+    actions: parseActions(o.actions, o.permission_name),
+  }));
+}
+
+async function resolveRoleEntityPermissions(roleName) {
+  const [overrides] = await db.query(
+    `SELECT id, permission_name, entity_type, entity_id, granted, actions
+     FROM role_entity_permissions
+     WHERE role_name = ?`,
+    [roleName]
+  );
+  return overrides.map((o) => ({
+    id: o.id,
+    permission_name: o.permission_name,
+    entity_type: o.entity_type,
+    entity_id: o.entity_id,
+    granted: !!o.granted,
+    actions: parseActions(o.actions, o.permission_name),
+  }));
+}
+
+function buildEntityAccessMap(entityOverrides) {
+  const map = new Map();
+  for (const o of entityOverrides || []) {
+    if (!map.has(o.entity_type)) {
+      map.set(o.entity_type, { granted: new Set(), denied: new Set() });
+    }
+    const bucket = map.get(o.entity_type);
+    if (o.granted) {
+      bucket.granted.add(o.entity_id);
+    } else {
+      bucket.denied.add(o.entity_id);
+    }
+  }
+  return map;
+}
+
+function canAccessEntity(user, entityType, entityId) {
+  if (!user) return false;
+  if (user.role === 'super_admin') return true;
+  const overrides = user.entity_overrides || [];
+  const accessMap = buildEntityAccessMap(overrides);
+  const typeAccess = accessMap.get(entityType);
+  if (!typeAccess) return true;
+  if (typeAccess.denied.has(entityId)) return false;
+  if (typeAccess.granted.has(entityId)) return true;
+  return false;
+}
+
+function isEntityTypeDeniedForUser(user, entityType) {
+  if (!user) return false;
+  if (user.role === 'super_admin') return false;
+  const overrides = user.entity_overrides || [];
+  const accessMap = buildEntityAccessMap(overrides);
+  const typeAccess = accessMap.get(entityType);
+  if (!typeAccess) return false;
+  return typeAccess.denied.size > 0 && typeAccess.granted.size === 0;
+}
+
+function requireEntityTypeAccess(entityType) {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ status: 'error', message: 'Authentication required', code: 'UNAUTHENTICATED' });
+    }
+    if (req.user.role === 'super_admin') {
+      return next();
+    }
+    if (isEntityTypeDeniedForUser(req.user, entityType)) {
+      return res.status(403).json({
+        status: 'error',
+        message: `Access to ${entityType} is denied for this user`,
+        code: 'ENTITY_ACCESS_DENIED',
+      });
+    }
+    next();
+  };
+}
+
 module.exports = {
   requireBusinessScope,
   requireDepartmentScope,
@@ -235,5 +326,10 @@ module.exports = {
   requirePermissionAction,
   resolveUserPermissions,
   resolveUserPermissionDetails,
+  resolveUserEntityOverrides,
+  resolveRoleEntityPermissions,
   parseActions,
+  canAccessEntity,
+  isEntityTypeDeniedForUser,
+  requireEntityTypeAccess,
 };

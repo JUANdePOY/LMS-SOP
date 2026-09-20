@@ -7,7 +7,7 @@ const { comparePassword, generateToken, hashPassword, generateRefreshToken, hash
 const { authenticateToken } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 const loginLimiter = require('../middleware/rateLimiter');
-const { resolveUserPermissions, resolveUserPermissionDetails } = require('../middleware/scope');
+const { resolveUserPermissions, resolveUserPermissionDetails, resolveRoleEntityPermissions } = require('../middleware/scope');
 const {
   findByEmail,
   incrementFailedAttempts,
@@ -196,32 +196,34 @@ router.post('/login', loginLimiter, [
       new_values: { email: user.email, role: user.role }
     });
 
-    const permissions = await resolveUserPermissions(user.id, user.role);
-    const permissionDetails = await resolveUserPermissionDetails(user.id, user.role);
+     const permissions = await resolveUserPermissions(user.id, user.role);
+     const permissionDetails = await resolveUserPermissionDetails(user.id, user.role);
+     const roleEntityPermissions = await resolveRoleEntityPermissions(user.role);
 
-    clearTimeout(loginTimer);
-    return res.status(200).json({
-      status: 'success',
-      message: 'Login successful',
-      data: {
-        token,
-        refreshToken,
-        user: {
-          id: user.id,
-          full_name: user.full_name,
-          email: user.email,
-          role: user.role,
-          department_id: user.department_id,
-          department_name: user.department_name,
-          business_id: user.business_id,
-          position_title: user.position_title,
-          employee_id: user.employee_id,
-          avatar_url: user.avatar_url,
-          permissions,
-          permission_details: permissionDetails,
-        }
-      }
-    });
+     clearTimeout(loginTimer);
+     return res.status(200).json({
+       status: 'success',
+       message: 'Login successful',
+       data: {
+         token,
+         refreshToken,
+         user: {
+           id: user.id,
+           full_name: user.full_name,
+           email: user.email,
+           role: user.role,
+           department_id: user.department_id,
+           department_name: user.department_name,
+           business_id: user.business_id,
+           position_title: user.position_title,
+           employee_id: user.employee_id,
+           avatar_url: user.avatar_url,
+            permissions,
+            permission_details: permissionDetails,
+            role_entity_permissions: roleEntityPermissions,
+          }
+       }
+     });
   } catch (error) {
     clearTimeout(loginTimer);
     const errCode = error?.code || error?.errno || null;
@@ -490,14 +492,15 @@ router.post('/refresh-token', [
           business_id: user.business_id,
           position_title: user.position_title,
           employee_id: user.employee_id,
-          avatar_url: user.avatar_url,
-          permissions,
-          permission_details: permissionDetails,
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Refresh token error:', error);
+           avatar_url: user.avatar_url,
+           permissions,
+           permission_details: permissionDetails,
+           role_entity_permissions: roleEntityPermissions,
+          }
+       }
+     });
+   } catch (error) {
+     console.error('Refresh token error:', error);
     res.status(500).json({
       status: 'error',
       message: 'Server error',
@@ -644,9 +647,9 @@ router.get('/profile', authenticateToken, async (req, res) => {
         bio: user.bio,
         cover_photo_url: user.cover_photo_url,
         avatar_url: user.avatar_url,
-        permissions,
-        permission_details: permissionDetails,
-        scoped_department_ids: scopedDepartmentIds,
+         permissions,
+         permission_details: permissionDetails,
+         scoped_department_ids: scopedDepartmentIds,
       }
     });
   } catch (error) {

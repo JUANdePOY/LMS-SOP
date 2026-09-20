@@ -106,6 +106,10 @@ function restrictionWhere(user, cols, alias = 's') {
       )
       ${departmentHeadPlaceholders ? `OR (${alias}.restriction_type = 'assigned' AND ${alias}.department_id IN (${departmentHeadPlaceholders}))` : ''}
       OR (
+        ${alias}.restriction_type = 'assigned'
+        AND ${alias}.${cols.owner} = ?
+      )
+      OR (
         ${alias}.restriction_type = 'private'
         AND ${alias}.${cols.owner} = ?
       )
@@ -116,7 +120,7 @@ function restrictionWhere(user, cols, alias = 's') {
   if (departmentHeadPlaceholders) {
     params.push(...departmentHeadScope, ...departmentHeadScope);
   }
-  params.push(userId);
+  params.push(userId, userId);
   return { sql, params };
 }
 
@@ -152,8 +156,9 @@ async function businessScopeWhere(user, cols, alias = 's') {
             AND sa.is_deleted = FALSE
             AND d.business_id = ?
         )
+        OR ${alias}.${cols.owner} = ?
       )`,
-      params: [user.business_id, user.business_id],
+      params: [user.business_id, user.business_id, user.id],
     };
   }
 
@@ -177,8 +182,9 @@ async function businessScopeWhere(user, cols, alias = 's') {
             AND sa.is_deleted = FALSE
             AND ad.department_id IN (${placeholders})
         )
+        OR ${alias}.${cols.owner} = ?
       )`,
-      params: [...scopedDeptIds, ...scopedDeptIds],
+      params: [...scopedDeptIds, ...scopedDeptIds, user.id],
     };
   }
 

@@ -14,46 +14,44 @@ async function seed() {
      { name: 'employee', display_name: 'Employee', description: 'Standard user / learner' },
    ];
 
-  for (const role of roles) {
-    await db.query(
-      `INSERT INTO roles (name, display_name, description, is_active)
-       VALUES (?, ?, ?, TRUE)
-       ON DUPLICATE KEY UPDATE display_name = VALUES(display_name)`,
-      [role.name, role.display_name, role.description]
-    );
-  }
+   for (const role of roles) {
+     await db.query(
+       `INSERT INTO roles (name, display_name, description, is_active)
+        VALUES (?, ?, ?, TRUE)
+        ON DUPLICATE KEY UPDATE display_name = VALUES(display_name)`,
+       [role.name, role.display_name, role.description]
+     );
+    }
 
-   const permissions = [
-     { name: 'view_dashboard', display_name: 'View Dashboard', category: 'dashboard' },
-     { name: 'manage_users', display_name: 'Manage Users', category: 'users' },
-     { name: 'manage_departments', display_name: 'Manage Departments', category: 'departments' },
-      { name: 'manage_sops', display_name: 'Manage SOPs', category: 'sops' },
-     { name: 'manage_courses', display_name: 'Manage Courses', category: 'courses' },
-     { name: 'manage_assessments', display_name: 'Manage Assessments', category: 'assessments' },
-     { name: 'manage_announcements', display_name: 'Manage Announcements', category: 'announcements' },
-     { name: 'manage_events', display_name: 'Manage Events', category: 'events' },
-     { name: 'view_reports', display_name: 'View Reports', category: 'reports' },
-     { name: 'manage_settings', display_name: 'Manage Settings', category: 'settings' },
-     { name: 'view_audit_logs', display_name: 'View Audit Logs', category: 'audit' },
-     { name: 'notifications.send', display_name: 'Send Notifications', category: 'notifications' },
-     { name: 'notifications.broadcast', display_name: 'Broadcast Notifications', category: 'notifications' },
-     { name: 'banners.manage', display_name: 'Manage Banners', category: 'banners' },
-     { name: 'manage_clients', display_name: 'Manage Clients', category: 'clients' },
-     { name: 'tasks.create', display_name: 'Create Tasks', category: 'tasks' },
-     { name: 'tasks.assign.department', display_name: 'Assign Tasks (Department)', category: 'tasks' },
-     { name: 'tasks.assign.any', display_name: 'Assign Tasks (Any User)', category: 'tasks' },
-     { name: 'tasks.view.all', display_name: 'View All Tasks in Scope', category: 'tasks' },
-     { name: 'projects.manage', display_name: 'Manage Projects', category: 'projects' },
-   ];
+    const permissions = [
+      { name: 'view_dashboard', display_name: 'View Dashboard', category: 'dashboard', feature: 'dashboard' },
+      { name: 'manage_users', display_name: 'Manage Users', category: 'users', feature: 'users' },
+      { name: 'manage_departments', display_name: 'Manage Departments', category: 'departments', feature: 'departments' },
+       { name: 'manage_sops', display_name: 'Manage SOPs', category: 'sops' },
+      { name: 'manage_courses', display_name: 'Manage Courses', category: 'courses' },
+      { name: 'manage_assessments', display_name: 'Manage Assessments', category: 'assessments' },
+      { name: 'manage_announcements', display_name: 'Manage Announcements', category: 'announcements' },
+      { name: 'manage_events', display_name: 'Manage Events', category: 'events' },
+      { name: 'view_reports', display_name: 'View Reports', category: 'reports' },
+      { name: 'manage_settings', display_name: 'Manage Settings', category: 'settings' },
+      { name: 'view_audit_logs', display_name: 'View Audit Logs', category: 'audit' },
+      { name: 'notifications.send', display_name: 'Send Notifications', category: 'notifications' },
+      { name: 'notifications.broadcast', display_name: 'Broadcast Notifications', category: 'notifications' },
+      { name: 'banners.manage', display_name: 'Manage Banners', category: 'banners' },
+       { name: 'manage_clients', display_name: 'Manage Clients', category: 'clients', actions: JSON.stringify(['view', 'create', 'edit', 'delete']) },
+       { name: 'manage_businesses', display_name: 'Manage Businesses', category: 'businesses', actions: JSON.stringify(['view', 'create', 'edit', 'delete']) },
+       { name: 'manage_tasks', display_name: 'Manage Tasks', category: 'tasks' },
+       { name: 'projects.manage', display_name: 'Manage Projects', category: 'projects' },
+    ];
 
-  for (const perm of permissions) {
-    await db.query(
-      `INSERT INTO permissions (name, display_name, category)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE display_name = VALUES(display_name)`,
-      [perm.name, perm.display_name, perm.category]
-    );
-  }
+   for (const perm of permissions) {
+     await db.query(
+       `INSERT INTO permissions (name, display_name, category, description, actions, is_active)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE display_name = VALUES(display_name), category = VALUES(category), description = VALUES(description), actions = VALUES(actions), is_active = VALUES(is_active)`,
+       [perm.name, perm.display_name, perm.category, perm.description || null, perm.actions || null, perm.is_active ?? true]
+     );
+   }
 
    const rolePermissions = [
       // super_admin: ALL permissions
@@ -70,64 +68,58 @@ async function seed() {
      ['super_admin', 'manage_events'],
      ['super_admin', 'notifications.send'],
      ['super_admin', 'notifications.broadcast'],
-     ['super_admin', 'banners.manage'],
-     ['super_admin', 'manage_clients'],
-     ['super_admin', 'tasks.create'],
-     ['super_admin', 'tasks.assign.department'],
-     ['super_admin', 'tasks.assign.any'],
-     ['super_admin', 'tasks.view.all'],
-     ['super_admin', 'projects.manage'],
-      // admin: business-scoped management (no manage_settings, no view_audit_logs)
-      ['admin', 'view_dashboard'],
-      ['admin', 'manage_users'],
-      ['admin', 'manage_departments'],
-      ['admin', 'manage_sops'],
-     ['admin', 'manage_courses'],
-     ['admin', 'manage_assessments'],
-     ['admin', 'view_reports'],
-     ['admin', 'manage_announcements'],
-     ['admin', 'manage_events'],
-     ['admin', 'notifications.send'],
-     ['admin', 'notifications.broadcast'],
-     ['admin', 'banners.manage'],
-     ['admin', 'manage_clients'],
-     ['admin', 'tasks.create'],
-     ['admin', 'tasks.assign.any'],
-     ['admin', 'tasks.view.all'],
-     ['admin', 'projects.manage'],
-      // department_head: department-scoped management
-      ['department_head', 'view_dashboard'],
-      ['department_head', 'manage_sops'],
-      ['department_head', 'manage_courses'],
-     ['department_head', 'manage_assessments'],
-     ['department_head', 'view_reports'],
-     ['department_head', 'manage_announcements'],
-     ['department_head', 'manage_events'],
-     ['department_head', 'notifications.send'],
-     ['department_head', 'notifications.broadcast'],
-     ['department_head', 'banners.manage'],
-     ['department_head', 'manage_clients'],
-     ['department_head', 'tasks.create'],
-     ['department_head', 'tasks.assign.department'],
-     ['department_head', 'tasks.view.all'],
-     // team_lead: task assignment within department only
-     ['team_lead', 'view_dashboard'],
-     ['team_lead', 'tasks.assign.department'],
-     ['team_lead', 'tasks.view.all'],
-     ['team_lead', 'view_reports'],
+       ['super_admin', 'banners.manage'],
+       ['super_admin', 'manage_clients'],
+       ['super_admin', 'manage_businesses'],
+       ['super_admin', 'manage_tasks'],
+       ['super_admin', 'projects.manage'],
+        // admin: business-scoped management (no manage_settings, no view_audit_logs)
+        ['admin', 'view_dashboard'],
+        ['admin', 'manage_users'],
+        ['admin', 'manage_departments'],
+        ['admin', 'manage_sops'],
+       ['admin', 'manage_courses'],
+       ['admin', 'manage_assessments'],
+       ['admin', 'view_reports'],
+       ['admin', 'manage_announcements'],
+       ['admin', 'manage_events'],
+       ['admin', 'notifications.send'],
+       ['admin', 'notifications.broadcast'],
+       ['admin', 'banners.manage'],
+       ['admin', 'manage_clients'],
+       ['admin', 'manage_businesses'],
+       ['admin', 'manage_tasks'],
+       ['admin', 'projects.manage'],
+        // department_head: department-scoped management
+        ['department_head', 'view_dashboard'],
+        ['department_head', 'manage_sops'],
+        ['department_head', 'manage_courses'],
+       ['department_head', 'manage_assessments'],
+       ['department_head', 'view_reports'],
+       ['department_head', 'manage_announcements'],
+       ['department_head', 'manage_events'],
+       ['department_head', 'notifications.send'],
+       ['department_head', 'notifications.broadcast'],
+       ['department_head', 'banners.manage'],
+       ['department_head', 'manage_clients'],
+       ['department_head', 'manage_businesses'],
+       ['department_head', 'manage_tasks'],
+      // team_lead: task assignment within department only
+      ['team_lead', 'view_dashboard'],
+      ['team_lead', 'view_reports'],
      // employee: read-only
      ['employee', 'view_dashboard'],
      ['employee', 'view_reports'],
    ];
 
-  for (const [roleName, permName] of rolePermissions) {
-    await db.query(
-      `INSERT INTO role_permissions (role_name, permission_name)
-       VALUES (?, ?)
-       ON DUPLICATE KEY UPDATE role_name = role_name`,
-      [roleName, permName]
-    );
-  }
+   for (const [roleName, permName] of rolePermissions) {
+     await db.query(
+       `INSERT INTO role_permissions (role_name, permission_name)
+        VALUES (?, ?)
+        ON DUPLICATE KEY UPDATE role_name = role_name`,
+       [roleName, permName]
+     );
+    }
 
   const businesses = [
     { business_name: 'Default Organization', business_code: 'ORG-001', description: 'Default organization for demo data' },

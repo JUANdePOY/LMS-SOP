@@ -1,3 +1,4 @@
+const db = require('../config/database');
 const enrollmentModel = require('../models/enrollmentModel');
 const courseModel = require('../models/courseModel');
 const lessonProgressModel = require('../models/lessonProgressModel');
@@ -73,6 +74,14 @@ async function enrollStudent(req, res) {
       return res.status(409).json({ success: false, message: 'User is already enrolled in this course', code: 'ALREADY_ENROLLED' });
     }
 
+    if (req.user.role === 'department_head') {
+      const scopedDeptIds = req.user.scoped_department_ids || (req.user.department_id ? [req.user.department_id] : []);
+      const [[targetUser]] = await db.query('SELECT department_id FROM users WHERE id = ?', [user_id]);
+      if (!targetUser || !scopedDeptIds.includes(targetUser.department_id)) {
+        return res.status(403).json({ success: false, message: 'Cannot enroll users outside your department scope', code: 'DEPT_SCOPE_DENIED' });
+      }
+    }
+
     const id = await enrollmentModel.create({
       course_id,
       user_id,
@@ -109,31 +118,67 @@ function bulkEnroll(req, res) {
     return res.status(400).json({ success: false, message: 'course_id and user_ids array are required', code: 'VALIDATION_ERROR' });
   }
 
-  courseModel.findById(course_id)
-    .then((course) => {
-      if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
-      const enrollments = user_ids.map((uid) => ({ course_id, user_id: uid, role: role || 'learner', status: 'active' }));
-      return enrollmentModel.bulkCreate(enrollments).then((ids) => ({ ids, course }));
-    })
-    .then(({ ids, course }) => {
-      logAudit('enrollment.bulk_create', userId, { course_id, count: ids.length });
-      ids.forEach((enrollmentId, index) => {
-        const uid = user_ids[index];
-        if (uid) {
-          createSystemNotification({
-            userId: uid,
-            title: 'You have been enrolled in a new course',
-            body: course.title,
-            type: 'info',
-            link: '/my-learning',
-            entityType: 'enrollment',
-            entityId: enrollmentId,
-          }).catch(() => {});
+  if (req.user.role === 'department_head') {
+    const scopedDeptIds = req.user.scoped_department_ids || (req.user.department_id ? [req.user.department_id] : []);
+    db.query('SELECT id, department_id FROM users WHERE id IN (?)', [user_ids])
+      .then(([users]) => {
+        const outOfScope = users.filter((u) => !scopedDeptIds.includes(u.department_id));
+        if (outOfScope.length) {
+          return res.status(403).json({ success: false, message: 'Cannot enroll users outside your department scope', code: 'DEPT_SCOPE_DENIED' });
         }
-      });
-      return res.status(201).json({ success: true, message: `${ids.length} students enrolled successfully`, data: { ids } });
-    })
-    .catch((err) => sendError(res, err, 'Failed to bulk enroll students'));
+        return courseModel.findById(course_id);
+      })
+      .then((course) => {
+        if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+        const enrollments = user_ids.map((uid) => ({ course_id, user_id: uid, role: role || 'learner', status: 'active' }));
+        return enrollmentModel.bulkCreate(enrollments).then((ids) => ({ ids, course }));
+      })
+      .then(({ ids, course }) => {
+        logAudit('enrollment.bulk_create', userId, { course_id, count: ids.length });
+        ids.forEach((enrollmentId, index) => {
+          const uid = user_ids[index];
+          if (uid) {
+            createSystemNotification({
+              userId: uid,
+              title: 'You have been enrolled in a new course',
+              body: course.title,
+              type: 'info',
+              link: '/my-learning',
+              entityType: 'enrollment',
+              entityId: enrollmentId,
+            }).catch(() => {});
+          }
+        });
+        return res.status(201).json({ success: true, message: `${ids.length} students enrolled successfully`, data: { ids } });
+      })
+      .catch((err) => sendError(res, err, 'Failed to bulk enroll students'));
+  } else {
+    courseModel.findById(course_id)
+      .then((course) => {
+        if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+        const enrollments = user_ids.map((uid) => ({ course_id, user_id: uid, role: role || 'learner', status: 'active' }));
+        return enrollmentModel.bulkCreate(enrollments).then((ids) => ({ ids, course }));
+      })
+      .then(({ ids, course }) => {
+        logAudit('enrollment.bulk_create', userId, { course_id, count: ids.length });
+        ids.forEach((enrollmentId, index) => {
+          const uid = user_ids[index];
+          if (uid) {
+            createSystemNotification({
+              userId: uid,
+              title: 'You have been enrolled in a new course',
+              body: course.title,
+              type: 'info',
+              link: '/my-learning',
+              entityType: 'enrollment',
+              entityId: enrollmentId,
+            }).catch(() => {});
+          }
+        });
+        return res.status(201).json({ success: true, message: `${ids.length} students enrolled successfully`, data: { ids } });
+      })
+      .catch((err) => sendError(res, err, 'Failed to bulk enroll students'));
+  }
 }
 
 async function bulkEnrollByDepartment(req, res) {
@@ -146,6 +191,13 @@ async function bulkEnrollByDepartment(req, res) {
   }
   if (!departmentId || Number.isNaN(departmentId)) {
     return res.status(400).json({ success: false, message: 'Valid department_id is required', code: 'VALIDATION_ERROR' });
+  }
+
+  if (req.user.role === 'department_head') {
+    const scopedDeptIds = req.user.scoped_department_ids || (req.user.department_id ? [req.user.department_id] : []);
+    if (!scopedDeptIds.includes(departmentId)) {
+      return res.status(403).json({ success: false, message: 'You are not scoped to this department', code: 'DEPT_SCOPE_DENIED' });
+    }
   }
 
   try {

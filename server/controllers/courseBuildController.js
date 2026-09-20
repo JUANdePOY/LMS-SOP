@@ -82,7 +82,7 @@ function getVisibleCoursesWhere(user) {
       return { where: '1 = 0', params: [] };
     }
     return {
-      where: 'EXISTS (SELECT 1 FROM departments d WHERE d.id = c.department_id AND d.business_id = ?)',
+      where: '(EXISTS (SELECT 1 FROM departments d WHERE d.id = c.department_id AND d.business_id = ?) OR c.department_id IS NULL)',
       params: [user.business_id],
     };
   }
@@ -163,8 +163,8 @@ async function getCourse(req, res) {
 
     if (req.user.role === 'department_head') {
       const deptId = req.user.department_id;
-      if (course.department_id !== deptId) {
-        return res.json({ success: true, message: 'OK', data: course, readOnly: true, modules: [], lessons: [] });
+      if (course.department_id !== deptId && course.department_id !== null) {
+        return res.status(403).json({ success: false, message: 'Forbidden - course does not belong to your department', code: 'FORBIDDEN' });
       }
     } else if (req.user.role === 'admin') {
       if (!req.user.business_id) {

@@ -1,20 +1,47 @@
 const express = require('express');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, resolveScope } = require('../middleware/auth');
+const { requirePermission, requirePermissionAction, requireEntityTypeAccess } = require('../middleware/scope');
 const { clientController } = require('../controllers/clientController');
 
 const router = express.Router();
 
-// Authenticated users may list clients; employees are scoped to their own SOP
-// business by the controller. Mutation routes remain admin-only.
-router.get('/', authenticateToken, clientController.listClients);
-router.get('/options', authenticateToken, requireAdmin, clientController.listClientOptions);
-router.get('/:id', authenticateToken, requireAdmin, clientController.getClient);
-router.post('/', authenticateToken, requireAdmin, clientController.createClient);
-router.put('/:id', authenticateToken, requireAdmin, clientController.updateClient);
-router.delete('/:id', authenticateToken, requireAdmin, clientController.deleteClient);
-// Append a single business to an existing client (does not remove others).
-router.post('/:id/businesses', authenticateToken, requireAdmin, clientController.addBusiness);
-// Delete a single business (client_businesses row) and cascade to its projects.
-router.delete('/:id/businesses/:businessId', authenticateToken, requireAdmin, clientController.deleteBusiness);
+router.get('/', authenticateToken, resolveScope, clientController.listClients);
+router.get('/options', authenticateToken, resolveScope, requirePermission('manage_clients'), clientController.listClientOptions);
+router.get('/:id', authenticateToken, resolveScope, requirePermission('manage_clients'), clientController.getClient);
+router.post('/', [
+  authenticateToken,
+  resolveScope,
+  requireEntityTypeAccess('client'),
+  requirePermission('manage_clients'),
+  requirePermissionAction('manage_clients', 'create'),
+], clientController.createClient);
+router.put('/:id', [
+  authenticateToken,
+  resolveScope,
+  requireEntityTypeAccess('client'),
+  requirePermission('manage_clients'),
+  requirePermissionAction('manage_clients', 'edit'),
+], clientController.updateClient);
+router.delete('/:id', [
+  authenticateToken,
+  resolveScope,
+  requireEntityTypeAccess('client'),
+  requirePermission('manage_clients'),
+  requirePermissionAction('manage_clients', 'delete'),
+], clientController.deleteClient);
+router.post('/:id/businesses', [
+  authenticateToken,
+  resolveScope,
+  requireEntityTypeAccess('client'),
+  requirePermission('manage_clients'),
+  requirePermissionAction('manage_clients', 'edit'),
+], clientController.addBusiness);
+router.delete('/:id/businesses/:businessId', [
+  authenticateToken,
+  resolveScope,
+  requireEntityTypeAccess('client'),
+  requirePermission('manage_clients'),
+  requirePermissionAction('manage_clients', 'edit'),
+], clientController.deleteBusiness);
 
 module.exports = router;

@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
+const { requirePermissionAction } = require('../middleware/scope');
 const { taskController } = require('../controllers/taskController');
 const { taskAttachmentModel } = require('../models/taskAttachmentModel');
 const { getMaxUploadBytes, safeExtFromOriginal } = require('../config/uploads');
@@ -82,22 +83,22 @@ function commentUploadMiddleware(req, res, next) {
 const router = express.Router();
 
 // Admin: list all tasks
-router.get('/', authenticateToken, taskController.listTasks);
+router.get('/', authenticateToken, requirePermissionAction('manage_tasks', 'view'), taskController.listTasks);
 
 // Admin: create task
-router.post('/', authenticateToken, requireAdmin, taskController.createTask);
+router.post('/', authenticateToken, requirePermissionAction('manage_tasks', 'create'), taskController.createTask);
 
 // Admin: assign task
-router.post('/assign', authenticateToken, requireAdmin, taskController.assignTask);
+router.post('/assign', authenticateToken, requirePermissionAction('manage_tasks', 'assign'), taskController.assignTask);
 
 // User/Admin: update progress
 router.post('/progress', authenticateToken, taskController.updateProgress);
 
 // Admin: bulk update tasks (status / priority / assignments / etc.)
-router.post('/batch', authenticateToken, requireAdmin, taskController.batchUpdateTasks);
+router.post('/batch', authenticateToken, requirePermissionAction('manage_tasks', 'edit'), taskController.batchUpdateTasks);
 
 // Admin: bulk delete tasks
-router.post('/batch/delete', authenticateToken, requireAdmin, taskController.batchDeleteTasks);
+router.post('/batch/delete', authenticateToken, requirePermissionAction('manage_tasks', 'delete'), taskController.batchDeleteTasks);
 
 // User: my tasks
 router.get('/my', authenticateToken, taskController.getMyTasks);
@@ -109,22 +110,22 @@ router.get('/my/hierarchy', authenticateToken, taskController.getMyTaskHierarchy
 router.get('/my/count', authenticateToken, taskController.getMyTaskCount);
 
 // Admin: stats
-router.get('/stats', authenticateToken, requireAdmin, taskController.getStats);
+router.get('/stats', authenticateToken, requirePermissionAction('manage_tasks', 'view'), taskController.getStats);
 
 // Admin/User: get task by id
 router.get('/:id', authenticateToken, taskController.getTask);
 
 // Admin: update task
-router.put('/:id', authenticateToken, requireAdmin, taskController.updateTask);
+router.put('/:id', authenticateToken, requirePermissionAction('manage_tasks', 'edit'), taskController.updateTask);
 
 // Admin: delete task
-router.delete('/:id', authenticateToken, requireAdmin, taskController.deleteTask);
+router.delete('/:id', authenticateToken, requirePermissionAction('manage_tasks', 'delete'), taskController.deleteTask);
 
 // Admin: duplicate task
-router.post('/:id/duplicate', authenticateToken, requireAdmin, taskController.duplicateTask);
+router.post('/:id/duplicate', authenticateToken, requirePermissionAction('manage_tasks', 'create'), taskController.duplicateTask);
 
 // Admin: unassign task
-router.delete('/:taskId/unassign/:assignmentType/:referenceId', authenticateToken, requireAdmin, taskController.unassignTask);
+router.delete('/:taskId/unassign/:assignmentType/:referenceId', authenticateToken, requirePermissionAction('manage_tasks', 'assign'), taskController.unassignTask);
 
 // User/Admin: add comment (supports inline attachments + @mentions)
 router.post('/:taskId/comments', authenticateToken, commentUploadMiddleware, taskController.addComment);

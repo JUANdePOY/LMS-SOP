@@ -1,6 +1,6 @@
 const express = require('express');
 const { authenticateToken, resolveScope } = require('../middleware/auth');
-const { requirePermission, requirePermissionAction, requireBusinessScope, requireDepartmentScope } = require('../middleware/scope');
+const { requirePermission, requirePermissionAction, requireBusinessScope, requireDepartmentScope, requireEntityTypeAccess, canAccessEntity } = require('../middleware/scope');
 const { sopController, moduleController, attachmentController, versionController, workflowController, auditController, shareController, assignmentController, acknowledgementController, approvalWorkflowController, exportController } = require('../controllers/sopController');
 const approvalController = require('../controllers/sopApprovalController');
 const assignmentCascadeController = require('../controllers/assignmentCascadeController');
@@ -19,6 +19,12 @@ async function requireSopReadScope(req, res, next) {
     if (!sop) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'SOP not found' } });
     }
+    if (!canAccessEntity(req.user, 'sop', sop.id)) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'ENTITY_ACCESS_DENIED', message: 'You do not have access to this SOP.' }
+      });
+    }
     const { enforceSopScope } = require('../services/sopService');
     await enforceSopScope(sop, req.user);
     next();
@@ -29,12 +35,15 @@ async function requireSopReadScope(req, res, next) {
 
 async function requireSopWriteScope(req, res, next) {
   try {
-    // Include trashed SOPs: restore/permanent-delete act on SOPs that are
-    // already in the trash, so findById (which excludes deleted rows) would
-    // wrongly 404 before the operation runs.
     const sop = await sopModel.findByIdIncludingDeleted(parseInt(req.params.id || req.params.sopId, 10));
     if (!sop) {
       return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'SOP not found' } });
+    }
+    if (!canAccessEntity(req.user, 'sop', sop.id)) {
+      return res.status(403).json({
+        success: false,
+        error: { code: 'ENTITY_ACCESS_DENIED', message: 'You do not have access to this SOP.' }
+      });
     }
     const { enforceSopWriteScope } = require('../services/sopService');
     await enforceSopWriteScope(sop, req.user);
@@ -56,8 +65,8 @@ function handleSopError(res, error) {
 }
 
 router.route('/')
-  .get(requirePermission('manage_sops'), sopController.list)
-  .post(requirePermission('manage_sops'), requirePermissionAction('manage_sops', 'create'), sopController.create);
+  .get(requireEntityTypeAccess('sop'), requirePermission('manage_sops'), sopController.list)
+  .post(requireEntityTypeAccess('sop'), requirePermission('manage_sops'), requirePermissionAction('manage_sops', 'create'), sopController.create);
 
 router.route('/stats')
   .get(requirePermission('view_reports'), sopController.getStats);

@@ -2,6 +2,7 @@ const courseModel = require('../models/courseModel');
 const courseModuleModel = require('../models/courseModuleModel');
 const courseContentModel = require('../models/courseContentModel');
 const quizModel = require('../models/quizModel');
+const certificateCourseLinkModel = require('../models/certificateCourseLinkModel');
 const { authenticateToken, requireAdmin } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 const db = require('../config/database');
@@ -495,30 +496,119 @@ function publishCourse(req, res) {
   const courseId = parseInt(req.params.id, 10);
   const userId = req.user?.id;
 
+  if (!['admin', 'super_admin'].includes(req.user?.role)) {
+    return res.status(403).json({ success: false, message: 'Only admin can publish courses', code: 'FORBIDDEN' });
+  }
+
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
       return enforceCourseScope(course, req.user).then(() => {
         return getLeadershipTargetUserIds(course.business_id, course.department_id, userId).then((targetUserIds) => {
-          return courseModel.update(courseId, { status: 'published' }).then(() => {
-            logAudit('course.published', userId, { courseId });
-            if (targetUserIds.length > 0) {
-              broadcastSystemChange({
-                title: 'New Course Published',
-                body: course.title,
-                type: 'success',
-                link: `/courses/${courseId}`,
-                entityType: 'course',
-                entityId: courseId,
-                targetUserIds,
-              }).catch(() => {});
+          const linkedCertificates = certificateCourseLinkModel.listByCourse(courseId);
+          return linkedCertificates.then((links) => {
+            if (!links.length) {
+              return res.status(400).json({ success: false, message: 'Link at least one certificate template before publishing', code: 'CERTIFICATE_REQUIRED' });
             }
-            return res.json({ success: true, message: 'Course published successfully' });
+            return courseModel.update(courseId, { status: 'published' }).then(() => {
+              logAudit('course.published', userId, { courseId });
+              if (targetUserIds.length > 0) {
+                broadcastSystemChange({
+                  title: 'New Course Published',
+                  body: course.title,
+                  type: 'success',
+                  link: `/courses/${courseId}`,
+                  entityType: 'course',
+                  entityId: courseId,
+                  targetUserIds,
+                }).catch(() => {});
+              }
+              return res.json({ success: true, message: 'Course published successfully' });
+            });
           });
         });
       });
     })
     .catch((err) => sendError(res, err, 'Failed to publish course'));
+}
+
+function submitForReview(req, res) {
+  const courseId = parseInt(req.params.id, 10);
+  const userId = req.user?.id;
+
+  courseModel.findById(courseId)
+    .then((course) => {
+      if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+      if (course.status !== 'draft') {
+        return res.status(400).json({ success: false, message: 'Only draft courses can be submitted for review', code: 'INVALID_STATUS' });
+      }
+      return enforceCourseScope(course, req.user).then(() => {
+      if (req.user.role === 'department_head') {
+        if (course.department_id !== null && course.department_id !== req.user.department_id) {
+          return res.status(403).json({ success: false, message: 'Cannot submit courses outside your department', code: 'FORBIDDEN' });
+        }
+      }
+        return courseModel.update(courseId, { status: 'under_review' }).then(() => {
+          logAudit('course.submit_for_review', userId, { courseId });
+          return res.json({ success: true, message: 'Course submitted for review' });
+        });
+      });
+    })
+    .catch((err) => sendError(res, err, 'Failed to submit course for review'));
+}
+
+function approveCourse(req, res) {
+  const courseId = parseInt(req.params.id, 10);
+  const userId = req.user?.id;
+
+  if (!['admin', 'super_admin'].includes(req.user?.role)) {
+    return res.status(403).json({ success: false, message: 'Only admin can approve courses', code: 'FORBIDDEN' });
+  }
+
+  courseModel.findById(courseId)
+    .then((course) => {
+      if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+      if (course.status !== 'under_review') {
+        return res.status(400).json({ success: false, message: 'Only courses under review can be approved', code: 'INVALID_STATUS' });
+      }
+      return enforceCourseScope(course, req.user).then(() => {
+        const linkedCertificates = certificateCourseLinkModel.listByCourse(courseId);
+        return linkedCertificates.then((links) => {
+          if (!links.length) {
+            return res.status(400).json({ success: false, message: 'Link at least one certificate template before approving', code: 'CERTIFICATE_REQUIRED' });
+          }
+          return courseModel.update(courseId, { status: 'published' }).then(() => {
+            logAudit('course.approved', userId, { courseId });
+            return res.json({ success: true, message: 'Course approved and published' });
+          });
+        });
+      });
+    })
+    .catch((err) => sendError(res, err, 'Failed to approve course'));
+}
+
+function rejectCourse(req, res) {
+  const courseId = parseInt(req.params.id, 10);
+  const userId = req.user?.id;
+
+  if (!['admin', 'super_admin'].includes(req.user?.role)) {
+    return res.status(403).json({ success: false, message: 'Only admin can reject courses', code: 'FORBIDDEN' });
+  }
+
+  courseModel.findById(courseId)
+    .then((course) => {
+      if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
+      if (course.status !== 'under_review') {
+        return res.status(400).json({ success: false, message: 'Only courses under review can be rejected', code: 'INVALID_STATUS' });
+      }
+      return enforceCourseScope(course, req.user).then(() => {
+        return courseModel.update(courseId, { status: 'draft' }).then(() => {
+          logAudit('course.rejected', userId, { courseId });
+          return res.json({ success: true, message: 'Course rejected and returned to draft' });
+        });
+      });
+    })
+    .catch((err) => sendError(res, err, 'Failed to reject course'));
 }
 
 function exportCourseCSV(req, res) {
@@ -659,6 +749,9 @@ module.exports = {
   deleteContent,
   archiveCourse,
   publishCourse,
+  submitForReview,
+  approveCourse,
+  rejectCourse,
   exportCourseCSV,
   exportCourseExcel,
   exportCoursePDF,

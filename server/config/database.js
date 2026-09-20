@@ -9,7 +9,7 @@ const dbConfig = {
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   database: process.env.DB_NAME || 'u607968802_lms_sop',
-  port: parseInt(process.env.DB_PORT, 10) || 3307,
+  port: parseInt(process.env.DB_PORT, 10) || 3306,
   waitForConnections: true,
   // Hostinger shared MySQL enforces `max_connections_per_hour` (500). That
   // cheapest way to stay under it is to open very few connections and keep
@@ -391,36 +391,56 @@ const MIGRATIONS = [
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS last_login_at DATETIME DEFAULT NULL`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
-  `CREATE TABLE IF NOT EXISTS roles (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    display_name VARCHAR(255) NOT NULL,
-    description TEXT DEFAULT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_roles_name (name)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-  `CREATE TABLE IF NOT EXISTS permissions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    display_name VARCHAR(255) NOT NULL,
-    description TEXT DEFAULT NULL,
-    category VARCHAR(100) DEFAULT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uk_permissions_name (name)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-  `CREATE TABLE IF NOT EXISTS role_permissions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    role_name VARCHAR(100) NOT NULL,
-    permission_name VARCHAR(100) NOT NULL,
-    granted_by INT DEFAULT NULL,
-    granted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (role_name) REFERENCES roles(name) ON DELETE CASCADE,
-    FOREIGN KEY (permission_name) REFERENCES permissions(name) ON DELETE CASCADE,
-    UNIQUE KEY uk_role_perm (role_name, permission_name)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-  `CREATE TABLE IF NOT EXISTS user_role_history (
+   `CREATE TABLE IF NOT EXISTS roles (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     name VARCHAR(100) NOT NULL,
+     display_name VARCHAR(255) NOT NULL,
+     description TEXT DEFAULT NULL,
+     is_active BOOLEAN NOT NULL DEFAULT TRUE,
+     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     UNIQUE KEY uk_roles_name (name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS permissions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      display_name VARCHAR(255) NOT NULL,
+      description TEXT DEFAULT NULL,
+      category VARCHAR(100) DEFAULT NULL,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uk_permissions_name (name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+   `CREATE TABLE IF NOT EXISTS role_permissions (
+     id INT AUTO_INCREMENT PRIMARY KEY,
+     role_name VARCHAR(100) NOT NULL,
+     permission_name VARCHAR(100) NOT NULL,
+     granted_by INT DEFAULT NULL,
+     granted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     FOREIGN KEY (role_name) REFERENCES roles(name) ON DELETE CASCADE,
+     FOREIGN KEY (permission_name) REFERENCES permissions(name) ON DELETE CASCADE,
+     UNIQUE KEY uk_role_perm (role_name, permission_name)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `INSERT IGNORE INTO permissions (name, display_name, category) VALUES
+      ('view_dashboard','View Dashboard','dashboard'),
+      ('manage_users','Manage Users','users'),
+      ('manage_departments','Manage Departments','departments'),
+      ('manage_sops','Manage SOPs','sops'),
+      ('manage_courses','Manage Courses','courses'),
+      ('manage_assessments','Manage Assessments','assessments'),
+      ('view_reports','View Reports','reports'),
+      ('manage_settings','Manage Settings','settings'),
+      ('view_audit_logs','View Audit Logs','audit'),
+      ('manage_announcements','Manage Announcements','announcements'),
+      ('manage_events','Manage Events','events'),
+      ('notifications.send','Send Notifications','notifications'),
+      ('notifications.broadcast','Broadcast Notifications','notifications'),
+      ('banners.manage','Manage Banners','banners'),
+       ('manage_clients','Manage Clients','clients'),
+       ('manage_tasks','Manage Tasks','tasks'),
+       ('projects.manage','Manage Projects','projects'),
+       ('manage_businesses','Manage Businesses','businesses')
+    ON DUPLICATE KEY UPDATE display_name = VALUES(display_name)`,
+    `CREATE TABLE IF NOT EXISTS user_role_history (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
     old_role VARCHAR(100) DEFAULT NULL,
@@ -833,13 +853,46 @@ const MIGRATIONS = [
     `UPDATE permissions SET actions = '["view","create","edit","delete","approve","publish","assign"]' WHERE name = 'manage_sops' AND actions IS NULL`,
     `UPDATE permissions SET actions = '["view","create","edit","delete","publish","archive","enroll","grade"]' WHERE name = 'manage_courses' AND actions IS NULL`,
     `UPDATE permissions SET actions = '["view","create","edit","delete","assign","grade","publish"]' WHERE name = 'manage_assessments' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","create","edit","delete","assign","complete"]' WHERE name = 'manage_tasks' AND actions IS NULL`,
     `UPDATE permissions SET actions = '["view","create","edit","delete","publish"]' WHERE name = 'manage_announcements' AND actions IS NULL`,
     `UPDATE permissions SET actions = '["view","create","edit","delete","register","manage_registrations"]' WHERE name = 'manage_events' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","create","edit","delete"]' WHERE name = 'manage_clients' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","create","edit","delete"]' WHERE name = 'projects.manage' AND actions IS NULL`,
+    `UPDATE permissions SET actions = '["view","create","edit","delete","manage_members"]' WHERE name = 'manage_businesses' AND actions IS NULL`,
     `UPDATE permissions SET actions = '["view","export","schedule"]' WHERE name = 'view_reports' AND actions IS NULL`,
     `UPDATE permissions SET actions = '["view","edit"]' WHERE name = 'manage_settings' AND actions IS NULL`,
     `UPDATE permissions SET actions = '["view","export"]' WHERE name = 'view_audit_logs' AND actions IS NULL`,
     `UPDATE permissions SET actions = '["send"]' WHERE name = 'notifications.send' AND actions IS NULL`,
     `UPDATE permissions SET actions = '["broadcast"]' WHERE name = 'notifications.broadcast' AND actions IS NULL`,
+    `CREATE TABLE IF NOT EXISTS entity_permission_overrides (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      permission_name VARCHAR(100) NOT NULL,
+      entity_type VARCHAR(50) NOT NULL,
+      entity_id INT NOT NULL,
+      granted BOOLEAN NOT NULL DEFAULT TRUE,
+      actions JSON DEFAULT NULL,
+      granted_by INT DEFAULT NULL,
+      granted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
+      UNIQUE KEY uk_entity_user_perm (user_id, permission_name, entity_type, entity_id),
+      INDEX idx_entity_user (user_id, entity_type, entity_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS role_entity_permissions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      role_name VARCHAR(100) NOT NULL,
+      permission_name VARCHAR(100) NOT NULL,
+      entity_type VARCHAR(50) NOT NULL,
+      entity_id INT NOT NULL,
+      granted BOOLEAN NOT NULL DEFAULT TRUE,
+      actions JSON DEFAULT NULL,
+      granted_by INT DEFAULT NULL,
+      granted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (granted_by) REFERENCES users(id) ON DELETE SET NULL,
+      UNIQUE KEY uk_role_entity_perm (role_name, permission_name, entity_type, entity_id),
+      INDEX idx_role_entity (role_name, entity_type, entity_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   ];
 
 async function runMigrations() {
@@ -893,6 +946,22 @@ async function runMigrations() {
     console.log('Certificate migrations applied');
   } catch (err) {
     console.error('Certificate migration error:', err.message);
+  }
+
+  try {
+    const { removeRedundantTaskPermissions } = require('../migrations/removeRedundantTaskPermissions');
+    await removeRedundantTaskPermissions();
+    console.log('Redundant task permissions removed');
+  } catch (err) {
+    console.error('Remove redundant task permissions error:', err.message);
+  }
+
+  try {
+    const { addBusinessAndClientPermissionControls } = require('../migrations/addBusinessAndClientPermissionControls');
+    await addBusinessAndClientPermissionControls();
+    console.log('Business and client permission controls migration applied');
+  } catch (err) {
+    console.error('Business and client permission controls migration error:', err.message);
   }
 }
 

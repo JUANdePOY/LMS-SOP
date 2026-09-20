@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const coursesController = require('../controllers/coursesController');
-const { authenticateToken } = require('../middleware/auth');
-const { requirePermission, requirePermissionAction, requireBusinessScope } = require('../middleware/scope');
+const { authenticateToken, resolveScope } = require('../middleware/auth');
+const { requirePermission, requirePermissionAction, requireBusinessScope, requireEntityTypeAccess } = require('../middleware/scope');
 const { upload: courseImageUpload } = require('../middleware/courseImageUpload');
 
 function handleImageUpload(req, res, next) {
@@ -24,12 +24,15 @@ router.get('/:courseId/modules', coursesController.listModules);
 router.get('/:courseId/modules/:moduleId/content', coursesController.listContent);
 
 // Protected mutation routes
-router.use(authenticateToken);
-router.post('/', requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'create'), coursesController.createCourse);
-router.put('/:id', requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'edit'), coursesController.updateCourse);
-router.delete('/:id', requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'delete'), coursesController.deleteCourse);
+router.use(authenticateToken, resolveScope);
+router.post('/', requireEntityTypeAccess('course'), requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'create'), coursesController.createCourse);
+router.put('/:id', requireEntityTypeAccess('course'), requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'edit'), coursesController.updateCourse);
+router.delete('/:id', requireEntityTypeAccess('course'), requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'delete'), coursesController.deleteCourse);
 router.patch('/:id/archive', requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'archive'), coursesController.archiveCourse);
 router.patch('/:id/publish', requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'publish'), coursesController.publishCourse);
+router.patch('/:id/submit-review', requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'edit'), coursesController.submitForReview);
+router.patch('/:id/approve', requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'publish'), coursesController.approveCourse);
+router.patch('/:id/reject', requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'edit'), coursesController.rejectCourse);
 router.get('/:id/export/csv', requirePermission('manage_courses'), coursesController.exportCourseCSV);
 router.get('/:id/export/excel', requirePermission('manage_courses'), coursesController.exportCourseExcel);
 router.get('/:id/export/pdf', requirePermission('manage_courses'), coursesController.exportCoursePDF);

@@ -187,10 +187,11 @@ async function resolveScope(req, res, next) {
   }
 
   try {
-    const { resolveUserPermissions, resolveUserPermissionDetails } = require('./scope');
+    const { resolveUserPermissions, resolveUserPermissionDetails, resolveUserEntityOverrides } = require('./scope');
     const permissions = await resolveUserPermissions(req.user.id, req.user.role);
     req.user.permissions = permissions;
     req.user.permission_details = await resolveUserPermissionDetails(req.user.id, req.user.role);
+    req.user.entity_overrides = await resolveUserEntityOverrides(req.user.id);
 
     if (req.user.role === 'department_head') {
       const [grants] = await db.query(
@@ -198,10 +199,6 @@ async function resolveScope(req, res, next) {
         [req.user.id]
       );
       const scoped = new Set(grants.map((g) => g.department_id));
-      // Always include the head's own department so scope checks have a
-      // non-empty base even when no explicit extra grants exist. Without this,
-      // scoped_department_ids would be [] and the `|| [department_id]` fallback
-      // inside enforceSopScope / businessScopeWhere would never trigger.
       if (req.user.department_id != null) {
         scoped.add(req.user.department_id);
       }

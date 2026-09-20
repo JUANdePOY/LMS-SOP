@@ -1,8 +1,8 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, resolveScope } = require('../middleware/auth');
 const { requireSuperAdmin, requireAdmin } = require('../middleware/auth');
-const { requireBusinessScope } = require('../middleware/scope');
+const { requireBusinessScope, requirePermission, requirePermissionAction } = require('../middleware/scope');
 const { logAudit } = require('../utils/auditLogger');
 const businessModel = require('../models/businessModel');
 const { upload } = require('../middleware/businessUpload');
@@ -189,6 +189,10 @@ router.get('/:id/logo', async (req, res) => {
 
 // POST /api/businesses
 router.post('/', [
+  authenticateToken,
+  resolveScope,
+  requirePermission('manage_businesses'),
+  requirePermissionAction('manage_businesses', 'create'),
   body('business_code').trim().isLength({ min: 2 }).withMessage('Business code is required'),
   body('business_name').trim().isLength({ min: 2 }).withMessage('Business name is required'),
   body('description').optional().trim(),
@@ -204,10 +208,6 @@ router.post('/', [
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
-    }
-
-    if (req.user.role !== 'super_admin') {
-      return res.status(403).json({ status: 'error', message: 'Only super admins can create businesses', code: 'SUPER_ADMIN_REQUIRED' });
     }
 
     const { business_code } = req.body;
@@ -236,6 +236,10 @@ router.post('/', [
 
 // PUT /api/businesses/:id
 router.put('/:id', [
+  authenticateToken,
+  requirePermission('manage_businesses'),
+  requirePermissionAction('manage_businesses', 'edit'),
+  requireBusinessScope('id'),
   body('business_code').optional().trim().isLength({ min: 2 }),
   body('business_name').optional().trim().isLength({ min: 2 }),
   body('description').optional().trim(),
@@ -257,14 +261,6 @@ router.put('/:id', [
     const target = await businessModel.findById(businessId);
     if (!target) {
       return res.status(404).json({ status: 'error', message: 'Business not found', code: 'NOT_FOUND' });
-    }
-
-    if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
-      return res.status(403).json({ status: 'error', message: 'Admin access required', code: 'ADMIN_REQUIRED' });
-    }
-
-    if (req.user.role !== 'super_admin' && req.user.business_id !== businessId) {
-      return res.status(403).json({ status: 'error', message: 'Cannot update another business', code: 'BUSINESS_SCOPE_DENIED' });
     }
 
     const updates = {};
@@ -310,13 +306,13 @@ router.put('/:id', [
 //   force=true — hard purge: physically DELETE the row and (with it, via
 //     businessModel.remove's cascade) its departments. Used by the Businesses
 //     management page, where "delete" means the entity is gone for good.
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', [
+  authenticateToken,
+  requirePermission('manage_businesses'),
+  requirePermissionAction('manage_businesses', 'delete'),
+], async (req, res) => {
   try {
     const businessId = parseInt(req.params.id);
-
-    if (req.user.role !== 'super_admin') {
-      return res.status(403).json({ status: 'error', message: 'Only super admins can delete businesses', code: 'ADMIN_ONLY' });
-    }
 
     const target = await businessModel.findById(businessId);
     if (!target) {

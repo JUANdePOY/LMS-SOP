@@ -16,14 +16,17 @@ function handleError(res, error) {
 const clientController = {
   async listClients(req, res) {
     try {
-      // Admins (super admin, admin, department head) see every client, optionally
-      // filtered by ?business_id. Employees are scoped to the single SOP business
-      // linked to their account so the secondary panel only surfaces their own
-      // clients — and never the rest of the org. An employee with no business
-      // linked sees nothing rather than the full client list.
-      const isEmployee = req.user?.role === 'employee';
+      const hasManageClients = (req.user?.permissions || []).includes('manage_clients');
+      const isEmployee = req.user?.role === 'employee' && !hasManageClients;
       if (isEmployee) {
-        const scopedId = req.user?.business_id;
+        let scopedId = req.user?.business_id;
+        if (!scopedId && req.user?.department_id) {
+          const [[dept]] = await db.query(
+            'SELECT business_id FROM departments WHERE id = ?',
+            [req.user.department_id]
+          );
+          if (dept?.business_id) scopedId = dept.business_id;
+        }
         if (!scopedId) {
           return res.json({ success: true, data: [], message: 'No clients for this account' });
         }
@@ -34,6 +37,7 @@ const clientController = {
       const clients = await clientModel.listClients(businessId);
       res.json({ success: true, data: clients, message: 'Clients retrieved successfully' });
     } catch (error) {
+      console.error('[ClientController] listClients error', error);
       handleError(res, error);
     }
   },

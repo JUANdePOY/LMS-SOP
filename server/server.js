@@ -1,4 +1,5 @@
 const express = require('express');
+const { permissionErrorHandler } = require('./middleware/permissionErrorHandler');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
@@ -128,6 +129,8 @@ if (fs.existsSync(clientDist)) {
 } else {
   console.warn('WARNING: client/dist not found! Build may have failed.');
 }
+
+app.use(permissionErrorHandler);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', usersRoutes);
