@@ -24,7 +24,8 @@ const TABS = [
 
 export default function TaskDetailsPage() {
   const { id } = useParams();
-  const { isAnyAdmin, user: currentUser } = useAuth();
+  const { user: currentUser, hasPermission } = useAuth();
+  const canManageTasks = hasPermission('manage_tasks');
   const { toast } = useToast();
   const { task, loading, error, saving, load, updateProgress, addComment, uploadFile, removeAttachment } = useTaskDetails(id);
 
@@ -217,7 +218,7 @@ export default function TaskDetailsPage() {
                 {uploading && <span className="ml-2 text-xs text-[var(--text-muted)]">Uploading...</span>}
                 {uploadError && <p className="text-xs text-red-500 mt-1">{uploadError}</p>}
               </div>
-              <AttachmentSection attachments={task.attachments} onDelete={handleDeleteAttachment} canManage={isAnyAdmin} />
+              <AttachmentSection attachments={task.attachments} onDelete={handleDeleteAttachment} canManage={canManageTasks} />
             </div>
           )}
         </div>

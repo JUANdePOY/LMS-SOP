@@ -42,7 +42,7 @@ function highlight(text, q) {
 
 export default function SecondarySidebar({ collapsed = false }) {
    const { secondaryNav, closeSecondaryNav } = useNavigation();
-   const { user, isAnyAdmin, isDepartmentHead } = useAuth();
+   const { user, isAnyAdmin, isDepartmentHead, hasPermission } = useAuth();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -109,10 +109,6 @@ export default function SecondarySidebar({ collapsed = false }) {
   }, [isAnyAdmin, orgVersion]);
 
   const visibleBusinesses = useMemo(() => {
-    // Department Heads see their SOP business (derived from their department's
-    // business_id, falling back to their own business_id) and within it, only
-    // clients that belong to their department. The business always shows even
-    // if no clients match yet, so the user can add clients.
     if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null)) {
       const sopBizId = Number(user.department_business_id ?? user.business_id);
       const deptId = user?.department_id != null ? Number(user.department_id) : null;
@@ -126,14 +122,9 @@ export default function SecondarySidebar({ collapsed = false }) {
         }));
     }
     if (isAnyAdmin) return businesses;
-    // Employees with no SOP business linked see an empty panel, never the full org.
     if (employeeBusinessId == null) return [];
     const biz = businesses.filter((b) => Number(b.id) === Number(employeeBusinessId));
-    // If we haven't loaded the employee's hierarchy yet, show the full business
-    // (avoids a flash of empty panel while loading).
     if (employeeClientIds == null || employeeBusinessIds == null) return biz;
-    // Filter each business's clients to only those where the employee has tasks,
-    // and filter each client's business units to only those with tasks.
     return biz.map((b) => ({
       ...b,
       clients: (b.clients || [])
@@ -479,7 +470,7 @@ export default function SecondarySidebar({ collapsed = false }) {
             <span className="flex-1 truncate">{highlight(client.client_name, q)}</span>
             {units.length > 0 && <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{units.length}</span>}
           </Link>
-          {isAnyAdmin && (
+          {isAnyAdmin && hasPermission('manage_clients') && (
           <div className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <button
               type="button"
@@ -567,7 +558,7 @@ export default function SecondarySidebar({ collapsed = false }) {
             <span className="flex-1 truncate text-left">{highlight(label, q)}</span>
             {items.length > 0 && <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{items.length}</span>}
           </Link>
-          {isAnyAdmin && (
+          {isAnyAdmin && hasPermission('manage_clients') && (
           <div className="ml-auto flex shrink-0 items-center gap-0.5">
             <button
               type="button"
@@ -744,14 +735,14 @@ export default function SecondarySidebar({ collapsed = false }) {
       </nav>
 
       <div className="border-t border-[var(--border-sidebar)] p-2 space-y-1.5">
-        {isAnyAdmin && addingBusiness ? (
+        {isAnyAdmin && hasPermission('manage_businesses') && addingBusiness ? (
           <InlineBusinessForm
             onCommit={commitAddBusiness}
             onCancel={() => setAddingBusiness(false)}
           />
         ) : (
           <>
-{user?.role === 'super_admin' && (
+            {hasPermission('manage_businesses') && (
                 <button
                   type="button"
                   onClick={() => setAddingBusiness(true)}
@@ -759,8 +750,8 @@ export default function SecondarySidebar({ collapsed = false }) {
                 >
                   <Plus size={16} /> New Business
                 </button>
-              )}
-             {clientBizPicker ? (
+               )}
+             {hasPermission('manage_clients') && (clientBizPicker ? (
                <div className="space-y-1">
                  <p className="px-1 pb-0.5 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--text-muted)]">
                    Select an Business
@@ -837,10 +828,10 @@ export default function SecondarySidebar({ collapsed = false }) {
                 className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-[color-mix(in_srgb,var(--text-on-sidebar)_75%,transparent)] hover:bg-[var(--bg-hover)] transition-colors"
               >
                 <Plus size={16} /> New Client
-              </button>
-            )}
-          </>
-        )}
+               </button>
+             ))}
+           </>
+         )}
       </div>
 
       <ConfirmationDialog

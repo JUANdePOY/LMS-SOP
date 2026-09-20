@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Building2, FolderKanban, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 import ClientFormModal from '@/features/task-management/components/ClientFormModal';
 import BusinessFormModal from '@/features/task-management/components/BusinessFormModal';
 import ProjectFormModal from '@/features/task-management/components/ProjectFormModal';
@@ -9,6 +10,7 @@ import ProjectFormModal from '@/features/task-management/components/ProjectFormM
 export default function QuickCreateMenu({ clientId: propClientId, onProjectCreated }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { hasPermission } = useAuth();
   const [open, setOpen] = useState(false);
   const [showClient, setShowClient] = useState(false);
   const [showBusiness, setShowBusiness] = useState(false);
@@ -40,11 +42,11 @@ export default function QuickCreateMenu({ clientId: propClientId, onProjectCreat
   }, []);
 
   const items = [
-    { label: 'New Client', icon: Building2, action: () => setShowClient(true) },
-    { label: 'New Business', icon: Building2, action: () => setShowBusiness(true) },
-    { label: 'New Project', icon: FolderKanban, action: () => setShowProject(true) },
+    { label: 'New Client', icon: Building2, action: () => setShowClient(true), permission: 'manage_clients' },
+    { label: 'New Business', icon: Building2, action: () => setShowBusiness(true), permission: 'manage_businesses' },
+    { label: 'New Project', icon: FolderKanban, action: () => setShowProject(true), permission: 'projects.manage' },
     { label: 'New Task', icon: CheckSquare, action: () => navigate('/tasks') },
-  ];
+  ].filter((it) => !it.permission || hasPermission(it.permission));
 
   return (
     <>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function Drawer({ open, onClose, children, title, size = "sm", showBackdrop = true }) {
+export default function Drawer({ open, onClose, children, title, footer, size = "sm", showBackdrop = true, topOffset = "0px" }) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function Drawer({ open, onClose, children, title, size = "sm", sh
       }}
     >
       {open && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+        <div className="fixed inset-0 z-50 flex justify-end" style={{ top: topOffset }}>
           {showBackdrop && (
             <motion.div
               className="fixed inset-0 bg-black/40 dark:bg-black/60"
@@ -45,7 +45,7 @@ export default function Drawer({ open, onClose, children, title, size = "sm", sh
             />
           )}
           <motion.div
-            className={`relative z-10 h-full ${sizeClass} border-l border-[var(--border)] bg-[var(--bg-surface)] shadow-xl flex flex-col`}
+            className={`fixed top-0 right-0 bottom-0 ${sizeClass} border-l border-[var(--border)] bg-[var(--bg-surface)] shadow-xl flex flex-col`}
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -71,6 +71,11 @@ export default function Drawer({ open, onClose, children, title, size = "sm", sh
             >
               {children}
             </motion.div>
+            {footer && (
+              <div className="border-t border-[var(--border)] px-4 py-3 shrink-0">
+                {footer}
+              </div>
+            )}
           </motion.div>
         </div>
       )}

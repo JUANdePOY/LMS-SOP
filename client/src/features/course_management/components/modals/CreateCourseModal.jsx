@@ -289,7 +289,7 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
         const res = await builderCreate(payload);
         if (res?.success || res?.data?.success || res === 201) {
           toast.success("Course created successfully");
-          onSuccess?.();
+          onSuccess?.(res);
           onClose?.();
         } else {
           throw new Error(res.data?.message || "Failed to create course");

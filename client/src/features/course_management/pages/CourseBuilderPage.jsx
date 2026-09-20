@@ -2,13 +2,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useToast } from "@/shared/components/ui/Toast";
 import ConfirmationDialog from "@/shared/components/ui/ConfirmationDialog";
-import { ChevronLeft, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, X, Save, Rocket, Clock, CheckCircle2, AlertCircle, Search, Plus, Layers, FileText, HelpCircle, BookOpen, ListChecks } from "lucide-react";
+import { ChevronLeft, PanelLeftOpen, PanelLeftClose, PanelRightOpen, PanelRightClose, X, Save, Rocket, Send, Clock, CheckCircle2, AlertCircle, Search, Plus, Layers, FileText, HelpCircle, BookOpen, ListChecks } from "lucide-react";
 import CourseOutline from "../components/course-builder/CourseOutline";
 import LessonEditor from "../components/course-builder/LessonEditor";
 import ModuleEditor from "../components/course-builder/ModuleEditor";
 import PublishReadiness from "../components/course-builder/PublishReadiness";
 import CourseCertificatesSection from "../components/course-builder/CourseCertificatesSection";
-import { builderGet, builderUpdate, publishCourse } from "../api/course.api";
+import { builderGet, builderUpdate, publishCourse, submitForReview, approveCourse } from "../api/course.api";
 import { listCourseCertificates, linkCertificateToCourse, unlinkCertificateFromCourse } from "../api/certificateCourseLink.api";
 import { enqueueBanner } from "@/shared/stores/notificationStore.js";
 import * as session from "@/services/session";
@@ -178,7 +178,7 @@ export default function CourseBuilderPage() {
   const { id: courseId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isEmployee } = useAuth();
+  const { isEmployee, user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [course, setCourse] = useState(null);
   const [modules, setModules] = useState([]);
@@ -223,6 +223,9 @@ export default function CourseBuilderPage() {
 
   const statusConfig = STATUS_CONFIG[course?.status] || STATUS_CONFIG.draft;
   const StatusIcon = statusConfig.icon;
+
+  const isDepartmentHead = user?.role === 'department_head';
+  const isAdminOrSuper = ['admin', 'super_admin'].includes(user?.role);
 
   const filteredModules = modules.filter((m) => {
     if (!outlineFilter.trim()) return true;
@@ -546,6 +549,101 @@ export default function CourseBuilderPage() {
       // error already shown in toast
     }
   }, [buildPayload, modules, courseId, saveNow, toast, navigate, isEmployee]);
+
+  const handleSubmitForReview = useCallback(async () => {
+    const payload = buildPayload();
+    payload.status = "under_review";
+    payload.title = payload.title.trim();
+    if (!payload.title) {
+      toast.error("Course title is required");
+      return;
+    }
+    if (!modules.length) {
+      toast.error("Add at least one module before submitting");
+      return;
+    }
+    const emptyModule = modules.find((m) => !(m.lessons || []).length);
+    if (emptyModule) {
+      toast.error(`Module "${emptyModule.title || "Untitled"}" has no lessons`);
+      return;
+    }
+    try {
+      await saveNow(payload);
+      await submitForReview(courseId);
+      toast.success("Course submitted for review");
+      setHasUnsavedChanges(false);
+      await refreshCourse();
+    } catch {
+      // error already shown in toast
+    }
+  }, [buildPayload, modules, courseId, saveNow, toast, refreshCourse]);
+
+  const handleApprove = useCallback(async () => {
+    if (!courseCertificates.length) {
+      toast.error("Link at least one certificate template before approving");
+      return;
+    }
+    try {
+      await approveCourse(courseId);
+      toast.success("Course approved and published");
+      setHasUnsavedChanges(false);
+      await refreshCourse();
+      if (!isEmployee) {
+        enqueueBanner({
+          id: `new-course-${courseId}`,
+          type: "new_course",
+          title: "New Course Published",
+          message: course?.title || "A new course is now available.",
+          link: `/courses/library/${courseId}`,
+          ctaLabel: "Check course",
+          priority: 1,
+          persistDismiss: true,
+        });
+      }
+    } catch {
+      // error already shown in toast
+    }
+  }, [courseId, courseCertificates, toast, refreshCourse, isEmployee]);
+
+  const primaryAction = (() => {
+    const status = course?.status;
+    if (isDepartmentHead) {
+      if (status === 'draft') {
+        return {
+          label: 'Submit for Review',
+          icon: Send,
+          onClick: handleSubmitForReview,
+          disabled: saving || courseCertificates.length === 0,
+          disabledLabel: 'Link a certificate to submit',
+          className: 'w-full rounded-md bg-[var(--color-primary)] px-2.5 py-2 text-sm font-medium text-white hover-brand disabled:opacity-50 transition-all flex items-center justify-center gap-1.5',
+        };
+      }
+      return null;
+    }
+    if (isAdminOrSuper) {
+      if (status === 'under_review') {
+        return {
+          label: 'Approve',
+          icon: CheckCircle2,
+          onClick: handleApprove,
+          disabled: saving || courseCertificates.length === 0,
+          disabledLabel: 'Link a certificate to approve',
+          className: 'w-full rounded-md bg-[var(--color-primary)] px-2.5 py-2 text-sm font-medium text-white hover-brand disabled:opacity-50 transition-all flex items-center justify-center gap-1.5',
+        };
+      }
+      if (status === 'draft' || status === 'published') {
+        return {
+          label: 'Publish',
+          icon: Rocket,
+          onClick: handlePublish,
+          disabled: saving || courseCertificates.length === 0,
+          disabledLabel: 'Link a certificate to publish',
+          className: 'w-full rounded-md bg-[var(--color-primary)] px-2.5 py-2 text-sm font-medium text-white hover-brand disabled:opacity-50 transition-all flex items-center justify-center gap-1.5',
+        };
+      }
+    }
+    return null;
+  })();
 
   const addModule = () => {
     const newModule = { id: "new-" + Date.now(), title: "", type: "chapter", order_index: modules.length + 1, lessons: [], isNew: true };
@@ -1009,16 +1107,18 @@ export default function CourseBuilderPage() {
                       setHasUnsavedChanges(true);
                     }}
                   />
-                  <div className="flex flex-col gap-2">
-                    <button onClick={handleSaveDraft} disabled={saving} className="rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-1.5 text-sm hover:border-neutral-300 dark:hover:border-neutral-600 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
-                      <Save size={14} />
-                      {saving ? "Saving..." : "Save Draft"}
-                    </button>
-                    <button onClick={handlePublish} disabled={saving} className="rounded-md bg-[var(--color-primary)] px-2.5 py-1.5 text-sm font-medium text-white hover-brand disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
-                      <Rocket size={14} />
-                      {saving ? "Publishing..." : "Publish"}
-                    </button>
-                  </div>
+          <div className="flex flex-col gap-2">
+            <button onClick={handleSaveDraft} disabled={saving} className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-2 text-sm hover:border-neutral-300 dark:hover:border-neutral-600 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
+              <Save size={14} />
+              {saving ? "Saving..." : "Save Draft"}
+            </button>
+            {primaryAction && (
+              <button onClick={primaryAction.onClick} disabled={primaryAction.disabled} className={primaryAction.className}>
+                <primaryAction.icon size={14} />
+                {saving ? (primaryAction.label + "...") : (primaryAction.disabled ? primaryAction.disabledLabel : primaryAction.label)}
+              </button>
+            )}
+          </div>
                 </div>
               </div>
             </div>
@@ -1050,10 +1150,12 @@ export default function CourseBuilderPage() {
                 <Save size={14} />
                 {saving ? "Saving..." : "Save Draft"}
               </button>
-              <button onClick={handlePublish} disabled={saving} className="w-full rounded-md bg-[var(--color-primary)] px-2.5 py-2 text-sm font-medium text-white hover-brand disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
-                <Rocket size={14} />
-                {saving ? "Publishing..." : "Publish"}
-              </button>
+              {primaryAction && (
+                <button onClick={primaryAction.onClick} disabled={primaryAction.disabled} className={primaryAction.className}>
+                  <primaryAction.icon size={14} />
+                  {saving ? (primaryAction.label + "...") : (primaryAction.disabled ? primaryAction.disabledLabel : primaryAction.label)}
+                </button>
+              )}
             </div>
           </div>
         </aside>

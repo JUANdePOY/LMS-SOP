@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   builderList, builderDelete, publishCourse, archiveCourse,
+  submitForReview, approveCourse, rejectCourse,
 } from "@/features/course_management/api/course.api";
 import { enqueueBanner } from "@/shared/stores/notificationStore.js";
 import CreateCourseModal from "@/features/course_management/components/modals/CreateCourseModal";
@@ -47,13 +48,53 @@ const DIFFICULTIES = ["beginner", "intermediate", "advanced", "all_levels"];
 export default function Courses({ departments = [] }) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { hasPermission, hasPermissionAction, isSuperAdmin, isAdmin, isDepartmentHead, isEmployee } = useAuth();
+  const { hasPermission, hasPermissionAction, isSuperAdmin, isAdmin, isDepartmentHead, isEmployee, user } = useAuth();
   const canManageCoursePage = hasPermission('manage_courses');
   const canCreateCourse = hasPermissionAction('manage_courses', 'create');
-  const canEditCourse = hasPermissionAction('manage_courses', 'edit');
-  const canDeleteCourse = hasPermissionAction('manage_courses', 'delete');
-  const canPublishCourse = hasPermissionAction('manage_courses', 'publish');
+  const canPublishCourse = (isAdmin || isSuperAdmin) && hasPermissionAction('manage_courses', 'publish');
   const canArchiveCourse = hasPermissionAction('manage_courses', 'archive');
+  const canApproveCourse = (isAdmin || isSuperAdmin) && hasPermissionAction('manage_courses', 'publish');
+  const canRejectCourse = (isAdmin || isSuperAdmin) && hasPermissionAction('manage_courses', 'edit');
+
+  const getScopedDeptIds = () => {
+    return (user?.scoped_department_ids?.length > 0)
+      ? user.scoped_department_ids
+      : (user?.department_id ? [user.department_id] : []);
+  };
+
+  const canEditCourseFor = (course) => {
+    if (!hasPermissionAction('manage_courses', 'edit')) return false;
+    if (isSuperAdmin || isAdmin) return true;
+    if (isDepartmentHead) {
+      return course.department_id && getScopedDeptIds().includes(course.department_id);
+    }
+    return false;
+  };
+
+  const canDeleteCourseFor = (course) => {
+    if (!hasPermissionAction('manage_courses', 'delete')) return false;
+    if (isSuperAdmin || isAdmin) return true;
+    if (isDepartmentHead) {
+      return course.department_id && getScopedDeptIds().includes(course.department_id);
+    }
+    return false;
+  };
+
+  const canArchiveCourseFor = (course) => {
+    if (!hasPermissionAction('manage_courses', 'archive')) return false;
+    if (isSuperAdmin || isAdmin) return true;
+    if (isDepartmentHead) {
+      return course.department_id && getScopedDeptIds().includes(course.department_id);
+    }
+    return false;
+  };
+
+  const canSubmitForReviewFor = (course) => {
+    if (!isDepartmentHead) return false;
+    if (course.status !== 'draft') return false;
+    if (!hasPermissionAction('manage_courses', 'edit')) return false;
+    return course.department_id && getScopedDeptIds().includes(course.department_id);
+  };
   const [courses, setCourses] = useState([]);
   const [stats, setStats] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -189,10 +230,14 @@ export default function Courses({ departments = [] }) {
     fetchCourses();
   };
 
-  const handleCreateSuccess = () => {
+  const handleCreateSuccess = (res) => {
     setPage((p) => ({ ...p, current: 1 }));
     fetchCourses();
     refreshStats();
+    const newCourseId = res?.data?.id || res?.id;
+    if (newCourseId) {
+      navigate(`/courses/${newCourseId}/builder`);
+    }
   };
 
   const handleDelete = async () => {
@@ -217,7 +262,30 @@ export default function Courses({ departments = [] }) {
 
   const handleQuickAction = async (course, action) => {
     try {
-      if (action === "publish") {
+      if (action === "submit_review") {
+        const res = await submitForReview(course.id);
+        if (res?.success) toast.success("Course submitted for review");
+      } else if (action === "approve") {
+        const res = await approveCourse(course.id);
+        if (res?.success) {
+          toast.success("Course approved and published");
+          if (!isEmployee) {
+            enqueueBanner({
+              id: `new-course-${course.id}`,
+              type: "new_course",
+              title: "New Course Published",
+              message: course.title || "A new course is now available.",
+              link: `/courses/library/${course.id}`,
+              ctaLabel: "Check course",
+              priority: 1,
+              persistDismiss: true,
+            });
+          }
+        }
+      } else if (action === "reject") {
+        const res = await rejectCourse(course.id);
+        if (res?.success) toast.success("Course rejected and returned to draft");
+      } else if (action === "publish") {
         const res = await publishCourse(course.id);
         if (res?.success) {
           toast.success("Course published");
@@ -469,17 +537,26 @@ export default function Courses({ departments = [] }) {
                       </td>
                       <td className="px-3 py-3.5">
                         <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
+                          {canSubmitForReviewFor(c) && c.status === "draft" && (
+                            <ActionButton action="Submit" label={`Submit ${c.title} for review`} onClick={() => handleQuickAction(c, "submit_review")} />
+                          )}
                           {canPublishCourse && c.status === "draft" && (
                             <ActionButton action="Publish" label={`Publish ${c.title}`} onClick={() => handleQuickAction(c, "publish")} />
                           )}
-                          {canArchiveCourse && c.status === "published" && (
+                          {canApproveCourse && c.status === "under_review" && (
+                            <ActionButton action="Approve" label={`Approve ${c.title}`} onClick={() => handleQuickAction(c, "approve")} />
+                          )}
+                          {canRejectCourse && c.status === "under_review" && (
+                            <ActionButton action="Reject" label={`Reject ${c.title}`} onClick={() => handleQuickAction(c, "reject")} />
+                          )}
+                          {canArchiveCourseFor(c) && c.status === "published" && (
                             <ActionButton action="Archive" label={`Archive ${c.title}`} onClick={() => handleQuickAction(c, "archive")} />
                           )}
-                          {canEditCourse && (
+                          {canEditCourseFor(c) && (
                             <ActionButton action="Edit" label={`Edit ${c.title}`} onClick={() => openEdit(c)} />
                           )}
                           <ActionButton action="View" label={`Open builder for ${c.title}`} onClick={() => openBuilder(c)} />
-                          {canDeleteCourse && (
+                          {canDeleteCourseFor(c) && (
                             <ActionButton action="Delete" label={`Delete ${c.title}`} onClick={() => openDelete(c)} />
                           )}
                         </div>

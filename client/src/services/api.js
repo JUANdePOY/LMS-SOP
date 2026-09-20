@@ -83,6 +83,19 @@ api.interceptors.response.use(
       session.clearCurrentSession();
       window.location.href = '/login';
     }
+
+    if (status === 403 && code === 'PERMISSION_DENIED') {
+      error.message = error.response?.data?.message || 'You do not have permission to perform this action.';
+      error.isPermissionDenied = true;
+      window.dispatchEvent(new CustomEvent('app:api-error', { detail: { error } }));
+    }
+
+    if (status === 403 && code === 'ENTITY_ACCESS_DENIED') {
+      error.message = error.response?.data?.message || 'Your access to this resource has been restricted by an administrator.';
+      error.isAccessRestricted = true;
+      window.dispatchEvent(new CustomEvent('app:api-error', { detail: { error } }));
+    }
+
     if (error.code === 'ECONNABORTED') {
       error.message = 'Request timed out. Please check your connection.';
     }
@@ -146,7 +159,12 @@ export const updateRole = (id, data) => api.put(`/roles/${id}`, data);
 export const deleteRole = (id) => api.delete(`/roles/${id}`);
 export const getPermissions = () => api.get('/roles/permissions');
 export const updateRolePermissions = (roleName, permission_names) => api.put(`/roles/permissions/${roleName}`, { permission_names });
-
+export const getEntities = (type) => api.get(`/roles/entities?type=${type}`);
+export const searchEntities = (type, q) => api.get(`/roles/entities/search`, { params: { type, q } });
+export const getUserEntityOverrides = (userId) => api.get(`/roles/users/${userId}/entity-overrides`);
+export const updateUserEntityOverrides = (userId, overrides) => api.put(`/roles/users/${userId}/entity-overrides`, { overrides });
+export const getRoleEntityPermissions = (roleName) => api.get(`/roles/${roleName}/entity-permissions`);
+export const updateRoleEntityPermissions = (roleName, overrides) => api.put(`/roles/${roleName}/entity-permissions`, { overrides });
 export const getSettings = () => api.get('/settings');
 export const createSetting = (data) => api.post('/settings', data);
 export const updateSetting = (key, data) => api.put(`/settings/${key}`, data);
@@ -182,8 +200,12 @@ export const updateCourseContent = (courseId, moduleId, contentId, data) => api.
 export const deleteCourseContent = (courseId, moduleId, contentId) => api.delete(`/courses/${courseId}/modules/${moduleId}/content/${contentId}`);
 
 export const getSopStats = () => api.get('/sops/stats');
+export const getSops = (params = {}) => api.get('/sops', { params });
 
 export const getMySopAcknowledgements = () => api.get('/sops/acknowledgements/my');
+
+export const getClients = (params = {}) => api.get('/clients', { params });
+export const getClient = (id) => api.get(`/clients/${id}`);
 
 export const getAnnouncements = (params = {}) => api.get('/announcements', { params });
 

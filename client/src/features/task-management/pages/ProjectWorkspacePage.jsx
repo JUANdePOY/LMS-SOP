@@ -16,9 +16,11 @@ const STORAGE_KEY = (id) => `ppm:last-view:${id}`;
 
 export default function ProjectWorkspacePage() {
   const { projectId } = useParams();
-  const { isAnyAdmin } = useAuth();
+  const { hasPermission } = useAuth();
   const { toast } = useToast();
   const orgVersion = useOrgTreeVersion();
+
+  const canManageTasks = hasPermission('manage_tasks');
 
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
@@ -201,7 +203,7 @@ export default function ProjectWorkspacePage() {
             <p className="text-sm text-[var(--ppm-text-muted)]">{project.task_count || tasks.length} tasks</p>
           </div>
         </div>
-        {isAnyAdmin && (
+        {canManageTasks && (
           <button
             onClick={() => { setEditingTask(null); setShowForm(true); }}
             className="ppm-btn-primary shrink-0"
@@ -218,7 +220,7 @@ export default function ProjectWorkspacePage() {
           tasks={tasks}
           loading={loading}
           projectsById={projectsById}
-          canManage={isAnyAdmin}
+          canManage={canManageTasks}
           storageKey={STORAGE_KEY(projectId)}
           activeViews={views}
           onEdit={handleEdit}

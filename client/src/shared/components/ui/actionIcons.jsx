@@ -36,6 +36,8 @@ import {
   ArrowUp,
   ArrowDown,
   Settings,
+  Upload,
+  Ban,
 } from "lucide-react";
 
 export const ActionIcons = {
@@ -60,6 +62,9 @@ export const ActionIcons = {
   MoveUp: ArrowUp,
   MoveDown: ArrowDown,
   Settings: Settings,
+  Submit: Upload,
+  Approve: Check,
+  Reject: Ban,
 };
 
 /**
@@ -102,6 +107,9 @@ export const ACTION_TONE_BY_NAME = {
   MoveUp: "neutral",
   MoveDown: "neutral",
   Settings: "neutral",
+  Submit: "primary",
+  Approve: "success",
+  Reject: "danger",
 };
 
 const SIZES = {

@@ -408,7 +408,7 @@ function formatDue(dateStr) {
 /** Builds Client -> Business -> Task[] tree from flat data. */
 function useHierarchy(tasks, projectsById, clientTree = [], tasksById = {}) {
   return useMemo(() => {
-    const clients = new Map(); // client_id -> { id, name, businesses: Map }
+    const clients = new Map();
 
     // Ensures the Client node exists (preserving its accent color from the org
     // tree) and returns it.
@@ -603,6 +603,7 @@ export default function TaskHierarchyTable({
   onInlineUpdate,
   onAddProjectTask,
   canManage,
+  canManageClients = false,
   scopeClientId,
   scopeBusinessId,
   scopeProjectId,
@@ -644,10 +645,11 @@ export default function TaskHierarchyTable({
    // used in other contexts.
    const filteredClientTree = useMemo(() => {
      if (userDepartmentId == null) return clientTree;
+     if (userRole !== 'department_head') return clientTree;
      return (clientTree || []).filter((c) => String(c.department_id) === String(userDepartmentId));
-   }, [clientTree, userDepartmentId]);
+   }, [clientTree, userDepartmentId, userRole]);
 
-    const clients = useHierarchy(tasks, projectsById, filteredClientTree, tasksById);
+     const clients = useHierarchy(tasks, projectsById, filteredClientTree, tasksById);
 
    // Build a set of client IDs that belong to the department head's department.
    // Used to determine which tasks the department head can manage.
@@ -1111,7 +1113,7 @@ export default function TaskHierarchyTable({
   return (
     <div>
       {table}
-      {canManage && (
+      {canManageClients && (
         <div className="px-2 pt-3">
           {addingClient ? (
 <AddClientForm

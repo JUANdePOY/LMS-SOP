@@ -6,6 +6,7 @@ import {
   updateClient,
   deleteClient,
 } from '../api/client.api';
+import { notifyOrgTreeChanged } from '@/shared/store/orgTreeBus';
 
 export function useClients() {
   const { toast } = useToast();
@@ -30,18 +31,21 @@ export function useClients() {
     await createClient(data);
     toast.success('Client created successfully');
     await load();
+    notifyOrgTreeChanged();
   };
 
   const update = async (id, data) => {
     await updateClient(id, data);
     toast.success('Client updated successfully');
     await load();
+    notifyOrgTreeChanged();
   };
 
   const remove = async (id) => {
     await deleteClient(id);
     toast.success('Client deleted successfully');
     setClients((prev) => prev.filter((c) => c.id !== id));
+    notifyOrgTreeChanged();
   };
 
   return { clients, loading, error, load, create, update, remove };

@@ -31,7 +31,11 @@ INSERT INTO permissions (name, display_name, category) VALUES
   ('manage_settings', 'Manage Settings', 'settings'),
   ('view_audit_logs', 'View Audit Logs', 'audit'),
   ('notifications.send', 'Send Notifications', 'notifications'),
-  ('notifications.broadcast', 'Broadcast Notifications', 'notifications')
+  ('notifications.broadcast', 'Broadcast Notifications', 'notifications'),
+  ('manage_clients', 'Manage Clients', 'clients'),
+  ('manage_tasks', 'Manage Tasks', 'tasks'),
+  ('projects.manage', 'Manage Projects', 'projects'),
+  ('manage_businesses', 'Manage Businesses', 'businesses')
 ON DUPLICATE KEY UPDATE display_name = VALUES(display_name);
 
 -- ============================================================
@@ -51,6 +55,14 @@ INSERT INTO role_permissions (role_name, permission_name) VALUES
   ('super_admin', 'manage_events'),
   ('super_admin', 'notifications.send'),
   ('super_admin', 'notifications.broadcast'),
+  ('super_admin', 'manage_clients'),
+  ('super_admin', 'manage_tasks'),
+  ('super_admin', 'tasks.create'),
+  ('super_admin', 'tasks.assign.department'),
+  ('super_admin', 'tasks.assign.any'),
+  ('super_admin', 'tasks.view.all'),
+  ('super_admin', 'projects.manage'),
+  ('super_admin', 'manage_businesses'),
   ('admin', 'view_dashboard'),
   ('admin', 'manage_users'),
   ('admin', 'manage_departments'),
@@ -62,6 +74,14 @@ INSERT INTO role_permissions (role_name, permission_name) VALUES
   ('admin', 'manage_events'),
   ('admin', 'notifications.send'),
   ('admin', 'notifications.broadcast'),
+  ('admin', 'manage_clients'),
+  ('admin', 'manage_tasks'),
+  ('admin', 'tasks.create'),
+  ('admin', 'tasks.assign.department'),
+  ('admin', 'tasks.assign.any'),
+  ('admin', 'tasks.view.all'),
+  ('admin', 'projects.manage'),
+  ('admin', 'manage_businesses'),
   ('department_head', 'view_dashboard'),
   ('department_head', 'manage_sops'),
   ('department_head', 'manage_courses'),

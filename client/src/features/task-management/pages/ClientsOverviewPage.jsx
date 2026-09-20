@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Building2, FolderKanban, Plus, Users, CheckSquare, ArrowLeft } from 'lucide-react';
 import api from '@/services/api';
 import { useToast } from '@/shared/components/ui/Toast';
+import { useAuth } from '@/contexts/AuthContext';
 import Breadcrumb from '../components/Breadcrumb';
 import ClientFormModal from '../components/ClientFormModal';
 
@@ -33,6 +34,7 @@ function ClientCard({ client, onOpen }) {
 export default function ClientsOverviewPage() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { hasPermission } = useAuth();
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -74,9 +76,11 @@ export default function ClientsOverviewPage() {
           <button onClick={() => navigate('/tasks')} className="ppm-btn-ghost shrink-0">
             <ArrowLeft size={16} /> Back
           </button>
-          <button onClick={() => setShowClient(true)} className="ppm-btn-primary shrink-0">
-            <Plus size={16} /> New Client
-          </button>
+          {hasPermission('manage_clients') && (
+            <button onClick={() => setShowClient(true)} className="ppm-btn-primary shrink-0">
+              <Plus size={16} /> New Client
+            </button>
+          )}
         </div>
       </div>
 

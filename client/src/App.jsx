@@ -15,6 +15,7 @@ import { EnrollmentProvider } from "@/features/course_management/context/Enrollm
 import { GradingProvider } from "@/features/course_management/context/GradingContext";
 import { useAuth } from "@/contexts/AuthContext";
 import OnboardingGuard from "@/features/employee/components/OnboardingGuard";
+import GlobalApiErrorHandler from "@/shared/components/GlobalApiErrorHandler";
 
 const Dashboard     = lazy(() => import("@/pages/Dashboard"));
 const EmployeeDashboard = lazy(() => import("@/features/employee/pages/EmployeeDashboard"));
@@ -311,6 +312,7 @@ export default function App() {
     <ErrorBoundary>
       <ToastProvider>
         <MotionProvider>
+          <GlobalApiErrorHandler />
           <AppRoot />
         </MotionProvider>
       </ToastProvider>

@@ -692,6 +692,18 @@ export default function LessonPage() {
               >
                 {marking ? 'Saving...' : videoWatched ? 'Mark as Complete' : 'Watch the full video to continue'}
               </button>
+            ) : currentLesson.type === 'quiz' ? (
+              latestAttempt?.passed ? (
+                <button
+                  onClick={handleMarkComplete}
+                  disabled={marking}
+                  className="rounded-lg px-4 py-2 text-sm btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {marking ? 'Saving...' : 'Mark as Complete'}
+                </button>
+              ) : (
+                <span className="text-sm text-neutral-500">Pass the quiz to mark this lesson complete.</span>
+              )
             ) : isVideoOrText && (
               <button
                 onClick={handleMarkComplete}

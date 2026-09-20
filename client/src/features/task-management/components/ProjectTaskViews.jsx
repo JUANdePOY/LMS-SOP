@@ -31,6 +31,7 @@ export default function ProjectTaskViews({
   projectsById = {},
   clientTree = [],
   canManage = false,
+  canManageClients = false,
   storageKey,
   viewProp,
   onViewChange,
@@ -66,7 +67,7 @@ export default function ProjectTaskViews({
   scopeBusinessId,
   scopeProjectId,
   newTaskIds,
-hideTabs = false,
+ hideTabs = false,
     userDepartmentId = null,
     userRole = '',
     userBusinessId = null,
@@ -102,7 +103,7 @@ hideTabs = false,
         <TaskListTableSkeleton count={5} />
       ) : (
         <>
-          {view === 'list' && (
+           {view === 'list' && (
             <TaskHierarchyTable
               tasks={tasks}
               projectsById={projectsById}
@@ -117,11 +118,12 @@ hideTabs = false,
               onInlineUpdate={onInlineUpdate}
               onQuickCreate={onQuickCreate}
                canManage={canManage}
+               canManageClients={canManageClients}
                scopeClientId={scopeClientId}
                scopeBusinessId={scopeBusinessId}
                  scopeProjectId={scopeProjectId}
                  userDepartmentId={userDepartmentId}
-                onAddProjectTask={onAddProjectTask}
+               onAddProjectTask={onAddProjectTask}
               onEditProject={onEditProject}
               onDeleteImmediate={onDeleteImmediate}
               onDuplicated={onDuplicated}

@@ -22,16 +22,17 @@ function normalizeUser(userData) {
       : '');
 
   return {
-    ...userData,
-    role: normalizedRole,
-    permissions: Array.isArray(userData.permissions) ? userData.permissions : [],
-    permission_details: Array.isArray(userData.permission_details) ? userData.permission_details : [],
-    scoped_department_ids: Array.isArray(userData.scoped_department_ids) ? userData.scoped_department_ids : [],
-    business_id: userData.business_id || null,
-    department_id: userData.department_id || null,
-    department_business_id: userData.department_business_id || null,
-  };
-}
+     ...userData,
+     role: normalizedRole,
+     permissions: Array.isArray(userData.permissions) ? userData.permissions : [],
+     permission_details: Array.isArray(userData.permission_details) ? userData.permission_details : [],
+     role_entity_permissions: Array.isArray(userData.role_entity_permissions) ? userData.role_entity_permissions : [],
+     scoped_department_ids: Array.isArray(userData.scoped_department_ids) ? userData.scoped_department_ids : [],
+     business_id: userData.business_id || null,
+     department_id: userData.department_id || null,
+     department_business_id: userData.department_business_id || null,
+   };
+ }
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);

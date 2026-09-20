@@ -84,13 +84,15 @@ function EditableDate({ label, value, disabled, onChange }) {
 
 function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks = false, readOnly = false }) {
   const { toast } = useToast();
-  const { user, isAnyAdmin, isDepartmentHead } = useAuth();
+  const { user, hasPermission } = useAuth();
   const [local, setLocal] = useState(null);
   const [pendingAttachmentId, setPendingAttachmentId] = useState(null);
   const [pendingSubtaskId, setPendingSubtaskId] = useState(null);
   const { task, loading, error, saving, load, updateProgress, addComment: postComment, uploadFile, removeAttachment } = useTaskDetails(taskId);
   const [inlineCompletionRate, setInlineCompletionRate] = useState(0);
   const [inlineStatus, setInlineStatus] = useState('In Progress');
+
+  const canManageTasks = hasPermission('manage_tasks');
 
   const isTaskOverdue = (task) => {
     if (!task) return false;
@@ -234,9 +236,9 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
   // payload, so a manager can edit this task's title, description, status,
   // priority, start/due dates, update progress, attach files, and comment —
   // even when they are not individually assigned to it.
-  const canEdit = !readOnly && (isAnyAdmin || local.can_edit);
-  const isAssigned = !readOnly && (isAnyAdmin || local.can_interact);
+  const canEdit = !readOnly && (canManageTasks || local.can_edit);
 
+  const isAssigned = !readOnly && (canManageTasks || local.can_interact);
   // Save only the user picks, but preserve any team/department assignments that
   // the picker doesn't manage so they aren't lost on update.
   const handleAssigneesSave = (userList) => {
@@ -317,20 +319,20 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
               <UserIcon size={12} /> {teamAssignees.length} team{teamAssignees.length > 1 ? 's' : ''}
             </span>
           )}
-          {isAnyAdmin && (
-            <AssigneePicker
-              assignments={local.assignments}
-              onSave={handleAssigneesSave}
-              alwaysAdd
-              buttonClassName="h-7 w-7 justify-center rounded-full border-dashed p-0 text-[var(--text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-            />
-          )}
+           {canManageTasks && (
+             <AssigneePicker
+               assignments={local.assignments}
+               onSave={handleAssigneesSave}
+               alwaysAdd
+               buttonClassName="h-7 w-7 justify-center rounded-full border-dashed p-0 text-[var(--text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+             />
+           )}
         </div>
       </div>
 
       <SubtaskList
         subtasks={local.subtasks}
-        canManage={isAnyAdmin}
+        canManage={canManageTasks}
         onToggle={handleToggleSubtask}
         onDelete={(id) => setPendingSubtaskId(id)}
         onAdd={handleAddSubtask}
@@ -415,7 +417,7 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
 
       <div className="border-t border-[var(--border)] px-2 pt-4">
         <h4 className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]"><MessageSquare size={15} /> Activity</h4>
-        <CommentSection comments={local.comments} currentUser={user} isAdmin={isAnyAdmin} canReply={isAssigned}
+        <CommentSection comments={local.comments} currentUser={user} isAdmin={canManageTasks} canReply={isAssigned}
           onAddComment={(c, parentId, files, mentions) => postComment(taskId, c, parentId, files, mentions)} />
       </div>
 

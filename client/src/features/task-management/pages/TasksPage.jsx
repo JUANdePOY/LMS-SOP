@@ -6,7 +6,7 @@ import { useToast } from '@/shared/components/ui/Toast';
 import { useNotifications } from '@/shared/stores/notificationStore.js';
 import { useTasks } from '../hooks/useTasks';
 import { updateProgress, bulkUpdateTasks, bulkDeleteTasks } from '../services/taskService';
-import { getProjects, getProjectTree, updateProject } from '../services/projectService';
+import { getProjects, updateProject } from '../services/projectService';
 import { createClient, updateClient } from '../api/client.api';
 import { updateBusiness } from '../api/business.api';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
@@ -29,7 +29,7 @@ const VIEW_STORAGE_KEY = 'ppm:tasks:view';
 
 
 export default function TasksPage() {
-  const { isAnyAdmin, isDepartmentHead, user } = useAuth();
+  const { isDepartmentHead, user, hasPermission } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { markEntityTypeRead } = useNotifications();
@@ -42,6 +42,9 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
+
+  const canManageTasks = hasPermission('manage_tasks');
+  const canManageClients = hasPermission('manage_clients');
 
   useEffect(() => {
     markEntityTypeRead('task');
@@ -87,16 +90,37 @@ export default function TasksPage() {
   const orgVersion = useOrgTreeVersion();
   const loadProjects = useCallback(() => {
     let active = true;
-    Promise.all([getProjects(), getProjectTree()])
-      .then(([projData, treeData]) => {
+    Promise.allSettled([getProjects(), api.get('/clients')])
+      .then(([projResult, clientRes]) => {
         if (!active) return;
+        const projData = projResult.status === 'fulfilled' ? projResult.value : null;
         const arr = Array.isArray(projData) ? projData : (projData?.rows || []);
         const map = {};
         arr.forEach((p) => { map[String(p.id)] = p; });
         setProjectsById(map);
-        setClientTree(Array.isArray(treeData) ? treeData : (treeData?.rows || []));
+        const rows = Array.isArray(clientRes?.value?.data?.data)
+          ? clientRes.value.data.data
+          : (clientRes?.value?.data?.rows || []);
+        const clientsMap = new Map();
+        for (const c of rows) {
+          if (!clientsMap.has(c.id)) {
+            clientsMap.set(c.id, {
+              id: c.id,
+              client_name: c.client_name,
+              business_id: c.business_id,
+              department_id: c.department_id,
+              business_name: c.business_name,
+              color: c.color,
+              businesses: Array.isArray(c.businesses) ? c.businesses : []
+            });
+          }
+        }
+        const tree = Array.from(clientsMap.values());
+        setClientTree(tree);
       })
-      .catch(() => {})
+      .catch((err) => {
+        console.log('[TasksPage] loadProjects error', err);
+      })
       .finally(() => { active = false; });
   }, []);
   useEffect(() => { loadProjects(); }, [loadProjects, orgVersion]);
@@ -166,9 +190,13 @@ export default function TasksPage() {
     }
   }, [toast, loadProjects]);
 
-  const handleCreateClient = useCallback(async (name, businessId = null) => {
+  const handleCreateClient = useCallback(async (name, businessId = null, departmentId = null) => {
     try {
-      await createClient({ client_name: name.trim(), business_id: businessId || null });
+      await createClient({
+        client_name: name.trim(),
+        business_id: businessId || null,
+        department_id: departmentId || null,
+      });
       toast.success('Client created');
       loadProjects();
       notifyOrgTreeChanged();
@@ -319,21 +347,21 @@ export default function TasksPage() {
   }, [openNewTask]);
 
   useEffect(() => {
-    if (!isAnyAdmin) {
+    if (!canManageTasks) {
       navigate('/tasks/my', { replace: true });
     }
-  }, [isAnyAdmin, navigate]);
+  }, [canManageTasks, navigate]);
 
   useEffect(() => {
-    if (!isAnyAdmin) return;
+    if (!canManageTasks) return;
     refreshStats();
-  }, [isAnyAdmin, refreshStats]);
+  }, [canManageTasks, refreshStats]);
 
   useEffect(() => {
-    if (!isAnyAdmin) return;
+    if (!canManageTasks) return;
     const timeout = setTimeout(() => refreshTasks(), 300);
     return () => clearTimeout(timeout);
-  }, [filters, isAnyAdmin, refreshTasks, statusFilter]);
+  }, [filters, canManageTasks, refreshTasks, statusFilter]);
 
   const assigneeOptions = useMemo(() => {
     const seen = new Set();
@@ -598,13 +626,16 @@ export default function TasksPage() {
     }
     const filtersActive = search || statusFilter || priorityFilter || assigneeFilter;
     if (!clientParam && !businessParam && !projectParam && filtersActive && matchingBusinessIds.size > 0) {
-      result = result.map((c) => ({
-        ...c,
-        businesses: (c.businesses || []).filter((b) => matchingBusinessIds.has(String(b.id))),
-      })).filter((c) => c.businesses.length > 0);
+      result = result.map((c) => {
+        if (!c.businesses || c.businesses.length === 0) return c;
+        const businesses = c.businesses.filter((b) => matchingBusinessIds.has(String(b.id)));
+        return businesses.length ? { ...c, businesses } : null;
+      }).filter(Boolean);
     }
     return result;
   }, [clientTree, clientParam, businessParam, projectParam, projectsById, isDepartmentHead, user, matchingBusinessIds, search, statusFilter, priorityFilter, assigneeFilter]);
+
+  console.log('[TasksPage] scopedClientTree', 'count=' + (scopedClientTree?.length ?? 0), 'first=' + (scopedClientTree?.[0]?.id ?? 'none'), 'clientTree=' + (clientTree?.length ?? 0));
 
   const handleSubmit = async (payload) => {
     setSaving(true);
@@ -761,7 +792,7 @@ export default function TasksPage() {
     }
   };
 
-  if (!isAnyAdmin) {
+  if (!canManageTasks) {
     return null;
   }
 
@@ -857,8 +888,9 @@ export default function TasksPage() {
           loading={loading}
           projectsById={scopedProjectsById}
           clientTree={scopedClientTree}
-          canManage
-          userDepartmentId={user?.department_id ?? null}
+           canManage={canManageTasks}
+           canManageClients={canManageClients}
+           userDepartmentId={user?.department_id ?? null}
           userRole={user?.role ?? ''}
           userBusinessId={user?.business_id ?? null}
           userDepartmentBusinessId={user?.department_business_id ?? null}

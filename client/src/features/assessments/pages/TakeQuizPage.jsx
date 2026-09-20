@@ -103,7 +103,7 @@ function ResultView({ result, quiz, attempt, attemptsRemaining, attemptsAllowed,
                 {completing ? "Completing…" : "Proceed to Next Lesson"}
                 <ArrowRight className="h-4 w-4 ml-1" />
               </Button>
-            ) : passed && backToLesson ? (
+            ) : backToLesson ? (
               <Button onClick={() => goToLesson(from.lessonId)} disabled={completing}>
                 {completing ? "Completing…" : "Back to Lesson"}
                 <ArrowLeft className="h-4 w-4 ml-1" />

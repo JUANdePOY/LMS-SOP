@@ -17,7 +17,7 @@ function getProjectId(task) {
 }
 
 export default function MyTasksPage() {
-  const { isAnyAdmin, isDepartmentHead, user } = useAuth();
+  const { isDepartmentHead, user, hasPermission } = useAuth();
   const { toast } = useToast();
   const { notifications, markRead } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -30,6 +30,8 @@ export default function MyTasksPage() {
   const [error, setError] = useState(null);
   const [viewingTaskId, setViewingTaskId] = useState(null);
   const [viewingTaskReadOnly, setViewingTaskReadOnly] = useState(false);
+
+  const canManageTasks = hasPermission('manage_tasks');
 
   // When arriving from a "You have been assigned a task" banner, scope the
   // table to the single project tree that contains that task.
@@ -242,9 +244,9 @@ export default function MyTasksPage() {
   }, [load, toast]);
 
   useEffect(() => {
-    if (isAnyAdmin) return;
+    if (canManageTasks) return;
     load();
-  }, [load, isAnyAdmin]);
+  }, [load, canManageTasks]);
 
   useEffect(() => {
     const timeout = setTimeout(() => load(), 300);
@@ -265,7 +267,7 @@ export default function MyTasksPage() {
     ];
   }, [scopedTasks]);
 
-  if (isAnyAdmin) {
+  if (canManageTasks) {
     return <div className="text-sm text-[var(--ppm-text-muted)]">Use the Tasks page to manage all tasks.</div>;
   }
 

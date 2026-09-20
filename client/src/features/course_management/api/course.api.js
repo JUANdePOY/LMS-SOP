@@ -96,6 +96,21 @@ export async function publishCourse(id) {
   return handle(res);
 }
 
+export async function submitForReview(id) {
+  const res = await fetch(`${API_BASE}/${id}/submit-review`, { method: "PATCH", headers: authHeaders() });
+  return handle(res);
+}
+
+export async function approveCourse(id) {
+  const res = await fetch(`${API_BASE}/${id}/approve`, { method: "PATCH", headers: authHeaders() });
+  return handle(res);
+}
+
+export async function rejectCourse(id) {
+  const res = await fetch(`${API_BASE}/${id}/reject`, { method: "PATCH", headers: authHeaders() });
+  return handle(res);
+}
+
 const BUILDER_BASE = "/api/course-builder";
 
 export async function builderList(params = {}) {
