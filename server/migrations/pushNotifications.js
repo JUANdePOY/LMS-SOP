@@ -27,11 +27,8 @@ async function runPushNotificationMigrations() {
       if (ignoreCodes.includes(err.code) || ignoreCodes.includes(err.errno)) {
         continue;
       }
-      console.error('Push notification migration error:', err.message);
     }
   }
-
-  console.log('Push notification migrations applied');
 }
 
 module.exports = { runPushNotificationMigrations };

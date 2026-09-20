@@ -291,15 +291,9 @@ router.post('/push/subscribe', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const userAgent = req.get('user-agent') || req.body.user_agent || null;
-    console.log(`[push] Subscribe request for user ${userId}`, {
-      hasEndpoint: !!req.body?.endpoint,
-      hasKeys: !!(req.body?.keys?.p256dh && req.body?.keys?.auth),
-    });
     await subscribe(userId, req.body, userAgent);
-    console.log(`[push] Subscribed user ${userId}`);
     res.json({ success: true });
   } catch (err) {
-    console.error('Push subscribe error:', err);
     const code = err.message === 'INVALID_SUBSCRIPTION' ? 'INVALID_SUBSCRIPTION' : 'PUSH_SUBSCRIBE_ERROR';
     res.status(400).json({ success: false, code, message: 'Failed to save push subscription' });
   }
@@ -311,7 +305,6 @@ router.post('/push/unsubscribe', authenticateToken, async (req, res) => {
     await unsubscribe(endpoint);
     res.json({ success: true });
   } catch (err) {
-    console.error('Push unsubscribe error:', err);
     res.status(500).json({ success: false, code: 'PUSH_UNSUBSCRIBE_ERROR', message: 'Failed to remove push subscription' });
   }
 });

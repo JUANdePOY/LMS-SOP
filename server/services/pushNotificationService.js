@@ -31,11 +31,8 @@ async function unsubscribe(endpoint) {
 async function sendPushNotification(userId, payload) {
   const subscriptions = await getSubscriptions(userId);
   if (!subscriptions.length) {
-    console.log(`[push] No active subscriptions for user ${userId}`);
     return;
   }
-
-  console.log(`[push] Delivering to ${subscriptions.length} subscription(s) for user ${userId}: ${payload.title}`);
 
   const results = await Promise.allSettled(
     subscriptions.map((sub) => deliverWebPush(sub, payload))
@@ -48,9 +45,6 @@ async function sendPushNotification(userId, payload) {
       if (statusCode === 410 || statusCode === 404) {
         unsubscribe(subscriptions[idx].endpoint).catch(() => {});
       }
-      console.error(`[push] Delivery failed for user ${userId}, endpoint ${subscriptions[idx]?.endpoint}:`, error.message || error);
-    } else {
-      console.log(`[push] Delivered successfully to user ${userId}, endpoint ${subscriptions[idx]?.endpoint}`);
     }
   });
 }
