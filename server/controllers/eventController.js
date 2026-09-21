@@ -83,7 +83,7 @@ function getEvent(req, res) {
     .catch((err) => sendError(res, err, 'Failed to load event'));
 }
 
-function createEvent(req, res) {
+async function createEvent(req, res) {
   const userId = req.user?.id;
   const { title, description, event_type, priority, status, event_date, end_date, location, target_roles, target_departments } = req.body;
 
@@ -94,39 +94,48 @@ function createEvent(req, res) {
     return res.status(400).json({ success: false, message: 'Event date is required', code: 'VALIDATION_ERROR' });
   }
 
-  const businessId = req.user?.business_id || null;
+  let businessId = req.user?.business_id || null;
+
+  if (businessId) {
+    const [[biz]] = await db.query('SELECT id FROM businesses WHERE id = ?', [businessId]);
+    if (!biz) {
+      businessId = null;
+    }
+  }
+
   const parsedTargetRoles = Array.isArray(target_roles) ? target_roles : null;
   const parsedTargetDepartments = Array.isArray(target_departments) ? target_departments.map(String) : null;
 
-  eventModel.create({
-    title: title.trim(),
-    description: description?.trim() || '',
-    event_type: event_type || 'Training',
-    priority: priority || 'medium',
-    status: status || 'active',
-    event_date,
-    end_date: end_date || null,
-    location: location || null,
-    organizer: req.user?.full_name || 'System',
-    business_id: businessId,
-    target_roles: parsedTargetRoles,
-    target_departments: parsedTargetDepartments,
-  })
-    .then((row) => {
-      logAudit && logAudit('event.create', userId, { eventId: row.id });
-      propagate(row.id, 'update');
-      broadcastSystemChange({
-        title: 'New Event',
-        body: row.title,
-        type: 'info',
-        link: '/events',
-        entityType: 'event',
-        entityId: row.id,
-        targetUserIds: getBusinessUserIds(businessId),
-      }).catch(() => {});
-      res.status(201).json({ success: true, message: 'Event created successfully', data: row });
-    })
-    .catch((err) => sendError(res, err, 'Failed to create event'));
+  try {
+    const row = await eventModel.create({
+      title: title.trim(),
+      description: description?.trim() || '',
+      event_type: event_type || 'Training',
+      priority: priority || 'medium',
+      status: status || 'active',
+      event_date,
+      end_date: end_date || null,
+      location: location || null,
+      organizer: req.user?.full_name || 'System',
+      business_id: businessId,
+      target_roles: parsedTargetRoles,
+      target_departments: parsedTargetDepartments,
+    });
+    logAudit && logAudit('event.create', userId, { eventId: row.id });
+    propagate(row.id, 'update');
+    await broadcastSystemChange({
+      title: 'New Event',
+      body: row.title,
+      type: 'info',
+      link: '/events',
+      entityType: 'event',
+      entityId: row.id,
+      targetUserIds: await getBusinessUserIds(businessId),
+    }).catch(() => {});
+    res.status(201).json({ success: true, message: 'Event created successfully', data: row });
+  } catch (err) {
+    sendError(res, err, 'Failed to create event');
+  }
 }
 
 function updateEvent(req, res) {
