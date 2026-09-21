@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate, Link } from "react-router-dom";
 import {
   Search,
   BookOpen,
@@ -499,7 +499,10 @@ export default function AppLayout() {
 
           <footer className="border-t border-[var(--border)] bg-[var(--app-shell-bg)] py-2.5 text-center lg:rounded-br-[var(--app-shell-radius)]">
             <p className="text-[11px] sm:text-xs text-neutral-400">
-              © {new Date().getFullYear()} SOP Training Platform. All rights reserved.
+              © {new Date().getFullYear()} SOP Training Platform. All rights reserved.{" "}
+              <Link to="/privacy" className="hover:underline">Privacy Policy</Link>{" "}
+              <span className="text-neutral-500">|</span>{" "}
+              <Link to="/terms" className="hover:underline">Terms of Service</Link>
             </p>
           </footer>
           </Scrollbar>

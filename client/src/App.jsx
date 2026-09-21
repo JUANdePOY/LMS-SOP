@@ -30,6 +30,8 @@ const UserProfilePage = lazy(() => import("@/features/profile/pages/UserProfileP
 const DigitalIDPage = lazy(() => import("@/features/digital-id/pages/DigitalIDPage"));
 const Login         = lazy(() => import("@/pages/Login"));
 const Settings      = lazy(() => import("@/pages/Settings"));
+const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("@/pages/TermsOfService"));
 const AuditLogs     = lazy(() => import("@/pages/AuditLogs"));
 const NotificationsPage = lazy(() => import("@/pages/Notifications"));
 const Courses = lazy(() => import("@/pages/courses"));
@@ -165,6 +167,16 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: wrap(Login),
+  },
+  {
+    path: "/privacy",
+    element: wrap(PrivacyPolicy),
+    handle: { title: "Privacy Policy" },
+  },
+  {
+    path: "/terms",
+    element: wrap(TermsOfService),
+    handle: { title: "Terms of Service" },
   },
   {
     path: "s/:token",

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { AlertCircle, Loader, Mail, Lock, Eye, EyeOff, KeyRound } from 'lucide-react';
 
@@ -288,7 +288,10 @@ export default function Login() {
 
           <div className="login-card-footer">
             <p className="login-footer-text">
-              © {new Date().getFullYear()} SOP Training Platform. All rights reserved.
+              © {new Date().getFullYear()} SOP Training Platform. All rights reserved.{" "}
+              <Link to="/privacy" className="hover:underline">Privacy Policy</Link>{" "}
+              <span className="text-neutral-500">|</span>{" "}
+              <Link to="/terms" className="hover:underline">Terms of Service</Link>
             </p>
           </div>
         </div>
