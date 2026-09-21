@@ -53,7 +53,7 @@ async function findByIdIgnoringDelete(id) {
 }
 
 async function listAllQuizzes(filters = {}) {
-  const { search, status, quizType, page = 1, limit = 20, business_id } = filters;
+  const { search, status, quizType, page = 1, limit = 20, business_id, role, scoped_department_ids } = filters;
   const pageNum = Number(page) || 1;
   const limitNum = Number(limit) || 20;
   const offset = (pageNum - 1) * limitNum;
@@ -63,7 +63,20 @@ async function listAllQuizzes(filters = {}) {
   if (status) { conditions.push('q.status = ?'); cParams.push(status); }
   if (quizType) { conditions.push('q.quiz_type = ?'); cParams.push(quizType); }
   if (search) { conditions.push('(q.title LIKE ? OR c.title LIKE ?)'); cParams.push(`%${search}%`, `%${search}%`); }
-  if (business_id) { conditions.push('d.business_id = ?'); cParams.push(parseInt(business_id, 10)); }
+
+  if (role === 'department_head') {
+    const deptIds = Array.isArray(scoped_department_ids) ? scoped_department_ids.filter(Boolean) : [];
+    if (!deptIds.length) {
+      return { data: [], total: 0 };
+    }
+    const placeholders = deptIds.map(() => '?').join(',');
+    conditions.push(`c.department_id IN (${placeholders})`);
+    cParams.push(...deptIds);
+  } else if (role === 'admin' && business_id) {
+    conditions.push('(d.business_id = ? OR (d.business_id IS NULL AND c.department_id IS NULL))');
+    cParams.push(parseInt(business_id, 10));
+  }
+
   const whereClause = conditions.length ? ' AND ' + conditions.join(' AND ') : '';
 
   const [rows] = await db.query(

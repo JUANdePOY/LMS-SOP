@@ -230,14 +230,16 @@ async function listQuizzes(req, res) {
 async function listAllQuizzes(req, res) {
   const { search, status, quizType, page, limit } = req.query;
   try {
-    const businessId = req.user?.business_id || null;
+    const { role, business_id, scoped_department_ids } = req.user || {};
     const result = await quizModel.listAllQuizzes({
       search,
       status,
       quizType,
       page,
       limit,
-      business_id: businessId,
+      business_id: role === 'admin' ? (business_id || null) : null,
+      role,
+      scoped_department_ids: role === 'department_head' ? scoped_department_ids : null,
     });
     res.json({
       success: true,
