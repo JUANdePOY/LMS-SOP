@@ -25,14 +25,14 @@ export function useBusinessClientTree(isAdmin = false) {
     setLoading(true);
     setError(null);
     try {
-      // Fetch independently: a failure on one endpoint (e.g. the businesses
-      // list being unavailable for a given role) must not blank the other list,
-      // otherwise the whole secondary panel renders empty.
-      const [bizRes, clientRes, projectRes] = await Promise.allSettled([
+      const requests = [
         api.get('/businesses', { params: { limit: 1000, status: 'active' } }),
         api.get('/clients'),
-        ...(isAdmin ? [api.get('/projects', { params: { limit: 1000 } })] : []),
-      ]);
+      ];
+      if (isAdmin) {
+        requests.push(api.get('/projects', { params: { limit: 1000 } }));
+      }
+      const [bizRes, clientRes, projectRes] = await Promise.allSettled(requests);
 
       const bizRows = bizRes.status === 'fulfilled'
         ? (bizRes.value?.data?.data?.rows || bizRes.value?.data?.rows || [])
@@ -42,7 +42,7 @@ export function useBusinessClientTree(isAdmin = false) {
             ? clientRes.value.data.data
             : (clientRes.value?.data?.rows || []))
         : [];
-      const projectRows = projectRes.status === 'fulfilled'
+      const projectRows = projectRes && projectRes.status === 'fulfilled'
         ? (projectRes.value?.data?.data?.rows || projectRes.value?.data?.rows || [])
         : [];
 

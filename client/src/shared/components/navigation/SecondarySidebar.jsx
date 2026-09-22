@@ -62,12 +62,12 @@ export default function SecondarySidebar({ collapsed = false }) {
   // Also filter business units (client_businesses) to only those with tasks.
   const [employeeClientIds, setEmployeeClientIds] = useState(null);
   const [employeeBusinessIds, setEmployeeBusinessIds] = useState(null);
-  const [employeeClientTree, setEmployeeClientTree] = useState(null);
+  const [employeeSopBusinessIds, setEmployeeSopBusinessIds] = useState(null);
   useEffect(() => {
     if (isAnyAdmin) {
       setEmployeeClientIds(null);
       setEmployeeBusinessIds(null);
-      setEmployeeClientTree(null);
+      setEmployeeSopBusinessIds(null);
       setHasUnassignedTasks(false);
       return;
     }
@@ -77,19 +77,21 @@ export default function SecondarySidebar({ collapsed = false }) {
         if (!active) return;
         const clientIds = new Set((data?.clientTree || []).map((c) => Number(c.id)));
         const bizIds = new Set();
+        const sopBizIds = new Set();
         for (const c of data?.clientTree || []) {
+          if (c.business_id != null) sopBizIds.add(Number(c.business_id));
           for (const b of c.businesses || []) {
             bizIds.add(Number(b.id));
           }
         }
         setEmployeeClientIds(clientIds);
         setEmployeeBusinessIds(bizIds);
-        setEmployeeClientTree(data?.clientTree || []);
+        setEmployeeSopBusinessIds(sopBizIds);
         const hasUnassigned = (data?.tasks || []).some((t) => t.client_business_id == null);
         setHasUnassignedTasks(hasUnassigned);
       })
       .catch(() => {
-        if (active) { setEmployeeClientIds(new Set()); setEmployeeBusinessIds(new Set()); setEmployeeClientTree(null); setHasUnassignedTasks(false); }
+        if (active) { setEmployeeClientIds(new Set()); setEmployeeBusinessIds(new Set()); setEmployeeSopBusinessIds(new Set()); setHasUnassignedTasks(false); }
       });
     return () => { active = false; };
   }, [isAnyAdmin, employeeBusinessId]);
@@ -120,57 +122,38 @@ export default function SecondarySidebar({ collapsed = false }) {
         .filter((b) => Number(b.id) === sopBizId)
         .map((b) => ({
           ...b,
-          clients: (b.clients || [])
-            .filter((c) => deptId == null || Number(c.department_id) === deptId)
-            .map((c) => ({
-              ...c,
-              businesses: (c.businesses || []).map((u) => ({
-                ...u,
-                projects: (u.projects || []),
-              })),
-            })),
+          clients: deptId != null
+            ? (b.clients || []).filter((c) => Number(c.department_id) === deptId)
+            : (b.clients || []),
         }));
     }
     if (isAnyAdmin) return businesses;
-    if (employeeClientTree) {
-      const byBiz = {};
-      const bizNames = {};
-      for (const c of employeeClientTree) {
-        const bizId = c.business_id;
-        if (bizId == null) continue;
-        if (!byBiz[bizId]) byBiz[bizId] = [];
-        byBiz[bizId].push(c);
-        if (!bizNames[bizId]) bizNames[bizId] = c.business_name;
-      }
-      const knownBizIds = new Set(businesses.map((b) => String(b.id)));
-      const extraBusinesses = Object.keys(byBiz)
-        .filter((id) => !knownBizIds.has(String(id)))
-        .map((id) => ({ id: Number(id), name: bizNames[id] || `Business ${id}` }));
-      return [...businesses, ...extraBusinesses].map((b) => ({
+    if (employeeBusinessId != null) {
+      const biz = businesses.filter((b) => Number(b.id) === Number(employeeBusinessId));
+      if (employeeClientIds == null || employeeBusinessIds == null) return biz;
+      return biz.map((b) => ({
         ...b,
-        clients: (byBiz[Number(b.id)] || []).map((c) => ({
-          id: c.id,
-          client_name: c.client_name,
-          businesses: (c.businesses || []).map((u) => ({
-            id: u.id,
-            business_name: u.business_name,
+        clients: (b.clients || [])
+          .filter((c) => employeeClientIds.has(Number(c.id)))
+          .map((c) => ({
+            ...c,
+            businesses: (c.businesses || []).filter((u) => employeeBusinessIds.has(Number(u.id))),
           })),
-        })),
-      })).filter((b) => (b.clients || []).length > 0);
+      }));
     }
-    if (employeeClientIds == null || employeeBusinessIds == null) {
-      return employeeBusinessId ? businesses.filter((b) => Number(b.id) === Number(employeeBusinessId)) : [];
-    }
-    return businesses.map((b) => ({
-      ...b,
-      clients: (b.clients || [])
-        .filter((c) => employeeClientIds.has(Number(c.id)))
-        .map((c) => ({
-          ...c,
-          businesses: (c.businesses || []).filter((u) => employeeBusinessIds.has(Number(u.id))),
-        })),
-    })).filter((b) => (b.clients || []).length > 0);
-  }, [businesses, employeeBusinessId, isAnyAdmin, isDepartmentHead, user, employeeClientIds, employeeBusinessIds, employeeClientTree]);
+    if (employeeSopBusinessIds == null || employeeClientIds == null || employeeBusinessIds == null) return [];
+    return businesses
+      .filter((b) => employeeSopBusinessIds.has(Number(b.id)))
+      .map((b) => ({
+        ...b,
+        clients: (b.clients || [])
+          .filter((c) => employeeClientIds.has(Number(c.id)))
+          .map((c) => ({
+            ...c,
+            businesses: (c.businesses || []).filter((u) => employeeBusinessIds.has(Number(u.id))),
+          })),
+      }));
+  }, [businesses, employeeBusinessId, isAnyAdmin, isDepartmentHead, user, employeeClientIds, employeeBusinessIds, employeeSopBusinessIds]);
   const showUnassigned = isAnyAdmin && hasUnassignedTasks;
   const { toast } = useToast();
   const [query, setQuery] = useState("");
@@ -326,8 +309,6 @@ export default function SecondarySidebar({ collapsed = false }) {
 
   const open = secondaryNav === "clients";
 
-  const taskBase = isAnyAdmin ? '/tasks' : '/tasks/my';
-
   const activeClientId = (() => {
     const m = location.pathname.match(/^\/clients\/(\d+)/);
     return m ? m[1] : null;
@@ -389,8 +370,9 @@ export default function SecondarySidebar({ collapsed = false }) {
     return departments.filter((d) => String(d.business_id) === String(bizId));
   }, [departments, clientDeptPicker]);
 
-  const q = query.trim().toLowerCase();
-  const searching = q.length > 0;
+   const tasksBase = isAnyAdmin ? '/tasks' : '/tasks/my';
+   const q = query.trim().toLowerCase();
+   const searching = q.length > 0;
 
   // Full-tree search: a SOP business matches if its name matches, or it contains
   // a client (or a client's business unit) whose name matches. Matched clients /
@@ -445,7 +427,7 @@ export default function SecondarySidebar({ collapsed = false }) {
         )}
       >
         <Link
-          to={`${taskBase}?business=${unit.id}&client=${client.id}`}
+          to={`${tasksBase}?business=${unit.id}&client=${client.id}`}
           className="flex min-w-0 flex-1 items-center gap-2 py-2 text-[13px]"
         >
           <Briefcase size={14} className="shrink-0" />
@@ -499,7 +481,7 @@ export default function SecondarySidebar({ collapsed = false }) {
           >
             {cOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </button>
-          <Link to={`${taskBase}?client=${client.id}`} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-sm">
+          <Link to={`${tasksBase}?client=${client.id}`} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-sm">
             <Building2
               size={16}
               className={cn(
@@ -590,7 +572,7 @@ export default function SecondarySidebar({ collapsed = false }) {
             {bOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </button>
           <Link
-            to={`${taskBase}?${isAnyAdmin ? 'business' : 'sopBusiness'}=${key}`}
+            to={`${tasksBase}?business=${key}`}
             onClick={(e) => e.stopPropagation()}
             className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left text-sm font-medium focus:outline-none"
           >
@@ -755,7 +737,7 @@ export default function SecondarySidebar({ collapsed = false }) {
             {query
               ? "No businesses or clients match your search."
               : employeeBusinessId != null
-                ? "Your SOP business has no clients yet."
+                ? "No assigned tasks yet."
                 : "No businesses yet."}
           </p>
         ) : (

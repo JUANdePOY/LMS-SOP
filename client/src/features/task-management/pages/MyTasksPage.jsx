@@ -17,7 +17,7 @@ function getProjectId(task) {
 }
 
 export default function MyTasksPage() {
-  const { isDepartmentHead, user, hasPermission } = useAuth();
+  const { isDepartmentHead, user, hasPermission, isSuperAdmin, isAdmin } = useAuth();
   const { toast } = useToast();
   const { notifications, markRead } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -33,7 +33,7 @@ export default function MyTasksPage() {
   const [viewingTaskId, setViewingTaskId] = useState(null);
   const [viewingTaskReadOnly, setViewingTaskReadOnly] = useState(false);
 
-  const canManageTasks = hasPermission('manage_tasks');
+  const canManageTasks = hasPermission('manage_tasks') && (isSuperAdmin || isAdmin);
 
   // When arriving from a "You have been assigned a task" banner, scope the
   // table to the single project tree that contains that task.
