@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Check, CalendarDays } from 'lucide-react';
+import { Plus, Check, CalendarDays, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import StatusBadge from './StatusBadge';
 import UserAvatar from '@/shared/components/ui/Avatar';
@@ -59,7 +59,7 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
   const userAssignees = (node.assignments || []).filter((a) => a.assignment_type === 'User');
   const children = node.subtasks || [];
   const canEdit = Boolean(node.can_edit);
-  const { isAnyAdmin } = useAuth();
+  const { isAnyAdmin, user } = useAuth();
   const [statusOpen, setStatusOpen] = useState(false);
   const statusRef = useRef(null);
 
@@ -163,6 +163,17 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
             <CalendarDays size={13} />
             {formatDateTime(node.deadline_datetime)}
           </span>
+        )}
+
+        {(canManage && user?.role !== 'employee') && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDelete?.(node.id); }}
+            className="shrink-0 text-[var(--text-muted)] hover:text-red-600 transition-colors"
+            aria-label="Delete sub-task"
+          >
+            <Trash2 size={14} />
+          </button>
         )}
       </div>
 

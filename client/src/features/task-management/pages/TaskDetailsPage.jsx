@@ -8,14 +8,17 @@ import { MAX_ATTACHMENT_SIZE_BYTES, ALLOWED_ATTACHMENT_MIME_TYPES } from '../con
 import { formatDate } from '../utils/taskDateUtils';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import AssignmentSection from '../components/AssignmentSection';
+import SubtaskList from '../components/SubtaskList';
 import AttachmentSection from '../components/AttachmentSection';
 import CommentSection from '../components/CommentSection';
 import ProgressModal from '../components/ProgressModal';
+import { createTask, updateTask, deleteTask } from '../services/taskService';
 import { PRIORITY_STYLES, STATUS_STYLES } from '../constants/taskConstants';
 import { FadeIn } from "@/shared/motion";
 
 const TABS = [
   { id: 'info', label: 'Info', icon: BarChart3 },
+  { id: 'subtasks', label: 'Subtasks', icon: Users },
   { id: 'assignments', label: 'Assignments', icon: Users },
   { id: 'progress', label: 'Progress', icon: BarChart3 },
   { id: 'comments', label: 'Comments', icon: MessageSquare },
@@ -38,6 +41,7 @@ export default function TaskDetailsPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [pendingAttachmentId, setPendingAttachmentId] = useState(null);
+  const [pendingSubtaskId, setPendingSubtaskId] = useState(null);
 
   if (loading && !task) {
     return <div className="text-center py-12 text-sm text-[var(--text-muted)]">Loading task...</div>;
@@ -96,6 +100,72 @@ export default function TaskDetailsPage() {
   const confirmDeleteAttachment = async () => {
     if (pendingAttachmentId == null) return;
     await removeAttachment(task.id, pendingAttachmentId);
+  };
+
+  const buildSubtaskPayload = (parentId, title) => ({
+    title: title.trim(),
+    parent_task_id: parentId,
+    status: 'Pending',
+    priority: 'Medium',
+    start_datetime: task.start_datetime || null,
+    deadline_datetime: task.deadline_datetime || null,
+    estimated_hours: 1,
+    client_id: task.client_id ?? null,
+    client_business_id: task.client_business_id ?? null,
+    business_id: task.business_id ?? null,
+    project_id: task.project_id ?? null,
+    assignments: [],
+  });
+
+  const handleAddSubtask = async (parentId, title) => {
+    try {
+      await createTask(buildSubtaskPayload(parentId, title));
+      toast.success('Sub-task added');
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to add sub-task');
+      throw err;
+    }
+  };
+
+  const handleToggleSubtask = async (id, next) => {
+    try {
+      await updateTask(id, { status: next });
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update sub-task');
+    }
+  };
+
+  const handleStatusChangeSubtask = async (id, next) => {
+    try {
+      await updateTask(id, { status: next });
+      await load();
+      toast.success('Sub-task status updated');
+    } catch (err) {
+      toast.error(err.message || 'Failed to update sub-task status');
+    }
+  };
+
+  const handleAssignSubtask = async (subtaskId, userList) => {
+    try {
+      await updateTask(subtaskId, { assignments: userList });
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to assign sub-task');
+    }
+  };
+
+  const handleDeleteSubtask = async () => {
+    const id = pendingSubtaskId;
+    setPendingSubtaskId(null);
+    try {
+      await deleteTask(id);
+      toast.success('Sub-task deleted');
+      await load();
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete sub-task');
+    }
   };
 
   return (
@@ -221,6 +291,18 @@ export default function TaskDetailsPage() {
               <AttachmentSection attachments={task.attachments} onDelete={handleDeleteAttachment} canManage={canManageTasks} />
             </div>
           )}
+
+          {activeTab === 'subtasks' && (
+            <SubtaskList
+              subtasks={task.subtasks || []}
+              canManage={canManageTasks}
+              onToggle={handleToggleSubtask}
+              onDelete={(id) => setPendingSubtaskId(id)}
+              onAdd={handleAddSubtask}
+              onAssign={handleAssignSubtask}
+              onStatusChange={handleStatusChangeSubtask}
+            />
+          )}
         </div>
       </div>
       </FadeIn>
@@ -233,6 +315,15 @@ export default function TaskDetailsPage() {
         onConfirm={confirmDeleteAttachment}
         title="Delete Attachment"
         message="Are you sure you want to delete this attachment?"
+        confirmText="Delete"
+        variant="destructive"
+      />
+      <ConfirmationDialog
+        isOpen={pendingSubtaskId !== null}
+        onClose={() => setPendingSubtaskId(null)}
+        onConfirm={handleDeleteSubtask}
+        title="Delete Sub-task"
+        message="Are you sure you want to delete this sub-task? Its own sub-tasks, if any, will be removed too."
         confirmText="Delete"
         variant="destructive"
       />
