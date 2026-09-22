@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Modal } from "@/shared/components/ui/modal";
 import { Button } from "@/shared/components/ui/button";
-import { Upload, X, CheckCircle2, Download, FileText, Table2, Braces } from "lucide-react";
+import { Upload, X, CheckCircle2, Download, FileText, Table2, Braces, Plus } from "lucide-react";
 import * as XLSX from "xlsx";
 import { bulkUploadClients } from "@/features/task-management/api/client.api";
 import { createPortal } from "react-dom";
@@ -138,14 +138,21 @@ export default function BulkUploadWizardModal({ open, onClose, toast, refetchCli
         const ws = wb.Sheets[wb.SheetNames[0]];
         rows = XLSX.utils.sheet_to_json(ws);
       } else if (format === "xlsx") {
-        const buf = xlsxBufferRef.current || file?.arrayBuffer?.();
-        if (!buf) {
-          toast.error("Please upload an Excel file first");
+        const sourceRows = xlsxPreview.rows.length > 0 ? xlsxPreview.rows : (() => {
+          const buf = xlsxBufferRef.current || file?.arrayBuffer?.();
+          if (!buf) {
+            toast.error("Please upload an Excel file first");
+            return [];
+          }
+          const wb = XLSX.read(buf, { type: "array" });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          return XLSX.utils.sheet_to_json(ws);
+        })();
+        if (!sourceRows.length) {
+          toast.error("No rows found in the input");
           return;
         }
-        const wb = XLSX.read(buf, { type: "array" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        rows = XLSX.utils.sheet_to_json(ws);
+        rows = sourceRows;
       } else {
         toast.error("Unsupported format");
         return;
@@ -215,8 +222,16 @@ export default function BulkUploadWizardModal({ open, onClose, toast, refetchCli
 
   const StepIndicator = (
     <div className="flex items-center gap-2 mb-4 text-xs font-medium">
-      <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${step === "upload" || step === "preview" ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"}`}>
+      <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${step !== "upload" || importResult ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"}`}>
         <span className="h-4 w-4 rounded-full bg-current opacity-20" /> 1. Upload Clients
+      </span>
+      <span className="text-neutral-300">→</span>
+      <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${step === "preview" || importResult ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"}`}>
+        <span className="h-4 w-4 rounded-full bg-current opacity-20" /> 2. Preview
+      </span>
+      <span className="text-neutral-300">→</span>
+      <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full ${importResult ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300" : "bg-neutral-100 dark:bg-neutral-800 text-neutral-500"}`}>
+        <span className="h-4 w-4 rounded-full bg-current opacity-20" /> 3. Import
       </span>
     </div>
   );
@@ -319,45 +334,62 @@ export default function BulkUploadWizardModal({ open, onClose, toast, refetchCli
                 <div className="flex-1 h-px bg-neutral-200 dark:bg-neutral-700" />
               </div>
 
-              <div>
-                <div className="flex justify-between items-center mb-1.5">
-                  <label className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                    Raw content
-                  </label>
-                  <Button size="sm" variant="ghost" onClick={downloadTemplate}>
-                    <Download className="h-4 w-4 mr-1" /> Template
-                  </Button>
-                </div>
-                {format === "xlsx" && xlsxPreview.rows.length > 0 ? (
-                  <div className="rounded-lg border border-neutral-300 dark:border-neutral-600 overflow-auto max-h-48">
-                    <table className="w-full text-xs">
-                      <thead className="bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
-                        <tr>
-                          {xlsxPreview.headers.map((h) => (
-                            <th key={h} className="px-2 py-1 text-left whitespace-nowrap">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                        {xlsxPreview.rows.map((row, idx) => (
-                          <tr key={idx} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/40">
-                            {xlsxPreview.headers.map((h) => (
-                              <td key={h} className="px-2 py-1 text-neutral-700 dark:text-neutral-200 whitespace-nowrap">{row[h] ?? ''}</td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <label className="block text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                        {format === "xlsx" ? "Spreadsheet" : "Raw content"}
+                      </label>
+                      <Button size="sm" variant="ghost" onClick={downloadTemplate}>
+                        <Download className="h-4 w-4 mr-1" /> Template
+                      </Button>
+                    </div>
+                    {format === "xlsx" && xlsxPreview.headers.length > 0 ? (
+                      <div>
+                        <div className="flex justify-end mb-1">
+                          <Button size="sm" variant="ghost" onClick={() => setXlsxPreview((prev) => ({ ...prev, rows: [...prev.rows, {}] }))}>
+                            <Plus className="h-4 w-4 mr-1" /> Add Row
+                          </Button>
+                        </div>
+                        <div className="rounded-lg border border-neutral-300 dark:border-neutral-600 overflow-auto max-h-48">
+                          <table className="w-full text-xs">
+                            <thead className="bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300">
+                              <tr>
+                                {xlsxPreview.headers.map((h) => (
+                                  <th key={h} className="px-2 py-1 text-left whitespace-nowrap">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                              {xlsxPreview.rows.map((row, idx) => (
+                                <tr key={idx} className="hover:bg-neutral-50 dark:hover:bg-neutral-800/40">
+                                  {xlsxPreview.headers.map((h) => (
+                                    <td key={h} className="px-2 py-1">
+                                      <input
+                                        className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-neutral-700 dark:text-neutral-200 outline-none focus:border-blue-500 focus:bg-white dark:focus:bg-neutral-800"
+                                        value={row[h] ?? ''}
+                                        onChange={(e) => {
+                                          const next = [...xlsxPreview.rows];
+                                          next[idx] = { ...next[idx], [h]: e.target.value };
+                                          setXlsxPreview((prev) => ({ ...prev, rows: next }));
+                                        }}
+                                      />
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    ) : (
+                      <textarea
+                        className="w-full h-48 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm font-mono text-neutral-900 dark:text-neutral-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none resize-y"
+                        value={rawContent}
+                        onChange={(e) => setRawContent(e.target.value)}
+                        placeholder={format === "csv" ? "Paste CSV content here…" : format === "json" ? "Paste JSON array here…" : "Upload an Excel file to see its contents here"}
+                      />
+                    )}
                   </div>
-                ) : (
-                  <textarea
-                    className="w-full h-48 rounded-lg border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 px-3 py-2 text-sm font-mono text-neutral-900 dark:text-neutral-100 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none resize-y"
-                    value={rawContent}
-                    onChange={(e) => setRawContent(e.target.value)}
-                    placeholder={format === "csv" ? "Paste CSV content here…" : format === "json" ? "Paste JSON array here…" : "Upload an Excel file to see its contents here"}
-                  />
-                )}
-              </div>
             </div>
           )}
 
