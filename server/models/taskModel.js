@@ -123,7 +123,9 @@ async function findAll(filters = {}) {
     sql += ' AND t.created_by = ?';
     params.push(created_by);
   }
-  if (task_ids && Array.isArray(task_ids) && task_ids.length > 0) {
+  const hasTaskIds = task_ids && Array.isArray(task_ids) && task_ids.length > 0;
+
+  if (hasTaskIds) {
     sql += ' AND t.id IN (?)';
     params.push(task_ids);
   }
@@ -136,8 +138,11 @@ async function findAll(filters = {}) {
     params.push(project_ids);
   }
 
-  sql += ' ORDER BY t.created_at DESC LIMIT ? OFFSET ?';
-  params.push(limit, offset);
+  sql += ' ORDER BY t.created_at DESC';
+  if (!hasTaskIds) {
+    sql += ' LIMIT ? OFFSET ?';
+    params.push(limit, offset);
+  }
 
   const [rows] = await db.query(sql, params);
 

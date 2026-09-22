@@ -62,10 +62,12 @@ export default function SecondarySidebar({ collapsed = false }) {
   // Also filter business units (client_businesses) to only those with tasks.
   const [employeeClientIds, setEmployeeClientIds] = useState(null);
   const [employeeBusinessIds, setEmployeeBusinessIds] = useState(null);
+  const [employeeClientTree, setEmployeeClientTree] = useState(null);
   useEffect(() => {
-    if (isAnyAdmin || employeeBusinessId == null) {
+    if (isAnyAdmin) {
       setEmployeeClientIds(null);
       setEmployeeBusinessIds(null);
+      setEmployeeClientTree(null);
       setHasUnassignedTasks(false);
       return;
     }
@@ -82,11 +84,12 @@ export default function SecondarySidebar({ collapsed = false }) {
         }
         setEmployeeClientIds(clientIds);
         setEmployeeBusinessIds(bizIds);
+        setEmployeeClientTree(data?.clientTree || []);
         const hasUnassigned = (data?.tasks || []).some((t) => t.client_business_id == null);
         setHasUnassignedTasks(hasUnassigned);
       })
       .catch(() => {
-        if (active) { setEmployeeClientIds(new Set()); setEmployeeBusinessIds(new Set()); setHasUnassignedTasks(false); }
+        if (active) { setEmployeeClientIds(new Set()); setEmployeeBusinessIds(new Set()); setEmployeeClientTree(null); setHasUnassignedTasks(false); }
       });
     return () => { active = false; };
   }, [isAnyAdmin, employeeBusinessId]);
@@ -117,16 +120,48 @@ export default function SecondarySidebar({ collapsed = false }) {
         .filter((b) => Number(b.id) === sopBizId)
         .map((b) => ({
           ...b,
-          clients: deptId != null
-            ? (b.clients || []).filter((c) => Number(c.department_id) === deptId)
-            : (b.clients || []),
+          clients: (b.clients || [])
+            .filter((c) => deptId == null || Number(c.department_id) === deptId)
+            .map((c) => ({
+              ...c,
+              businesses: (c.businesses || []).map((u) => ({
+                ...u,
+                projects: (u.projects || []),
+              })),
+            })),
         }));
     }
     if (isAnyAdmin) return businesses;
-    if (employeeBusinessId == null) return [];
-    const biz = businesses.filter((b) => Number(b.id) === Number(employeeBusinessId));
-    if (employeeClientIds == null || employeeBusinessIds == null) return biz;
-    return biz.map((b) => ({
+    if (employeeClientTree) {
+      const byBiz = {};
+      const bizNames = {};
+      for (const c of employeeClientTree) {
+        const bizId = c.business_id;
+        if (bizId == null) continue;
+        if (!byBiz[bizId]) byBiz[bizId] = [];
+        byBiz[bizId].push(c);
+        if (!bizNames[bizId]) bizNames[bizId] = c.business_name;
+      }
+      const knownBizIds = new Set(businesses.map((b) => String(b.id)));
+      const extraBusinesses = Object.keys(byBiz)
+        .filter((id) => !knownBizIds.has(String(id)))
+        .map((id) => ({ id: Number(id), name: bizNames[id] || `Business ${id}` }));
+      return [...businesses, ...extraBusinesses].map((b) => ({
+        ...b,
+        clients: (byBiz[Number(b.id)] || []).map((c) => ({
+          id: c.id,
+          client_name: c.client_name,
+          businesses: (c.businesses || []).map((u) => ({
+            id: u.id,
+            business_name: u.business_name,
+          })),
+        })),
+      })).filter((b) => (b.clients || []).length > 0);
+    }
+    if (employeeClientIds == null || employeeBusinessIds == null) {
+      return employeeBusinessId ? businesses.filter((b) => Number(b.id) === Number(employeeBusinessId)) : [];
+    }
+    return businesses.map((b) => ({
       ...b,
       clients: (b.clients || [])
         .filter((c) => employeeClientIds.has(Number(c.id)))
@@ -134,8 +169,8 @@ export default function SecondarySidebar({ collapsed = false }) {
           ...c,
           businesses: (c.businesses || []).filter((u) => employeeBusinessIds.has(Number(u.id))),
         })),
-    }));
-  }, [businesses, employeeBusinessId, isAnyAdmin, isDepartmentHead, user, employeeClientIds, employeeBusinessIds]);
+    })).filter((b) => (b.clients || []).length > 0);
+  }, [businesses, employeeBusinessId, isAnyAdmin, isDepartmentHead, user, employeeClientIds, employeeBusinessIds, employeeClientTree]);
   const showUnassigned = isAnyAdmin && hasUnassignedTasks;
   const { toast } = useToast();
   const [query, setQuery] = useState("");
@@ -291,6 +326,8 @@ export default function SecondarySidebar({ collapsed = false }) {
 
   const open = secondaryNav === "clients";
 
+  const taskBase = isAnyAdmin ? '/tasks' : '/tasks/my';
+
   const activeClientId = (() => {
     const m = location.pathname.match(/^\/clients\/(\d+)/);
     return m ? m[1] : null;
@@ -408,7 +445,7 @@ export default function SecondarySidebar({ collapsed = false }) {
         )}
       >
         <Link
-          to={`/tasks?business=${unit.id}&client=${client.id}`}
+          to={`${taskBase}?business=${unit.id}&client=${client.id}`}
           className="flex min-w-0 flex-1 items-center gap-2 py-2 text-[13px]"
         >
           <Briefcase size={14} className="shrink-0" />
@@ -462,7 +499,7 @@ export default function SecondarySidebar({ collapsed = false }) {
           >
             {cOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </button>
-          <Link to={`/tasks?client=${client.id}`} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-sm">
+          <Link to={`${taskBase}?client=${client.id}`} className="flex min-w-0 flex-1 items-center gap-2 py-2 text-sm">
             <Building2
               size={16}
               className={cn(
@@ -553,7 +590,7 @@ export default function SecondarySidebar({ collapsed = false }) {
             {bOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           </button>
           <Link
-            to={`/tasks?business=${key}`}
+            to={`${taskBase}?${isAnyAdmin ? 'business' : 'sopBusiness'}=${key}`}
             onClick={(e) => e.stopPropagation()}
             className="flex min-w-0 flex-1 items-center gap-2 py-2 text-left text-sm font-medium focus:outline-none"
           >

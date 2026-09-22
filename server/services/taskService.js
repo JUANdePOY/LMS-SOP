@@ -1340,9 +1340,10 @@ async function getMyTaskHierarchy(userId) {
   }
   if (directTaskIds.length) {
     const [directTasks] = await db.query(
-      `SELECT t.*, cl.client_name, cb.business_name AS client_business_name
+      `SELECT t.*, cl.client_name, cl.business_id AS client_sop_business_id, b.business_name AS client_sop_business_name, cb.business_name AS client_business_name
        FROM tasks t
        LEFT JOIN clients cl ON t.client_id = cl.id
+       LEFT JOIN businesses b ON cl.business_id = b.id
        LEFT JOIN client_businesses cb ON t.client_business_id = cb.id
        WHERE t.id IN (?)`,
       [directTaskIds]
@@ -1452,10 +1453,12 @@ async function getMyTaskHierarchy(userId) {
     const [rows] = await db.query(
       `SELECT p.id, p.name, p.client_business_id,
               cb.client_id, cb.business_name AS client_business_name,
-              c.client_name, c.color AS client_color
+              c.client_name, c.color AS client_color, c.business_id AS client_sop_business_id,
+              b.business_name AS client_sop_business_name
        FROM projects p
        LEFT JOIN client_businesses cb ON p.client_business_id = cb.id
        LEFT JOIN clients c ON cb.client_id = c.id
+       LEFT JOIN businesses b ON c.business_id = b.id
        WHERE p.client_business_id IN (?)`,
       [businessIds]
     );
@@ -1488,6 +1491,8 @@ async function getMyTaskHierarchy(userId) {
         id: p.client_id,
         client_name: p.client_name,
         color: p.client_color || null,
+        business_id: p.client_sop_business_id,
+        business_name: p.client_sop_business_name,
         businesses: new Map(),
       });
     }
@@ -1505,9 +1510,11 @@ async function getMyTaskHierarchy(userId) {
   if (businessIds.length > 0) {
     const [taskBizRows] = await db.query(
       `SELECT cb.id AS business_id, cb.business_name, cb.client_id,
-              c.client_name, c.color AS client_color
+              c.client_name, c.color AS client_color, c.business_id AS client_sop_business_id,
+              b.business_name AS client_sop_business_name
        FROM client_businesses cb
        LEFT JOIN clients c ON cb.client_id = c.id
+       LEFT JOIN businesses b ON c.business_id = b.id
        WHERE cb.id IN (?)`,
       [businessIds]
     );
@@ -1518,6 +1525,8 @@ async function getMyTaskHierarchy(userId) {
           id: b.client_id,
           client_name: b.client_name,
           color: b.client_color || null,
+          business_id: b.client_sop_business_id,
+          business_name: b.client_sop_business_name,
           businesses: new Map(),
         });
       }
@@ -1560,6 +1569,8 @@ async function getMyTaskHierarchy(userId) {
         id: clientId,
         client_name: t.client_name || 'Unassigned Client',
         color: t.client_color || null,
+        business_id: t.client_sop_business_id,
+        business_name: t.client_sop_business_name,
         businesses: new Map(),
       });
     }
@@ -1575,6 +1586,8 @@ async function getMyTaskHierarchy(userId) {
     id: c.id,
     client_name: c.client_name,
     color: c.color,
+    business_id: c.business_id,
+    business_name: c.business_name,
     businesses: Array.from(c.businesses.values()),
   }));
 

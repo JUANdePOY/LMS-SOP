@@ -38,6 +38,7 @@ export default function MyTasksPage() {
   // When arriving from a "You have been assigned a task" banner, scope the
   // table to the single project tree that contains that task.
   const [scope, setScope] = useState(null);
+  const [sopBusinessScope, setSopBusinessScope] = useState(null);
   useEffect(() => {
     if (!focusTaskId) {
       setScope(null);
@@ -56,6 +57,26 @@ export default function MyTasksPage() {
       projectId: projectId ?? null,
     });
   }, [focusTaskId, hierarchy.tasks, hierarchy.projectsById]);
+
+  useEffect(() => {
+    const biz = searchParams.get('sopBusiness');
+    setSopBusinessScope(biz);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const clientId = searchParams.get('client');
+    const businessId = searchParams.get('business');
+    if (focusTaskId) return;
+    if (clientId || businessId) {
+      setScope({
+        clientId: clientId || null,
+        businessId: businessId || null,
+        projectId: null,
+      });
+    } else {
+      setScope(null);
+    }
+  }, [searchParams, focusTaskId]);
 
   // Identify tasks that still have an unread assignment notification so we can
   // surface a red "New" badge on each task row. The badge clears for a task once
@@ -98,9 +119,20 @@ export default function MyTasksPage() {
   }, [tasks, statusFilter, priorityFilter, search]);
 
   const scopedTasks = useMemo(() => {
-    if (!scope || !scope.projectId) return displayedTasks;
-    return (tasks || []).filter((t) => String(getProjectId(t)) === String(scope.projectId));
-  }, [tasks, displayedTasks, scope]);
+    let result = displayedTasks;
+    if (sopBusinessScope) {
+      const clientIdsInBiz = new Set(
+        (hierarchy.clientTree || [])
+          .filter((c) => String(c.business_id) === String(sopBusinessScope))
+          .map((c) => String(c.id))
+      );
+      result = result.filter((t) => clientIdsInBiz.has(String(t.client_id)));
+    }
+    if (scope && scope.projectId) {
+      result = result.filter((t) => String(getProjectId(t)) === String(scope.projectId));
+    }
+    return result;
+  }, [displayedTasks, scope, sopBusinessScope, hierarchy.clientTree]);
 
   const matchingBusinessIds = useMemo(() => {
     const ids = new Set();
@@ -118,9 +150,13 @@ export default function MyTasksPage() {
   }, [scopedTasks, hierarchy.projectsById]);
 
   const scopedClientTree = useMemo(() => {
+    let tree = hierarchy.clientTree || [];
+    if (sopBusinessScope) {
+      tree = tree.filter((c) => String(c.business_id) === String(sopBusinessScope));
+    }
     const filtersActive = search || statusFilter || priorityFilter;
     if (scope) {
-      const base = (hierarchy.clientTree || [])
+      const base = tree
         .filter((c) => !scope.clientId || String(c.id) === String(scope.clientId))
         .map((c) => ({
           ...c,
@@ -139,15 +175,15 @@ export default function MyTasksPage() {
       return base;
     }
     if (filtersActive && matchingBusinessIds.size > 0) {
-      return (hierarchy.clientTree || [])
+      return tree
         .map((c) => ({
           ...c,
           businesses: (c.businesses || []).filter((b) => matchingBusinessIds.has(String(b.id))),
         }))
         .filter((c) => c.businesses.length > 0);
     }
-    return hierarchy.clientTree;
-  }, [hierarchy.clientTree, scope, matchingBusinessIds, search, statusFilter, priorityFilter]);
+    return tree;
+  }, [hierarchy.clientTree, scope, sopBusinessScope, matchingBusinessIds, search, statusFilter, priorityFilter]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -368,7 +404,7 @@ export default function MyTasksPage() {
           userDepartmentId={isDepartmentHead ? (user?.department_id ?? null) : null}
           showCountBadges={true}
           newTaskIds={newTaskIds}
-          autoExpand={!!(search || statusFilter || priorityFilter)}
+          autoExpand={!!(search || statusFilter || priorityFilter || sopBusinessScope)}
         />
       )}
 
