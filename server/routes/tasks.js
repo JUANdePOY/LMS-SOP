@@ -100,6 +100,39 @@ router.post('/batch', authenticateToken, requirePermissionAction('manage_tasks',
 // Admin: bulk delete tasks
 router.post('/batch/delete', authenticateToken, requirePermissionAction('manage_tasks', 'delete'), taskController.batchDeleteTasks);
 
+function bulkUploadMiddleware(req, res, next) {
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 25 * 1024 * 1024 },
+    fileFilter(req, file, cb) {
+      const ext = safeExtFromOriginal(file.originalname);
+      const mime = String(file.mimetype || '').toLowerCase();
+      const allowedMimes = new Set([
+        'text/csv',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+        'application/json',
+      ]);
+      const allowedExts = new Set(['.csv', '.xlsx', '.xls', '.json']);
+      if (!allowedMimes.has(mime) && !allowedExts.has(ext)) {
+        return cb(new Error('Invalid file type. Allowed: CSV, XLSX, JSON.'), false);
+      }
+      cb(null, true);
+    },
+  }).single('file');
+
+  upload(req, res, (err) => {
+    if (err) {
+      const msg = err.code === 'LIMIT_FILE_SIZE' ? 'File too large (max 25 MB)' : err.message || 'Upload failed';
+      return res.status(400).json({ success: false, message: msg, code: 'VALIDATION_ERROR' });
+    }
+    next();
+  });
+}
+
+// Admin: bulk upload tasks
+router.post('/bulk-upload', authenticateToken, requirePermissionAction('manage_tasks', 'create'), bulkUploadMiddleware, taskController.bulkUploadTasks);
+
 // User: my tasks
 router.get('/my', authenticateToken, taskController.getMyTasks);
 

@@ -14,6 +14,7 @@ import InlineBusinessForm from "@/features/task-management/components/InlineBusi
 import ConfirmationDialog from "@/shared/components/ui/ConfirmationDialog";
 import { getMyTaskHierarchy } from "@/features/task-management/services/taskService";
 import { getDepartmentsForAssignment } from "@/features/task-management/api/assignment.api";
+import BulkUploadWizardModal from "@/features/organization-management/components/BulkUploadWizardModal";
 
 /**
  * Secondary (nested) sidebar shown beside the main nav rail. Lists every SOP
@@ -144,8 +145,9 @@ export default function SecondarySidebar({ collapsed = false }) {
    const [addingClientDeptId, setAddingClientDeptId] = useState(null); // department id or null
    const [addingUnitClient, setAddingUnitClient] = useState(null); // client id or null
    const [menu, setMenu] = useState(null); // { kind: 'client'|'unit', id, clientId, name }
-   const [pendingDelete, setPendingDelete] = useState(null);
-   // When true, the "New Client" control shows an SOP-business picker first so a
+    const [pendingDelete, setPendingDelete] = useState(null);
+    const [bulkUploadWizardBiz, setBulkUploadWizardBiz] = useState(null);
+    // When true, the "New Client" control shows an SOP-business picker first so a
    // client is always created under a chosen business rather than unassigned.
    const [clientBizPicker, setClientBizPicker] = useState(false);
    // Holds the chosen business while the department picker is shown (next step).
@@ -571,33 +573,40 @@ export default function SecondarySidebar({ collapsed = false }) {
             >
               <Plus size={14} />
             </button>
-            {user?.role === 'super_admin' && (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenu((m) => (m?.kind === "business" && m.id === Number(key) ? null : { kind: "business", id: Number(key), name: label }));
-                  }}
-                  title="More actions"
-                  className="rounded p-1 text-[var(--text-on-sidebar)] opacity-0 transition-opacity hover:bg-[var(--bg-hover)] group-hover:opacity-100"
-                >
-                  <MoreHorizontal size={14} />
-                </button>
-                {menu?.kind === "business" && menu?.id === Number(key) && (
-                  <div className="absolute right-0 top-full z-40 mt-1 w-40 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-lg">
-                    <button
-                      type="button"
-                      onClick={() => requestDelete("business", Number(key), null, label)}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
-                    >
-                      <Trash2 size={13} /> Hide business
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+             {user?.role === 'super_admin' && (
+               <div className="relative">
+                 <button
+                   type="button"
+                   onClick={(e) => {
+                     e.stopPropagation();
+                     setMenu((m) => (m?.kind === "business" && m.id === Number(key) ? null : { kind: "business", id: Number(key), name: label }));
+                   }}
+                   title="More actions"
+                   className="rounded p-1 text-[var(--text-on-sidebar)] opacity-0 transition-opacity hover:bg-[var(--bg-hover)] group-hover:opacity-100"
+                 >
+                   <MoreHorizontal size={14} />
+                 </button>
+                 {menu?.kind === "business" && menu?.id === Number(key) && (
+                   <div className="absolute right-0 top-full z-40 mt-1 w-40 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-lg">
+                     <button
+                       type="button"
+                       onClick={() => { setBulkUploadWizardBiz(Number(key)); setMenu(null); }}
+                       className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                     >
+                       Bulk upload clients
+                     </button>
+                     <button
+                       type="button"
+                       onClick={() => requestDelete("business", Number(key), null, label)}
+                       className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40"
+                     >
+                       <Trash2 size={13} /> Hide business
+                     </button>
+                   </div>
+                 )}
+               </div>
+              )}
+            </div>
           )}
         </div>
         {bOpen && (
@@ -844,6 +853,15 @@ export default function SecondarySidebar({ collapsed = false }) {
           : `Are you sure you want to delete "${pendingDelete?.name || ""}"? This may also affect its business units, projects, and tasks.`}
         confirmText={pendingDelete?.kind === "business" ? "Hide" : "Deletes"}
         variant="destructive"
+      />
+      <BulkUploadWizardModal
+        open={!!bulkUploadWizardBiz}
+        onClose={() => setBulkUploadWizardBiz(null)}
+        toast={toast}
+        refetchClients={refresh}
+        businessId={bulkUploadWizardBiz}
+        businessName={bulkUploadWizardBiz ? businesses.find((b) => Number(b.id) === Number(bulkUploadWizardBiz))?.name : null}
+        departments={departments}
       />
       </div>
     </div>

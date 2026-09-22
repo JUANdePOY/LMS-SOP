@@ -5,6 +5,7 @@ const { validateFilters, validateBatchIds, validateBatchUpdatePayload } = requir
 const taskNotifications = require('../services/taskNotificationService');
 const notificationService = require('../services/notificationService');
 const db = require('../config/database');
+const { parseFile, validateRows } = require('../utils/taskBulkValidation');
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
@@ -444,6 +445,73 @@ const taskController = {
 
       const result = await taskService.batchDeleteTasks(validation.value.ids, req.user.id);
       res.json({ success: true, data: result, message: 'Tasks deleted successfully' });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  async bulkUploadTasks(req, res) {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({
+          success: false,
+          message: 'File is required',
+          code: 'VALIDATION_ERROR',
+        });
+      }
+
+      const format = String(req.body?.format || '').trim().toLowerCase();
+      if (!['csv', 'xlsx', 'xls', 'json'].includes(format)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid format. Supported: csv, xlsx, json',
+          code: 'VALIDATION_ERROR',
+        });
+      }
+
+      let rawRows;
+      try {
+        rawRows = await parseFile(file.buffer, format);
+      } catch (err) {
+        return res.status(400).json({
+          success: false,
+          message: err.message || 'Failed to parse file',
+          code: 'VALIDATION_ERROR',
+        });
+      }
+
+      if (!Array.isArray(rawRows) || rawRows.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'No rows found in file',
+          code: 'VALIDATION_ERROR',
+        });
+      }
+
+      const overrides = {
+        client_id: req.body?.client_id ? Number(req.body.client_id) : null,
+        client_business_id: req.body?.client_business_id ? Number(req.body.client_business_id) : null,
+        assigned_departments: req.body?.assigned_departments ? JSON.parse(req.body.assigned_departments) : null,
+      };
+
+      const { valid, invalid, summary } = await validateRows(rawRows, req.user.id, overrides);
+
+      if (invalid.length > 0) {
+        return res.status(400).json({
+          success: false,
+          data: { summary, invalid },
+          message: 'Some rows failed validation',
+          code: 'VALIDATION_ERROR',
+        });
+      }
+
+      const result = await taskService.bulkCreateTasks(valid, req.user.id, overrides);
+      res.json({
+        success: true,
+        data: { imported: result.imported, summary },
+        message: 'Tasks imported successfully',
+      });
     } catch (error) {
       handleError(res, error);
     }

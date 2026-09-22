@@ -27,3 +27,13 @@ export const deleteClientBusiness = (clientId, businessId) => {
   }
   return api.delete(`/clients/${numClientId}/businesses/${numBusinessId}`);
 };
+
+export const bulkUploadClients = (file, format, businessId) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('format', format);
+  if (businessId != null) formData.append('business_id', String(businessId));
+  return api.post('/clients/bulk-upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then((r) => r.data);
+};

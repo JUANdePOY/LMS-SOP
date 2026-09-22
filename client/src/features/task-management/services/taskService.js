@@ -123,3 +123,18 @@ export async function bulkDeleteTasks(ids) {
   const res = await api.post(`${API_BASE}/batch/delete`, { ids });
   return ensureSuccess(res, 'Failed to delete tasks').data;
 }
+
+export async function bulkUploadTasks(file, format, context = {}) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('format', format);
+  if (context.client_id) formData.append('client_id', String(context.client_id));
+  if (context.client_business_id) formData.append('client_business_id', String(context.client_business_id));
+  if (context.assigned_departments) {
+    formData.append('assigned_departments', JSON.stringify(context.assigned_departments));
+  }
+  const res = await api.post(`${API_BASE}/bulk-upload`, formData, {
+    skipAuthRedirect: true,
+  });
+  return ensureSuccess(res, 'Failed to upload tasks').data;
+}

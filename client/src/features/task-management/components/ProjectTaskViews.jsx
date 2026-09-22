@@ -73,7 +73,8 @@ export default function ProjectTaskViews({
     userBusinessId = null,
     userDepartmentBusinessId = null,
     autoExpand,
-  }) {
+  onOpenBulkUpload,
+}) {
   const [internalView, setInternalView] = useState(() => {
     const validKeys = activeViews || TASK_VIEW_KEYS;
     const initial = storageKey ? localStorage.getItem(storageKey) : null;
@@ -104,46 +105,47 @@ export default function ProjectTaskViews({
       ) : (
         <>
            {view === 'list' && (
-            <TaskHierarchyTable
-              tasks={tasks}
-              projectsById={projectsById}
-              clientTree={clientTree}
-              loading={loading}
-              search={search || ''}
-              onViewTask={onViewTask}
-              onViewSubtasks={onViewSubtasks}
-              onEdit={onEdit}
-              onDelete={onDelete}
-              onStatusChange={onStatusChange}
-              onInlineUpdate={onInlineUpdate}
-              onQuickCreate={onQuickCreate}
-               canManage={canManage}
-               canManageClients={canManageClients}
-               scopeClientId={scopeClientId}
-               scopeBusinessId={scopeBusinessId}
-                 scopeProjectId={scopeProjectId}
-                 userDepartmentId={userDepartmentId}
-               onAddProjectTask={onAddProjectTask}
-              onEditProject={onEditProject}
-              onDeleteImmediate={onDeleteImmediate}
-              onDuplicated={onDuplicated}
-              onQuickAddTask={onQuickAddTask}
-              onQuickAddSubtask={onQuickAddSubtask}
-              onRenameClient={onRenameClient}
-              onRenameBusiness={onRenameBusiness}
-              onRenameProject={onRenameProject}
-               onRenameTask={onRenameTask}
-              onAddChild={onAddChild}
-              onDeleteEntity={onDeleteEntity}
-               onCreateBusiness={onCreateBusiness}
-               onCreateProject={onCreateProject}
-               onCreateClient={onCreateClient}
-                 newTaskIds={newTaskIds}
-                 userRole={userRole}
-                 userBusinessId={userBusinessId}
-                 userDepartmentBusinessId={userDepartmentBusinessId}
-                 autoExpand={autoExpand}
-              />
+              <TaskHierarchyTable
+                tasks={tasks}
+                projectsById={projectsById}
+                clientTree={clientTree}
+                loading={loading}
+                search={search || ''}
+                onViewTask={onViewTask}
+                onViewSubtasks={onViewSubtasks}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onStatusChange={onStatusChange}
+                onInlineUpdate={onInlineUpdate}
+                onQuickCreate={onQuickCreate}
+                 canManage={canManage}
+                 canManageClients={canManageClients}
+                 scopeClientId={scopeClientId}
+                 scopeBusinessId={scopeBusinessId}
+                  scopeProjectId={scopeProjectId}
+                  userDepartmentId={userDepartmentId}
+                onAddProjectTask={onAddProjectTask}
+               onEditProject={onEditProject}
+               onDeleteImmediate={onDeleteImmediate}
+               onDuplicated={onDuplicated}
+               onQuickAddTask={onQuickAddTask}
+               onQuickAddSubtask={onQuickAddSubtask}
+               onRenameClient={onRenameClient}
+               onRenameBusiness={onRenameBusiness}
+               onRenameProject={onRenameProject}
+                onRenameTask={onRenameTask}
+               onAddChild={onAddChild}
+               onDeleteEntity={onDeleteEntity}
+                onCreateBusiness={onCreateBusiness}
+                onCreateProject={onCreateProject}
+                onCreateClient={onCreateClient}
+                  newTaskIds={newTaskIds}
+                  userRole={userRole}
+                  userBusinessId={userBusinessId}
+                  userDepartmentBusinessId={userDepartmentBusinessId}
+                  autoExpand={autoExpand}
+                  onOpenBulkUpload={onOpenBulkUpload}
+                />
           )}
           {view === 'board' && (
             <TaskBoard

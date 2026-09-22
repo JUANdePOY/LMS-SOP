@@ -1,5 +1,6 @@
 const clientModel = require('../models/clientModel');
 const { validateClientPayload } = require('../validators/clientValidator');
+const { parseFile } = require('../utils/taskBulkValidation');
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
@@ -200,6 +201,100 @@ const clientController = {
       if (/Duplicate entry/.test(error.message) && /uk_client_business/.test(error.message)) {
         return res.status(409).json({ success: false, message: 'A business with this name already exists for this client', code: 'DUPLICATE' });
       }
+      handleError(res, error);
+    }
+  },
+
+  async bulkUploadClients(req, res) {
+    try {
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ success: false, message: 'File is required', code: 'VALIDATION_ERROR' });
+      }
+
+      const format = String(req.body?.format || '').trim().toLowerCase();
+      if (!['csv', 'xlsx', 'xls', 'json'].includes(format)) {
+        return res.status(400).json({ success: false, message: 'Invalid format. Supported: csv, xlsx, json', code: 'VALIDATION_ERROR' });
+      }
+
+      let rows;
+      try {
+        rows = await parseFile(file.buffer, format);
+      } catch (err) {
+        return res.status(400).json({ success: false, message: err.message || 'Failed to parse file', code: 'VALIDATION_ERROR' });
+      }
+
+      if (!rows.length) {
+        return res.json({ success: true, data: { created: 0, failed: 0, results: [] }, message: 'No data found in file' });
+      }
+
+      const createdBy = req.user?.id || null;
+      const defaultBusinessId = req.body?.business_id ? Number(req.body.business_id) : null;
+      const results = [];
+      let createdCount = 0;
+      let failedCount = 0;
+
+      for (const row of rows) {
+        const rawIndex = row._rawIndex != null ? row._rawIndex : results.length + 2;
+        const businessesRaw = row.businesses || row.Businesses || row.BUSINESSES || row.business || row.Business || row.BUSINESS || '';
+        const businessList = String(businessesRaw)
+          .split(/[;,]/)
+          .map((b) => String(b).trim())
+          .filter((b) => b.length > 0);
+
+        const rowBusinessId = row.business_id || row.Business_ID || row.BUSINESS_ID || row.businessId || row.businessid || defaultBusinessId;
+
+        const validation = validateClientPayload({
+          client_name: row.client_name || row.Client_Name || row.Client || row.CLIENT || row.client || row.CLIENT_NAME || row['Client Name'] || row['CLIENT NAME'],
+          business_id: rowBusinessId,
+          businesses: businessList,
+        }, false);
+
+        if (!validation.valid) {
+          failedCount++;
+          results.push({
+            row: rawIndex,
+            status: 'failed',
+            error: validation.errors.join('; '),
+            data: row,
+          });
+          continue;
+        }
+
+        try {
+          const clientId = await clientModel.createClient({
+            client_name: validation.value.client_name,
+            businesses: validation.value.businesses,
+            created_by: createdBy,
+            business_id: validation.value.business_id,
+            department_id: validation.value.department_id,
+          });
+          createdCount++;
+          results.push({
+            row: rawIndex,
+            status: 'created',
+            client_id: clientId,
+            client_name: validation.value.client_name,
+            businesses: validation.value.businesses,
+          });
+        } catch (err) {
+          failedCount++;
+          const message = err.code === 'ER_DUP_ENTRY' ? 'Duplicate client name' : err.message;
+          results.push({
+            row: rawIndex,
+            status: 'failed',
+            error: message,
+            data: row,
+          });
+        }
+      }
+
+      res.json({
+        success: true,
+        data: { created: createdCount, failed: failedCount, results },
+        message: `Bulk upload complete. Created: ${createdCount}, Failed: ${failedCount}`,
+      });
+    } catch (error) {
       handleError(res, error);
     }
   },

@@ -13,6 +13,7 @@ import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import EntityDetailPanel from '../components/EntityDetailPanel';
 import BulkActionBar from '../components/BulkActionBar';
 import TaskForm from '../components/TaskForm';
+import TaskBulkUploadModal from '../components/TaskBulkUploadModal';
 import { deleteClient, deleteClientBusiness } from '../api/client.api';
 import { deleteProject } from '../services/projectService';
 import api from '@/services/api';
@@ -24,6 +25,7 @@ import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
 import { notifyOrgTreeChanged, useOrgTreeVersion } from '@/shared/store/orgTreeBus';
 import ClientFormModal from '../components/ClientFormModal';
 import { isOverdue } from '../utils/taskDateUtils';
+import { Button } from '@/shared/components/ui/button';
 
 const VIEW_STORAGE_KEY = 'ppm:tasks:view';
 
@@ -68,6 +70,11 @@ export default function TasksPage() {
   const [taskDefaults, setTaskDefaults] = useState(undefined);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [showAddClient, setShowAddClient] = useState(false);
+  const [bulkUploadContext, setBulkUploadContext] = useState(null);
+
+  const handleOpenBulkUpload = useCallback((ctx) => {
+    setBulkUploadContext(ctx);
+  }, []);
 
   const toggleSelect = useCallback((id) => {
     const key = String(id);
@@ -932,6 +939,7 @@ export default function TasksPage() {
           onCreateClient={handleCreateClient}
           onDeleteEntity={handleDeleteEntity}
           autoExpand={!!hasActiveFilters}
+          onOpenBulkUpload={handleOpenBulkUpload}
         />
       )}
 
@@ -1002,6 +1010,18 @@ export default function TasksPage() {
           onClear={clearSelection}
         />
       )}
+
+      <TaskBulkUploadModal
+        open={!!bulkUploadContext}
+        onClose={() => setBulkUploadContext(null)}
+        toast={toast}
+        refetch={() => { refreshTasks(); refreshStats(); }}
+        businessId={bulkUploadContext?.businessId}
+        businessName={bulkUploadContext?.businessName}
+        clientId={bulkUploadContext?.clientId}
+        clientName={bulkUploadContext?.clientName}
+        departments={bulkUploadContext?.departments}
+      />
     </div>
   );
 }

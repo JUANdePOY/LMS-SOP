@@ -10,6 +10,122 @@ const { logAudit } = require('../utils/auditLogger');
 const { computeAutoStatus, deriveParentStatus } = require('../utils/taskStatus');
 const { validateTaskPayload, validateAssignmentPayload, validateProgressPayload, validateCommentPayload } = require('../validators/taskValidator');
 const taskDueReminder = require('./taskDueReminderService');
+const { validateRows } = require('../utils/taskBulkValidation');
+
+async function bulkCreateTasks(rows, actorId, overrides = {}) {
+  const isAdmin = await isUserAdmin(actorId);
+  if (!isAdmin) {
+    const error = new Error('Only admins can bulk upload tasks');
+    error.code = 'FORBIDDEN';
+    throw error;
+  }
+
+  const actor = await getUser(actorId);
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const imported = [];
+    const errors = [];
+
+    for (const rowData of rows) {
+      const { payload, title, raw } = rowData;
+
+      if (!title) {
+        errors.push({ row: raw._rawIndex, message: 'Title is required' });
+        continue;
+      }
+
+      if (payload.parent_task_id) {
+        const [parentRows] = await conn.query('SELECT id FROM tasks WHERE id = ? LIMIT 1', [payload.parent_task_id]);
+        if (!parentRows.length) {
+          errors.push({ row: raw._rawIndex, message: 'Parent task not found' });
+          continue;
+        }
+      }
+
+      if (!payload.parent_task_id && actor?.role === 'department_head') {
+        try {
+          await assertClientScopeForTaskCreate(actorId, payload.client_id, payload.client_business_id);
+        } catch (err) {
+          errors.push({ row: raw._rawIndex, message: err.message || 'Scope violation' });
+          continue;
+        }
+      }
+
+      const clientId = overrides.client_id ?? payload.client_id ?? null;
+      const clientBusinessId = overrides.client_business_id ?? payload.client_business_id ?? null;
+      const businessId = overrides.business_id ?? payload.business_id ?? null;
+      const assignedDepartments = overrides.assigned_departments ?? payload.assigned_departments ?? [];
+
+      const [result] = await conn.query(
+        `INSERT INTO tasks (
+          title, description, priority, status, start_datetime, deadline_datetime,
+          estimated_hours, category, created_by, parent_task_id, client_id,
+          client_business_id, business_id, project_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          title,
+          payload.description || null,
+          payload.priority || 'Medium',
+          payload.status || 'Pending',
+          payload.start_datetime ? payload.start_datetime.replace('T', ' ') : null,
+          payload.deadline_datetime ? payload.deadline_datetime.replace('T', ' ') : null,
+          payload.estimated_hours || null,
+          payload.category || null,
+          actorId,
+          payload.parent_task_id ?? null,
+          clientId,
+          clientBusinessId,
+          businessId,
+          payload.project_id ?? null,
+        ]
+      );
+
+      const taskId = result.insertId;
+
+      if (Array.isArray(assignedDepartments)) {
+        for (const deptId of assignedDepartments) {
+          if (!deptId) continue;
+          try {
+            await conn.query(
+              'INSERT INTO task_assignments (task_id, assignment_type, reference_id, assigned_by) VALUES (?, ?, ?, ?)',
+              [taskId, 'Department', Number(deptId), actorId]
+            );
+          } catch (err) {
+            errors.push({ row: raw._rawIndex, message: `Failed to assign department ${deptId}: ${err.message}` });
+            continue;
+          }
+        }
+      }
+
+      imported.push({ task_id: taskId, title });
+    }
+
+    if (errors.length > 0) {
+      await conn.rollback();
+      const error = new Error(errors.map((e) => e.message).join('; '));
+      error.code = 'VALIDATION_ERROR';
+      error.details = errors;
+      throw error;
+    }
+
+    await conn.commit();
+
+    logAudit('task.bulk_upload', actorId, {
+      imported: imported.length,
+      titles: imported.map((i) => i.title),
+    });
+
+    return { imported: imported.length, errors: [] };
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    if (conn && typeof conn.release === 'function') conn.release();
+  }
+}
 
 async function listTasks(filters = {}, actorId) {
   const isAdmin = await isUserAdmin(actorId);
@@ -1936,6 +2052,7 @@ module.exports = {
   getTaskStats,
   batchUpdateTasks,
   batchDeleteTasks,
+  bulkCreateTasks,
   isUserAssignedToTask,
   isUserAssignedToTaskById,
   grantBusinessManager,
