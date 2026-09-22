@@ -47,7 +47,7 @@ export default function SecondarySidebar({ collapsed = false }) {
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-   const { businesses, unassigned, loading, refresh } = useBusinessClientTree();
+    const { businesses, unassigned, loading, refresh } = useBusinessClientTree(isAnyAdmin);
    const orgVersion = useOrgTreeVersion();
    const [hasUnassignedTasks, setHasUnassignedTasks] = useState(false);
 
@@ -184,12 +184,11 @@ export default function SecondarySidebar({ collapsed = false }) {
       if (user?.role === 'super_admin') {
         setClientBizPicker(true);
       } else if (user?.role === 'admin') {
-        // Admins are locked to their own SOP business; pre-select it and go
-        // straight to the department picker.
-        setAddingClientBiz(String(user?.business_id ?? ''));
+        setAddingClientBiz(user?.business_id ?? null);
         setAddingClientDeptId(null);
-        setClientDeptPicker(String(user?.business_id ?? ''));
+        setClientDeptPicker(user?.business_id ?? null);
         setClientNamePicker(false);
+        setClientBizPicker(false);
       } else {
         // Department Head: business + department come from the actor's own
         // scope, so only the name field is needed.
@@ -214,25 +213,27 @@ export default function SecondarySidebar({ collapsed = false }) {
     setExpandedClient((p) => ({ ...p, [clientId]: true }));
   };
 
-   const commitAddClient = async (name) => {
-     const bizId = addingClientBiz === "unassigned" ? null : addingClientBiz;
-     try {
-       await api.post("/clients", {
-         client_name: name,
-         business_id: bizId ? Number(bizId) : null,
-         department_id: addingClientDeptId ? Number(addingClientDeptId) : null,
-       });
-       toast.success("Client created");
-       setAddingClientBiz(null);
-       setAddingClientDeptId(null);
-       setClientDeptPicker(null);
-       refresh();
-       notifyOrgTreeChanged();
-     } catch (err) {
-       toast.error(err.response?.data?.message || "Failed to create client");
-       throw err;
-     }
-   };
+    const commitAddClient = async (name) => {
+      const bizId = addingClientBiz === "unassigned" ? null : addingClientBiz;
+      try {
+        await api.post("/clients", {
+          client_name: name,
+          business_id: bizId ? Number(bizId) : null,
+          department_id: addingClientDeptId ? Number(addingClientDeptId) : null,
+        });
+        toast.success("Client created");
+        setAddingClientBiz(null);
+        setAddingClientDeptId(null);
+        setClientDeptPicker(null);
+        setClientBizPicker(false);
+        setClientNamePicker(false);
+        refresh();
+        notifyOrgTreeChanged();
+      } catch (err) {
+        toast.error(err.response?.data?.message || "Failed to create client");
+        throw err;
+      }
+    };
 
   const commitAddUnit = async (name) => {
     try {
@@ -611,7 +612,7 @@ export default function SecondarySidebar({ collapsed = false }) {
         </div>
         {bOpen && (
           <ul className="ml-[22px] mt-0.5 space-y-0.5 border-l border-[var(--border-sidebar)] pb-0.5">
-            {addingClientBiz === key && (
+            {addingClientBiz === key && !clientNamePicker && (
               <InlineNameRow
                 placeholder="New client name…"
                 onCommit={commitAddClient}

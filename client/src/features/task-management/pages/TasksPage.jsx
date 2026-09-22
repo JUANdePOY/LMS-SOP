@@ -647,8 +647,6 @@ export default function TasksPage() {
     return result;
   }, [clientTree, clientParam, businessParam, projectParam, projectsById, isDepartmentHead, user, matchingBusinessIds, search, statusFilter, priorityFilter, assigneeFilter]);
 
-  console.log('[TasksPage] scopedClientTree', 'count=' + (scopedClientTree?.length ?? 0), 'first=' + (scopedClientTree?.[0]?.id ?? 'none'), 'clientTree=' + (clientTree?.length ?? 0));
-
   const handleSubmit = async (payload) => {
     setSaving(true);
     try {

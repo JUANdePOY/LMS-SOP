@@ -313,18 +313,21 @@ async function enrichAssignmentRows(assignments) {
 // ON DELETE CASCADE and self-references are rejected by the validator, but we
 // guard anyway). Each node is enriched with assignments + auto status so the
 // client can render the tree without extra round-trips.
-async function buildSubtree(parentId, depth = 0) {
+async function buildSubtree(parentId, depth = 0, actorId = null) {
   if (depth > 6) return [];
   const children = await taskModel.findByParentId(parentId);
   const nodes = [];
   for (const child of children) {
     const assignments = await taskAssignmentModel.findByTaskId(child.id);
+    const isAssigned = actorId != null ? await isUserAssignedToTaskById(actorId, child.id) : false;
     nodes.push({
       ...child,
       auto_status: computeAutoStatus(child.start_datetime, child.deadline_datetime, child.status),
       status: child.status,
       assignments: await enrichAssignmentRows(assignments),
-      subtasks: await buildSubtree(child.id, depth + 1),
+      can_edit: isAssigned,
+      can_interact: isAssigned,
+      subtasks: await buildSubtree(child.id, depth + 1, actorId),
     });
   }
   return nodes;
@@ -429,18 +432,42 @@ async function getTask(id, actorId) {
 
   const customFields = await projectModel.getTaskCustomFields(id);
 
-  const subtasks = await buildSubtree(id);
+  const subtasks = await buildSubtree(id, 0, actorId);
+
+  // Compute derived progress_rate for parent tasks from children's latest
+  // completion_rate, matching the list view behavior.
+  let derivedProgressRate = null;
+  if (subtasks.length > 0) {
+    const childIds = subtasks.map((s) => s.id);
+    const [childProgressRows] = await db.query(
+      `SELECT tp.task_id, tp.completion_rate
+       FROM task_progress tp
+       INNER JOIN (
+         SELECT task_id, MAX(updated_at) AS max_updated
+         FROM task_progress
+         WHERE task_id IN (?)
+         GROUP BY task_id
+       ) latest ON tp.task_id = latest.task_id AND tp.updated_at = latest.max_updated`,
+      [childIds]
+    );
+    const progressMap = {};
+    childProgressRows.forEach((p) => { progressMap[p.task_id] = p.completion_rate; });
+    const rates = subtasks.map((s) => Number(progressMap[s.id] ?? 0));
+    derivedProgressRate = Math.round(rates.reduce((sum, r) => sum + r, 0) / rates.length);
+  }
 
   // Capability flags consumed by the task-detail drawer so it enables exactly
   // the controls the actor is allowed to perform:
-  //   can_edit    — updateTask gate: admin, creator, or a granted business
-  //                  manager of this task's business. Gates title, description,
-  //                  status, priority, start/due dates, and assignees.
+  //   can_edit    — updateTask gate: admin, creator, a granted business
+  //                  manager of this task's business, OR any direct assignee
+  //                  of a sub-task. Gates title, description, status, priority,
+  //                  start/due dates, and assignees.
   //   can_interact — progress / attachments / comments gate: admin, a direct
   //                  (User/Department/Position) assignee, or a granted business
   //                  manager of this task's business.
-  const canEdit = isAdmin || task.created_by === actorId || await isTaskEditableByManager(actorId, id);
-  const canInteract = isAdmin || await isUserAssignedToTaskById(actorId, id);
+  const isAssigned = await isUserAssignedToTaskById(actorId, id);
+  const canEdit = isAdmin || task.created_by === actorId || await isTaskEditableByManager(actorId, id) || (isAssigned && task.parent_task_id != null);
+  const canInteract = isAdmin || isAssigned;
 
   return {
     ...task,
@@ -452,6 +479,7 @@ async function getTask(id, actorId) {
     attachments: enrichedTaskAttachments,
     custom_fields: customFields,
     subtasks,
+    progress_rate: derivedProgressRate ?? task.progress_rate ?? null,
     can_edit: canEdit,
     can_interact: canInteract,
   };
@@ -652,7 +680,9 @@ async function updateTask(id, payload, actorId) {
   // tasks created by other users — that's the whole point of the grant. They
   // are restricted to the MANAGER_ALLOWED_FIELDS set below.
   const isManager = !isAdmin && await isTaskEditableByManager(actorId, id);
-  if (task.created_by !== actorId && !isAdmin && !isManager) {
+  const isAssigned = !isAdmin && !isManager ? await isUserAssignedToTaskById(actorId, id) : false;
+  const canEditSubtask = isAssigned && task.parent_task_id != null;
+  if (task.created_by !== actorId && !isAdmin && !isManager && !canEditSubtask) {
     const error = new Error('You are not authorized to update this task');
     error.code = 'FORBIDDEN';
     throw error;
@@ -663,6 +693,17 @@ async function updateTask(id, payload, actorId) {
     if (disallowed.length) {
       const error = new Error(
         `Business managers can only edit title, description, status, priority, start date, and due date. Cannot modify: ${disallowed.join(', ')}`
+      );
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
+  }
+  if (canEditSubtask) {
+    const attempted = Object.keys(payload).filter((k) => payload[k] !== undefined);
+    const disallowed = attempted.filter((k) => !MANAGER_ALLOWED_FIELDS.has(k) && k !== 'assignments');
+    if (disallowed.length) {
+      const error = new Error(
+        `Subtask assignees can only edit title, description, status, priority, start date, due date, and assignments. Cannot modify: ${disallowed.join(', ')}`
       );
       error.code = 'FORBIDDEN';
       throw error;
@@ -696,6 +737,36 @@ async function updateTask(id, payload, actorId) {
 
   await taskModel.update(id, validation.value);
 
+  // When the stored status actually changed, mirror it into task_progress so
+  // parent progress derivation (average of children's completion_rate) and the
+  // progress table stay in sync with the task row.
+  if (validation.value.status !== undefined && validation.value.status !== task.status) {
+    const completionRate = validation.value.status === 'Completed' ? 100
+      : validation.value.status === 'In Progress' ? 50
+      : 0;
+
+    await taskProgressModel.create({
+      task_id: id,
+      user_id: actorId,
+      completion_rate: completionRate,
+      status: validation.value.status,
+      notes: null,
+    });
+
+    // Recompute the parent task's status from its children so the parent moves
+    // to the correct status row and KPI stats stay consistent.
+    if (task.parent_task_id != null) {
+      const children = await taskModel.findByParentId(task.parent_task_id);
+      const parent = await taskModel.findById(task.parent_task_id);
+      if (parent && parent.status !== 'Cancelled') {
+        const derived = deriveParentStatus(children);
+        if (derived && derived !== parent.status) {
+          await taskModel.update(parent.id, { status: derived });
+        }
+      }
+    }
+  }
+
   // When assignments are explicitly provided (including an empty array), treat
   // it as a full replace: sync the stored rows to exactly match the payload so
   // clearing all assignees actually removes them. Only skip when the key is
@@ -721,12 +792,13 @@ async function updateTask(id, payload, actorId) {
            error.details = assignmentValidation.errors;
            throw error;
          }
-         // Enforce assignment scope on each new assignment.
-         const scopeCheck = await validateAssignmentScope(
-           actorId,
-           assignmentValidation.value.assignment_type,
-           assignmentValidation.value.reference_id
-         );
+          // Enforce assignment scope on each new assignment.
+          const scopeCheck = await validateAssignmentScope(
+            actorId,
+            assignmentValidation.value.assignment_type,
+            assignmentValidation.value.reference_id,
+            id
+          );
          if (!scopeCheck.valid) {
            const error = new Error(scopeCheck.message);
            error.code = 'FORBIDDEN';
@@ -833,13 +905,14 @@ async function assignTask(payload, actorId) {
      }
    }
 
-   // Enforce assignment scope: department_head can only assign within their
-   // department; admin can only assign within their business.
-   const scopeCheck = await validateAssignmentScope(
-     actorId,
-     validation.value.assignment_type,
-     validation.value.reference_id
-   );
+    // Enforce assignment scope: department_head can only assign within their
+    // department; admin can only assign within their business.
+    const scopeCheck = await validateAssignmentScope(
+      actorId,
+      validation.value.assignment_type,
+      validation.value.reference_id,
+      validation.value.task_id
+    );
    if (!scopeCheck.valid) {
      const error = new Error(scopeCheck.message);
      error.code = 'FORBIDDEN';
@@ -930,9 +1003,10 @@ async function updateProgress(payload, actorId) {
   }
 
   // Block progress edits on finalized tasks. To change the progress rate the
-  // user must first move the task out of Completed/Cancelled via its status.
-  // Status-only changes (e.g. re-opening a Completed task) are still allowed.
-  if (completion_rate !== undefined && (task.status === 'Completed' || task.status === 'Cancelled')) {
+  // user must first move the task out of Cancelled via its status.
+  // Completed tasks are allowed because saving 100% is the expected final
+  // state, and the code below auto-corrects any Completed save to 100%.
+  if (completion_rate !== undefined && task.status === 'Cancelled') {
     const error = new Error('Update the Status Before editing the progress rate');
     error.code = 'VALIDATION_ERROR';
     throw error;
@@ -992,18 +1066,6 @@ async function updateProgress(payload, actorId) {
       const derived = deriveParentStatus(children);
       if (derived && derived !== parent.status) {
         await taskModel.update(parent.id, { status: derived });
-      }
-    }
-  }
-
-  // When a parent task's status is explicitly changed, propagate it to its direct
-  // children so they "respect the parent status" and the parent row stays consistent
-  // with what the user selected.
-  if (task.parent_task_id == null && status) {
-    const children = await taskModel.findByParentId(task.id);
-    for (const child of children) {
-      if (child.status !== status) {
-        await taskModel.update(child.id, { status });
       }
     }
   }
@@ -1541,14 +1603,63 @@ async function isUserAdmin(userId) {
 // Validates that an actor (assigner) is allowed to assign the given
 // assignment_type + reference_id target. Enforces department-level isolation
 // for department_head and business-level isolation for admin.
+// If taskId is provided, users assigned to that task may also assign other
+// users (scoped to their department).
 // Returns { valid: true } or { valid: false, message: '...' }.
-async function validateAssignmentScope(actorId, assignmentType, referenceId) {
+async function validateAssignmentScope(actorId, assignmentType, referenceId, taskId = null) {
   const [actors] = await db.query(
     'SELECT id, role, business_id, department_id FROM users WHERE id = ? LIMIT 1',
     [actorId]
   );
   const actor = actors[0];
   if (!actor) return { valid: false, message: 'Actor not found' };
+
+  // Allow task assignees to assign other users to the same task.
+  if (taskId != null && !['super_admin', 'admin', 'department_head'].includes(actor.role)) {
+    const [assigned] = await db.query(
+      `SELECT ta.id FROM task_assignments ta
+       WHERE ta.task_id = ?
+         AND (
+           (ta.assignment_type = 'User' AND ta.reference_id = ?)
+           OR (ta.assignment_type = 'Department' AND ta.reference_id = ?)
+           OR (ta.assignment_type = 'Position' AND ta.reference_id = ?)
+         )
+       LIMIT 1`,
+      [taskId, actorId, actor.department_id, actor.position_title]
+    );
+    if (assigned.length > 0) {
+      if (assignmentType === 'User') {
+        const [targets] = await db.query(
+          'SELECT id, business_id, department_id FROM users WHERE id = ? LIMIT 1',
+          [referenceId]
+        );
+        const target = targets[0];
+        if (!target) return { valid: false, message: 'User not found' };
+        if (actor.department_id != null && String(target.department_id) !== String(actor.department_id)) {
+          return { valid: false, message: 'You can only assign users within your department' };
+        }
+        if (actor.business_id != null && target.business_id != null && String(target.business_id) !== String(actor.business_id)) {
+          return { valid: false, message: 'You can only assign users within your business' };
+        }
+        return { valid: true };
+      }
+      if (assignmentType === 'Department') {
+        const [depts] = await db.query(
+          'SELECT id, business_id FROM departments WHERE id = ? LIMIT 1',
+          [referenceId]
+        );
+        const dept = depts[0];
+        if (!dept) return { valid: false, message: 'Department not found' };
+        if (actor.department_id != null && String(dept.id) !== String(actor.department_id)) {
+          return { valid: false, message: 'You can only assign your own department' };
+        }
+        return { valid: true };
+      }
+      if (assignmentType === 'Position') {
+        return { valid: true };
+      }
+    }
+  }
 
   // super_admin: unrestricted
   if (actor.role === 'super_admin') return { valid: true };

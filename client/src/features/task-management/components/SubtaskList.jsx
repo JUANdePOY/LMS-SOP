@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
-import { Plus, Trash2, Check, CalendarDays } from 'lucide-react';
+import { Plus, Check, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import StatusBadge from './StatusBadge';
 import UserAvatar from '@/shared/components/ui/Avatar';
 import { formatDateTime } from '../utils/taskDateUtils';
 import { AssigneePicker } from './TaskListRow';
+import { TASK_STATUSES } from '../constants/taskConstants';
+import { useAuth } from '@/contexts/AuthContext';
 
 function isCompleted(node) {
   return node.auto_status === 'Completed' || node.status === 'Completed';
@@ -52,10 +54,25 @@ function AddSubtaskRow({ parentId, depth, onAdd, autoFocus }) {
   );
 }
 
-function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, onAdd, onAssign }) {
+function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, onAdd, onAssign, onStatusChange }) {
   const done = isCompleted(node);
   const userAssignees = (node.assignments || []).filter((a) => a.assignment_type === 'User');
   const children = node.subtasks || [];
+  const canEdit = Boolean(node.can_edit);
+  const { isAnyAdmin } = useAuth();
+  const [statusOpen, setStatusOpen] = useState(false);
+  const statusRef = useRef(null);
+
+  useEffect(() => {
+    if (!statusOpen) return;
+    const handler = (e) => {
+      if (statusRef.current && !statusRef.current.contains(e.target)) {
+        setStatusOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [statusOpen]);
 
   const handleAssign = (userList) => {
     const teams = (node.assignments || []).filter((a) => a.assignment_type !== 'User');
@@ -93,43 +110,59 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
           {node.title}
         </button>
 
-        {canManage && (
+        {isAnyAdmin ? (
           <span onClick={(e) => e.stopPropagation()} className="shrink-0">
             <AssigneePicker assignments={node.assignments} onSave={handleAssign} />
           </span>
+        ) : (
+          userAssignees.length > 0 && (
+            <span className="flex shrink-0 items-center -space-x-1">
+              {userAssignees.slice(0, 3).map((a, i) => (
+                <UserAvatar
+                  key={`${a.reference_id}-${i}`}
+                  user={{ full_name: a.reference_name, avatar_url: a.avatar_url }}
+                  size="xs"
+                  className="ring-2 ring-[var(--bg-surface)]"
+                />
+              ))}
+            </span>
+          )
         )}
 
-        <StatusBadge status={node.auto_status} className="shrink-0" />
+        {(canEdit || canManage) ? (
+          <div className="relative shrink-0" ref={statusRef}>
+            <button
+              type="button"
+              onClick={() => setStatusOpen((o) => !o)}
+              className="focus:outline-none"
+            >
+              <StatusBadge status={node.auto_status} />
+            </button>
+            {statusOpen && (
+              <select
+                value={node.status || node.auto_status || 'Pending'}
+                onChange={(e) => {
+                  onStatusChange?.(node.id, e.target.value);
+                  setStatusOpen(false);
+                }}
+                className="absolute right-0 top-full z-10 mt-1 h-7 w-max rounded-md border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-0.5 text-xs shadow-sm focus:border-[var(--color-primary)] focus:outline-none"
+                autoFocus
+              >
+                {TASK_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        ) : (
+          <StatusBadge status={node.auto_status} className="shrink-0" />
+        )}
 
         {node.deadline_datetime && (
           <span className="flex shrink-0 items-center gap-1 text-xs text-[var(--text-muted)]">
             <CalendarDays size={13} />
             {formatDateTime(node.deadline_datetime)}
           </span>
-        )}
-
-        {userAssignees.length > 0 && (
-          <span className="flex shrink-0 items-center -space-x-1">
-            {userAssignees.slice(0, 3).map((a, i) => (
-              <UserAvatar
-                key={`${a.reference_id}-${i}`}
-                user={{ full_name: a.reference_name, avatar_url: a.avatar_url }}
-                size="xs"
-                className="ring-2 ring-[var(--bg-surface)]"
-              />
-            ))}
-          </span>
-        )}
-
-        {canManage && (
-          <button
-            type="button"
-            onClick={() => onDelete(node.id)}
-            aria-label="Delete sub-task"
-            className="shrink-0 rounded-md p-1 text-[var(--text-muted)] opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40"
-          >
-            <Trash2 size={14} />
-          </button>
         )}
       </div>
 
@@ -146,19 +179,20 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
               onOpenTask={onOpenTask}
               onAdd={onAdd}
               onAssign={onAssign}
+              onStatusChange={onStatusChange}
             />
           ))}
         </div>
       )}
 
-      {canManage && (
+      {canManage || canEdit ? (
         <AddSubtaskRow parentId={node.id} depth={depth + 1} onAdd={onAdd} />
-      )}
+      ) : null}
     </div>
   );
 }
 
-export default function SubtaskList({ subtasks = [], canManage, onToggle, onDelete, onAdd, onOpenTask, onAssign, scrollIntoView = false }) {
+export default function SubtaskList({ subtasks = [], canManage, onToggle, onDelete, onAdd, onAssign, onStatusChange, onOpenTask, scrollIntoView = false }) {
   const flat = subtasks || [];
   const doneCount = flat.filter(isCompleted).length;
   const sectionRef = useRef(null);
@@ -228,6 +262,8 @@ export default function SubtaskList({ subtasks = [], canManage, onToggle, onDele
               onDelete={onDelete}
               onOpenTask={onOpenTask}
               onAdd={onAdd}
+              onAssign={onAssign}
+              onStatusChange={onStatusChange}
             />
           ))}
         </div>

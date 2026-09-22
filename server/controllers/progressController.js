@@ -322,6 +322,14 @@ async function enrollStudent(req, res) {
       return res.status(409).json({ success: false, message: 'User is already enrolled in this course', code: 'ALREADY_ENROLLED' });
     }
 
+    const [[targetUser]] = await db.query('SELECT role FROM users WHERE id = ?', [user_id]);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found', code: 'NOT_FOUND' });
+    }
+    if (['department_head', 'admin', 'super_admin'].includes(targetUser.role)) {
+      return res.status(403).json({ success: false, message: 'Cannot assign users with admin roles to courses', code: 'ROLE_ASSIGN_DENIED' });
+    }
+
     const conn = await lessonProgressModel.db.getConnection();
     try {
       await conn.beginTransaction();

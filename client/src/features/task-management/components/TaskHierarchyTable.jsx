@@ -768,6 +768,7 @@ export default function TaskHierarchyTable({
   // Each business row reads from this map; without it the picker would always
   // start empty and the read-only view would never render.
   useEffect(() => {
+    if (!canManage) return;
     const ids = new Set();
     for (const client of clients) {
       for (const business of client.businesses) {
@@ -781,7 +782,7 @@ export default function TaskHierarchyTable({
     // Intentionally keyed on the business-id set only — re-running on every
     // `clients` reference change (e.g. after creating a task) would re-fetch
     // managers/ departments for rows the admin is actively working in.
-  }, [clients, loadBusinessManagers, loadBusinessDepartments]);
+  }, [canManage, clients, loadBusinessManagers, loadBusinessDepartments]);
 
   // Opens an inline "add" row directly under the clicked parent (no modal):
   // a client reveals a business row, a business reveals a task row.

@@ -130,8 +130,9 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
   useEffect(() => {
     if (task) {
       setLocal(task);
+      const derivedRate = task.progress_rate != null ? Number(task.progress_rate) : null;
       const latest = Array.isArray(task.progress) && task.progress.length > 0 ? task.progress[0] : null;
-      const rate = latest ? Number(latest.completion_rate || 0) : Number(task.completion_rate || 0);
+      const rate = derivedRate != null ? derivedRate : (latest ? Number(latest.completion_rate || 0) : Number(task.completion_rate || 0));
       setInlineCompletionRate(rate);
       let status = latest?.status || task.status || 'In Progress';
       if (rate >= 100) status = 'Completed';
@@ -172,6 +173,7 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
       await createTask(buildSubtaskPayload(pid, title));
       toast.success('Sub-task added');
       await load();
+      onUpdated?.(await getTask(taskId));
     } catch (err) {
       toast.error(err.message || 'Failed to add sub-task');
       throw err;
@@ -184,6 +186,16 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
       await load();
     } catch (err) {
       toast.error(err.message || 'Failed to update sub-task');
+    }
+  };
+
+  const handleStatusChangeSubtask = async (id, next) => {
+    try {
+      await updateTask(id, { status: next });
+      await load();
+      toast.success('Sub-task status updated');
+    } catch (err) {
+      toast.error(err.message || 'Failed to update sub-task status');
     }
   };
 
@@ -237,8 +249,9 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
   // priority, start/due dates, update progress, attach files, and comment —
   // even when they are not individually assigned to it.
   const canEdit = !readOnly && (canManageTasks || local.can_edit);
-
   const isAssigned = !readOnly && (canManageTasks || local.can_interact);
+  const canEditDates = !readOnly && canManageTasks;
+  const canEditPriority = !readOnly && canManageTasks;
   // Save only the user picks, but preserve any team/department assignments that
   // the picker doesn't manage so they aren't lost on update.
   const handleAssigneesSave = (userList) => {
@@ -275,18 +288,18 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
           <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Priority</label>
           <div className="flex items-center gap-2">
             <PriorityFlag priority={local.priority} />
-            <select
-              value={local.priority}
-              disabled={!canEdit || saving}
-              onChange={(e) => patch({ priority: e.target.value })}
-              className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)] disabled:opacity-60"
-            >
+              <select
+                value={local.priority}
+                disabled={!canEditPriority || saving}
+                onChange={(e) => patch({ priority: e.target.value })}
+                className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)] disabled:opacity-60"
+              >
               {TASK_PRIORITIES.map((p) => <option key={p} value={p}>{p}</option>)}
             </select>
           </div>
         </div>
-        <EditableDate label="Start" value={local.start_datetime} disabled={!canEdit || saving} onChange={(v) => patch({ start_datetime: v })} />
-        <EditableDate label="Due" value={local.deadline_datetime} disabled={!canEdit || saving} onChange={(v) => patch({ deadline_datetime: v })} />
+        <EditableDate label="Start" value={local.start_datetime} disabled={!canEditDates || saving} onChange={(v) => patch({ start_datetime: v })} />
+        <EditableDate label="Due" value={local.deadline_datetime} disabled={!canEditDates || saving} onChange={(v) => patch({ deadline_datetime: v })} />
       </div>
 
       <div className="px-2">
@@ -319,14 +332,14 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
               <UserIcon size={12} /> {teamAssignees.length} team{teamAssignees.length > 1 ? 's' : ''}
             </span>
           )}
-           {canManageTasks && (
-             <AssigneePicker
-               assignments={local.assignments}
-               onSave={handleAssigneesSave}
-               alwaysAdd
-               buttonClassName="h-7 w-7 justify-center rounded-full border-dashed p-0 text-[var(--text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
-             />
-           )}
+           {canManageTasks && user?.role !== 'employee' && (
+              <AssigneePicker
+                assignments={local.assignments}
+                onSave={handleAssigneesSave}
+                alwaysAdd
+                buttonClassName="h-7 w-7 justify-center rounded-full border-dashed p-0 text-[var(--text-muted)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+              />
+            )}
         </div>
       </div>
 
@@ -337,6 +350,7 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
         onDelete={(id) => setPendingSubtaskId(id)}
         onAdd={handleAddSubtask}
         onAssign={handleAssignSubtask}
+        onStatusChange={handleStatusChangeSubtask}
         onOpenTask={onOpenTask}
         scrollIntoView={focusSubtasks}
       />

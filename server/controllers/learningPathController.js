@@ -115,10 +115,20 @@ async function assignPath(req, res) {
   try {
     if (Array.isArray(user_ids) && user_ids.length) {
       targetUserIds = user_ids.map((id) => parseInt(id, 10));
+      const [users] = await db.query(
+        'SELECT id, role FROM users WHERE id IN (?) AND is_active = TRUE',
+        [targetUserIds]
+      );
+      const admins = users.filter((u) => ['department_head', 'admin', 'super_admin'].includes(u.role));
+      if (admins.length) {
+        return res.status(403).json({ success: false, message: 'Cannot assign users with admin roles to learning paths', code: 'ROLE_ASSIGN_DENIED' });
+      }
+      const foundIds = new Set(users.map((u) => u.id));
+      targetUserIds = targetUserIds.filter((id) => foundIds.has(id));
     } else if (department_id) {
       const [rows] = await db.query(
-        'SELECT id FROM users WHERE department_id = ? AND is_active = TRUE',
-        [parseInt(department_id, 10)]
+        'SELECT id FROM users WHERE department_id = ? AND is_active = TRUE AND role NOT IN (?, ?, ?)',
+        [parseInt(department_id, 10), 'department_head', 'admin', 'super_admin']
       );
       targetUserIds = rows.map((r) => r.id);
     }

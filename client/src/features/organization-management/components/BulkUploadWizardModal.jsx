@@ -5,6 +5,7 @@ import { Upload, X, CheckCircle2, Download, FileText, Table2, Braces } from "luc
 import * as XLSX from "xlsx";
 import { bulkUploadClients } from "@/features/task-management/api/client.api";
 import { createPortal } from "react-dom";
+import { notifyOrgTreeChanged } from "@/shared/store/orgTreeBus";
 
 const CSV_TEMPLATE = `Client Name,Businesses
 "Acme Corp","SOP Business 1,SOP Business 2"`;
@@ -176,6 +177,7 @@ export default function BulkUploadWizardModal({ open, onClose, toast, refetchCli
       setImportResult(payload || {});
       toast.success(payload?.message || 'Import completed');
       if (typeof refetchClients === 'function') refetchClients();
+      notifyOrgTreeChanged();
     } catch (err) {
       setImportResult({ success: false, data: {}, message: err.message || 'Import failed' });
       toast.error(err.message || 'Failed to import clients');

@@ -16,8 +16,13 @@ async function departmentExists(departmentId) {
 }
 
 async function userExists(userId) {
-  const [rows] = await db.query('SELECT id FROM users WHERE id = ? AND is_active = TRUE', [userId]);
-  return Boolean(rows[0]);
+  const [rows] = await db.query('SELECT id, role FROM users WHERE id = ? AND is_active = TRUE', [userId]);
+  return rows[0] || false;
+}
+
+async function getRole(userId) {
+  const [rows] = await db.query('SELECT role FROM users WHERE id = ? LIMIT 1', [userId]);
+  return rows[0]?.role || null;
 }
 
 async function listAssignments(sopId) {
@@ -199,9 +204,15 @@ async function createAssignment(sopId, payload, assignedBy) {
   // Validate that referenced users exist when User or Mixed type.
   if (normalized.assignment_type === 'User' || userIds.length > 0) {
     for (const userId of userIds) {
-      if (!(await userExists(userId))) {
+      const user = await userExists(userId);
+      if (!user) {
         const error = new Error('User not found or inactive');
         error.code = 'VALIDATION_ERROR';
+        throw error;
+      }
+      if (['department_head', 'admin', 'super_admin'].includes(user.role)) {
+        const error = new Error('Cannot assign users with admin roles to SOPs');
+        error.code = 'ROLE_ASSIGN_DENIED';
         throw error;
       }
     }
@@ -246,18 +257,27 @@ async function createAssignment(sopId, payload, assignedBy) {
     userIds.forEach((uid) => targetUserIds.add(uid));
     if (assignedBy) targetUserIds.delete(assignedBy);
 
-    for (const uid of targetUserIds) {
-      notificationService
-        .createSystemNotification({
-          userId: uid,
-          title: 'A new SOP has been assigned to you',
-          body: sop.title,
-          type: 'info',
-          link: `/my-learning/sops/${sopId}`,
-          entityType: 'sop',
-          entityId: sopId,
-        })
-        .catch(() => {});
+    const adminRoles = ['department_head', 'admin', 'super_admin'];
+    if (targetUserIds.size > 0) {
+      const [targetUsers] = await db.query(
+        'SELECT id, role FROM users WHERE id IN (?) AND is_active = TRUE',
+        [[...targetUserIds]]
+      );
+      const adminIds = new Set(targetUsers.filter((u) => adminRoles.includes(u.role)).map((u) => u.id));
+      for (const uid of targetUserIds) {
+        if (adminIds.has(uid)) continue;
+        notificationService
+          .createSystemNotification({
+            userId: uid,
+            title: 'A new SOP has been assigned to you',
+            body: sop.title,
+            type: 'info',
+            link: `/my-learning/sops/${sopId}`,
+            entityType: 'sop',
+            entityId: sopId,
+          })
+          .catch(() => {});
+      }
     }
   } catch (notifyErr) {
     console.error('Failed to send SOP assignment notifications:', notifyErr);

@@ -148,8 +148,8 @@ router.get('/stats', authenticateToken, requirePermissionAction('manage_tasks', 
 // Admin/User: get task by id
 router.get('/:id', authenticateToken, taskController.getTask);
 
-// Admin: update task
-router.put('/:id', authenticateToken, requirePermissionAction('manage_tasks', 'edit'), taskController.updateTask);
+// Admin/Assignee: update task
+router.put('/:id', authenticateToken, taskController.updateTask);
 
 // Admin: delete task
 router.delete('/:id', authenticateToken, requirePermissionAction('manage_tasks', 'delete'), taskController.deleteTask);

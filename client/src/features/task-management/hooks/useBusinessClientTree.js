@@ -14,7 +14,7 @@ import { useOrgTreeVersion } from '@/shared/store/orgTreeBus';
  * Clients with no `business_id` are surfaced under an "Unassigned" pseudo-group
  * so they are never orphaned from the panel.
  */
-export function useBusinessClientTree() {
+export function useBusinessClientTree(isAdmin = false) {
   const [businesses, setBusinesses] = useState([]);
   const [clients, setClients] = useState([]);
   const [projectsByBiz, setProjectsByBiz] = useState({});
@@ -31,7 +31,7 @@ export function useBusinessClientTree() {
       const [bizRes, clientRes, projectRes] = await Promise.allSettled([
         api.get('/businesses', { params: { limit: 1000, status: 'active' } }),
         api.get('/clients'),
-        api.get('/projects', { params: { limit: 1000 } }),
+        ...(isAdmin ? [api.get('/projects', { params: { limit: 1000 } })] : []),
       ]);
 
       const bizRows = bizRes.status === 'fulfilled'

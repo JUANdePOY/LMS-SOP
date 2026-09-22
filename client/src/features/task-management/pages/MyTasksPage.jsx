@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/components/ui/Toast';
@@ -26,6 +26,8 @@ export default function MyTasksPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [hierarchy, setHierarchy] = useState({ tasks: [], projectsById: {}, clientTree: [] });
+  const hierarchyRef = useRef(hierarchy);
+  useEffect(() => { hierarchyRef.current = hierarchy; }, [hierarchy]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [viewingTaskId, setViewingTaskId] = useState(null);
@@ -376,7 +378,11 @@ export default function MyTasksPage() {
         open={viewingTaskId !== null}
         onClose={() => { setViewingTaskId(null); setViewingTaskReadOnly(false); }}
         onUpdated={load}
-        onOpenTask={(id) => setViewingTaskId(id)}
+        onOpenTask={(id) => {
+          const task = hierarchyRef.current.tasks.find((t) => String(t.id) === String(id));
+          setViewingTaskReadOnly(task ? !task.can_edit : true);
+          setViewingTaskId(id);
+        }}
         readOnly={viewingTaskReadOnly}
       />
     </div>

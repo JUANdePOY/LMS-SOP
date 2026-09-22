@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Building2, Users, Layers, ChevronRight, Loader2, Inbox, X } from 'lucide-react';
 import { useBusinessClientTree } from '../hooks/useBusinessClientTree';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 function TreeRow({ depth = 0, icon: Icon, title, meta, open, onToggle, children }) {
   return (
@@ -37,7 +38,8 @@ function TreeRow({ depth = 0, icon: Icon, title, meta, open, onToggle, children 
  * assigned, a clear empty state is shown instead of a blank panel.
  */
 export default function BusinessTreePanel({ businessId, onClose }) {
-  const { businesses, loading, error } = useBusinessClientTree();
+  const { isAnyAdmin } = useAuth();
+  const { businesses, loading, error } = useBusinessClientTree(isAnyAdmin);
 
   const scoped = useMemo(() => {
     if (businessId == null) return businesses;

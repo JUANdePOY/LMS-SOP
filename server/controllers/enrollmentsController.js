@@ -74,10 +74,17 @@ async function enrollStudent(req, res) {
       return res.status(409).json({ success: false, message: 'User is already enrolled in this course', code: 'ALREADY_ENROLLED' });
     }
 
+    const [[targetUser]] = await db.query('SELECT department_id, role FROM users WHERE id = ?', [user_id]);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found', code: 'NOT_FOUND' });
+    }
+    if (['department_head', 'admin', 'super_admin'].includes(targetUser.role)) {
+      return res.status(403).json({ success: false, message: 'Cannot assign users with admin roles to courses', code: 'ROLE_ASSIGN_DENIED' });
+    }
+
     if (req.user.role === 'department_head') {
       const scopedDeptIds = req.user.scoped_department_ids || (req.user.department_id ? [req.user.department_id] : []);
-      const [[targetUser]] = await db.query('SELECT department_id FROM users WHERE id = ?', [user_id]);
-      if (!targetUser || !scopedDeptIds.includes(targetUser.department_id)) {
+      if (!scopedDeptIds.includes(targetUser.department_id)) {
         return res.status(403).json({ success: false, message: 'Cannot enroll users outside your department scope', code: 'DEPT_SCOPE_DENIED' });
       }
     }
@@ -120,11 +127,15 @@ function bulkEnroll(req, res) {
 
   if (req.user.role === 'department_head') {
     const scopedDeptIds = req.user.scoped_department_ids || (req.user.department_id ? [req.user.department_id] : []);
-    db.query('SELECT id, department_id FROM users WHERE id IN (?)', [user_ids])
+    db.query('SELECT id, department_id, role FROM users WHERE id IN (?)', [user_ids])
       .then(([users]) => {
         const outOfScope = users.filter((u) => !scopedDeptIds.includes(u.department_id));
         if (outOfScope.length) {
           return res.status(403).json({ success: false, message: 'Cannot enroll users outside your department scope', code: 'DEPT_SCOPE_DENIED' });
+        }
+        const admins = users.filter((u) => ['department_head', 'admin', 'super_admin'].includes(u.role));
+        if (admins.length) {
+          return res.status(403).json({ success: false, message: 'Cannot assign users with admin roles to courses', code: 'ROLE_ASSIGN_DENIED' });
         }
         return courseModel.findById(course_id);
       })
@@ -153,7 +164,14 @@ function bulkEnroll(req, res) {
       })
       .catch((err) => sendError(res, err, 'Failed to bulk enroll students'));
   } else {
-    courseModel.findById(course_id)
+    db.query('SELECT id, role FROM users WHERE id IN (?)', [user_ids])
+      .then(([users]) => {
+        const admins = users.filter((u) => ['department_head', 'admin', 'super_admin'].includes(u.role));
+        if (admins.length) {
+          return res.status(403).json({ success: false, message: 'Cannot assign users with admin roles to courses', code: 'ROLE_ASSIGN_DENIED' });
+        }
+        return courseModel.findById(course_id);
+      })
       .then((course) => {
         if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
         const enrollments = user_ids.map((uid) => ({ course_id, user_id: uid, role: role || 'learner', status: 'active' }));
@@ -205,7 +223,9 @@ async function bulkEnrollByDepartment(req, res) {
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
 
     const users = await departmentModel.getUsers(departmentId);
-    const activeUserIds = users.filter((u) => u.is_active).map((u) => u.id);
+    const activeUserIds = users
+      .filter((u) => u.is_active && !['department_head', 'admin', 'super_admin'].includes(u.role))
+      .map((u) => u.id);
     if (!activeUserIds.length) {
       return res.status(400).json({ success: false, message: 'No active users found in this department', code: 'NO_USERS' });
     }
