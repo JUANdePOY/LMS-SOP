@@ -718,10 +718,10 @@ async function updateTask(id, payload, actorId) {
   }
   if (canEditSubtask) {
     const attempted = Object.keys(payload).filter((k) => payload[k] !== undefined);
-    const disallowed = attempted.filter((k) => !MANAGER_ALLOWED_FIELDS.has(k) && k !== 'assignments');
+    const disallowed = attempted.filter((k) => !MANAGER_ALLOWED_FIELDS.has(k));
     if (disallowed.length) {
       const error = new Error(
-        `Subtask assignees can only edit title, description, status, priority, start date, due date, and assignments. Cannot modify: ${disallowed.join(', ')}`
+        `Subtask assignees can only edit title, description, status, priority, start date, and due date. Cannot modify: ${disallowed.join(', ')}`
       );
       error.code = 'FORBIDDEN';
       throw error;

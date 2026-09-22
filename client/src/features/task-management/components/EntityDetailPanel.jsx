@@ -92,7 +92,7 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
   const [inlineCompletionRate, setInlineCompletionRate] = useState(0);
   const [inlineStatus, setInlineStatus] = useState('In Progress');
 
-  const canManageTasks = hasPermission('manage_tasks');
+  const canManageTasks = hasPermission('manage_tasks') && (user?.role === 'super_admin' || user?.role === 'admin');
 
   const isTaskOverdue = (task) => {
     if (!task) return false;
