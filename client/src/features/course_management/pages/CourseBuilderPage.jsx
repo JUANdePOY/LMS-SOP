@@ -394,7 +394,12 @@ export default function CourseBuilderPage() {
         requiresQuizPass: !!l.requiresQuizPass,
         passingScore: l.passingScore || null,
         quizId: l.quizId || null,
+        certificateTemplateId: l.certificateTemplateId || null,
+        documentFile: l.documentFile || null,
+        chapters: l.chapters || [],
         thumbnail_url: l.thumbnail_url || l.thumbnailUrl || null,
+        bunnyLibraryId: l.bunnyLibraryId || null,
+        bunnyVideoId: l.bunnyVideoId || null,
       })),
     })),
   }), [form, modules]);

@@ -25,6 +25,8 @@ import {
   hasRestrictablePermission,
   isActivePermission,
   ENTITY_TYPES,
+  getDefinedActions,
+  parseActions,
 } from './rolesPermissionHelpers';
 
 export default function RolesPanel({ activeTab = 'roles' }) {
@@ -47,7 +49,7 @@ export default function RolesPanel({ activeTab = 'roles' }) {
   const [drawerLoading, setDrawerLoading] = useState(false);
 
   const [editRole, setEditRole] = useState(null);
-  const [editRolePermNames, setEditRolePermNames] = useState([]);
+  const [editRolePermActions, setEditRolePermActions] = useState({});
   const [editRoleUsers, setEditRoleUsers] = useState([]);
 
   const [editUser, setEditUser] = useState(null);
@@ -97,7 +99,12 @@ export default function RolesPanel({ activeTab = 'roles' }) {
       ]);
       const roleData = roleRes.data?.data;
       setEditRole(roleData);
-      setEditRolePermNames((roleData?.permissions || []).map(p => p.name));
+      const permActions = {};
+      (roleData?.permissions || []).forEach(p => {
+        const actions = p.role_actions ? parseActions(p.role_actions) : getDefinedActions(p);
+        permActions[p.name] = new Set(actions);
+      });
+      setEditRolePermActions(permActions);
       setEditRoleUsers(usersRes.data?.data?.rows || []);
     } catch {
       toast.error('Failed to load role details');
@@ -156,7 +163,7 @@ export default function RolesPanel({ activeTab = 'roles' }) {
   const closeDrawer = useCallback(() => {
     setDrawerMode(null);
     setEditRole(null);
-    setEditRolePermNames([]);
+    setEditRolePermActions({});
     setEditRoleUsers([]);
     setEditUser(null);
     setEditUserRolePerms([]);
@@ -169,12 +176,23 @@ export default function RolesPanel({ activeTab = 'roles' }) {
 
   /* ---------- toggle handlers ---------- */
 
-  const handleRoleActionToggle = useCallback((perm) => {
-    setEditRolePermNames(prev =>
-      prev.includes(perm.name)
-        ? prev.filter(p => p !== perm.name)
-        : [...prev, perm.name]
-    );
+  const handleRoleActionToggle = useCallback((perm, action) => {
+    setEditRolePermActions(prev => {
+      const current = prev[perm.name] || new Set();
+      const next = new Set(current);
+      if (next.has(action)) {
+        next.delete(action);
+      } else {
+        next.add(action);
+      }
+      const result = { ...prev };
+      if (next.size === 0) {
+        delete result[perm.name];
+      } else {
+        result[perm.name] = next;
+      }
+      return result;
+    });
   }, []);
 
   const handleUserActionToggle = useCallback((perm, action) => {
@@ -220,8 +238,8 @@ export default function RolesPanel({ activeTab = 'roles' }) {
   /* ---------- computed values ---------- */
 
   const rolePermStates = useMemo(
-    () => computeRolePermState(permissions, editRolePermNames),
-    [permissions, editRolePermNames]
+    () => computeRolePermState(permissions, editRolePermActions),
+    [permissions, editRolePermActions]
   );
 
   const userPermStates = useMemo(
@@ -248,7 +266,11 @@ export default function RolesPanel({ activeTab = 'roles' }) {
     if (!editRole) return;
     setSaving(true);
     try {
-      await updateRolePermissions(editRole.name, editRolePermNames);
+      const permissions = Object.entries(editRolePermActions).map(([name, actions]) => ({
+        name,
+        actions: Array.from(actions),
+      }));
+      await updateRolePermissions(editRole.name, permissions);
       toast.success('Role permissions updated');
       closeDrawer();
     } catch (err) {
@@ -467,7 +489,6 @@ export default function RolesPanel({ activeTab = 'roles' }) {
           drawerLoading={drawerLoading}
           saving={saving}
           editRole={editRole}
-          editRolePermNames={editRolePermNames}
           editRoleUsers={editRoleUsers}
           rolePermStates={rolePermStates}
           editUser={editUser}

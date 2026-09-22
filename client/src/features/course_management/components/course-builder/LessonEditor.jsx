@@ -189,7 +189,8 @@ export default function LessonEditor({
     setTitle(lesson.title || "");
     setType(lesson.type || "reading");
     setUrl(lesson.url || lesson.content || "");
-    setDescription(lesson.description || lesson.content || "");
+    const rawDesc = lesson.description || lesson.content || "";
+    setDescription(rawDesc.replace(/<p>\s*<\/p>/g, '').trim());
     setDuration(lesson.duration || "");
     setRequiresQuizPass(!!lesson.requiresQuizPass);
     setPassingScore(lesson.passingScore || "");
@@ -349,10 +350,11 @@ export default function LessonEditor({
   };
 
   const handleSave = () => {
+    const cleanDescription = (description || '').replace(/<p>\s*<\/p>/g, '').trim();
     onSave?.({
       title: title.trim(),
       type,
-      description: type === "reading" ? description : description,
+      description: cleanDescription,
       duration: duration ? parseInt(duration, 10) : null,
       requiresQuizPass: isQuiz ? requiresQuizPass : false,
       passingScore: isQuiz && requiresQuizPass && passingScore ? parseInt(passingScore, 10) : null,
@@ -366,7 +368,7 @@ export default function LessonEditor({
       bunnyVideoId: type === "video" ? bunnyVideoId || null : null,
       url: type === "video" && bunnyLibraryId && bunnyVideoId
         ? `https://iframe.mediadelivery.net/embed/${bunnyLibraryId}/${bunnyVideoId}`
-        : (type === "reading" ? description : url),
+        : (type === "reading" ? cleanDescription : url),
     });
     setHasChanges(false);
     setLastSavedAt(new Date());

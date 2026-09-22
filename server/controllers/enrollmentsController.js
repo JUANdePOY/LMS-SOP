@@ -196,7 +196,7 @@ async function bulkEnrollByDepartment(req, res) {
   if (req.user.role === 'department_head') {
     const scopedDeptIds = req.user.scoped_department_ids || (req.user.department_id ? [req.user.department_id] : []);
     if (!scopedDeptIds.includes(departmentId)) {
-      return res.status(403).json({ success: false, message: 'You are not scoped to this department', code: 'DEPT_SCOPE_DENIED' });
+      return res.status(403).json({ success: false, message: 'You don\'t have access to this department.', code: 'DEPT_SCOPE_DENIED' });
     }
   }
 

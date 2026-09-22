@@ -1,6 +1,6 @@
 import { getDefinedActions, parseActions, CATEGORY_LABELS, COURSE_ACTIONS, SOP_ACTIONS, CLIENT_ACTIONS } from './roleUtils';
 
-export { CATEGORY_LABELS };
+export { CATEGORY_LABELS, getDefinedActions, parseActions };
 
 export const DEPRECATED_PERMISSIONS = new Set();
 
@@ -16,19 +16,19 @@ export const ENTITY_TYPE_CONFIG = {
 
 export const ENTITY_TYPES = Object.keys(ENTITY_TYPE_CONFIG);
 
-export function computeRolePermState(allPermissions, rolePermNames) {
-  const permNameSet = new Set(rolePermNames);
+export function computeRolePermState(allPermissions, rolePermActions) {
   return allPermissions.map(perm => {
     const defined = getDefinedActions(perm);
-    const isGranted = permNameSet.has(perm.name);
+    const selected = rolePermActions?.[perm.name];
+    const isGranted = selected && selected.size > 0;
     return {
       name: perm.name,
       display_name: perm.display_name,
       category: perm.category || 'other',
       granted: isGranted,
       definedActions: defined,
-      selectedActions: isGranted ? [...defined] : [],
-      useDefaults: isGranted,
+      selectedActions: isGranted ? Array.from(selected) : [],
+      useDefaults: isGranted && selected.size === defined.length,
     };
   });
 }

@@ -28,7 +28,7 @@ router.get('/', authenticateToken, async (req, res) => {
   try {
     const role = req.user?.role;
     if (!['super_admin', 'admin', 'department_head'].includes(role)) {
-      return res.status(403).json({ success: false, message: 'Access denied', code: 'FORBIDDEN' });
+      return res.status(403).json({ success: false, message: 'Only administrators, department heads, or system administrators can view the dashboard.', code: 'FORBIDDEN' });
     }
 
     const businessId = await getUserBusinessId(req.user.id);

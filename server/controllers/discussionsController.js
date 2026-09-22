@@ -28,7 +28,7 @@ async function enforceDiscussionScope(courseId, user) {
     [course.department_id]
   );
   if (!dept || user.business_id !== dept.business_id) {
-    const error = new Error('Access denied: discussion is outside your business scope');
+    const error = new Error('You don\'t have access to this discussion.');
     error.statusCode = 403;
     throw error;
   }

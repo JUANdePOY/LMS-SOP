@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { FileText, Download, ExternalLink, HelpCircle, ListChecks, Award, Clock, CheckCircle2, RefreshCw, PlayCircle, AlertCircle, Loader2, ArrowRight } from "lucide-react";
 import { useLessonProgress } from "../hooks/useLessonProgress";
@@ -15,6 +15,7 @@ import SOP_CONTENT_STYLES from "@/features/sop-management/utils/sopContentStyles
 import PublicModuleCard from "@/features/sop-management/components/SOPEditor/PublicModuleCard";
 import { resolveBodyImages } from "@/lib/fileUrl";
 import { getEmployeeSop } from "@/features/employee/api/employeeSop.api";
+import { formatTimestamp, parseTimestamp } from "../utils/videoUrl";
 import CertificateCelebrationModal from "@/features/certificate-management/components/CertificateCelebrationModal";
 import { StaggerList, MotionItem } from "@/shared/motion";
 
@@ -26,6 +27,11 @@ function formatDate(dateStr) {
     month: "short",
     day: "numeric",
   });
+}
+
+function stripEmptyParagraphs(html) {
+  if (!html) return '';
+  return html.replace(/<p>\s*<\/p>/g, '').trim();
 }
 
 export default function LessonPage() {
@@ -47,6 +53,7 @@ export default function LessonPage() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [celebrationCertificate, setCelebrationCertificate] = useState(null);
   const [videoWatched, setVideoWatched] = useState(false);
+  const videoPlayerRef = useRef(null);
 
   const [ sop, setSop ] = useState(null);
   const [ sopLoading, setSopLoading ] = useState(false);
@@ -299,13 +306,36 @@ export default function LessonPage() {
           {currentLesson.type === 'video' ? (
             <div className="p-4 space-y-3">
               <VideoPlayer
+                ref={videoPlayerRef}
                 src={currentLesson.url}
                 title={currentLesson.title}
                 onEnded={() => setVideoWatched(true)}
               />
-              {currentLesson.description && (
-                <div className="prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300">
-                  {currentLesson.description}
+              {stripEmptyParagraphs(currentLesson.description) && (
+                <div className="prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300"
+                  dangerouslySetInnerHTML={{ __html: stripEmptyParagraphs(currentLesson.description) }}
+                />
+              )}
+              {Array.isArray(currentLesson.chapters) && currentLesson.chapters.length > 0 && (
+                <div className="rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 divide-y divide-neutral-100 dark:divide-neutral-800">
+                  {currentLesson.chapters.map((ch, idx) => {
+                    const seconds = parseTimestamp(ch.start) ?? 0;
+                    return (
+                      <button
+                        key={ch.id || idx}
+                        type="button"
+                        onClick={() => videoPlayerRef.current?.seekTo(seconds)}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-left hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
+                      >
+                        <span className="text-xs font-mono text-neutral-500 dark:text-neutral-400 tabular-nums w-14 shrink-0">
+                          {formatTimestamp(seconds)}
+                        </span>
+                        <span className="text-sm text-neutral-800 dark:text-neutral-200 truncate">
+                          {ch.title || `Chapter ${idx + 1}`}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -314,15 +344,15 @@ export default function LessonPage() {
               <h2 className="text-xl font-bold mb-3">{currentLesson.title}</h2>
               <div
                 className={`prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300 ${LB_PROSE}`}
-                dangerouslySetInnerHTML={{ __html: resolveBodyImages(currentLesson.description || currentLesson.content || "No content available.") }}
+                dangerouslySetInnerHTML={{ __html: resolveBodyImages(stripEmptyParagraphs(currentLesson.description) || stripEmptyParagraphs(currentLesson.content) || "No content available.") }}
               />
             </div>
           ) : currentLesson.type === 'quiz' ? (
             <div className="p-6">
               <div className="mb-5">
                 <h2 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-50">{currentLesson.title}</h2>
-                {currentLesson.description && (
-                  <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">{currentLesson.description}</p>
+                {stripEmptyParagraphs(currentLesson.description) && (
+                  <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">{stripEmptyParagraphs(currentLesson.description)}</p>
                 )}
               </div>
               {quizLoading ? (
@@ -616,8 +646,8 @@ export default function LessonPage() {
             ) : currentLesson.type === 'certificate' ? (
             <div className="p-6">
               <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
-              {currentLesson.description && (
-                <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">{currentLesson.description}</p>
+              {stripEmptyParagraphs(currentLesson.description) && (
+                <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">{stripEmptyParagraphs(currentLesson.description)}</p>
               )}
               {certificateLoading ? (
                 <p className="text-sm text-neutral-500">Loading certificate…</p>
@@ -647,8 +677,8 @@ export default function LessonPage() {
           ) : currentLesson.type === 'link' ? (
             <div className="p-6">
               <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
-              {currentLesson.description && (
-                <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">{currentLesson.description}</p>
+              {stripEmptyParagraphs(currentLesson.description) && (
+                <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">{stripEmptyParagraphs(currentLesson.description)}</p>
               )}
               {currentLesson.url && (
                 <a href={currentLesson.url} target="_blank" rel="noreferrer" className="text-sm text-[var(--color-primary)] hover:underline">
@@ -687,10 +717,10 @@ export default function LessonPage() {
             ) : currentLesson.type === 'video' ? (
               <button
                 onClick={handleMarkComplete}
-                disabled={marking || !videoWatched}
+                disabled={marking}
                 className="rounded-lg px-4 py-2 text-sm btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {marking ? 'Saving...' : videoWatched ? 'Mark as Complete' : 'Watch the full video to continue'}
+                {marking ? 'Saving...' : 'Mark as Complete'}
               </button>
             ) : currentLesson.type === 'quiz' ? (
               latestAttempt?.passed ? (

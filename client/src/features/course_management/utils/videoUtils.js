@@ -8,12 +8,12 @@ export function getVideoEmbedInfo(url) {
 
   const yt = trimmed.match(YOUTUBE_RE);
   if (yt && yt[1]) {
-    return { type: "youtube", src: `https://www.youtube.com/embed/${yt[1]}` };
+    return { type: "youtube", src: `https://www.youtube.com/embed/${yt[1]}?enablejsapi=1` };
   }
 
   const vm = trimmed.match(VIMEO_RE);
   if (vm && vm[1]) {
-    return { type: "vimeo", src: `https://player.vimeo.com/video/${vm[1]}` };
+    return { type: "vimeo", src: `https://player.vimeo.com/video/${vm[1]}?api=1` };
   }
 
   return { type: "file", src: trimmed };

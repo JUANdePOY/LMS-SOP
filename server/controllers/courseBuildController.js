@@ -100,7 +100,7 @@ function getVisibleCoursesWhere(user) {
 async function listCourses(req, res) {
   const userId = req.user?.id;
   if (!isAuthoringRole(req.user)) {
-    return res.status(403).json({ success: false, message: 'Forbidden', code: 'FORBIDDEN' });
+    return res.status(403).json({ success: false, message: "You don't have permission to perform this action.", code: 'FORBIDDEN' });
   }
 
   const { page = 1, limit = 20 } = req.query;
@@ -141,7 +141,7 @@ async function listCourses(req, res) {
 async function getCourse(req, res) {
   const userId = req.user?.id;
   if (!isAuthoringRole(req.user)) {
-    return res.status(403).json({ success: false, message: 'Forbidden', code: 'FORBIDDEN' });
+    return res.status(403).json({ success: false, message: "You don't have permission to perform this action.", code: 'FORBIDDEN' });
   }
 
   const courseId = parseInt(req.params.id, 10);
@@ -164,11 +164,11 @@ async function getCourse(req, res) {
     if (req.user.role === 'department_head') {
       const deptId = req.user.department_id;
       if (course.department_id !== deptId && course.department_id !== null) {
-        return res.status(403).json({ success: false, message: 'Forbidden - course does not belong to your department', code: 'FORBIDDEN' });
+        return res.status(403).json({ success: false, message: 'You don\'t have access to this course.', code: 'FORBIDDEN' });
       }
     } else if (req.user.role === 'admin') {
       if (!req.user.business_id) {
-        return res.status(403).json({ success: false, message: 'Your account has no business scope', code: 'BUSINESS_SCOPE_DENIED' });
+        return res.status(403).json({ success: false, message: 'Your account is not assigned to a business.', code: 'BUSINESS_SCOPE_DENIED' });
       }
       if (course.department_id) {
         const [[dept]] = await db.query(
@@ -176,7 +176,7 @@ async function getCourse(req, res) {
           [course.department_id]
         );
         if (!dept || dept.business_id !== req.user.business_id) {
-          return res.status(403).json({ success: false, message: 'Course is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+          return res.status(403).json({ success: false, message: 'This course belongs to a different business.', code: 'BUSINESS_SCOPE_DENIED' });
         }
       }
     }
@@ -197,11 +197,22 @@ async function getCourse(req, res) {
 
     // Map DB snake_case rows to the camelCase shape the client expects
     // (e.g. quiz_id -> quizId, certificate_template_id -> certificateTemplateId).
-    const normalizeLesson = (l) => ({
-      ...l,
-      quizId: l.quiz_id ?? null,
-      certificateTemplateId: l.certificate_template_id ?? null,
-    });
+    const normalizeLesson = (l) => {
+      let chapters = l.chapters;
+      if (typeof chapters === 'string') {
+        try {
+          chapters = JSON.parse(chapters);
+        } catch {
+          chapters = [];
+        }
+      }
+      return {
+        ...l,
+        quizId: l.quiz_id ?? null,
+        certificateTemplateId: l.certificate_template_id ?? null,
+        chapters: Array.isArray(chapters) ? chapters : [],
+      };
+    };
 
     const lessonsByModule = new Map();
     for (const l of lessonsRows) {
@@ -223,7 +234,7 @@ async function getCourse(req, res) {
 async function createCourse(req, res) {
   const userId = req.user?.id;
   if (!isAuthoringRole(req.user)) {
-    return res.status(403).json({ success: false, message: 'Forbidden', code: 'FORBIDDEN' });
+    return res.status(403).json({ success: false, message: "You don't have permission to perform this action.", code: 'FORBIDDEN' });
   }
   if (!req.user?.id) {
     return res.status(401).json({ success: false, message: 'Authentication required' });
@@ -339,7 +350,7 @@ async function createCourse(req, res) {
 async function updateCourse(req, res) {
   const userId = req.user?.id;
   if (!isAuthoringRole(req.user)) {
-    return res.status(403).json({ success: false, message: 'Forbidden', code: 'FORBIDDEN' });
+    return res.status(403).json({ success: false, message: "You don't have permission to perform this action.", code: 'FORBIDDEN' });
   }
 
   const courseId = parseInt(req.params.id, 10);
@@ -356,11 +367,11 @@ async function updateCourse(req, res) {
     if (req.user.role === 'department_head') {
       const deptId = req.user.department_id;
       if (course.department_id !== deptId) {
-        return res.status(403).json({ success: false, message: 'Forbidden - course does not belong to your department', code: 'FORBIDDEN' });
+        return res.status(403).json({ success: false, message: 'You don\'t have access to this course.', code: 'FORBIDDEN' });
       }
     } else if (req.user.role === 'admin') {
       if (!req.user.business_id) {
-        return res.status(403).json({ success: false, message: 'Your account has no business scope', code: 'BUSINESS_SCOPE_DENIED' });
+        return res.status(403).json({ success: false, message: 'Your account is not assigned to a business.', code: 'BUSINESS_SCOPE_DENIED' });
       }
       if (course.department_id) {
         const [[dept]] = await db.query(
@@ -368,7 +379,7 @@ async function updateCourse(req, res) {
           [course.department_id]
         );
         if (!dept || dept.business_id !== req.user.business_id) {
-          return res.status(403).json({ success: false, message: 'Course is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+          return res.status(403).json({ success: false, message: 'This course belongs to a different business.', code: 'BUSINESS_SCOPE_DENIED' });
         }
       }
     }
@@ -579,7 +590,7 @@ async function updateCourse(req, res) {
 async function deleteCourse(req, res) {
   const userId = req.user?.id;
   if (!isAuthoringRole(req.user)) {
-    return res.status(403).json({ success: false, message: 'Forbidden', code: 'FORBIDDEN' });
+    return res.status(403).json({ success: false, message: 'You don\'t have permission to delete this course.', code: 'FORBIDDEN' });
   }
 
   const courseId = parseInt(req.params.id, 10);
@@ -594,11 +605,11 @@ async function deleteCourse(req, res) {
     if (req.user.role === 'department_head') {
       const deptId = req.user.department_id;
       if (course.department_id !== deptId) {
-        return res.status(403).json({ success: false, message: 'Forbidden - course does not belong to your department', code: 'FORBIDDEN' });
+        return res.status(403).json({ success: false, message: 'You don\'t have access to this course.', code: 'FORBIDDEN' });
       }
     } else if (req.user.role === 'admin') {
       if (!req.user.business_id) {
-        return res.status(403).json({ success: false, message: 'Your account has no business scope', code: 'BUSINESS_SCOPE_DENIED' });
+        return res.status(403).json({ success: false, message: 'Your account is not assigned to a business.', code: 'BUSINESS_SCOPE_DENIED' });
       }
       if (course.department_id) {
         const [[dept]] = await db.query(
@@ -606,7 +617,7 @@ async function deleteCourse(req, res) {
           [course.department_id]
         );
         if (!dept || dept.business_id !== req.user.business_id) {
-          return res.status(403).json({ success: false, message: 'Course is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+          return res.status(403).json({ success: false, message: 'This course belongs to a different business.', code: 'BUSINESS_SCOPE_DENIED' });
         }
       }
     }

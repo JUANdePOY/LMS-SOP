@@ -245,7 +245,7 @@ router.get('/:id/scope-grants', requireAdmin, async (req, res) => {
     }
 
     if (req.user.role !== 'super_admin' && req.user.business_id !== targetDept.business_id) {
-      return res.status(403).json({ status: 'error', message: 'Access denied to this department', code: 'BUSINESS_SCOPE_DENIED' });
+      return res.status(403).json({ status: 'error', message: 'You don\'t have access to this department.', code: 'BUSINESS_SCOPE_DENIED' });
     }
 
     const [grants] = await db.query(

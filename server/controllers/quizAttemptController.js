@@ -93,7 +93,7 @@ async function getAttempt(req, res) {
     const attempt = await quizModel.getAttempt(req.params.id);
     if (!attempt) return res.status(404).json({ success: false, message: 'Attempt not found', code: 'NOT_FOUND' });
     if (attempt.user_id !== req.user.id) {
-      return res.status(403).json({ success: false, message: 'Not your attempt', code: 'FORBIDDEN' });
+      return res.status(403).json({ success: false, message: "You don't have access to this quiz attempt.", code: 'FORBIDDEN' });
     }
     res.json({ success: true, data: serializeAttempt(attempt) });
   } catch (err) {
@@ -106,7 +106,7 @@ async function saveDraftAttempt(req, res) {
   try {
     const attempt = await quizModel.getAttempt(req.params.id);
     if (!attempt) return res.status(404).json({ success: false, message: 'Attempt not found', code: 'NOT_FOUND' });
-    if (attempt.user_id !== req.user.id) return res.status(403).json({ success: false, message: 'Not your attempt', code: 'FORBIDDEN' });
+    if (attempt.user_id !== req.user.id) return res.status(403).json({ success: false, message: "You don't have access to this quiz attempt.", code: 'FORBIDDEN' });
     if (attempt.status !== 'in_progress') {
       return res.status(400).json({ success: false, message: 'Attempt cannot be modified', code: 'INVALID_STATE' });
     }
@@ -124,7 +124,7 @@ async function submitAttempt(req, res) {
   try {
     const attempt = await quizModel.getAttempt(req.params.id);
     if (!attempt) return res.status(404).json({ success: false, message: 'Attempt not found', code: 'NOT_FOUND' });
-    if (attempt.user_id !== userId) return res.status(403).json({ success: false, message: 'Not your attempt', code: 'FORBIDDEN' });
+    if (attempt.user_id !== userId) return res.status(403).json({ success: false, message: "You don't have access to this quiz attempt.", code: 'FORBIDDEN' });
     if (attempt.status !== 'in_progress') {
       return res.status(400).json({ success: false, message: 'Attempt already submitted', code: 'INVALID_STATE' });
     }
@@ -252,7 +252,7 @@ async function cancelAttempt(req, res) {
   try {
     const attempt = await quizModel.getAttempt(req.params.id);
     if (!attempt) return res.status(404).json({ success: false, message: 'Attempt not found', code: 'NOT_FOUND' });
-    if (attempt.user_id !== req.user.id) return res.status(403).json({ success: false, message: 'Not your attempt', code: 'FORBIDDEN' });
+    if (attempt.user_id !== req.user.id) return res.status(403).json({ success: false, message: "You don't have access to this quiz attempt.", code: 'FORBIDDEN' });
     if (attempt.status !== 'in_progress') {
       return res.status(400).json({ success: false, message: 'Attempt cannot be cancelled', code: 'INVALID_STATE' });
     }
@@ -288,7 +288,7 @@ async function getAttemptResults(req, res) {
   try {
     const attempt = await quizModel.getAttempt(req.params.id);
     if (!attempt) return res.status(404).json({ success: false, message: 'Attempt not found', code: 'NOT_FOUND' });
-    if (attempt.user_id !== req.user.id) return res.status(403).json({ success: false, message: 'Not your attempt', code: 'FORBIDDEN' });
+    if (attempt.user_id !== req.user.id) return res.status(403).json({ success: false, message: "You don't have access to this quiz attempt.", code: 'FORBIDDEN' });
 
     const result = await quizModel.getAttemptResults(attempt.id);
     let feedback = result ? result.feedback : null;

@@ -52,13 +52,22 @@ async function getCourseProgress(req, res) {
 
     const enriched = allLessons.map((lp, idx) => {
       const userProgress = progressMap.get(lp.lesson_id);
+      let chapters = lp.chapters;
+      if (typeof chapters === 'string') {
+        try {
+          chapters = JSON.parse(chapters);
+        } catch {
+          chapters = [];
+        }
+      }
+      if (!Array.isArray(chapters)) chapters = [];
       return {
         id: lp.lesson_id,
         title: lp.lesson_title,
         type: lp.lesson_type,
         order: lp.lesson_order,
         moduleId: lp.module_id,
-        moduleOrder: lp.module_order,
+        moduleOrder: lp.lesson_module_order,
         status: userProgress ? userProgress.status : (idx === 0 ? 'unlocked' : 'locked'),
         completedAt: userProgress ? userProgress.completed_at : null,
         duration: lp.duration,
@@ -67,6 +76,7 @@ async function getCourseProgress(req, res) {
         thumbnailUrl: lp.thumbnail_url ?? null,
         quizId: lp.quiz_id ?? null,
         certificateTemplateId: lp.certificate_template_id ?? null,
+        chapters,
         isFirst: idx === 0,
         isLast: idx === allLessons.length - 1,
       };

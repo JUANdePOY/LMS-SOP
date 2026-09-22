@@ -132,7 +132,7 @@ router.get('/:id', async (req, res) => {
     }
 
     if (req.user.role !== 'super_admin' && req.user.business_id !== user.business_id) {
-      return res.status(403).json({ status: 'error', message: 'Access denied to this user', code: 'BUSINESS_SCOPE_DENIED' });
+      return res.status(403).json({ status: 'error', message: 'You don\'t have access to this user.', code: 'BUSINESS_SCOPE_DENIED' });
     }
 
     const { password_hash, ...safeUser } = user;
@@ -286,7 +286,7 @@ router.put('/:id', [
       }
       const permDetail = details.find((d) => d.name === 'manage_users');
       if (!permDetail || !Array.isArray(permDetail.actions) || !permDetail.actions.includes('edit')) {
-        return res.status(403).json({ status: 'error', message: 'Missing permission action: manage_users.edit', code: 'PERMISSION_ACTION_DENIED' });
+        return res.status(403).json({ status: 'error', message: 'You don\'t have permission to edit users.', code: 'PERMISSION_ACTION_DENIED' });
       }
     }
 
@@ -311,7 +311,7 @@ router.put('/:id', [
     if (!isSelf && req.user.role === 'admin' && updates.role !== undefined && updates.role !== targetUser.role) {
       const permDetail = (req.user.permission_details || []).find((d) => d.name === 'manage_users');
       if (!permDetail || !Array.isArray(permDetail.actions) || !permDetail.actions.includes('manage_roles')) {
-        return res.status(403).json({ status: 'error', message: 'Missing permission action: manage_users.manage_roles', code: 'PERMISSION_ACTION_DENIED' });
+        return res.status(403).json({ status: 'error', message: 'You don\'t have permission to manage user roles.', code: 'PERMISSION_ACTION_DENIED' });
       }
     }
 
@@ -493,7 +493,7 @@ router.post('/:userId/onboarding-sops', requireAdmin, async (req, res) => {
     }
 
     if (req.user.role !== 'super_admin' && targetUser.business_id !== req.user.business_id) {
-      return res.status(403).json({ status: 'error', message: 'Access denied to this user', code: 'BUSINESS_SCOPE_DENIED' });
+      return res.status(403).json({ status: 'error', message: 'You don\'t have access to this user.', code: 'BUSINESS_SCOPE_DENIED' });
     }
 
     const onboardingService = require('../services/sopOnboardingService');

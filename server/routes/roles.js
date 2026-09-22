@@ -112,7 +112,7 @@ router.put('/users/:userId/permissions', authenticateToken, requireSuperAdmin, [
 });
 
 router.put('/permissions/:roleName', authenticateToken, requireSuperAdmin, [
-  body('permission_names').optional().isArray().withMessage('permission_names must be an array'),
+  body('permissions').optional().isArray().withMessage('permissions must be an array'),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -121,7 +121,7 @@ router.put('/permissions/:roleName', authenticateToken, requireSuperAdmin, [
     }
 
     const roleName = req.params.roleName;
-    const { permission_names } = req.body;
+    const permissions = req.body.permissions;
 
     const [existing] = await db.query('SELECT id FROM roles WHERE name = ?', [roleName]);
     if (existing.length === 0) {
@@ -130,9 +130,12 @@ router.put('/permissions/:roleName', authenticateToken, requireSuperAdmin, [
 
     await db.query('DELETE FROM role_permissions WHERE role_name = ?', [roleName]);
 
-    if (Array.isArray(permission_names) && permission_names.length > 0) {
-      const values = permission_names.map(p => [roleName, p]);
-      await db.query('INSERT INTO role_permissions (role_name, permission_name) VALUES ?', [values]);
+    if (Array.isArray(permissions) && permissions.length > 0) {
+      const values = permissions.map(p => {
+        const actions = Array.isArray(p.actions) ? JSON.stringify(p.actions) : null;
+        return [roleName, p.name, actions];
+      });
+      await db.query('INSERT INTO role_permissions (role_name, permission_name, actions) VALUES ?', [values]);
     }
 
     logAudit({
@@ -140,10 +143,10 @@ router.put('/permissions/:roleName', authenticateToken, requireSuperAdmin, [
       action: 'role.permissions_updated',
       entity_type: 'role',
       entity_id: null,
-      new_values: { role_name: roleName, permission_count: permission_names?.length || 0 }
+      new_values: { role_name: roleName, permission_count: permissions?.length || 0 }
     });
 
-    res.json({ status: 'success', message: 'Role permissions updated', data: { role_name: roleName, permission_count: permission_names?.length || 0 } });
+    res.json({ status: 'success', message: 'Role permissions updated', data: { role_name: roleName, permission_count: permissions?.length || 0 } });
   } catch (err) {
     console.error('Role permissions update error:', err);
     res.status(500).json({ status: 'error', message: 'Failed to update permissions', code: 'DB_ERROR' });
@@ -304,7 +307,7 @@ router.get('/:id', authenticateToken, requireSuperAdmin, async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Role not found', code: 'NOT_FOUND' });
     }
     const role = rows[0];
-    const [perms] = await db.query('SELECT p.id, p.name, p.display_name, p.category, p.actions, p.description FROM permissions p JOIN role_permissions rp ON p.name = rp.permission_name WHERE rp.role_name = ? ORDER BY p.category, p.name', [role.name]);
+    const [perms] = await db.query('SELECT p.id, p.name, p.display_name, p.category, p.actions, p.description, rp.actions AS role_actions FROM permissions p JOIN role_permissions rp ON p.name = rp.permission_name WHERE rp.role_name = ? ORDER BY p.category, p.name', [role.name]);
     role.permissions = perms;
     res.json({ status: 'success', data: role });
   } catch (err) {

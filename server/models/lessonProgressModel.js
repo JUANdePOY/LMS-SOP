@@ -191,9 +191,10 @@ async function getNextModuleId(courseId, currentModuleId) {
 async function listAllLessonsByCourse(courseId) {
   const [rows] = await db.query(
     `SELECT mc.id AS lesson_id, mc.title AS lesson_title, mc.type AS lesson_type,
-     mc.order_index AS lesson_order, mc.module_id, cm.order_index AS module_order,
-       mc.duration, mc.url, mc.description, mc.quiz_id, mc.certificate_template_id, mc.thumbnail_url
-       FROM module_content mc
+      mc.order_index AS lesson_order, mc.module_id, cm.order_index AS module_order,
+      mc.duration, mc.url, mc.description, mc.quiz_id, mc.certificate_template_id,
+      mc.thumbnail_url, mc.chapters
+      FROM module_content mc
      JOIN course_modules cm ON mc.module_id = cm.id
      WHERE cm.course_id = ? AND mc.is_deleted = FALSE AND cm.is_deleted = FALSE
      ORDER BY cm.order_index ASC, mc.order_index ASC`,

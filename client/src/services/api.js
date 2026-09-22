@@ -84,16 +84,43 @@ api.interceptors.response.use(
       window.location.href = '/login';
     }
 
-    if (status === 403 && code === 'PERMISSION_DENIED') {
-      error.message = error.response?.data?.message || 'You do not have permission to perform this action.';
+    const FRIENDLY_403_MESSAGES = {
+      PERMISSION_DENIED: 'You don\'t have permission to perform this action.',
+      ENTITY_ACCESS_DENIED: 'You don\'t have access to this resource.',
+      FORBIDDEN: error.response?.data?.message || 'You don\'t have permission to perform this action.',
+      BUSINESS_SCOPE_DENIED: 'You don\'t have access to this business.',
+      DEPT_OUT_OF_BUSINESS_SCOPE: 'This department belongs to a different business.',
+      DEPT_SCOPE_DENIED: 'You don\'t have access to this department.',
+      SUPER_ADMIN_REQUIRED: 'Only system administrators can perform this action.',
+      ADMIN_REQUIRED: 'Only administrators can perform this action.',
+      DEPT_HEAD_REQUIRED: 'Only department heads can perform this action.',
+      ADMIN_ARSEN_REQUIRED: 'Only administrators or ARSEN admins can perform this action.',
+      ACCOUNT_DEACTIVATED: 'Your account has been deactivated. Please contact your administrator.',
+      ACCOUNT_LOCKED: 'Your account is temporarily locked. Please try again later or contact support.',
+      OUT_OF_SCOPE: 'You can only manage this resource within your assigned scope.',
+      USE_SELF_SERVICE: 'Please use the self-service endpoints for this action.',
+    };
+
+    if (status === 403 && FRIENDLY_403_MESSAGES[code]) {
+      error.message = FRIENDLY_403_MESSAGES[code];
+      error.isPermissionDenied = true;
+      window.dispatchEvent(new CustomEvent('app:api-error', { detail: { error } }));
+    } else if (status === 403) {
+      error.message = error.response?.data?.message || 'You don\'t have permission to perform this action.';
       error.isPermissionDenied = true;
       window.dispatchEvent(new CustomEvent('app:api-error', { detail: { error } }));
     }
 
-    if (status === 403 && code === 'ENTITY_ACCESS_DENIED') {
-      error.message = error.response?.data?.message || 'Your access to this resource has been restricted by an administrator.';
-      error.isAccessRestricted = true;
-      window.dispatchEvent(new CustomEvent('app:api-error', { detail: { error } }));
+    const FRIENDLY_401_MESSAGES = {
+      NO_TOKEN: 'Please log in to continue.',
+      USER_NOT_FOUND: 'Your account could not be found. Please contact support.',
+      INVALID_TOKEN: 'Your session has expired. Please log in again.',
+      TOKEN_ERROR: 'There was a problem verifying your session. Please log in again.',
+      UNAUTHORIZED: 'Please log in to continue.',
+    };
+
+    if (status === 401 && FRIENDLY_401_MESSAGES[code]) {
+      error.message = FRIENDLY_401_MESSAGES[code];
     }
 
     if (error.code === 'ECONNABORTED') {
@@ -158,7 +185,8 @@ export const createRole = (data) => api.post('/roles', data);
 export const updateRole = (id, data) => api.put(`/roles/${id}`, data);
 export const deleteRole = (id) => api.delete(`/roles/${id}`);
 export const getPermissions = () => api.get('/roles/permissions');
-export const updateRolePermissions = (roleName, permission_names) => api.put(`/roles/permissions/${roleName}`, { permission_names });
+export const updateRolePermissions = (roleName, permissions) =>
+  api.put(`/roles/permissions/${roleName}`, { permissions });
 export const getEntities = (type) => api.get(`/roles/entities?type=${type}`);
 export const searchEntities = (type, q) => api.get(`/roles/entities/search`, { params: { type, q } });
 export const getUserEntityOverrides = (userId) => api.get(`/roles/users/${userId}/entity-overrides`);

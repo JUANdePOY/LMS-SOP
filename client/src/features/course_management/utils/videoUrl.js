@@ -91,7 +91,7 @@ export function parseVideoUrl(rawUrl) {
         url,
         libraryId,
         videoId,
-        embedUrl: `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}`,
+        embedUrl: `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?playerjs=true`,
         playUrl: `https://${libraryId}.mediadelivery.net/${videoId}.mp4`,
         isValid: true,
       };

@@ -34,14 +34,27 @@ router.post('/:id/businesses', [
   resolveScope,
   requireEntityTypeAccess('client'),
   requirePermission('manage_clients'),
-  requirePermissionAction('manage_clients', 'edit'),
+  requirePermissionAction('manage_clients', 'create'),
 ], clientController.addBusiness);
-router.delete('/:id/businesses/:businessId', [
+router.get('/:id/businesses/:businessId', [
+  authenticateToken,
+  resolveScope,
+  requireEntityTypeAccess('client'),
+  requirePermission('manage_clients'),
+], clientController.getClientBusiness);
+router.put('/:id/businesses/:businessId', [
   authenticateToken,
   resolveScope,
   requireEntityTypeAccess('client'),
   requirePermission('manage_clients'),
   requirePermissionAction('manage_clients', 'edit'),
+], clientController.updateBusiness);
+router.delete('/:id/businesses/:businessId', [
+  authenticateToken,
+  resolveScope,
+  requireEntityTypeAccess('client'),
+  requirePermission('manage_clients'),
+  requirePermissionAction('manage_clients', 'delete'),
 ], clientController.deleteBusiness);
 
 module.exports = router;

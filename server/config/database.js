@@ -410,16 +410,17 @@ const MIGRATIONS = [
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       UNIQUE KEY uk_permissions_name (name)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-   `CREATE TABLE IF NOT EXISTS role_permissions (
-     id INT AUTO_INCREMENT PRIMARY KEY,
-     role_name VARCHAR(100) NOT NULL,
-     permission_name VARCHAR(100) NOT NULL,
-     granted_by INT DEFAULT NULL,
-     granted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-     FOREIGN KEY (role_name) REFERENCES roles(name) ON DELETE CASCADE,
-     FOREIGN KEY (permission_name) REFERENCES permissions(name) ON DELETE CASCADE,
-     UNIQUE KEY uk_role_perm (role_name, permission_name)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    `CREATE TABLE IF NOT EXISTS role_permissions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      role_name VARCHAR(100) NOT NULL,
+      permission_name VARCHAR(100) NOT NULL,
+      actions JSON DEFAULT NULL,
+      granted_by INT DEFAULT NULL,
+      granted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (role_name) REFERENCES roles(name) ON DELETE CASCADE,
+      FOREIGN KEY (permission_name) REFERENCES permissions(name) ON DELETE CASCADE,
+      UNIQUE KEY uk_role_perm (role_name, permission_name)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
     `INSERT IGNORE INTO permissions (name, display_name, category) VALUES
       ('view_dashboard','View Dashboard','dashboard'),
       ('manage_users','Manage Users','users'),
@@ -900,6 +901,7 @@ async function runMigrations() {
 
   await addColumnIfMissing(db, 'permissions', 'actions', 'JSON DEFAULT NULL AFTER category');
   await addColumnIfMissing(db, 'user_permission_overrides', 'actions', 'JSON DEFAULT NULL AFTER granted');
+  await addColumnIfMissing(db, 'role_permissions', 'actions', 'JSON DEFAULT NULL AFTER permission_name');
 
   for (const sql of MIGRATIONS) {
     if (!sql || !sql.trim()) continue;

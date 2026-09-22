@@ -204,7 +204,7 @@ async function assertCanViewCourse(req, courseId) {
 function requireAdminRole(req, res, next) {
   const role = req.user?.role;
   if (!ADMIN_ROLES.includes(role)) {
-    return res.status(403).json({ success: false, message: 'Admin role required', code: 'FORBIDDEN' });
+    return res.status(403).json({ success: false, message: 'Only administrators can perform this action.', code: 'FORBIDDEN' });
   }
   next();
 }

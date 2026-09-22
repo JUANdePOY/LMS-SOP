@@ -15,7 +15,7 @@ async function requireClientBusinessScope(req, res, next) {
   try {
     if (req.user.role === 'super_admin') return next();
     if (!['super_admin', 'admin', 'department_head'].includes(req.user.role)) {
-      return res.status(403).json({ success: false, message: 'Access denied', code: 'FORBIDDEN' });
+      return res.status(403).json({ success: false, message: 'You don\'t have permission to manage business managers.', code: 'FORBIDDEN' });
     }
     const businessId = parseInt(req.params.businessId, 10);
     if (!Number.isFinite(businessId) || businessId <= 0) {
@@ -41,7 +41,7 @@ async function requireClientBusinessScope(req, res, next) {
       return res.status(404).json({ success: false, message: 'Business not found', code: 'NOT_FOUND' });
     }
     if (Number(cb.owner_business_id) !== Number(req.user.business_id)) {
-      return res.status(403).json({ success: false, message: 'Access denied to this business', code: 'BUSINESS_SCOPE_DENIED' });
+      return res.status(403).json({ success: false, message: 'You don\'t have access to this business.', code: 'BUSINESS_SCOPE_DENIED' });
     }
     next();
   } catch (err) {

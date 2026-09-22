@@ -148,7 +148,7 @@ const taskController = {
       // Only assignees (or admins) may update a task's progress.
       const allowed = await taskService.isUserAssignedToTask(taskId, req.user).catch(() => false);
       if (!allowed) {
-        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'You are not assigned to this task' });
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: "You don't have access to this task." });
       }
       const before = Number.isFinite(taskId)
         ? await taskService.getTask(taskId, req.user.id).catch(() => null)
@@ -273,7 +273,7 @@ const taskController = {
       // Only assignees (or admins) may comment on a task.
       const allowed = await taskService.isUserAssignedToTask(taskId, req.user).catch(() => false);
       if (!allowed) {
-        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'You are not assigned to this task' });
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: "You don't have access to this task." });
       }
       if (req.body.mentions) {
         try {
@@ -328,7 +328,7 @@ const taskController = {
       // Only assignees (or admins) may attach files to a task.
       const allowed = await taskService.isUserAssignedToTask(taskId, req.user).catch(() => false);
       if (!allowed) {
-        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: 'You are not assigned to this task' });
+        return res.status(403).json({ success: false, code: 'FORBIDDEN', message: "You don't have access to this task." });
       }
       if (!req.file) {
         return res.status(400).json({ success: false, message: 'File is required', code: 'VALIDATION_ERROR' });

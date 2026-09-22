@@ -295,7 +295,7 @@ function requireScopedUserManagement(req, res, next) {
   if (!req.user) {
     return res.status(401).json({
       status: 'error',
-      message: 'Unauthorized - No user information',
+      message: 'Please log in to continue.',
       code: 'UNAUTHORIZED'
     });
   }
@@ -304,7 +304,7 @@ function requireScopedUserManagement(req, res, next) {
   if (!adminRoles.includes(req.user.role)) {
     return res.status(403).json({
       status: 'error',
-      message: 'Admin access required to manage users',
+      message: 'Only administrators can manage users.',
       code: 'ADMIN_REQUIRED'
     });
   }

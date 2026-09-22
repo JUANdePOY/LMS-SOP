@@ -7,7 +7,7 @@ import UserAvatar from '@/shared/components/ui/Avatar';
 import PriorityFlag from './PriorityFlag';
 import { updateTask, getTask, createTask, deleteTask } from '../services/taskService';
 import { getProject, updateProject, deleteProject } from '../services/projectService';
-import { getClient, updateClient, deleteClient } from '../api/client.api';
+import { getClient, updateClient, deleteClient, getClientBusiness, updateClientBusiness, deleteClientBusiness } from '../api/client.api';
 import { getBusiness, updateBusiness, deleteBusiness } from '../api/business.api';
 import { useToast } from '@/shared/components/ui/Toast';
 import { useTaskDetails } from '../hooks/useTaskDetails';
@@ -573,7 +573,7 @@ function ClientBody({ clientId, entity, open, onUpdated }) {
 }
 
 // Editable Business panel. Mirrors server/businessModel allowed fields.
-function BusinessBody({ businessId, entity, open, onUpdated }) {
+function BusinessBody({ businessId, clientId, entity, open, onUpdated }) {
   const { toast } = useToast();
   const [local, setLocal] = useState(entity || null);
   const [loading, setLoading] = useState(false);
@@ -584,20 +584,25 @@ function BusinessBody({ businessId, entity, open, onUpdated }) {
     if (businessId) {
       let active = true;
       setLoading(true);
-      getBusiness(businessId)
+      const fetchBusiness = clientId
+        ? getClientBusiness(clientId, businessId)
+        : getBusiness(businessId);
+      fetchBusiness
         .then((data) => { if (active) setLocal(data); })
         .catch((err) => toast.error(err.message || 'Failed to load business'))
         .finally(() => { if (active) setLoading(false); });
       return () => { active = false; };
     }
     setLocal(entity || null);
-  }, [open, businessId, entity, toast]);
+  }, [open, businessId, clientId, entity, toast]);
 
   const patch = async (field, value) => {
     if (!local?.id) return;
     setSaving(true);
     try {
-      const updated = await updateBusiness(local.id, { [field]: value });
+      const updated = clientId
+        ? await updateClientBusiness(clientId, local.id, { [field]: value })
+        : await updateBusiness(local.id, { [field]: value });
       setLocal((p) => ({ ...p, ...updated }));
       onUpdated?.(updated);
       toast.success('Business updated');
@@ -784,7 +789,13 @@ export default function EntityDetailPanel({ open, onClose, type = 'task', taskId
     try {
       if (type === 'project' && projectId) await deleteProject(projectId);
       else if (type === 'client' && clientId) await deleteClient(clientId);
-      else if (type === 'business' && businessId) await deleteBusiness(businessId);
+      else if (type === 'business' && businessId) {
+        if (clientId) {
+          await deleteClientBusiness(clientId, businessId);
+        } else {
+          await deleteBusiness(businessId);
+        }
+      }
       else return;
       toast.success(`${label} deleted`);
       setPendingDelete(false);
@@ -840,8 +851,8 @@ export default function EntityDetailPanel({ open, onClose, type = 'task', taskId
                 ? <ProjectBody projectId={projectId} open={open} onClose={onClose} onUpdated={onUpdated} />
                 : type === 'client'
                   ? <ClientBody clientId={clientId} entity={entity} open={open} onUpdated={onUpdated} onDeleted={onDeleted} />
-                  : type === 'business'
-                    ? <BusinessBody businessId={businessId} entity={entity} open={open} onUpdated={onUpdated} onDeleted={onDeleted} />
+                    : type === 'business'
+                      ? <BusinessBody businessId={businessId} clientId={clientId} entity={entity} open={open} onUpdated={onUpdated} onDeleted={onDeleted} />
                     : <GenericBody entity={entity} type={type} />}
             </motion.div>
           </div>

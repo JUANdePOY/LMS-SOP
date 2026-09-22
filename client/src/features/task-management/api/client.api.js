@@ -3,8 +3,12 @@ import api from '@/services/api';
 export const getClients = () => api.get('/clients');
 export const getClientOptions = () => api.get('/clients/options');
 export const getClient = (id) => api.get(`/clients/${id}`).then((r) => r.data?.data);
+export const getClientBusiness = (clientId, businessId) =>
+  api.get(`/clients/${clientId}/businesses/${businessId}`).then((r) => r.data?.data);
 export const createClient = (data) => api.post('/clients', data);
 export const updateClient = (id, data) => api.put(`/clients/${id}`, data).then((r) => r.data?.data);
+export const updateClientBusiness = (clientId, businessId, data) =>
+  api.put(`/clients/${clientId}/businesses/${businessId}`, data).then((r) => r.data?.data);
 export const deleteClient = (id) => {
   const numId = Number(id);
   if (!Number.isFinite(numId) || numId <= 0) {

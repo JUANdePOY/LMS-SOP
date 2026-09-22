@@ -76,7 +76,7 @@ router.get('/:id', async (req, res) => {
     }
 
     if (req.user.role !== 'super_admin' && req.user.business_id !== businessId) {
-      return res.status(403).json({ status: 'error', message: 'Access denied to this business', code: 'BUSINESS_SCOPE_DENIED' });
+      return res.status(403).json({ status: 'error', message: 'You don\'t have access to this business.', code: 'BUSINESS_SCOPE_DENIED' });
     }
 
     res.json({ status: 'success', data: business });

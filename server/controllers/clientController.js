@@ -164,6 +164,45 @@ const clientController = {
       handleError(res, error);
     }
   },
+
+  async getClientBusiness(req, res) {
+    try {
+      const clientId = parseInt(req.params.id, 10);
+      const businessId = parseInt(req.params.businessId, 10);
+      const business = await clientModel.getClientBusiness(clientId, businessId);
+      if (!business) {
+        return res.status(404).json({ success: false, message: 'Business not found', code: 'NOT_FOUND' });
+      }
+      res.json({ success: true, data: business, message: 'Business retrieved successfully' });
+    } catch (error) {
+      handleError(res, error);
+    }
+  },
+
+  async updateBusiness(req, res) {
+    try {
+      const clientId = parseInt(req.params.id, 10);
+      const businessId = parseInt(req.params.businessId, 10);
+      const existing = await clientModel.getClientBusiness(clientId, businessId);
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'Business not found', code: 'NOT_FOUND' });
+      }
+
+      const business_name = req.body.business_name !== undefined ? String(req.body.business_name).trim() : undefined;
+      if (business_name === undefined || business_name.length < 2) {
+        return res.status(400).json({ success: false, message: 'Business name must be at least 2 characters', code: 'VALIDATION_ERROR' });
+      }
+
+      await clientModel.updateBusiness(clientId, businessId, { business_name });
+      const updated = await clientModel.getClientBusiness(clientId, businessId);
+      res.json({ success: true, data: updated, message: 'Business updated successfully' });
+    } catch (error) {
+      if (/Duplicate entry/.test(error.message) && /uk_client_business/.test(error.message)) {
+        return res.status(409).json({ success: false, message: 'A business with this name already exists for this client', code: 'DUPLICATE' });
+      }
+      handleError(res, error);
+    }
+  },
 };
 
 module.exports = { clientController };

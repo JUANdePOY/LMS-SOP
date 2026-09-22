@@ -11,7 +11,7 @@ const VARIANT_CONFIG = {
 const DEFAULT_CONFIRM_TEXT = 'Confirm';
 const DEFAULT_CANCEL_TEXT = 'Cancel';
 const DEFAULT_PROCESSING_TEXT = 'Processing...';
-const DEFAULT_ERROR_MESSAGE = 'An error occurred. Please try again.';
+const DEFAULT_ERROR_MESSAGE = 'Something went wrong. Please try again.';
 
 export default function ConfirmationDialog({
   isOpen,

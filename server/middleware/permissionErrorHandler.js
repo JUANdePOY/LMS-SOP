@@ -2,7 +2,7 @@ function permissionErrorHandler(err, req, res, next) {
   if (err && err.code === 'PERMISSION_DENIED') {
     return res.status(403).json({
       status: 'error',
-      message: err.message || 'You do not have permission to perform this action.',
+      message: err.message || 'You don\'t have permission to perform this action.',
       code: 'PERMISSION_DENIED',
     });
   }
@@ -10,7 +10,7 @@ function permissionErrorHandler(err, req, res, next) {
   if (err && err.code === 'ENTITY_ACCESS_DENIED') {
     return res.status(403).json({
       status: 'error',
-      message: err.message || 'Your access to this resource has been restricted by an administrator.',
+      message: err.message || 'You don\'t have access to this resource.',
       code: 'ENTITY_ACCESS_DENIED',
     });
   }

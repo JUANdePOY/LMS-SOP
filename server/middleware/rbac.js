@@ -40,17 +40,17 @@ const authorize = (...roles) => {
     if (!req.user) {
       return res.status(401).json({
         status: 'error',
-        message: 'Unauthorized - No user information',
+        message: 'Please log in to continue.',
         code: 'UNAUTHORIZED'
       });
     }
 
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        status: 'error',
-        message: `Access denied. Required roles: ${roles.join(', ')}`,
-        code: 'FORBIDDEN'
-      });
+    return res.status(403).json({
+      status: 'error',
+      message: `You don't have permission to perform this action. Required roles: ${roles.join(', ')}`,
+      code: 'FORBIDDEN'
+    });
     }
 
     next();
@@ -64,7 +64,7 @@ const requireAdmin = (req, res, next) => {
   if (!isAdmin(req.user?.role)) {
     return res.status(403).json({
       status: 'error',
-      message: 'Admin access required',
+      message: 'Only administrators can perform this action.',
       code: 'ADMIN_REQUIRED'
     });
   }
@@ -78,7 +78,7 @@ const requireSuperAdmin = (req, res, next) => {
   if (req.user?.role !== 'super_admin') {
     return res.status(403).json({
       status: 'error',
-      message: 'System administrator access required',
+      message: 'Only system administrators can perform this action.',
       code: 'SUPER_ADMIN_REQUIRED'
     });
   }
@@ -94,7 +94,7 @@ const requireAdminArsenOrHigher = (req, res, next) => {
   if (!allowed.includes(req.user?.role)) {
     return res.status(403).json({
       status: 'error',
-      message: 'Admin or ARSEN admin access required',
+      message: 'Only administrators or ARSEN admins can perform this action.',
       code: 'ADMIN_ARSEN_REQUIRED'
     });
   }
@@ -121,7 +121,7 @@ const checkOwnership = (userIdField = 'user_id') => {
     if (!isAdmin(req.user.role) && resourceUserId !== String(req.user.id)) {
       return res.status(403).json({
         status: 'error',
-        message: 'Access denied - You can only access your own resources',
+        message: 'You can only access your own resources.',
         code: 'FORBIDDEN'
       });
     }
@@ -183,7 +183,7 @@ function enforceScope(options = {}) {
     if (req.user.role === 'reservist' && options.blockReservist !== false) {
       return res.status(403).json({
         status: 'error',
-        message: 'Access denied. Use self-service endpoints.',
+        message: 'Please use the self-service endpoints for this action.',
         code: 'USE_SELF_SERVICE'
       });
     }
@@ -442,7 +442,7 @@ function authorizeManageEntity(entityType, options = {}) {
       if (!userCanManageScope(req.user, entityScope, entityType)) {
         return res.status(403).json({
           status: 'error',
-          message: `You can only manage ${entityType}s within your assigned scope`,
+          message: `You can only manage this resource within your assigned scope.`,
           code: 'OUT_OF_SCOPE'
         });
       }

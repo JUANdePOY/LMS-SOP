@@ -17,7 +17,7 @@ async function authenticateToken(req, res, next) {
   if (!token) {
     return res.status(401).json({
       status: 'error',
-      message: 'Access token required',
+      message: 'Please log in to continue.',
       code: 'NO_TOKEN'
     });
   }
@@ -33,7 +33,7 @@ async function authenticateToken(req, res, next) {
     if (users.length === 0) {
       return res.status(401).json({
         status: 'error',
-        message: 'User not found',
+        message: 'Your account could not be found. Please contact support.',
         code: 'USER_NOT_FOUND'
       });
     }
@@ -42,7 +42,7 @@ async function authenticateToken(req, res, next) {
     if (!user.is_active) {
       return res.status(403).json({
         status: 'error',
-        message: 'User account is deactivated',
+        message: 'Your account has been deactivated. Please contact your administrator.',
         code: 'ACCOUNT_DEACTIVATED'
       });
     }
@@ -54,7 +54,7 @@ async function authenticateToken(req, res, next) {
       if (now < lockExpiresAt) {
         return res.status(403).json({
           status: 'error',
-          message: 'Account is temporarily locked',
+          message: 'Your account is temporarily locked. Please try again later or contact support.',
           code: 'ACCOUNT_LOCKED'
         });
       }
@@ -76,14 +76,14 @@ async function authenticateToken(req, res, next) {
     if (error.name === 'TokenExpiredError' || error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         status: 'error',
-        message: 'Invalid or expired token',
+        message: 'Your session has expired. Please log in again.',
         code: 'INVALID_TOKEN'
       });
     }
 
     return res.status(401).json({
       status: 'error',
-      message: 'Token verification failed',
+      message: 'There was a problem verifying your session. Please log in again.',
       code: 'TOKEN_ERROR'
     });
   }
@@ -125,7 +125,7 @@ function requireSuperAdmin(req, res, next) {
   if (req.user?.role !== 'super_admin') {
     return res.status(403).json({
       status: 'error',
-      message: 'Super admin access required',
+      message: 'Only system administrators can perform this action.',
       code: 'SUPER_ADMIN_REQUIRED'
     });
   }
@@ -137,7 +137,7 @@ function requireAdmin(req, res, next) {
   if (!adminRoles.includes(req.user?.role)) {
     return res.status(403).json({
       status: 'error',
-      message: 'Admin access required',
+      message: 'Only administrators can perform this action.',
       code: 'ADMIN_REQUIRED'
     });
   }
@@ -148,7 +148,7 @@ function requireDepartmentHead(req, res, next) {
   if (req.user?.role !== 'department_head' && req.user?.role !== 'super_admin' && req.user?.role !== 'admin') {
     return res.status(403).json({
       status: 'error',
-      message: 'Department head access required',
+      message: 'Only department heads can perform this action.',
       code: 'DEPT_HEAD_REQUIRED'
     });
   }
@@ -158,19 +158,19 @@ function requireDepartmentHead(req, res, next) {
 function authorize(...roles) {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({
-        status: 'error',
-        message: 'Unauthorized - No user information',
-        code: 'UNAUTHORIZED'
-      });
+    return res.status(401).json({
+      status: 'error',
+      message: 'Please log in to continue.',
+      code: 'UNAUTHORIZED'
+    });
     }
 
     if (!roles.includes(req.user.role)) {
-      return res.status(403).json({
-        status: 'error',
-        message: `Access denied. Required roles: ${roles.join(', ')}`,
-        code: 'FORBIDDEN'
-      });
+    return res.status(403).json({
+      status: 'error',
+      message: `You don't have permission to perform this action. Required roles: ${roles.join(', ')}`,
+      code: 'FORBIDDEN'
+    });
     }
 
     next();

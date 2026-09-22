@@ -5,7 +5,7 @@ export const apiGet = async (url, params = {}) => {
     const response = await api.get(url, { params });
     return response.data;
   } catch (error) {
-    throw error.response?.data || { message: 'An error occurred' };
+    throw error.response?.data || { message: 'Something went wrong. Please try again.' };
   }
 };
 
@@ -14,7 +14,7 @@ export const apiPost = async (url, data = {}) => {
     const response = await api.post(url, data);
     return response.data;
   } catch (error) {
-    throw error.response?.data || { message: 'An error occurred' };
+    throw error.response?.data || { message: 'Something went wrong. Please try again.' };
   }
 };
 
@@ -23,7 +23,7 @@ export const apiPut = async (url, data = {}) => {
     const response = await api.put(url, data);
     return response.data;
   } catch (error) {
-    throw error.response?.data || { message: 'An error occurred' };
+    throw error.response?.data || { message: 'Something went wrong. Please try again.' };
   }
 };
 
@@ -32,7 +32,7 @@ export const apiDelete = async (url) => {
     const response = await api.delete(url);
     return response.data;
   } catch (error) {
-    throw error.response?.data || { message: 'An error occurred' };
+    throw error.response?.data || { message: 'Something went wrong. Please try again.' };
   }
 };
 

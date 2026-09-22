@@ -425,6 +425,25 @@ async function remove(id) {
   }
 }
 
+async function getClientBusiness(clientId, businessId) {
+  const [rows] = await db.query(
+    'SELECT id, client_id, business_name FROM client_businesses WHERE id = ? AND client_id = ?',
+    [businessId, clientId]
+  );
+  return rows[0] || null;
+}
+
+async function updateBusiness(clientId, businessId, data) {
+  const { business_name } = data;
+  if (!business_name) return 0;
+
+  const [result] = await db.query(
+    'UPDATE client_businesses SET business_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND client_id = ?',
+    [business_name, businessId, clientId]
+  );
+  return result.affectedRows;
+}
+
 module.exports = {
   createClient,
   addBusiness,
@@ -436,4 +455,6 @@ module.exports = {
   remove,
   isFullyCompleted,
   isBusinessFullyCompleted,
+  getClientBusiness,
+  updateBusiness,
 };

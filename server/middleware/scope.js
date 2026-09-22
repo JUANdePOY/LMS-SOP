@@ -12,11 +12,11 @@ function requireBusinessScope(businessIdParam = 'businessId') {
     );
 
     if (!targetBusinessId || req.user.business_id !== targetBusinessId) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Access denied to this business',
-        code: 'BUSINESS_SCOPE_DENIED',
-      });
+    return res.status(403).json({
+      status: 'error',
+      message: 'You don\'t have access to this business.',
+      code: 'BUSINESS_SCOPE_DENIED',
+    });
     }
 
     next();
@@ -37,7 +37,7 @@ function requireDepartmentScope(departmentIdParam = 'departmentId') {
     if (!targetDeptId || isNaN(targetDeptId)) {
       return res.status(400).json({
         status: 'error',
-        message: 'Valid departmentId is required',
+        message: 'A valid department ID is required.',
         code: 'MISSING_DEPT_ID',
       });
     }
@@ -48,11 +48,11 @@ function requireDepartmentScope(departmentIdParam = 'departmentId') {
     );
 
     if (!dept || req.user.business_id !== dept.business_id) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Department is outside your business scope',
-        code: 'DEPT_OUT_OF_BUSINESS_SCOPE',
-      });
+    return res.status(403).json({
+      status: 'error',
+      message: 'This department belongs to a different business.',
+      code: 'DEPT_OUT_OF_BUSINESS_SCOPE',
+    });
     }
 
     const [[grant]] = await db.query(
@@ -61,11 +61,11 @@ function requireDepartmentScope(departmentIdParam = 'departmentId') {
     );
 
     if (!grant) {
-      return res.status(403).json({
-        status: 'error',
-        message: 'You are not scoped to this department',
-        code: 'DEPT_SCOPE_DENIED',
-      });
+    return res.status(403).json({
+      status: 'error',
+      message: 'You don\'t have access to this department.',
+      code: 'DEPT_SCOPE_DENIED',
+    });
     }
 
     next();
@@ -122,7 +122,7 @@ async function resolveUserPermissionDetails(userId, role) {
   }
 
   const [rolePerms] = await db.query(
-    `SELECT p.name, p.actions
+    `SELECT p.name, p.actions AS permission_actions, rp.actions AS role_actions
      FROM permissions p
      INNER JOIN role_permissions rp ON rp.permission_name = p.name
      WHERE rp.role_name = ? AND p.is_active = TRUE`,
@@ -146,7 +146,7 @@ async function resolveUserPermissionDetails(userId, role) {
     const override = overrideMap.get(perm.name);
     if (override) {
       if (!override.granted) continue;
-      const definedActions = parseActions(perm.actions, perm.name);
+      const definedActions = parseActions(perm.role_actions || perm.permission_actions, perm.name);
       let userActions;
       if (override.actions === null) {
         userActions = definedActions;
@@ -158,7 +158,7 @@ async function resolveUserPermissionDetails(userId, role) {
       }
       result.push({ name: perm.name, actions: userActions });
     } else {
-      result.push({ name: perm.name, actions: parseActions(perm.actions, perm.name) });
+      result.push({ name: perm.name, actions: parseActions(perm.role_actions || perm.permission_actions, perm.name) });
     }
   }
 
@@ -174,21 +174,21 @@ function requirePermission(permissionName) {
 
     const perms = req.user?.permissions || [];
     if (!perms.includes(permissionName)) {
-      return res.status(403).json({
-        status: 'error',
-        message: `Missing permission: ${permissionName}`,
-        code: 'PERMISSION_DENIED',
-      });
+    return res.status(403).json({
+      status: 'error',
+      message: 'You don\'t have permission to do this.',
+      code: 'PERMISSION_DENIED',
+    });
     }
 
     const details = req.user?.permission_details || [];
     const permDetail = details.find((d) => d.name === permissionName);
     if (permDetail && Array.isArray(permDetail.actions) && permDetail.actions.length === 0) {
-      return res.status(403).json({
-        status: 'error',
-        message: `Missing permission: ${permissionName}`,
-        code: 'PERMISSION_DENIED',
-      });
+    return res.status(403).json({
+      status: 'error',
+      message: 'You don\'t have permission to do this.',
+      code: 'PERMISSION_DENIED',
+    });
     }
 
     next();
@@ -209,7 +209,7 @@ function requirePermissionAction(permissionName, action) {
       } catch (err) {
         return res.status(403).json({
           status: 'error',
-          message: `Missing permission action: ${permissionName}.${action}`,
+          message: 'You don\'t have permission to perform this action.',
           code: 'PERMISSION_ACTION_DENIED',
         });
       }
@@ -219,7 +219,7 @@ function requirePermissionAction(permissionName, action) {
     if (!permDetail || !Array.isArray(permDetail.actions) || !permDetail.actions.includes(action)) {
       return res.status(403).json({
         status: 'error',
-        message: `Missing permission action: ${permissionName}.${action}`,
+        message: 'You don\'t have permission to perform this action.',
         code: 'PERMISSION_ACTION_DENIED',
       });
     }
@@ -303,7 +303,7 @@ function isEntityTypeDeniedForUser(user, entityType) {
 function requireEntityTypeAccess(entityType) {
   return (req, res, next) => {
     if (!req.user) {
-      return res.status(401).json({ status: 'error', message: 'Authentication required', code: 'UNAUTHENTICATED' });
+      return res.status(401).json({ status: 'error', message: 'Please log in to continue.', code: 'UNAUTHENTICATED' });
     }
     if (req.user.role === 'super_admin') {
       return next();
@@ -311,7 +311,7 @@ function requireEntityTypeAccess(entityType) {
     if (isEntityTypeDeniedForUser(req.user, entityType)) {
       return res.status(403).json({
         status: 'error',
-        message: `Access to ${entityType} is denied for this user`,
+        message: `You don't have access to this resource.`,
         code: 'ENTITY_ACCESS_DENIED',
       });
     }

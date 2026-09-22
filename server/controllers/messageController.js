@@ -61,7 +61,7 @@ async function createConversation(req, res) {
     if (!allowed.includes(role)) {
       return res.status(403).json({
         success: false,
-        message: 'Only Super Admins and Admins can create a group forum',
+        message: 'Only administrators can create group conversations.',
         code: 'FORBIDDEN',
       });
     }
@@ -224,7 +224,7 @@ function deleteConversation(req, res) {
       return messageModel.isParticipant(id, userId)
         .then((isParticipant) => {
           if (!isParticipant) {
-            return res.status(403).json({ success: false, message: 'You are not a participant of this conversation', code: 'FORBIDDEN' });
+            return res.status(403).json({ success: false, message: "You don't have access to this conversation.", code: 'FORBIDDEN' });
           }
           return messageModel.deleteConversation(id)
             .then(() => res.json({ success: true, message: 'Conversation deleted' }));
@@ -237,7 +237,7 @@ function deleteMessage(req, res) {
   const { messageId } = req.params;
   const role = req.user?.role;
   if (role !== 'super_admin') {
-    return res.status(403).json({ success: false, message: 'Only Super Admins can delete messages', code: 'FORBIDDEN' });
+    return res.status(403).json({ success: false, message: 'Only administrators can delete messages.', code: 'FORBIDDEN' });
   }
   messageModel.getMessage(messageId)
     .then((message) => {
@@ -254,7 +254,7 @@ function deleteParticipant(req, res) {
   const { conversationId, userId } = req.params;
   const role = req.user?.role;
   if (role !== 'super_admin') {
-    return res.status(403).json({ success: false, message: 'Only Super Admins can remove participants', code: 'FORBIDDEN' });
+    return res.status(403).json({ success: false, message: 'Only administrators can remove participants.', code: 'FORBIDDEN' });
   }
   messageModel.getConversation(conversationId)
     .then((conversation) => {
@@ -272,7 +272,7 @@ function addParticipant(req, res) {
   const { userId } = req.body || {};
   const role = req.user?.role;
   if (role !== 'super_admin') {
-    return res.status(403).json({ success: false, message: 'Only Super Admins can add participants', code: 'FORBIDDEN' });
+    return res.status(403).json({ success: false, message: 'Only administrators can add participants.', code: 'FORBIDDEN' });
   }
   if (!userId) {
     return res.status(400).json({ success: false, message: 'userId is required', code: 'VALIDATION_ERROR' });

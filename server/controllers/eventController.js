@@ -72,10 +72,10 @@ function getEvent(req, res) {
       if (!row) return res.status(404).json({ success: false, message: 'Event not found', code: 'NOT_FOUND' });
       if (req.user?.role !== 'super_admin') {
         if (row.business_id && row.business_id !== req.user?.business_id) {
-          return res.status(403).json({ success: false, message: 'Access denied: event is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+          return res.status(403).json({ success: false, message: "You don't have access to this event.", code: 'BUSINESS_SCOPE_DENIED' });
         }
         if (!row.business_id && !req.user?.business_id) {
-          return res.status(403).json({ success: false, message: 'Access denied: event is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+          return res.status(403).json({ success: false, message: "You don't have access to this event.", code: 'BUSINESS_SCOPE_DENIED' });
         }
       }
       res.json({ success: true, message: 'OK', data: row });
@@ -147,7 +147,7 @@ function updateEvent(req, res) {
     .then((row) => {
       if (!row) return res.status(404).json({ success: false, message: 'Event not found', code: 'NOT_FOUND' });
       if (req.user?.role !== 'super_admin' && row.business_id && row.business_id !== req.user?.business_id) {
-        return res.status(403).json({ success: false, message: 'Access denied: event is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+        return res.status(403).json({ success: false, message: "You don't have access to this event.", code: 'BUSINESS_SCOPE_DENIED' });
       }
       const parsedTargetRoles = Array.isArray(target_roles) ? target_roles : row.target_roles;
       const parsedTargetDepartments = Array.isArray(target_departments) ? target_departments.map(String) : row.target_departments;
@@ -191,7 +191,7 @@ function deleteEvent(req, res) {
     .then((row) => {
       if (!row) return res.status(404).json({ success: false, message: 'Event not found', code: 'NOT_FOUND' });
       if (req.user?.role !== 'super_admin' && row.business_id && row.business_id !== req.user?.business_id) {
-        return res.status(403).json({ success: false, message: 'Access denied: event is outside your business scope', code: 'BUSINESS_SCOPE_DENIED' });
+        return res.status(403).json({ success: false, message: "You don't have access to this event.", code: 'BUSINESS_SCOPE_DENIED' });
       }
       return eventModel.delete(id);
     })

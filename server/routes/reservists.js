@@ -394,7 +394,7 @@ router.get('/:id', authenticateToken, async (req, res, next) => {
     if (req.user.role === 'reservist' && req.user.id !== parseInt(id)) {
       return res.status(403).json({
         status: 'error',
-        message: 'Access denied',
+        message: 'You can only view your own reservist record.',
         code: 'ACCESS_DENIED'
       });
     }
@@ -921,7 +921,7 @@ router.get('/:id/assignments', authenticateToken, async (req, res) => {
     if (req.user.role === 'reservist' && req.user.id !== parseInt(id)) {
       return res.status(403).json({
         status: 'error',
-        message: 'Access denied',
+        message: 'You can only view your own reservist assignments.',
         code: 'ACCESS_DENIED'
       });
     }

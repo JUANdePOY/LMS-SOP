@@ -51,7 +51,7 @@ router.get('/:id', async (req, res) => {
     if (req.user.role !== 'super_admin' && req.user.role !== 'admin') {
       const allowedDepts = req.user.scoped_department_ids || (req.user.department_id ? [req.user.department_id] : []);
       if (!allowedDepts.includes(category.department_id)) {
-        return res.status(403).json({ status: 'error', message: 'Access denied to this category', code: 'DEPT_SCOPE_DENIED' });
+        return res.status(403).json({ status: 'error', message: 'You don\'t have access to this category.', code: 'DEPT_SCOPE_DENIED' });
       }
     }
 

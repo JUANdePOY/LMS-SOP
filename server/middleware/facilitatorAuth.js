@@ -5,7 +5,7 @@ const authorizeFacilitator = () => {
     if (!req.user) {
       return res.status(401).json({
         status: 'error',
-        message: 'Unauthorized - No user information',
+        message: 'Please log in to continue.',
         code: 'UNAUTHORIZED'
       });
     }
@@ -25,7 +25,7 @@ const authorizeFacilitator = () => {
       if (!isFac) {
         return res.status(403).json({
           status: 'error',
-          message: 'Access denied. You must be an admin or assigned facilitator for this event.',
+          message: 'You must be an admin or assigned facilitator for this event.',
           code: 'FORBIDDEN'
         });
       }
@@ -34,7 +34,7 @@ const authorizeFacilitator = () => {
       if (!isFac) {
         return res.status(403).json({
           status: 'error',
-          message: 'Access denied. You must be an admin or assigned facilitator for this event.',
+          message: 'You must be an admin or assigned facilitator for this event.',
           code: 'FORBIDDEN'
         });
       }
@@ -44,7 +44,7 @@ const authorizeFacilitator = () => {
       if (!isFac) {
         return res.status(403).json({
           status: 'error',
-          message: 'Access denied. You must be an admin or assigned facilitator for this event.',
+          message: 'You must be an admin or assigned facilitator for this event.',
           code: 'FORBIDDEN'
         });
       }

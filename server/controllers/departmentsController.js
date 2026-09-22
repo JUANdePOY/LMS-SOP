@@ -31,7 +31,7 @@ function getDepartmentLeaderboard(req, res) {
     if (!req.user.business_id) {
       return res.status(403).json({
         success: false,
-        message: 'No business scope assigned',
+        message: 'Your account is not assigned to a business.',
         code: 'NO_BUSINESS_SCOPE'
       });
     }

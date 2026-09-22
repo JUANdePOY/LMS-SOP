@@ -34,12 +34,12 @@ async function enforceCourseScope(course, user) {
 
   if (role === 'admin') {
     if (!user.business_id) {
-      const error = new Error('Your account has no business scope');
+      const error = new Error('You don\'t have access to this course.');
       error.statusCode = 403;
       throw error;
     }
     if (courseBusinessId && courseBusinessId !== user.business_id) {
-      const error = new Error('Access denied: course is outside your business scope');
+      const error = new Error('This course belongs to a different business.');
       error.statusCode = 403;
       throw error;
     }
@@ -49,7 +49,7 @@ async function enforceCourseScope(course, user) {
         [deptId]
       );
       if (!dept || dept.business_id !== user.business_id) {
-        const error = new Error('Access denied: course is outside your business scope');
+        const error = new Error('This course belongs to a different business.');
         error.statusCode = 403;
         throw error;
       }
@@ -60,7 +60,7 @@ async function enforceCourseScope(course, user) {
   if (role === 'department_head') {
     const scopedDeptIds = user.scoped_department_ids || (user.department_id ? [user.department_id] : []);
     if (deptId && !scopedDeptIds.includes(deptId)) {
-      const error = new Error('Access denied: course is outside your department scope');
+      const error = new Error('You don\'t have access to this course.');
       error.statusCode = 403;
       throw error;
     }
@@ -497,7 +497,7 @@ function publishCourse(req, res) {
   const userId = req.user?.id;
 
   if (!['admin', 'super_admin'].includes(req.user?.role)) {
-    return res.status(403).json({ success: false, message: 'Only admin can publish courses', code: 'FORBIDDEN' });
+    return res.status(403).json({ success: false, message: 'Only administrators can publish courses.', code: 'FORBIDDEN' });
   }
 
   courseModel.findById(courseId)
@@ -545,7 +545,7 @@ function submitForReview(req, res) {
       return enforceCourseScope(course, req.user).then(() => {
       if (req.user.role === 'department_head') {
         if (course.department_id !== null && course.department_id !== req.user.department_id) {
-          return res.status(403).json({ success: false, message: 'Cannot submit courses outside your department', code: 'FORBIDDEN' });
+          return res.status(403).json({ success: false, message: 'You don\'t have access to submit this course for review.', code: 'FORBIDDEN' });
         }
       }
         return courseModel.update(courseId, { status: 'under_review' }).then(() => {
@@ -562,7 +562,7 @@ function approveCourse(req, res) {
   const userId = req.user?.id;
 
   if (!['admin', 'super_admin'].includes(req.user?.role)) {
-    return res.status(403).json({ success: false, message: 'Only admin can approve courses', code: 'FORBIDDEN' });
+    return res.status(403).json({ success: false, message: 'Only administrators can approve courses.', code: 'FORBIDDEN' });
   }
 
   courseModel.findById(courseId)
@@ -592,7 +592,7 @@ function rejectCourse(req, res) {
   const userId = req.user?.id;
 
   if (!['admin', 'super_admin'].includes(req.user?.role)) {
-    return res.status(403).json({ success: false, message: 'Only admin can reject courses', code: 'FORBIDDEN' });
+    return res.status(403).json({ success: false, message: 'Only administrators can reject courses.', code: 'FORBIDDEN' });
   }
 
   courseModel.findById(courseId)

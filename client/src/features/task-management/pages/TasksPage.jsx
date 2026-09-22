@@ -7,7 +7,7 @@ import { useNotifications } from '@/shared/stores/notificationStore.js';
 import { useTasks } from '../hooks/useTasks';
 import { updateProgress, bulkUpdateTasks, bulkDeleteTasks } from '../services/taskService';
 import { getProjects, updateProject } from '../services/projectService';
-import { createClient, updateClient } from '../api/client.api';
+import { createClient, updateClient, updateClientBusiness } from '../api/client.api';
 import { updateBusiness } from '../api/business.api';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import EntityDetailPanel from '../components/EntityDetailPanel';
@@ -145,15 +145,28 @@ export default function TasksPage() {
     }
   }, [toast, loadProjects]);
 
+  const findClientIdForBusiness = useCallback((id) => {
+    for (const client of clientTree || []) {
+      const match = (client.businesses || []).find((b) => String(b.id) === String(id));
+      if (match) return client.id;
+    }
+    return null;
+  }, [clientTree]);
+
   const renameBusiness = useCallback(async (id, name) => {
+    const clientId = findClientIdForBusiness(id);
+    if (clientId == null) {
+      toast.error('Could not resolve the client for this business');
+      return;
+    }
     try {
-      await updateBusiness(id, { business_name: name });
+      await updateClientBusiness(clientId, id, { business_name: name });
       toast.success('Business renamed');
       loadProjects();
     } catch (err) {
       toast.error(err.message || 'Failed to rename business');
     }
-  }, [toast, loadProjects]);
+  }, [toast, loadProjects, findClientIdForBusiness]);
 
   const renameTask = useCallback(async (id, title) => {
     try {
@@ -205,14 +218,6 @@ export default function TasksPage() {
       throw err;
     }
   }, [toast, loadProjects]);
-
-  const findClientIdForBusiness = useCallback((id) => {
-    for (const client of clientTree || []) {
-      const match = (client.businesses || []).find((b) => String(b.id) === String(id));
-      if (match) return client.id;
-    }
-    return null;
-  }, [clientTree]);
 
   const handleDeleteEntity = useCallback(async (kind, id) => {
     if (id == null || (typeof id === 'number' && !Number.isFinite(id))) {
@@ -980,8 +985,9 @@ export default function TasksPage() {
       <EntityDetailPanel
         type="business"
         businessId={viewingBusinessId}
+        clientId={clientParam || (viewingBusinessId ? findClientIdForBusiness(viewingBusinessId) : null)}
         open={viewingBusinessId !== null}
-        onClose={() => setViewingBusinessId(null)}
+        onClose={() => { setViewingBusinessId(null); setFocusSubtasks(false); }}
         onUpdated={loadProjects}
         onDeleted={loadProjects}
       />
