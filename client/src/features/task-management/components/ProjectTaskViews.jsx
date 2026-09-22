@@ -105,47 +105,48 @@ export default function ProjectTaskViews({
       ) : (
         <>
            {view === 'list' && (
-              <TaskHierarchyTable
-                tasks={tasks}
-                projectsById={projectsById}
-                clientTree={clientTree}
-                loading={loading}
-                search={search || ''}
-                onViewTask={onViewTask}
-                onViewSubtasks={onViewSubtasks}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onStatusChange={onStatusChange}
-                onInlineUpdate={onInlineUpdate}
-                onQuickCreate={onQuickCreate}
-                 canManage={canManage}
-                 canManageClients={canManageClients}
-                 scopeClientId={scopeClientId}
-                 scopeBusinessId={scopeBusinessId}
-                  scopeProjectId={scopeProjectId}
-                  userDepartmentId={userDepartmentId}
-                onAddProjectTask={onAddProjectTask}
-               onEditProject={onEditProject}
-               onDeleteImmediate={onDeleteImmediate}
-               onDuplicated={onDuplicated}
-               onQuickAddTask={onQuickAddTask}
-               onQuickAddSubtask={onQuickAddSubtask}
-               onRenameClient={onRenameClient}
-               onRenameBusiness={onRenameBusiness}
-               onRenameProject={onRenameProject}
-                onRenameTask={onRenameTask}
-               onAddChild={onAddChild}
-               onDeleteEntity={onDeleteEntity}
-                onCreateBusiness={onCreateBusiness}
-                onCreateProject={onCreateProject}
-                onCreateClient={onCreateClient}
-                  newTaskIds={newTaskIds}
-                  userRole={userRole}
-                  userBusinessId={userBusinessId}
-                  userDepartmentBusinessId={userDepartmentBusinessId}
-                  autoExpand={autoExpand}
-                  onOpenBulkUpload={onOpenBulkUpload}
-                />
+               <TaskHierarchyTable
+                 tasks={tasks}
+                 projectsById={projectsById}
+                 clientTree={clientTree}
+                 loading={loading}
+                 search={search || ''}
+                 onViewTask={onViewTask}
+                 onViewSubtasks={onViewSubtasks}
+                 onEdit={onEdit}
+                 onDelete={onDelete}
+                 onStatusChange={onStatusChange}
+                 onInlineUpdate={onInlineUpdate}
+                 onQuickCreate={onQuickCreate}
+                  canManage={canManage}
+                  canManageClients={canManageClients}
+                  scopeClientId={scopeClientId}
+                  scopeBusinessId={scopeBusinessId}
+                   scopeProjectId={scopeProjectId}
+                   userDepartmentId={userDepartmentId}
+                 onAddProjectTask={onAddProjectTask}
+                onEditProject={onEditProject}
+                onDeleteImmediate={onDeleteImmediate}
+                onDuplicated={onDuplicated}
+                onQuickAddTask={onQuickAddTask}
+                onQuickAddSubtask={onQuickAddSubtask}
+                onRenameClient={onRenameClient}
+                onRenameBusiness={onRenameBusiness}
+                onRenameProject={onRenameProject}
+                 onRenameTask={onRenameTask}
+                onAddChild={onAddChild}
+                onDeleteEntity={onDeleteEntity}
+                 onCreateBusiness={onCreateBusiness}
+                 onCreateProject={onCreateProject}
+                 onCreateClient={onCreateClient}
+                   newTaskIds={newTaskIds}
+                   userRole={userRole}
+                   userBusinessId={userBusinessId}
+                   userDepartmentBusinessId={userDepartmentBusinessId}
+                   canManageTask={canManageTask}
+                   autoExpand={autoExpand}
+                   onOpenBulkUpload={onOpenBulkUpload}
+                 />
           )}
           {view === 'board' && (
             <TaskBoard

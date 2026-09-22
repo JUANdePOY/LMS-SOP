@@ -345,7 +345,7 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
 
       <SubtaskList
         subtasks={local.subtasks}
-        canManage={canManageTasks}
+        canManage={isAssigned}
         onToggle={handleToggleSubtask}
         onDelete={(id) => setPendingSubtaskId(id)}
         onAdd={handleAddSubtask}

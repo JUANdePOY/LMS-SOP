@@ -342,8 +342,9 @@ async function getTask(id, actorId) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
+  let directlyAssigned = isAdmin;
   if (!isAdmin) {
-    const directlyAssigned = await isUserAssignedToTaskById(actorId, id);
+    directlyAssigned = await isUserAssignedToTaskById(actorId, id);
     if (!directlyAssigned) {
       // Allow viewing any task that belongs to a project the user is assigned to,
       // so employees can see the progress of their peers on the project.
@@ -378,6 +379,23 @@ async function getTask(id, actorId) {
       }
     }
   }
+
+  // Inherit assignability from parent tasks: if the user is assigned to any
+  // ancestor, they may edit/interact with this sub-task too.
+  let inheritedAssigned = false;
+  if (!directlyAssigned && task.parent_task_id != null) {
+    let cursor = task.parent_task_id;
+    const seen = new Set();
+    while (cursor != null && !inheritedAssigned && !seen.has(String(cursor))) {
+      seen.add(String(cursor));
+      inheritedAssigned = await isUserAssignedToTaskById(actorId, cursor);
+      if (!inheritedAssigned) {
+        const [parent] = await db.query('SELECT parent_task_id FROM tasks WHERE id = ?', [cursor]);
+        cursor = parent?.[0]?.parent_task_id || null;
+      }
+    }
+  }
+  const effectiveAssigned = directlyAssigned || inheritedAssigned;
 
   if (isAdmin) {
     // Department Heads can only view tasks assigned to their department.
@@ -466,8 +484,8 @@ async function getTask(id, actorId) {
   //                  (User/Department/Position) assignee, or a granted business
   //                  manager of this task's business.
   const isAssigned = await isUserAssignedToTaskById(actorId, id);
-  const canEdit = isAdmin || task.created_by === actorId || await isTaskEditableByManager(actorId, id) || (isAssigned && task.parent_task_id != null);
-  const canInteract = isAdmin || isAssigned;
+  const canEdit = isAdmin || task.created_by === actorId || await isTaskEditableByManager(actorId, id) || (effectiveAssigned && task.parent_task_id != null);
+  const canInteract = isAdmin || effectiveAssigned;
 
   return {
     ...task,
@@ -1419,14 +1437,16 @@ async function getMyTaskHierarchy(userId) {
     progress_rate: progressMap[task.id] ?? null,
     assignments: assignmentsMap[task.id] || [],
     is_assigned: assignedTaskIds.has(String(task.id)),
+    can_interact: assignedTaskIds.has(String(task.id)),
   }));
 
-  // Capability flag for granted business managers. A manager is not directly
-  // assigned to every task in their business, but the grant entitles them to
-  // edit them (title, description, status, priority, start/due dates, update
-  // progress, attach files, comment). Without this flag the employee task
-  // drawer would force read-only for tasks the manager isn't individually
-  // assigned to — even though they own the whole business.
+  const parentAssignedIds = new Set(tasks.filter((t) => t.is_assigned && t.parent_task_id == null).map((t) => String(t.id)));
+  for (const task of tasks) {
+    if (!task.is_assigned && task.parent_task_id != null && parentAssignedIds.has(String(task.parent_task_id))) {
+      task.is_assigned = true;
+    }
+  }
+
   const managerBusinessIds = new Set(
     (await db.query('SELECT business_id FROM business_managers WHERE user_id = ?', [userId]))[0].map((r) => String(r.business_id))
   );
@@ -1439,9 +1459,19 @@ async function getMyTaskHierarchy(userId) {
       [userId]
     ))[0].map((r) => String(r.business_id))
   );
+
   for (const task of tasks) {
     const bizId = task.client_business_id != null ? String(task.client_business_id) : null;
     task.can_edit = task.is_assigned || (bizId != null && (managerBusinessIds.has(bizId) || departmentBusinessIds.has(bizId)));
+    task.can_interact = task.can_edit;
+  }
+
+  const parentEditableIds = new Set(tasks.filter((t) => t.can_edit && t.parent_task_id == null).map((t) => String(t.id)));
+  for (const task of tasks) {
+    if (!task.can_edit && task.parent_task_id != null && parentEditableIds.has(String(task.parent_task_id))) {
+      task.can_edit = true;
+      task.can_interact = true;
+    }
   }
 
   // Build projectsById + clientTree from business linkage. Include ALL

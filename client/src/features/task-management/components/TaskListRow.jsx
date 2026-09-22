@@ -1508,7 +1508,7 @@ function MoreActionsMenu({ task, businesses, onOpen, onMoveBusiness, onDelete, o
   );
 }
 
-export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, projects, showCountBadges = false, subtaskCount = 0, isNew = false, tasksById = {}, onAddSubtask, onViewSubtasks, userDepartmentId = null, userDepartmentClientIds = null, depth = 0 }) {
+export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, canManageTask, projects, showCountBadges = false, subtaskCount = 0, isNew = false, tasksById = {}, onAddSubtask, onViewSubtasks, userDepartmentId = null, userDepartmentClientIds = null, depth = 0 }) {
   const { toast } = useToast();
 
   const overdue = isOverdue(task);
@@ -1556,17 +1556,8 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
     })() ?? null
   );
   const baseManage = canManage && (userDepartmentId == null || taskDeptIds.has(String(userDepartmentId)) || (userDepartmentClientIds != null && userDepartmentClientIds.has(taskClientId)));
-  // Inline field edits (status, priority, due date, title, complete toggle)
-  // are allowed for admins, department heads, task creators, direct assignees,
-  // OR any user granted business-manager access to this task's business. The
-  // server flags that grant on the task payload as `can_edit`, so an employee
-  // assigned to the business (client) can edit these cells inline even when
-  // they aren't individually assigned to the task.
-  const canEditThisTask = baseManage || Boolean(task.can_edit);
-  // Administration (assignees, delete, move, duplicate, add sub-task) stays with
-  // admins / department heads only — a business manager cannot reassign or
-  // remove tasks, even for the business they manage.
-  const canAdminister = baseManage;
+  const canAdminister = baseManage || (canManageTask ? canManageTask(task) : false);
+  const canEditThisTask = canAdminister || Boolean(task.can_edit);
 
   // A sub-task is one with a parent_task_id. Resolve the parent's title from
   // the sibling map so the employee can see which task this one belongs to.

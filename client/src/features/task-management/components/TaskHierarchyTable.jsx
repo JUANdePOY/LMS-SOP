@@ -604,6 +604,7 @@ export default function TaskHierarchyTable({
   onAddProjectTask,
   canManage,
   canManageClients = false,
+  canManageTask,
   scopeClientId,
   scopeBusinessId,
   scopeProjectId,
@@ -1010,27 +1011,28 @@ export default function TaskHierarchyTable({
                                 const tDimmed = search && !subtreeMatches(task, 'task', search);
                                 return (
                                   <Fragment key={task.id}>
-                                    <TaskRow
-                                      task={task}
-                                      depth={2}
-                                      dimmed={tDimmed}
-                                      onViewTask={onViewTask}
-                                      onViewSubtasks={onViewSubtasks}
-                                      onStatusChange={onStatusChange}
-                                      onInlineUpdate={onInlineUpdate}
-                                      onDelete={onDelete}
-                                      onDeleteImmediate={onDeleteImmediate}
-                                      onDuplicated={onDuplicated}
-                                      onRenameTask={onRenameTask}
-                                      canManage={canManage}
-                                      projects={projects}
-                                      tasksById={tasksById}
-                                      userDepartmentId={userDepartmentId}
-                                      userDepartmentClientIds={userDepartmentClientIds}
-                                      onAddSubtask={(t) => startAdd('task', t.id)}
-                                      subtaskCount={subtaskCountMap[task.id] || 0}
-                                      isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
-                                    />
+                                     <TaskRow
+                                       task={task}
+                                       depth={2}
+                                       dimmed={tDimmed}
+                                       onViewTask={onViewTask}
+                                       onViewSubtasks={onViewSubtasks}
+                                       onStatusChange={onStatusChange}
+                                       onInlineUpdate={onInlineUpdate}
+                                       onDelete={onDelete}
+                                       onDeleteImmediate={onDeleteImmediate}
+                                       onDuplicated={onDuplicated}
+                                       onRenameTask={onRenameTask}
+                                       canManage={canManage}
+                                       canManageTask={canManageTask}
+                                       projects={projects}
+                                       tasksById={tasksById}
+                                       userDepartmentId={userDepartmentId}
+                                       userDepartmentClientIds={userDepartmentClientIds}
+                                       onAddSubtask={(t) => startAdd('task', t.id)}
+                                       subtaskCount={subtaskCountMap[task.id] || 0}
+                                       isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
+                                     />
                                     {addingFor?.kind === 'subtask' && addingFor.parentId === task.id && (
                                       <InlineNameRow
                                         key="__add-subtask"

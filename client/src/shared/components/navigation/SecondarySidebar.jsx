@@ -63,11 +63,13 @@ export default function SecondarySidebar({ collapsed = false }) {
   const [employeeClientIds, setEmployeeClientIds] = useState(null);
   const [employeeBusinessIds, setEmployeeBusinessIds] = useState(null);
   const [employeeSopBusinessIds, setEmployeeSopBusinessIds] = useState(null);
+  const [employeeClientTree, setEmployeeClientTree] = useState([]);
   useEffect(() => {
     if (isAnyAdmin) {
       setEmployeeClientIds(null);
       setEmployeeBusinessIds(null);
       setEmployeeSopBusinessIds(null);
+      setEmployeeClientTree([]);
       setHasUnassignedTasks(false);
       return;
     }
@@ -87,11 +89,12 @@ export default function SecondarySidebar({ collapsed = false }) {
         setEmployeeClientIds(clientIds);
         setEmployeeBusinessIds(bizIds);
         setEmployeeSopBusinessIds(sopBizIds);
+        setEmployeeClientTree(data?.clientTree || []);
         const hasUnassigned = (data?.tasks || []).some((t) => t.client_business_id == null);
         setHasUnassignedTasks(hasUnassigned);
       })
       .catch(() => {
-        if (active) { setEmployeeClientIds(new Set()); setEmployeeBusinessIds(new Set()); setEmployeeSopBusinessIds(new Set()); setHasUnassignedTasks(false); }
+        if (active) { setEmployeeClientIds(new Set()); setEmployeeBusinessIds(new Set()); setEmployeeSopBusinessIds(new Set()); setEmployeeClientTree([]); setHasUnassignedTasks(false); }
       });
     return () => { active = false; };
   }, [isAnyAdmin, employeeBusinessId]);
@@ -128,32 +131,30 @@ export default function SecondarySidebar({ collapsed = false }) {
         }));
     }
     if (isAnyAdmin) return businesses;
-    if (employeeBusinessId != null) {
-      const biz = businesses.filter((b) => Number(b.id) === Number(employeeBusinessId));
-      if (employeeClientIds == null || employeeBusinessIds == null) return biz;
-      return biz.map((b) => ({
-        ...b,
-        clients: (b.clients || [])
-          .filter((c) => employeeClientIds.has(Number(c.id)))
-          .map((c) => ({
-            ...c,
-            businesses: (c.businesses || []).filter((u) => employeeBusinessIds.has(Number(u.id))),
-          })),
-      }));
+    if (employeeSopBusinessIds != null && employeeClientIds != null && employeeBusinessIds != null && employeeClientTree.length > 0) {
+      const bizMap = new Map();
+      for (const c of employeeClientTree) {
+        const bizId = Number(c.business_id);
+        if (!employeeSopBusinessIds.has(bizId)) continue;
+        if (!bizMap.has(bizId)) {
+          bizMap.set(bizId, {
+            id: bizId,
+            name: c.business_name || `Business ${bizId}`,
+            clients: []
+          });
+        }
+        bizMap.get(bizId).clients.push({
+          ...c,
+          businesses: (c.businesses || []).filter((u) => employeeBusinessIds.has(Number(u.id))),
+        });
+      }
+      return Array.from(bizMap.values());
     }
-    if (employeeSopBusinessIds == null || employeeClientIds == null || employeeBusinessIds == null) return [];
-    return businesses
-      .filter((b) => employeeSopBusinessIds.has(Number(b.id)))
-      .map((b) => ({
-        ...b,
-        clients: (b.clients || [])
-          .filter((c) => employeeClientIds.has(Number(c.id)))
-          .map((c) => ({
-            ...c,
-            businesses: (c.businesses || []).filter((u) => employeeBusinessIds.has(Number(u.id))),
-          })),
-      }));
-  }, [businesses, employeeBusinessId, isAnyAdmin, isDepartmentHead, user, employeeClientIds, employeeBusinessIds, employeeSopBusinessIds]);
+    if (employeeBusinessId != null) {
+      return businesses.filter((b) => Number(b.id) === Number(employeeBusinessId));
+    }
+    return [];
+  }, [businesses, employeeBusinessId, isAnyAdmin, isDepartmentHead, user, employeeClientIds, employeeBusinessIds, employeeSopBusinessIds, employeeClientTree]);
   const showUnassigned = isAnyAdmin && hasUnassignedTasks;
   const { toast } = useToast();
   const [query, setQuery] = useState("");
@@ -329,12 +330,23 @@ export default function SecondarySidebar({ collapsed = false }) {
   // Employees only have one business, so reveal it by default (clients stay
   // collapsed until the user opens the business) so the panel isn't blank.
   useEffect(() => {
+    if (!isAnyAdmin && employeeSopBusinessIds != null && employeeSopBusinessIds.size > 0 && visibleBusinesses.length) {
+      const updates = {};
+      for (const bizId of employeeSopBusinessIds) {
+        const key = String(bizId);
+        if (!expandedBiz[key]) updates[key] = true;
+      }
+      if (Object.keys(updates).length > 0) {
+        setExpandedBiz((prev) => ({ ...prev, ...updates }));
+      }
+      return;
+    }
     if (employeeBusinessId == null) return;
     const key = String(employeeBusinessId);
     if (visibleBusinesses.length && !expandedBiz[key]) {
       setExpandedBiz((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
     }
-  }, [employeeBusinessId, visibleBusinesses, expandedBiz]);
+  }, [employeeBusinessId, employeeSopBusinessIds, visibleBusinesses, expandedBiz, isAnyAdmin]);
 
   // Expand the branch that matches an active Tasks scope (client/business
   // chosen in the panel) so the selected row is visible. Keyed on the scope
