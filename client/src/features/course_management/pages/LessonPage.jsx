@@ -312,7 +312,7 @@ export default function LessonPage() {
                 onEnded={() => setVideoWatched(true)}
               />
               {stripEmptyParagraphs(currentLesson.description) && (
-                <div className="prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300"
+                <div className={`prose prose-sm dark:prose-invert max-w-none text-neutral-700 dark:text-neutral-300 ${LB_PROSE}`}
                   dangerouslySetInnerHTML={{ __html: stripEmptyParagraphs(currentLesson.description) }}
                 />
               )}
