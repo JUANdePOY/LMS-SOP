@@ -278,6 +278,10 @@ const COURSE_MANAGEMENT_MIGRATIONS = [
   `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS bunny_video_id VARCHAR(120) DEFAULT NULL`,
   `CREATE INDEX IF NOT EXISTS idx_module_content_bunny ON module_content (bunny_library_id, bunny_video_id)`,
 
+  `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS file_path VARCHAR(500) DEFAULT NULL`,
+  `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS file_name VARCHAR(500) DEFAULT NULL`,
+  `ALTER TABLE module_content ADD COLUMN IF NOT EXISTS link_title VARCHAR(500) DEFAULT NULL`,
+
   `CREATE TABLE IF NOT EXISTS lesson_progress (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,

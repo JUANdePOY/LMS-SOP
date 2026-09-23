@@ -1,11 +1,12 @@
 import { useMemo, useState, useCallback, useEffect, useRef, useLayoutEffect, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2, Inbox, Building2, Briefcase, FolderKanban, Filter, Upload } from 'lucide-react';
+import { ChevronRight, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2, Inbox, Building2, Briefcase, FolderKanban, Filter, Upload, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { getBusinesses } from '../api/business.api';
 import { getDepartmentsForAssignment } from '../api/assignment.api';
+import { duplicateClientBusiness } from '../api/client.api';
 import api from '@/services/api';
 import { TaskRow, AddTaskRow, Avatar, BusinessAssigneePicker } from './TaskListRow';
 import InlineEditableName from './InlineEditableName';
@@ -629,6 +630,7 @@ export default function TaskHierarchyTable({
   userDepartmentBusinessId = null,
   autoExpand,
   onOpenBulkUpload,
+  onDuplicateBusiness,
 }) {
   const { toast } = useToast();
   const tasksById = useMemo(() => {
@@ -764,6 +766,16 @@ export default function TaskHierarchyTable({
       // Parent surfaces its own error toast
     }
   }, [handleAssignBusinessManager, handleRevokeBusinessManager, handleGrantBusinessDepartment]);
+
+  const handleDuplicateBusiness = useCallback(async (clientId, businessId) => {
+    try {
+      const result = await duplicateClientBusiness(clientId, businessId);
+      toast.success('Business duplicated successfully');
+      onDuplicateBusiness?.(result.data || result);
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to duplicate business');
+    }
+  }, [toast, onDuplicateBusiness]);
 
   // Load the granted-manager list for every business in the hierarchy once.
   // Each business row reads from this map; without it the picker would always
@@ -996,6 +1008,7 @@ export default function TaskHierarchyTable({
                             clientName: client.name,
                             departments: businessDepartments[String(business.id)] || [],
                           }) : null}
+                          onDuplicateBusiness={canManage ? () => handleDuplicateBusiness(client.id, business.id) : null}
                         />
                         <AnimatePresence initial={false}>
                           {bOpen && (
@@ -1214,7 +1227,7 @@ const LEVEL_STYLE = {
    business: { font: 'font-normal',  size: 'text-sm', tracking: '', leading: '' },
 };
 
-function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false, businessManagers = null, businessDepartments = null, onBusinessAssigneeSave, count = null, countLabel = '', userRole = '', userDepartmentId = null, userBusinessId = null, onOpenBulkUpload = null }) {
+function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false, businessManagers = null, businessDepartments = null, onBusinessAssigneeSave, count = null, countLabel = '', userRole = '', userDepartmentId = null, userBusinessId = null, onOpenBulkUpload = null, onDuplicateBusiness = null }) {
   const level = LEVEL_STYLE[kind] || LEVEL_STYLE.business;
   const meta = KIND_META[kind];
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1271,6 +1284,7 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
   if (kind === 'business') {
     if (onAddTask) menuItems.push({ label: 'New Task', icon: Plus, onClick: () => { setMenuOpen(false); onAddTask(); } });
     if (onOpenBulkUpload) menuItems.push({ label: 'Bulk Upload', icon: Upload, onClick: () => { setMenuOpen(false); onOpenBulkUpload(); } });
+    if (onDuplicateBusiness) menuItems.push({ label: 'Duplicate Business', icon: Copy, onClick: () => { setMenuOpen(false); onDuplicateBusiness(); } });
   } else {
     menuItems.push({ label: `Add ${childNoun}`, icon: Plus, onClick: () => onAddChild?.(kind, id) });
   }

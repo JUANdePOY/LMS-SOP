@@ -195,6 +195,17 @@ export default function TasksPage() {
     }
   }, [toast, loadProjects]);
 
+  const handleDuplicateBusiness = useCallback(async (result) => {
+    loadProjects();
+    notifyOrgTreeChanged();
+    try {
+      await refreshTasks();
+      await refreshStats();
+    } catch (err) {
+      // ignore refresh errors
+    }
+  }, [loadProjects, notifyOrgTreeChanged, refreshTasks, refreshStats]);
+
   const handleCreateProject = useCallback(async (businessId, name) => {
     try {
       await api.post('/projects', {
@@ -935,10 +946,11 @@ export default function TasksPage() {
           onCreateBusiness={handleCreateBusiness}
           onCreateProject={handleCreateProject}
           onCreateClient={handleCreateClient}
-          onDeleteEntity={handleDeleteEntity}
-          autoExpand={!!hasActiveFilters}
-          onOpenBulkUpload={handleOpenBulkUpload}
-        />
+           onDeleteEntity={handleDeleteEntity}
+           autoExpand={!!hasActiveFilters}
+           onOpenBulkUpload={handleOpenBulkUpload}
+           onDuplicateBusiness={handleDuplicateBusiness}
+         />
       )}
 
       <TaskForm

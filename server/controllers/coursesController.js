@@ -496,10 +496,6 @@ function publishCourse(req, res) {
   const courseId = parseInt(req.params.id, 10);
   const userId = req.user?.id;
 
-  if (!['admin', 'super_admin'].includes(req.user?.role)) {
-    return res.status(403).json({ success: false, message: 'Only administrators can publish courses.', code: 'FORBIDDEN' });
-  }
-
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
@@ -561,10 +557,6 @@ function approveCourse(req, res) {
   const courseId = parseInt(req.params.id, 10);
   const userId = req.user?.id;
 
-  if (!['admin', 'super_admin'].includes(req.user?.role)) {
-    return res.status(403).json({ success: false, message: 'Only administrators can approve courses.', code: 'FORBIDDEN' });
-  }
-
   courseModel.findById(courseId)
     .then((course) => {
       if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
@@ -590,10 +582,6 @@ function approveCourse(req, res) {
 function rejectCourse(req, res) {
   const courseId = parseInt(req.params.id, 10);
   const userId = req.user?.id;
-
-  if (!['admin', 'super_admin'].includes(req.user?.role)) {
-    return res.status(403).json({ success: false, message: 'Only administrators can reject courses.', code: 'FORBIDDEN' });
-  }
 
   courseModel.findById(courseId)
     .then((course) => {
@@ -723,6 +711,29 @@ async function uploadImage(req, res) {
   }
 }
 
+async function uploadDocument(req, res) {
+  const courseId = parseInt(req.params.courseId, 10);
+  const moduleId = parseInt(req.params.moduleId, 10);
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'No document file uploaded', code: 'NO_FILE' });
+  }
+  try {
+    const course = await courseModel.findById(courseId);
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+    await enforceCourseScope(course, req.user);
+
+    const { saveCourseDocument } = require('../middleware/courseDocumentUpload');
+    const url = await saveCourseDocument(courseId, moduleId, req.file);
+    logAudit('course.document.uploaded', req.user.id, { course_id: courseId, module_id: moduleId, url });
+    res.status(201).json({ success: true, data: { view_url: url, file_name: req.file.originalname }, message: 'Document uploaded successfully' });
+  } catch (err) {
+    console.error('[Course Document Upload Error]', err);
+    res.status(500).json({ success: false, message: 'Failed to upload document', code: 'UPLOAD_ERROR' });
+  }
+}
+
 function listCategories(req, res) {
   const { status } = req.query;
   courseModel.listCategories({ status })
@@ -756,4 +767,5 @@ module.exports = {
   exportCourseExcel,
   exportCoursePDF,
   uploadImage,
+  uploadDocument,
 };

@@ -39,15 +39,15 @@ function buildBunnyUrl(bunnyLibraryId, bunnyVideoId) {
 async function create(contentData) {
   const {
     module_id, title, type, description, order_index, url, duration, is_required, allow_access_after, quiz_id, certificate_template_id,
-    bunny_library_id, bunny_video_id,
+    bunny_library_id, bunny_video_id, file_path, file_name, link_title,
   } = contentData;
 
   const resolvedUrl = url ?? buildBunnyUrl(bunny_library_id, bunny_video_id);
 
   const [result] = await db.query(
     `INSERT INTO module_content (
-      module_id, title, type, description, order_index, url, duration, is_required, allow_access_after, quiz_id, certificate_template_id, bunny_library_id, bunny_video_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      module_id, title, type, description, order_index, url, duration, is_required, allow_access_after, quiz_id, certificate_template_id, bunny_library_id, bunny_video_id, file_path, file_name, link_title
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       module_id,
       title,
@@ -62,13 +62,16 @@ async function create(contentData) {
       certificate_template_id ? parseInt(certificate_template_id, 10) : null,
       bunny_library_id ?? null,
       bunny_video_id ?? null,
+      file_path ?? null,
+      file_name ?? null,
+      link_title ?? null,
     ]
   );
   return result.insertId;
 }
 
 async function update(id, updates) {
-  const allowed = ['title', 'type', 'description', 'order_index', 'url', 'duration', 'is_required', 'allow_access_after', 'quiz_id', 'certificate_template_id', 'bunny_library_id', 'bunny_video_id'];
+  const allowed = ['title', 'type', 'description', 'order_index', 'url', 'duration', 'is_required', 'allow_access_after', 'quiz_id', 'certificate_template_id', 'bunny_library_id', 'bunny_video_id', 'file_path', 'file_name', 'link_title'];
   const sets = [];
   const params = [];
 

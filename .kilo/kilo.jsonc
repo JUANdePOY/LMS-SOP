@@ -1,4 +1,5 @@
 {
+  "$schema": "https://app.kilo.ai/config.json",
   "project": {
     "name": "LMS SOP Management System",
     "language": "javascript",

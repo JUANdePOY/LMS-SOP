@@ -6,6 +6,7 @@ const taskAttachmentModel = require('../models/taskAttachmentModel');
 const { buildViewUrl } = require('../services/taskAttachmentPublicFile');
 const taskCommentModel = require('../models/taskCommentModel');
 const projectModel = require('../models/projectModel');
+const clientModel = require('../models/clientModel');
 const { logAudit } = require('../utils/auditLogger');
 const { computeAutoStatus } = require('../utils/taskStatus');
 const { validateTaskPayload, validateAssignmentPayload, validateProgressPayload, validateCommentPayload } = require('../validators/taskValidator');
@@ -641,6 +642,109 @@ async function duplicateTask(id, actorId) {
   logAudit('task.duplicate', actorId, { task_id: newId, source_task_id: id, title: source.title });
 
   return await getTask(newId, actorId);
+}
+
+async function duplicateBusiness(businessId, actorId) {
+  const isAdmin = await isUserAdmin(actorId);
+  if (!isAdmin) {
+    const error = new Error('You are not authorized to duplicate this business');
+    error.code = 'FORBIDDEN';
+    throw error;
+  }
+
+  const business = await clientModel.getClientBusinessById(businessId);
+  if (!business) {
+    const error = new Error('Business not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+
+  const dupBusiness = await clientModel.duplicateBusiness(businessId, actorId);
+
+  const [taskRows] = await db.query(
+    `SELECT t.id, t.title, t.description, t.priority, t.status, t.start_datetime, t.deadline_datetime,
+            t.estimated_hours, t.category, t.parent_task_id, t.client_id, t.business_id, t.project_id
+       FROM tasks t
+  LEFT JOIN projects p ON p.id = t.project_id
+      WHERE (t.client_business_id = ? OR p.client_business_id = ?)
+        AND (t.parent_task_id IS NULL OR t.parent_task_id = '' OR t.parent_task_id = 0)`,
+    [businessId, businessId]
+  );
+
+  const oldIdToNewId = new Map();
+  const newTaskIds = [];
+
+  for (const task of taskRows) {
+    const newId = await taskModel.create({
+      title: `${task.title} (copy)`,
+      description: task.description,
+      priority: task.priority || 'Medium',
+      status: task.status || 'Pending',
+      start_datetime: task.start_datetime,
+      deadline_datetime: task.deadline_datetime,
+      estimated_hours: task.estimated_hours,
+      category: task.category,
+      parent_task_id: null,
+      client_id: task.client_id ?? null,
+      client_business_id: dupBusiness.id,
+      business_id: task.business_id ?? null,
+      project_id: null,
+      created_by: actorId,
+    });
+    oldIdToNewId.set(String(task.id), newId);
+    newTaskIds.push(newId);
+
+    const [assignmentRows] = await db.query(
+      'SELECT assignment_type, reference_id FROM task_assignments WHERE task_id = ?',
+      [task.id]
+    );
+    for (const a of assignmentRows) {
+      await taskAssignmentModel.create({
+        task_id: newId,
+        assignment_type: a.assignment_type,
+        reference_id: a.reference_id,
+        assigned_by: actorId,
+      });
+    }
+  }
+
+  for (const task of taskRows) {
+    if (task.parent_task_id == null || String(task.parent_task_id) === '' || Number(task.parent_task_id) === 0) continue;
+    const newParentId = oldIdToNewId.get(String(task.parent_task_id));
+    if (!newParentId) continue;
+    const newId = await taskModel.create({
+      title: `${task.title} (copy)`,
+      description: task.description,
+      priority: task.priority || 'Medium',
+      status: task.status || 'Pending',
+      start_datetime: task.start_datetime,
+      deadline_datetime: task.deadline_datetime,
+      estimated_hours: task.estimated_hours,
+      category: task.category,
+      parent_task_id: newParentId,
+      client_id: task.client_id ?? null,
+      client_business_id: dupBusiness.id,
+      business_id: task.business_id ?? null,
+      project_id: null,
+      created_by: actorId,
+    });
+    const [assignmentRows] = await db.query(
+      'SELECT assignment_type, reference_id FROM task_assignments WHERE task_id = ?',
+      [task.id]
+    );
+    for (const a of assignmentRows) {
+      await taskAssignmentModel.create({
+        task_id: newId,
+        assignment_type: a.assignment_type,
+        reference_id: a.reference_id,
+        assigned_by: actorId,
+      });
+    }
+  }
+
+  logAudit('business.duplicate', actorId, { business_id: dupBusiness.id, source_business_id: businessId, name: dupBusiness.business_name });
+
+  return { ...dupBusiness, task_ids: newTaskIds };
 }
 
 // Fields a granted business manager (a non-admin user) may edit on a task in
@@ -2140,6 +2244,7 @@ module.exports = {
   getTask,
   createTask,
   duplicateTask,
+  duplicateBusiness,
   updateTask,
   deleteTask,
   assignTask,

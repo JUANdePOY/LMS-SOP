@@ -11,7 +11,9 @@ import { useNotifications } from "@/shared/stores/notificationStore.js";
 import { FadeIn } from "@/shared/motion";
 
 export default function AnnouncementsPage() {
-  const { hasPermission, hasPermissionAction, role, department_id } = useAuth();
+  const { hasPermissionAction, user } = useAuth();
+  const role = user?.role;
+  const department_id = user?.department_id;
   const canCreateAnnouncement = hasPermissionAction('manage_announcements', 'create');
   const canEditAnnouncement = hasPermissionAction('manage_announcements', 'edit');
   const canDeleteAnnouncement = hasPermissionAction('manage_announcements', 'delete');

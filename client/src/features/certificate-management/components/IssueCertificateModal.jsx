@@ -3,6 +3,7 @@ import { Modal } from '@/shared/components/ui/modal';
 import { Button } from '@/shared/components/ui/button';
 import { Label } from '@/shared/components/ui/label';
 import { Input } from '@/shared/components/ui/input';
+import UserSearchSelect from './UserSearchSelect';
 import {
   getCertificateTemplates,
   issueCertificate,
@@ -94,15 +95,13 @@ export default function IssueCertificateModal({ open, onClose, onSuccess }) {
         </div>
         <div>
           <Label htmlFor="user">Recipient User ID</Label>
-          <Input
+          <UserSearchSelect
             id="user"
-            type="number"
             value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            placeholder="Enter user ID"
+            onChange={setUserId}
+            placeholder="Search users by name..."
             required
           />
-          <p className="mt-1 text-xs text-gray-500">For demo: try user ID 2 (Jane S.)</p>
         </div>
         <div>
           <Label htmlFor="recipient">Recipient Name (override)</Label>

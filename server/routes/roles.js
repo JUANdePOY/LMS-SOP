@@ -123,30 +123,41 @@ router.put('/permissions/:roleName', authenticateToken, requireSuperAdmin, [
     const roleName = req.params.roleName;
     const permissions = req.body.permissions;
 
-    const [existing] = await db.query('SELECT id FROM roles WHERE name = ?', [roleName]);
-    if (existing.length === 0) {
-      return res.status(404).json({ status: 'error', message: 'Role not found', code: 'NOT_FOUND' });
-    }
+     const [existingRole] = await db.query('SELECT id FROM roles WHERE name = ?', [roleName]);
+     if (existingRole.length === 0) {
+       return res.status(404).json({ status: 'error', message: 'Role not found', code: 'NOT_FOUND' });
+     }
 
-    await db.query('DELETE FROM role_permissions WHERE role_name = ?', [roleName]);
+     await db.query('DELETE FROM role_permissions WHERE role_name = ?', [roleName]);
 
-    if (Array.isArray(permissions) && permissions.length > 0) {
-      const values = permissions.map(p => {
-        const actions = Array.isArray(p.actions) ? JSON.stringify(p.actions) : null;
-        return [roleName, p.name, actions];
-      });
-      await db.query('INSERT INTO role_permissions (role_name, permission_name, actions) VALUES ?', [values]);
-    }
+     let savedCount = 0;
+     if (Array.isArray(permissions) && permissions.length > 0) {
+       const values = permissions.map(p => {
+         const actions = Array.isArray(p.actions) ? JSON.stringify(p.actions) : null;
+         return [roleName, p.name, actions];
+       });
+       await db.query('INSERT INTO role_permissions (role_name, permission_name, actions) VALUES ?', [values]);
+       savedCount = values.length;
+     }
 
-    logAudit({
-      user_id: req.user.id,
-      action: 'role.permissions_updated',
-      entity_type: 'role',
-      entity_id: null,
-      new_values: { role_name: roleName, permission_count: permissions?.length || 0 }
-    });
+     const [updatedPerms] = await db.query(
+       `SELECT p.id, p.name, p.display_name, p.category, p.actions, p.description, rp.actions AS role_actions
+        FROM permissions p
+        JOIN role_permissions rp ON p.name = rp.permission_name
+        WHERE rp.role_name = ?
+        ORDER BY p.category, p.name`,
+       [roleName]
+     );
 
-    res.json({ status: 'success', message: 'Role permissions updated', data: { role_name: roleName, permission_count: permissions?.length || 0 } });
+     logAudit({
+       user_id: req.user.id,
+       action: 'role.permissions_updated',
+       entity_type: 'role',
+       entity_id: existingRole[0].id,
+       new_values: { role_name: roleName, permission_count: savedCount }
+     });
+
+    res.json({ status: 'success', message: 'Role permissions updated', data: { role_name: roleName, permissions: updatedPerms } });
   } catch (err) {
     console.error('Role permissions update error:', err);
     res.status(500).json({ status: 'error', message: 'Failed to update permissions', code: 'DB_ERROR' });
@@ -510,6 +521,121 @@ router.put('/users/:userId/entity-overrides', authenticateToken, requireSuperAdm
   } catch (err) {
     console.error('User entity permissions update error:', err);
     res.status(500).json({ status: 'error', message: 'Failed to update user entity permissions', code: 'DB_ERROR' });
+  }
+});
+
+router.post('/users/:userId/full-save', authenticateToken, requireSuperAdmin, [
+  body('role').optional().trim(),
+  body('overrides').optional().isArray().withMessage('overrides must be an array'),
+  body('overrides.*.permission_name').notEmpty().withMessage('permission_name is required'),
+  body('overrides.*.granted').isBoolean().withMessage('granted must be boolean'),
+  body('overrides.*.actions').optional({ nullable: true }).isArray().withMessage('actions must be an array'),
+  body('entityOverrides').optional().isArray().withMessage('entityOverrides must be an array'),
+  body('entityOverrides.*.permission_name').notEmpty().withMessage('permission_name is required'),
+  body('entityOverrides.*.entity_type').notEmpty().withMessage('entity_type is required'),
+  body('entityOverrides.*.entity_id').optional({ nullable: true }).isInt().withMessage('entity_id must be an integer'),
+  body('entityOverrides.*.granted').isBoolean().withMessage('granted must be boolean'),
+  body('entityOverrides.*.actions').optional({ nullable: true }).isArray().withMessage('actions must be an array'),
+], async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
+    }
+
+    const targetUserId = parseInt(req.params.userId);
+    const [userRows] = await db.query('SELECT id, role FROM users WHERE id = ?', [targetUserId]);
+    if (userRows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
+    }
+
+    const [allPerms] = await db.query('SELECT name, actions FROM permissions WHERE is_active = TRUE');
+    const permActionMap = new Map(allPerms.map(p => [p.name, parseActions(p.actions, p.name)]));
+
+    const validatePermission = (o) => {
+      if (!permActionMap.has(o.permission_name)) {
+        throw { status: 400, body: { status: 'error', message: `Unknown permission: ${o.permission_name}`, code: 'UNKNOWN_PERMISSION' } };
+      }
+      if (Array.isArray(o.actions)) {
+        const defined = permActionMap.get(o.permission_name);
+        const invalid = o.actions.filter((a) => typeof a !== 'string' || !defined.includes(a));
+        if (invalid.length > 0) {
+          throw { status: 400, body: { status: 'error', message: `Invalid actions for ${o.permission_name}: ${invalid.join(', ')}`, code: 'INVALID_ACTIONS' } };
+        }
+      }
+    };
+
+    await connection.beginTransaction();
+
+    const newRole = req.body.role;
+    if (newRole && newRole !== userRows[0].role) {
+      await connection.query('UPDATE users SET role = ? WHERE id = ?', [newRole, targetUserId]);
+    }
+
+    const permOverrides = req.body.overrides || [];
+    for (const o of permOverrides) validatePermission(o);
+    await connection.query('DELETE FROM user_permission_overrides WHERE user_id = ?', [targetUserId]);
+    if (permOverrides.length > 0) {
+      const values = permOverrides.map(o => {
+        const actionsJson = Array.isArray(o.actions) ? JSON.stringify(o.actions) : null;
+        return [targetUserId, o.permission_name, o.granted ? 1 : 0, actionsJson, req.user.id];
+      });
+      await connection.query(
+        'INSERT INTO user_permission_overrides (user_id, permission_name, granted, actions, granted_by) VALUES ?',
+        [values]
+      );
+    }
+
+    const entityOverrides = req.body.entityOverrides || [];
+    const validEntityTypes = new Set(Object.keys(ENTITY_TABLES));
+    for (const o of entityOverrides) {
+      if (!permActionMap.has(o.permission_name)) {
+        throw { status: 400, body: { status: 'error', message: `Unknown permission: ${o.permission_name}`, code: 'UNKNOWN_PERMISSION' } };
+      }
+      if (!validEntityTypes.has(o.entity_type)) {
+        throw { status: 400, body: { status: 'error', message: `Invalid entity type: ${o.entity_type}`, code: 'INVALID_ENTITY_TYPE' } };
+      }
+      if (Array.isArray(o.actions)) {
+        const defined = permActionMap.get(o.permission_name);
+        const invalid = o.actions.filter((a) => typeof a !== 'string' || !defined.includes(a));
+        if (invalid.length > 0) {
+          throw { status: 400, body: { status: 'error', message: `Invalid actions for ${o.permission_name}: ${invalid.join(', ')}`, code: 'INVALID_ACTIONS' } };
+        }
+      }
+    }
+    await connection.query('DELETE FROM entity_permission_overrides WHERE user_id = ?', [targetUserId]);
+    if (entityOverrides.length > 0) {
+      const values = entityOverrides.map(o => {
+        const actionsJson = Array.isArray(o.actions) ? JSON.stringify(o.actions) : null;
+        return [targetUserId, o.permission_name, o.entity_type, o.entity_id, o.granted ? 1 : 0, actionsJson, req.user.id];
+      });
+      await connection.query(
+        'INSERT INTO entity_permission_overrides (user_id, permission_name, entity_type, entity_id, granted, actions, granted_by) VALUES ?',
+        [values]
+      );
+    }
+
+    await connection.commit();
+
+    logAudit({
+      user_id: req.user.id,
+      action: 'user.permissions_full_updated',
+      entity_type: 'user',
+      entity_id: targetUserId,
+      new_values: { role_changed: !!newRole, permission_override_count: permOverrides.length, entity_override_count: entityOverrides.length }
+    });
+
+    res.json({ status: 'success', message: 'User role, permissions, and entity overrides updated' });
+  } catch (err) {
+    await connection.rollback();
+    if (err?.status && err?.body) {
+      return res.status(err.status).json(err.body);
+    }
+    console.error('User full save error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to update user', code: 'DB_ERROR' });
+  } finally {
+    connection.release();
   }
 });
 

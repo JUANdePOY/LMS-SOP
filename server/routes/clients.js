@@ -50,6 +50,13 @@ router.put('/:id/businesses/:businessId', [
   requirePermission('manage_clients'),
   requirePermissionAction('manage_clients', 'edit'),
 ], clientController.updateBusiness);
+router.post('/:id/businesses/:businessId/duplicate', [
+  authenticateToken,
+  resolveScope,
+  requireEntityTypeAccess('client'),
+  requirePermission('manage_clients'),
+  requirePermissionAction('manage_clients', 'create'),
+], clientController.duplicateBusiness);
 router.delete('/:id/businesses/:businessId', [
   authenticateToken,
   resolveScope,

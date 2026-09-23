@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { logAudit } = require('../utils/auditLogger');
 
 async function createClient({ client_name, businesses, created_by, business_id, department_id }) {
   const conn = await db.getConnection();
@@ -248,6 +249,30 @@ async function addBusiness(clientId, businessName) {
   return result.insertId;
 }
 
+async function duplicateBusiness(businessId, actorId) {
+  const [businessRows] = await db.query(
+    'SELECT id, client_id, business_name FROM client_businesses WHERE id = ? LIMIT 1',
+    [businessId]
+  );
+  const business = businessRows[0];
+  if (!business) {
+    const error = new Error('Business not found');
+    error.code = 'NOT_FOUND';
+    throw error;
+  }
+
+  const newName = `${business.business_name} (copy)`;
+  const [dupResult] = await db.query(
+    'INSERT INTO client_businesses (client_id, business_name) VALUES (?, ?)',
+    [business.client_id, newName]
+  );
+  const newBusinessId = dupResult.insertId;
+
+  logAudit('business.duplicate', actorId, { business_id: newBusinessId, source_business_id: businessId, name: newName });
+
+  return { id: newBusinessId, client_id: business.client_id, business_name: newName };
+}
+
 async function isFullyCompleted(clientId) {
   if (!clientId) return false;
 
@@ -427,8 +452,16 @@ async function remove(id) {
 
 async function getClientBusiness(clientId, businessId) {
   const [rows] = await db.query(
-    'SELECT id, client_id, business_name FROM client_businesses WHERE id = ? AND client_id = ?',
+    'SELECT id, client_id, business_name FROM client_businesses WHERE id = ? AND client_id = ? LIMIT 1',
     [businessId, clientId]
+  );
+  return rows[0] || null;
+}
+
+async function getClientBusinessById(businessId) {
+  const [rows] = await db.query(
+    'SELECT id, client_id, business_name FROM client_businesses WHERE id = ? LIMIT 1',
+    [businessId]
   );
   return rows[0] || null;
 }
@@ -456,5 +489,7 @@ module.exports = {
   isFullyCompleted,
   isBusinessFullyCompleted,
   getClientBusiness,
+  getClientBusinessById,
   updateBusiness,
+  duplicateBusiness,
 };

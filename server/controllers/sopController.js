@@ -551,7 +551,7 @@ const PDF_COLORS = {
   accentDark: '#173D6E',
   text: '#1A1A1A',
   muted: '#6B7280',
-  border: '#E2E8F0',
+  border: '#64748B',
   lightBg: '#F1F5F9',
   white: '#FFFFFF',
 };
@@ -744,10 +744,8 @@ function renderModuleContentForPdf(html, imageCache, doc) {
     const tag = node.tagName?.toLowerCase();
     if (!tag) return;
 
-    console.error('[PDF] processNode tag:', tag);
-
     switch (tag) {
-             case 'h2': {
+      case 'h2': {
           doc.fillColor(PDF_COLORS.text).font('Helvetica-Bold').fontSize(16);
           const text = $(node).text().trim();
           if (text) {
@@ -857,8 +855,13 @@ function renderModuleContentForPdf(html, imageCache, doc) {
           break;
         }
       case 'figure': {
-        console.error('[PDF] processNode found figure tag');
         renderFigure($, node, doc, imageCache, startX, width);
+        break;
+      }
+      case 'img': {
+        renderFigure($, node, doc, imageCache, startX, width);
+        hasContent = true;
+        break;
       }
       case 'table': {
         renderTable($, node, doc, startX, width);
@@ -873,7 +876,6 @@ function renderModuleContentForPdf(html, imageCache, doc) {
       default: {
         // Container wrapper — recurse into children
         const children = $(node).children();
-        console.error('[PDF] container:', tag, 'children:', [...new Set([...children.toArray().map(c => c.tagName?.toLowerCase())])]);
         if (children.length > 0) {
           children.each((i, child) => processNode(child));
         } else {
@@ -895,15 +897,23 @@ function renderModuleContentForPdf(html, imageCache, doc) {
             hasContent = true;
           }
         });
+
+        const images = $(node).find('img').toArray();
+        images.forEach(img => {
+          if (!img._pdfRendered) {
+            img._pdfRendered = true;
+            renderFigure($, img, doc, imageCache, startX, width);
+            hasContent = true;
+          }
+        });
       }
     }
   }
 
-  // Start from root children — this covers TipTap's root wrapper
+   // Start from root children — this covers TipTap's root wrapper
   try {
   $.root().each((i, el) => processNode(el));
   } catch (err) {
-    console.error('[PDF] renderModuleContentForPdf error:', err.message);
     const allText = $.root().text().trim();
     if (allText) {
       const paragraphs = allText.split(/\n+/).filter(p => p.trim());
@@ -1007,27 +1017,27 @@ function renderInlineContent($, el, doc, options = {}) {
   doc.x = x;
 }
 
-function renderFigure($, el, doc, imageCache, startX, width) {  console.error('[PDF] renderFigure CALLED');
+function renderFigure($, el, doc, imageCache, startX, width) {
 
   const figure = $(el);
-  const img = figure.find('img').first();
+  let img = figure.find('img').first();
+
+  if (img.length === 0 && el.tagName?.toLowerCase() === 'img') {
+    img = figure;
+  }
+
   const figcaption = figure.find('figcaption').first();
 
   const src = img.attr('src') || '';
-  console.error('[PDF] figure src:', src);
   const idMatch = src.match(/\/api\/sops\/attachments\/(\d+)\/file/);
-  console.error('[PDF] figure idMatch:', idMatch ? idMatch[1] : null);
 
   if (!idMatch) {
-    console.error('[PDF] renderFigure early return - no idMatch');
     return;
   }
 
   const attId = parseInt(idMatch[1], 10);
   const image = imageCache.get(attId);
-  console.error('[PDF] renderFigure attId:', attId, 'image in cache:', !!image);
   if (!image) {
-    console.error('[PDF] renderFigure early return - no image in cache');
     return;
   }
 
@@ -1076,7 +1086,6 @@ if (dataAlign) {
 
   doc.image(image.data, imgX, doc.y, {
     fit: [maxWidth, maxHeight],
-    align: align,
   });
   doc.x = startX;
   doc.moveDown(0.5);
@@ -1095,7 +1104,7 @@ function renderTable($, el, doc, startX, width) {
 
   const rowHeight = 28;
   const padding = 8;
-  const colCount = Math.max(...$rows.map((i, tr) => $('td, th', tr).length).get()) || 1;
+  const colCount = Math.max(...$rows.toArray().map((tr) => $(tr).find('td, th').length)) || 1;
   const colWidth = width / colCount;
 
   let totalHeight = 0;
@@ -1106,6 +1115,7 @@ function renderTable($, el, doc, startX, width) {
   ensureSpace(doc, totalHeight + 20);
 
   $rows.each((i, tr) => {
+    const rowY = doc.y;
     const $cells = $('td, th', tr);
     let colIdx = 0;
 
@@ -1113,13 +1123,14 @@ function renderTable($, el, doc, startX, width) {
       const isHeader = cell.tagName?.toLowerCase() === 'th';
       const cellX = startX + colIdx * colWidth;
       const cellWidth = colWidth;
-      const cellY = doc.y;
+      const cellY = rowY;
 
       if (isHeader) {
         doc.rect(cellX, cellY, cellWidth, rowHeight).fill(PDF_COLORS.lightBg);
       }
 
-      doc.rect(cellX, cellY, cellWidth, rowHeight).lineWidth(0.5).stroke(PDF_COLORS.border);
+      doc.strokeColor(PDF_COLORS.border).lineWidth(0.75);
+      doc.rect(cellX, cellY, cellWidth, rowHeight).stroke();
 
       const text = $(cell).text().trim();
       if (text) {
@@ -1136,7 +1147,7 @@ function renderTable($, el, doc, startX, width) {
       colIdx++;
     });
 
-    doc.y += rowHeight;
+    doc.y = rowY + rowHeight;
   });
 
   doc.moveDown(0.5);
@@ -1150,7 +1161,9 @@ function drawFooter(doc, sop, pageNumber, totalPages) {
   const width = contentWidthOf(doc);
 
   doc.moveTo(startX, bottomY - 8).lineTo(startX + width, bottomY - 8)
-    .lineWidth(0.5).stroke(PDF_COLORS.border);
+    .lineWidth(0.75);
+  doc.strokeColor(PDF_COLORS.border);
+  doc.stroke();
 
   // Text placed in the footer sits below the normal content margin, which
   // would otherwise make pdfkit think the text overflows the page and
@@ -1279,23 +1292,21 @@ const exportController = {
             }
           }
         });
-      console.error('[PDF] attachmentIds collected:', [...attachmentIds]);
-
-
-        for (const attId of attachmentIds) {
-          try {
-            const attachment = await sopModuleAttachmentModel.getById(attId);
-            if (attachment && attachment.file_data && attachment.mime_type) {
-              imageCache.set(attId, {
-                data: attachment.file_data,
-                mime: attachment.mime_type,
-              });
+        if (modules.length > 0) {
+          for (const attId of attachmentIds) {
+            try {
+              const attachment = await sopModuleAttachmentModel.getById(attId);
+              if (attachment && attachment.file_data && attachment.mime_type) {
+                imageCache.set(attId, {
+                  data: attachment.file_data,
+                  mime: attachment.mime_type,
+                });
+              }
+            } catch {
+              // Skip attachments that can't be loaded
             }
-          } catch {
-            // Skip attachments that can't be loaded
           }
         }
-        console.error('[PDF] imageCache keys:', [...imageCache.keys()]);
       }
 
       // Modules
@@ -1338,7 +1349,9 @@ const exportController = {
             doc.moveDown(1);
             ensureSpace(doc, 20);
             doc.moveTo(startX, doc.y).lineTo(startX + width, doc.y)
-              .lineWidth(0.5).stroke(PDF_COLORS.border);
+              .lineWidth(0.75);
+            doc.strokeColor(PDF_COLORS.border);
+            doc.stroke();
             doc.moveDown(1.5);
           }
           doc.fillColor(PDF_COLORS.text);

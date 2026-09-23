@@ -110,14 +110,6 @@ function AttachmentUploader({ attachments, onUpload, onAddLink, onDelete, loadin
             disabled={addingLink || loading}
             className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40 placeholder:text-neutral-500 dark:placeholder-neutral-500 disabled:opacity-50"
           />
-          <input
-            type="text"
-            placeholder="Link title (optional)"
-            value={linkTitle}
-            onChange={(e) => setLinkTitle(e.target.value)}
-            disabled={addingLink || loading}
-            className="w-full rounded-lg border border-neutral-300 dark:border-neutral-600 bg-neutral-50 dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/40 placeholder:text-neutral-500 dark:placeholder-neutral-500 disabled:opacity-50"
-          />
           <button
             onClick={handleAddLink}
             disabled={addingLink || loading || !linkUrl.trim()}

@@ -92,7 +92,7 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
   const [inlineCompletionRate, setInlineCompletionRate] = useState(0);
   const [inlineStatus, setInlineStatus] = useState('In Progress');
 
-  const canManageTasks = hasPermission('manage_tasks') && (user?.role === 'super_admin' || user?.role === 'admin');
+  const canManageTasks = hasPermission('manage_tasks');
 
   const isTaskOverdue = (task) => {
     if (!task) return false;
@@ -332,8 +332,8 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
               <UserIcon size={12} /> {teamAssignees.length} team{teamAssignees.length > 1 ? 's' : ''}
             </span>
           )}
-           {canManageTasks && user?.role !== 'employee' && (
-              <AssigneePicker
+           {canManageTasks && (
+               <AssigneePicker
                 assignments={local.assignments}
                 onSave={handleAssigneesSave}
                 alwaysAdd

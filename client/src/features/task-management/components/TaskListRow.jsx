@@ -8,7 +8,6 @@ import { getUsersForAssignment, getAssignmentScope } from '../api/assignment.api
 import api from '@/services/api';
 import { formatDate } from '../utils/taskDateUtils';
 import { useToast } from '@/shared/components/ui/Toast';
-import { useAuth } from '@/contexts/AuthContext';
 import { duplicateTask } from '../services/taskService';
 import { HIERARCHY_GRID } from './TaskHierarchyTable';
 import InlineEditableName from './InlineEditableName';
@@ -1511,7 +1510,6 @@ function MoreActionsMenu({ task, businesses, onOpen, onMoveBusiness, onDelete, o
 
 export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, canManageTask, projects, showCountBadges = false, subtaskCount = 0, isNew = false, tasksById = {}, onAddSubtask, onViewSubtasks, userDepartmentId = null, userDepartmentClientIds = null, depth = 0 }) {
   const { toast } = useToast();
-  const { isEmployee } = useAuth();
 
   const overdue = isOverdue(task);
 
@@ -1726,7 +1724,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
       </span>
 
       <span className="hidden min-w-0 items-center justify-center overflow-hidden sm:flex px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
-        {canAdminister && !isEmployee ? (
+        {canAdminister ? (
           <AssigneePicker assignments={task.assignments} onSave={handleAssigneeSave} />
         ) : (
           <ReadOnlyAssignees assignments={task.assignments} />
@@ -1742,7 +1740,7 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
       </span>
 
       <span className="hidden sm:flex items-center justify-center px-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75" onClick={(e) => e.stopPropagation()}>
-        {canEditThisTask && !isEmployee ? (
+        {canEditThisTask ? (
           <PriorityDropdown priority={task.priority} onChange={(p) => onInlineUpdate?.(task, { priority: p })} />
         ) : (
           <span className="text-xs text-[var(--text-secondary)]">{task.priority || 'None'}</span>

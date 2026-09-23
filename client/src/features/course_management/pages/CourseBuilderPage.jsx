@@ -178,8 +178,9 @@ export default function CourseBuilderPage() {
   const { id: courseId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isEmployee, user } = useAuth();
+  const { isEmployee, user, hasPermissionAction } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [documentUploading, setDocumentUploading] = useState(false);
   const [course, setCourse] = useState(null);
   const [modules, setModules] = useState([]);
   const modulesRef = useRef([]);
@@ -212,6 +213,7 @@ export default function CourseBuilderPage() {
   const selectedLessonIdRef = useRef(selectedLessonId);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const handleSaveDraftRef = useRef(null);
+  const autoSaveTimerRef = useRef(null);
 
   useEffect(() => {
     selectedModuleIdRef.current = selectedModuleId;
@@ -232,14 +234,6 @@ export default function CourseBuilderPage() {
     const q = outlineFilter.toLowerCase();
     return (m.title || "").toLowerCase().includes(q) || (m.lessons || []).some((l) => (l.title || "").toLowerCase().includes(q));
   });
-
-  useEffect(() => {
-    if (!courseId || !hasUnsavedChanges) return;
-    const timer = setTimeout(() => {
-      handleSaveDraftRef.current?.();
-    }, 30000);
-    return () => clearTimeout(timer);
-  }, [courseId, hasUnsavedChanges, modules, form]);
 
   useEffect(() => {
     const handleBeforeUnload = (e) => {
@@ -396,6 +390,7 @@ export default function CourseBuilderPage() {
         quizId: l.quizId || null,
         certificateTemplateId: l.certificateTemplateId || null,
         documentFile: l.documentFile || null,
+        file_name: l.file_name || null,
         chapters: l.chapters || [],
         thumbnail_url: l.thumbnail_url || l.thumbnailUrl || null,
         bunnyLibraryId: l.bunnyLibraryId || null,
@@ -471,6 +466,43 @@ export default function CourseBuilderPage() {
     },
     [courseId, toast, refreshCourse, syncCourseData]
   );
+
+  const silentSave = useCallback(
+    (payload) => {
+      if (!courseId) return Promise.resolve();
+      setIsSavingDraft(true);
+      return builderUpdate(courseId, payload)
+        .then(async (res) => {
+          if (res?.success || res?.data?.success) {
+            setHasUnsavedChanges(false);
+            setLastSaved(new Date());
+            await syncCourseData();
+          }
+        })
+        .catch((err) => {
+          console.error("Autosave failed:", err);
+        })
+        .finally(() => {
+          setIsSavingDraft(false);
+        });
+    },
+    [courseId, syncCourseData]
+  );
+
+  useEffect(() => {
+    if (!courseId || !hasUnsavedChanges) return;
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+    autoSaveTimerRef.current = setTimeout(() => {
+      silentSave(buildPayload());
+    }, 30000);
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [courseId, hasUnsavedChanges, modules, form, buildPayload, silentSave]);
 
   const handleSaveDraft = useCallback(async () => {
     try {
@@ -612,21 +644,11 @@ export default function CourseBuilderPage() {
 
   const primaryAction = (() => {
     const status = course?.status;
-    if (isDepartmentHead) {
-      if (status === 'draft') {
-        return {
-          label: 'Submit for Review',
-          icon: Send,
-          onClick: handleSubmitForReview,
-          disabled: saving || courseCertificates.length === 0,
-          disabledLabel: 'Link a certificate to submit',
-          className: 'w-full rounded-md bg-[var(--color-primary)] px-2.5 py-2 text-sm font-medium text-white hover-brand disabled:opacity-50 transition-all flex items-center justify-center gap-1.5',
-        };
-      }
-      return null;
-    }
-    if (isAdminOrSuper) {
-      if (status === 'under_review') {
+    const canPublish = hasPermissionAction('manage_courses', 'publish');
+    const canEdit = hasPermissionAction('manage_courses', 'edit');
+
+    if (isDepartmentHead || isAdminOrSuper) {
+      if (status === 'under_review' && canPublish) {
         return {
           label: 'Approve',
           icon: CheckCircle2,
@@ -636,13 +658,23 @@ export default function CourseBuilderPage() {
           className: 'w-full rounded-md bg-[var(--color-primary)] px-2.5 py-2 text-sm font-medium text-white hover-brand disabled:opacity-50 transition-all flex items-center justify-center gap-1.5',
         };
       }
-      if (status === 'draft' || status === 'published') {
+      if ((status === 'draft' || status === 'published') && canPublish) {
         return {
           label: 'Publish',
           icon: Rocket,
           onClick: handlePublish,
           disabled: saving || courseCertificates.length === 0,
           disabledLabel: 'Link a certificate to publish',
+          className: 'w-full rounded-md bg-[var(--color-primary)] px-2.5 py-2 text-sm font-medium text-white hover-brand disabled:opacity-50 transition-all flex items-center justify-center gap-1.5',
+        };
+      }
+      if (status === 'draft' && canEdit) {
+        return {
+          label: 'Submit for Review',
+          icon: Send,
+          onClick: handleSubmitForReview,
+          disabled: saving || courseCertificates.length === 0,
+          disabledLabel: 'Link a certificate to submit',
           className: 'w-full rounded-md bg-[var(--color-primary)] px-2.5 py-2 text-sm font-medium text-white hover-brand disabled:opacity-50 transition-all flex items-center justify-center gap-1.5',
         };
       }
@@ -1029,6 +1061,7 @@ export default function CourseBuilderPage() {
               canMoveUp={lessonNavIndex > 0}
               canMoveDown={lessonNavIndex < flatLessons.length - 1}
               saving={saving}
+              onDocumentUploadingChange={setDocumentUploading}
             />
           ) : selectedModule ? (
             <ModuleEditor
@@ -1113,14 +1146,14 @@ export default function CourseBuilderPage() {
                     }}
                   />
           <div className="flex flex-col gap-2">
-            <button onClick={handleSaveDraft} disabled={saving} className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-2 text-sm hover:border-neutral-300 dark:hover:border-neutral-600 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
+            <button onClick={handleSaveDraft} disabled={saving || documentUploading} className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-2 text-sm hover:border-neutral-300 dark:hover:border-neutral-600 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
               <Save size={14} />
               {saving ? "Saving..." : "Save Draft"}
             </button>
             {primaryAction && (
-              <button onClick={primaryAction.onClick} disabled={primaryAction.disabled} className={primaryAction.className}>
+              <button onClick={primaryAction.onClick} disabled={primaryAction.disabled || documentUploading} className={primaryAction.className}>
                 <primaryAction.icon size={14} />
-                {saving ? (primaryAction.label + "...") : (primaryAction.disabled ? primaryAction.disabledLabel : primaryAction.label)}
+                {saving ? (primaryAction.label + "...") : (primaryAction.disabled || documentUploading ? primaryAction.disabledLabel : primaryAction.label)}
               </button>
             )}
           </div>
@@ -1151,14 +1184,14 @@ export default function CourseBuilderPage() {
               }}
             />
             <div className="bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-700 rounded-xl shadow-sm p-4 space-y-2">
-              <button onClick={handleSaveDraft} disabled={saving} className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-2 text-sm hover:border-neutral-300 dark:hover:border-neutral-600 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
+              <button onClick={handleSaveDraft} disabled={saving || documentUploading} className="w-full rounded-md border border-neutral-200 dark:border-neutral-700 px-2.5 py-2 text-sm hover:border-neutral-300 dark:hover:border-neutral-600 disabled:opacity-50 transition-all flex items-center justify-center gap-1.5">
                 <Save size={14} />
                 {saving ? "Saving..." : "Save Draft"}
               </button>
               {primaryAction && (
-                <button onClick={primaryAction.onClick} disabled={primaryAction.disabled} className={primaryAction.className}>
+                <button onClick={primaryAction.onClick} disabled={primaryAction.disabled || documentUploading} className={primaryAction.className}>
                   <primaryAction.icon size={14} />
-                  {saving ? (primaryAction.label + "...") : (primaryAction.disabled ? primaryAction.disabledLabel : primaryAction.label)}
+                  {saving ? (primaryAction.label + "...") : (primaryAction.disabled || documentUploading ? primaryAction.disabledLabel : primaryAction.label)}
                 </button>
               )}
             </div>

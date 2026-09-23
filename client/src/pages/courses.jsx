@@ -51,10 +51,10 @@ export default function Courses({ departments = [] }) {
   const { hasPermission, hasPermissionAction, isSuperAdmin, isAdmin, isDepartmentHead, isEmployee, user } = useAuth();
   const canManageCoursePage = hasPermission('manage_courses');
   const canCreateCourse = hasPermissionAction('manage_courses', 'create');
-  const canPublishCourse = (isAdmin || isSuperAdmin) && hasPermissionAction('manage_courses', 'publish');
+  const canPublishCourse = hasPermissionAction('manage_courses', 'publish');
   const canArchiveCourse = hasPermissionAction('manage_courses', 'archive');
-  const canApproveCourse = (isAdmin || isSuperAdmin) && hasPermissionAction('manage_courses', 'publish');
-  const canRejectCourse = (isAdmin || isSuperAdmin) && hasPermissionAction('manage_courses', 'edit');
+  const canApproveCourse = hasPermissionAction('manage_courses', 'publish');
+  const canRejectCourse = hasPermissionAction('manage_courses', 'edit');
 
   const getScopedDeptIds = () => {
     return (user?.scoped_department_ids?.length > 0)

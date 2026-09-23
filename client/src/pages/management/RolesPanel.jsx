@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   getRoles, getRole, createRole, updateRole, deleteRole, getPermissions,
-  getUsers, updateUser, getUserPermissions, updateUserPermissions,
-  getUserEntityOverrides, updateUserEntityOverrides, getEntities,
-  updateRolePermissions,
+  getUsers, getUserPermissions,
+  getUserEntityOverrides, getEntities,
+  updateRolePermissions, updateUserFullSave,
 } from '@/services/api';
 import { Button } from '@/shared/components/ui/button';
 import { Modal } from '@/shared/components/ui/modal';
@@ -262,7 +262,7 @@ export default function RolesPanel({ activeTab = 'roles' }) {
 
   /* ---------- save handlers ---------- */
 
-  const handleSaveRole = async () => {
+   const handleSaveRole = async () => {
     if (!editRole) return;
     setSaving(true);
     try {
@@ -273,6 +273,7 @@ export default function RolesPanel({ activeTab = 'roles' }) {
       await updateRolePermissions(editRole.name, permissions);
       toast.success('Role permissions updated');
       closeDrawer();
+      fetchRoles();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to update role permissions');
     } finally { setSaving(false); }
@@ -282,12 +283,11 @@ export default function RolesPanel({ activeTab = 'roles' }) {
     if (!editUser) return;
     setSaving(true);
     try {
-      if (editUserNewRoleName && editUserNewRoleName !== editUserOriginalRole) {
-        await updateUser(editUser.id, { role: editUserNewRoleName });
-        toast.success('User role updated');
-      }
-      await updateUserPermissions(editUser.id, computeUserOverridesToSave(userPermStates, editUserRolePerms));
-      await updateUserEntityOverrides(editUser.id, computeEntityOverridesToSave(entityStates));
+      await updateUserFullSave(editUser.id, {
+        role: editUserNewRoleName && editUserNewRoleName !== editUserOriginalRole ? editUserNewRoleName : undefined,
+        overrides: computeUserOverridesToSave(userPermStates, editUserRolePerms),
+        entityOverrides: computeEntityOverridesToSave(entityStates),
+      });
       toast.success('User permissions updated');
       closeDrawer();
       fetchRoles();

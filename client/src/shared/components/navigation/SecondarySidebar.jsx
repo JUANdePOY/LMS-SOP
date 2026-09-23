@@ -504,7 +504,7 @@ export default function SecondarySidebar({ collapsed = false }) {
             <span className="flex-1 truncate">{highlight(client.client_name, q)}</span>
             {units.length > 0 && <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{units.length}</span>}
           </Link>
-          {isAnyAdmin && hasPermission('manage_clients') && (
+          {hasPermission('manage_clients') && (
           <div className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
             <button
               type="button"
@@ -592,7 +592,7 @@ export default function SecondarySidebar({ collapsed = false }) {
             <span className="flex-1 truncate text-left">{highlight(label, q)}</span>
             {items.length > 0 && <span className="shrink-0 text-[10px] text-[var(--text-muted)]">{items.length}</span>}
           </Link>
-          {isAnyAdmin && hasPermission('manage_clients') && (
+          {hasPermission('manage_clients') && (
           <div className="ml-auto flex shrink-0 items-center gap-0.5">
             <button
               type="button"
@@ -776,7 +776,7 @@ export default function SecondarySidebar({ collapsed = false }) {
       </nav>
 
       <div className="border-t border-[var(--border-sidebar)] p-2 space-y-1.5">
-        {isAnyAdmin && hasPermission('manage_businesses') && addingBusiness ? (
+        {hasPermission('manage_businesses') && addingBusiness ? (
           <InlineBusinessForm
             onCommit={commitAddBusiness}
             onCancel={() => setAddingBusiness(false)}

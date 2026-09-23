@@ -1,11 +1,11 @@
 const router = require('express').Router();
 const announcementController = require('../controllers/announcementController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, resolveScope } = require('../middleware/auth');
 const { requirePermission, requirePermissionAction } = require('../middleware/scope');
 const { announcementImageUpload } = require('../middleware/announcementUpload');
 const storage = require('../config/storage');
 
-router.use(authenticateToken);
+router.use(authenticateToken, resolveScope);
 
 // Upload an image to be embedded in an announcement body. The bytes are always
 // persisted into the `file_blobs` table (independent of STORAGE_DRIVER) so the

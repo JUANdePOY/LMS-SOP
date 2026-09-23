@@ -28,7 +28,7 @@ function getAttribute(node, name) {
 function findDescendants(node, tagName) {
   if (!node || !node.children) return [];
   const results = [];
-  const stack = [...node.children];
+  const stack = [...node.children].reverse();
   while (stack.length) {
     const child = stack.pop();
     if (!child) continue;
@@ -36,7 +36,7 @@ function findDescendants(node, tagName) {
       results.push(child);
     }
     if (child.children) {
-      stack.push(...child.children);
+      stack.push(...[...child.children].reverse());
     }
   }
   return results;

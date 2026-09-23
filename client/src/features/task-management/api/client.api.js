@@ -28,6 +28,9 @@ export const deleteClientBusiness = (clientId, businessId) => {
   return api.delete(`/clients/${numClientId}/businesses/${numBusinessId}`);
 };
 
+export const duplicateClientBusiness = (clientId, businessId) =>
+  api.post(`/clients/${clientId}/businesses/${businessId}/duplicate`).then((r) => r.data?.data);
+
 export const bulkUploadClients = (file, format, businessId) => {
   const formData = new FormData();
   formData.append('file', file);

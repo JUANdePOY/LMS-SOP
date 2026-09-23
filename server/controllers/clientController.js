@@ -1,4 +1,5 @@
 const clientModel = require('../models/clientModel');
+const taskService = require('../services/taskService');
 const { validateClientPayload } = require('../validators/clientValidator');
 const { parseFile } = require('../utils/taskBulkValidation');
 
@@ -201,6 +202,22 @@ const clientController = {
       if (/Duplicate entry/.test(error.message) && /uk_client_business/.test(error.message)) {
         return res.status(409).json({ success: false, message: 'A business with this name already exists for this client', code: 'DUPLICATE' });
       }
+      handleError(res, error);
+    }
+  },
+
+  async duplicateBusiness(req, res) {
+    try {
+      const clientId = parseInt(req.params.id, 10);
+      const businessId = parseInt(req.params.businessId, 10);
+      const existing = await clientModel.getClientBusiness(clientId, businessId);
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'Business not found', code: 'NOT_FOUND' });
+      }
+
+      const result = await taskService.duplicateBusiness(businessId, req.user.id);
+      res.status(201).json({ success: true, data: result, message: 'Business duplicated successfully' });
+    } catch (error) {
       handleError(res, error);
     }
   },

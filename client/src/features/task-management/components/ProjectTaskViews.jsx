@@ -74,6 +74,7 @@ export default function ProjectTaskViews({
     userDepartmentBusinessId = null,
     autoExpand,
   onOpenBulkUpload,
+  onDuplicateBusiness,
 }) {
   const [internalView, setInternalView] = useState(() => {
     const validKeys = activeViews || TASK_VIEW_KEYS;
@@ -144,9 +145,10 @@ export default function ProjectTaskViews({
                    userBusinessId={userBusinessId}
                    userDepartmentBusinessId={userDepartmentBusinessId}
                    canManageTask={canManageTask}
-                   autoExpand={autoExpand}
-                   onOpenBulkUpload={onOpenBulkUpload}
-                 />
+                    autoExpand={autoExpand}
+                    onOpenBulkUpload={onOpenBulkUpload}
+                    onDuplicateBusiness={onDuplicateBusiness}
+                  />
           )}
           {view === 'board' && (
             <TaskBoard

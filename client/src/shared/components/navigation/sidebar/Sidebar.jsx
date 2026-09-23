@@ -59,6 +59,7 @@ const EMPLOYEE_MENU_ITEMS = [
     group: true,
     items: [
       { name: "My Tasks", path: "/tasks/my", icon: CheckSquare },
+      { name: "Tasks & Projects", path: "/tasks", icon: CheckSquare, roles: LMS_ROLES, permission: "manage_tasks" },
     ],
   },
   {
@@ -128,7 +129,7 @@ const MENU_ITEMS = [
     name: "WORKFLOW",
     group: true,
     items: [
-      { name: "Tasks & Projects", path: "/tasks", icon: CheckSquare, roles: ['super_admin', 'admin', 'department_head'] },
+      { name: "Tasks & Projects", path: "/tasks", icon: CheckSquare, roles: ['super_admin', 'admin', 'department_head'], permission: "manage_tasks" },
     ],
   },
   {

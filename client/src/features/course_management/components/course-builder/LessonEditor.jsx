@@ -28,7 +28,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getSops } from "@/features/sop-management/services/sopService";
 import { getQuizzes, duplicateQuiz } from "@/features/assessments/api/quiz.api";
 import { getCertificateTemplates } from "@/features/certificate-management/services/certificateService";
-import { uploadContent } from "@/features/course_management/api/content.api";
+import { uploadContent, uploadDocument } from "@/features/course_management/api/content.api";
 import RichTextEditor from "@/features/sop-management/components/SOPEditor/RichTextEditor";
 import LessonContentBlocks, { extractOutline, parseBlocks } from "./LessonContentBlocks";
 import OutlineRail from "./OutlineRail";
@@ -136,6 +136,7 @@ export default function LessonEditor({
   canMoveUp,
   canMoveDown,
   onOpenQuizBuilder,
+  onDocumentUploadingChange,
 }) {
   const { user } = useAuth();
   const [title, setTitle] = useState("");
@@ -158,6 +159,15 @@ export default function LessonEditor({
   const [loadingCertificates, setLoadingCertificates] = useState(false);
   const [selectedCertificateId, setSelectedCertificateId] = useState(null);
   const [documentFile, setDocumentFile] = useState(null);
+  const [documentUploading, setDocumentUploading] = useState(false);
+  const [documentUploadError, setDocumentUploadError] = useState(null);
+
+  useEffect(() => {
+    if (typeof onDocumentUploadingChange === 'function') {
+      onDocumentUploadingChange(documentUploading);
+    }
+  }, [documentUploading, onDocumentUploadingChange]);
+
   const [linkTitle, setLinkTitle] = useState("");
   const [chapters, setChapters] = useState([]);
   const [thumbnailUrl, setThumbnailUrl] = useState(null);
@@ -296,7 +306,7 @@ export default function LessonEditor({
     if (url && type !== "reading") return true;
     if (type === "quiz" && selectedQuizId) return true;
     if (type === "certificate" && selectedCertificateId) return true;
-    if (type === "document" && documentFile) return true;
+    if (type === "document" && (documentFile || url)) return true;
     if (type === "video" && (chapters.length || thumbnailUrl)) return true;
     return false;
   };
@@ -361,7 +371,6 @@ export default function LessonEditor({
       is_required: isRequired,
       quizId: isQuiz ? selectedQuizId : null,
       certificateTemplateId: type === "certificate" ? selectedCertificateId : null,
-      documentFile: type === "document" ? documentFile : null,
       chapters: type === "video" ? chapters : [],
       thumbnail_url: thumbnailUrl || null,
       bunnyLibraryId: type === "video" ? bunnyLibraryId || null : null,
@@ -433,7 +442,7 @@ export default function LessonEditor({
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || documentUploading}
                 className="inline-flex items-center gap-1.5 rounded-md bg-[var(--color-primary)] px-3 py-1.5 text-xs font-medium text-white hover-brand disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 {saving ? (
@@ -693,12 +702,35 @@ export default function LessonEditor({
                               onChange={(e) => {
                                 const file = e.target.files?.[0] || null;
                                 setDocumentFile(file);
+                                setDocumentUploadError(null);
                                 if (file) {
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => {
-                                    emitPatch({ documentFile: file, url: reader.result });
-                                  };
-                                  reader.readAsDataURL(file);
+                                  if (!isAcceptedDocument(file.name)) {
+                                    setDocumentUploadError("This file type isn't supported.");
+                                    setDocumentFile(null);
+                                    e.target.value = "";
+                                    return;
+                                  }
+                                  if (file.size > DOCUMENT_MAX_BYTES) {
+                                    setDocumentUploadError(`File is ${formatBytes(file.size)} — the limit is 25 MB.`);
+                                  }
+                                  setDocumentUploading(true);
+                                  uploadDocument(courseId, moduleId, file)
+                                    .then((res) => {
+                                      const uploadedUrl = res?.data?.view_url || res?.view_url;
+                                      const uploadedFileName = res?.data?.file_name || res?.file_name || file.name;
+                                      if (!uploadedUrl) throw new Error("No URL returned from upload");
+                                      setUrl(uploadedUrl);
+                                      emitPatch({ documentFile: file, url: uploadedUrl, file_name: uploadedFileName });
+                                    })
+                                    .catch((err) => {
+                                      console.error("Document upload failed:", err);
+                                      setDocumentUploadError(err.message || "Upload failed");
+                                      setDocumentFile(null);
+                                      emitPatch({ documentFile: null, url: "" });
+                                    })
+                                    .finally(() => {
+                                      setDocumentUploading(false);
+                                    });
                                 } else {
                                   emitPatch({ documentFile: null, url: "" });
                                 }
@@ -715,20 +747,34 @@ export default function LessonEditor({
                               }`}
                             >
                               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-neutral-100 text-neutral-500">
-                                <FileArchive size={22} />
+                                {documentUploading ? <Loader2 size={22} className="animate-spin" /> : <FileArchive size={22} />}
                               </span>
-                              {documentFile ? (
-                                <>
-                                  <p className="text-sm font-medium text-neutral-700">{documentFile.name}</p>
-                                  <p className="text-xs text-neutral-500">Click to replace</p>
-                                </>
-                              ) : (
-                                <>
-                                  <p className="text-sm font-medium text-neutral-700">Click to upload a document</p>
-                                  <p className="text-xs text-neutral-500">PDF, DOCX, PPTX, XLSX, CSV · up to 25 MB</p>
-                                </>
-                              )}
+                              {(() => {
+                                const hasDocument = !!documentFile || !!url;
+                                const documentName = documentFile
+                                  ? documentFile.name
+                                  : url
+                                    ? decodeURIComponent(url.split('/').pop() || 'Document')
+                                    : null;
+                                return hasDocument ? (
+                                  <>
+                                    <p className="text-sm font-medium text-neutral-700">{documentName}</p>
+                                    <p className="text-xs text-neutral-500">Click to replace</p>
+                                  </>
+                                ) : (
+                                  <>
+                                    <p className="text-sm font-medium text-neutral-700">Click to upload a document</p>
+                                    <p className="text-xs text-neutral-500">PDF, DOCX, PPTX, XLSX, CSV · up to 25 MB</p>
+                                  </>
+                                );
+                              })()}
                             </label>
+                            {documentUploading && (
+                              <p className="mt-1.5 text-xs text-[var(--color-primary)]">Uploading document...</p>
+                            )}
+                            {documentUploadError && (
+                              <p className="mt-1.5 text-xs text-red-600">{documentUploadError}</p>
+                            )}
                             {documentFile && !isAcceptedDocument(documentFile.name) && (
                               <p className="mt-1.5 text-xs text-[var(--color-warning)]">
                                 This file type isn’t supported. Use a PDF, Word, PowerPoint, Excel, or CSV file.
@@ -934,23 +980,6 @@ export default function LessonEditor({
                             {url.trim() && !isValidUrl(url) && (
                               <p className="mt-1.5 text-xs text-red-600">Enter a full URL starting with http:// or https://</p>
                             )}
-                          </div>
-
-                          <div>
-                            <label htmlFor="link-title" className="block text-sm font-medium text-neutral-700 mb-2">
-                              Link title <span className="font-normal text-neutral-400">(optional)</span>
-                            </label>
-                            <input
-                              id="link-title"
-                              value={linkTitle}
-                              onChange={(e) => {
-                                setLinkTitle(e.target.value);
-                                emitPatch({ linkTitle: e.target.value });
-                              }}
-                              placeholder="e.g. Company Handbook"
-                               className="w-full rounded-md border border-neutral-200 bg-white dark:bg-neutral-800 px-3 py-2 text-sm text-neutral-900 dark:text-neutral-200 placeholder:text-neutral-400 dark:placeholder:text-neutral-500 focus:border-[var(--color-primary)] focus:ring-1 focus:ring-blue-600 transition-colors"
-                            />
-                            <p className="mt-1.5 text-xs text-neutral-500">Shown in the course outline when set; otherwise the link host is used.</p>
                           </div>
 
                           <LinkPreview url={url} title={linkTitle} />

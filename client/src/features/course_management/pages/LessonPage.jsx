@@ -678,12 +678,57 @@ export default function LessonPage() {
             <div className="p-6">
               <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
               {stripEmptyParagraphs(currentLesson.description) && (
-                <p className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400">{stripEmptyParagraphs(currentLesson.description)}</p>
+                <div
+                  className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400 prose prose-sm dark:prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: stripEmptyParagraphs(currentLesson.description) }}
+                />
               )}
               {currentLesson.url && (
                 <a href={currentLesson.url} target="_blank" rel="noreferrer" className="text-sm text-[var(--color-primary)] hover:underline">
                   {currentLesson.url}
                 </a>
+              )}
+            </div>
+          ) : currentLesson.type === 'document' ? (
+            <div className="p-6">
+              <h2 className="text-xl font-bold mb-2">{currentLesson.title}</h2>
+              {stripEmptyParagraphs(currentLesson.description) && (
+                <div
+                  className="mt-1.5 text-sm text-neutral-500 dark:text-neutral-400 mb-4 prose prose-sm dark:prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: stripEmptyParagraphs(currentLesson.description) }}
+                />
+              )}
+              {currentLesson.url && (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
+                    <FileText size={16} className="shrink-0" />
+                    <span className="font-medium truncate">
+                      {currentLesson.file_name || decodeURIComponent(currentLesson.url.split('/').pop() || 'Document')}
+                    </span>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch(currentLesson.url);
+                        const blob = await res.blob();
+                        const blobUrl = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = blobUrl;
+                        a.download = currentLesson.file_name || decodeURIComponent(currentLesson.url.split('/').pop() || 'document');
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        window.URL.revokeObjectURL(blobUrl);
+                      } catch (err) {
+                        window.open(currentLesson.url, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover-brand w-fit"
+                  >
+                    <Download size={16} />
+                    Download Document
+                  </button>
+                </div>
               )}
             </div>
           ) : (

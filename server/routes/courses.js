@@ -5,12 +5,25 @@ const { authenticateToken, resolveScope } = require('../middleware/auth');
 const { requirePermission, requirePermissionAction, requireBusinessScope, requireEntityTypeAccess } = require('../middleware/scope');
 const { upload: courseImageUpload } = require('../middleware/courseImageUpload');
 
+const { upload: courseDocumentUpload } = require('../middleware/courseDocumentUpload');
+
 function handleImageUpload(req, res, next) {
   courseImageUpload.single('file')(req, res, (err) => {
     if (err) {
       const message = err.message || 'Image upload failed';
       const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
       return res.status(status).json({ success: false, message, code: 'IMAGE_UPLOAD_ERROR' });
+    }
+    next();
+  });
+}
+
+function handleDocumentUpload(req, res, next) {
+  courseDocumentUpload.single('file')(req, res, (err) => {
+    if (err) {
+      const message = err.message || 'Document upload failed';
+      const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+      return res.status(status).json({ success: false, message, code: 'DOCUMENT_UPLOAD_ERROR' });
     }
     next();
   });
@@ -43,5 +56,6 @@ router.post('/:courseId/modules/:moduleId/content', requirePermission('manage_co
 router.put('/:courseId/modules/:moduleId/content/:contentId', requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'edit'), coursesController.updateContent);
 router.delete('/:courseId/modules/:moduleId/content/:contentId', requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'delete'), coursesController.deleteContent);
 router.post('/:courseId/modules/:moduleId/images', handleImageUpload, requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'create'), coursesController.uploadImage);
+router.post('/:courseId/modules/:moduleId/documents', handleDocumentUpload, requirePermission('manage_courses'), requirePermissionAction('manage_courses', 'create'), coursesController.uploadDocument);
 
 module.exports = router;

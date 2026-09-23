@@ -56,3 +56,15 @@ export async function uploadContent(courseId, moduleId, file) {
   if (!res.ok) throw new Error("Failed to upload image");
   return res.json();
 }
+
+export async function uploadDocument(courseId, moduleId, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`${API_BASE}/${courseId}/modules/${moduleId}/documents`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: formData,
+  });
+  if (!res.ok) throw new Error("Failed to upload document");
+  return res.json();
+}

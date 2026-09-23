@@ -160,10 +160,10 @@ export function toggleUserAction(userOverrides, permName, action, definedActions
   const existing = userOverrides.find(o => o.permission_name === permName);
 
   if (existing) {
-    if (!existing.granted) {
+    if (!existing.granted || (existing.actions != null && existing.actions.length === 0)) {
       return userOverrides.map(o =>
         o.permission_name === permName
-          ? { permission_name: permName, granted: true, actions: [action] }
+          ? { permission_name: permName, granted: true, actions: [...definedActions] }
           : o
       );
     }
@@ -190,10 +190,9 @@ export function toggleUserAction(userOverrides, permName, action, definedActions
     );
   }
 
-  const remaining = definedActions.filter(a => a !== action);
   return [...userOverrides, {
     permission_name: permName,
     granted: true,
-    actions: remaining,
+    actions: [...definedActions],
   }];
 }

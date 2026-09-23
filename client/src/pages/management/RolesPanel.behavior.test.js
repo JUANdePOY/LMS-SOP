@@ -1,20 +1,3 @@
-const { JSDOM } = require('jsdom');
-
-function normalizeOverrideActions(override) {
-  let actions = override.actions;
-  if (typeof actions === 'string') {
-    try {
-      const parsed = JSON.parse(actions);
-      actions = Array.isArray(parsed) ? parsed : null;
-    } catch {
-      actions = null;
-    }
-  } else if (!Array.isArray(actions)) {
-    actions = null;
-  }
-  return { ...override, actions };
-}
-
 function parseActions(actionsJson, permissionName) {
   if (Array.isArray(actionsJson)) {
     return actionsJson.filter((a) => typeof a === 'string');
@@ -35,6 +18,21 @@ function parseActions(actionsJson, permissionName) {
   return [];
 }
 
+function normalizeOverrideActions(override) {
+  let actions = override.actions;
+  if (typeof actions === 'string') {
+    try {
+      const parsed = JSON.parse(actions);
+      actions = Array.isArray(parsed) ? parsed : null;
+    } catch {
+      actions = null;
+    }
+  } else if (!Array.isArray(actions)) {
+    actions = null;
+  }
+  return { ...override, actions };
+}
+
 function toggleEditorAction({ editorOverrides, expandedRoleData, editingUser }, permName, action) {
   const existing = editorOverrides.find((o) => o.permission_name === permName);
   const data = expandedRoleData[editingUser.roleName] || { rolePerms: [] };
@@ -42,14 +40,37 @@ function toggleEditorAction({ editorOverrides, expandedRoleData, editingUser }, 
   const defined = parseActions(perm?.actions, permName);
 
   if (existing) {
-    const current = existing.actions != null ? existing.actions : defined;
-    const next = current.includes(action) ? current.filter((a) => a !== action) : [...current, action];
-    const filtered = next.filter((a) => defined.includes(a));
-    return editorOverrides.map((o) => o.permission_name === permName ? { ...o, granted: true, actions: filtered } : o);
+    if (!existing.granted || (existing.actions != null && existing.actions.length === 0)) {
+      return editorOverrides.map(o =>
+        o.permission_name === permName
+          ? { permission_name: permName, granted: true, actions: [...defined] }
+          : o
+      );
+    }
+    const currentActions = (existing.actions != null ? existing.actions : defined).filter((a) => defined.includes(a));
+    if (currentActions.includes(action)) {
+      const next = currentActions.filter((a) => a !== action);
+      if (next.length === 0) {
+        return editorOverrides.map(o =>
+          o.permission_name === permName
+            ? { permission_name: permName, granted: false, actions: [] }
+            : o
+        );
+      }
+      return editorOverrides.map(o =>
+        o.permission_name === permName
+          ? { ...o, actions: next }
+          : o
+      );
+    }
+    return editorOverrides.map(o =>
+      o.permission_name === permName
+        ? { ...o, actions: [...currentActions, action] }
+        : o
+    );
   }
 
-  const newActions = defined.filter((a) => a !== action);
-  return [...editorOverrides, { permission_name: permName, granted: true, actions: newActions }];
+  return [...editorOverrides, { permission_name: permName, granted: true, actions: [...defined] }];
 }
 
 function getSelectedActions(editorOverrides, perm) {
@@ -76,11 +97,11 @@ console.log('Defined actions:', defined);
   if (!pass) failed++;
 }
 
-// Test 2: clicking one action should not check all
+// Test 2: clicking one action on a denied/defaultless permission grants all defined actions
 {
   let next = toggleEditorAction({ editorOverrides, expandedRoleData, editingUser }, 'manage_sops', 'view');
   const selected = getSelectedActions(next, perm);
-  const pass = JSON.stringify(selected) === '["view"]';
+  const pass = JSON.stringify(selected) === JSON.stringify(defined);
   console.log(`${pass ? 'PASS' : 'FAIL'}: click one action => ${JSON.stringify(selected)}`);
   if (!pass) failed++;
 }
@@ -112,12 +133,12 @@ console.log('Defined actions:', defined);
   if (!pass) failed++;
 }
 
-// Test 6: after empty actions, clicking an action adds only that action
+// Test 6: after empty actions, clicking an action grants all defined actions
 {
   let overrides = [{ permission_name: 'manage_sops', granted: true, actions: [] }];
   let next = toggleEditorAction({ editorOverrides: overrides, expandedRoleData, editingUser }, 'manage_sops', 'edit');
   const selected = getSelectedActions(next, perm);
-  const pass = JSON.stringify(selected) === '["edit"]';
+  const pass = JSON.stringify(selected) === JSON.stringify(defined);
   console.log(`${pass ? 'PASS' : 'FAIL'}: after empty, click action => ${JSON.stringify(selected)}`);
   if (!pass) failed++;
 }
