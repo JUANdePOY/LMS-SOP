@@ -1,5 +1,5 @@
 const db = require('../config/database');
-const { computeAutoStatus, deriveParentStatus } = require('../utils/taskStatus');
+const { computeAutoStatus } = require('../utils/taskStatus');
 
 // MySQL DATETIME columns reject ISO-8601 strings (e.g. "2026-08-30T02:33:30.495Z").
 // Convert them to "YYYY-MM-DD HH:MM:SS"; pass through values already in that shape.
@@ -286,17 +286,6 @@ async function getStats(filters = {}) {
     if (!isTopLevel) continue;
 
     let finalStatus = autoStatus.get(r.id);
-
-    const children = childrenMap[r.id];
-    if (children && children.length > 0) {
-      const childStatuses = children.map((cid) => autoStatus.get(cid));
-      const derived = deriveParentStatus(childStatuses);
-      // A Cancelled parent is left as-is; otherwise use the derived status so a
-      // parent with all-completed children counts as Completed, etc.
-      if (derived && finalStatus !== 'Cancelled') {
-        finalStatus = derived;
-      }
-    }
 
     stats.total += 1;
     topLevelIds.push(r.id);

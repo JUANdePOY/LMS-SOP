@@ -274,10 +274,10 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
           <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Status</label>
           <div className="flex items-center gap-2">
             <Pill label={displayStatus} color={STATUS_COLORS[displayStatus]} bg={STATUS_BG[displayStatus]} />
-            <select
-              value={statusSelectValue}
-              disabled={!canEdit || saving}
-              onChange={(e) => patch({ status: e.target.value })}
+              <select
+                value={statusSelectValue}
+                disabled={(!canEdit && !isAssigned) || saving}
+                onChange={(e) => patch({ status: e.target.value })}
               className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)] disabled:opacity-60"
             >
               {TASK_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}

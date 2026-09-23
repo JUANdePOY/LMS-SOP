@@ -45,10 +45,10 @@ function computeAutoStatus(startDatetime, deadlineDatetime, currentStatus) {
 function deriveParentStatus(children) {
   if (!children || children.length === 0) return null;
   const statuses = children.map((c) => c.status);
-  if (statuses.every((s) => s === 'Completed')) return 'Completed';
   if (statuses.some((s) => s === 'In Progress')) return 'In Progress';
   if (statuses.some((s) => s === 'Overdue')) return 'Overdue';
   if (statuses.every((s) => s === 'Cancelled')) return 'Cancelled';
+  if (statuses.every((s) => s === 'Completed')) return null;
   return 'Pending';
 }
 

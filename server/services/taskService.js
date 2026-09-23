@@ -7,7 +7,7 @@ const { buildViewUrl } = require('../services/taskAttachmentPublicFile');
 const taskCommentModel = require('../models/taskCommentModel');
 const projectModel = require('../models/projectModel');
 const { logAudit } = require('../utils/auditLogger');
-const { computeAutoStatus, deriveParentStatus } = require('../utils/taskStatus');
+const { computeAutoStatus } = require('../utils/taskStatus');
 const { validateTaskPayload, validateAssignmentPayload, validateProgressPayload, validateCommentPayload } = require('../validators/taskValidator');
 const taskDueReminder = require('./taskDueReminderService');
 const { validateRows } = require('../utils/taskBulkValidation');
@@ -261,14 +261,6 @@ async function listTasks(filters = {}, actorId) {
       task.progress_rate = avg;
       task.is_parent = true;
       task.subtasks = children;
-      // Derive the parent's status from its children so the parent moves to the
-      // correct status row (Completed when all done, In Progress when any child
-      // is active, Overdue if any child is overdue). A Cancelled parent is left
-      // as-is.
-      if (task.status !== 'Cancelled') {
-        const derived = deriveParentStatus(children);
-        if (derived) task.status = derived;
-      }
     } else {
       task.is_parent = false;
       task.subtasks = [];
@@ -319,7 +311,7 @@ async function buildSubtree(parentId, depth = 0, actorId = null) {
   const nodes = [];
   for (const child of children) {
     const assignments = await taskAssignmentModel.findByTaskId(child.id);
-    const isAssigned = actorId != null ? await isUserAssignedToTaskById(actorId, child.id) : false;
+    const isAssigned = actorId != null ? await isUserAssignedToTaskOrAncestor(actorId, child.id) : false;
     nodes.push({
       ...child,
       auto_status: computeAutoStatus(child.start_datetime, child.deadline_datetime, child.status),
@@ -452,28 +444,6 @@ async function getTask(id, actorId) {
 
   const subtasks = await buildSubtree(id, 0, actorId);
 
-  // Compute derived progress_rate for parent tasks from children's latest
-  // completion_rate, matching the list view behavior.
-  let derivedProgressRate = null;
-  if (subtasks.length > 0) {
-    const childIds = subtasks.map((s) => s.id);
-    const [childProgressRows] = await db.query(
-      `SELECT tp.task_id, tp.completion_rate
-       FROM task_progress tp
-       INNER JOIN (
-         SELECT task_id, MAX(updated_at) AS max_updated
-         FROM task_progress
-         WHERE task_id IN (?)
-         GROUP BY task_id
-       ) latest ON tp.task_id = latest.task_id AND tp.updated_at = latest.max_updated`,
-      [childIds]
-    );
-    const progressMap = {};
-    childProgressRows.forEach((p) => { progressMap[p.task_id] = p.completion_rate; });
-    const rates = subtasks.map((s) => Number(progressMap[s.id] ?? 0));
-    derivedProgressRate = Math.round(rates.reduce((sum, r) => sum + r, 0) / rates.length);
-  }
-
   // Capability flags consumed by the task-detail drawer so it enables exactly
   // the controls the actor is allowed to perform:
   //   can_edit    — updateTask gate: admin, creator, a granted business
@@ -497,7 +467,7 @@ async function getTask(id, actorId) {
     attachments: enrichedTaskAttachments,
     custom_fields: customFields,
     subtasks,
-    progress_rate: derivedProgressRate ?? task.progress_rate ?? null,
+    progress_rate: task.progress_rate ?? null,
     can_edit: canEdit,
     can_interact: canInteract,
   };
@@ -523,6 +493,22 @@ async function createTask(payload, actorId) {
     const error = new Error('Deadline must be after start date and time');
     error.code = 'VALIDATION_ERROR';
     throw error;
+  }
+
+  if (parent_task_id) {
+    const parent = await taskModel.findById(parent_task_id);
+    if (!parent) {
+      const error = new Error('Parent task not found');
+      error.code = 'NOT_FOUND';
+      throw error;
+    }
+    const isAdmin = await isUserAdmin(actorId);
+    const canCreateSubtask = isAdmin || await isUserAssignedToTaskOrAncestor(actorId, parent_task_id);
+    if (!canCreateSubtask) {
+      const error = new Error('You are not authorized to create a sub-task for this task');
+      error.code = 'FORBIDDEN';
+      throw error;
+    }
   }
 
   // Department Heads may only create tasks for clients in their own department.
@@ -698,7 +684,7 @@ async function updateTask(id, payload, actorId) {
   // tasks created by other users — that's the whole point of the grant. They
   // are restricted to the MANAGER_ALLOWED_FIELDS set below.
   const isManager = !isAdmin && await isTaskEditableByManager(actorId, id);
-  const isAssigned = !isAdmin && !isManager ? await isUserAssignedToTaskById(actorId, id) : false;
+  const isAssigned = !isAdmin && !isManager ? await isUserAssignedToTaskOrAncestor(actorId, id) : false;
   const canEditSubtask = isAssigned && task.parent_task_id != null;
   if (task.created_by !== actorId && !isAdmin && !isManager && !canEditSubtask) {
     const error = new Error('You are not authorized to update this task');
@@ -770,19 +756,6 @@ async function updateTask(id, payload, actorId) {
       status: validation.value.status,
       notes: null,
     });
-
-    // Recompute the parent task's status from its children so the parent moves
-    // to the correct status row and KPI stats stay consistent.
-    if (task.parent_task_id != null) {
-      const children = await taskModel.findByParentId(task.parent_task_id);
-      const parent = await taskModel.findById(task.parent_task_id);
-      if (parent && parent.status !== 'Cancelled') {
-        const derived = deriveParentStatus(children);
-        if (derived && derived !== parent.status) {
-          await taskModel.update(parent.id, { status: derived });
-        }
-      }
-    }
   }
 
   // When assignments are explicitly provided (including an empty array), treat
@@ -856,7 +829,11 @@ async function deleteTask(id, actorId) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  if (task.created_by !== actorId && !isAdmin) {
+  const isCreator = task.created_by === actorId;
+  const canDeleteSubtask = !isCreator && !isAdmin && task.parent_task_id != null
+    ? await isUserAssignedToTaskOrAncestor(actorId, id)
+    : false;
+  if (!isCreator && !isAdmin && !canDeleteSubtask) {
     const error = new Error('You are not authorized to delete this task');
     error.code = 'FORBIDDEN';
     throw error;
@@ -875,18 +852,6 @@ async function deleteTask(id, actorId) {
   await taskAssignmentModel.removeByTaskId(id);
   await taskCommentModel.removeByTaskId(id);
   await taskModel.remove(id);
-
-  // Recompute the (former) parent's derived status now that a child is gone.
-  if (parentTaskId != null) {
-    const children = await taskModel.findByParentId(parentTaskId);
-    const parent = await taskModel.findById(parentTaskId);
-    if (parent && parent.status !== 'Cancelled') {
-      const derived = deriveParentStatus(children);
-      if (derived && derived !== parent.status) {
-        await taskModel.update(parent.id, { status: derived });
-      }
-    }
-  }
 
   logAudit('task.delete', actorId, { task_id: id, title: task.title });
 }
@@ -1013,7 +978,7 @@ async function updateProgress(payload, actorId) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  const isAssigned = await isUserAssignedToTaskById(actorId, task_id);
+  const isAssigned = await isUserAssignedToTaskOrAncestor(actorId, task_id);
   if (!isAdmin && !isAssigned) {
     const error = new Error('You are not authorized to update progress for this task');
     error.code = 'FORBIDDEN';
@@ -1075,19 +1040,6 @@ async function updateProgress(payload, actorId) {
 
   await taskModel.update(task_id, { status: finalStatus });
 
-  // Recompute the parent task's status from its children so the parent moves to
-  // the correct status row and KPI stats stay consistent with this update.
-  if (task.parent_task_id != null) {
-    const children = await taskModel.findByParentId(task.parent_task_id);
-    const parent = await taskModel.findById(task.parent_task_id);
-    if (parent && parent.status !== 'Cancelled') {
-      const derived = deriveParentStatus(children);
-      if (derived && derived !== parent.status) {
-        await taskModel.update(parent.id, { status: derived });
-      }
-    }
-  }
-
   logAudit('task.progress.update', actorId, {
     task_id,
     completion_rate: completion_rate ?? 0,
@@ -1124,7 +1076,7 @@ async function addComment(payload, actorId, req) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  const isAssigned = await isUserAssignedToTaskById(actorId, task_id);
+  const isAssigned = await isUserAssignedToTaskOrAncestor(actorId, task_id);
   if (!isAdmin && !isAssigned) {
     const error = new Error('You are not authorized to comment on this task');
     error.code = 'FORBIDDEN';
@@ -1196,7 +1148,7 @@ async function uploadAttachment(taskId, file, actorId, req) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  const isAssigned = await isUserAssignedToTaskById(actorId, taskId);
+  const isAssigned = await isUserAssignedToTaskOrAncestor(actorId, taskId);
   if (!isAdmin && !isAssigned) {
     const error = new Error('You are not authorized to upload attachments for this task');
     error.code = 'FORBIDDEN';
@@ -1246,7 +1198,7 @@ async function deleteAttachment(attachmentId, actorId) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  const isAssigned = await isUserAssignedToTaskById(actorId, attachment.task_id);
+  const isAssigned = await isUserAssignedToTaskOrAncestor(actorId, attachment.task_id);
   if (!isAdmin && !isAssigned) {
     const error = new Error('You are not authorized to delete this attachment');
     error.code = 'FORBIDDEN';
@@ -1851,6 +1803,16 @@ async function isUserSuperAdmin(userId) {
   return user && user.role === 'super_admin';
 }
 
+async function isUserAssignedToTaskOrAncestor(userId, taskId, seen = new Set()) {
+  if (seen.has(String(taskId))) return false;
+  seen.add(String(taskId));
+  if (await isUserAssignedToTaskById(userId, taskId)) return true;
+  const [rows] = await db.query('SELECT parent_task_id FROM tasks WHERE id = ? LIMIT 1', [taskId]);
+  const parentId = rows[0]?.parent_task_id;
+  if (!parentId) return false;
+  return await isUserAssignedToTaskOrAncestor(userId, parentId, seen);
+}
+
 async function isUserAssignedToTaskById(userId, taskId) {
   // 1. Direct assignment on this task (User / Department / Position)
   const [direct] = await db.query(
@@ -2162,20 +2124,6 @@ async function batchDeleteTasks(ids, actorId) {
       logAudit('task.delete', actorId, { task_id: id, batch: true });
     }
 
-    // Recompute the derived status of any (non-cancelled) parent whose children
-    // changed as a result of the deletes, so the parent row stays consistent.
-    for (const pid of parentIds) {
-      const [children] = await conn.query('SELECT id, status FROM tasks WHERE parent_task_id = ?', [pid]);
-      const [parentRows] = await conn.query('SELECT id, status FROM tasks WHERE id = ?', [pid]);
-      const parent = parentRows[0];
-      if (parent && parent.status !== 'Cancelled' && children.length > 0) {
-        const derived = deriveParentStatus(children.map((c) => c.status));
-        if (derived && derived !== parent.status) {
-          await conn.query('UPDATE tasks SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [derived, pid]);
-        }
-      }
-    }
-
     await conn.commit();
     return { deleted: ids.length };
   } catch (err) {
@@ -2209,6 +2157,7 @@ module.exports = {
   bulkCreateTasks,
   isUserAssignedToTask,
   isUserAssignedToTaskById,
+  isUserAssignedToTaskOrAncestor,
   grantBusinessManager,
   listBusinessManagers,
   revokeBusinessManager,
@@ -2228,22 +2177,7 @@ const ADMIN_ROLES = ['super_admin', 'admin', 'department_head'];
 async function isUserAssignedToTask(taskId, user) {
   if (!user) return false;
   if (ADMIN_ROLES.includes(user.role)) return true;
-  const [rows] = await db.query(
-    `SELECT assignment_type, reference_id FROM task_assignments WHERE task_id = ?`,
-    [taskId]
-  );
-  const direct = rows.some((a) => {
-    if (a.assignment_type === 'User') return String(a.reference_id) === String(user.id);
-    if (a.assignment_type === 'Department') {
-      return user.department_id != null && String(a.reference_id) === String(user.department_id);
-    }
-    if (a.assignment_type === 'Position') {
-      return Boolean(a.reference_id) && a.reference_id === user.position_title;
-    }
-    return false;
-  });
-  if (direct) return true;
-  return await isUserBusinessManagerOfTask(user.id, taskId);
+  return await isUserAssignedToTaskOrAncestor(user.id, taskId);
 }
 
 // Grant/revoke management access to every task in a business. A business

@@ -165,7 +165,7 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
           </span>
         )}
 
-        {(canManage && user?.role !== 'employee') && (
+        {canManage || canEdit ? (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onDelete?.(node.id); }}
@@ -174,7 +174,7 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
           >
             <Trash2 size={14} />
           </button>
-        )}
+        ) : null}
       </div>
 
       {children.length > 0 && (
