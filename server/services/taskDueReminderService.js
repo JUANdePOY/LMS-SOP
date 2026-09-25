@@ -141,6 +141,7 @@ function nextKindForTask(task, now) {
   if (!task || !task.deadline_datetime) return null;
   const deadline = new Date(task.deadline_datetime).getTime();
   if (Number.isNaN(deadline)) return null;
+  if (task.status === 'Completed' || task.status === 'Cancelled') return null;
 
   const timeLeft = deadline - now;
 

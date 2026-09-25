@@ -47,3 +47,8 @@ server/*.log
 
 # Runtime lock files
 server/.tmp/
+
+# Database dumps
+*.sql
+*.sql.gz
+*.dump
