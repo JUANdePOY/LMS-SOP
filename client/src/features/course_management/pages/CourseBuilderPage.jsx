@@ -717,6 +717,25 @@ export default function CourseBuilderPage() {
     });
   };
 
+  const reorderModules = (reordered) => {
+    const mapped = reordered.map((m, i) => ({ ...m, order_index: i + 1 }));
+    modulesRef.current = mapped;
+    setModules(mapped);
+    setHasUnsavedChanges(true);
+  };
+
+  const reorderLessons = (moduleId, reorderedLessons) => {
+    setModules((prev) => {
+      const next = prev.map((m) => {
+        if (m.id !== moduleId) return m;
+        return { ...m, lessons: reorderedLessons };
+      });
+      modulesRef.current = next;
+      setHasUnsavedChanges(true);
+      return next;
+    });
+  };
+
   const removeModule = (moduleId) => {
     setModules((prev) => {
       const next = prev.filter((m) => m.id !== moduleId).map((m, i) => ({ ...m, order_index: i + 1 }));
@@ -981,15 +1000,15 @@ export default function CourseBuilderPage() {
                       setShowLeftSidebar(false);
                       setShowRightSidebar(true);
                     }}
-                    onAddModule={addModule}
-                    onUpdateModule={updateModule}
-                    onRemoveModule={removeModule}
-                    onAddLesson={addLesson}
-                    onUpdateLesson={updateLesson}
-                    onRemoveLesson={removeLesson}
-                    onMoveLessonUp={moveLessonUp}
-                    onMoveLessonDown={moveLessonDown}
-                  />
+                     onAddModule={addModule}
+                     onUpdateModule={updateModule}
+                     onRemoveModule={removeModule}
+                     onAddLesson={addLesson}
+                     onUpdateLesson={updateLesson}
+                     onRemoveLesson={removeLesson}
+                     onReorder={reorderModules}
+                     onReorderLessons={reorderLessons}
+                   />
                 </div>
               </div>
             </div>
@@ -1028,15 +1047,15 @@ export default function CourseBuilderPage() {
                   setShowLeftSidebar(false);
                   setShowRightSidebar(true);
                 }}
-                onAddModule={addModule}
-                onUpdateModule={updateModule}
-                onRemoveModule={removeModule}
-                onAddLesson={addLesson}
-                onUpdateLesson={updateLesson}
-                onRemoveLesson={removeLesson}
-                onMoveLessonUp={moveLessonUp}
-                onMoveLessonDown={moveLessonDown}
-              />
+                 onAddModule={addModule}
+                 onUpdateModule={updateModule}
+                 onRemoveModule={removeModule}
+                 onAddLesson={addLesson}
+                 onUpdateLesson={updateLesson}
+                 onRemoveLesson={removeLesson}
+                 onReorder={reorderModules}
+                 onReorderLessons={reorderLessons}
+               />
             </div>
           </div>
         </aside>

@@ -26,8 +26,19 @@ import { notifyOrgTreeChanged, useOrgTreeVersion } from '@/shared/store/orgTreeB
 import ClientFormModal from '../components/ClientFormModal';
 import { isOverdue } from '../utils/taskDateUtils';
 import { Button } from '@/shared/components/ui/button';
+import { cn } from '@/lib/utils';
 
 const VIEW_STORAGE_KEY = 'ppm:tasks:view';
+
+const BUSINESS_CATEGORIES = [
+  { key: 'all', label: 'All' },
+  { key: 'local_seo', label: 'Local SEO' },
+  { key: 'full_seo', label: 'Full SEO' },
+  { key: 'inactive', label: 'Inactive' },
+  { key: 'archived', label: 'Archived' },
+];
+
+const INACTIVE_STATUSES = ['inactive', 'paused', 'stopped', 'cancelled'];
 
 
 export default function TasksPage() {
@@ -44,6 +55,7 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [businessCategory, setBusinessCategory] = useState('all');
 
   const canManageTasks = hasPermission('manage_tasks');
   const canManageClients = hasPermission('manage_clients');
@@ -69,6 +81,7 @@ export default function TasksPage() {
   const [view, setView] = useState(() => localStorage.getItem(VIEW_STORAGE_KEY) || 'list');
   const [taskDefaults, setTaskDefaults] = useState(undefined);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [selectedBusinessIds, setSelectedBusinessIds] = useState(() => new Set());
   const [showAddClient, setShowAddClient] = useState(false);
   const [bulkUploadContext, setBulkUploadContext] = useState(null);
 
@@ -90,7 +103,10 @@ export default function TasksPage() {
     setSelectedIds(new Set(ids));
   }, []);
 
-  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setSelectedBusinessIds(new Set());
+  }, []);
 
   const [projectsById, setProjectsById] = useState({});
   const [clientTree, setClientTree] = useState([]);
@@ -175,6 +191,19 @@ export default function TasksPage() {
     }
   }, [toast, loadProjects, findClientIdForBusiness]);
 
+  const updateBusinessStatus = useCallback(async (businessId, clientId, status) => {
+    try {
+      const result = await updateClientBusiness(clientId, businessId, { status });
+      console.log('[updateBusinessStatus] OK', { clientId, businessId, status, result });
+      toast.success('Business status updated');
+      loadProjects();
+      notifyOrgTreeChanged();
+    } catch (err) {
+      console.error('[updateBusinessStatus] FAILED', { clientId, businessId, status, error: err?.response?.data || err?.message || err });
+      toast.error(err.response?.data?.message || err.message || 'Failed to update business status');
+    }
+  }, [toast, loadProjects]);
+
   const renameTask = useCallback(async (id, title) => {
     try {
       await update(id, { title });
@@ -183,9 +212,9 @@ export default function TasksPage() {
     }
   }, [update, toast]);
 
-  const handleCreateBusiness = useCallback(async (clientId, name) => {
+  const handleCreateBusiness = useCallback(async (clientId, name, category = 'none') => {
     try {
-      await api.post(`/clients/${clientId}/businesses`, { business_name: name.trim() });
+      await api.post(`/clients/${clientId}/businesses`, { business_name: name.trim(), category });
       toast.success('Business created');
       loadProjects();
       notifyOrgTreeChanged();
@@ -510,23 +539,137 @@ export default function TasksPage() {
     return ids;
   }, [displayedTasks, projectsById]);
 
-  const statItems = useMemo(() => {
-    const list = displayedTasks || [];
-    const total = list.length;
-    const pending = list.filter((t) => t.status === 'Pending').length;
-    const inProgress = list.filter((t) => t.status === 'In Progress').length;
-    const completed = list.filter((t) => t.status === 'Completed').length;
-    const overdue = list.filter((t) => isOverdue(t)).length;
-    const cancelled = list.filter((t) => t.status === 'Cancelled').length;
-    return [
-      { label: 'Total', value: total, icon: ClipboardList },
-      { label: 'Pending', value: pending, icon: Clock },
-      { label: 'In Progress', value: inProgress, icon: RefreshCw },
-      { label: 'Completed', value: completed, icon: CheckCircle },
-      { label: 'Overdue', value: overdue, icon: AlertTriangle },
-      { label: 'Cancelled', value: cancelled, icon: XCircle },
-    ];
-  }, [displayedTasks]);
+  const scopedClientTree = useMemo(() => {
+    let result = clientTree || [];
+    if (clientParam || businessParam || projectParam) {
+      const targetClient = clientParam ?? (projectParam ? projectsById[String(projectParam)]?.client_id : null);
+      result = result.map((client) => {
+        if (targetClient && String(client.id) !== String(targetClient)) return null;
+        if (businessParam && !clientParam && !projectParam) {
+          if (String(client.business_id) !== String(businessParam)) return null;
+          return client;
+        }
+        if (businessParam) {
+          const businesses = (client.businesses || []).filter(
+            (b) => String(b.id) === String(businessParam)
+          );
+          return { ...client, businesses };
+        }
+        return client;
+      }).filter(Boolean);
+    }
+    if (user?.role === 'admin' && user?.business_id != null) {
+      const adminBizId = String(user.business_id);
+      result = result.filter((c) => {
+        if (c.business_id != null && String(c.business_id) === adminBizId) return true;
+        return (c.businesses || []).some((b) => String(b.id) === adminBizId);
+      });
+    }
+    if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null)) {
+      const sopBizId = String(user.department_business_id ?? user.business_id);
+      const deptId = user?.department_id != null ? String(user.department_id) : null;
+      result = result.filter((c) => {
+        if (String(c.business_id) !== sopBizId) return false;
+        if (deptId != null && String(c.department_id) !== deptId) return false;
+        return true;
+      });
+    }
+    const filtersActive = search || statusFilter || priorityFilter || assigneeFilter;
+    if (!clientParam && !businessParam && !projectParam && filtersActive && matchingBusinessIds.size > 0) {
+      result = result.map((c) => {
+        if (!c.businesses || c.businesses.length === 0) return c;
+        const businesses = c.businesses.filter((b) => matchingBusinessIds.has(String(b.id)));
+        return businesses.length ? { ...c, businesses } : null;
+      }).filter(Boolean);
+    }
+    return result;
+  }, [clientTree, clientParam, businessParam, projectParam, projectsById, isDepartmentHead, user, matchingBusinessIds, search, statusFilter, priorityFilter, assigneeFilter]);
+
+  const categoryFilteredClientTree = useMemo(() => {
+    if (!businessCategory || businessCategory === 'all') {
+      return scopedClientTree.map((client) => ({
+        ...client,
+        businesses: (client.businesses || []).filter((b) => b.status !== 'archived'),
+      })).filter((c) => (c.businesses || []).length > 0);
+    }
+    return scopedClientTree.map((client) => ({
+      ...client,
+      businesses: (client.businesses || []).filter((b) => {
+        if (businessCategory === 'inactive') {
+          return INACTIVE_STATUSES.includes(b.status);
+        }
+        if (businessCategory === 'archived') {
+          return b.status === 'archived';
+        }
+        return b.category === businessCategory;
+      }),
+    })).filter((c) => (c.businesses || []).length > 0);
+  }, [scopedClientTree, businessCategory]);
+
+  const categoryFilteredTasks = useMemo(() => {
+    if (!businessCategory || businessCategory === 'all') return displayedTasks;
+    const businessMatch = new Map();
+    for (const client of scopedClientTree) {
+      for (const business of client.businesses || []) {
+        const bid = String(business.id);
+        if (businessCategory === 'inactive') {
+          businessMatch.set(bid, INACTIVE_STATUSES.includes(business.status));
+        } else if (businessCategory === 'archived') {
+          businessMatch.set(bid, business.status === 'archived');
+        } else {
+          businessMatch.set(bid, business.category === businessCategory);
+        }
+      }
+    }
+    if (businessMatch.size === 0) return [];
+    return displayedTasks.filter((t) => {
+      const pid = t.project_id ?? t.projectId ?? t.project?.id;
+      const proj = pid != null ? projectsById[String(pid)] : null;
+      const bid = t.client_business_id != null ? String(t.client_business_id) : (proj?.client_business_id != null ? String(proj.client_business_id) : null);
+      if (bid == null) return false;
+      return businessMatch.get(bid) === true;
+    });
+  }, [displayedTasks, businessCategory, scopedClientTree, projectsById]);
+
+  const visibleBusinessIds = useMemo(() => {
+    const tree = (businessCategory && businessCategory !== 'all') ? categoryFilteredClientTree : clientTree;
+    if (!tree || tree.length === 0) return new Set();
+    const ids = new Set();
+    if (clientParam) {
+      for (const client of tree) {
+        if (String(client.id) === String(clientParam)) {
+          for (const business of client.businesses || []) {
+            ids.add(String(business.id));
+          }
+        }
+      }
+    } else if (businessParam) {
+      for (const client of tree) {
+        for (const business of client.businesses || []) {
+          if (String(business.id) === String(businessParam)) {
+            ids.add(String(business.id));
+          }
+        }
+      }
+    } else if (projectParam) {
+      for (const client of tree) {
+        for (const business of client.businesses || []) {
+          for (const task of business.tasks || []) {
+            if (String(task.project_id ?? task.projectId ?? task.project?.id) === String(projectParam)) {
+              ids.add(String(business.id));
+            }
+          }
+        }
+      }
+    } else {
+      for (const client of tree) {
+        for (const business of client.businesses || []) {
+          ids.add(String(business.id));
+        }
+      }
+    }
+    return ids;
+  }, [clientTree, categoryFilteredClientTree, businessCategory, clientParam, businessParam, projectParam]);
 
   const hasActiveFilters = search || statusFilter || priorityFilter || assigneeFilter;
 
@@ -612,51 +755,39 @@ export default function TasksPage() {
     return scoped;
   }, [projectsById, clientParam, businessParam, projectParam, clientTree, isDepartmentHead, user]);
 
-  const scopedClientTree = useMemo(() => {
-    let result = clientTree || [];
-    if (clientParam || businessParam || projectParam) {
-      const targetClient = clientParam ?? (projectParam ? projectsById[String(projectParam)]?.client_id : null);
-      result = result.map((client) => {
-        if (targetClient && String(client.id) !== String(targetClient)) return null;
-        if (businessParam && !clientParam && !projectParam) {
-          if (String(client.business_id) !== String(businessParam)) return null;
-          return client;
-        }
-        if (businessParam) {
-          const businesses = (client.businesses || []).filter(
-            (b) => String(b.id) === String(businessParam)
-          );
-          return { ...client, businesses };
-        }
-        return client;
-      }).filter(Boolean);
+  const statItems = useMemo(() => {
+    const list = categoryFilteredTasks || [];
+    const total = list.length;
+    const pending = list.filter((t) => t.status === 'Pending').length;
+    const inProgress = list.filter((t) => t.status === 'In Progress').length;
+    const completed = list.filter((t) => t.status === 'Completed').length;
+    const overdue = list.filter((t) => isOverdue(t)).length;
+    const cancelled = list.filter((t) => t.status === 'Cancelled').length;
+    return [
+      { label: 'Total', value: total, icon: ClipboardList },
+      { label: 'Pending', value: pending, icon: Clock },
+      { label: 'In Progress', value: inProgress, icon: RefreshCw },
+      { label: 'Completed', value: completed, icon: CheckCircle },
+      { label: 'Overdue', value: overdue, icon: AlertTriangle },
+      { label: 'Cancelled', value: cancelled, icon: XCircle },
+    ];
+  }, [categoryFilteredTasks]);
+
+  const allBusinesses = useMemo(() => {
+    const list = [];
+    for (const client of scopedClientTree || []) {
+      for (const business of client.businesses || []) {
+        list.push({
+          id: business.id,
+          name: business.business_name,
+          status: business.status,
+          clientId: client.id,
+          clientName: client.client_name,
+        });
+      }
     }
-    if (user?.role === 'admin' && user?.business_id != null) {
-      const adminBizId = String(user.business_id);
-      result = result.filter((c) => {
-        if (c.business_id != null && String(c.business_id) === adminBizId) return true;
-        return (c.businesses || []).some((b) => String(b.id) === adminBizId);
-      });
-    }
-    if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null)) {
-      const sopBizId = String(user.department_business_id ?? user.business_id);
-      const deptId = user?.department_id != null ? String(user.department_id) : null;
-      result = result.filter((c) => {
-        if (String(c.business_id) !== sopBizId) return false;
-        if (deptId != null && String(c.department_id) !== deptId) return false;
-        return true;
-      });
-    }
-    const filtersActive = search || statusFilter || priorityFilter || assigneeFilter;
-    if (!clientParam && !businessParam && !projectParam && filtersActive && matchingBusinessIds.size > 0) {
-      result = result.map((c) => {
-        if (!c.businesses || c.businesses.length === 0) return c;
-        const businesses = c.businesses.filter((b) => matchingBusinessIds.has(String(b.id)));
-        return businesses.length ? { ...c, businesses } : null;
-      }).filter(Boolean);
-    }
-    return result;
-  }, [clientTree, clientParam, businessParam, projectParam, projectsById, isDepartmentHead, user, matchingBusinessIds, search, statusFilter, priorityFilter, assigneeFilter]);
+    return list;
+  }, [scopedClientTree]);
 
   const handleSubmit = async (payload) => {
     setSaving(true);
@@ -718,11 +849,23 @@ export default function TasksPage() {
     }
   }, [remove, toast, viewingTaskId]);
 
-  const runBulk = useCallback(async (fn, successMsg) => {
-    const ids = [...selectedIds];
-    if (ids.length === 0) return;
+  const runBulk = useCallback(async (fn, successMsg, ids) => {
+    let taskIds = ids || [...selectedIds];
+    if (taskIds.length === 0 && selectedBusinessIds.size > 0) {
+      const businessIdSet = new Set(selectedBusinessIds);
+      const collected = [];
+      for (const client of clientTree || []) {
+        for (const business of client.businesses || []) {
+          if (businessIdSet.has(String(business.id))) {
+            (business.tasks || []).forEach((t) => collected.push(String(t.id)));
+          }
+        }
+      }
+      taskIds = collected;
+    }
+    if (taskIds.length === 0) return;
     try {
-      await fn(ids);
+      await fn(taskIds);
       await refreshTasks();
       await refreshStats();
       toast.success(successMsg);
@@ -730,27 +873,190 @@ export default function TasksPage() {
     } catch (err) {
       toast.error(err.message || 'Bulk action failed');
     }
-  }, [selectedIds, refreshTasks, refreshStats, toast, clearSelection]);
+  }, [selectedIds, selectedBusinessIds, clientTree, refreshTasks, refreshStats, toast, clearSelection]);
 
-  const handleBulkStatus = useCallback((status) => runBulk(
-    (ids) => bulkUpdateTasks(ids, { status }),
-    `${selectedIds.size} task(s) updated to ${status}`
-  ), [runBulk, selectedIds.size]);
+  const handleBulkStatus = useCallback((status) => {
+    const count = selectedIds.size > 0 ? selectedIds.size : selectedBusinessIds.size;
+    return runBulk(
+      (ids) => bulkUpdateTasks(ids, { status }),
+      `${count} task(s) updated to ${status}`
+    );
+  }, [runBulk, selectedIds.size, selectedBusinessIds.size]);
 
-  const handleBulkPriority = useCallback((priority) => runBulk(
-    (ids) => bulkUpdateTasks(ids, { priority }),
-    `${selectedIds.size} task(s) set to ${priority} priority`
-  ), [runBulk, selectedIds.size]);
+  const handleBulkPriority = useCallback((priority) => {
+    const count = selectedIds.size > 0 ? selectedIds.size : selectedBusinessIds.size;
+    return runBulk(
+      (ids) => bulkUpdateTasks(ids, { priority }),
+      `${count} task(s) set to ${priority} priority`
+    );
+  }, [runBulk, selectedIds.size, selectedBusinessIds.size]);
 
-  const handleBulkAssignee = useCallback((assignments) => runBulk(
-    (ids) => bulkUpdateTasks(ids, { assignments }),
-    `${selectedIds.size} task(s) reassigned`
-  ), [runBulk, selectedIds.size]);
+  const handleBulkAssignee = useCallback((assignments) => {
+    const count = selectedIds.size > 0 ? selectedIds.size : selectedBusinessIds.size;
+    return runBulk(
+      (ids) => bulkUpdateTasks(ids, { assignments }),
+      `${count} task(s) reassigned`
+    );
+  }, [runBulk, selectedIds.size, selectedBusinessIds.size]);
 
-  const handleBulkDelete = useCallback(() => runBulk(
-    (ids) => bulkDeleteTasks(ids),
-    `${selectedIds.size} task(s) deleted`
-  ), [runBulk]);
+  const handleDeselectAllBusinesses = useCallback(() => {
+    setSelectedBusinessIds(new Set());
+  }, []);
+
+  const handleSelectBusinessTasks = useCallback((businessId, taskIds, selected, allTaskIds) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (businessId == null) {
+        const ids = selected ? (allTaskIds || []) : [];
+        if (!selected) next.clear();
+        else ids.forEach((id) => next.add(String(id)));
+      } else {
+        (taskIds || []).forEach((id) => {
+          const key = String(id);
+          if (selected) next.add(key);
+          else next.delete(key);
+        });
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleBusinessSelect = useCallback((businessId, taskIds, selected) => {
+    setSelectedBusinessIds((prev) => {
+      const next = new Set(prev);
+      const key = String(businessId);
+      if (selected) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
+
+  const handleToggleTaskSelect = useCallback((taskId, selected) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const key = String(taskId);
+      if (selected) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
+
+  const handleSelectAllBusinesses = useCallback((businessIds) => {
+    let ids = Array.isArray(businessIds) ? businessIds : [];
+    if (ids.length === 0) {
+      const fallback = [];
+      for (const client of scopedClientTree || []) {
+        for (const business of client.businesses || []) {
+          fallback.push(String(business.id));
+        }
+      }
+      ids = fallback;
+    }
+    if (ids.length === 0) return;
+    setSelectedBusinessIds(new Set(ids));
+  }, [scopedClientTree]);
+
+  const handleSelectAllTasks = useCallback(() => {
+    const allTaskIds = (displayedTasks || [])
+      .map((t) => String(t.id))
+      .filter(Boolean);
+    if (allTaskIds.length === 0) return;
+    setSelectedIds(new Set(allTaskIds));
+  }, [displayedTasks]);
+
+  const handleBulkDelete = useCallback(async () => {
+    const count = selectedIds.size > 0 ? selectedIds.size : selectedBusinessIds.size;
+    if (selectedBusinessIds.size > 0 && selectedIds.size === 0) {
+      const deletedIds = new Set(Array.from(selectedBusinessIds));
+      try {
+        await Promise.allSettled(
+          Array.from(deletedIds).map((businessId) => {
+            const clientId = findClientIdForBusiness(businessId);
+            if (clientId == null) return Promise.resolve();
+            return deleteClientBusiness(clientId, businessId);
+          })
+        );
+        setClientTree((prev) =>
+          prev
+            .map((client) => ({
+              ...client,
+              businesses: (client.businesses || []).filter((b) => !deletedIds.has(String(b.id))),
+            }))
+        );
+        await refreshTasks();
+        await refreshStats();
+        toast.success(`${count} business(es) deleted`);
+        handleDeselectAllBusinesses();
+      } catch (err) {
+        toast.error(err.message || 'Failed to delete selected businesses');
+      }
+      return;
+    }
+    runBulk(
+      (ids) => bulkDeleteTasks(ids),
+      `${count} task(s) deleted`
+    );
+  }, [runBulk, selectedIds.size, selectedBusinessIds.size, findClientIdForBusiness, deleteClientBusiness, refreshTasks, refreshStats, toast, handleDeselectAllBusinesses, setClientTree]);
+
+  const handleAssignToSelectedBusinesses = useCallback(async (assignment) => {
+    const ids = Array.from(selectedBusinessIds);
+    if (!ids.length) return;
+    try {
+      if (assignment.assignment_type === 'User') {
+        await Promise.allSettled(
+          ids.map((businessId) => api.post(`/client-businesses/${businessId}/managers`, { user_id: assignment.reference_id }))
+        );
+        toast.success(`User assigned to ${ids.length} business(es)`);
+      } else if (assignment.assignment_type === 'Department') {
+        await Promise.allSettled(
+          ids.map((businessId) => api.post(`/client-businesses/${businessId}/departments`, { department_id: assignment.reference_id }))
+        );
+        toast.success(`Department assigned to ${ids.length} business(es)`);
+      }
+      await refreshTasks();
+      await refreshStats();
+    } catch (err) {
+      toast.error(err.message || 'Failed to assign to selected businesses');
+    }
+  }, [selectedBusinessIds, toast, refreshTasks, refreshStats]);
+
+  const handleBulkArchive = useCallback((ids) => {
+    if (!ids || ids.length === 0) return;
+    runBulk(
+      (ids) => bulkUpdateTasks(ids, { status: 'Cancelled' }),
+      `${ids.length} task(s) archived`,
+      ids
+    );
+  }, [runBulk]);
+
+  const handleBulkMove = useCallback(async (ids, targetBusinessId) => {
+    if (!ids || ids.length === 0) return;
+    const targetClient = (clientTree || []).find((c) =>
+      (c.businesses || []).some((b) => String(b.id) === String(targetBusinessId))
+    );
+    const targetClientId = targetClient?.id ?? null;
+    try {
+      await bulkUpdateTasks(ids, {
+        client_business_id: Number(targetBusinessId),
+        client_id: targetClientId != null ? Number(targetClientId) : null,
+      });
+      await refreshTasks();
+      await refreshStats();
+      toast.success(`${ids.length} task(s) moved`);
+      clearSelection();
+    } catch (err) {
+      toast.error(err.message || 'Failed to move tasks');
+    }
+  }, [clientTree, refreshTasks, refreshStats, toast, clearSelection]);
+
+  const handleBulkUpdateStatus = useCallback((ids, status) => {
+    if (!ids || ids.length === 0) return;
+    runBulk(
+      (ids) => bulkUpdateTasks(ids, { status }),
+      `${ids.length} task(s) updated to ${status}`,
+      ids
+    );
+  }, [runBulk]);
 
   const handleStatusChange = useCallback(async (task, newStatus) => {
     const changes = { status: newStatus };
@@ -886,6 +1192,9 @@ export default function TasksPage() {
         assigneeFilter={assigneeFilter}
         onAssignee={setAssigneeFilter}
         assigneeOptions={assigneeOptions}
+        categories={BUSINESS_CATEGORIES}
+        onCategory={setBusinessCategory}
+        activeCategory={businessCategory}
       />
 
       {error && (
@@ -895,7 +1204,7 @@ export default function TasksPage() {
         </div>
       )}
 
-      {displayedTasks.length === 0 && !loading && view !== 'list' ? (
+      {categoryFilteredTasks.length === 0 && !loading && view !== 'list' ? (
         <div className="ppm-empty">
           <ClipboardList size={28} />
           <p className="text-sm">No tasks found</p>
@@ -905,10 +1214,10 @@ export default function TasksPage() {
         </div>
       ) : (
         <ProjectTaskViews
-          tasks={displayedTasks}
+          tasks={categoryFilteredTasks}
           loading={loading}
           projectsById={scopedProjectsById}
-          clientTree={scopedClientTree}
+          clientTree={categoryFilteredClientTree}
            canManage={canManageTasks}
            canManageClients={canManageClients}
            userDepartmentId={user?.department_id ?? null}
@@ -948,9 +1257,22 @@ export default function TasksPage() {
           onCreateClient={handleCreateClient}
            onDeleteEntity={handleDeleteEntity}
            autoExpand={!!hasActiveFilters}
-           onOpenBulkUpload={handleOpenBulkUpload}
-           onDuplicateBusiness={handleDuplicateBusiness}
-         />
+              onOpenBulkUpload={handleOpenBulkUpload}
+              onDuplicateBusiness={handleDuplicateBusiness}
+               onSelectBusinessTasks={handleSelectBusinessTasks}
+               selectedBusinessIds={selectedBusinessIds}
+               onToggleBusinessSelect={handleToggleBusinessSelect}
+               onSelectAllBusinesses={handleSelectAllBusinesses}
+               onDeselectAllBusinesses={handleDeselectAllBusinesses}
+               selectedTaskIds={selectedIds}
+               onToggleTaskSelect={handleToggleTaskSelect}
+               onBulkArchive={handleBulkArchive}
+               onBulkMove={handleBulkMove}
+               onBulkDelete={handleBulkDelete}
+               onBulkUpdateStatus={handleBulkUpdateStatus}
+               onUpdateBusinessStatus={updateBusinessStatus}
+               visibleBusinessIds={visibleBusinessIds}
+              />
       )}
 
       <TaskForm
@@ -1010,14 +1332,37 @@ export default function TasksPage() {
         onDeleted={loadProjects}
       />
 
-      {selectedIds.size > 0 && (
+      {(selectedIds.size > 0 || selectedBusinessIds.size > 0) && (
         <BulkActionBar
-          count={selectedIds.size}
+          count={selectedBusinessIds.size > 0 ? selectedBusinessIds.size : selectedIds.size}
           onStatusChange={handleBulkStatus}
           onPriorityChange={handleBulkPriority}
-          onAssigneeChange={handleBulkAssignee}
           onDelete={handleBulkDelete}
-          onClear={clearSelection}
+          onClear={() => {
+            clearSelection();
+            handleDeselectAllBusinesses();
+          }}
+          isAllBusinessesSelected={
+            visibleBusinessIds.size > 0 &&
+            selectedBusinessIds.size === visibleBusinessIds.size
+          }
+          onToggleSelectAllBusinesses={() => {
+            if (selectedBusinessIds.size === visibleBusinessIds.size) {
+              handleDeselectAllBusinesses();
+            } else {
+              handleSelectAllBusinesses(Array.from(visibleBusinessIds));
+            }
+          }}
+          selectedBusinessIds={selectedBusinessIds}
+          selectedTaskIds={selectedIds}
+          onSelectAllTasks={handleSelectAllTasks}
+          displayedTaskCount={displayedTasks.length}
+          onAssigneeChange={handleBulkAssignee}
+          onAssignToSelectedBusinesses={handleAssignToSelectedBusinesses}
+          onMoveToBusiness={(targetBusinessId) => handleBulkMove(Array.from(selectedIds), targetBusinessId)}
+          businesses={allBusinesses}
+          canManageTasks={canManageTasks}
+          userRole={user?.role}
         />
       )}
 

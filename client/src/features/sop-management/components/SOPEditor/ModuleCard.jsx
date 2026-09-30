@@ -8,7 +8,7 @@ function ModuleCard({ module, onEdit, onDelete }) {
   };
 
   return (
-    <div className="module-card border border-neutral-200 dark:border-neutral-700 rounded-lg p-3 mb-2 bg-white dark:bg-neutral-800 hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-800 transition-all cursor-pointer group">
+    <div className="module-card border border-neutral-200 dark:border-neutral-700 rounded-lg p-3 mb-2 bg-white dark:bg-neutral-800 hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-800 transition-all cursor-pointer group" onClick={() => onEdit(module)}>
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -26,7 +26,7 @@ function ModuleCard({ module, onEdit, onDelete }) {
             <span className="px-1.5 py-0.5 bg-neutral-100 dark:bg-neutral-700 rounded text-neutral-600 dark:text-neutral-400">Sort: {module.sort_order}</span>
           </div>
         </div>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2" onClick={(e) => e.stopPropagation()}>
           <ActionButton action="Edit" label="Edit module" onClick={() => onEdit(module)} />
           <ActionButton action="Delete" label="Delete module" onClick={() => onDelete(module.id)} />
         </div>

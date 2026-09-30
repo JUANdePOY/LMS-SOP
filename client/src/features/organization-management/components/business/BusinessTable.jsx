@@ -2,6 +2,16 @@ import { useMemo, useState, useEffect } from 'react';
 import { Pencil, Trash2, Building2, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { getBusinessLogo } from '@/features/organization-management/api/business.api';
 
+const STATUS_STYLES = {
+  active: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
+  inactive: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+};
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'inactive', label: 'Inactive' },
+];
+
 function initials(name = '') {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return '';
@@ -80,6 +90,7 @@ function SkeletonRow() {
 export default function BusinessTable({ businesses = [], loading, onEdit, onDelete, onToggleStatus }) {
   const [sortField, setSortField] = useState(null);
   const [sortOrder, setSortOrder] = useState('asc');
+  const [statusMenuId, setStatusMenuId] = useState(null);
 
   const sorted = useMemo(() => {
     if (!sortField) return businesses;
@@ -109,6 +120,20 @@ export default function BusinessTable({ businesses = [], loading, onEdit, onDele
       setSortOrder('asc');
     }
   };
+
+  useEffect(() => {
+    if (statusMenuId == null) return;
+    const onDocClick = (e) => {
+      if (!e.target.closest('[data-status-menu]')) setStatusMenuId(null);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') setStatusMenuId(null); };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [statusMenuId]);
 
   if (!loading && (!businesses || businesses.length === 0)) {
     return (
@@ -160,7 +185,6 @@ export default function BusinessTable({ businesses = [], loading, onEdit, onDele
             {loading
               ? Array.from({ length: 5 }).map((_, i) => <SkeletonRow key={i} />)
               : sorted.map((business) => {
-                  const isActive = business.status === 'active';
                   return (
                     <tr key={business.id} className="group hover:bg-[var(--bg-hover)] transition-colors">
                       <td className="px-4 py-3">
@@ -184,34 +208,33 @@ export default function BusinessTable({ businesses = [], loading, onEdit, onDele
                           {business.department_count || 0}
                         </span>
                       </td>
-                      <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={isActive}
-                          onClick={() => onToggleStatus && onToggleStatus(business)}
-                          className="inline-flex items-center gap-2"
-                          title={isActive ? 'Deactivate' : 'Activate'}
-                        >
-                          <span
-                            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                              isActive ? 'bg-green-600' : 'bg-gray-300 dark:bg-gray-700'
-                            }`}
+                      <td className="px-4 py-3 relative" data-status-menu>
+                        <span className="relative inline-flex items-center">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setStatusMenuId(statusMenuId === business.id ? null : business.id); }}
+                            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium transition-colors ${STATUS_STYLES[business.status] || STATUS_STYLES.inactive}`}
                           >
-                            <span
-                              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform ${
-                                isActive ? 'translate-x-4' : 'translate-x-1'
-                              }`}
-                            />
-                          </span>
-                          <span
-                            className={`text-xs font-medium ${
-                              isActive ? 'text-green-700 dark:text-green-400' : 'text-[var(--text-muted)]'
-                            }`}
-                          >
-                            {isActive ? 'Active' : 'Inactive'}
-                          </span>
-                        </button>
+                            {business.status === 'inactive' ? 'Inactive' : business.status ? business.status.charAt(0).toUpperCase() + business.status.slice(1) : 'Unknown'}
+                          </button>
+                          {statusMenuId === business.id && (
+                            <span className="absolute top-full left-0 z-20 mt-1 w-36 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-xl">
+                              {STATUS_OPTIONS.map((opt) => (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); onToggleStatus?.(business, opt.value); setStatusMenuId(null); }}
+                                  className={`flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-[var(--bg-surface-hover)] ${business.status === opt.value ? 'font-semibold' : 'text-[var(--text-secondary)]'}`}
+                                >
+                                  <span className={`mr-2 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${STATUS_STYLES[opt.value] || STATUS_STYLES.inactive}`}>
+                                    {opt.label}
+                                  </span>
+                                  {business.status === opt.value && <span className="ml-auto text-[10px] text-[var(--text-muted)]">✓</span>}
+                                </button>
+                              ))}
+                            </span>
+                          )}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-1">

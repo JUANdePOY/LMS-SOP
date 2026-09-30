@@ -16,12 +16,15 @@ const CLIENT_MANAGEMENT_MIGRATIONS = [
     id INT AUTO_INCREMENT PRIMARY KEY,
     client_id INT NOT NULL,
     business_name VARCHAR(255) NOT NULL,
+    status ENUM('active','inactive','paused','stopped','cancelled') NOT NULL DEFAULT 'active',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
     UNIQUE KEY uk_client_business (client_id, business_name),
-    INDEX idx_client_businesses_client (client_id)
+    INDEX idx_client_businesses_client (client_id),
+    INDEX idx_client_businesses_status (status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `ALTER TABLE client_businesses MODIFY COLUMN status ENUM('active','inactive','paused','stopped','cancelled') NOT NULL DEFAULT 'active'`,
 
   `ALTER TABLE tasks ADD COLUMN parent_task_id INT DEFAULT NULL`,
   `ALTER TABLE tasks ADD COLUMN client_id INT DEFAULT NULL`,

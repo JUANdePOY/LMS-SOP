@@ -153,10 +153,13 @@ const clientController = {
       if (!existing) {
         return res.status(404).json({ success: false, message: 'Client not found', code: 'NOT_FOUND' });
       }
-      const id = await clientModel.addBusiness(clientId, name);
+      const businessType = req.body.business_type || null;
+      const category = req.body.category === 'local_seo' || req.body.category === 'full_seo' ? req.body.category : 'none';
+      const id = await clientModel.addBusiness(clientId, name, businessType, category);
+      const created = await clientModel.getClientBusiness(clientId, id);
       res.status(201).json({
         success: true,
-        data: { id, client_id: clientId, business_name: name, project_count: 0 },
+        data: created,
         message: 'Business created successfully',
       });
     } catch (error) {
@@ -191,11 +194,25 @@ const clientController = {
       }
 
       const business_name = req.body.business_name !== undefined ? String(req.body.business_name).trim() : undefined;
-      if (business_name === undefined || business_name.length < 2) {
+      if (business_name !== undefined && business_name.length < 2) {
         return res.status(400).json({ success: false, message: 'Business name must be at least 2 characters', code: 'VALIDATION_ERROR' });
       }
 
-      await clientModel.updateBusiness(clientId, businessId, { business_name });
+      const business_type = req.body.business_type !== undefined ? String(req.body.business_type).trim() || null : undefined;
+      const allowedTypes = ['orders', 'va_clients', 'local_seo_clients', 'full_seo_clients'];
+      if (business_type !== undefined && business_type !== null && !allowedTypes.includes(business_type)) {
+        return res.status(400).json({ success: false, message: 'Invalid business type', code: 'VALIDATION_ERROR' });
+      }
+
+      const status = req.body.status !== undefined ? String(req.body.status).trim() : undefined;
+      const allowedStatuses = ['active', 'inactive', 'paused', 'stopped', 'cancelled', 'archived'];
+      if (status !== undefined && !allowedStatuses.includes(status)) {
+        return res.status(400).json({ success: false, message: 'Invalid business status', code: 'VALIDATION_ERROR' });
+      }
+
+      const category = req.body.category === 'local_seo' || req.body.category === 'full_seo' ? req.body.category : 'none';
+
+      await clientModel.updateBusiness(clientId, businessId, { business_name, business_type, status, category });
       const updated = await clientModel.getClientBusiness(clientId, businessId);
       res.json({ success: true, data: updated, message: 'Business updated successfully' });
     } catch (error) {

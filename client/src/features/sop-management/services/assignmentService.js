@@ -10,7 +10,7 @@ export const fetchPositions = (departmentId) =>
   api.get(`${base}/positions/${departmentId}`);
 
 export const fetchUsers = (departmentId, params = {}) =>
-  api.get(`${base}/users/${departmentId}`, { params });
+  api.get(`${base}/users/${departmentId}`, { params: { includeAdmins: true, ...params } });
 
 export const fetchAssigned = (sopId) =>
   api.get(`${assignmentsBase}/${sopId}/assigned`);

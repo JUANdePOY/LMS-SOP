@@ -1,7 +1,12 @@
 const db = require('../config/database');
 const departmentModel = require('./departmentModel');
 
-const BUSINESS_STATUSES = ['active', 'inactive'];
+const BUSINESS_STATUSES = ['active', 'inactive', 'paused', 'stopped', 'cancelled'];
+const INACTIVE_CATEGORY_STATUSES = new Set(['inactive', 'paused', 'stopped', 'cancelled']);
+
+function isInactiveCategory(status) {
+  return INACTIVE_CATEGORY_STATUSES.has(status);
+}
 
 async function findAll(filters = {}) {
   const { search, status, page = 1, limit = 50, business_id } = filters;

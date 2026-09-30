@@ -202,37 +202,37 @@ router.post('/', [
   body('email').optional({ checkFalsy: true }).isEmail().withMessage('Valid email is required'),
   body('phone').optional().trim(),
   body('address').optional().trim(),
-  body('status').optional().isIn(['active', 'inactive']),
+  body('status').optional().isIn(['active', 'inactive', 'paused', 'stopped', 'cancelled']),
 ], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
-    }
+   try {
+     const errors = validationResult(req);
+     if (!errors.isEmpty()) {
+       return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
+     }
 
-    const { business_code } = req.body;
-    const existing = await businessModel.findByCode(business_code);
-    if (existing) {
-      return res.status(409).json({ status: 'error', message: 'Business code already exists', code: 'CODE_EXISTS' });
-    }
+     const { business_code } = req.body;
+     const existing = await businessModel.findByCode(business_code);
+     if (existing) {
+       return res.status(409).json({ status: 'error', message: 'Business code already exists', code: 'CODE_EXISTS' });
+     }
 
-    const businessId = await businessModel.create(req.body, req.user.id);
+     const businessId = await businessModel.create(req.body, req.user.id);
 
-    logAudit({
-      user_id: req.user.id,
-      action: 'business.created',
-      entity_type: 'business',
-      entity_id: businessId,
-      metadata: { business_code, business_name: req.body.business_name }
-    });
+     logAudit({
+       user_id: req.user.id,
+       action: 'business.created',
+       entity_type: 'business',
+       entity_id: businessId,
+       metadata: { business_code, business_name: req.body.business_name }
+     });
 
-    const created = await businessModel.findById(businessId);
-    res.status(201).json({ status: 'success', message: 'Business created successfully', data: created });
-  } catch (err) {
-    console.error('Business create error:', err);
-    res.status(500).json({ status: 'error', message: 'Failed to create business', code: 'DB_ERROR' });
-  }
-});
+     const created = await businessModel.findById(businessId);
+     res.status(201).json({ status: 'success', message: 'Business created successfully', data: created });
+   } catch (err) {
+     console.error('Business create error:', err);
+     res.status(500).json({ status: 'error', message: 'Failed to create business', code: 'DB_ERROR' });
+   }
+ });
 
 // PUT /api/businesses/:id
 router.put('/:id', [
@@ -249,7 +249,7 @@ router.put('/:id', [
   body('email').optional({ checkFalsy: true }).isEmail(),
   body('phone').optional().trim(),
   body('address').optional().trim(),
-  body('status').optional().isIn(['active', 'inactive']),
+  body('status').optional().isIn(['active', 'inactive', 'paused', 'stopped', 'cancelled']),
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

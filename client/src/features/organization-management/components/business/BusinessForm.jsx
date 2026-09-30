@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useId } from 'react';
-import { X, Loader2, CheckCircle2, AlertCircle, ImagePlus } from 'lucide-react';
+import { X, Loader2, AlertCircle, ImagePlus } from 'lucide-react';
 import { uploadBusinessLogo, deleteBusinessLogo, getBusinessLogo } from '@/features/organization-management/api/business.api';
 
 const defaultForm = {
@@ -424,37 +424,20 @@ export default function BusinessForm({ initialData, onSubmit, onCancel, loading 
       {/* Status */}
       <div>
         <SectionHeading>Status</SectionHeading>
-        <div
-          role="radiogroup"
-          aria-label="Business status"
-          className="inline-flex rounded-lg border border-[var(--border)] bg-[var(--bg-page)] p-1"
+        <select
+          value={form.status}
+          onChange={handleChange('status')}
+          className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500 transition-colors"
         >
-          {[
-            { value: 'active', label: 'Active' },
-            { value: 'inactive', label: 'Inactive' },
-          ].map((opt) => {
-            const selected = form.status === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                onClick={() => setForm((prev) => ({ ...prev, status: opt.value }))}
-                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                  selected
-                    ? opt.value === 'active'
-                      ? 'bg-green-600 text-white'
-                      : 'bg-[var(--text-muted)] text-white'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                {selected && <CheckCircle2 className="h-3.5 w-3.5" />}
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+          <option value="paused">Paused</option>
+          <option value="stopped">Stopped</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          Paused, Stopped, and Cancelled businesses are automatically categorized as Inactive.
+        </p>
       </div>
 
       <div className="flex items-center justify-end gap-3 pt-4 border-t border-[var(--border)]">

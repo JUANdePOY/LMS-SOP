@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef, useLayoutEffect, Fragment } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2, Inbox, Building2, Briefcase, FolderKanban, Filter, Upload, Copy } from 'lucide-react';
+import { ChevronRight, MoreHorizontal, Plus, Pencil, Check, EyeOff, Trash2, Inbox, Building2, Briefcase, FolderKanban, Filter, Upload, Copy, Archive, RefreshCw, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { getBusinesses } from '../api/business.api';
@@ -11,6 +11,7 @@ import api from '@/services/api';
 import { TaskRow, AddTaskRow, Avatar, BusinessAssigneePicker } from './TaskListRow';
 import InlineEditableName from './InlineEditableName';
 import InlineNameRow from './InlineNameRow';
+import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
 import { useToast } from '@/shared/components/ui/Toast';
 
 // Shared responsive grid template for the hierarchy table. Column order is
@@ -28,6 +29,126 @@ export const HIERARCHY_GRID =
 // Visibility classes that must be applied to the corresponding grid cell so the
 // number of visible cells always matches the active HIERARCHY_GRID column count.
 const CELL_HIDE_SM = 'hidden sm:flex'; // assignees / priority / progress
+
+function useEscToClose(open, onClose) {
+  useEffect(() => {
+    if (!open) return;
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [open, onClose]);
+}
+
+const BUSINESS_STATUS_STYLES = {
+  active: 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400',
+  inactive: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+  paused: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+  stopped: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400',
+  cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+  archived: 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+};
+
+const BUSINESS_STATUS_LABEL = {
+  active: 'Active',
+  inactive: 'Inactive',
+  paused: 'Paused',
+  stopped: 'Stopped',
+  cancelled: 'Cancelled',
+  archived: 'Archived',
+};
+
+const BUSINESS_STATUS_TOKENS = {
+  active: 'var(--ppm-st-pending)',
+  inactive: 'var(--ppm-status-muted, var(--text-muted))',
+  paused: 'var(--ppm-st-overdue)',
+  stopped: 'var(--ppm-st-in-progress)',
+  cancelled: 'var(--ppm-st-cancelled)',
+};
+
+function BusinessStatusDot({ status }) {
+  const token = BUSINESS_STATUS_TOKENS[status];
+  const label = BUSINESS_STATUS_LABEL[status] || status;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-[var(--text-primary)]">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: token }} aria-hidden="true" />
+      {label}
+    </span>
+  );
+}
+
+function BusinessStatusDropdown({ status, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useClickOutside(() => setOpen(false));
+  const triggerRef = useRef(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0 });
+
+  useEscToClose(open, () => setOpen(false));
+
+  const updatePosition = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 4, left: rect.left });
+  }, []);
+
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    updatePosition();
+    const onScroll = (e) => {
+      if (ref.current && e.target && ref.current.contains(e.target)) return;
+      const el = triggerRef.current;
+      if (!el) { setOpen(false); return; }
+      const rect = el.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > window.innerHeight || rect.right < 0 || rect.left > window.innerWidth) {
+        setOpen(false);
+        return;
+      }
+      setCoords({ top: rect.bottom + 4, left: rect.left });
+    };
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [open, updatePosition]);
+
+  return (
+    <span ref={ref} className="relative inline-block">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        className="rounded px-1 py-0.5 hover:bg-[var(--bg-surface-hover)]"
+      >
+        {status ? <BusinessStatusDot status={status} /> : <span className="text-xs text-[var(--text-muted)]">Set status</span>}
+      </button>
+      {open && createPortal(
+        <div
+          ref={ref}
+          onClick={(e) => e.stopPropagation()}
+          style={{ position: 'fixed', top: coords.top, left: coords.left, zIndex: 60 }}
+          className="w-36 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-xl"
+        >
+          {Object.keys(BUSINESS_STATUS_LABEL).map((value) => (
+            <button
+              key={value}
+              type="button"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onChange?.(value); setOpen(false); }}
+              className="flex w-full items-center px-3 py-1.5 text-left text-xs hover:bg-[var(--bg-surface-hover)]"
+            >
+              <BusinessStatusDot status={value} />
+            </button>
+          ))}
+        </div>,
+        document.body
+      )}
+    </span>
+  );
+}
 
 /**
  * Inline "add client" form. Beyond a name it lets the user assign the new client
@@ -427,12 +548,19 @@ function useHierarchy(tasks, projectsById, clientTree = [], tasksById = {}) {
     // Ensures the Client -> Business skeleton exists and returns the business
     // node so tasks can be attached directly to it (the project layer has been
     // removed — tasks live under their client business unit).
-    const ensureBusiness = (clientId, clientName, businessId, businessName, color) => {
-      const client = ensureClient(clientId, clientName, color);
-      const bid = businessId ?? 'unassigned-business';
-      const bname = businessName || 'Unassigned Business';
+    const ensureBusiness = (clientId, clientName, business) => {
+      const client = ensureClient(clientId, clientName, business?.color);
+      const bid = business?.id ?? 'unassigned-business';
+      const bname = business?.business_name || business?.name || 'Unassigned Business';
       if (!client.businesses.has(bid)) {
-        client.businesses.set(bid, { id: bid, name: bname, clientId: client.id, tasks: [] });
+        const source = business || {};
+        client.businesses.set(bid, {
+          id: bid,
+          name: bname,
+          clientId: client.id,
+          tasks: [],
+          ...source,
+        });
       }
       return client.businesses.get(bid);
     };
@@ -443,7 +571,7 @@ function useHierarchy(tasks, projectsById, clientTree = [], tasksById = {}) {
     for (const client of clientTree || []) {
       ensureClient(client.id, client.client_name, client.color);
       for (const business of client.businesses || []) {
-        ensureBusiness(client.id, client.client_name, business.id, business.business_name, client.color);
+        ensureBusiness(client.id, client.client_name, business);
       }
     }
 
@@ -482,8 +610,11 @@ function useHierarchy(tasks, projectsById, clientTree = [], tasksById = {}) {
         business = ensureBusiness(
           task.client_id,
           task.client_name,
-          task.client_business_id,
-          task.client_business_name
+          {
+            id: task.client_business_id,
+            business_name: task.client_business_name,
+            ...(task.color ? { color: task.color } : {}),
+          }
         );
       } else {
         const projectId = getProjectId(task);
@@ -492,8 +623,10 @@ function useHierarchy(tasks, projectsById, clientTree = [], tasksById = {}) {
           business = ensureBusiness(
             project.client_id,
             project.client_name,
-            project.client_business_id,
-            project.client_business_name
+            {
+              id: project.client_business_id,
+              business_name: project.client_business_name,
+            }
           );
         }
       }
@@ -501,8 +634,7 @@ function useHierarchy(tasks, projectsById, clientTree = [], tasksById = {}) {
         business = ensureBusiness(
           null,
           'Unassigned Client',
-          'unassigned-business',
-          'Unassigned Business'
+          { id: 'unassigned-business', business_name: 'Unassigned Business' }
         );
       }
       // Attach the parent task to its business unit, and seed an empty
@@ -581,6 +713,14 @@ function subtreeMatches(node, kind, term) {
   return false;
 }
 
+const STATUS_TOKENS = {
+  Pending: 'var(--ppm-st-pending)',
+  'In Progress': 'var(--ppm-st-in-progress)',
+  Completed: 'var(--ppm-st-completed)',
+  Overdue: 'var(--ppm-st-overdue)',
+  Cancelled: 'var(--ppm-st-cancelled)',
+};
+
 const EXPANDED_STORAGE_KEY = 'ppm:tasks:tree-expanded';
 
 function loadExpanded() {
@@ -590,6 +730,69 @@ function loadExpanded() {
   } catch {
     return new Set();
   }
+}
+
+const BUSINESS_CATEGORIES = [
+  { value: 'none', label: 'None' },
+  { value: 'local_seo', label: 'Local SEO' },
+  { value: 'full_seo', label: 'Full SEO' },
+];
+
+function InlineBusinessForm({ indent = 0, onSubmit, onCancel }) {
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('none');
+  const [submitting, setSubmitting] = useState(false);
+
+  const commit = async () => {
+    const next = name.trim();
+    if (!next) {
+      onCancel?.();
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await onSubmit(next, category);
+      setName('');
+      setCategory('none');
+    } catch {
+      // parent surfaces toast
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div
+      className="flex items-center gap-2 border-b border-[var(--border-subtle)]/40 px-2 py-2 text-sm h-10"
+      style={{ paddingLeft: `${indent + 8}px` }}
+    >
+      <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-primary)] opacity-40" aria-hidden="true" />
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); commit(); }
+          if (e.key === 'Escape') { e.preventDefault(); onCancel?.(); }
+        }}
+        onBlur={() => { if (name.trim()) commit(); else onCancel?.(); }}
+        placeholder="New business name…"
+        className="flex-1 rounded border border-[var(--color-primary)] bg-[var(--bg-surface)] px-2 py-1 text-sm outline-none"
+      />
+      <select
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        className="rounded border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none"
+      >
+        {BUSINESS_CATEGORIES.map((c) => (
+          <option key={c.value} value={c.value}>{c.label}</option>
+        ))}
+      </select>
+      {submitting && (
+        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--border)] border-t-blue-500" />
+      )}
+    </div>
+  );
 }
 
 export default function TaskHierarchyTable({
@@ -631,6 +834,19 @@ export default function TaskHierarchyTable({
   autoExpand,
   onOpenBulkUpload,
   onDuplicateBusiness,
+  onSelectBusinessTasks,
+  selectedBusinessIds = new Set(),
+  onToggleBusinessSelect,
+  onSelectAllBusinesses,
+  onDeselectAllBusinesses,
+  selectedTaskIds = new Set(),
+  onToggleTaskSelect,
+  onBulkArchive,
+  onBulkMove,
+  onBulkDelete,
+  onBulkUpdateStatus,
+  onUpdateBusinessStatus,
+  visibleBusinessIds = new Set(),
 }) {
   const { toast } = useToast();
   const tasksById = useMemo(() => {
@@ -680,6 +896,38 @@ export default function TaskHierarchyTable({
   const [addingFor, setAddingFor] = useState(null);
   // Whether the inline "add client" row at the bottom of the table is open.
   const [addingClient, setAddingClient] = useState(false);
+  // Track which businesses have all tasks selected for the "Select All" feature.
+  // State is lifted to TasksPage so BulkActionBar can also trigger select/deselect all.
+  const handleToggleBusinessSelect = useCallback((businessId, taskIds) => {
+    const isSelected = selectedBusinessIds.has(String(businessId));
+    onToggleBusinessSelect?.(businessId, taskIds, !isSelected);
+  }, [onToggleBusinessSelect, selectedBusinessIds]);
+
+  const handleSelectAllBusinesses = useCallback(() => {
+    const allBusinessIds = [];
+    for (const client of clientTree || []) {
+      for (const business of client.businesses || []) {
+        if (visibleBusinessIds.has(String(business.id))) {
+          allBusinessIds.push(String(business.id));
+        }
+      }
+    }
+    onSelectAllBusinesses?.(allBusinessIds);
+  }, [clientTree, visibleBusinessIds, onSelectAllBusinesses]);
+
+  const handleDeselectAllBusinesses = useCallback(() => {
+    onDeselectAllBusinesses?.();
+  }, [onDeselectAllBusinesses]);
+
+  const allBusinesses = useMemo(() => {
+    const list = [];
+    for (const client of clientTree || []) {
+      for (const business of client.businesses || []) {
+        list.push({ id: business.id, name: business.business_name, clientId: client.id, clientName: client.client_name });
+      }
+    }
+    return list;
+  }, [clientTree]);
 
   // Business managers: { [client_business_id]: manager[] }. Each business row
   // shows its granted managers in the Assignees column and lets an admin grant
@@ -976,40 +1224,54 @@ export default function TaskHierarchyTable({
                     const bOpen = isExpanded(businessKey, 'business', business);
                     return (
                       <div key={businessKey}>
-                        <Row
-                          depth={1}
-                          kind="business"
-                          id={business.id}
-                          name={business.name}
-                          open={bOpen}
-                          onToggle={() => toggle(businessKey)}
-                          dueDate={business.rollup.earliestDue}
-                          progress={business.rollup.avgProgress}
-                          dimmed={bDimmed}
-                          canEdit={canManage}
-                          onRename={onRenameBusiness}
-                          onAddChild={startAdd}
-                          onDeleteEntity={onDeleteEntity}
-                          onHideEmptyGroups={hideEmptyGroups}
-                          hideDue
-                          noBorder
-                          businessManagers={businessManagers[String(business.id)]}
-                          businessDepartments={businessDepartments[String(business.id)]}
-                          onBusinessAssigneeSave={handleBusinessAssigneeSave}
-                          userRole={userRole}
-                          userDepartmentId={userDepartmentId}
-                          userBusinessId={userBusinessId}
-                          count={business.rollup.total}
-                          countLabel="tasks"
-                          onOpenBulkUpload={onOpenBulkUpload ? () => onOpenBulkUpload({
-                            businessId: business.id,
-                            businessName: business.name,
-                            clientId: client.id,
-                            clientName: client.name,
-                            departments: businessDepartments[String(business.id)] || [],
-                          }) : null}
-                          onDuplicateBusiness={canManage ? () => handleDuplicateBusiness(client.id, business.id) : null}
-                        />
+                           <Row
+                             depth={1}
+                             kind="business"
+                             id={business.id}
+                             clientId={client.id}
+                             name={business.name}
+                             status={business.status}
+                             open={bOpen}
+                            onToggle={() => toggle(businessKey)}
+                            dueDate={business.rollup.earliestDue}
+                            progress={business.rollup.avgProgress}
+                            dimmed={bDimmed}
+                            canEdit={canManage}
+                            onRename={onRenameBusiness}
+                            onAddChild={startAdd}
+                            onDeleteEntity={onDeleteEntity}
+                            onHideEmptyGroups={hideEmptyGroups}
+                            hideDue
+                            noBorder
+                            businessManagers={businessManagers[String(business.id)]}
+                            businessDepartments={businessDepartments[String(business.id)]}
+                            onBusinessAssigneeSave={handleBusinessAssigneeSave}
+                            userRole={userRole}
+                            userDepartmentId={userDepartmentId}
+                            userBusinessId={userBusinessId}
+                            count={business.rollup.total}
+                            countLabel="tasks"
+                            onOpenBulkUpload={onOpenBulkUpload ? () => onOpenBulkUpload({
+                              businessId: business.id,
+                              businessName: business.name,
+                              clientId: client.id,
+                              clientName: client.name,
+                              departments: businessDepartments[String(business.id)] || [],
+                            }) : null}
+                             onDuplicateBusiness={canManage ? () => handleDuplicateBusiness(client.id, business.id) : null}
+                             isBusinessSelected={selectedBusinessIds.has(String(business.id))}
+                             onToggleBusinessSelect={() => handleToggleBusinessSelect(business.id, business.tasks.map((t) => t.id))}
+                             onBulkArchive={onBulkArchive}
+                             onBulkMove={onBulkMove}
+                             onBulkDelete={onBulkDelete}
+                             onBulkUpdateStatus={onBulkUpdateStatus}
+                             onUpdateBusinessStatus={onUpdateBusinessStatus}
+                             businessTaskIds={business.tasks.map((t) => t.id)}
+                             allBusinesses={allBusinesses}
+                             anyBusinessSelected={selectedBusinessIds.size > 0}
+                             onSelectAllBusinesses={handleSelectAllBusinesses}
+                             onDeselectAllBusinesses={handleDeselectAllBusinesses}
+                           />
                         <AnimatePresence initial={false}>
                           {bOpen && (
                             <motion.div
@@ -1024,28 +1286,30 @@ export default function TaskHierarchyTable({
                                 const tDimmed = search && !subtreeMatches(task, 'task', search);
                                 return (
                                   <Fragment key={task.id}>
-                                     <TaskRow
-                                       task={task}
-                                       depth={2}
-                                       dimmed={tDimmed}
-                                       onViewTask={onViewTask}
-                                       onViewSubtasks={onViewSubtasks}
-                                       onStatusChange={onStatusChange}
-                                       onInlineUpdate={onInlineUpdate}
-                                       onDelete={onDelete}
-                                       onDeleteImmediate={onDeleteImmediate}
-                                       onDuplicated={onDuplicated}
-                                       onRenameTask={onRenameTask}
-                                       canManage={canManage}
-                                       canManageTask={canManageTask}
-                                       projects={projects}
-                                       tasksById={tasksById}
-                                       userDepartmentId={userDepartmentId}
-                                       userDepartmentClientIds={userDepartmentClientIds}
-                                       onAddSubtask={(t) => startAdd('task', t.id)}
-                                       subtaskCount={subtaskCountMap[task.id] || 0}
-                                       isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
-                                     />
+                                      <TaskRow
+                                        task={task}
+                                        depth={2}
+                                        dimmed={tDimmed}
+                                        onViewTask={onViewTask}
+                                        onViewSubtasks={onViewSubtasks}
+                                        onStatusChange={onStatusChange}
+                                        onInlineUpdate={onInlineUpdate}
+                                        onDelete={onDelete}
+                                        onDeleteImmediate={onDeleteImmediate}
+                                        onDuplicated={onDuplicated}
+                                        onRenameTask={onRenameTask}
+                                        canManage={canManage}
+                                        canManageTask={canManageTask}
+                                        projects={projects}
+                                        tasksById={tasksById}
+                                        userDepartmentId={userDepartmentId}
+                                        userDepartmentClientIds={userDepartmentClientIds}
+                                        onAddSubtask={(t) => startAdd('task', t.id)}
+                                        subtaskCount={subtaskCountMap[task.id] || 0}
+                                        isNew={newTaskIds ? newTaskIds.has(String(task.id)) : false}
+                                        selectedTaskIds={selectedTaskIds}
+                                        onToggleTaskSelect={onToggleTaskSelect}
+                                      />
                                     {addingFor?.kind === 'subtask' && addingFor.parentId === task.id && (
                                       <InlineNameRow
                                         key="__add-subtask"
@@ -1093,11 +1357,10 @@ export default function TaskHierarchyTable({
                     );
                   })}
                   {addingFor?.kind === 'business' && addingFor.parentId === client.id && (
-                    <InlineNameRow
+                    <InlineBusinessForm
                       key="__add-business"
-                      placeholder="New business name…"
                       indent={DEPTH_INDENT_PX * 1}
-                      onCommit={async (name) => { await onCreateBusiness?.(client.id, name); setAddingFor(null); }}
+                      onSubmit={async (name, category) => { await onCreateBusiness?.(client.id, name, category); setAddingFor(null); }}
                       onCancel={() => setAddingFor(null)}
                     />
                   )}
@@ -1227,21 +1490,22 @@ const LEVEL_STYLE = {
    business: { font: 'font-normal',  size: 'text-sm', tracking: '', leading: '' },
 };
 
-function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false, businessManagers = null, businessDepartments = null, onBusinessAssigneeSave, count = null, countLabel = '', userRole = '', userDepartmentId = null, userBusinessId = null, onOpenBulkUpload = null, onDuplicateBusiness = null }) {
+function Row({ depth, kind, id, name, status, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false, businessManagers = null, businessDepartments = null, onBusinessAssigneeSave, count = null, countLabel = '', userRole = '', userDepartmentId = null, userBusinessId = null, onOpenBulkUpload = null, onDuplicateBusiness = null, isBusinessSelected = false, onToggleBusinessSelect, onBulkArchive, onBulkMove, onBulkDelete, onBulkUpdateStatus, businessTaskIds = [], anyBusinessSelected = false, onSelectAllBusinesses, onDeselectAllBusinesses, clientId = null, onUpdateBusinessStatus = null }) {
   const level = LEVEL_STYLE[kind] || LEVEL_STYLE.business;
   const meta = KIND_META[kind];
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renameSignal, setRenameSignal] = useState(0);
   const [menuCoords, setMenuCoords] = useState({ top: 0, left: 0 });
-  const menuRef = useClickOutside(() => { setMenuOpen(false); setConfirmDelete(false); });
+  const menuRef = useClickOutside(() => { setMenuOpen(false); setConfirmDelete(false); setSubview(null); });
   const menuTriggerRef = useRef(null);
+  const [Subview, setSubview] = useState(null);
 
   // Position the action menu with fixed coordinates so it escapes the table's
   // overflow-x-auto scroll container and isn't painted under later rows (e.g. a
   // project's own task rows). Mirrors the approach used by TaskListRow.
   useLayoutEffect(() => {
-    if (!menuOpen && !confirmDelete) return;
+    if (!menuOpen && !confirmDelete && !Subview) return;
     const MARGIN = 8;
     const update = () => {
       const el = menuTriggerRef.current;
@@ -1268,6 +1532,7 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
       if (menuRef.current && e.target && menuRef.current.contains(e.target)) return;
       setMenuOpen(false);
       setConfirmDelete(false);
+      setSubview(null);
     };
     window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', update);
@@ -1285,6 +1550,15 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
     if (onAddTask) menuItems.push({ label: 'New Task', icon: Plus, onClick: () => { setMenuOpen(false); onAddTask(); } });
     if (onOpenBulkUpload) menuItems.push({ label: 'Bulk Upload', icon: Upload, onClick: () => { setMenuOpen(false); onOpenBulkUpload(); } });
     if (onDuplicateBusiness) menuItems.push({ label: 'Duplicate Business', icon: Copy, onClick: () => { setMenuOpen(false); onDuplicateBusiness(); } });
+    if (canEdit) {
+      menuItems.push({ label: isBusinessSelected ? 'Deselect all tasks' : 'Select all tasks', icon: Check, onClick: () => { setMenuOpen(false); onToggleBusinessSelect?.(); } });
+      menuItems.push({ label: 'Select all businesses', icon: Check, onClick: () => { setMenuOpen(false); onSelectAllBusinesses?.(); } });
+      menuItems.push({ label: 'Unselect all businesses', icon: X, onClick: () => { setMenuOpen(false); onDeselectAllBusinesses?.(); } });
+      menuItems.push({ label: 'Bulk delete', icon: Trash2, danger: true, onClick: () => { setMenuOpen(false); onBulkDelete?.(businessTaskIds); } });
+      menuItems.push({ label: 'Bulk archive', icon: Archive, onClick: () => { setMenuOpen(false); onBulkArchive?.(businessTaskIds); } });
+      menuItems.push({ label: 'Bulk move', icon: Briefcase, onClick: () => { setMenuOpen(false); setSubview('move'); } });
+      menuItems.push({ label: 'Bulk update status', icon: RefreshCw, onClick: () => { setMenuOpen(false); setSubview('status'); } });
+    }
   } else {
     menuItems.push({ label: `Add ${childNoun}`, icon: Plus, onClick: () => onAddChild?.(kind, id) });
   }
@@ -1313,55 +1587,80 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
       )}
     >
       <span
-        className="relative z-10 min-w-0 h-full flex items-center pr-2"
+        className="relative z-10 min-w-0 h-full flex items-center justify-between gap-1.5 pr-2"
         style={{ paddingLeft: `${depth * DEPTH_INDENT_PX}px` }}
       >
-        <div className="flex items-center gap-x-2 whitespace-nowrap overflow-hidden">
-           <button
-             type="button"
-             onClick={(e) => { e.stopPropagation(); onToggle(); }}
-             aria-expanded={open}
-             aria-label={`${open ? 'Collapse' : 'Expand'} ${name}`}
-             className="grid h-5 w-5 shrink-0 place-items-center rounded transition-colors duration-150 ease-out motion-reduce:transition-none hover:bg-[var(--bg-surface-hover)]"
-           >
-             <ChevronRight
-               size={15}
-               className={cn(
-                 'shrink-0 transition-transform duration-150 ease-out motion-reduce:transition-none',
-                 open ? 'rotate-90' : 'rotate-0',
-                 meta?.accent || 'text-[var(--text-muted)]'
-               )}
-             />
-           </button>
-           {meta && (
-             <span
-               className={cn(
-                 'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
-                 meta.chip
-               )}
-             >
-               <meta.icon size={11} />
-               {meta.label}
-             </span>
-           )}
-<span className="flex min-w-0 items-center" data-no-nav>
-             <InlineEditableName
-               value={name}
-               canEdit={canEdit}
-               onCommit={(next) => onRename?.(id, next)}
-               renameSignal={renameSignal}
-               className={cn(
-                 'truncate text-[var(--text-primary)]',
-                 level.font,
-                 level.size,
-                 level.tracking,
-                 level.leading
-               )}
-               inputClassName={cn(level.font, level.size, level.tracking, level.leading)}
-               ariaLabel={`Rename ${kind}`}
-              />
-             </span>
-             {count != null && (
+        <span className="flex min-w-0 items-center gap-1.5">
+          {kind === 'business' && canEdit && onToggleBusinessSelect && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleBusinessSelect?.();
+                if (isBusinessSelected && open) {
+                  onToggle();
+                }
+              }}
+              className={cn(
+                'grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[3px] border transition-opacity duration-150 ease-out motion-reduce:transition-none hover:border-[var(--color-primary)]',
+                isBusinessSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-80'
+              )}
+              style={{
+                borderColor: isBusinessSelected ? 'var(--color-primary)' : 'var(--text-muted)',
+                backgroundColor: isBusinessSelected ? 'var(--color-primary)' : 'transparent',
+                color: isBusinessSelected ? 'white' : 'transparent',
+              }}
+              title={isBusinessSelected ? 'Deselect all tasks' : 'Select all tasks'}
+              aria-label={isBusinessSelected ? 'Deselect all tasks' : 'Select all tasks'}
+            >
+              <Check size={13} strokeWidth={3.5} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onToggle(); }}
+            aria-expanded={open}
+            aria-label={`${open ? 'Collapse' : 'Expand'} ${name}`}
+            className="grid h-5 w-5 shrink-0 place-items-center rounded transition-colors duration-150 ease-out motion-reduce:transition-none hover:bg-[var(--bg-surface-hover)]"
+          >
+            <ChevronRight
+              size={15}
+              className={cn(
+                'shrink-0 transition-transform duration-150 ease-out motion-reduce:transition-none',
+                open ? 'rotate-90' : 'rotate-0',
+                meta?.accent || 'text-[var(--text-muted)]'
+              )}
+            />
+          </button>
+          {meta && (
+            <span
+              className={cn(
+                'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider',
+                meta.chip
+              )}
+            >
+              <meta.icon size={11} />
+              {meta.label}
+            </span>
+            )}
+  <span className="flex min-w-0 items-center" data-no-nav>
+    <InlineEditableName
+      value={name}
+      canEdit={canEdit}
+      onCommit={(next) => onRename?.(id, next)}
+      renameSignal={renameSignal}
+      className={cn(
+        'truncate text-[var(--text-primary)]',
+        level.font,
+        level.size,
+        level.tracking,
+        level.leading
+      )}
+      inputClassName={cn(level.font, level.size, level.tracking, level.leading)}
+      ariaLabel={`Rename ${kind}`}
+    />
+  </span>
+  {count != null && (
                <span
                  title={`${count} ${countLabel}`}
                  className="flex shrink-0 items-center rounded-full bg-[var(--bg-surface-hover)] px-2 py-0.5 text-[10px] font-medium tabular-nums text-[var(--text-secondary)]"
@@ -1392,10 +1691,10 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
                 <MoreHorizontal size={13} />
               </button>
             </span>
-          )}
-          </div>
+            )}
+          </span>
 
-        {(menuOpen || confirmDelete) && createPortal(
+        {(menuOpen || confirmDelete || Subview) && createPortal(
           <div
             ref={menuRef}
             onClick={(e) => e.stopPropagation()}
@@ -1418,6 +1717,60 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
                 {item.label}
               </button>
             ))}
+            {Subview === 'status' && (
+              <div className="border-t border-[var(--border)] pt-1">
+                {TASK_STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => { onBulkUpdateStatus?.(businessTaskIds, s); setSubview(null); setMenuOpen(false); }}
+                    className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: STATUS_TOKENS[s] || 'currentColor' }} />
+                    {s}
+                  </button>
+                ))}
+              </div>
+            )}
+            {Subview === 'move' && (
+              <div className="border-t border-[var(--border)] pt-1">
+                <div className="px-2 pb-1">
+                  <input
+                    autoFocus
+                    onChange={(e) => {
+                      const q = e.target.value.toLowerCase();
+                      const items = menuRef.current?.querySelectorAll('[data-move-business]');
+                      items?.forEach((el) => {
+                        const name = el.dataset.moveBusiness || '';
+                        el.style.display = name.includes(q) ? '' : 'none';
+                      });
+                    }}
+                    placeholder="Search businesses..."
+                    className="w-full rounded border border-[var(--border)] bg-[var(--bg-page)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
+                  />
+                </div>
+                <div className="max-h-36 overflow-y-auto px-1">
+                  {allBusinesses.length === 0 && <p className="px-2 py-1 text-xs text-[var(--text-muted)]">No businesses</p>}
+                   {allBusinesses.map((b) => (
+                     <button
+                       key={b.id}
+                       data-move-business={b.name}
+                       type="button"
+                       onClick={(e) => { e.stopPropagation(); onBulkMove?.(businessTaskIds, b.id); setSubview(null); setMenuOpen(false); }}
+                       className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-xs hover:bg-[var(--bg-surface-hover)]"
+                     >
+                       <Building2 size={12} className="shrink-0 text-[var(--text-muted)]" />
+                       <span className="truncate text-[var(--text-primary)]">{b.name}</span>
+                       {b.status && (
+                         <span className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${BUSINESS_STATUS_STYLES[b.status] || BUSINESS_STATUS_STYLES.inactive}`}>
+                           {BUSINESS_STATUS_LABEL[b.status] || b.status}
+                         </span>
+                       )}
+                     </button>
+                   ))}
+                </div>
+              </div>
+            )}
             {confirmDelete && (
               <div className="flex items-center gap-2 px-3 py-2 text-xs text-red-700 dark:text-red-300">
                 <span>Delete {kind}?</span>
@@ -1461,7 +1814,15 @@ function Row({ depth, kind, id, name, open, onToggle, dueDate, progress, dimmed,
           )
         ) : null}
       </span>
-      <span className="px-2" />
+      <span className="flex items-center justify-center px-2" onClick={(e) => e.stopPropagation()}>
+        {kind === 'business' && canEdit && onUpdateBusinessStatus ? (
+          <BusinessStatusDropdown status={status} onChange={(value) => onUpdateBusinessStatus?.(id, clientId, value)} />
+        ) : kind === 'business' && status ? (
+          <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${BUSINESS_STATUS_STYLES[status] || BUSINESS_STATUS_STYLES.inactive}`}>
+            {BUSINESS_STATUS_LABEL[status] || status}
+          </span>
+        ) : null}
+      </span>
       <span className={cn(CELL_HIDE_SM, 'px-2')} />
       <span className="flex items-center justify-center tabular-nums text-xs text-[var(--text-secondary)] text-center px-2">
         {hideDue ? '' : formatDue(dueDate)}

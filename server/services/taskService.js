@@ -592,6 +592,88 @@ async function createTask(payload, actorId) {
   return created;
 }
 
+async function copyTaskDetails(sourceTaskId, newTaskId, actorId) {
+  const comments = await taskCommentModel.findByTaskId(sourceTaskId);
+  const commentIdMap = new Map();
+
+  for (const c of comments) {
+    const newCommentId = await taskCommentModel.create({
+      task_id: newTaskId,
+      user_id: c.user_id,
+      comment: c.comment,
+      parent_id: c.parent_id || null,
+      mentions: c.mentions || null,
+    });
+    commentIdMap.set(c.id, newCommentId);
+  }
+
+  for (const c of comments) {
+    if (c.parent_id && commentIdMap.has(c.parent_id)) {
+      await db.query(
+        'UPDATE task_comments SET parent_id = ? WHERE id = ?',
+        [commentIdMap.get(c.parent_id), commentIdMap.get(c.id)]
+      );
+    }
+  }
+
+  for (const [oldCommentId, newCommentId] of commentIdMap) {
+    const commentAttachments = await taskAttachmentModel.findByCommentId(oldCommentId);
+    for (const att of commentAttachments) {
+      await taskAttachmentModel.create({
+        task_progress_id: null,
+        task_id: newTaskId,
+        comment_id: newCommentId,
+        file_name: att.file_name,
+        original_name: att.original_name,
+        mime_type: att.mime_type,
+        size_bytes: att.size_bytes,
+        file_data: att.file_data,
+        uploaded_by: att.uploaded_by || actorId,
+      });
+    }
+  }
+
+  const taskAttachments = await taskAttachmentModel.findByTaskId(sourceTaskId);
+  for (const att of taskAttachments) {
+    await taskAttachmentModel.create({
+      task_progress_id: null,
+      task_id: newTaskId,
+      comment_id: null,
+      file_name: att.file_name,
+      original_name: att.original_name,
+      mime_type: att.mime_type,
+      size_bytes: att.size_bytes,
+      file_data: att.file_data,
+      uploaded_by: att.uploaded_by || actorId,
+    });
+  }
+
+  const progressEntries = await taskProgressModel.findByTaskId(sourceTaskId);
+  for (const p of progressEntries) {
+    const newProgressId = await taskProgressModel.create({
+      task_id: newTaskId,
+      user_id: p.user_id,
+      completion_rate: p.completion_rate,
+      status: p.status,
+      notes: p.notes,
+    });
+    const progressAttachments = await taskAttachmentModel.findByProgressId(p.id);
+    for (const att of progressAttachments) {
+      await taskAttachmentModel.create({
+        task_progress_id: newProgressId,
+        task_id: newTaskId,
+        comment_id: null,
+        file_name: att.file_name,
+        original_name: att.original_name,
+        mime_type: att.mime_type,
+        size_bytes: att.size_bytes,
+        file_data: att.file_data,
+        uploaded_by: att.uploaded_by || actorId,
+      });
+    }
+  }
+}
+
 async function duplicateTask(id, actorId) {
   const source = await taskModel.findById(id);
   if (!source) {
@@ -607,7 +689,54 @@ async function duplicateTask(id, actorId) {
     throw error;
   }
 
-  // Copy the source task's assignments onto the duplicate.
+  async function duplicateWithParent(taskId, newParentId) {
+    const src = await taskModel.findById(taskId);
+    if (!src) return null;
+
+    const [assignmentRows] = await db.query(
+      'SELECT assignment_type, reference_id FROM task_assignments WHERE task_id = ?',
+      [taskId]
+    );
+
+    const newId = await taskModel.create({
+      title: `${src.title} (copy)`,
+      description: src.description,
+      priority: src.priority || 'Medium',
+      status: src.status || 'Pending',
+      start_datetime: src.start_datetime,
+      deadline_datetime: src.deadline_datetime,
+      estimated_hours: src.estimated_hours,
+      category: src.category,
+      parent_task_id: newParentId,
+      client_id: src.client_id ?? null,
+      client_business_id: src.client_business_id ?? null,
+      business_id: src.business_id ?? null,
+      project_id: src.project_id ?? null,
+      created_by: actorId,
+    });
+
+    for (const a of assignmentRows) {
+      await taskAssignmentModel.create({
+        task_id: newId,
+        assignment_type: a.assignment_type,
+        reference_id: a.reference_id,
+        assigned_by: actorId,
+      });
+    }
+
+    await copyTaskDetails(taskId, newId, actorId);
+
+    const [children] = await db.query(
+      'SELECT id FROM tasks WHERE parent_task_id = ?',
+      [taskId]
+    );
+    for (const child of children) {
+      await duplicateWithParent(child.id, newId);
+    }
+
+    return newId;
+  }
+
   const [assignmentRows] = await db.query(
     'SELECT assignment_type, reference_id FROM task_assignments WHERE task_id = ?',
     [id]
@@ -639,6 +768,16 @@ async function duplicateTask(id, actorId) {
     });
   }
 
+  await copyTaskDetails(id, newId, actorId);
+
+  const [children] = await db.query(
+    'SELECT id FROM tasks WHERE parent_task_id = ?',
+    [id]
+  );
+  for (const child of children) {
+    await duplicateWithParent(child.id, newId);
+  }
+
   logAudit('task.duplicate', actorId, { task_id: newId, source_task_id: id, title: source.title });
 
   return await getTask(newId, actorId);
@@ -666,17 +805,42 @@ async function duplicateBusiness(businessId, actorId) {
             t.estimated_hours, t.category, t.parent_task_id, t.client_id, t.business_id, t.project_id
        FROM tasks t
   LEFT JOIN projects p ON p.id = t.project_id
-      WHERE (t.client_business_id = ? OR p.client_business_id = ?)
-        AND (t.parent_task_id IS NULL OR t.parent_task_id = '' OR t.parent_task_id = 0)`,
+      WHERE (t.client_business_id = ? OR p.client_business_id = ?)`,
     [businessId, businessId]
   );
+
+  const taskById = new Map();
+  for (const task of taskRows) {
+    taskById.set(String(task.id), task);
+  }
+
+  const sortedTasks = taskRows.filter((t) => {
+    const pid = t.parent_task_id;
+    return pid == null || String(pid) === '' || Number(pid) === 0 || !taskById.has(String(pid));
+  });
+  const childTasks = taskRows.filter((t) => {
+    const pid = t.parent_task_id;
+    return pid != null && String(pid) !== '' && Number(pid) !== 0 && taskById.has(String(pid));
+  });
+  childTasks.sort((a, b) => {
+    const aDepth = getDepth(a.id, taskById);
+    const bDepth = getDepth(b.id, taskById);
+    return aDepth - bDepth;
+  });
+
+  const orderedTasks = [...sortedTasks, ...childTasks];
 
   const oldIdToNewId = new Map();
   const newTaskIds = [];
 
-  for (const task of taskRows) {
+  for (const task of orderedTasks) {
+    const parentKey = task.parent_task_id != null && String(task.parent_task_id) !== '' && Number(task.parent_task_id) !== 0
+      ? String(task.parent_task_id)
+      : null;
+    const newParentId = parentKey ? oldIdToNewId.get(parentKey) || null : null;
+
     const newId = await taskModel.create({
-      title: `${task.title} (copy)`,
+      title: task.title,
       description: task.description,
       priority: task.priority || 'Medium',
       status: task.status || 'Pending',
@@ -684,7 +848,7 @@ async function duplicateBusiness(businessId, actorId) {
       deadline_datetime: task.deadline_datetime,
       estimated_hours: task.estimated_hours,
       category: task.category,
-      parent_task_id: null,
+      parent_task_id: newParentId,
       client_id: task.client_id ?? null,
       client_business_id: dupBusiness.id,
       business_id: task.business_id ?? null,
@@ -706,45 +870,23 @@ async function duplicateBusiness(businessId, actorId) {
         assigned_by: actorId,
       });
     }
-  }
-
-  for (const task of taskRows) {
-    if (task.parent_task_id == null || String(task.parent_task_id) === '' || Number(task.parent_task_id) === 0) continue;
-    const newParentId = oldIdToNewId.get(String(task.parent_task_id));
-    if (!newParentId) continue;
-    const newId = await taskModel.create({
-      title: `${task.title} (copy)`,
-      description: task.description,
-      priority: task.priority || 'Medium',
-      status: task.status || 'Pending',
-      start_datetime: task.start_datetime,
-      deadline_datetime: task.deadline_datetime,
-      estimated_hours: task.estimated_hours,
-      category: task.category,
-      parent_task_id: newParentId,
-      client_id: task.client_id ?? null,
-      client_business_id: dupBusiness.id,
-      business_id: task.business_id ?? null,
-      project_id: null,
-      created_by: actorId,
-    });
-    const [assignmentRows] = await db.query(
-      'SELECT assignment_type, reference_id FROM task_assignments WHERE task_id = ?',
-      [task.id]
-    );
-    for (const a of assignmentRows) {
-      await taskAssignmentModel.create({
-        task_id: newId,
-        assignment_type: a.assignment_type,
-        reference_id: a.reference_id,
-        assigned_by: actorId,
-      });
-    }
+    await copyTaskDetails(task.id, newId, actorId);
   }
 
   logAudit('business.duplicate', actorId, { business_id: dupBusiness.id, source_business_id: businessId, name: dupBusiness.business_name });
 
   return { ...dupBusiness, task_ids: newTaskIds };
+}
+
+function getDepth(taskId, taskById) {
+  let depth = 0;
+  let current = taskById.get(String(taskId));
+  while (current && current.parent_task_id != null && String(current.parent_task_id) !== '' && Number(current.parent_task_id) !== 0) {
+    depth++;
+    current = taskById.get(String(current.parent_task_id));
+    if (!current) break;
+  }
+  return depth;
 }
 
 // Fields a granted business manager (a non-admin user) may edit on a task in

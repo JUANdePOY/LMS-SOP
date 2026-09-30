@@ -1,6 +1,4 @@
 import { X } from 'lucide-react';
-import CheckboxList from './CheckboxList';
-import GroupedCheckboxList from './GroupedCheckboxList';
 
 function SOPCreateForm({
   showCreate,
@@ -9,25 +7,14 @@ function SOPCreateForm({
   setNewTitle,
   newDescription,
   setNewDescription,
-  newCategoryId,
-  setNewCategoryId,
-  filteredCategories,
-  loadingCategories,
-  loading,
-  cascade,
-  onCancel,
-  onCreate,
   newIsDefaultOnboarding,
   setNewIsDefaultOnboarding,
   newMinTimeLimit,
   setNewMinTimeLimit,
-  lockedDepartmentIds = null,
-  lockedBusinessIds = null,
-  isBusinessLocked = false,
-  isDepartmentLocked = false,
-  isDepartmentHead = false,
-  isAdmin = false,
-  isSuperAdmin = false,
+  onCancel,
+  onCreate,
+  loading,
+  showBusinessDepartment = true,
 }) {
   if (!showCreate) return null;
 
@@ -108,35 +95,35 @@ function SOPCreateForm({
               />
             </div>
           )}
-          {(!isDepartmentHead && !isAdmin) && (
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Business</label>
-              <CheckboxList
-                items={cascade.businesses}
-                selectedIds={cascade.selectedBusinessIds}
-                onToggle={cascade.toggleBusiness}
-                labelKey="business_name"
-                valueKey="id"
-                placeholder="Select businesses..."
-                loading={cascade.loading.businesses}
-                disabled={isBusinessLocked}
-              />
-            </div>
-          )}
-          {(!isDepartmentHead) && (
-            <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Departments</label>
-              <GroupedCheckboxList
-                items={cascade.groupedDepartments}
-                selectedIds={cascade.selectedDeptIds}
-                onToggle={cascade.toggleDepartment}
-                labelKey="name"
-                valueKey="id"
-                loading={cascade.loading.departments}
-                emptyText={cascade.selectedBusinessIds.length ? 'No departments for selected businesses' : 'Select a business first'}
-                disabled={isDepartmentLocked}
-              />
-            </div>
+          {showBusinessDepartment && (
+            <>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Business</label>
+                <CheckboxList
+                  items={cascade.businesses}
+                  selectedIds={cascade.selectedBusinessIds}
+                  onToggle={cascade.toggleBusiness}
+                  labelKey="business_name"
+                  valueKey="id"
+                  placeholder="Select businesses..."
+                  loading={cascade.loading.businesses}
+                  disabled={isBusinessLocked}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Departments</label>
+                <GroupedCheckboxList
+                  items={cascade.groupedDepartments}
+                  selectedIds={cascade.selectedDeptIds}
+                  onToggle={cascade.toggleDepartment}
+                  labelKey="name"
+                  valueKey="id"
+                  loading={cascade.loading.departments}
+                  emptyText={cascade.selectedBusinessIds.length ? 'No departments for selected businesses' : 'Select a business first'}
+                  disabled={isDepartmentLocked}
+                />
+              </div>
+            </>
           )}
 
         </div>

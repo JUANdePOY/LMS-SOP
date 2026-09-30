@@ -49,11 +49,13 @@ async function listUsers(req, res) {
     if (!departmentId) {
       return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'departmentId is required' } });
     }
+    const includeAdmins = req.query.includeAdmins !== 'false';
     const users = await assignmentCascadeService.getUsersForDepartment(departmentId, {
       positionName: req.query.position || undefined,
       search: req.query.search || undefined,
       page: parseInt(req.query.page) || 1,
       limit: parseInt(req.query.limit) || 50,
+      includeAdmins,
     });
     res.json({ success: true, data: users });
   } catch (error) {

@@ -1508,7 +1508,7 @@ function MoreActionsMenu({ task, businesses, onOpen, onMoveBusiness, onDelete, o
   );
 }
 
-export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, canManageTask, projects, showCountBadges = false, subtaskCount = 0, isNew = false, tasksById = {}, onAddSubtask, onViewSubtasks, userDepartmentId = null, userDepartmentClientIds = null, depth = 0 }) {
+export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpdate, onDelete, onDeleteImmediate, onDuplicated, onRenameTask, canManage, canManageTask, projects, showCountBadges = false, subtaskCount = 0, isNew = false, tasksById = {}, onAddSubtask, onViewSubtasks, userDepartmentId = null, userDepartmentClientIds = null, depth = 0, selectedTaskIds = new Set(), onToggleTaskSelect }) {
   const { toast } = useToast();
 
   const overdue = isOverdue(task);
@@ -1630,36 +1630,55 @@ export function TaskRow({ task, dimmed, onViewTask, onStatusChange, onInlineUpda
         'hover:bg-[var(--bg-surface-hover)]',
         dimmed && 'opacity-40'
       )}
-    >
-      <span
-        className="relative z-10 flex min-w-0 items-center justify-between gap-1.5 pr-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75"
-        style={{ paddingLeft: depth > 0 ? `${depth * 20}px` : '4px' }}
       >
-        <span className="flex min-w-0 items-center gap-1.5">
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); handleCompleteToggle(); }}
-          disabled={!canEditThisTask}
-          aria-pressed={task.status === 'Completed'}
-          className={cn(
-            'grid h-4 w-4 shrink-0 place-items-center rounded-full border-[1.5px] transition-colors duration-150 ease-out motion-reduce:transition-none',
-            task.status === 'Completed'
-              ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
-              : 'border-[var(--border)] hover:border-[var(--color-primary)]',
-            !canEditThisTask && 'cursor-not-allowed opacity-60'
-          )}
-          title={task.status === 'Completed' ? 'Mark incomplete' : 'Mark complete'}
-          aria-label={task.status === 'Completed' ? 'Mark incomplete' : 'Mark complete'}
+        <span
+          className="relative z-10 flex min-w-0 items-center justify-between gap-1.5 pr-2 border-r-[0.5px] border-neutral-300/70 dark:border-neutral-600/75"
+          style={{ paddingLeft: depth > 0 ? `${depth * 20}px` : '4px' }}
         >
-          <span
-            className={cn(
-              'transition-transform duration-100 ease-out motion-reduce:transition-none',
-              task.status === 'Completed' ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
+          <span className="flex min-w-0 items-center gap-1.5">
+            {onToggleTaskSelect && (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onToggleTaskSelect?.(task.id, !selectedTaskIds.has(String(task.id))); }}
+                className={cn(
+                  'grid h-[18px] w-[18px] shrink-0 place-items-center rounded-[3px] border transition-opacity duration-150 ease-out motion-reduce:transition-none hover:border-[var(--color-primary)]',
+                  selectedTaskIds.has(String(task.id)) ? 'opacity-100' : 'opacity-0 group-hover:opacity-80'
+                )}
+                style={{
+                  borderColor: selectedTaskIds.has(String(task.id)) ? 'var(--color-primary)' : 'var(--text-muted)',
+                  backgroundColor: selectedTaskIds.has(String(task.id)) ? 'var(--color-primary)' : 'transparent',
+                  color: selectedTaskIds.has(String(task.id)) ? 'white' : 'transparent',
+                }}
+                title="Select task"
+                aria-label="Select task"
+              >
+                <Check size={13} strokeWidth={3.5} />
+              </button>
             )}
-          >
-            <Check size={10} strokeWidth={3} />
-          </span>
-        </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleCompleteToggle(); }}
+              disabled={!canEditThisTask}
+              aria-pressed={task.status === 'Completed'}
+              className={cn(
+                'grid h-4 w-4 shrink-0 place-items-center rounded-full border-[1.5px] transition-colors duration-150 ease-out motion-reduce:transition-none',
+                task.status === 'Completed'
+                  ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white'
+                  : 'border-[var(--border)] hover:border-[var(--color-primary)]',
+                !canEditThisTask && 'cursor-not-allowed opacity-60'
+              )}
+              title={task.status === 'Completed' ? 'Mark incomplete' : 'Mark complete'}
+              aria-label={task.status === 'Completed' ? 'Mark incomplete' : 'Mark complete'}
+            >
+              <span
+                className={cn(
+                  'transition-transform duration-100 ease-out motion-reduce:transition-none',
+                  task.status === 'Completed' ? 'scale-100 opacity-100' : 'scale-0 opacity-0'
+                )}
+              >
+                <Check size={10} strokeWidth={3} />
+              </span>
+            </button>
         <span className="inline-flex min-w-0 max-w-full items-center" data-no-nav>
           <InlineEditableName
             value={task.title}

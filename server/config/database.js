@@ -493,7 +493,7 @@ const MIGRATIONS = [
     email VARCHAR(255) DEFAULT NULL,
     phone VARCHAR(50) DEFAULT NULL,
     address TEXT DEFAULT NULL,
-    status ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    status ENUM('active','inactive','paused','stopped','cancelled') NOT NULL DEFAULT 'active',
     created_by INT DEFAULT NULL,
     updated_by INT DEFAULT NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -503,6 +503,7 @@ const MIGRATIONS = [
     UNIQUE KEY uk_business_code (business_code),
     INDEX idx_businesses_status (status)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `ALTER TABLE businesses MODIFY COLUMN status ENUM('active','inactive','paused','stopped','cancelled') NOT NULL DEFAULT 'active'`,
   `ALTER TABLE departments ADD COLUMN business_id INT DEFAULT NULL`,
   `CREATE INDEX IF NOT EXISTS idx_departments_business ON departments(business_id)`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS business_id INT DEFAULT NULL`,
@@ -964,6 +965,22 @@ async function runMigrations() {
     console.log('Business and client permission controls migration applied');
   } catch (err) {
     console.error('Business and client permission controls migration error:', err.message);
+  }
+
+  try {
+    const { runClientMigrations } = require('../migrations/clientManagement');
+    await runClientMigrations();
+    console.log('Client management migrations applied');
+  } catch (err) {
+    console.error('Client management migration error:', err.message);
+  }
+
+  try {
+    const { runBusinessTypeMigrations } = require('../migrations/businessTypes');
+    await runBusinessTypeMigrations();
+    console.log('Business type migrations applied');
+  } catch (err) {
+    console.error('Business type migration error:', err.message);
   }
 }
 

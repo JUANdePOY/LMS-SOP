@@ -41,10 +41,11 @@ export default function BusinessPage() {
 
   const kpiCards = useMemo(() => {
     const list = businesses || [];
+    const inactiveCategory = list.filter((b) => ['inactive', 'paused', 'stopped', 'cancelled'].includes(b.status)).length;
     return [
       { label: 'Total Businesses', value: list.length, sub: { icon: 'Building2' }, color: 'blue' },
       { label: 'Active', value: list.filter((b) => b.status === 'active').length, sub: { icon: 'Building2' }, color: 'emerald' },
-      { label: 'Inactive', value: list.filter((b) => b.status === 'inactive').length, sub: { icon: 'Building2' }, color: 'amber' },
+      { label: 'Inactive', value: inactiveCategory, sub: { icon: 'Building2' }, color: 'amber' },
     ];
   }, [businesses]);
 
@@ -177,6 +178,9 @@ export default function BusinessPage() {
             <option value="all">All statuses</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
+            <option value="paused">Paused</option>
+            <option value="stopped">Stopped</option>
+            <option value="cancelled">Cancelled</option>
           </select>
           {hasActiveFilters && (
             <button

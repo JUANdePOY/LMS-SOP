@@ -279,7 +279,7 @@ export default function TaskListTable({
         onClick={() => onViewTask?.(task)}
       >
         {/* Checkbox */}
-        <span className={cn('flex items-center', selectedRow ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 transition-opacity')}>
+        <span className={cn('flex items-center rounded hover:bg-[var(--bg-hover)] transition-colors', selectedRow ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 transition-opacity')}>
           <input
             type="checkbox"
             checked={selectedRow}

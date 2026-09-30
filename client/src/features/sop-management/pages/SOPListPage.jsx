@@ -301,13 +301,7 @@ function SOPListPage() {
             setNewIsDefaultOnboarding={setNewIsDefaultOnboarding}
             newMinTimeLimit={newMinTimeLimit}
             setNewMinTimeLimit={setNewMinTimeLimit}
-            lockedDepartmentIds={isDepartmentHead ? scopedDepartmentIds : null}
-            lockedBusinessIds={isAdmin || isDepartmentHead ? [businessId] : null}
-            isBusinessLocked={!isSuperAdmin}
-            isDepartmentLocked={isDepartmentHead}
-            isDepartmentHead={isDepartmentHead}
-            isAdmin={isAdmin}
-            isSuperAdmin={isSuperAdmin}
+            showBusinessDepartment={false}
           />
 
           <div className="flex flex-col sm:flex-row gap-3">

@@ -53,15 +53,19 @@ async function getAvailablePositions() {
 const ADMIN_ROLES = ['department_head', 'admin', 'super_admin'];
 
 async function getUsersForDepartment(departmentId, opts = {}) {
-  const { positionName, search, page = 1, limit = 50 } = opts;
+  const { positionName, search, page = 1, limit = 50, includeAdmins = true } = opts;
   const offset = (page - 1) * limit;
-  let sql = `SELECT DISTINCT u.id, u.full_name, u.email, u.position_title, u.employee_id
-    FROM users u WHERE u.is_active = TRUE
-    AND u.role NOT IN (?, ?, ?)
-    AND (u.department_id = ? OR u.id IN (
+  let sql = `SELECT DISTINCT u.id, u.full_name, u.email, u.position_title, u.employee_id, u.role
+    FROM users u WHERE u.is_active = TRUE`;
+  const params = [];
+  if (!includeAdmins) {
+    sql += ' AND u.role NOT IN (?, ?, ?)';
+    params.push('department_head', 'admin', 'super_admin');
+  }
+  sql += ` AND (u.department_id = ? OR u.id IN (
       SELECT dm.user_id FROM department_members dm WHERE dm.department_id = ?
     ))`;
-  const params = ['department_head', 'admin', 'super_admin', departmentId, departmentId];
+  params.push(departmentId, departmentId);
   if (positionName) { sql += ' AND LOWER(u.position_title) = LOWER(?)'; params.push(positionName); }
   if (search) {
     sql += ' AND (u.full_name LIKE ? OR u.email LIKE ? OR u.employee_id LIKE ?)';

@@ -75,6 +75,19 @@ export default function ProjectTaskViews({
     autoExpand,
   onOpenBulkUpload,
   onDuplicateBusiness,
+  onSelectBusinessTasks,
+  selectedBusinessIds,
+  onToggleBusinessSelect,
+  onSelectAllBusinesses,
+  onDeselectAllBusinesses,
+  selectedTaskIds = new Set(),
+  onToggleTaskSelect,
+  onBulkArchive,
+  onBulkMove,
+  onBulkDelete,
+  onBulkUpdateStatus,
+  onUpdateBusinessStatus,
+  visibleBusinessIds,
 }) {
   const [internalView, setInternalView] = useState(() => {
     const validKeys = activeViews || TASK_VIEW_KEYS;
@@ -146,9 +159,22 @@ export default function ProjectTaskViews({
                    userDepartmentBusinessId={userDepartmentBusinessId}
                    canManageTask={canManageTask}
                     autoExpand={autoExpand}
-                    onOpenBulkUpload={onOpenBulkUpload}
-                    onDuplicateBusiness={onDuplicateBusiness}
-                  />
+                      onOpenBulkUpload={onOpenBulkUpload}
+                      onDuplicateBusiness={onDuplicateBusiness}
+                       onSelectBusinessTasks={onSelectBusinessTasks}
+                       selectedBusinessIds={selectedBusinessIds}
+                       onToggleBusinessSelect={onToggleBusinessSelect}
+                       onSelectAllBusinesses={onSelectAllBusinesses}
+                       onDeselectAllBusinesses={onDeselectAllBusinesses}
+                       selectedTaskIds={selectedTaskIds}
+                       onToggleTaskSelect={onToggleTaskSelect}
+                        onBulkArchive={onBulkArchive}
+                        onBulkMove={onBulkMove}
+                        onBulkDelete={onBulkDelete}
+                        onBulkUpdateStatus={onBulkUpdateStatus}
+                        onUpdateBusinessStatus={onUpdateBusinessStatus}
+                        visibleBusinessIds={visibleBusinessIds}
+                      />
           )}
           {view === 'board' && (
             <TaskBoard

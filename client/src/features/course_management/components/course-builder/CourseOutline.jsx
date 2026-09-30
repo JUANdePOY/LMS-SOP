@@ -15,6 +15,21 @@ import {
   GripVertical,
   Search,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const TYPE_CONFIG = {
   video: { icon: PlayCircle, label: "Video", color: "text-[var(--color-primary)] bg-[rgba(242,92,5,0.08)] dark:bg-blue-900/20" },
@@ -25,6 +40,62 @@ const TYPE_CONFIG = {
   certificate: { icon: Award, label: "Cert", color: "text-[var(--color-success)] bg-success-soft dark:bg-success-soft" },
   document: { icon: FileArchive, label: "File", color: "text-red-500 bg-red-50 dark:bg-red-900/20" },
 };
+
+function SortableLessonOutlineItem({
+  lesson,
+  index,
+  typeConfig,
+  isSelected,
+  onSelect,
+  onRemove,
+  onUpdateTitle,
+  isFirst,
+  isLast,
+  onReorderLessons,
+  moduleId,
+  children,
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lesson.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const handleMoveUp = (e) => {
+    e.stopPropagation();
+    if (!isFirst && onReorderLessons) {
+      onReorderLessons(moduleId, index, index - 1);
+    }
+  };
+
+  const handleMoveDown = (e) => {
+    e.stopPropagation();
+    if (!isLast && onReorderLessons) {
+      onReorderLessons(moduleId, index, index + 1);
+    }
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      {typeof children === "function"
+        ? children({
+            lesson,
+            index,
+            typeConfig,
+            isSelected,
+            onSelect,
+            onRemove,
+            onUpdateTitle,
+            isFirst,
+            isLast,
+            handleMoveUp,
+            handleMoveDown,
+          })
+        : children}
+    </div>
+  );
+}
 
 export default function CourseOutline({
   modules,
@@ -38,11 +109,42 @@ export default function CourseOutline({
   onAddLesson,
   onUpdateLesson,
   onRemoveLesson,
-  onMoveLessonUp,
-  onMoveLessonDown,
+  onReorder,
+  onReorderLessons,
 }) {
   const [expandedModules, setExpandedModules] = useState(() => modules.map((m) => m.id));
   const [searchQuery, setSearchQuery] = useState("");
+  const [localModules, setLocalModules] = useState(() => modules);
+
+  useEffect(() => {
+    setLocalModules(modules);
+  }, [modules]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor)
+  );
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = localModules.findIndex((m) => m.id === active.id);
+    const newIndex = localModules.findIndex((m) => m.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(localModules, oldIndex, newIndex).map((m, i) => ({ ...m, order_index: i + 1 }));
+    setLocalModules(reordered);
+    onReorder?.(reordered);
+  };
+
+  const handleLessonDragEnd = (event, moduleId, moduleLessons) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = moduleLessons.findIndex((l) => l.id === active.id);
+    const newIndex = moduleLessons.findIndex((l) => l.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reorderedLessons = arrayMove(moduleLessons, oldIndex, newIndex).map((l, i) => ({ ...l, order_index: i + 1 }));
+    onReorderLessons?.(moduleId, reorderedLessons);
+  };
 
   const toggleModule = (moduleId) => {
     setExpandedModules((prev) =>
@@ -50,7 +152,7 @@ export default function CourseOutline({
     );
   };
 
-  const filteredModules = modules.filter((m) => {
+  const filteredModules = localModules.filter((m) => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -84,25 +186,29 @@ export default function CourseOutline({
         </div>
       </div>
       <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
-        {filteredModules.map((mod, idx) => (
-          <ModuleOutlineItem
-            key={mod.id || idx}
-            module={mod}
-            index={idx}
-            expanded={expandedModules.includes(mod.id)}
-            onToggle={() => toggleModule(mod.id)}
-            selected={selectedModuleId === mod.id}
-            selectedLessonId={selectedLessonId}
-            onSelectLesson={(lessonId) => onSelectLesson?.(mod.id, lessonId)}
-            onUpdate={(patch) => onUpdateModule?.(mod.id, patch)}
-            onRemove={() => onRemoveModule?.(mod.id)}
-            onAddLesson={() => onAddLesson?.(mod.id)}
-            onUpdateLesson={onUpdateLesson}
-            onRemoveLesson={onRemoveLesson}
-            onMoveLessonUp={onMoveLessonUp}
-            onMoveLessonDown={onMoveLessonDown}
-          />
-        ))}
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={filteredModules.map((m) => m.id)} strategy={verticalListSortingStrategy}>
+             {filteredModules.map((mod, idx) => (
+               <SortableModuleOutlineItem
+                 key={mod.id || idx}
+                 module={mod}
+                 index={idx}
+                 expanded={expandedModules.includes(mod.id)}
+                 onToggle={() => toggleModule(mod.id)}
+                 selected={selectedModuleId === mod.id}
+                 selectedLessonId={selectedLessonId}
+                 onSelectLesson={(lessonId) => onSelectLesson?.(mod.id, lessonId)}
+                 onUpdate={(patch) => onUpdateModule?.(mod.id, patch)}
+                 onRemove={() => onRemoveModule?.(mod.id)}
+                 onAddLesson={() => onAddLesson?.(mod.id)}
+                 onUpdateLesson={onUpdateLesson}
+                 onRemoveLesson={onRemoveLesson}
+                 onSelectModule={onSelectModule}
+                 onReorderLessons={onReorderLessons}
+               />
+             ))}
+          </SortableContext>
+        </DndContext>
         {filteredModules.length === 0 && (
           <div className="text-center py-8">
             <div className="w-12 h-12 bg-neutral-100 dark:bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -127,7 +233,7 @@ export default function CourseOutline({
   );
 }
 
-function ModuleOutlineItem({
+function ModuleOutlineItemInner({
   module,
   index,
   expanded,
@@ -140,14 +246,21 @@ function ModuleOutlineItem({
   onAddLesson,
   onUpdateLesson,
   onRemoveLesson,
-  onMoveLessonUp,
-  onMoveLessonDown,
+  onSelectModule,
+  onReorderLessons,
+  sortableAttributes,
+  sortableListeners,
+  sortableStyle,
 }) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState("");
   const titleInputRef = useRef(null);
   const lessons = module.lessons || [];
   const hasLessons = lessons.length > 0;
+  const lessonSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor)
+  );
 
   useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -183,7 +296,10 @@ function ModuleOutlineItem({
 
   return (
     <div
+      {...(sortableAttributes || {})}
+      {...(sortableListeners || {})}
       className="rounded-lg border border-transparent transition-all"
+      style={sortableStyle}
     >
       <div className="flex items-center gap-1 px-2 py-2.5">
         <button
@@ -191,11 +307,15 @@ function ModuleOutlineItem({
           onClick={onToggle}
           aria-expanded={expanded}
           aria-label={expanded ? `Collapse ${module.title || `Module ${index + 1}`}` : `Expand ${module.title || `Module ${index + 1}`}`}
+          className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors shrink-0"
+        >
+          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </button>
+        <button
+          type="button"
+          onClick={() => onSelectModule?.(module.id)}
           className="flex flex-1 min-w-0 items-center gap-1.5 text-left rounded-md transition-colors hover:bg-neutral-100 dark:hover:bg-neutral-800/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"
         >
-          <span className="text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors shrink-0">
-            {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          </span>
           <span className="flex-1 min-w-0">
             {isEditingTitle ? (
               <input
@@ -254,37 +374,75 @@ function ModuleOutlineItem({
       </div>
 
       {expanded && (
-        <div className="border-t border-neutral-100 dark:border-neutral-800 px-2 py-1.5 space-y-0.5">
-          {lessons.map((lesson, lIdx) => {
-            const cfg = TYPE_CONFIG[lesson.type] || TYPE_CONFIG.reading;
-            const isSelected = selectedLessonId === lesson.id;
-            return (
-              <LessonOutlineItem
-                key={lesson.id || lIdx}
-                lesson={lesson}
-                index={lIdx}
-                typeConfig={cfg}
-                isSelected={isSelected}
-                onSelect={() => onSelectLesson?.(lesson.id)}
-                onMoveUp={() => onMoveLessonUp?.(module.id, lIdx)}
-                onMoveDown={() => onMoveLessonDown?.(module.id, lIdx)}
-                onRemove={() => onRemoveLesson?.(module.id, lIdx)}
-                onUpdateTitle={(newTitle) => onUpdateLesson?.(module.id, lIdx, { title: newTitle })}
-                isFirst={lIdx === 0}
-                isLast={lIdx === lessons.length - 1}
-              />
-            );
-          })}
-          <button
-            type="button"
-            onClick={onAddLesson}
-            className="w-full rounded border border-dashed border-neutral-300 dark:border-neutral-600 py-2 text-xs text-neutral-600 dark:text-neutral-300 hover:border-neutral-400 dark:hover:border-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-all"
-          >
-            <Plus size={14} className="inline mr-1" />
-            Add Lesson
-          </button>
-        </div>
+        <DndContext sensors={lessonSensors} collisionDetection={closestCenter} onDragEnd={(event) => handleLessonDragEnd(event, module.id, lessons)}>
+          <SortableContext items={lessons.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+            <div className="border-t border-neutral-100 dark:border-neutral-800 px-2 py-1.5 space-y-0.5">
+              {lessons.map((lesson, lIdx) => {
+                const cfg = TYPE_CONFIG[lesson.type] || TYPE_CONFIG.reading;
+                const isSelected = selectedLessonId === lesson.id;
+                return (
+                  <SortableLessonOutlineItem
+                    key={lesson.id || lIdx}
+                    lesson={lesson}
+                    index={lIdx}
+                    typeConfig={cfg}
+                    isSelected={isSelected}
+                    onSelect={() => onSelectLesson?.(lesson.id)}
+                    onRemove={() => onRemoveLesson?.(module.id, lIdx)}
+                    onUpdateTitle={(newTitle) => onUpdateLesson?.(module.id, lIdx, { title: newTitle })}
+                    isFirst={lIdx === 0}
+                    isLast={lIdx === lessons.length - 1}
+                    onReorderLessons={onReorderLessons}
+                    moduleId={module.id}
+                  >
+                    {({ lesson: l, index: li, typeConfig: tc, isSelected: sel, onSelect: selFn, onRemove: remFn, onUpdateTitle: updTitle, isFirst: first, isLast: last, handleMoveUp: up, handleMoveDown: down }) => (
+                      <LessonOutlineItem
+                        lesson={l}
+                        index={li}
+                        typeConfig={tc}
+                        isSelected={sel}
+                        onSelect={selFn}
+                        onMoveUp={up}
+                        onMoveDown={down}
+                        onRemove={remFn}
+                        onUpdateTitle={updTitle}
+                        isFirst={first}
+                        isLast={last}
+                      />
+                    )}
+                  </SortableLessonOutlineItem>
+                );
+              })}
+              <button
+                type="button"
+                onClick={onAddLesson}
+                className="w-full rounded border border-dashed border-neutral-300 dark:border-neutral-600 py-2 text-xs text-neutral-600 dark:text-neutral-300 hover:border-neutral-400 dark:hover:border-neutral-500 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-all"
+              >
+                <Plus size={14} className="inline mr-1" />
+                Add Lesson
+              </button>
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
+    </div>
+  );
+}
+
+function SortableModuleOutlineItem(props) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: props.module.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <ModuleOutlineItemInner {...props} sortableAttributes={attributes} sortableListeners={listeners} sortableStyle={style} />
     </div>
   );
 }

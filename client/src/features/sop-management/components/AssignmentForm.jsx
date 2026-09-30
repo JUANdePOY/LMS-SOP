@@ -22,7 +22,6 @@ export default function AssignmentForm({
 
   const {
     setSelectedDeptIds,
-    setSelectedPositions,
     setSelectedUserIds,
     setSelectedBusinessIds,
     setUserSourceDeptIds,
@@ -56,7 +55,6 @@ export default function AssignmentForm({
       return;
     }
     const deptIds = new Set();
-    const positions = new Set();
     const userIds = new Set();
     for (const assignment of existingAssignments) {
       for (const dept of assignment.departments || []) {
@@ -64,7 +62,6 @@ export default function AssignmentForm({
           deptIds.add(dept.id);
         }
       }
-      for (const pos of assignment.positions || []) positions.add(pos);
       for (const user of assignment.users || []) userIds.add(user.id);
     }
     if (deptIds.size > 0) {
@@ -73,9 +70,8 @@ export default function AssignmentForm({
       setSelectedDeptIds(lockedDepartmentIds);
     }
     setUserSourceDeptIds(Array.from(deptIds).length > 0 ? Array.from(deptIds) : lockedDepartmentIds);
-    setSelectedPositions(Array.from(positions));
     setSelectedUserIds(Array.from(userIds));
-  }, [existingAssignments, lockedDepartmentIds, isDepartmentLocked, setSelectedDeptIds, setSelectedPositions, setSelectedUserIds, setUserSourceDeptIds]);
+  }, [existingAssignments, lockedDepartmentIds, isDepartmentLocked, setSelectedDeptIds, setSelectedUserIds, setUserSourceDeptIds]);
 
   useEffect(() => {
     if (!isDepartmentLocked || !groupedDepartments.length) return;
@@ -107,13 +103,11 @@ export default function AssignmentForm({
     try {
       await createAssignment(sopId, {
         department_ids: cascade.selectedDeptIds,
-        position_names: cascade.selectedPositions,
         user_ids: cascade.selectedUserIds,
         due_date: null,
         notes: '',
       });
       cascade.setSelectedDeptIds([]);
-      cascade.setSelectedPositions([]);
       cascade.setSelectedUserIds([]);
       cascade.setUserSearch('');
       cascade.setUserSourceDeptIds([]);
@@ -162,20 +156,6 @@ export default function AssignmentForm({
       )}
 
       <div>
-        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Positions</label>
-        <CheckboxList
-          items={cascade.positions}
-          selectedIds={cascade.selectedPositions}
-          onToggle={cascade.togglePosition}
-          labelKey={(p) => p}
-          valueKey={(p) => p}
-          placeholder="Select positions..."
-          loading={cascade.loading.positions}
-          emptyText={cascade.selectedDeptIds.length ? 'No positions found' : 'Select a department first'}
-        />
-      </div>
-
-      <div>
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs font-medium text-[var(--text-secondary)]">Users</span>
           <div className="flex items-center gap-2">
@@ -209,7 +189,10 @@ export default function AssignmentForm({
           groupKey="business_name"
           subgroupKey="department_name"
           labelKey="full_name"
-          subLabelKey="position_title"
+          subLabelKey={(user) => {
+            const parts = [user.position_title, user.role].filter(Boolean);
+            return parts.length > 0 ? parts.join(' • ') : '';
+          }}
           valueKey="id"
           loading={cascade.loading.users}
           emptyText={(cascade.selectedDeptIds.length || isAdmin || isDepartmentHead) ? 'No users found' : 'Select a department first'}

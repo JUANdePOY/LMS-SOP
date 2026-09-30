@@ -56,7 +56,7 @@ async function listClients(businessId) {
   const clientIds = clients.map((c) => c.id);
   const placeholders = clientIds.map(() => '?').join(',');
   const [businesses] = await db.query(
-    `SELECT id, client_id, business_name
+    `SELECT id, client_id, business_name, status, business_type, category
      FROM client_businesses
      WHERE client_id IN (${placeholders})
      ORDER BY business_name ASC`,
@@ -66,14 +66,17 @@ async function listClients(businessId) {
   const byClient = {};
   for (const b of businesses) {
     if (!byClient[b.client_id]) byClient[b.client_id] = [];
-    byClient[b.client_id].push({ id: b.id, business_name: b.business_name, project_count: 0 });
+    byClient[b.client_id].push({ id: b.id, business_name: b.business_name, status: b.status, business_type: b.business_type, category: b.category, project_count: 0 });
   }
 
   const counts = await getProjectCounts(clientIds);
   for (const b of businesses) {
     if (byClient[b.client_id]) {
       const entry = byClient[b.client_id].find((x) => x.id === b.id);
-      if (entry) entry.project_count = counts[b.id] || 0;
+      if (entry) {
+        entry.project_count = counts[b.id] || 0;
+        entry.status = b.status;
+      }
     }
   }
 
@@ -208,7 +211,7 @@ async function listClientOptions() {
   const clientIds = clients.map((c) => c.id);
   const placeholders = clientIds.map(() => '?').join(',');
   const [businesses] = await db.query(
-    `SELECT id, client_id, business_name
+    `SELECT id, client_id, business_name, status, business_type, category
      FROM client_businesses
      WHERE client_id IN (${placeholders})
      ORDER BY business_name ASC`,
@@ -218,14 +221,16 @@ async function listClientOptions() {
   const byClient = {};
   for (const b of businesses) {
     if (!byClient[b.client_id]) byClient[b.client_id] = [];
-    byClient[b.client_id].push({ id: b.id, business_name: b.business_name, project_count: 0 });
+    byClient[b.client_id].push({ id: b.id, business_name: b.business_name, status: b.status, business_type: b.business_type, category: b.category, project_count: 0 });
   }
 
   const counts = await getProjectCounts(clientIds);
   for (const b of businesses) {
     if (byClient[b.client_id]) {
       const entry = byClient[b.client_id].find((x) => x.id === b.id);
-      if (entry) entry.project_count = counts[b.id] || 0;
+      if (entry) {
+        entry.project_count = counts[b.id] || 0;
+      }
     }
   }
 
@@ -241,10 +246,10 @@ async function listClientOptions() {
   );
 }
 
-async function addBusiness(clientId, businessName) {
+async function addBusiness(clientId, businessName, businessType = null, category = 'none') {
   const [result] = await db.query(
-    'INSERT INTO client_businesses (client_id, business_name) VALUES (?, ?)',
-    [clientId, String(businessName).trim()]
+    'INSERT INTO client_businesses (client_id, business_name, business_type, category) VALUES (?, ?, ?, ?)',
+    [clientId, String(businessName).trim(), businessType, category]
   );
   return result.insertId;
 }
@@ -263,14 +268,14 @@ async function duplicateBusiness(businessId, actorId) {
 
   const newName = `${business.business_name} (copy)`;
   const [dupResult] = await db.query(
-    'INSERT INTO client_businesses (client_id, business_name) VALUES (?, ?)',
-    [business.client_id, newName]
+    'INSERT INTO client_businesses (client_id, business_name, status, business_type, category) VALUES (?, ?, ?, ?, ?)',
+    [business.client_id, newName, business.status, business.business_type, business.category]
   );
   const newBusinessId = dupResult.insertId;
 
   logAudit('business.duplicate', actorId, { business_id: newBusinessId, source_business_id: businessId, name: newName });
 
-  return { id: newBusinessId, client_id: business.client_id, business_name: newName };
+  return { id: newBusinessId, client_id: business.client_id, business_name: newName, status: business.status, business_type: business.business_type, category: business.category };
 }
 
 async function isFullyCompleted(clientId) {
@@ -336,7 +341,7 @@ async function getClient(id) {
   if (!client) return null;
 
   const [businesses] = await db.query(
-    'SELECT id, client_id, business_name FROM client_businesses WHERE client_id = ? ORDER BY business_name ASC',
+    'SELECT id, client_id, business_name, status, business_type, category FROM client_businesses WHERE client_id = ? ORDER BY business_name ASC',
     [id]
   );
   const counts = await getProjectCounts(businesses.map((b) => b.id));
@@ -398,13 +403,11 @@ async function removeBusiness(businessId) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    const [projects] = await conn.query('SELECT id FROM projects WHERE client_business_id = ?', [businessId]);
-    for (const p of projects) {
-      await conn.query('DELETE FROM projects WHERE id = ?', [p.id]);
-    }
-    // Tasks linked directly to this business (no project) must be removed
-    // explicitly — their client_business_id FK is ON DELETE SET NULL.
+
+    await conn.query('DELETE FROM projects WHERE client_business_id = ?', [businessId]);
+
     await conn.query('DELETE FROM tasks WHERE client_business_id = ?', [businessId]);
+
     const [result] = await conn.query('DELETE FROM client_businesses WHERE id = ?', [businessId]);
     await conn.commit();
     return result.affectedRows;
@@ -425,20 +428,17 @@ async function remove(id) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
+
     const [businesses] = await conn.query('SELECT id FROM client_businesses WHERE client_id = ?', [id]);
-    for (const b of businesses) {
-      const [projects] = await conn.query('SELECT id FROM projects WHERE client_business_id = ?', [b.id]);
-      for (const p of projects) {
-        await conn.query('DELETE FROM projects WHERE id = ?', [p.id]);
-      }
-      // Tasks linked directly to this business (no project) must be removed
-      // explicitly — their client_business_id FK is ON DELETE SET NULL.
-      await conn.query('DELETE FROM tasks WHERE client_business_id = ?', [b.id]);
-      await conn.query('DELETE FROM client_businesses WHERE id = ?', [b.id]);
+    const businessIds = businesses.map((b) => b.id);
+    if (businessIds.length > 0) {
+      const placeholders = businessIds.map(() => '?').join(',');
+      await conn.query(`DELETE FROM projects WHERE client_business_id IN (${placeholders})`, businessIds);
+      await conn.query(`DELETE FROM tasks WHERE client_business_id IN (${placeholders})`, businessIds);
     }
-    // Tasks linked directly to the client (no business/project) must also be
-    // removed explicitly.
+
     await conn.query('DELETE FROM tasks WHERE client_id = ?', [id]);
+
     const [result] = await conn.query('DELETE FROM clients WHERE id = ?', [id]);
     await conn.commit();
     return result.affectedRows;
@@ -452,7 +452,7 @@ async function remove(id) {
 
 async function getClientBusiness(clientId, businessId) {
   const [rows] = await db.query(
-    'SELECT id, client_id, business_name FROM client_businesses WHERE id = ? AND client_id = ? LIMIT 1',
+    'SELECT id, client_id, business_name, status, business_type, category FROM client_businesses WHERE id = ? AND client_id = ? LIMIT 1',
     [businessId, clientId]
   );
   return rows[0] || null;
@@ -460,19 +460,37 @@ async function getClientBusiness(clientId, businessId) {
 
 async function getClientBusinessById(businessId) {
   const [rows] = await db.query(
-    'SELECT id, client_id, business_name FROM client_businesses WHERE id = ? LIMIT 1',
+    'SELECT id, client_id, business_name, status, business_type, category FROM client_businesses WHERE id = ? LIMIT 1',
     [businessId]
   );
   return rows[0] || null;
 }
 
 async function updateBusiness(clientId, businessId, data) {
-  const { business_name } = data;
-  if (!business_name) return 0;
-
+  const { business_name, business_type, status, category } = data;
+  const sets = [];
+  const params = [];
+  if (business_name !== undefined) {
+    sets.push('business_name = ?');
+    params.push(String(business_name).trim());
+  }
+  if (business_type !== undefined) {
+    sets.push('business_type = ?');
+    params.push(business_type);
+  }
+  if (status !== undefined) {
+    sets.push('status = ?');
+    params.push(status);
+  }
+  if (category !== undefined) {
+    sets.push('category = ?');
+    params.push(category);
+  }
+  if (sets.length === 0) return 0;
+  params.push(businessId, clientId);
   const [result] = await db.query(
-    'UPDATE client_businesses SET business_name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND client_id = ?',
-    [business_name, businessId, clientId]
+    `UPDATE client_businesses SET ${sets.join(', ')}, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND client_id = ?`,
+    params
   );
   return result.affectedRows;
 }

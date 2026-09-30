@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { fetchBusinesses, fetchDepartments, fetchPositions, fetchUsers } from '@/features/sop-management/services/assignmentService';
 
 export function useAssignmentCascade() {
@@ -14,6 +14,8 @@ export function useAssignmentCascade() {
   const [loading, setLoading] = useState({ businesses: false, departments: false, positions: false, users: false });
   const [totalUsers, setTotalUsers] = useState(0);
   const [userSearch, setUserSearch] = useState('');
+  const autoSelectUsersRef = useRef(false);
+  const userDepartmentMapRef = useRef({});
 
   useEffect(() => {
     setLoading((p) => ({ ...p, businesses: true }));
@@ -88,6 +90,7 @@ export function useAssignmentCascade() {
         setUsers([]);
         setTotalUsers(0);
         setSelectedUserIds([]);
+        userDepartmentMapRef.current = {};
         return;
       }
       setLoading((p) => ({ ...p, users: true }));
@@ -120,13 +123,24 @@ export function useAssignmentCascade() {
         }
         setUsers(allUsers);
         setTotalUsers(allUsers.length);
+        const deptUserMap = {};
+        allUsers.forEach((u) => {
+          deptUserMap[u.id] = u.department_id;
+        });
+        userDepartmentMapRef.current = deptUserMap;
+        if (autoSelectUsersRef.current) {
+          const newUserIds = allUsers.map((u) => u.id);
+          setSelectedUserIds((prev) => Array.from(new Set([...prev, ...newUserIds])));
+          autoSelectUsersRef.current = false;
+        }
       } catch {
         setUsers([]);
         setTotalUsers(0);
+        userDepartmentMapRef.current = {};
       }
       setLoading((p) => ({ ...p, users: false }));
     },
-    [userSearch, deptMap, businessMap]
+    [userSearch, deptMap, businessMap, setSelectedUserIds]
   );
 
   useEffect(() => {
@@ -140,20 +154,65 @@ export function useAssignmentCascade() {
     }
   }, [selectedDeptIds, userSourceDeptIds, loadUsers]);
 
-  const toggleBusiness = useCallback((id) =>
-    setSelectedBusinessIds((prev) => {
-      const next = prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id];
-      setSelectedDeptIds([]);
-      setSelectedPositions([]);
-      setUsers([]);
-      setSelectedUserIds([]);
-      return next;
-    }), []);
+  const hasAppliedBusinessCascadeRef = useRef(false);
 
-  const toggleDepartment = useCallback((id) =>
-    setSelectedDeptIds((prev) =>
-      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
-    ), []);
+  useEffect(() => {
+    if (!selectedBusinessIds.length) {
+      hasAppliedBusinessCascadeRef.current = false;
+      return;
+    }
+    if (!departments.length) return;
+    if (selectedDeptIds.length > 0) {
+      hasAppliedBusinessCascadeRef.current = true;
+      return;
+    }
+    if (hasAppliedBusinessCascadeRef.current) return;
+    const deptIds = departments.filter((d) => selectedBusinessIds.includes(d.business_id)).map((d) => d.id);
+    if (deptIds.length > 0) {
+      setSelectedDeptIds(deptIds);
+      setUserSourceDeptIds(deptIds);
+      autoSelectUsersRef.current = true;
+      hasAppliedBusinessCascadeRef.current = true;
+    }
+  }, [departments, selectedBusinessIds, selectedDeptIds]);
+
+  const toggleBusiness = useCallback((id) => {
+    setSelectedBusinessIds((prev) => {
+      const isAdding = !prev.includes(id);
+      if (isAdding) {
+        const deptIds = departments.filter((d) => d.business_id === id).map((d) => d.id);
+        setSelectedDeptIds(deptIds);
+        setSelectedPositions([]);
+        setUsers([]);
+        setSelectedUserIds([]);
+        setUserSourceDeptIds(deptIds);
+        autoSelectUsersRef.current = true;
+      } else {
+        const deptIds = departments.filter((d) => d.business_id === id).map((d) => d.id);
+        setSelectedDeptIds((prev) => prev.filter((d) => !deptIds.includes(d)));
+        setSelectedPositions([]);
+        setUsers([]);
+        setSelectedUserIds([]);
+        setUserSourceDeptIds((prev) => prev.filter((d) => !deptIds.includes(d)));
+      }
+      return isAdding ? [...prev, id] : prev.filter((b) => b !== id);
+    });
+  }, [departments]);
+
+  const toggleDepartment = useCallback((id) => {
+    setSelectedDeptIds((prev) => {
+      const isAdding = !prev.includes(id);
+      if (!isAdding) {
+        const userIdsToRemove = Object.entries(userDepartmentMapRef.current)
+          .filter(([, deptId]) => deptId === id)
+          .map(([uid]) => parseInt(uid, 10));
+        setSelectedUserIds((current) => current.filter((uid) => !userIdsToRemove.includes(uid)));
+      } else {
+        autoSelectUsersRef.current = true;
+      }
+      return isAdding ? [...prev, id] : prev.filter((d) => d !== id);
+    });
+  }, []);
 
   const togglePosition = useCallback((name) =>
     setSelectedPositions((prev) =>

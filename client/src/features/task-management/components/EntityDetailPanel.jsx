@@ -26,6 +26,14 @@ const ENTITY_LABEL = {
   client: 'Client',
 };
 
+const BUSINESS_STATUS_LABEL = {
+  active: 'Active',
+  inactive: 'Inactive',
+  paused: 'Paused',
+  stopped: 'Stopped',
+  cancelled: 'Cancelled',
+};
+
 const STATUS_COLORS = {
   Pending: 'var(--ppm-status-pending)',
   'In Progress': 'var(--ppm-status-progress)',
@@ -657,12 +665,12 @@ function BusinessBody({ businessId, clientId, entity, open, onUpdated }) {
         <div>
           <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Status</label>
           <select
-            value={local.status || 'Active'}
+            value={local.status || 'active'}
             onChange={(e) => { const v = e.target.value; setLocal((p) => ({ ...p, status: v })); patch('status', v); }}
             className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs outline-none focus:border-[var(--color-primary)]"
           >
-            {['Active', 'On Hold', 'Completed', 'Cancelled'].map((s) => (
-              <option key={s} value={s}>{s}</option>
+            {['active', 'inactive', 'paused', 'stopped', 'cancelled'].map((s) => (
+              <option key={s} value={s}>{BUSINESS_STATUS_LABEL[s] || s}</option>
             ))}
           </select>
         </div>

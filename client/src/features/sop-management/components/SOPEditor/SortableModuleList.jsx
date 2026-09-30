@@ -51,7 +51,7 @@ function SortableModuleList({ modules, onEdit, onDelete, onReorder }) {
     if (oldIndex === -1 || newIndex === -1) return;
 
     const reordered = arrayMove(modules, oldIndex, newIndex);
-    onReorder?.(reordered);
+    onReorder?.(reordered.map((m, idx) => ({ moduleId: m.id, sortOrder: idx + 1 })));
   };
 
   return (
