@@ -256,7 +256,7 @@ async function addBusiness(clientId, businessName, businessType = null, category
 
 async function duplicateBusiness(businessId, actorId) {
   const [businessRows] = await db.query(
-    'SELECT id, client_id, business_name FROM client_businesses WHERE id = ? LIMIT 1',
+    'SELECT id, client_id, business_name, status, business_type, category FROM client_businesses WHERE id = ? LIMIT 1',
     [businessId]
   );
   const business = businessRows[0];
