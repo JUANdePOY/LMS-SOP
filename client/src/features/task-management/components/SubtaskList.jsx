@@ -54,10 +54,9 @@ function AddSubtaskRow({ parentId, depth, onAdd, autoFocus }) {
   );
 }
 
-function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, onAdd, onAssign, onStatusChange }) {
+function SubtaskRow({ node, canManage, onToggle, onDelete, onOpenTask, onAdd, onAssign, onStatusChange }) {
   const done = isCompleted(node);
   const userAssignees = (node.assignments || []).filter((a) => a.assignment_type === 'User');
-  const children = node.subtasks || [];
   const canEdit = Boolean(node.can_edit);
   const { isAnyAdmin, user } = useAuth();
   const [statusOpen, setStatusOpen] = useState(false);
@@ -83,7 +82,7 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
     <div>
       <div
         className="group flex items-center gap-2 py-2"
-        style={{ paddingLeft: depth * 16 + 8 }}
+        style={{ paddingLeft: 8 }}
       >
         <button
           type="button"
@@ -176,29 +175,6 @@ function SubtaskRow({ node, depth, canManage, onToggle, onDelete, onOpenTask, on
           </button>
         ) : null}
       </div>
-
-      {children.length > 0 && (
-        <div>
-          {children.map((child) => (
-            <SubtaskRow
-              key={child.id}
-              node={child}
-              depth={depth + 1}
-              canManage={canManage}
-              onToggle={onToggle}
-              onDelete={onDelete}
-              onOpenTask={onOpenTask}
-              onAdd={onAdd}
-              onAssign={onAssign}
-              onStatusChange={onStatusChange}
-            />
-          ))}
-        </div>
-      )}
-
-      {canManage || canEdit ? (
-        <AddSubtaskRow parentId={node.id} depth={depth + 1} onAdd={onAdd} />
-      ) : null}
     </div>
   );
 }
@@ -267,7 +243,6 @@ export default function SubtaskList({ subtasks = [], canManage, onToggle, onDele
             <SubtaskRow
               key={node.id}
               node={node}
-              depth={0}
               canManage={canManage}
               onToggle={onToggle}
               onDelete={onDelete}

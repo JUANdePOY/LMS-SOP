@@ -1551,19 +1551,13 @@ function Row({ depth, kind, id, name, status, open, onToggle, dueDate, progress,
     if (onOpenBulkUpload) menuItems.push({ label: 'Bulk Upload', icon: Upload, onClick: () => { setMenuOpen(false); onOpenBulkUpload(); } });
     if (onDuplicateBusiness) menuItems.push({ label: 'Duplicate Business', icon: Copy, onClick: () => { setMenuOpen(false); onDuplicateBusiness(); } });
     if (canEdit) {
-      menuItems.push({ label: isBusinessSelected ? 'Deselect all tasks' : 'Select all tasks', icon: Check, onClick: () => { setMenuOpen(false); onToggleBusinessSelect?.(); } });
-      menuItems.push({ label: 'Select all businesses', icon: Check, onClick: () => { setMenuOpen(false); onSelectAllBusinesses?.(); } });
-      menuItems.push({ label: 'Unselect all businesses', icon: X, onClick: () => { setMenuOpen(false); onDeselectAllBusinesses?.(); } });
-      menuItems.push({ label: 'Bulk delete', icon: Trash2, danger: true, onClick: () => { setMenuOpen(false); onBulkDelete?.(businessTaskIds); } });
-      menuItems.push({ label: 'Bulk archive', icon: Archive, onClick: () => { setMenuOpen(false); onBulkArchive?.(businessTaskIds); } });
-      menuItems.push({ label: 'Bulk move', icon: Briefcase, onClick: () => { setMenuOpen(false); setSubview('move'); } });
-      menuItems.push({ label: 'Bulk update status', icon: RefreshCw, onClick: () => { setMenuOpen(false); setSubview('status'); } });
+      menuItems.push({ label: 'Rename', icon: Pencil, onClick: () => { setMenuOpen(false); setRenameSignal((s) => s + 1); } });
     }
   } else {
     menuItems.push({ label: `Add ${childNoun}`, icon: Plus, onClick: () => onAddChild?.(kind, id) });
   }
   if (canEdit) {
-    menuItems.push({ label: 'Rename', icon: Pencil, onClick: () => setRenameSignal((s) => s + 1) });
+    menuItems.push({ label: 'Rename', icon: Pencil, onClick: () => { setMenuOpen(false); setRenameSignal((s) => s + 1); } });
   }
   menuItems.push({ label: 'Delete', icon: Trash2, danger: true, onClick: () => { setMenuOpen(false); setConfirmDelete(true); } });
   menuItems.push({ label: 'Hide all empty groups', icon: EyeOff, onClick: () => { setMenuOpen(false); onHideEmptyGroups?.(); } });
