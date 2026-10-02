@@ -9,6 +9,10 @@ import AssignmentInput from './AssignmentInput';
 import DescriptionModal from './DescriptionModal';
 import UserAvatar from '@/shared/components/ui/Avatar';
 
+function stripHtml(html) {
+  return (html || '').replace(/<[^>]*>/g, '').trim();
+}
+
 
 function AssigneeStack({ items }) {
   if (!items || items.length === 0) {
@@ -383,20 +387,20 @@ const TaskRow = memo(function TaskRow({ task, onEdit, onDelete, onStatusChange, 
          )}
        </div>
 
-        <div className="min-w-0 overflow-hidden">
-          {canManage ? (
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setDescriptionOpen(true); }}
-              className="min-w-0 w-full truncate rounded-md px-1.5 py-0.5 -mx-1.5 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-page)]"
-              title="Click to edit description"
-            >
-              {task.description || <span className="text-[var(--text-muted)]">Click to add description</span>}
-            </button>
-          ) : (
-            <span className="min-w-0 w-full block truncate text-sm text-[var(--text-secondary)]">{task.description || '—'}</span>
-          )}
-        </div>
+         <div className="min-w-0 overflow-hidden">
+           {canManage ? (
+             <button
+               type="button"
+               onClick={(e) => { e.stopPropagation(); setDescriptionOpen(true); }}
+               className="min-w-0 w-full truncate rounded-md px-1.5 py-0.5 -mx-1.5 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-page)]"
+               title="Click to edit description"
+             >
+               {task.description ? stripHtml(task.description) : <span className="text-[var(--text-muted)]">Click to add description</span>}
+             </button>
+           ) : (
+             <span className="min-w-0 w-full block truncate text-sm text-[var(--text-secondary)]">{task.description ? stripHtml(task.description) : '—'}</span>
+           )}
+         </div>
 
        <DescriptionModal
          open={descriptionOpen}

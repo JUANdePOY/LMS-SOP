@@ -87,6 +87,7 @@ export default function ProjectTaskViews({
   onBulkDelete,
   onBulkUpdateStatus,
   onUpdateBusinessStatus,
+  onUpdateBusinessService,
   visibleBusinessIds,
 }) {
   const [internalView, setInternalView] = useState(() => {
@@ -172,8 +173,9 @@ export default function ProjectTaskViews({
                         onBulkMove={onBulkMove}
                         onBulkDelete={onBulkDelete}
                         onBulkUpdateStatus={onBulkUpdateStatus}
-                        onUpdateBusinessStatus={onUpdateBusinessStatus}
-                        visibleBusinessIds={visibleBusinessIds}
+                         onUpdateBusinessStatus={onUpdateBusinessStatus}
+                         onUpdateBusinessService={onUpdateBusinessService}
+                         visibleBusinessIds={visibleBusinessIds}
                       />
           )}
           {view === 'board' && (

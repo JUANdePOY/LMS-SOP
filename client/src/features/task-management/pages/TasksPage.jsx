@@ -204,6 +204,17 @@ export default function TasksPage() {
     }
   }, [toast, loadProjects]);
 
+  const handleUpdateBusinessService = useCallback(async (businessId, clientId, category) => {
+    try {
+      await updateClientBusiness(clientId, businessId, { category });
+      toast.success('Service updated');
+      loadProjects();
+      notifyOrgTreeChanged();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Failed to update service');
+    }
+  }, [toast, loadProjects]);
+
   const renameTask = useCallback(async (id, title) => {
     try {
       await update(id, { title });
@@ -443,21 +454,7 @@ export default function TasksPage() {
       }
       return null;
     };
-    if (user?.role === 'admin' && user?.business_id != null) {
-      const adminBizId = String(user.business_id);
-      const adminClientIds = new Set(
-        (clientTree || [])
-          .filter((c) => c.business_id != null && String(c.business_id) === adminBizId)
-          .map((c) => String(c.id))
-      );
-      result = result.filter((t) => {
-        if (t.business_id != null && String(t.business_id) === adminBizId) return true;
-        const scope = taskClientId(t);
-        if (scope?.clientId != null && adminClientIds.has(String(scope.clientId))) return true;
-        return false;
-      });
-    }
-    if (isDepartmentHead && user?.department_id != null) {
+    if (user?.role === 'department_head' && user?.department_id != null) {
       const deptId = String(user.department_id);
       const sopBizId = user?.department_business_id != null || user?.business_id != null
         ? String(user.department_business_id ?? user.business_id)
@@ -500,7 +497,7 @@ export default function TasksPage() {
       const q = search.toLowerCase();
       result = result.filter((t) =>
         (t.title || '').toLowerCase().includes(q) ||
-        (t.description || '').toLowerCase().includes(q)
+        (t.description || '').replace(/<[^>]*>/g, '').toLowerCase().includes(q)
       );
     }
     if (statusFilter) {
@@ -558,13 +555,6 @@ export default function TasksPage() {
         return client;
       }).filter(Boolean);
     }
-    if (user?.role === 'admin' && user?.business_id != null) {
-      const adminBizId = String(user.business_id);
-      result = result.filter((c) => {
-        if (c.business_id != null && String(c.business_id) === adminBizId) return true;
-        return (c.businesses || []).some((b) => String(b.id) === adminBizId);
-      });
-    }
     if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null)) {
       const sopBizId = String(user.department_business_id ?? user.business_id);
       const deptId = user?.department_id != null ? String(user.department_id) : null;
@@ -590,7 +580,7 @@ export default function TasksPage() {
       return scopedClientTree.map((client) => ({
         ...client,
         businesses: (client.businesses || []).filter((b) => b.status !== 'archived'),
-      })).filter((c) => (c.businesses || []).length > 0);
+      })).filter((c) => (c.businesses || []).length > 0 || c.business_id != null);
     }
     return scopedClientTree.map((client) => ({
       ...client,
@@ -603,7 +593,7 @@ export default function TasksPage() {
         }
         return b.category === businessCategory;
       }),
-    })).filter((c) => (c.businesses || []).length > 0);
+    })).filter((c) => (c.businesses || []).length > 0 || c.business_id != null);
   }, [scopedClientTree, businessCategory]);
 
   const categoryFilteredTasks = useMemo(() => {
@@ -692,21 +682,6 @@ export default function TasksPage() {
   }, [businessParam, clientParam, projectsById, clientTree, projectParam]);
 
   const scopedProjectsById = useMemo(() => {
-    if (user?.role === 'admin' && user?.business_id != null && !clientParam && !businessParam && !projectParam) {
-      const adminBizId = String(user.business_id);
-      const validClientIds = new Set(
-        (clientTree || [])
-          .filter((c) => c.business_id != null && String(c.business_id) === adminBizId)
-          .map((c) => String(c.id))
-      );
-      const scoped = {};
-      for (const p of Object.values(projectsById)) {
-        if (p.client_id != null && validClientIds.has(String(p.client_id))) {
-          scoped[String(p.id)] = p;
-        }
-      }
-      return scoped;
-    }
     if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null) && !clientParam && !businessParam && !projectParam) {
       const sopBizId = String(user.department_business_id ?? user.business_id);
       const deptId = user?.department_id != null ? String(user.department_id) : null;
@@ -1270,8 +1245,9 @@ export default function TasksPage() {
                onBulkMove={handleBulkMove}
                onBulkDelete={handleBulkDelete}
                onBulkUpdateStatus={handleBulkUpdateStatus}
-               onUpdateBusinessStatus={updateBusinessStatus}
-               visibleBusinessIds={visibleBusinessIds}
+                onUpdateBusinessStatus={updateBusinessStatus}
+                onUpdateBusinessService={handleUpdateBusinessService}
+                visibleBusinessIds={visibleBusinessIds}
               />
       )}
 

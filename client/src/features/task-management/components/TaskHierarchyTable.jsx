@@ -174,7 +174,7 @@ function AddClientForm({ onCommit, onCancel, onExpandBusiness, userRole = '', us
   const [touched, setTouched] = useState(false);
   const inputRef = useRef(null);
 
-  const isSuperAdmin = userRole === 'super_admin';
+  const isSuperAdmin = userRole === 'super_admin' || userRole === 'admin';
   const isDepartmentHead = userRole === 'department_head';
 
   // Sequential stepper state. Super admins walk business → department → name;
@@ -220,11 +220,9 @@ function AddClientForm({ onCommit, onCancel, onExpandBusiness, userRole = '', us
     return () => { active = false; };
   }, [isDepartmentHead, deptHeadBizId, deptHeadDeptId]);
 
-  // Departments filtered to the selected business (super_admin + admin).
   const departmentsForBusiness = useMemo(() => {
-    if (!businessId) return [];
-    return departments.filter((d) => String(d.business_id) === String(businessId));
-  }, [departments, businessId]);
+    return departments || [];
+  }, [departments]);
 
   // For admins the business is locked to their own; departments are filtered to
   // that business automatically. Re-derive the admin's department list whenever
@@ -736,12 +734,19 @@ const BUSINESS_CATEGORIES = [
   { value: 'none', label: 'None' },
   { value: 'local_seo', label: 'Local SEO' },
   { value: 'full_seo', label: 'Full SEO' },
+  { value: 'va', label: 'VA' },
+  { value: 'orders', label: 'Orders' },
 ];
 
 function InlineBusinessForm({ indent = 0, onSubmit, onCancel }) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState('none');
   const [submitting, setSubmitting] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const commit = async () => {
     const next = name.trim();
@@ -768,6 +773,7 @@ function InlineBusinessForm({ indent = 0, onSubmit, onCancel }) {
     >
       <span className="h-2 w-2 shrink-0 rounded-full bg-[var(--color-primary)] opacity-40" aria-hidden="true" />
       <input
+        ref={inputRef}
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
@@ -846,6 +852,7 @@ export default function TaskHierarchyTable({
   onBulkDelete,
   onBulkUpdateStatus,
   onUpdateBusinessStatus,
+  onUpdateBusinessService,
   visibleBusinessIds = new Set(),
 }) {
   const { toast } = useToast();
@@ -1265,8 +1272,9 @@ export default function TaskHierarchyTable({
                              onBulkMove={onBulkMove}
                              onBulkDelete={onBulkDelete}
                              onBulkUpdateStatus={onBulkUpdateStatus}
-                             onUpdateBusinessStatus={onUpdateBusinessStatus}
-                             businessTaskIds={business.tasks.map((t) => t.id)}
+                              onUpdateBusinessStatus={onUpdateBusinessStatus}
+                              onUpdateBusinessService={onUpdateBusinessService}
+                              businessTaskIds={business.tasks.map((t) => t.id)}
                              allBusinesses={allBusinesses}
                              anyBusinessSelected={selectedBusinessIds.size > 0}
                              onSelectAllBusinesses={handleSelectAllBusinesses}
@@ -1490,16 +1498,17 @@ const LEVEL_STYLE = {
    business: { font: 'font-normal',  size: 'text-sm', tracking: '', leading: '' },
 };
 
-function Row({ depth, kind, id, name, status, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false, businessManagers = null, businessDepartments = null, onBusinessAssigneeSave, count = null, countLabel = '', userRole = '', userDepartmentId = null, userBusinessId = null, onOpenBulkUpload = null, onDuplicateBusiness = null, isBusinessSelected = false, onToggleBusinessSelect, onBulkArchive, onBulkMove, onBulkDelete, onBulkUpdateStatus, businessTaskIds = [], anyBusinessSelected = false, onSelectAllBusinesses, onDeselectAllBusinesses, clientId = null, onUpdateBusinessStatus = null }) {
+function Row({ depth, kind, id, name, status, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false, businessManagers = null, businessDepartments = null, onBusinessAssigneeSave, count = null, countLabel = '', userRole = '', userDepartmentId = null, userBusinessId = null, onOpenBulkUpload = null, onDuplicateBusiness = null, isBusinessSelected = false, onToggleBusinessSelect, onBulkArchive, onBulkMove, onBulkDelete, onBulkUpdateStatus, onUpdateBusinessStatus = null, businessTaskIds = [], anyBusinessSelected = false, onSelectAllBusinesses, onDeselectAllBusinesses, clientId = null, onUpdateBusinessService = null }) {
   const level = LEVEL_STYLE[kind] || LEVEL_STYLE.business;
   const meta = KIND_META[kind];
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [renameSignal, setRenameSignal] = useState(0);
   const [menuCoords, setMenuCoords] = useState({ top: 0, left: 0 });
-  const menuRef = useClickOutside(() => { setMenuOpen(false); setConfirmDelete(false); setSubview(null); });
+  const menuRef = useClickOutside(() => { setMenuOpen(false); setConfirmDelete(false); setSubview(null); setSubmenuLabel(''); });
   const menuTriggerRef = useRef(null);
   const [Subview, setSubview] = useState(null);
+  const [submenuLabel, setSubmenuLabel] = useState('');
 
   // Position the action menu with fixed coordinates so it escapes the table's
   // overflow-x-auto scroll container and isn't painted under later rows (e.g. a
@@ -1540,7 +1549,7 @@ function Row({ depth, kind, id, name, status, open, onToggle, dueDate, progress,
       window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', update);
     };
-  }, [menuOpen, confirmDelete]);
+  }, [menuOpen, confirmDelete, submenuLabel]);
 
   const childNoun = kind === 'client' ? 'business' : 'task';
   const addTitle = `Add ${childNoun}`;
@@ -1550,6 +1559,16 @@ function Row({ depth, kind, id, name, status, open, onToggle, dueDate, progress,
     if (onAddTask) menuItems.push({ label: 'New Task', icon: Plus, onClick: () => { setMenuOpen(false); onAddTask(); } });
     if (onOpenBulkUpload) menuItems.push({ label: 'Bulk Upload', icon: Upload, onClick: () => { setMenuOpen(false); onOpenBulkUpload(); } });
     if (onDuplicateBusiness) menuItems.push({ label: 'Duplicate Business', icon: Copy, onClick: () => { setMenuOpen(false); onDuplicateBusiness(); } });
+    if (onUpdateBusinessService) {
+      menuItems.push({
+        label: 'Services',
+        icon: Briefcase,
+        submenu: BUSINESS_CATEGORIES.filter((c) => c.value !== 'none').map((c) => ({
+          label: c.label,
+          onClick: () => { setMenuOpen(false); onUpdateBusinessService(id, clientId, c.value); },
+        })),
+      });
+    }
     if (canEdit) {
       menuItems.push({ label: 'Rename', icon: Pencil, onClick: () => { setMenuOpen(false); setRenameSignal((s) => s + 1); } });
     }
@@ -1695,22 +1714,65 @@ function Row({ depth, kind, id, name, status, open, onToggle, dueDate, progress,
             style={{ position: 'fixed', top: menuCoords.top, left: menuCoords.left, zIndex: 50 }}
             className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] py-1 shadow-[0_2px_8px_rgba(0,0,0,0.08)] dark:shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
           >
-            {menuOpen && menuItems.map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={item.onClick}
-                className={cn(
-                  'flex w-48 items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors duration-150 ease-out motion-reduce:transition-none',
-                  item.danger
-                    ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40'
-                    : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
-                )}
-              >
-                {item.icon && <item.icon size={13} />}
-                {item.label}
-              </button>
-            ))}
+            {menuOpen && !submenuLabel && menuItems.map((item) => {
+              if (item.submenu) {
+                return (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => { setSubmenuLabel(item.label); }}
+                    className={cn(
+                      'flex w-48 items-center justify-between px-3 py-1.5 text-left text-xs transition-colors duration-150 ease-out motion-reduce:transition-none',
+                      'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      {item.icon && <item.icon size={13} />}
+                      {item.label}
+                    </span>
+                    <span className="text-[10px] text-[var(--text-muted)]">›</span>
+                  </button>
+                );
+              }
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={item.onClick}
+                  className={cn(
+                    'flex w-48 items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors duration-150 ease-out motion-reduce:transition-none',
+                    item.danger
+                      ? 'text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40'
+                      : 'text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]'
+                  )}
+                >
+                  {item.icon && <item.icon size={13} />}
+                  {item.label}
+                </button>
+              );
+            })}
+            {submenuLabel && (
+              <div className="border-t border-[var(--border)] pt-1">
+                <div className="px-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">{submenuLabel}</div>
+                {menuItems.find((i) => i.label === submenuLabel)?.submenu?.map((sub) => (
+                  <button
+                    key={sub.label}
+                    type="button"
+                    onClick={sub.onClick}
+                    className="flex w-48 items-center px-3 py-1.5 text-left text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
+                  >
+                    {sub.label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setSubmenuLabel('')}
+                  className="flex w-48 items-center px-3 py-1.5 text-left text-xs text-[var(--text-muted)] hover:bg-[var(--bg-surface-hover)]"
+                >
+                  ← Back
+                </button>
+              </div>
+            )}
             {Subview === 'status' && (
               <div className="border-t border-[var(--border)] pt-1">
                 {TASK_STATUSES.map((s) => (

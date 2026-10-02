@@ -211,17 +211,17 @@ export function AuthProvider({ children }) {
 
   const hasPermission = useCallback((permission) => {
     if (!permission || !Array.isArray(permissions)) return false;
-    if (isSuperAdmin) return true;
+    if (isSuperAdmin || isAdmin) return true;
     return permissions.includes(permission);
-  }, [permissions, isSuperAdmin]);
+  }, [permissions, isSuperAdmin, isAdmin]);
 
   const hasPermissionAction = useCallback((permission, action) => {
     if (!permission || !action || !Array.isArray(permissionDetails)) return false;
-    if (isSuperAdmin) return true;
+    if (isSuperAdmin || isAdmin) return true;
     const detail = permissionDetails.find((d) => d.name === permission);
     if (!detail || !Array.isArray(detail.actions)) return false;
     return detail.actions.includes(action);
-  }, [permissionDetails, isSuperAdmin]);
+  }, [permissionDetails, isSuperAdmin, isAdmin]);
 
   const canCreateSops = isSuperAdmin || isAdmin || isDepartmentHead || hasPermission('create_sops');
 

@@ -24,7 +24,7 @@ router.get('/', async (req, res) => {
     // heads) are NOT rejected: the navigation tree needs the SOP businesses that
     // own the clients they manage. We return just those businesses so the panel
     // can render without leaking unrelated businesses.
-    const callsAll = req.user.role === 'super_admin';
+    const callsAll = ['super_admin', 'admin'].includes(req.user.role);
     const scopedBusinessId = !callsAll ? req.user.business_id : null;
 
     let result;
@@ -75,7 +75,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Business not found', code: 'NOT_FOUND' });
     }
 
-    if (req.user.role !== 'super_admin' && req.user.business_id !== businessId) {
+    if (!['super_admin', 'admin'].includes(req.user.role) && req.user.business_id !== businessId) {
       return res.status(403).json({ status: 'error', message: 'You don\'t have access to this business.', code: 'BUSINESS_SCOPE_DENIED' });
     }
 

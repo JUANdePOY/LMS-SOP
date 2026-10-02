@@ -347,9 +347,8 @@ async function getDepartmentTreeForBusiness(businessId) {
             ) AS sop_count
      FROM departments d
      LEFT JOIN users m ON d.head_user_id = m.id
-     WHERE d.business_id = ? AND d.parent_department_id IS NULL
-     ORDER BY d.name ASC`,
-    [businessId]
+     WHERE d.parent_department_id IS NULL
+     ORDER BY d.name ASC`
   );
 
   for (const dept of rootDepts) {

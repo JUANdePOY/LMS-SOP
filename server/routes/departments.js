@@ -14,7 +14,6 @@ router.use(authenticateToken);
 
 router.get('/', async (req, res) => {
   try {
-    let effectiveBusinessId = undefined;
     let effectiveDepartmentId = undefined;
 
     if (req.user.role === 'department_head') {
@@ -22,18 +21,12 @@ router.get('/', async (req, res) => {
         return res.status(403).json({ status: 'error', message: 'No department assigned', code: 'NO_DEPARTMENT_SCOPE' });
       }
       effectiveDepartmentId = req.user.department_id;
-    } else if (req.user.role !== 'super_admin') {
-      if (!req.user.business_id) {
-        return res.status(403).json({ status: 'error', message: 'No business scope assigned', code: 'NO_BUSINESS_SCOPE' });
-      }
-      effectiveBusinessId = req.user.business_id;
     }
 
     const { search, status, page = 1, limit = 50 } = req.query;
     const result = await departmentModel.findAll({
       search: search || undefined,
       status: status || undefined,
-      business_id: effectiveBusinessId,
       department_id: effectiveDepartmentId,
       page: parseInt(page),
       limit: parseInt(limit),
@@ -92,23 +85,12 @@ router.post('/', [
 
     const { name, code, description, parent_department_id, head_user_id, business_id, status } = req.body;
 
-    let finalBusinessId = business_id ? parseInt(business_id) : null;
-    if (req.user.role !== 'super_admin') {
-      if (!req.user.business_id) {
-        return res.status(403).json({ status: 'error', message: 'No business scope assigned', code: 'NO_BUSINESS_SCOPE' });
-      }
-      if (finalBusinessId && finalBusinessId !== req.user.business_id) {
-        return res.status(403).json({ status: 'error', message: 'Cannot create departments in another business', code: 'BUSINESS_SCOPE_DENIED' });
-      }
-      finalBusinessId = req.user.business_id;
-    }
-
     const existing = await departmentModel.findByCode(code);
     if (existing) {
       return res.status(409).json({ status: 'error', message: 'Department code already exists', code: 'CODE_EXISTS' });
     }
 
-    const departmentId = await departmentModel.create({ name, code, description, parent_department_id, head_user_id, business_id: finalBusinessId, status });
+    const departmentId = await departmentModel.create({ name, code, description, parent_department_id, head_user_id, business_id: null, status });
 
     logAudit({
       user_id: req.user.id,
@@ -150,23 +132,12 @@ router.put('/:id', [
       return res.status(403).json({ status: 'error', message: 'Admin access required', code: 'ADMIN_REQUIRED' });
     }
 
-    if (req.user.role !== 'super_admin' && req.user.business_id !== targetDept.business_id) {
-      return res.status(403).json({ status: 'error', message: 'Cannot update departments outside your business', code: 'BUSINESS_SCOPE_DENIED' });
-    }
-
     const updates = {};
-    const allowed = ['name', 'code', 'description', 'parent_department_id', 'head_user_id', 'business_id', 'status'];
+    const allowed = ['name', 'code', 'description', 'parent_department_id', 'head_user_id', 'status'];
     for (const key of allowed) {
       if (req.body[key] !== undefined) {
         updates[key] = req.body[key];
       }
-    }
-
-    if (req.user.role !== 'super_admin') {
-      if (updates.business_id !== undefined && updates.business_id !== null && updates.business_id !== req.user.business_id) {
-        return res.status(403).json({ status: 'error', message: 'Cannot move departments to another business', code: 'BUSINESS_SCOPE_DENIED' });
-      }
-      updates.business_id = req.user.business_id;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -244,7 +215,7 @@ router.get('/:id/scope-grants', requireAdmin, async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'Department not found', code: 'NOT_FOUND' });
     }
 
-    if (req.user.role !== 'super_admin' && req.user.business_id !== targetDept.business_id) {
+    if (!['super_admin', 'admin'].includes(req.user.role) && req.user.business_id !== targetDept.business_id) {
       return res.status(403).json({ status: 'error', message: 'You don\'t have access to this department.', code: 'BUSINESS_SCOPE_DENIED' });
     }
 
@@ -279,7 +250,7 @@ router.put('/:id/scope-grants', requireAdmin, [
       return res.status(404).json({ status: 'error', message: 'Department not found', code: 'NOT_FOUND' });
     }
 
-    if (req.user.role !== 'super_admin' && req.user.business_id !== targetDept.business_id) {
+    if (!['super_admin', 'admin'].includes(req.user.role) && req.user.business_id !== targetDept.business_id) {
       return res.status(403).json({ status: 'error', message: 'Cannot manage scope for another business', code: 'BUSINESS_SCOPE_DENIED' });
     }
 

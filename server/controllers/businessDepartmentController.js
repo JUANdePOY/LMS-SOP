@@ -12,7 +12,7 @@ function sendError(res, err, fallback = 'Request failed') {
 
 async function requireClientBusinessScope(req, res, next) {
   try {
-    if (req.user.role === 'super_admin') return next();
+    if (['super_admin', 'admin'].includes(req.user.role)) return next();
     if (!['super_admin', 'admin', 'department_head'].includes(req.user.role)) {
       return res.status(403).json({ success: false, message: 'You don\'t have permission to manage business departments.', code: 'FORBIDDEN' });
     }

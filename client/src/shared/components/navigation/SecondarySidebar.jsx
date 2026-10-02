@@ -200,14 +200,8 @@ export default function SecondarySidebar({ collapsed = false }) {
         toast.error('Create an SOP business first');
         return;
       }
-      if (user?.role === 'super_admin') {
+      if (user?.role === 'super_admin' || user?.role === 'admin') {
         setClientBizPicker(true);
-      } else if (user?.role === 'admin') {
-        setAddingClientBiz(user?.business_id ?? null);
-        setAddingClientDeptId(null);
-        setClientDeptPicker(user?.business_id ?? null);
-        setClientNamePicker(false);
-        setClientBizPicker(false);
       } else {
         // Department Head: business + department come from the actor's own
         // scope, so only the name field is needed.
@@ -377,10 +371,8 @@ export default function SecondarySidebar({ collapsed = false }) {
   // created under a given business can only be assigned to one of that
   // business's departments — the picker must reflect that scope.
   const departmentsForBusiness = useMemo(() => {
-    const bizId = clientDeptPicker;
-    if (bizId == null || bizId === '') return departments;
-    return departments.filter((d) => String(d.business_id) === String(bizId));
-  }, [departments, clientDeptPicker]);
+    return departments || [];
+  }, [departments]);
 
    const tasksBase = isAnyAdmin ? '/tasks' : '/tasks/my';
    const q = query.trim().toLowerCase();

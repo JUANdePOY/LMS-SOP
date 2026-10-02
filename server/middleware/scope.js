@@ -2,7 +2,7 @@ const db = require('../config/database');
 
 function requireBusinessScope(businessIdParam = 'businessId') {
   return async (req, res, next) => {
-    if (req.user.role === 'super_admin') {
+    if (['super_admin', 'admin'].includes(req.user?.role)) {
       return next();
     }
 
@@ -168,7 +168,7 @@ async function resolveUserPermissionDetails(userId, role) {
 function requirePermission(permissionName) {
   return async (req, res, next) => {
     const role = req.user?.role || '';
-    if (role === 'super_admin') {
+    if (['super_admin', 'admin'].includes(role)) {
       return next();
     }
 
@@ -197,7 +197,7 @@ function requirePermission(permissionName) {
 
 function requirePermissionAction(permissionName, action) {
   return async (req, res, next) => {
-    if (req.user?.role === 'super_admin') {
+    if (['super_admin', 'admin'].includes(req.user?.role)) {
       return next();
     }
 
@@ -280,7 +280,7 @@ function buildEntityAccessMap(entityOverrides) {
 
 function canAccessEntity(user, entityType, entityId) {
   if (!user) return false;
-  if (user.role === 'super_admin') return true;
+  if (['super_admin', 'admin'].includes(user.role)) return true;
   const overrides = user.entity_overrides || [];
   const accessMap = buildEntityAccessMap(overrides);
   const typeAccess = accessMap.get(entityType);
@@ -292,7 +292,7 @@ function canAccessEntity(user, entityType, entityId) {
 
 function isEntityTypeDeniedForUser(user, entityType) {
   if (!user) return false;
-  if (user.role === 'super_admin') return false;
+  if (['super_admin', 'admin'].includes(user.role)) return false;
   const overrides = user.entity_overrides || [];
   const accessMap = buildEntityAccessMap(overrides);
   const typeAccess = accessMap.get(entityType);
@@ -305,7 +305,7 @@ function requireEntityTypeAccess(entityType) {
     if (!req.user) {
       return res.status(401).json({ status: 'error', message: 'Please log in to continue.', code: 'UNAUTHENTICATED' });
     }
-    if (req.user.role === 'super_admin') {
+    if (['super_admin', 'admin'].includes(req.user.role)) {
       return next();
     }
     if (isEntityTypeDeniedForUser(req.user, entityType)) {

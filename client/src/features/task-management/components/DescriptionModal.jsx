@@ -1,28 +1,15 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { X, AlignLeft } from 'lucide-react';
+import TaskRichTextEditor from './TaskRichTextEditor';
 
 const DescriptionModal = memo(function DescriptionModal({ open, onClose, onSubmit, initialDescription }) {
   const [value, setValue] = useState(initialDescription || '');
-  const textareaRef = useRef(null);
 
   useEffect(() => {
     if (open) {
       setValue(initialDescription || '');
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-        }
-      }, 0);
     }
   }, [open, initialDescription]);
-
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, [value]);
 
   if (!open) return null;
 
@@ -39,7 +26,7 @@ const DescriptionModal = memo(function DescriptionModal({ open, onClose, onSubmi
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-sm" onClick={handleClose} />
-      <div className="relative z-10 w-full max-w-lg rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-2xl">
+      <div className="relative z-10 w-full max-w-2xl rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] shadow-2xl">
         <div className="flex items-center justify-between border-b border-[var(--border)] px-4 sm:px-6 py-4">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] dark:bg-[var(--color-primary)]/15 dark:text-[var(--color-primary)]">
@@ -56,13 +43,11 @@ const DescriptionModal = memo(function DescriptionModal({ open, onClose, onSubmi
           </button>
         </div>
         <div className="px-4 sm:px-6 py-4">
-          <textarea
-            ref={textareaRef}
+          <TaskRichTextEditor
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={setValue}
             placeholder="Add a description..."
-            rows={1}
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 placeholder:text-[var(--text-muted)] resize-none transition-colors"
+            minHeight="180px"
           />
         </div>
         <div className="flex justify-end gap-2 border-t border-[var(--border)] px-4 sm:px-6 py-4">

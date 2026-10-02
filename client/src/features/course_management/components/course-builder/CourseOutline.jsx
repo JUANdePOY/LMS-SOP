@@ -136,16 +136,6 @@ export default function CourseOutline({
     onReorder?.(reordered);
   };
 
-  const handleLessonDragEnd = (event, moduleId, moduleLessons) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const oldIndex = moduleLessons.findIndex((l) => l.id === active.id);
-    const newIndex = moduleLessons.findIndex((l) => l.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
-    const reorderedLessons = arrayMove(moduleLessons, oldIndex, newIndex).map((l, i) => ({ ...l, order_index: i + 1 }));
-    onReorderLessons?.(moduleId, reorderedLessons);
-  };
-
   const toggleModule = (moduleId) => {
     setExpandedModules((prev) =>
       prev.includes(moduleId) ? prev.filter((id) => id !== moduleId) : [...prev, moduleId]
@@ -294,6 +284,16 @@ function ModuleOutlineItemInner({
     }
   };
 
+  const handleLessonDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = lessons.findIndex((l) => l.id === active.id);
+    const newIndex = lessons.findIndex((l) => l.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reorderedLessons = arrayMove(lessons, oldIndex, newIndex).map((l, i) => ({ ...l, order_index: i + 1 }));
+    onReorderLessons?.(module.id, reorderedLessons);
+  };
+
   return (
     <div
       {...(sortableAttributes || {})}
@@ -374,7 +374,7 @@ function ModuleOutlineItemInner({
       </div>
 
       {expanded && (
-        <DndContext sensors={lessonSensors} collisionDetection={closestCenter} onDragEnd={(event) => handleLessonDragEnd(event, module.id, lessons)}>
+        <DndContext sensors={lessonSensors} collisionDetection={closestCenter} onDragEnd={handleLessonDragEnd}>
           <SortableContext items={lessons.map((l) => l.id)} strategy={verticalListSortingStrategy}>
             <div className="border-t border-neutral-100 dark:border-neutral-800 px-2 py-1.5 space-y-0.5">
               {lessons.map((lesson, lIdx) => {

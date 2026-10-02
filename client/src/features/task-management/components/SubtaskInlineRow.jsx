@@ -6,6 +6,10 @@ import { validateTaskPayload } from '../utils/taskValidation';
 import CreateAssignmentModal from './CreateAssignmentModal';
 import DescriptionModal from './DescriptionModal';
 
+function stripHtml(html) {
+  return (html || '').replace(/<[^>]*>/g, '').trim();
+}
+
 function buildCreatePayload(title, assignments, start, end, description, parentTask) {
   return {
     title: title.trim(),
@@ -172,7 +176,7 @@ export default function SubtaskInlineRow({ parentTask, onSave, onCancel, canMana
           className="min-w-0 w-full truncate rounded-md px-1.5 py-0.5 -mx-1.5 text-left text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-page)]"
           title="Click to add description"
         >
-          {description || <span className="text-[var(--text-muted)]">Click to add description</span>}
+          {description ? stripHtml(description) : <span className="text-[var(--text-muted)]">Click to add description</span>}
         </button>
       </div>
 

@@ -1079,11 +1079,8 @@ export function BusinessAssigneePicker({ businessId, businessName, managers = []
     if (userRole === 'department_head' && userDepartmentId != null) {
       return options.filter((u) => String(u.department_id) === String(userDepartmentId));
     }
-    if (userRole === 'admin' && userBusinessId != null) {
-      return options.filter((u) => String(u.business_id) === String(userBusinessId));
-    }
     return options;
-  }, [options, userRole, userDepartmentId, userBusinessId]);
+  }, [options, userRole, userDepartmentId]);
 
   const selectable = tab === 'people'
     ? filteredOptions.filter((u) => !grantedUserIds.has(String(u.id)))

@@ -210,9 +210,9 @@ const clientController = {
         return res.status(400).json({ success: false, message: 'Invalid business status', code: 'VALIDATION_ERROR' });
       }
 
-      const category = req.body.category === 'local_seo' || req.body.category === 'full_seo' ? req.body.category : 'none';
+       const category = ['none', 'local_seo', 'full_seo', 'va', 'orders'].includes(req.body.category) ? req.body.category : 'none';
 
-      await clientModel.updateBusiness(clientId, businessId, { business_name, business_type, status, category });
+       await clientModel.updateBusiness(clientId, businessId, { business_name, business_type, status, category });
       const updated = await clientModel.getClientBusiness(clientId, businessId);
       res.json({ success: true, data: updated, message: 'Business updated successfully' });
     } catch (error) {

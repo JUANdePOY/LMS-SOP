@@ -14,6 +14,8 @@ const BUSINESS_CATEGORIES = [
   { value: 'none', label: 'None' },
   { value: 'local_seo', label: 'Local SEO' },
   { value: 'full_seo', label: 'Full SEO' },
+  { value: 'va', label: 'VA' },
+  { value: 'orders', label: 'Orders' },
 ];
 
 export default function BusinessFormModal({ open, clientId, clientName, onClose, onCreated }) {

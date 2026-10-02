@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { TASK_PRIORITIES, TASK_STATUSES } from '../constants/taskConstants';
 import { validateTaskPayload } from '../utils/taskValidation';
 import AssignmentInput from './AssignmentInput';
+import TaskRichTextEditor from './TaskRichTextEditor';
 import { getBusinesses } from '../../organization-management/api/business.api';
 import { getClientOptions } from '../api/client.api';
 
@@ -228,12 +229,11 @@ function TaskForm({ show, onClose, onSubmit, saving, initialData, defaultValues,
 
           <div>
             <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">Description</label>
-            <textarea
+            <TaskRichTextEditor
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={setDescription}
               placeholder="Detailed instructions"
-              rows={3}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-page)] px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/40 placeholder:text-[var(--text-muted)]"
+              minHeight="150px"
             />
           </div>
 

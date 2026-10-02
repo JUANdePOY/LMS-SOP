@@ -33,7 +33,7 @@ router.get('/', async (req, res) => {
       }
       effectiveDepartmentId = req.user.department_id;
       effectiveBusinessId = req.user.business_id;
-    } else if (req.user.role !== 'super_admin') {
+    } else if (!['super_admin', 'admin'].includes(req.user.role)) {
       effectiveBusinessId = req.user.business_id;
     }
 
@@ -86,7 +86,7 @@ router.get('/leaderboard', async (req, res) => {
       }
       effectiveDepartmentId = req.user.department_id;
       effectiveBusinessId = req.user.business_id;
-    } else if (req.user.role !== 'super_admin') {
+    } else if (!['super_admin', 'admin'].includes(req.user.role)) {
       // Regular employees should only see their own department's leaderboard,
       // not everyone across the business.
       if (req.user.department_id) {
@@ -157,7 +157,7 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
     }
 
-    if (req.user.role !== 'super_admin' && req.user.business_id !== user.business_id) {
+    if (!['super_admin', 'admin'].includes(req.user.role) && req.user.business_id !== user.business_id) {
       return res.status(403).json({ status: 'error', message: 'You don\'t have access to this user.', code: 'BUSINESS_SCOPE_DENIED' });
     }
 
@@ -171,7 +171,7 @@ router.get('/:id', async (req, res) => {
 
 router.post('/', requireAdmin, requirePermissionAction('manage_users', 'create'), [
   body('full_name').trim().isLength({ min: 2 }).withMessage('Full name is required'),
-  body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+  body('email').isEmail().normalizeEmail({ all_lowercase: true, gmail_remove_dots: false }).withMessage('Valid email is required'),
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
   body('role').isIn(['super_admin', 'admin', 'department_head', 'employee']).withMessage('Invalid role'),
   body('department_id').optional().isInt(),
@@ -270,7 +270,7 @@ router.post('/', requireAdmin, requirePermissionAction('manage_users', 'create')
 
 router.put('/:id', [
   body('full_name').optional().trim().isLength({ min: 2 }),
-  body('email').optional().isEmail().normalizeEmail(),
+  body('email').optional().isEmail().normalizeEmail({ all_lowercase: true, gmail_remove_dots: false }),
   body('role').optional().isIn(['super_admin', 'admin', 'department_head', 'employee']),
   body('department_id').optional().isInt(),
   body('business_id').optional().isInt(),
@@ -518,7 +518,7 @@ router.post('/:userId/onboarding-sops', requireAdmin, async (req, res) => {
       return res.status(404).json({ status: 'error', message: 'User not found', code: 'NOT_FOUND' });
     }
 
-    if (req.user.role !== 'super_admin' && targetUser.business_id !== req.user.business_id) {
+    if (!['super_admin', 'admin'].includes(req.user.role) && targetUser.business_id !== req.user.business_id) {
       return res.status(403).json({ status: 'error', message: 'You don\'t have access to this user.', code: 'BUSINESS_SCOPE_DENIED' });
     }
 

@@ -531,7 +531,7 @@ async function createTask(payload, actorId) {
       error.details = assignmentValidation.errors;
       throw error;
     }
-    if (assignmentValidation.value.assignment_type === 'Department' && actor && actor.business_id && actor.role !== 'super_admin') {
+    if (assignmentValidation.value.assignment_type === 'Department' && actor && actor.business_id && !['super_admin', 'admin'].includes(actor.role)) {
       const [[dept]] = await db.query(
         'SELECT business_id FROM departments WHERE id = ?',
         [assignmentValidation.value.reference_id]
@@ -1914,9 +1914,6 @@ async function validateAssignmentScope(actorId, assignmentType, referenceId, tas
     if (!dept) return { valid: false, message: 'Department not found' };
 
     if (actor.role === 'admin') {
-      if (dept.business_id !== actor.business_id) {
-        return { valid: false, message: 'Cannot assign a department outside your business' };
-      }
       return { valid: true };
     }
     if (actor.role === 'department_head') {
@@ -1937,9 +1934,6 @@ async function validateAssignmentScope(actorId, assignmentType, referenceId, tas
     if (!target) return { valid: false, message: 'User not found' };
 
     if (actor.role === 'admin') {
-      if (target.business_id !== actor.business_id) {
-        return { valid: false, message: 'Cannot assign a user outside your business' };
-      }
       return { valid: true };
     }
     if (actor.role === 'department_head') {
@@ -2019,11 +2013,14 @@ async function isUserDepartmentHead(userId) {
 }
 
 // Returns the set of task IDs an admin-role user is allowed to access.
-// Super admins get ALL tasks (they own every business); Department Heads get
-// department-scoped IDs; admins get business-scoped IDs. Used by every
+// Super admins get ALL tasks; admins also get ALL tasks (they manage every
+// business); Department Heads get department-scoped IDs. Used by every
 // mutating operation and the task list to enforce scope.
 async function getAdminScopedTaskIds(actorId) {
   if (await isUserSuperAdmin(actorId)) {
+    return await getSuperAdminScopedTaskIds();
+  }
+  if (await isUserAdmin(actorId)) {
     return await getSuperAdminScopedTaskIds();
   }
   if (await isUserDepartmentHead(actorId)) {
@@ -2038,6 +2035,15 @@ async function getAdminScopedTaskIds(actorId) {
 async function getSuperAdminScopedTaskIds() {
   const [rows] = await db.query('SELECT id AS task_id FROM tasks');
   return rows.map((r) => r.task_id);
+}
+
+async function isUserAdmin(userId) {
+  const [users] = await db.query(
+    'SELECT role FROM users WHERE id = ? LIMIT 1',
+    [userId]
+  );
+  const user = users[0];
+  return user && ['admin', 'super_admin'].includes(user.role);
 }
 
 async function isUserSuperAdmin(userId) {

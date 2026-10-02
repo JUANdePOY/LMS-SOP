@@ -86,7 +86,7 @@ const router = express.Router();
 router.get('/', authenticateToken, requirePermissionAction('manage_tasks', 'view'), taskController.listTasks);
 
 // Admin: create task
-router.post('/', authenticateToken, taskController.createTask);
+router.post('/', authenticateToken, requirePermissionAction('manage_tasks', 'create'), taskController.createTask);
 
 // Admin: assign task
 router.post('/assign', authenticateToken, requirePermissionAction('manage_tasks', 'assign'), taskController.assignTask);
@@ -149,10 +149,10 @@ router.get('/stats', authenticateToken, requirePermissionAction('manage_tasks', 
 router.get('/:id', authenticateToken, taskController.getTask);
 
 // Admin/Assignee: update task
-router.put('/:id', authenticateToken, taskController.updateTask);
+router.put('/:id', authenticateToken, requirePermissionAction('manage_tasks', 'edit'), taskController.updateTask);
 
 // Admin: delete task
-router.delete('/:id', authenticateToken, taskController.deleteTask);
+router.delete('/:id', authenticateToken, requirePermissionAction('manage_tasks', 'delete'), taskController.deleteTask);
 
 // Admin: duplicate task
 router.post('/:id/duplicate', authenticateToken, requirePermissionAction('manage_tasks', 'create'), taskController.duplicateTask);

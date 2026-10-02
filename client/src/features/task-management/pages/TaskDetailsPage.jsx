@@ -181,7 +181,7 @@ export default function TaskDetailsPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-lg font-semibold text-[var(--text-primary)]">{task.title}</h1>
-            {task.description && <p className="mt-1 text-sm text-[var(--text-muted)]">{task.description}</p>}
+            {task.description && <p className="mt-1 text-sm text-[var(--text-muted)]">{task.description.replace(/<[^>]*>/g, '').trim()}</p>}
             <div className="mt-2 flex items-center gap-2 flex-wrap">
               <span className={`inline-flex items-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium ${PRIORITY_STYLES[task.priority] || PRIORITY_STYLES.Medium}`}>{task.priority}</span>
               <span className={`inline-flex items-center rounded-full border border-transparent px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[displayStatus] || STATUS_STYLES.Pending}`}>{displayStatus}</span>
@@ -218,7 +218,14 @@ export default function TaskDetailsPage() {
             <div className="space-y-4">
               <div>
                 <h3 className="text-sm font-medium text-[var(--text-primary)] mb-2">Description</h3>
-                <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{task.description || 'No description provided.'}</p>
+                {task.description ? (
+                  <div
+                    className="text-sm text-[var(--text-secondary)] prose prose-sm dark:prose-invert max-w-none"
+                    dangerouslySetInnerHTML={{ __html: task.description.replace(/<p>\s*<\/p>/g, '').trim() }}
+                  />
+                ) : (
+                  <p className="text-sm text-[var(--text-muted)]">No description provided.</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="text-[var(--text-muted)]">Priority:</span> <span className="font-medium">{task.priority}</span></div>

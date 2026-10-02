@@ -6,7 +6,7 @@ async function listDepartments(req, res) {
     const isSuperAdmin = req.user?.role === 'super_admin';
     const isDepartmentHead = req.user?.role === 'department_head';
     const isAdmin = req.user?.role === 'admin';
-    let businessId = isSuperAdmin ? null : (req.user?.business_id || null);
+    let businessId = isSuperAdmin || isAdmin ? null : (req.user?.business_id || null);
     let departments = await assignmentCascadeService.getDepartments(true, businessId);
 
     if (isDepartmentHead) {
@@ -20,8 +20,6 @@ async function listDepartments(req, res) {
       }
       const scopedDeptIds = [...scoped];
       departments = departments.filter((dept) => scopedDeptIds.includes(dept.id));
-    } else if (isAdmin && businessId) {
-      departments = departments.filter((dept) => dept.business_id === businessId);
     }
 
     res.json({ success: true, data: departments });

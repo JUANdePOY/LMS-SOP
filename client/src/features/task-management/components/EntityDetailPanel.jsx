@@ -18,6 +18,7 @@ import CommentSection from './CommentSection';
 import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import SubtaskList from './SubtaskList';
 import { AssigneePicker } from './TaskListRow';
+import TaskRichTextEditor from './TaskRichTextEditor';
 
 const ENTITY_LABEL = {
   task: 'Task',
@@ -312,15 +313,20 @@ function TaskBody({ taskId, open, onClose, onUpdated, onOpenTask, focusSubtasks 
 
       <div className="px-2">
         <h4 className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[var(--text-muted)]">Description</h4>
-        <textarea
-          value={local.description || ''}
-          onChange={(e) => setLocal({ ...local, description: e.target.value })}
-          onBlur={() => patch({ description: local.description })}
-          disabled={!canEdit}
-          rows={3}
-          placeholder="Add a description…"
-          className="w-full resize-y rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)] disabled:cursor-default disabled:opacity-100 disabled:hover:border-[var(--border)]"
-        />
+        {canEdit ? (
+          <TaskRichTextEditor
+            value={local.description || ''}
+            onChange={(html) => setLocal({ ...local, description: html })}
+            onBlur={() => patch({ description: local.description })}
+            placeholder="Add a description…"
+            minHeight="120px"
+          />
+        ) : (
+          <div
+            className="text-sm text-[var(--text-secondary)] prose prose-sm dark:prose-invert max-w-none"
+            dangerouslySetInnerHTML={{ __html: local.description ? local.description.replace(/<p>\s*<\/p>/g, '').trim() : '' }}
+          />
+        )}
       </div>
 
       <div className="px-2">
