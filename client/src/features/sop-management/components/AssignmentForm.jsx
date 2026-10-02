@@ -20,6 +20,12 @@ export default function AssignmentForm({
   const cascade = useAssignmentCascade();
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (allowedBusinessId != null) {
+      cascade.setSelectedBusinessIds([allowedBusinessId]);
+    }
+  }, [allowedBusinessId, cascade.setSelectedBusinessIds]);
+
   const {
     setSelectedDeptIds,
     setSelectedUserIds,

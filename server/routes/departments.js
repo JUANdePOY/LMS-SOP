@@ -90,14 +90,15 @@ router.post('/', [
       return res.status(409).json({ status: 'error', message: 'Department code already exists', code: 'CODE_EXISTS' });
     }
 
-    const departmentId = await departmentModel.create({ name, code, description, parent_department_id, head_user_id, business_id: null, status });
+    const safeBusinessId = business_id && !isNaN(Number(business_id)) ? Number(business_id) : null;
+    const departmentId = await departmentModel.create({ name, code, description, parent_department_id, head_user_id, business_id: safeBusinessId, status });
 
     logAudit({
       user_id: req.user.id,
       action: 'department.created',
       entity_type: 'department',
       entity_id: departmentId,
-      new_values: { name, code, business_id: finalBusinessId }
+      new_values: { name, code, business_id: safeBusinessId }
     });
 
     res.status(201).json({ status: 'success', message: 'Department created successfully', data: { id: departmentId, name, code } });

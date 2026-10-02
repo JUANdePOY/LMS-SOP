@@ -4,7 +4,13 @@ const base = '/sops/assignment';
 const assignmentsBase = '/sops';
 
 export const fetchBusinesses = () => api.get('/businesses');
-export const fetchDepartments = () => api.get(`${base}/departments`);
+export const fetchDepartments = (businessId) => {
+  const params = {};
+  if (businessId != null) {
+    params.business_id = businessId;
+  }
+  return api.get(`${base}/departments`, { params });
+};
 
 export const fetchPositions = (departmentId) =>
   api.get(`${base}/positions/${departmentId}`);

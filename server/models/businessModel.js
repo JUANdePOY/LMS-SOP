@@ -348,17 +348,19 @@ async function getDepartmentTreeForBusiness(businessId) {
      FROM departments d
      LEFT JOIN users m ON d.head_user_id = m.id
      WHERE d.parent_department_id IS NULL
-     ORDER BY d.name ASC`
+       AND d.business_id = ?
+     ORDER BY d.name ASC`,
+    [businessId]
   );
 
   for (const dept of rootDepts) {
-    dept.children = await getDepartmentChildren(dept.id);
+    dept.children = await getDepartmentChildren(dept.id, businessId);
   }
 
   return rootDepts;
 }
 
-async function getDepartmentChildren(parentId) {
+async function getDepartmentChildren(parentId, businessId) {
   const [rows] = await db.query(
     `SELECT d.*, m.full_name AS head_name,
             (SELECT COUNT(*) FROM users u WHERE u.department_id = d.id AND u.is_active = TRUE) AS user_count,
@@ -382,12 +384,13 @@ async function getDepartmentChildren(parentId) {
      FROM departments d
      LEFT JOIN users m ON d.head_user_id = m.id
      WHERE d.parent_department_id = ?
+       AND d.business_id = ?
      ORDER BY d.name ASC`,
-    [parentId]
+    [parentId, businessId]
   );
 
   for (const dept of rows) {
-    dept.children = await getDepartmentChildren(dept.id);
+    dept.children = await getDepartmentChildren(dept.id, businessId);
   }
 
   return rows;

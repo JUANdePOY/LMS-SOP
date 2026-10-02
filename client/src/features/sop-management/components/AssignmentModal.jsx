@@ -47,7 +47,7 @@ export default function AssignmentModal({ sopId, open, onClose }) {
 
   if (!open) return null;
 
-  const allowedBusinessId = isSuperAdmin ? null : (sop?.business_id || businessId);
+  const allowedBusinessId = sop?.business_id || (isSuperAdmin ? null : businessId);
   const allowedDepartmentIds = isSuperAdmin ? null : (isDepartmentHead ? scopedDepartmentIds : null);
 
   return (

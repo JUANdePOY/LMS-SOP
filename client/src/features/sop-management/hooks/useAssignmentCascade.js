@@ -20,13 +20,22 @@ export function useAssignmentCascade() {
   useEffect(() => {
     setLoading((p) => ({ ...p, businesses: true }));
     fetchBusinesses()
-      .then((r) => setBusinesses(r.data?.data?.rows || []))
+      .then((r) => {
+        const rows = r.data?.data?.rows || [];
+        const normalized = rows.map((b) => ({
+          ...b,
+          id: Number(b.id),
+        }));
+        setBusinesses(normalized);
+      })
       .finally(() => setLoading((p) => ({ ...p, businesses: false })));
   }, []);
 
-  const filteredDepartments = selectedBusinessIds.length > 0
-    ? departments.filter((d) => selectedBusinessIds.includes(d.business_id))
-    : departments;
+  const filteredDepartments = useMemo(() => {
+    if (!selectedBusinessIds.length) return departments;
+    const ids = new Set(selectedBusinessIds.map(Number));
+    return departments.filter((d) => d.business_id != null && ids.has(Number(d.business_id)));
+  }, [departments, selectedBusinessIds]);
 
   const deptMap = useMemo(() => {
     const map = new Map();
@@ -47,16 +56,17 @@ export function useAssignmentCascade() {
   }, [filteredDepartments, businessMap]);
 
 
-  const loadDepartments = useCallback(async () => {
+  const loadDepartments = useCallback(async (businessIds = []) => {
     setLoading((p) => ({ ...p, departments: true }));
     try {
-      const r = await fetchDepartments();
+      const businessId = businessIds.length === 1 ? businessIds[0] : null;
+      const r = await fetchDepartments(businessId);
       setDepartments(Array.isArray(r?.data?.data) ? r.data.data : (r.data?.data?.rows || []));
     } catch { setDepartments([]); }
     setLoading((p) => ({ ...p, departments: false }));
   }, []);
 
-  useEffect(() => { loadDepartments(); }, [loadDepartments]);
+  useEffect(() => { loadDepartments(selectedBusinessIds); }, [loadDepartments, selectedBusinessIds]);
 
   const loadPositions = useCallback(
     async (deptIds) => {

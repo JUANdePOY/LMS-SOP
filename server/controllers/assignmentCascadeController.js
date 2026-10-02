@@ -7,6 +7,9 @@ async function listDepartments(req, res) {
     const isDepartmentHead = req.user?.role === 'department_head';
     const isAdmin = req.user?.role === 'admin';
     let businessId = isSuperAdmin || isAdmin ? null : (req.user?.business_id || null);
+    if (req.query.business_id) {
+      businessId = parseInt(req.query.business_id, 10);
+    }
     let departments = await assignmentCascadeService.getDepartments(true, businessId);
 
     if (isDepartmentHead) {
