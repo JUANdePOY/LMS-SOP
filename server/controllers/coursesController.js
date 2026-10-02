@@ -119,7 +119,7 @@ function createCourse(req, res) {
     return res.status(401).json({ success: false, message: 'Authentication required' });
   }
 
-  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, business_id } = req.body;
+  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, business_id, duration_hours } = req.body;
 
   if (!title || !title.trim()) {
     return res.status(400).json({ success: false, message: 'Course title is required', code: 'VALIDATION_ERROR' });
@@ -145,6 +145,7 @@ function createCourse(req, res) {
       status: status || 'draft',
       department_id: effectiveDepartmentId,
       business_id: effectiveBusinessId,
+      duration_hours: duration_hours !== undefined && duration_hours !== '' ? Number(duration_hours) : null,
     })
       .then((id) => {
         logAudit('course.create', userId, { courseId: id, title });
@@ -224,7 +225,8 @@ function applyCourseUpdate(req, courseId, userId, course) {
   const allowed = [
     'title', 'description', 'category', 'category_id', 'difficulty', 'thumbnail_url',
     'prerequisites', 'learning_outcomes', 'max_enrollments', 'start_date',
-    'end_date', 'grading_scale', 'allow_self_enrollment', 'send_completion_certificates', 'status', 'instructor_id'
+    'end_date', 'grading_scale', 'allow_self_enrollment', 'send_completion_certificates', 'status', 'instructor_id',
+    'duration_hours'
   ];
   const updates = {};
   for (const key of allowed) {

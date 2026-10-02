@@ -241,7 +241,7 @@ async function createCourse(req, res) {
   }
 
   const body = req.body || {};
-  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, modules } = body;
+  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, modules, duration_hours } = body;
 
   if (!title || !String(title).trim()) {
     return res.status(400).json({ success: false, message: 'Course title is required', code: 'VALIDATION_ERROR' });
@@ -263,8 +263,8 @@ async function createCourse(req, res) {
       `INSERT INTO courses (
         title, description, category, category_id, difficulty, status, instructor_id, thumbnail_url,
         prerequisites, learning_outcomes, max_enrollments, start_date, end_date,
-        grading_scale, allow_self_enrollment, send_completion_certificates, department_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        grading_scale, allow_self_enrollment, send_completion_certificates, department_id, duration_hours
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         String(title).trim(),
         description ?? null,
@@ -283,6 +283,7 @@ async function createCourse(req, res) {
         allow_self_enrollment ?? true,
         send_completion_certificates ?? true,
         effectiveDepartmentId,
+        duration_hours !== undefined && duration_hours !== '' ? Number(duration_hours) : null,
       ]
     );
 
@@ -358,7 +359,7 @@ async function updateCourse(req, res) {
 
   const courseId = parseInt(req.params.id, 10);
   const body = req.body || {};
-  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, modules } = body;
+  const { title, description, category, category_id, difficulty, thumbnail_url, prerequisites, learning_outcomes, max_enrollments, start_date, end_date, grading_scale, allow_self_enrollment, send_completion_certificates, status, department_id, modules, duration_hours } = body;
 
   try {
     const [courseRows] = await db.query('SELECT * FROM courses WHERE id = ? AND is_deleted = FALSE LIMIT 1', [courseId]);
@@ -394,7 +395,8 @@ async function updateCourse(req, res) {
       const allowed = [
         'title', 'description', 'category', 'category_id', 'difficulty', 'thumbnail_url',
         'prerequisites', 'learning_outcomes', 'max_enrollments', 'start_date',
-        'end_date', 'grading_scale', 'allow_self_enrollment', 'send_completion_certificates', 'status'
+        'end_date', 'grading_scale', 'allow_self_enrollment', 'send_completion_certificates', 'status',
+        'duration_hours'
       ];
       const updates = {};
       for (const key of allowed) {

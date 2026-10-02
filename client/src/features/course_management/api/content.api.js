@@ -8,7 +8,7 @@ function authHeaders() {
 }
 
 export async function getContent(courseId, moduleId) {
-  const res = await fetch(`${API_BASE}/${courseId}/modules/${moduleId}/content`);
+  const res = await fetch(`${API_BASE}/${courseId}/modules/${moduleId}/content`, { headers: authHeaders() });
   if (!res.ok) throw new Error("Failed to fetch content");
   return res.json();
 }

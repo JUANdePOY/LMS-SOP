@@ -31,7 +31,7 @@ function toMs(value) {
 function nextReminderKind(task, now) {
   const deadline = toMs(task.deadline_datetime);
   if (!deadline) return null;
-  if (task.status === 'Completed' || task.status === 'Cancelled') return null;
+  if (task.status === 'Completed' || task.status === 'Cancelled' || task.status === 'Archived') return null;
 
   const timeLeft = deadline - now;
 

@@ -22,6 +22,9 @@ export default function FilterBar({
   categories,
   onCategory,
   activeCategory,
+  businessStatusFilter,
+  onBusinessStatus,
+  businessStatusOptions = [],
   children,
   className,
   hideSearch = false,
@@ -60,12 +63,28 @@ export default function FilterBar({
               value={statusFilter || ''}
               onChange={(e) => onStatus?.(e.target.value)}
               className="h-9 rounded-lg border border-[var(--ppm-border)] bg-[var(--bg-surface)] px-2.5 text-sm outline-none transition-colors focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]/20"
-              aria-label="Filter by status"
+              aria-label="Filter by service status"
             >
-              <option value="">All Status</option>
+              <option value="">All Task Status</option>
               {statusOptions.map((s) => (
                 <option key={s} value={s}>
                   {s}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {(businessStatusOptions.length > 0 || onBusinessStatus) && (
+            <select
+              value={businessStatusFilter || ''}
+              onChange={(e) => onBusinessStatus?.(e.target.value)}
+              className="h-9 rounded-lg border border-[var(--ppm-border)] bg-[var(--bg-surface)] px-2.5 text-sm outline-none transition-colors focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]/20"
+              aria-label="Filter by business status"
+            >
+              <option value="">All Business Status</option>
+              {businessStatusOptions.map((s) => (
+                <option key={s.key || s} value={s.key || s}>
+                  {s.label || s}
                 </option>
               ))}
             </select>
@@ -104,23 +123,18 @@ export default function FilterBar({
           )}
 
           {Array.isArray(categories) && categories.length > 0 && (
-            <div className="flex items-center gap-1.5">
+            <select
+              value={activeCategory || ''}
+              onChange={(e) => onCategory?.(e.target.value)}
+              className="h-9 rounded-lg border border-[var(--ppm-border)] bg-[var(--bg-surface)] px-2.5 text-sm outline-none transition-colors focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]/20"
+              aria-label="Filter by service type"
+            >
               {categories.map((cat) => (
-                <button
-                  key={cat.key}
-                  type="button"
-                  onClick={() => onCategory?.(cat.key)}
-                  className={cn(
-                    'h-9 rounded-lg border px-3 text-sm font-medium transition-all duration-150 ease-out motion-reduce:transition-none',
-                    activeCategory === cat.key
-                      ? 'border-[var(--color-primary)] bg-[var(--color-primary)] text-white shadow-sm'
-                      : 'border-[var(--ppm-border)] bg-[var(--bg-surface)] text-[var(--text-secondary)] hover:border-[var(--color-primary)]/40 hover:bg-[var(--bg-surface-hover)]'
-                  )}
-                >
+                <option key={cat.key} value={cat.key}>
                   {cat.label}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           )}
 
           {children && <div className="flex items-center gap-2">{children}</div>}

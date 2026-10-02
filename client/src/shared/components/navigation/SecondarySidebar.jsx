@@ -51,6 +51,10 @@ export default function SecondarySidebar({ collapsed = false }) {
    const orgVersion = useOrgTreeVersion();
    const [hasUnassignedTasks, setHasUnassignedTasks] = useState(false);
 
+  useEffect(() => {
+    refresh();
+  }, [refresh, orgVersion]);
+
   // Employees (non-admins) only ever see the single SOP business linked to their
   // account — the task tree in the My Tasks page is scoped to it, so this panel
   // mirrors that scope instead of exposing the whole org. Admins keep the full list.
@@ -122,7 +126,7 @@ export default function SecondarySidebar({ collapsed = false }) {
       const sopBizId = Number(user.department_business_id ?? user.business_id);
       const deptId = user?.department_id != null ? Number(user.department_id) : null;
       return businesses
-        .filter((b) => Number(b.id) === sopBizId)
+        .filter((b) => Number(b.id) === sopBizId && b.status !== 'archived')
         .map((b) => ({
           ...b,
           clients: deptId != null
@@ -130,7 +134,7 @@ export default function SecondarySidebar({ collapsed = false }) {
             : (b.clients || []),
         }));
     }
-    if (isAnyAdmin) return businesses;
+    if (isAnyAdmin) return businesses.filter((b) => b.status !== 'archived');
     if (employeeSopBusinessIds != null && employeeClientIds != null && employeeBusinessIds != null && employeeClientTree.length > 0) {
       const bizMap = new Map();
       for (const c of employeeClientTree) {
@@ -151,7 +155,7 @@ export default function SecondarySidebar({ collapsed = false }) {
       return Array.from(bizMap.values());
     }
     if (employeeBusinessId != null) {
-      return businesses.filter((b) => Number(b.id) === Number(employeeBusinessId));
+      return businesses.filter((b) => Number(b.id) === Number(employeeBusinessId) && b.status !== 'archived');
     }
     return [];
   }, [businesses, employeeBusinessId, isAnyAdmin, isDepartmentHead, user, employeeClientIds, employeeBusinessIds, employeeSopBusinessIds, employeeClientTree]);
@@ -389,9 +393,9 @@ export default function SecondarySidebar({ collapsed = false }) {
         const clients = (b.clients || [])
           .map((c) => {
             const clientMatch = (c.client_name || "").toLowerCase().includes(q);
-            const units = (c.businesses || []).filter((u) => (u.business_name || "").toLowerCase().includes(q));
+            const units = (c.businesses || []).filter((u) => u.status !== 'archived' && (u.business_name || "").toLowerCase().includes(q));
             if (clientMatch || units.length > 0) {
-              return { ...c, businesses: clientMatch ? c.businesses : units };
+              return { ...c, businesses: clientMatch ? (c.businesses || []).filter((u) => u.status !== 'archived') : units };
             }
             return null;
           })
@@ -408,8 +412,10 @@ export default function SecondarySidebar({ collapsed = false }) {
     return unassigned
       .map((c) => {
         const clientMatch = (c.client_name || "").toLowerCase().includes(q);
-        const units = (c.businesses || []).filter((u) => (u.business_name || "").toLowerCase().includes(q));
-        if (clientMatch || units.length > 0) return { ...c, businesses: clientMatch ? c.businesses : units };
+        const units = (c.businesses || []).filter((u) => u.status !== 'archived' && (u.business_name || "").toLowerCase().includes(q));
+        if (clientMatch || units.length > 0) {
+          return { ...c, businesses: clientMatch ? (c.businesses || []).filter((u) => u.status !== 'archived') : units };
+        }
         return null;
       })
       .filter(Boolean);
@@ -467,7 +473,7 @@ export default function SecondarySidebar({ collapsed = false }) {
 
   const renderClient = (client) => {
     const cOpen = expandedClient[client.id] || searching;
-    const units = client.businesses || [];
+    const units = (client.businesses || []).filter((u) => u.status !== 'archived');
     return (
       <li key={client.id}>
         <div

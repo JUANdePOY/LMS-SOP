@@ -1,6 +1,6 @@
 const db = require('../config/database');
 
-const PROGRESS_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled'];
+const PROGRESS_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled', 'Archived'];
 
 async function create(data) {
   const { task_id, user_id, completion_rate, status, notes } = data;

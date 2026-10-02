@@ -16,6 +16,8 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
+  const [difficulty, setDifficulty] = useState("beginner");
+  const [durationHours, setDurationHours] = useState("");
   const [businessId, setBusinessId] = useState("");
   const [departmentId, setDepartmentId] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -43,6 +45,8 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
       const courseDepartmentId = course.department_id || "";
       setBusinessId(courseBusinessId);
       setCategory(course.category || "");
+      setDifficulty(course.difficulty || "beginner");
+      setDurationHours(course.duration_hours ?? course.durationHours ?? "");
       setCategoryId(course.category_id || "");
       setDepartmentId(courseDepartmentId);
       fetchBusinesses(courseBusinessId);
@@ -58,6 +62,8 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
       setTitle("");
       setDescription("");
       setCategory("");
+      setDifficulty("beginner");
+      setDurationHours("");
       setThumbnailUrl("");
       if (isAdmin && scopedBusinessId) {
         setBusinessId(String(scopedBusinessId));
@@ -267,6 +273,8 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
         description,
         category,
         category_id: categoryId ? parseInt(categoryId, 10) : undefined,
+        difficulty: difficulty || 'beginner',
+        duration_hours: durationHours !== "" ? Number(durationHours) : undefined,
         department_id: departmentId ? parseInt(departmentId, 10) : undefined,
         business_id: businessId ? parseInt(businessId, 10) : undefined,
         modules: [],
@@ -358,20 +366,46 @@ export default function CreateCourseModal({ open, onClose, loading, course = nul
             </select>
           </div>
         </div>
-        <div>
-          <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Category</label>
-          <select
-            value={categoryId}
-            onChange={handleCategoryChange}
-            disabled={loadingOptions.categories || loading}
-            className={`w-full rounded-md border px-2.5 py-1.5 text-sm ${selectClassName}`}
-          >
-            <option value="">All Categories</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
+         <div>
+           <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Category</label>
+           <select
+             value={categoryId}
+             onChange={handleCategoryChange}
+             disabled={loadingOptions.categories || loading}
+             className={`w-full rounded-md border px-2.5 py-1.5 text-sm ${selectClassName}`}
+           >
+             <option value="">All Categories</option>
+             {categories.map((c) => (
+               <option key={c.id} value={c.id}>{c.name}</option>
+             ))}
+           </select>
+         </div>
+         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+           <div>
+             <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Difficulty</label>
+             <select
+               value={difficulty}
+               onChange={(e) => setDifficulty(e.target.value)}
+               className={`w-full rounded-md border px-2.5 py-1.5 text-sm ${selectClassName}`}
+             >
+               <option value="beginner">Beginner</option>
+               <option value="intermediate">Intermediate</option>
+               <option value="advanced">Advanced</option>
+               <option value="all_levels">All Levels</option>
+             </select>
+           </div>
+           <div>
+             <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Duration (hours)</label>
+             <Input
+               type="number"
+               min="0"
+               value={durationHours}
+               onChange={(e) => setDurationHours(e.target.value)}
+               placeholder="e.g. 8"
+               className={selectClassName}
+             />
+           </div>
+         </div>
         <div>
           <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1.5">Thumbnail</label>
           <div className="flex items-center gap-3">

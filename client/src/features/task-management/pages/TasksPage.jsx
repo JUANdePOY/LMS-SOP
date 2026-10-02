@@ -32,13 +32,12 @@ const VIEW_STORAGE_KEY = 'ppm:tasks:view';
 
 const BUSINESS_CATEGORIES = [
   { key: 'all', label: 'All' },
-  { key: 'local_seo', label: 'Local SEO' },
-  { key: 'full_seo', label: 'Full SEO' },
-  { key: 'inactive', label: 'Inactive' },
+  { key: 'orders', label: 'Orders' },
+  { key: 'va', label: 'VA Clients' },
+  { key: 'local_seo', label: 'Local SEO Clients' },
+  { key: 'full_seo', label: 'Full SEO Clients' },
   { key: 'archived', label: 'Archived' },
 ];
-
-const INACTIVE_STATUSES = ['inactive', 'paused', 'stopped', 'cancelled'];
 
 
 export default function TasksPage() {
@@ -56,9 +55,19 @@ export default function TasksPage() {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [businessCategory, setBusinessCategory] = useState('all');
+  const [businessStatusFilter, setBusinessStatusFilter] = useState('all');
 
   const canManageTasks = hasPermission('manage_tasks');
   const canManageClients = hasPermission('manage_clients');
+
+  const BUSINESS_STATUSES = [
+    { key: 'all', label: 'All Statuses' },
+    { key: 'active', label: 'Active' },
+    { key: 'inactive', label: 'Inactive' },
+    { key: 'paused', label: 'Paused' },
+    { key: 'stopped', label: 'Stopped' },
+    { key: 'cancelled', label: 'Cancelled' },
+  ];
 
   useEffect(() => {
     markEntityTypeRead('task');
@@ -193,16 +202,21 @@ export default function TasksPage() {
 
   const updateBusinessStatus = useCallback(async (businessId, clientId, status) => {
     try {
-      const result = await updateClientBusiness(clientId, businessId, { status });
-      console.log('[updateBusinessStatus] OK', { clientId, businessId, status, result });
+      const updated = await updateClientBusiness(clientId, businessId, { status });
+      setClientTree((prev) =>
+        prev.map((client) => ({
+          ...client,
+          businesses: (client.businesses || []).map((b) =>
+            String(b.id) === String(businessId) && updated ? { ...b, ...updated } : b
+          ),
+        }))
+      );
       toast.success('Business status updated');
-      loadProjects();
       notifyOrgTreeChanged();
     } catch (err) {
-      console.error('[updateBusinessStatus] FAILED', { clientId, businessId, status, error: err?.response?.data || err?.message || err });
       toast.error(err.response?.data?.message || err.message || 'Failed to update business status');
     }
-  }, [toast, loadProjects]);
+  }, [toast, notifyOrgTreeChanged]);
 
   const handleUpdateBusinessService = useCallback(async (businessId, clientId, category) => {
     try {
@@ -290,13 +304,14 @@ export default function TasksPage() {
         await deleteClientBusiness(clientId, id);
       } else if (kind === 'project') await deleteProject(id);
       toast.success(`${kind[0].toUpperCase()}${kind.slice(1)} deleted`);
-      loadProjects();
-      refreshTasks();
-      notifyOrgTreeChanged();
     } catch (err) {
       toast.error(err.message || `Failed to delete ${kind}`);
+      return;
     }
-  }, [toast, loadProjects, refreshTasks, findClientIdForBusiness]);
+    await refreshTasks();
+    loadProjects();
+    notifyOrgTreeChanged();
+  }, [toast, loadProjects, refreshTasks, findClientIdForBusiness, notifyOrgTreeChanged]);
 
   const scopeDefaults = useMemo(() => {
     if (!clientParam && !businessParam) return undefined;
@@ -503,6 +518,8 @@ export default function TasksPage() {
     if (statusFilter) {
       if (statusFilter === 'Overdue') {
         result = result.filter((t) => isOverdue(t));
+      } else if (statusFilter === 'Archived') {
+        result = result.filter((t) => (t.status || '') === 'Archived');
       } else {
         result = result.filter((t) => (t.status || '') === statusFilter && !isOverdue(t));
       }
@@ -576,39 +593,60 @@ export default function TasksPage() {
   }, [clientTree, clientParam, businessParam, projectParam, projectsById, isDepartmentHead, user, matchingBusinessIds, search, statusFilter, priorityFilter, assigneeFilter]);
 
   const categoryFilteredClientTree = useMemo(() => {
-    if (!businessCategory || businessCategory === 'all') {
-      return scopedClientTree.map((client) => ({
-        ...client,
-        businesses: (client.businesses || []).filter((b) => b.status !== 'archived'),
-      })).filter((c) => (c.businesses || []).length > 0 || c.business_id != null);
-    }
+    const archivedOnly = businessCategory === 'archived';
+    const categoryOnly = businessCategory && businessCategory !== 'all' && businessCategory !== 'archived';
+    const statusOnly = businessStatusFilter && businessStatusFilter !== 'all';
     return scopedClientTree.map((client) => ({
       ...client,
       businesses: (client.businesses || []).filter((b) => {
-        if (businessCategory === 'inactive') {
-          return INACTIVE_STATUSES.includes(b.status);
-        }
-        if (businessCategory === 'archived') {
-          return b.status === 'archived';
-        }
-        return b.category === businessCategory;
+        let match = true;
+        if (archivedOnly) match = b.status === 'archived';
+        else if (categoryOnly) match = b.category === businessCategory && b.status !== 'archived';
+        else match = b.status !== 'archived';
+        if (match && statusOnly) match = b.status === businessStatusFilter;
+        return match;
       }),
     })).filter((c) => (c.businesses || []).length > 0 || c.business_id != null);
-  }, [scopedClientTree, businessCategory]);
+  }, [scopedClientTree, businessCategory, businessStatusFilter]);
 
   const categoryFilteredTasks = useMemo(() => {
-    if (!businessCategory || businessCategory === 'all') return displayedTasks;
+    const archivedOnly = businessCategory === 'archived';
+    const categoryOnly = businessCategory && businessCategory !== 'all' && businessCategory !== 'archived';
+    const statusOnly = businessStatusFilter && businessStatusFilter !== 'all';
+
+    if (!archivedOnly && !categoryOnly && !statusOnly) {
+      const archivedBizIds = new Set();
+      for (const client of scopedClientTree || []) {
+        for (const business of client.businesses || []) {
+          if (business.status === 'archived') {
+            archivedBizIds.add(String(business.id));
+          }
+        }
+      }
+      if (archivedBizIds.size === 0) return displayedTasks;
+      return displayedTasks.filter((t) => {
+        const pid = t.project_id ?? t.projectId ?? t.project?.id;
+        const proj = pid != null ? projectsById[String(pid)] : null;
+        const bid = t.client_business_id != null ? String(t.client_business_id) : (proj?.client_business_id != null ? String(proj.client_business_id) : null);
+        if (bid == null) return true;
+        return !archivedBizIds.has(bid);
+      });
+    }
+
     const businessMatch = new Map();
     for (const client of scopedClientTree) {
       for (const business of client.businesses || []) {
         const bid = String(business.id);
-        if (businessCategory === 'inactive') {
-          businessMatch.set(bid, INACTIVE_STATUSES.includes(business.status));
-        } else if (businessCategory === 'archived') {
-          businessMatch.set(bid, business.status === 'archived');
+        let match = false;
+        if (archivedOnly) {
+          match = business.status === 'archived';
+        } else if (categoryOnly) {
+          match = business.category === businessCategory && business.status !== 'archived';
         } else {
-          businessMatch.set(bid, business.category === businessCategory);
+          match = business.status !== 'archived';
         }
+        if (match && statusOnly) match = business.status === businessStatusFilter;
+        businessMatch.set(bid, match);
       }
     }
     if (businessMatch.size === 0) return [];
@@ -619,7 +657,7 @@ export default function TasksPage() {
       if (bid == null) return false;
       return businessMatch.get(bid) === true;
     });
-  }, [displayedTasks, businessCategory, scopedClientTree, projectsById]);
+  }, [displayedTasks, businessCategory, businessStatusFilter, scopedClientTree, projectsById]);
 
   const visibleBusinessIds = useMemo(() => {
     const tree = (businessCategory && businessCategory !== 'all') ? categoryFilteredClientTree : clientTree;
@@ -661,7 +699,7 @@ export default function TasksPage() {
     return ids;
   }, [clientTree, categoryFilteredClientTree, businessCategory, clientParam, businessParam, projectParam]);
 
-  const hasActiveFilters = search || statusFilter || priorityFilter || assigneeFilter;
+  const hasActiveFilters = search || statusFilter || priorityFilter || assigneeFilter || businessStatusFilter && businessStatusFilter !== 'all';
 
   const filteredClientName = useMemo(() => {
     if (!clientParam) return null;
@@ -960,6 +998,8 @@ export default function TasksPage() {
         );
         await refreshTasks();
         await refreshStats();
+        await loadProjects();
+        notifyOrgTreeChanged();
         toast.success(`${count} business(es) deleted`);
         handleDeselectAllBusinesses();
       } catch (err) {
@@ -971,7 +1011,7 @@ export default function TasksPage() {
       (ids) => bulkDeleteTasks(ids),
       `${count} task(s) deleted`
     );
-  }, [runBulk, selectedIds.size, selectedBusinessIds.size, findClientIdForBusiness, deleteClientBusiness, refreshTasks, refreshStats, toast, handleDeselectAllBusinesses, setClientTree]);
+  }, [runBulk, selectedIds.size, selectedBusinessIds.size, findClientIdForBusiness, deleteClientBusiness, refreshTasks, refreshStats, loadProjects, notifyOrgTreeChanged, toast, handleDeselectAllBusinesses, setClientTree]);
 
   const handleAssignToSelectedBusinesses = useCallback(async (assignment) => {
     const ids = Array.from(selectedBusinessIds);
@@ -1033,11 +1073,43 @@ export default function TasksPage() {
     );
   }, [runBulk]);
 
+  const handleBulkBusinessStatus = useCallback(async (status) => {
+    const ids = [...selectedBusinessIds];
+    if (ids.length === 0) return;
+    let updated = 0;
+    for (const bid of ids) {
+      const clientId = findClientIdForBusiness(bid);
+      if (clientId == null) continue;
+      try {
+        const result = await updateClientBusiness(clientId, bid, { status });
+        setClientTree((prev) =>
+          prev.map((client) => ({
+            ...client,
+            businesses: (client.businesses || []).map((b) =>
+              String(b.id) === String(bid) && result ? { ...b, ...result } : b
+            ),
+          }))
+        );
+        updated++;
+      } catch (err) {
+        toast.error(err.response?.data?.message || err.message || `Failed to update business ${bid}`);
+      }
+    }
+    if (updated > 0) {
+      toast.success(`${updated} business${updated > 1 ? 'es' : ''} updated to ${status}`);
+      notifyOrgTreeChanged();
+    }
+    clearSelection();
+  }, [selectedBusinessIds, findClientIdForBusiness, updateClientBusiness, setClientTree, toast, notifyOrgTreeChanged, clearSelection]);
+
   const handleStatusChange = useCallback(async (task, newStatus) => {
     const changes = { status: newStatus };
     if (newStatus === 'Completed') {
       changes.completion_rate = 100;
       changes.progress_rate = 100;
+    } else {
+      changes.completion_rate = 0;
+      changes.progress_rate = 0;
     }
     const rollback = patchTask(task.id, changes);
     try {
@@ -1170,6 +1242,9 @@ export default function TasksPage() {
         categories={BUSINESS_CATEGORIES}
         onCategory={setBusinessCategory}
         activeCategory={businessCategory}
+        businessStatusFilter={businessStatusFilter}
+        onBusinessStatus={setBusinessStatusFilter}
+        businessStatusOptions={BUSINESS_STATUSES}
       />
 
       {error && (
@@ -1335,11 +1410,12 @@ export default function TasksPage() {
           displayedTaskCount={displayedTasks.length}
           onAssigneeChange={handleBulkAssignee}
           onAssignToSelectedBusinesses={handleAssignToSelectedBusinesses}
-          onMoveToBusiness={(targetBusinessId) => handleBulkMove(Array.from(selectedIds), targetBusinessId)}
-          businesses={allBusinesses}
-          canManageTasks={canManageTasks}
-          userRole={user?.role}
-        />
+           onMoveToBusiness={(targetBusinessId) => handleBulkMove(Array.from(selectedIds), targetBusinessId)}
+           businesses={allBusinesses}
+           canManageTasks={canManageTasks}
+           userRole={user?.role}
+           onUpdateBusinessStatus={handleBulkBusinessStatus}
+         />
       )}
 
       <TaskBulkUploadModal

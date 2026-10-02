@@ -1,4 +1,4 @@
-import { BookOpen, PlayCircle, Users, CheckCircle2, ChevronRight, BarChart3 } from "lucide-react";
+import { BookOpen, PlayCircle, Users, ChevronRight, BarChart3, Clock } from "lucide-react";
 import { Badge } from "@/shared/components/ui/badge";
 import { getDifficultyMeta, ProgressBar } from "../utils/courseVisuals";
 import { resolveFileUrl } from "@/lib/fileUrl";
@@ -6,7 +6,6 @@ import { resolveFileUrl } from "@/lib/fileUrl";
 export default function CourseListRow({ course, onClick, myProgress }) {
   const enrollments = course.enrollment_count || course.enrollments_count || 0;
   const avgProgress = myProgress != null ? myProgress : (course.avg_progress || 0);
-  const completed = course.completed_count || 0;
   const difficultyMeta = getDifficultyMeta(course.difficulty);
   const isEnrolled = myProgress != null;
 
@@ -72,13 +71,17 @@ export default function CourseListRow({ course, onClick, myProgress }) {
                 </span>
               </>
             )}
-            <span className="hidden items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400 sm:inline-flex" title="Enrollments">
+            <span className="inline-flex items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400" title="Duration">
+              <Clock size={11} />
+              {course.duration_hours || 0}h
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400" title="Lessons">
+              <BookOpen size={11} />
+              {course.lesson_count || 0}
+            </span>
+            <span className="inline-flex items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400" title="Enrollments">
               <Users size={11} />
               {enrollments}
-            </span>
-            <span className="hidden items-center gap-1 text-[11px] text-neutral-500 dark:text-neutral-400 sm:inline-flex" title="Completed">
-              <CheckCircle2 size={11} />
-              {completed}
             </span>
           </div>
         </div>

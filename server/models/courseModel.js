@@ -28,14 +28,23 @@ async function listCourses(filters = {}) {
       c.instructor_id, c.thumbnail_url, c.max_enrollments, c.start_date, c.end_date,
       c.grading_scale, c.allow_self_enrollment, c.send_completion_certificates,
       c.created_at, c.updated_at,
+      c.duration_hours,
       d.name AS department_name,
       u.full_name AS instructor_name,
       COUNT(DISTINCT e.id) AS enrollment_count,
-      COUNT(DISTINCT m.id) AS module_count
+      COUNT(DISTINCT m.id) AS module_count,
+      (SELECT COUNT(mc.id) FROM course_modules m2 
+        LEFT JOIN module_content mc ON m2.id = mc.module_id AND mc.is_deleted = FALSE 
+        WHERE m2.course_id = c.id AND m2.is_deleted = FALSE) AS lesson_count,
+      (SELECT COUNT(*) FROM course_enrollments ce 
+        WHERE ce.course_id = c.id AND ce.is_deleted = FALSE AND ce.progress_percentage >= 100) AS completed_count,
+      (SELECT COALESCE(SUM(mc2.duration), 0) FROM course_modules m3 
+        LEFT JOIN module_content mc2 ON m3.id = mc2.module_id AND mc2.is_deleted = FALSE 
+        WHERE m3.course_id = c.id AND m3.is_deleted = FALSE) AS total_duration_minutes
     FROM courses c
     LEFT JOIN departments d ON c.department_id = d.id
     LEFT JOIN users u ON c.instructor_id = u.id
-    LEFT JOIN course_enrollments e ON c.id = e.course_id AND e.status = 'active' AND e.is_deleted = FALSE
+    LEFT JOIN course_enrollments e ON c.id = e.course_id AND e.is_deleted = FALSE
     LEFT JOIN course_modules m ON c.id = m.course_id AND m.is_deleted = FALSE
     WHERE c.is_deleted = FALSE
   `;
@@ -79,7 +88,11 @@ async function listCourses(filters = {}) {
   params.push(limit, offset);
 
   const [rows] = await db.query(sql, params);
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    lesson_count: row.lesson_count || 0,
+    duration_hours: row.duration_hours != null ? row.duration_hours : Math.round((row.total_duration_minutes || 0) / 60),
+  }));
 }
 
 async function countCourses(filters = {}) {
@@ -134,16 +147,31 @@ async function findById(id) {
       c.*, 
       u.full_name AS instructor_name,
       COUNT(DISTINCT e.id) AS enrollment_count,
-      COUNT(DISTINCT m.id) AS module_count
+      COUNT(DISTINCT m.id) AS module_count,
+      (SELECT COUNT(mc.id) FROM course_modules m2 
+        LEFT JOIN module_content mc ON m2.id = mc.module_id AND mc.is_deleted = FALSE 
+        WHERE m2.course_id = c.id AND m2.is_deleted = FALSE) AS lesson_count,
+      (SELECT COUNT(*) FROM course_enrollments ce 
+        WHERE ce.course_id = c.id AND ce.is_deleted = FALSE AND ce.progress_percentage >= 100) AS completed_count,
+      (SELECT COALESCE(SUM(mc2.duration), 0) FROM course_modules m3 
+        LEFT JOIN module_content mc2 ON m3.id = mc2.module_id AND mc2.is_deleted = FALSE 
+        WHERE m3.course_id = c.id AND m3.is_deleted = FALSE) AS total_duration_minutes
      FROM courses c
      LEFT JOIN users u ON c.instructor_id = u.id
-     LEFT JOIN course_enrollments e ON c.id = e.course_id AND e.status = 'active' AND e.is_deleted = FALSE
+     LEFT JOIN course_enrollments e ON c.id = e.course_id AND e.is_deleted = FALSE
      LEFT JOIN course_modules m ON c.id = m.course_id AND m.is_deleted = FALSE
      WHERE c.id = ? AND c.is_deleted = FALSE
      GROUP BY c.id`,
     [id]
   );
-  return rows[0] || null;
+  const course = rows[0] || null;
+  if (course) {
+    course.lesson_count = course.lesson_count || 0;
+    if (course.duration_hours == null) {
+      course.duration_hours = Math.round((course.total_duration_minutes || 0) / 60);
+    }
+  }
+  return course;
 }
 
 async function create(courseData) {
@@ -151,7 +179,7 @@ async function create(courseData) {
     title, description, category, difficulty, instructor_id, thumbnail_url,
     prerequisites, learning_outcomes, max_enrollments, start_date, end_date,
     grading_scale, allow_self_enrollment, send_completion_certificates, status,
-    department_id, business_id, category_id
+    department_id, business_id, category_id, duration_hours
   } = courseData;
 
   const queryResult = await db.query(
@@ -159,8 +187,8 @@ async function create(courseData) {
       title, description, category, category_id, difficulty, status, instructor_id, thumbnail_url,
       prerequisites, learning_outcomes, max_enrollments, start_date, end_date,
       grading_scale, allow_self_enrollment, send_completion_certificates,
-      department_id, business_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      department_id, business_id, duration_hours
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       title,
       description ?? null,
@@ -180,6 +208,7 @@ async function create(courseData) {
       send_completion_certificates ?? false,
       department_id ? parseInt(department_id, 10) : null,
       business_id ? parseInt(business_id, 10) : null,
+      duration_hours !== undefined && duration_hours !== '' ? Number(duration_hours) : null,
     ]
   );
   const result = Array.isArray(queryResult) ? queryResult[0] : queryResult;
@@ -192,7 +221,7 @@ async function update(id, updates) {
     'title', 'description', 'category', 'category_id', 'difficulty', 'status', 'instructor_id',
     'thumbnail_url', 'prerequisites', 'learning_outcomes', 'max_enrollments',
     'start_date', 'end_date', 'grading_scale', 'allow_self_enrollment',
-    'send_completion_certificates', 'department_id', 'business_id'
+    'send_completion_certificates', 'department_id', 'business_id', 'duration_hours'
   ];
 
   const sets = [];

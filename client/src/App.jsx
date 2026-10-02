@@ -200,7 +200,13 @@ const router = createBrowserRouter([
       { index: true, element: LMSProtectedWrapper(RoleBasedDashboard), handle: { title: "Dashboard" } },
       { path: "my-learning", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeDashboard /></OnboardingGuard>), handle: { title: "My Learning" } },
       { path: "my-learning/catalog", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeCourseCatalog /></OnboardingGuard>), handle: { title: "Course Catalog" } },
-      { path: "my-learning/course/:id", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeCourseView /></OnboardingGuard>), handle: { title: "Course" } },
+      { path: "my-learning/course/:id", element: (
+        <ProtectedRoute allowedRoles={['employee', 'super_admin', 'admin', 'department_head']}>
+          <Suspense fallback={<PageLoader />}>
+            <OnboardingGuard><EmployeeCourseView /></OnboardingGuard>
+          </Suspense>
+        </ProtectedRoute>
+      ), handle: { title: "Course" } },
       { path: "my-learning/sops", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeSOPLibrary /></OnboardingGuard>), handle: { title: "SOP Library" } },
       { path: "my-learning/sops/:id", element: EmployeeProtectedWrapper(() => <OnboardingGuard><EmployeeSOPView /></OnboardingGuard>), handle: { title: "SOP" } },
       { path: "profile", element: LMSProtectedWrapper(Profile), handle: { title: "Profile" } },

@@ -99,7 +99,7 @@ function ModuleBlock({ courseId, module, index, onLessonView, locked }) {
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{module.title}</p>
           {module.description && (
-            <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{module.description}</p>
+            <p className="truncate text-xs text-neutral-500 dark:text-neutral-400" dangerouslySetInnerHTML={{ __html: module.description }} />
           )}
         </div>
         <span className="shrink-0 text-[11px] font-medium text-neutral-400 dark:text-neutral-500">

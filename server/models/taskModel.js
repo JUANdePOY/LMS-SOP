@@ -14,7 +14,7 @@ function toMysqlDateTime(value) {
 }
 
 const TASK_PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
-const TASK_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled'];
+const TASK_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled', 'Archived'];
 
 async function create(data) {
   const {

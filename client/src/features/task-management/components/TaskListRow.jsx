@@ -19,6 +19,7 @@ const STATUS_TOKENS = {
   Completed: { var: '--ppm-st-completed', label: 'Completed' },
   Overdue: { var: '--ppm-st-overdue', label: 'Overdue' },
   Cancelled: { var: '--ppm-st-cancelled', label: 'Cancelled' },
+  Archived: { var: '--ppm-status-muted, var(--text-muted)', label: 'Archived' },
 };
 
 function useEscToClose(open, onClose) {

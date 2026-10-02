@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import api from '@/services/api';
 import { useOrgTreeVersion } from '@/shared/store/orgTreeBus';
 
@@ -20,8 +20,10 @@ export function useBusinessClientTree(isAdmin = false) {
   const [projectsByBiz, setProjectsByBiz] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    const currentRequestId = ++requestIdRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -33,6 +35,8 @@ export function useBusinessClientTree(isAdmin = false) {
         requests.push(api.get('/projects', { params: { limit: 1000 } }));
       }
       const [bizRes, clientRes, projectRes] = await Promise.allSettled(requests);
+
+      if (currentRequestId !== requestIdRef.current) return;
 
       const bizRows = bizRes.status === 'fulfilled'
         ? (bizRes.value?.data?.data?.rows || bizRes.value?.data?.rows || [])
@@ -69,11 +73,14 @@ export function useBusinessClientTree(isAdmin = false) {
       setClients(Array.isArray(clientRows) ? clientRows : []);
       setProjectsByBiz(projectsByBiz);
     } catch (err) {
+      if (currentRequestId !== requestIdRef.current) return;
       setError(err?.message || 'Failed to load business/client tree');
     } finally {
-      setLoading(false);
+      if (currentRequestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, []);
+  }, [isAdmin]);
 
   const orgVersion = useOrgTreeVersion();
 

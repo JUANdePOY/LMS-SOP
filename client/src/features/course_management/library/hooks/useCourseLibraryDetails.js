@@ -25,13 +25,19 @@ export function useCourseLibraryDetails(courseId) {
       if (!cancelRef.current) {
         if (courseRes.status === "fulfilled") {
           setCourse(courseRes.value.data || courseRes.value);
+        } else if (courseRes.status === "rejected") {
+          setError(courseRes.reason?.message || "Failed to load course");
         }
         if (enrollmentsRes.status === "fulfilled") {
           const data = enrollmentsRes.value.data?.rows || enrollmentsRes.value.data || [];
           setEnrollments(Array.isArray(data) ? data : []);
+        } else if (enrollmentsRes.status === "rejected") {
+          console.error("Failed to load enrollments:", enrollmentsRes.reason);
         }
         if (analyticsRes.status === "fulfilled") {
           setAnalytics(analyticsRes.value.data || analyticsRes.value);
+        } else if (analyticsRes.status === "rejected") {
+          console.error("Failed to load analytics:", analyticsRes.reason);
         }
       }
     } catch (err) {

@@ -46,6 +46,6 @@ export function formatDate(dateStr) {
  */
 export function isOverdue(task) {
   if (!task?.deadline_datetime) return false;
-  if (task.status === 'Completed' || task.status === 'Cancelled') return false;
+  if (task.status === 'Completed' || task.status === 'Cancelled' || task.status === 'Archived') return false;
   return new Date(task.deadline_datetime) < new Date();
 }

@@ -1,5 +1,5 @@
 export const TASK_PRIORITIES = ['Low', 'Medium', 'High', 'Critical'];
-export const TASK_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled'];
+export const TASK_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled', 'Archived'];
 export const ASSIGNMENT_TYPES = ['User', 'Department'];
 
 export const PRIORITY_STYLES = {
@@ -15,6 +15,7 @@ export const STATUS_STYLES = {
   Completed: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-100 border-emerald-200 dark:border-emerald-500/30',
   Overdue: 'bg-red-50 text-red-700 dark:bg-red-500/15 dark:text-red-100 border-red-200 dark:border-red-500/30',
   Cancelled: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-500/15 dark:text-neutral-100 border-neutral-200 dark:border-neutral-500/30',
+  Archived: 'bg-slate-100 text-slate-600 dark:bg-slate-500/15 dark:text-slate-100 border-slate-200 dark:border-slate-500/30',
 };
 
 export const ASSIGNMENT_TYPE_LABELS = {
@@ -52,7 +53,7 @@ export const ALLOWED_ATTACHMENT_MIME_TYPES = [
 export const TASK_TABLE_GRID_COLS = '40px minmax(220px,1.5fr) 210px 180px 150px 150px minmax(180px,1fr) 100px';
 
 /** Status display order in the task table. */
-export const TASK_STATUS_ORDER = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled'];
+export const TASK_STATUS_ORDER = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled', 'Archived'];
 
 export const UNKNOWN_STATUS_KEY = '__unknown__';
 
@@ -63,6 +64,7 @@ export const TASK_STATUS_LABELS = {
   Completed: 'Completed',
   Overdue: 'Overdue',
   Cancelled: 'Cancelled',
+  Archived: 'Archived',
   [UNKNOWN_STATUS_KEY]: 'Other',
 };
 

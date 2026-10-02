@@ -2,7 +2,7 @@
 // (KPI cards) and the task list/table compute identical statuses and never drift.
 
 function computeAutoStatus(startDatetime, deadlineDatetime, currentStatus) {
-  if (currentStatus === 'Completed' || currentStatus === 'Cancelled') {
+  if (currentStatus === 'Completed' || currentStatus === 'Cancelled' || currentStatus === 'Archived') {
     return currentStatus;
   }
 
@@ -47,7 +47,7 @@ function deriveParentStatus(children) {
   const statuses = children.map((c) => c.status);
   if (statuses.some((s) => s === 'In Progress')) return 'In Progress';
   if (statuses.some((s) => s === 'Overdue')) return 'Overdue';
-  if (statuses.every((s) => s === 'Cancelled')) return 'Cancelled';
+  if (statuses.every((s) => s === 'Cancelled' || s === 'Archived')) return 'Cancelled';
   if (statuses.every((s) => s === 'Completed')) return null;
   return 'Pending';
 }

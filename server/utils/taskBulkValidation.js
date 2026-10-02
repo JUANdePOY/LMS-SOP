@@ -470,7 +470,7 @@ async function validateRows(rows, actorId, overrides = {}) {
 
     let status = row.status != null ? String(row.status).trim() : '';
     if (status) {
-      const TASK_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled'];
+      const TASK_STATUSES = ['Pending', 'In Progress', 'Completed', 'Overdue', 'Cancelled', 'Archived'];
       const normalized = status.replace(/\b\w/g, (c) => c.toUpperCase());
       if (!TASK_STATUSES.includes(normalized)) {
         errors.push(`Status must be one of: ${TASK_STATUSES.join(', ')}`);

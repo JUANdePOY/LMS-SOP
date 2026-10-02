@@ -65,6 +65,7 @@ const BUSINESS_STATUS_TOKENS = {
   paused: 'var(--ppm-st-overdue)',
   stopped: 'var(--ppm-st-in-progress)',
   cancelled: 'var(--ppm-st-cancelled)',
+  archived: 'var(--ppm-st-cancelled)',
 };
 
 function BusinessStatusDot({ status }) {
@@ -1274,6 +1275,7 @@ export default function TaskHierarchyTable({
                              onBulkUpdateStatus={onBulkUpdateStatus}
                               onUpdateBusinessStatus={onUpdateBusinessStatus}
                               onUpdateBusinessService={onUpdateBusinessService}
+                              category={business.category}
                               businessTaskIds={business.tasks.map((t) => t.id)}
                              allBusinesses={allBusinesses}
                              anyBusinessSelected={selectedBusinessIds.size > 0}
@@ -1498,7 +1500,7 @@ const LEVEL_STYLE = {
    business: { font: 'font-normal',  size: 'text-sm', tracking: '', leading: '' },
 };
 
-function Row({ depth, kind, id, name, status, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false, businessManagers = null, businessDepartments = null, onBusinessAssigneeSave, count = null, countLabel = '', userRole = '', userDepartmentId = null, userBusinessId = null, onOpenBulkUpload = null, onDuplicateBusiness = null, isBusinessSelected = false, onToggleBusinessSelect, onBulkArchive, onBulkMove, onBulkDelete, onBulkUpdateStatus, onUpdateBusinessStatus = null, businessTaskIds = [], anyBusinessSelected = false, onSelectAllBusinesses, onDeselectAllBusinesses, clientId = null, onUpdateBusinessService = null }) {
+function Row({ depth, kind, id, name, status, open, onToggle, dueDate, progress, dimmed, canEdit, onRename, onAddChild, onAddTask, onDeleteEntity, onHideEmptyGroups, hideAdd, hideDue, onFilter, taller = false, noBorder = false, businessManagers = null, businessDepartments = null, onBusinessAssigneeSave, count = null, countLabel = '', userRole = '', userDepartmentId = null, userBusinessId = null, onOpenBulkUpload = null, onDuplicateBusiness = null, isBusinessSelected = false, onToggleBusinessSelect, onBulkArchive, onBulkMove, onBulkDelete, onBulkUpdateStatus, onUpdateBusinessStatus = null, businessTaskIds = [], anyBusinessSelected = false, onSelectAllBusinesses, onDeselectAllBusinesses, clientId = null, onUpdateBusinessService = null, category = null }) {
   const level = LEVEL_STYLE[kind] || LEVEL_STYLE.business;
   const meta = KIND_META[kind];
   const [menuOpen, setMenuOpen] = useState(false);
@@ -1560,11 +1562,13 @@ function Row({ depth, kind, id, name, status, open, onToggle, dueDate, progress,
     if (onOpenBulkUpload) menuItems.push({ label: 'Bulk Upload', icon: Upload, onClick: () => { setMenuOpen(false); onOpenBulkUpload(); } });
     if (onDuplicateBusiness) menuItems.push({ label: 'Duplicate Business', icon: Copy, onClick: () => { setMenuOpen(false); onDuplicateBusiness(); } });
     if (onUpdateBusinessService) {
+      const currentCategoryLabel = category ? (BUSINESS_CATEGORIES.find((c) => c.value === category)?.label || category) : null;
       menuItems.push({
-        label: 'Services',
+        label: currentCategoryLabel ? `Service: ${currentCategoryLabel}` : 'Services',
         icon: Briefcase,
         submenu: BUSINESS_CATEGORIES.filter((c) => c.value !== 'none').map((c) => ({
           label: c.label,
+          active: c.value === category,
           onClick: () => { setMenuOpen(false); onUpdateBusinessService(id, clientId, c.value); },
         })),
       });
@@ -1761,6 +1765,7 @@ function Row({ depth, kind, id, name, status, open, onToggle, dueDate, progress,
                     onClick={sub.onClick}
                     className="flex w-48 items-center px-3 py-1.5 text-left text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-surface-hover)]"
                   >
+                    {sub.active && <Check size={12} className="mr-1.5 text-[var(--color-primary)]" />}
                     {sub.label}
                   </button>
                 ))}

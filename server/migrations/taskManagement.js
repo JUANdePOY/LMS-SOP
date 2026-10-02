@@ -12,7 +12,7 @@ const TASK_MANAGEMENT_MIGRATIONS = [
   // Allow tasks to be created without a status, priority, or dates so the new
   // task can be configured afterwards (the hierarchy quick-add leaves them empty).
   `ALTER TABLE tasks MODIFY COLUMN priority ENUM('Low','Medium','High','Critical') NULL DEFAULT 'Medium'`,
-  `ALTER TABLE tasks MODIFY COLUMN status ENUM('Pending','In Progress','Completed','Overdue','Cancelled') NULL DEFAULT 'Pending'`,
+   `ALTER TABLE tasks MODIFY COLUMN status ENUM('Pending','In Progress','Completed','Overdue','Cancelled','Archived') NULL DEFAULT 'Pending'`,
   `ALTER TABLE tasks MODIFY COLUMN start_datetime DATETIME NULL`,
   `ALTER TABLE tasks MODIFY COLUMN deadline_datetime DATETIME NULL`,
   // Progress notes: the task_progress.notes column is part of the base table
@@ -20,7 +20,8 @@ const TASK_MANAGEMENT_MIGRATIONS = [
   // IF NOT EXISTS never adds a missing column to an existing table, so without
   // this migration notes typed in "Update Progress" are silently dropped and the
   // progress history renders nothing for them.
-  `ALTER TABLE task_progress ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT NULL AFTER status`,
+   `ALTER TABLE task_progress ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT NULL AFTER status`,
+   `ALTER TABLE task_progress MODIFY COLUMN status ENUM('Pending','In Progress','Completed','Overdue','Cancelled','Archived') NOT NULL DEFAULT 'Pending'`,
 
   // Business managers: a user granted management access to a SOP business
   // (client_businesses) can manage every task in that business. Distinct from

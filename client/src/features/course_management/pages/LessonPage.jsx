@@ -5,6 +5,7 @@ import { useLessonProgress } from "../hooks/useLessonProgress";
 import { useMarkLessonComplete } from "../hooks/useMarkLessonComplete";
 import LessonProgressBar from "../components/LessonProgressBar";
 import LessonList from "../components/LessonList";
+import { useAuth } from "@/contexts/AuthContext";
 import VideoPlayer from "../components/utils/VideoPlayer";
 import ImageLightbox from "@/shared/components/ui/ImageLightbox";
 import LB_PROSE from "../utils/lbProse";
@@ -54,6 +55,8 @@ export default function LessonPage() {
   const [celebrationCertificate, setCelebrationCertificate] = useState(null);
   const [videoWatched, setVideoWatched] = useState(false);
   const videoPlayerRef = useRef(null);
+  const { user } = useAuth();
+  const isStaff = ['super_admin', 'admin', 'department_head'].includes(user?.role);
 
   const [ sop, setSop ] = useState(null);
   const [ sopLoading, setSopLoading ] = useState(false);
@@ -239,7 +242,7 @@ export default function LessonPage() {
     );
   }
 
-  if (currentLesson.status === 'locked') {
+  if (currentLesson.status === 'locked' && !isStaff) {
     return (
       <div className="space-y-4">
         <h1 className="text-xl font-bold">{currentLesson.title}</h1>

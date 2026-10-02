@@ -1,5 +1,5 @@
 import { useRef, useCallback } from "react";
-import { BookOpen, PlayCircle, Users, CheckCircle2, BarChart3, UserPlus } from "lucide-react";
+import { BookOpen, PlayCircle, Users, BarChart3, UserPlus, Clock } from "lucide-react";
 import { Badge } from "@/shared/components/ui/badge";
 import { useBookOpening } from "./BookOpeningTransition";
 import { getDifficultyMeta, ProgressBar } from "../utils/courseVisuals";
@@ -28,7 +28,6 @@ export default function CourseLibraryCard({ course, onClick, onAssign, myProgres
 
   const enrollments = course.enrollment_count || course.enrollments_count || 0;
   const avgProgress = myProgress != null ? myProgress : (course.avg_progress || 0);
-  const completed = course.completed_count || 0;
   const difficultyMeta = getDifficultyMeta(course.difficulty);
   const isEnrolled = myProgress != null;
   const isAdmin = Boolean(onAssign);
@@ -109,13 +108,17 @@ export default function CourseLibraryCard({ course, onClick, onAssign, myProgres
         )}
 
         <div className="flex items-center gap-4 border-t border-neutral-100 dark:border-neutral-800 pt-3 text-xs text-neutral-500 dark:text-neutral-400">
+          <span className="inline-flex items-center gap-1.5" title="Duration">
+            <Clock size={13} className="text-neutral-400" />
+            {course.duration_hours || 0}h
+          </span>
+          <span className="inline-flex items-center gap-1.5" title="Lessons">
+            <BookOpen size={13} className="text-neutral-400" />
+            {course.lesson_count || 0}
+          </span>
           <span className="inline-flex items-center gap-1.5" title="Enrollments">
             <Users size={13} className="text-neutral-400" />
             {enrollments}
-          </span>
-          <span className="inline-flex items-center gap-1.5" title="Completed">
-            <CheckCircle2 size={13} className="text-neutral-400" />
-            {completed}
           </span>
         </div>
       </div>

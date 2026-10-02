@@ -10,6 +10,7 @@ const STATUS_TOKENS = {
   Completed: 'var(--ppm-st-completed)',
   Overdue: 'var(--ppm-st-overdue)',
   Cancelled: 'var(--ppm-st-cancelled)',
+  Archived: 'var(--ppm-status-muted, var(--text-muted))',
 };
 
 const BUSINESS_STATUS_STYLES = {
@@ -18,6 +19,7 @@ const BUSINESS_STATUS_STYLES = {
   paused: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
   stopped: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400',
   cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+  archived: 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
 };
 
 const BUSINESS_STATUS_LABEL = {
@@ -26,7 +28,17 @@ const BUSINESS_STATUS_LABEL = {
   paused: 'Paused',
   stopped: 'Stopped',
   cancelled: 'Cancelled',
+  archived: 'Archived',
 };
+
+const BUSINESS_STATUS_OPTIONS = [
+  { key: 'active', label: 'Active' },
+  { key: 'inactive', label: 'Inactive' },
+  { key: 'paused', label: 'Paused' },
+  { key: 'stopped', label: 'Stopped' },
+  { key: 'cancelled', label: 'Cancelled' },
+  { key: 'archived', label: 'Archived' },
+];
 
 function Popover({ label, icon: Icon, children }) {
   const [open, setOpen] = useState(false);
@@ -160,6 +172,7 @@ export default function BulkActionBar({
   businesses,
   canManageTasks = false,
   userRole = '',
+  onUpdateBusinessStatus,
 }) {
   const [assignOpen, setAssignOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -288,6 +301,18 @@ export default function BulkActionBar({
         )}
 
         {selectedBusinessIds.size > 0 && <span className="h-5 w-px bg-[var(--border)]" />}
+
+        {selectedBusinessIds.size > 0 && onUpdateBusinessStatus && (
+          <Popover label="Business Status">
+            {BUSINESS_STATUS_OPTIONS.map((s) => (
+              <MenuItem key={s.key} onClick={() => onUpdateBusinessStatus?.(s.key)}>
+                <span className={`mr-2 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${BUSINESS_STATUS_STYLES[s.key] || BUSINESS_STATUS_STYLES.inactive}`}>
+                  {s.label}
+                </span>
+              </MenuItem>
+            ))}
+          </Popover>
+        )}
 
         <span ref={assignRef} className="relative inline-block">
           <button

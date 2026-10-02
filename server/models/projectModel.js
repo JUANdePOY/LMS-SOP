@@ -307,13 +307,14 @@ async function getRollupsForProjects(projectIds) {
         COUNT(DISTINCT t.id) AS total,
         SUM(CASE WHEN t.status = 'Completed' THEN 1 ELSE 0 END) AS completed,
         SUM(CASE WHEN t.status = 'Cancelled' THEN 1 ELSE 0 END) AS cancelled,
+        SUM(CASE WHEN t.status = 'Archived' THEN 1 ELSE 0 END) AS archived,
         SUM(CASE WHEN t.status = 'In Progress' THEN 1 ELSE 0 END) AS in_progress,
         SUM(CASE WHEN t.status = 'Review' THEN 1 ELSE 0 END) AS review,
         SUM(CASE WHEN t.status = 'Pending' AND t.deadline_datetime <= NOW() THEN 1 ELSE 0 END) AS overdue,
         SUM(CASE WHEN t.status = 'Pending' AND (t.deadline_datetime IS NULL OR t.deadline_datetime > NOW()) THEN 1 ELSE 0 END) AS pending,
-        SUM(CASE WHEN t.status NOT IN ('Completed','Cancelled') AND t.deadline_datetime IS NOT NULL AND t.deadline_datetime <= DATE_ADD(NOW(), INTERVAL 48 HOUR) THEN 1 ELSE 0 END) AS at_risk,
+        SUM(CASE WHEN t.status NOT IN ('Completed','Cancelled','Archived') AND t.deadline_datetime IS NOT NULL AND t.deadline_datetime <= DATE_ADD(NOW(), INTERVAL 48 HOUR) THEN 1 ELSE 0 END) AS at_risk,
         AVG(COALESCE((SELECT completion_rate FROM task_progress tp WHERE tp.task_id = t.id ORDER BY tp.updated_at DESC LIMIT 1), 0)) AS aggregate_progress,
-        MIN(CASE WHEN t.status NOT IN ('Completed','Cancelled') THEN t.deadline_datetime END) AS earliest_due
+        MIN(CASE WHEN t.status NOT IN ('Completed','Cancelled','Archived') THEN t.deadline_datetime END) AS earliest_due
      FROM tasks t
      WHERE t.project_id IN (${placeholders})
      GROUP BY t.project_id`,

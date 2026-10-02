@@ -130,7 +130,8 @@ async function bulkCreateTasks(rows, actorId, overrides = {}) {
 
 async function listTasks(filters = {}, actorId) {
   const isAdmin = await isUserAdmin(actorId);
-  if (!isAdmin) {
+  const isDepartmentHead = await isUserDepartmentHead(actorId);
+  if (!isAdmin && !isDepartmentHead) {
     const assignedTaskIds = await getAssignedTaskIdsForUser(actorId);
     if (!filters.assigned_to_me) {
       filters.task_ids = assignedTaskIds;
@@ -1235,7 +1236,11 @@ async function updateProgress(payload, actorId) {
   // user must first move the task out of Cancelled via its status.
   // Completed tasks are allowed because saving 100% is the expected final
   // state, and the code below auto-corrects any Completed save to 100%.
-  if (completion_rate !== undefined && task.status === 'Cancelled') {
+  if (
+    completion_rate !== undefined &&
+    (task.status === 'Cancelled' || task.status === 'Archived') &&
+    (status === undefined || status === task.status)
+  ) {
     const error = new Error('Update the Status Before editing the progress rate');
     error.code = 'VALIDATION_ERROR';
     throw error;
@@ -2043,7 +2048,7 @@ async function isUserAdmin(userId) {
     [userId]
   );
   const user = users[0];
-  return user && ['admin', 'super_admin'].includes(user.role);
+  return user && ['super_admin', 'admin', 'department_head'].includes(user.role);
 }
 
 async function isUserSuperAdmin(userId) {
@@ -2261,7 +2266,8 @@ async function getDepartmentScopedTaskIdsForDeptHead(userId) {
 
 async function getMyTaskCount(userId) {
   const isAdmin = await isUserAdmin(userId);
-  if (isAdmin) {
+  const isDepartmentHead = await isUserDepartmentHead(userId);
+  if (isAdmin || isDepartmentHead) {
     // Count the exact same scope set the task list uses (super_admin = all,
     // department_head = department-scoped, admin = business-scoped) so the
     // badge never disagrees with the rendered rows.

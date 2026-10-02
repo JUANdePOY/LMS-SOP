@@ -674,7 +674,7 @@ const MIGRATIONS = [
       title VARCHAR(255) NOT NULL,
       description TEXT DEFAULT NULL,
       priority ENUM('Low','Medium','High','Critical') NOT NULL DEFAULT 'Medium',
-      status ENUM('Pending','In Progress','Completed','Overdue','Cancelled') NOT NULL DEFAULT 'Pending',
+      status ENUM('Pending','In Progress','Completed','Overdue','Cancelled','Archived') NOT NULL DEFAULT 'Pending',
       start_datetime DATETIME NOT NULL,
       deadline_datetime DATETIME NOT NULL,
       estimated_hours INT DEFAULT NULL,
@@ -706,7 +706,7 @@ const MIGRATIONS = [
       task_id INT NOT NULL,
       user_id INT NOT NULL,
       completion_rate TINYINT NOT NULL DEFAULT 0,
-      status ENUM('Pending','In Progress','Completed','Overdue','Cancelled') NOT NULL DEFAULT 'Pending',
+      status ENUM('Pending','In Progress','Completed','Overdue','Cancelled','Archived') NOT NULL DEFAULT 'Pending',
       notes TEXT DEFAULT NULL,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
@@ -975,14 +975,22 @@ async function runMigrations() {
     console.error('Client management migration error:', err.message);
   }
 
-  try {
-    const { runBusinessTypeMigrations } = require('../migrations/businessTypes');
-    await runBusinessTypeMigrations();
-    console.log('Business type migrations applied');
-  } catch (err) {
-    console.error('Business type migration error:', err.message);
-  }
-}
+   try {
+     const { runBusinessTypeMigrations } = require('../migrations/businessTypes');
+     await runBusinessTypeMigrations();
+     console.log('Business type migrations applied');
+   } catch (err) {
+     console.error('Business type migration error:', err.message);
+   }
+
+   try {
+     const { runTaskMigrations } = require('../migrations/taskManagement');
+     await runTaskMigrations();
+     console.log('Task management migrations applied');
+   } catch (err) {
+     console.error('Task management migration error:', err.message);
+   }
+ }
 
 async function addColumnIfMissing(db, table, column, definition) {
   const [rows] = await db.query(

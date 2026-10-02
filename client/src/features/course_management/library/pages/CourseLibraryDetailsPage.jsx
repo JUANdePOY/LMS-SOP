@@ -159,7 +159,7 @@ function ModuleAccordion({ courseId, module, index, onView, getContent, locked }
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-neutral-900 dark:text-neutral-100">{module.title}</p>
           {module.description && (
-            <p className="truncate text-xs text-neutral-500 dark:text-neutral-400">{module.description}</p>
+            <p className="truncate text-xs text-neutral-500 dark:text-neutral-400" dangerouslySetInnerHTML={{ __html: module.description }} />
           )}
         </div>
         <span className="shrink-0 text-[11px] font-medium text-neutral-400 dark:text-neutral-500">
@@ -470,11 +470,10 @@ export default function CourseLibraryDetailsPage() {
           <CourseContentSection
             courseId={courseId}
             locked={!canAccessContent}
-            onLessonView={(payload) =>
-              isEmployee
-                ? navigate(`/my-learning/course/${courseId}`)
-                : trackContentView(payload)
-            }
+            onLessonView={(payload) => {
+              navigate(`/my-learning/course/${courseId}`);
+              trackContentView(payload);
+            }}
             headerAction={
               isEmployee && employeeEnrolled ? (
                 <button
@@ -766,11 +765,10 @@ export default function CourseLibraryDetailsPage() {
                 modules={modules}
                 modulesLoading={modulesLoading}
                 locked={!canAccessContent}
-                onView={(payload) =>
-                  isEmployee
-                    ? navigate(`/my-learning/course/${courseId}`)
-                    : trackContentView(payload)
-                }
+                onView={(payload) => {
+                  navigate(`/my-learning/course/${courseId}`);
+                  trackContentView(payload);
+                }}
               />
             </div>
           </div>
