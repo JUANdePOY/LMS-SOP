@@ -1,6 +1,7 @@
 const sopOnboardingService = require('../services/sopOnboardingService');
 const sopOnboardingSessionService = require('../services/sopOnboardingSessionService');
 const db = require('../config/database');
+const { logAudit } = require('../utils/auditLogger');
 
 function sendError(res, err, fallback = 'Request failed') {
   const code = err.code || 'INTERNAL_ERROR';
@@ -40,6 +41,7 @@ async function acknowledgeOnboardingSop(req, res) {
       throw err;
     }
     await sopOnboardingService.acknowledgeOnboardingSop(ackId, req.user.id);
+    logAudit({ user_id: req.user.id, action: 'onboarding.acknowledge', entity_type: 'onboarding', entity_id: ackId });
     res.json({ success: true, message: 'SOP acknowledged successfully' });
   } catch (error) {
     sendError(res, error, 'Failed to acknowledge SOP');
@@ -73,6 +75,7 @@ async function getOrCreateOnboardingSession(req, res) {
       sopVersionId: acknowledgement.sop_version_id,
     });
 
+    logAudit({ user_id: req.user.id, action: 'onboarding.session.create', entity_type: 'onboarding_session', entity_id: status.session_id || acknowledgement.id });
     res.json({ success: true, data: status });
   } catch (error) {
     sendError(res, error, 'Failed to load onboarding session');
@@ -91,6 +94,7 @@ async function heartbeatOnboardingSession(req, res) {
     const elapsed = Math.max(0, parseInt(req.body.elapsed_seconds || req.query.elapsed_seconds || 0, 10));
     await sopOnboardingSessionService.heartbeatSession(sessionId, req.user.id, elapsed);
     const status = await sopOnboardingSessionService.getSessionStatus(sessionId, req.user.id);
+    logAudit({ user_id: req.user.id, action: 'onboarding.session.heartbeat', entity_type: 'onboarding_session', entity_id: sessionId });
     res.json({ success: true, data: status });
   } catch (error) {
     sendError(res, error, 'Failed to record heartbeat');

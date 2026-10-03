@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const projectModel = require('../models/projectModel');
 const { validateProjectPayload, validateFieldDefPayload } = require('../validators/projectValidator');
+const { logAudit } = require('../utils/auditLogger');
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
@@ -89,6 +90,7 @@ const projectController = {
       }
       const projectId = await projectModel.create({ ...validation.value, created_by: req.user.id });
       const project = await projectModel.findById(projectId);
+      logAudit({ user_id: req.user.id, action: 'project.create', entity_type: 'project', entity_id: projectId });
       res.status(201).json({ success: true, data: project, message: 'Project created successfully' });
     } catch (error) {
       if (/ER_NO_REFERENCED_ROW/.test(error.message)) {
@@ -111,6 +113,7 @@ const projectController = {
       }
       await projectModel.update(id, validation.value);
       const project = await projectModel.findById(id);
+      logAudit({ user_id: req.user.id, action: 'project.update', entity_type: 'project', entity_id: id });
       res.json({ success: true, data: project, message: 'Project updated successfully' });
     } catch (error) {
       if (/ER_NO_REFERENCED_ROW/.test(error.message)) {
@@ -127,6 +130,7 @@ const projectController = {
       if (affected === 0) {
         return res.status(404).json({ success: false, message: 'Project not found', code: 'NOT_FOUND' });
       }
+      logAudit({ user_id: req.user.id, action: 'project.delete', entity_type: 'project', entity_id: id });
       res.json({ success: true, message: 'Project deleted successfully' });
     } catch (error) {
       handleError(res, error);
@@ -155,6 +159,7 @@ const projectController = {
       }
       await projectModel.createFieldDef({ project_id: projectId, ...validation.value });
       const fields = await projectModel.listFieldDefs(projectId);
+      logAudit({ user_id: req.user.id, action: 'project.field.create', entity_type: 'project_field', entity_id: projectId });
       res.status(201).json({ success: true, data: fields, message: 'Custom field created successfully' });
     } catch (error) {
       handleError(res, error);
@@ -169,6 +174,7 @@ const projectController = {
       }
       await projectModel.updateFieldDef(parseInt(req.params.fieldId, 10), validation.value);
       const fields = await projectModel.listFieldDefs(parseInt(req.params.id, 10));
+      logAudit({ user_id: req.user.id, action: 'project.field.update', entity_type: 'project_field', entity_id: req.params.fieldId });
       res.json({ success: true, data: fields, message: 'Custom field updated successfully' });
     } catch (error) {
       handleError(res, error);
@@ -179,6 +185,7 @@ const projectController = {
     try {
       await projectModel.removeFieldDef(parseInt(req.params.fieldId, 10));
       const fields = await projectModel.listFieldDefs(parseInt(req.params.id, 10));
+      logAudit({ user_id: req.user.id, action: 'project.field.delete', entity_type: 'project_field', entity_id: req.params.fieldId });
       res.json({ success: true, data: fields, message: 'Custom field deleted successfully' });
     } catch (error) {
       handleError(res, error);

@@ -26,6 +26,8 @@ export function useActiveBanners({ enabled = true } = {}) {
           ctaLabel: b.ctaLabel || null,
           imageUrl: b.imageUrl || null,
           priority: typeof b.priority === 'number' ? b.priority : 0,
+          createdAt: b.createdAt || Date.now(),
+          endAt: b.endAt ? new Date(b.endAt).getTime() : null,
         }))
       );
       setError(null);

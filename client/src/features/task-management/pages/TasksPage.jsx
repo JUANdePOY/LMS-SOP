@@ -1139,6 +1139,36 @@ export default function TasksPage() {
     clearSelection();
   }, [selectedBusinessIds, findClientIdForBusiness, updateClientBusiness, setClientTree, toast, notifyOrgTreeChanged, clearSelection]);
 
+  const handleBulkUpdateBusinessService = useCallback(async (category) => {
+    const ids = [...selectedBusinessIds];
+    if (ids.length === 0) return;
+    let updated = 0;
+    for (const bid of ids) {
+      const clientId = findClientIdForBusiness(bid);
+      if (clientId == null) continue;
+      try {
+        const result = await updateClientBusiness(clientId, bid, { category });
+        setClientTree((prev) =>
+          prev.map((client) => ({
+            ...client,
+            businesses: (client.businesses || []).map((b) =>
+              String(b.id) === String(bid) && result ? { ...b, ...result } : b
+            ),
+          }))
+        );
+        updated++;
+      } catch (err) {
+        toast.error(err.response?.data?.message || err.message || `Failed to update business ${bid}`);
+      }
+    }
+    if (updated > 0) {
+      const label = BUSINESS_CATEGORIES.find((c) => c.value === category)?.label || category;
+      toast.success(`${updated} business${updated > 1 ? 'es' : ''} updated to ${label}`);
+      notifyOrgTreeChanged();
+    }
+    clearSelection();
+  }, [selectedBusinessIds, findClientIdForBusiness, updateClientBusiness, setClientTree, toast, notifyOrgTreeChanged, clearSelection]);
+
   const handleStatusChange = useCallback(async (task, newStatus) => {
     const changes = { status: newStatus };
     if (newStatus === 'Completed') {
@@ -1451,8 +1481,9 @@ export default function TasksPage() {
            businesses={allBusinesses}
            canManageTasks={canManageTasks}
            userRole={user?.role}
-           onUpdateBusinessStatus={handleBulkBusinessStatus}
-         />
+            onUpdateBusinessStatus={handleBulkBusinessStatus}
+            onUpdateBusinessService={handleBulkUpdateBusinessService}
+          />
       )}
 
       <TaskBulkUploadModal

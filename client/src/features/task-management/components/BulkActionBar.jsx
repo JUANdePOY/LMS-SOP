@@ -1,8 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, Trash2, X, UserPlus, Building2, Users } from 'lucide-react';
+import { ChevronDown, Trash2, X, UserPlus, Building2, Users, Briefcase } from 'lucide-react';
 import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
-import { getUsersForAssignment, getDepartmentsForAssignment } from '../api/assignment.api';
 import { cn } from '@/lib/utils';
+
+const BUSINESS_CATEGORIES = [
+  { value: 'none', label: 'None' },
+  { value: 'local_seo', label: 'Local SEO' },
+  { value: 'full_seo', label: 'Full SEO' },
+  { value: 'va', label: 'VA' },
+  { value: 'orders', label: 'Orders' },
+];
 
 const STATUS_TOKENS = {
   Pending: 'var(--ppm-st-pending)',
@@ -173,6 +180,7 @@ export default function BulkActionBar({
   canManageTasks = false,
   userRole = '',
   onUpdateBusinessStatus,
+  onUpdateBusinessService,
 }) {
   const [assignOpen, setAssignOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -181,6 +189,7 @@ export default function BulkActionBar({
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingDepts, setLoadingDepts] = useState(false);
   const [tab, setTab] = useState('user');
+  const [serviceOpen, setServiceOpen] = useState(false);
   const assignRef = useRef(null);
 
   useEffect(() => {
@@ -309,6 +318,17 @@ export default function BulkActionBar({
                 <span className={`mr-2 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[10px] font-medium ${BUSINESS_STATUS_STYLES[s.key] || BUSINESS_STATUS_STYLES.inactive}`}>
                   {s.label}
                 </span>
+              </MenuItem>
+            ))}
+          </Popover>
+        )}
+
+        {selectedBusinessIds.size > 0 && onUpdateBusinessService && (
+          <Popover label="Service">
+            {BUSINESS_CATEGORIES.filter((c) => c.value !== 'none').map((c) => (
+              <MenuItem key={c.value} onClick={() => { onUpdateBusinessService?.(c.value); setServiceOpen(false); }}>
+                <Briefcase size={13} className="text-[var(--text-muted)]" />
+                {c.label}
               </MenuItem>
             ))}
           </Popover>

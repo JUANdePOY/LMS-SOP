@@ -2,6 +2,7 @@ const clientModel = require('../models/clientModel');
 const taskService = require('../services/taskService');
 const { validateClientPayload } = require('../validators/clientValidator');
 const { parseFile } = require('../utils/taskBulkValidation');
+const { logAudit } = require('../utils/auditLogger');
 
 function handleError(res, error) {
   const code = error.code || 'INTERNAL_ERROR';
@@ -76,6 +77,7 @@ const clientController = {
         created_by: req.user.id,
       });
       const client = await clientModel.getClient(clientId);
+      logAudit({ user_id: req.user.id, action: 'client.create', entity_type: 'client', entity_id: clientId });
       res.status(201).json({ success: true, data: client, message: 'Client created successfully' });
     } catch (error) {
       if (/Duplicate entry/.test(error.message) && /uk_clients_name/.test(error.message)) {
@@ -103,6 +105,7 @@ const clientController = {
 
       await clientModel.updateClient(id, validation.value);
       const client = await clientModel.getClient(id);
+      logAudit({ user_id: req.user.id, action: 'client.update', entity_type: 'client', entity_id: id });
       res.json({ success: true, data: client, message: 'Client updated successfully' });
     } catch (error) {
       if (/Duplicate entry/.test(error.message) && /uk_clients_name/.test(error.message)) {
@@ -122,6 +125,7 @@ const clientController = {
       if (affected === 0) {
         return res.status(404).json({ success: false, message: 'Client not found', code: 'NOT_FOUND' });
       }
+      logAudit({ user_id: req.user.id, action: 'client.delete', entity_type: 'client', entity_id: id });
       res.json({ success: true, message: 'Client deleted successfully' });
     } catch (error) {
       handleError(res, error);
@@ -135,6 +139,7 @@ const clientController = {
       if (affected === 0) {
         return res.status(404).json({ success: false, message: 'Business not found', code: 'NOT_FOUND' });
       }
+      logAudit({ user_id: req.user.id, action: 'client_business.delete', entity_type: 'client_business', entity_id: businessId });
       res.json({ success: true, message: 'Business deleted successfully' });
     } catch (error) {
       handleError(res, error);
@@ -156,6 +161,7 @@ const clientController = {
       const category = req.body.category === 'local_seo' || req.body.category === 'full_seo' ? req.body.category : 'none';
       const id = await clientModel.addBusiness(clientId, name, businessType, category);
       const created = await clientModel.getClientBusiness(clientId, id);
+      logAudit({ user_id: req.user.id, action: 'client_business.create', entity_type: 'client_business', entity_id: id });
       res.status(201).json({
         success: true,
         data: created,
@@ -211,8 +217,9 @@ const clientController = {
 
        const category = ['none', 'local_seo', 'full_seo', 'va', 'orders'].includes(req.body.category) ? req.body.category : 'none';
 
-       await clientModel.updateBusiness(clientId, businessId, { business_name, business_type, status, category });
+        await clientModel.updateBusiness(clientId, businessId, { business_name, business_type, status, category });
       const updated = await clientModel.getClientBusiness(clientId, businessId);
+      logAudit({ user_id: req.user.id, action: 'client_business.update', entity_type: 'client_business', entity_id: businessId });
       res.json({ success: true, data: updated, message: 'Business updated successfully' });
     } catch (error) {
       if (/Duplicate entry/.test(error.message) && /uk_client_business/.test(error.message)) {
@@ -327,6 +334,7 @@ const clientController = {
         data: { created: createdCount, failed: failedCount, results },
         message: `Bulk upload complete. Created: ${createdCount}, Failed: ${failedCount}`,
       });
+      logAudit({ user_id: req.user.id, action: 'client.bulk_upload', entity_type: 'client', metadata: { created: createdCount, failed: failedCount } });
     } catch (error) {
       handleError(res, error);
     }

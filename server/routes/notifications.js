@@ -4,6 +4,7 @@ const { authenticateToken, resolveScope } = require('../middleware/auth');
 const { requirePermission, requirePermissionAction } = require('../middleware/scope');
 const { broadcastSystemChange, createSystemNotification } = require('../services/notificationService');
 const { subscribe, unsubscribe } = require('../services/pushNotificationService');
+const { logAudit } = require('../utils/auditLogger');
 
 function sendError(res, statusCode, code, message) {
   return res.status(statusCode).json({ success: false, code, message });
@@ -102,6 +103,7 @@ router.post('/', resolveScope, requirePermission('notifications.send'), requireP
       return sendError(res, 500, 'NOTIFICATION_CREATE_ERROR', 'Failed to create notification');
     }
 
+    logAudit({ user_id: req.user.id, action: 'notification.send', entity_type: 'notification', entity_id: notificationId, metadata: { target_user_id: targetUserId, title } });
     res.status(201).json({ success: true, data: { id: notificationId } });
   } catch (err) {
     console.error('Notification create error:', err);
@@ -143,6 +145,7 @@ router.post('/broadcast', resolveScope, requirePermission('notifications.broadca
       targetUserIds,
     });
 
+    logAudit({ user_id: req.user.id, action: 'notification.broadcast', entity_type: 'notification', metadata: { title, entity_type, entity_id: Number(entity_id), target_count: ids.length } });
     res.status(201).json({ success: true, data: { count: ids.length } });
   } catch (err) {
     console.error('Notification broadcast error:', err);

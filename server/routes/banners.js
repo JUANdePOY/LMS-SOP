@@ -3,6 +3,7 @@ const db = require('../config/database');
 const { authenticateToken, resolveScope } = require('../middleware/auth');
 const { requirePermission } = require('../middleware/scope');
 const bannerService = require('../services/bannerService');
+const { logAudit } = require('../utils/auditLogger');
 
 function sendError(res, statusCode, code, message) {
   return res.status(statusCode).json({ success: false, code, message });
@@ -101,6 +102,7 @@ router.post('/', authenticateToken, resolveScope, requirePermission('banners.man
     if (!id) {
       return sendError(res, 500, 'BANNER_CREATE_ERROR', 'Failed to create banner');
     }
+    logAudit({ user_id: req.user.id, action: 'banner.create', entity_type: 'banner', entity_id: id });
     res.status(201).json({ success: true, data: { id } });
   } catch (err) {
     console.error('Banner create error:', err);
@@ -113,6 +115,7 @@ router.put('/:id', authenticateToken, resolveScope, requirePermission('banners.m
   try {
     const ok = await bannerService.updateBanner(req.params.id, req.body);
     if (!ok) return sendError(res, 404, 'NOT_FOUND', 'Banner not found');
+    logAudit({ user_id: req.user.id, action: 'banner.update', entity_type: 'banner', entity_id: req.params.id });
     res.json({ success: true });
   } catch (err) {
     console.error('Banner update error:', err);
@@ -126,6 +129,7 @@ router.patch('/:id/status', authenticateToken, resolveScope, requirePermission('
     const { status } = req.body;
     const ok = await bannerService.setBannerStatus(req.params.id, status);
     if (!ok) return sendError(res, 400, 'INVALID_STATUS', 'Invalid or unknown status');
+    logAudit({ user_id: req.user.id, action: 'banner.status_update', entity_type: 'banner', entity_id: req.params.id, metadata: { status } });
     res.json({ success: true });
   } catch (err) {
     console.error('Banner status error:', err);
@@ -138,6 +142,7 @@ router.delete('/:id', authenticateToken, resolveScope, requirePermission('banner
   try {
     const ok = await bannerService.deleteBanner(req.params.id);
     if (!ok) return sendError(res, 404, 'NOT_FOUND', 'Banner not found');
+    logAudit({ user_id: req.user.id, action: 'banner.delete', entity_type: 'banner', entity_id: req.params.id });
     res.json({ success: true });
   } catch (err) {
     console.error('Banner delete error:', err);

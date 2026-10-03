@@ -111,6 +111,7 @@ async function saveDraftAttempt(req, res) {
       return res.status(400).json({ success: false, message: 'Attempt cannot be modified', code: 'INVALID_STATE' });
     }
     await quizModel.updateAttempt(req.params.id, { answers });
+    logAudit && logAudit('quiz.attempt.save_draft', req.user.id, { attemptId: req.params.id });
     res.json({ success: true, message: 'Draft saved' });
   } catch (err) {
     sendError(res, err, 'Failed to save draft');
@@ -257,6 +258,7 @@ async function cancelAttempt(req, res) {
       return res.status(400).json({ success: false, message: 'Attempt cannot be cancelled', code: 'INVALID_STATE' });
     }
     await quizModel.updateAttempt(req.params.id, { status: 'cancelled' });
+    logAudit && logAudit('quiz.attempt.cancel', req.user.id, { attemptId: req.params.id });
     res.json({ success: true, message: 'Attempt cancelled' });
   } catch (err) {
     sendError(res, err, 'Failed to cancel attempt');
@@ -448,6 +450,7 @@ async function listOverrides(req, res) {
 async function revokeOverride(req, res) {
   try {
     await quizModel.revokeOverride(req.params.id);
+    logAudit && logAudit('quiz.override.revoke', req.user.id, { overrideId: req.params.id });
     res.json({ success: true, message: 'Override revoked' });
   } catch (err) {
     sendError(res, err, 'Failed to revoke override');

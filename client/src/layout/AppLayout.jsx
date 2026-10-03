@@ -149,7 +149,6 @@ export default function AppLayout() {
   useNotificationStore();
   useNotificationPoller();
   useWebSocket();
-  const isDashboard = location.pathname === '/';
   const notificationData = useNotifications();
   const { fetchPreferences } = notificationData;
   // Auto-subscribe every logged-in user to web push on first load (opt-out
@@ -181,8 +180,8 @@ export default function AppLayout() {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  const { banners: activeBanners } = useActiveBanners({ enabled: isDashboard });
-  const { banners: contextualBanners } = useContextualBanners({ enabled: isDashboard });
+  const { banners: activeBanners } = useActiveBanners({ enabled: true });
+  const { banners: contextualBanners } = useContextualBanners({ enabled: true });
   const messageBadgeCount = notificationData.unreadMessageCount || 0;
   const eventBadgeCount = notificationData.getUnreadCountByEntityType('event') || 0;
   const announcementBadgeCount = notificationData.getUnreadCountByEntityType('announcement') || 0;
@@ -491,7 +490,7 @@ export default function AppLayout() {
           >
           <Scrollbar variant="viewport">
           <div className="w-full px-4 sm:px-6 pt-4 sm:pt-6 pb-8 sm:pb-10 flex-1">
-            {isDashboard && <BannerSection items={[...activeBanners, ...contextualBanners]} />}
+            <BannerSection items={[...activeBanners, ...contextualBanners]} />
             <PageTransition>
               <Outlet />
             </PageTransition>

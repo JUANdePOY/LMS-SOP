@@ -206,8 +206,8 @@ async function getActiveBannersForUser(user) {
        AND (b.type NOT IN ('new_course', 'new_sop') OR b.created_at >= NOW() - INTERVAL ${NEW_CONTENT_FRESHNESS_DAYS} DAY)
        AND ${audience.sql}
        AND (d.id IS NULL OR (d.snooze_until IS NOT NULL AND d.snooze_until <= NOW()))
-     ORDER BY b.priority DESC, b.created_at DESC
-     LIMIT 20`,
+      ORDER BY b.priority DESC, b.created_at DESC
+      LIMIT 50`,
     [user.id, ...BANNER_SLOT_TYPES, ...audience.params]
   );
   return rows;

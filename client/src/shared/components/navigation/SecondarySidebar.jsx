@@ -135,24 +135,27 @@ export default function SecondarySidebar({ collapsed = false }) {
         }));
     }
     if (isAnyAdmin) return businesses.filter((b) => b.status !== 'archived');
-    if (employeeSopBusinessIds != null && employeeClientIds != null && employeeBusinessIds != null && employeeClientTree.length > 0) {
-      const bizMap = new Map();
-      for (const c of employeeClientTree) {
-        const bizId = Number(c.business_id);
-        if (!employeeSopBusinessIds.has(bizId)) continue;
-        if (!bizMap.has(bizId)) {
-          bizMap.set(bizId, {
-            id: bizId,
-            name: c.business_name || `Business ${bizId}`,
-            clients: []
+    if (employeeSopBusinessIds != null && employeeClientIds != null && employeeBusinessIds != null) {
+      if (employeeClientTree.length > 0) {
+        const bizMap = new Map();
+        for (const c of employeeClientTree) {
+          const bizId = Number(c.business_id);
+          if (!employeeSopBusinessIds.has(bizId)) continue;
+          if (!bizMap.has(bizId)) {
+            bizMap.set(bizId, {
+              id: bizId,
+              name: c.business_name || `Business ${bizId}`,
+              clients: []
+            });
+          }
+          bizMap.get(bizId).clients.push({
+            ...c,
+            businesses: (c.businesses || []).filter((u) => employeeBusinessIds.has(Number(u.id))),
           });
         }
-        bizMap.get(bizId).clients.push({
-          ...c,
-          businesses: (c.businesses || []).filter((u) => employeeBusinessIds.has(Number(u.id))),
-        });
+        return Array.from(bizMap.values());
       }
-      return Array.from(bizMap.values());
+      return [];
     }
     if (employeeBusinessId != null) {
       return businesses.filter((b) => Number(b.id) === Number(employeeBusinessId) && b.status !== 'archived');

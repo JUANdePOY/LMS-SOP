@@ -84,7 +84,7 @@ function sortQueue(entries) {
 }
 
 function isExpired(entry) {
-  return Boolean(entry.expiresAt && Date.now() > entry.expiresAt);
+  return Boolean(entry.endAt && Date.now() > entry.endAt);
 }
 
 // Render banner text inline so the whole banner stays on a single row on
