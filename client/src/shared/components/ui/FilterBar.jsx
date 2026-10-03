@@ -63,7 +63,7 @@ export default function FilterBar({
               value={statusFilter || ''}
               onChange={(e) => onStatus?.(e.target.value)}
               className="h-9 rounded-lg border border-[var(--ppm-border)] bg-[var(--bg-surface)] px-2.5 text-sm outline-none transition-colors focus:border-[var(--color-primary)] focus:ring-1 focus:ring-[var(--color-primary)]/20"
-              aria-label="Filter by service status"
+              aria-label="Filter by task status"
             >
               <option value="">All Task Status</option>
               {statusOptions.map((s) => (

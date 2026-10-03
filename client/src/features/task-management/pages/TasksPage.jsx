@@ -538,6 +538,24 @@ export default function TasksPage() {
     return result;
   }, [tasks, search, statusFilter, priorityFilter, assigneeFilter, user, clientParam, businessParam, projectsById, scopedClientIdsForBusiness, isDepartmentHead, clientTree]);
 
+  const selectableTasks = useMemo(() => {
+    const archivedBizIds = new Set();
+    for (const client of clientTree || []) {
+      for (const business of client.businesses || []) {
+        if (String(business?.status).toLowerCase() === 'archived') {
+          archivedBizIds.add(String(business.id));
+        }
+      }
+    }
+    return (displayedTasks || []).filter((t) => {
+      const isParent = t.parent_task_id == null || t.parent_task_id === '';
+      const isTaskArchived = String(t.status || '').toLowerCase() === 'archived';
+      const bizId = t.client_business_id != null ? String(t.client_business_id) : (projectsById[String(t.project_id ?? t.projectId ?? t.project?.id)]?.client_business_id != null ? String(projectsById[String(t.project_id ?? t.projectId ?? t.project?.id)]?.client_business_id) : null);
+      const isBizArchived = bizId != null && archivedBizIds.has(bizId);
+      return isParent && !isTaskArchived && !isBizArchived;
+    });
+  }, [displayedTasks, clientTree, projectsById]);
+
   const matchingBusinessIds = useMemo(() => {
     const ids = new Set();
     for (const task of displayedTasks || []) {
@@ -663,18 +681,19 @@ export default function TasksPage() {
     const tree = (businessCategory && businessCategory !== 'all') ? categoryFilteredClientTree : clientTree;
     if (!tree || tree.length === 0) return new Set();
     const ids = new Set();
+    const isArchived = (b) => String(b?.status).toLowerCase() === 'archived';
     if (clientParam) {
       for (const client of tree) {
         if (String(client.id) === String(clientParam)) {
           for (const business of client.businesses || []) {
-            ids.add(String(business.id));
+            if (!isArchived(business)) ids.add(String(business.id));
           }
         }
       }
     } else if (businessParam) {
       for (const client of tree) {
         for (const business of client.businesses || []) {
-          if (String(business.id) === String(businessParam)) {
+          if (String(business.id) === String(businessParam) && !isArchived(business)) {
             ids.add(String(business.id));
           }
         }
@@ -683,7 +702,7 @@ export default function TasksPage() {
       for (const client of tree) {
         for (const business of client.businesses || []) {
           for (const task of business.tasks || []) {
-            if (String(task.project_id ?? task.projectId ?? task.project?.id) === String(projectParam)) {
+            if (String(task.project_id ?? task.projectId ?? task.project?.id) === String(projectParam) && !isArchived(business)) {
               ids.add(String(business.id));
             }
           }
@@ -692,7 +711,7 @@ export default function TasksPage() {
     } else {
       for (const client of tree) {
         for (const business of client.businesses || []) {
-          ids.add(String(business.id));
+          if (!isArchived(business)) ids.add(String(business.id));
         }
       }
     }
@@ -945,6 +964,22 @@ export default function TasksPage() {
   }, []);
 
   const handleToggleTaskSelect = useCallback((taskId, selected) => {
+    const task = (tasks || []).find((t) => String(t.id) === String(taskId));
+    if (task) {
+      const isParent = task.parent_task_id == null || task.parent_task_id === '';
+      const isTaskArchived = String(task.status || '').toLowerCase() === 'archived';
+      const bizId = task.client_business_id != null ? String(task.client_business_id) : (projectsById[String(task.project_id ?? task.projectId ?? task.project?.id)]?.client_business_id != null ? String(projectsById[String(task.project_id ?? task.projectId ?? task.project?.id)]?.client_business_id) : null);
+      const archivedBizIds = new Set();
+      for (const client of clientTree || []) {
+        for (const business of client.businesses || []) {
+          if (String(business?.status).toLowerCase() === 'archived') {
+            archivedBizIds.add(String(business.id));
+          }
+        }
+      }
+      const isBizArchived = bizId != null && archivedBizIds.has(bizId);
+      if (!isParent || isTaskArchived || isBizArchived) return;
+    }
     setSelectedIds((prev) => {
       const next = new Set(prev);
       const key = String(taskId);
@@ -952,7 +987,7 @@ export default function TasksPage() {
       else next.delete(key);
       return next;
     });
-  }, []);
+  }, [tasks, clientTree, projectsById]);
 
   const handleSelectAllBusinesses = useCallback((businessIds) => {
     let ids = Array.isArray(businessIds) ? businessIds : [];
@@ -960,7 +995,9 @@ export default function TasksPage() {
       const fallback = [];
       for (const client of scopedClientTree || []) {
         for (const business of client.businesses || []) {
-          fallback.push(String(business.id));
+          if (String(business?.status).toLowerCase() !== 'archived') {
+            fallback.push(String(business.id));
+          }
         }
       }
       ids = fallback;
@@ -970,12 +1007,12 @@ export default function TasksPage() {
   }, [scopedClientTree]);
 
   const handleSelectAllTasks = useCallback(() => {
-    const allTaskIds = (displayedTasks || [])
+    const allTaskIds = (selectableTasks || [])
       .map((t) => String(t.id))
       .filter(Boolean);
     if (allTaskIds.length === 0) return;
     setSelectedIds(new Set(allTaskIds));
-  }, [displayedTasks]);
+  }, [selectableTasks]);
 
   const handleBulkDelete = useCallback(async () => {
     const count = selectedIds.size > 0 ? selectedIds.size : selectedBusinessIds.size;
@@ -1407,7 +1444,7 @@ export default function TasksPage() {
           selectedBusinessIds={selectedBusinessIds}
           selectedTaskIds={selectedIds}
           onSelectAllTasks={handleSelectAllTasks}
-          displayedTaskCount={displayedTasks.length}
+          displayedTaskCount={selectableTasks.length}
           onAssigneeChange={handleBulkAssignee}
           onAssignToSelectedBusinesses={handleAssignToSelectedBusinesses}
            onMoveToBusiness={(targetBusinessId) => handleBulkMove(Array.from(selectedIds), targetBusinessId)}

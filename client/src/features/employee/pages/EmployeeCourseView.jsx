@@ -12,12 +12,11 @@ import CourseReviewPanel from "../components/CourseReviewPanel";
 import * as session from "@/services/session";
 import { resolveFileUrl } from "@/lib/fileUrl";
 import { useCourseCompletionCertificates } from "@/features/certificate-management/hooks/useCourseCompletionCertificates";
-import {
+  import {
   getEmployeeCourseDetails,
   getEmployeeCourseProgress,
   getEmployeeEnrollmentStatus,
 } from "../api/employee.api";
-import { useAuth } from "@/contexts/AuthContext";
 import { StaggerList, MotionItem, FadeIn } from "@/shared/motion";
 
 const DIFFICULTY_META = {
@@ -40,11 +39,9 @@ export default function EmployeeCourseView() {
   const [progressError, setProgressError] = useState(null);
   const [error, setError] = useState(null);
   const [reviewOpen, setReviewOpen] = useState(false);
-  const { fetchByUser, getCertificateForCourse } = useCourseCompletionCertificates();
+  const { fetchByUser, getCertificateForCourse, issuances } = useCourseCompletionCertificates();
   const currentUser = session.getCurrentUser();
   const userId = currentUser?.id;
-  const { user } = useAuth();
-  const isStaff = ['super_admin', 'admin', 'department_head'].includes(user?.role);
 
   const parseJSONField = (field) => {
     if (!field) return [];
@@ -89,7 +86,7 @@ export default function EmployeeCourseView() {
 
   const fetchProgress = useCallback(async () => {
     if (!courseId) return;
-    if (!enrollmentStatus?.isEnrolled && !isStaff) return;
+    if (!enrollmentStatus?.isEnrolled) return;
     setProgressLoading(true);
     setProgressError(null);
     try {
@@ -100,7 +97,7 @@ export default function EmployeeCourseView() {
     } finally {
       setProgressLoading(false);
     }
-  }, [courseId, enrollmentStatus?.isEnrolled, isStaff]);
+  }, [courseId, enrollmentStatus?.isEnrolled]);
 
   useEffect(() => {
     fetchCourseDetails();
@@ -115,7 +112,7 @@ export default function EmployeeCourseView() {
   };
 
   const handleBack = () => {
-    navigate(backTo);
+    navigate("/my-learning");
   };
 
   const handleRetryProgress = () => {
@@ -145,14 +142,11 @@ export default function EmployeeCourseView() {
   const prerequisites = parseJSONField(course?.prerequisites);
   const modules = progressData?.modules || [];
   const lessons = progressData?.lessons || [];
-  const unlockedLessons = isStaff ? lessons.map(l => ({ ...l, status: 'unlocked' })) : lessons;
   const moduleProgress = progressData?.moduleProgress || [];
   const summary = progressData?.summary || { total: 0, completed: 0, completionPct: 0 };
   const isEnrolled = enrollmentStatus?.isEnrolled ?? !!progressData;
   const isCompleted = summary.completionPct >= 100;
   const difficulty = DIFFICULTY_META[course?.difficulty] || DIFFICULTY_META.all_levels;
-  const backLabel = isStaff ? 'Back to Course Library' : 'Back to My Learning';
-  const backTo = isStaff ? '/courses/library' : '/my-learning';
 
   useEffect(() => {
     if (openReviewPanel && isEnrolled && lessons.length > 0) {
@@ -183,7 +177,7 @@ export default function EmployeeCourseView() {
     return (
       <div className="w-full max-w-3xl mx-auto space-y-4">
         <button onClick={handleBack} className="flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-700">
-          <ChevronLeft size={16} /> {backLabel}
+          <ChevronLeft size={16} /> Back to My Learning
         </button>
         <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm">
           <p className="font-medium text-red-800">Course Not Found</p>
@@ -201,7 +195,7 @@ export default function EmployeeCourseView() {
           className="flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
         >
           <ChevronLeft size={16} />
-          <span>{backLabel}</span>
+          <span>Back to My Learning</span>
         </button>
 
         <div className="group relative rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm overflow-hidden">
@@ -299,7 +293,7 @@ export default function EmployeeCourseView() {
                     onClick={handleBack}
                     className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-neutral-700 px-5 py-2.5 text-sm font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
                   >
-                    {backLabel}
+                    Back to Dashboard
                   </button>
                 </>
               ) : (
@@ -307,7 +301,7 @@ export default function EmployeeCourseView() {
                   onClick={handleBack}
                   className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 dark:border-neutral-700 px-5 py-2.5 text-sm font-medium text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-colors"
                 >
-                  {backLabel}
+                  Back to Dashboard
                 </button>
               )}
             </div>
@@ -362,7 +356,7 @@ export default function EmployeeCourseView() {
             <div className="rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 shadow-sm overflow-hidden">
               <div className="px-5 sm:px-6 py-4 border-b border-neutral-200 dark:border-neutral-700">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Course Contentssss</h2>
+                  <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Course Content</h2>
                   <div className="flex items-center gap-2">
                     {isCompleted && (
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
@@ -384,7 +378,7 @@ export default function EmployeeCourseView() {
               </div>
               <div className="p-5 sm:p-6">
                 <LessonList
-                  lessons={unlockedLessons}
+                  lessons={lessons}
                   modules={modules}
                   onLessonClick={handleLessonClick}
                   courseId={courseId}
@@ -475,7 +469,7 @@ export default function EmployeeCourseView() {
         onClose={() => setReviewOpen(false)}
         courseId={courseId}
         modules={modules}
-        lessons={unlockedLessons}
+        lessons={lessons}
         onSelectLesson={handleReviewSelect}
       />
     </div>

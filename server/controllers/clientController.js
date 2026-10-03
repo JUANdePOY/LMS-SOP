@@ -11,7 +11,6 @@ function handleError(res, error) {
     code === 'DUPLICATE' ? 409 :
     500;
 
-  if (status === 500) console.error('[ClientController Error]', error);
   return res.status(status).json({ success: false, message: error.message, code });
 }
 
