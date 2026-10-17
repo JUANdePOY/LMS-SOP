@@ -10,10 +10,13 @@ let sql = `
      SELECT d.*, 
             m.full_name AS head_name,
             b.business_name,
-            (SELECT GROUP_CONCAT(b2.business_name ORDER BY b2.business_name ASC SEPARATOR ', ')
-             FROM department_business_assignments dba
-             INNER JOIN businesses b2 ON b2.id = dba.business_id
-             WHERE dba.department_id = d.id) AS business_names,
+             (SELECT GROUP_CONCAT(b2.business_name ORDER BY b2.business_name ASC SEPARATOR ', ')
+              FROM businesses b2
+              WHERE b2.id = d.business_id
+                 OR EXISTS (
+                     SELECT 1 FROM department_business_assignments dba
+                     WHERE dba.department_id = d.id AND dba.business_id = b2.id
+                 )) AS business_names,
             (SELECT COUNT(*) FROM users u WHERE u.department_id = d.id AND u.is_active = TRUE) AS user_count
      FROM departments d
      LEFT JOIN users m ON d.head_user_id = m.id
@@ -311,7 +314,7 @@ async function getDepartmentLeaderboard(filters = {}) {
 async function getBusinessAssignments(departmentId) {
   const [rows] = await db.query(
     `SELECT b.id, b.business_code, b.business_name, b.status,
-            dba.assigned_at, dba.assigned_by
+            s.assigned_at, s.assigned_by
      FROM (
        SELECT ? AS department_id, business_id, 0 AS sort_order, NULL AS assigned_at, NULL AS assigned_by
        FROM departments d
