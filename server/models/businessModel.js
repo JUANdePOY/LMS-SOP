@@ -12,16 +12,21 @@ async function findAll(filters = {}) {
   const { search, status, page = 1, limit = 50, business_id } = filters;
   const offset = (page - 1) * limit;
 
-  let sql = `
-    SELECT b.*,
-           creator.full_name AS created_by_name,
-           updater.full_name AS updated_by_name,
-           (SELECT COUNT(*) FROM departments d WHERE d.business_id = b.id) AS department_count
-    FROM businesses b
-    LEFT JOIN users creator ON b.created_by = creator.id
-    LEFT JOIN users updater ON b.updated_by = updater.id
-    WHERE 1 = 1
-  `;
+let sql = `
+     SELECT b.*,
+            creator.full_name AS created_by_name,
+            updater.full_name AS updated_by_name,
+            (SELECT COUNT(DISTINCT d.id)
+             FROM departments d
+             WHERE d.business_id = b.id
+                OR EXISTS (SELECT 1 FROM department_business_assignments dba
+                           WHERE dba.department_id = d.id AND dba.business_id = b.id)
+            ) AS department_count
+     FROM businesses b
+     LEFT JOIN users creator ON b.created_by = creator.id
+     LEFT JOIN users updater ON b.updated_by = updater.id
+     WHERE 1 = 1
+   `;
   const params = [];
 
   if (search) {
@@ -250,7 +255,12 @@ async function restore(id, userId = null) {
 async function getHierarchy() {
   const [businesses] = await db.query(
     `SELECT b.*,
-            (SELECT COUNT(*) FROM departments d WHERE d.business_id = b.id) AS department_count
+            (SELECT COUNT(DISTINCT d.id)
+             FROM departments d
+             WHERE d.business_id = b.id
+                OR EXISTS (SELECT 1 FROM department_business_assignments dba
+                           WHERE dba.department_id = d.id AND dba.business_id = b.id)
+            ) AS department_count
      FROM businesses b
      WHERE b.status = 'active'
      ORDER BY b.business_name ASC`
@@ -324,6 +334,11 @@ function attachCategories(departments, categoriesByDeptId) {
 // prevents a SOP that's assigned to several departments (or matches both
 // the owner column and an assignment) from being double-counted within a
 // single department's badge.
+//
+// `businessId` here is the *viewing* business. A department appears under a
+// business if it is the department's primary business (departments.business_id)
+// OR it has been assigned to the business via the department_business_assignments
+// junction table. Departments can therefore render under multiple businesses.
 async function getDepartmentTreeForBusiness(businessId) {
   const [rootDepts] = await db.query(
     `SELECT d.*, m.full_name AS head_name,
@@ -348,9 +363,9 @@ async function getDepartmentTreeForBusiness(businessId) {
      FROM departments d
      LEFT JOIN users m ON d.head_user_id = m.id
      WHERE d.parent_department_id IS NULL
-       AND d.business_id = ?
+       AND (d.business_id = ? OR EXISTS (SELECT 1 FROM department_business_assignments dba WHERE dba.department_id = d.id AND dba.business_id = ?))
      ORDER BY d.name ASC`,
-    [businessId]
+    [businessId, businessId]
   );
 
   for (const dept of rootDepts) {
@@ -384,9 +399,9 @@ async function getDepartmentChildren(parentId, businessId) {
      FROM departments d
      LEFT JOIN users m ON d.head_user_id = m.id
      WHERE d.parent_department_id = ?
-       AND d.business_id = ?
+       AND (d.business_id = ? OR EXISTS (SELECT 1 FROM department_business_assignments dba WHERE dba.department_id = d.id AND dba.business_id = ?))
      ORDER BY d.name ASC`,
-    [parentId, businessId]
+    [parentId, businessId, businessId]
   );
 
   for (const dept of rows) {
@@ -416,20 +431,25 @@ async function findBusinessesWithClients(filters = {}) {
     params.push(status);
   }
 
-  const sql = `
-    SELECT b.*,
-           creator.full_name AS created_by_name,
-           updater.full_name AS updated_by_name,
-           (SELECT COUNT(*) FROM departments d WHERE d.business_id = b.id) AS department_count
-    FROM businesses b
-    LEFT JOIN users creator ON b.created_by = creator.id
-    LEFT JOIN users updater ON b.updated_by = updater.id
-    INNER JOIN clients c ON c.business_id = b.id
-    ${where}
-    GROUP BY b.id
-    ORDER BY b.business_name ASC
-    LIMIT ? OFFSET ?
-  `;
+const sql = `
+     SELECT b.*,
+            creator.full_name AS created_by_name,
+            updater.full_name AS updated_by_name,
+            (SELECT COUNT(DISTINCT d.id)
+             FROM departments d
+             WHERE d.business_id = b.id
+                OR EXISTS (SELECT 1 FROM department_business_assignments dba
+                           WHERE dba.department_id = d.id AND dba.business_id = b.id)
+            ) AS department_count
+     FROM businesses b
+     LEFT JOIN users creator ON b.created_by = creator.id
+     LEFT JOIN users updater ON b.updated_by = updater.id
+     INNER JOIN clients c ON c.business_id = b.id
+     ${where}
+     GROUP BY b.id
+     ORDER BY b.business_name ASC
+     LIMIT ? OFFSET ?
+   `;
   const [rows] = await db.query(sql, [...params, limit, offset]);
 
   const [countRows] = await db.query(

@@ -6,16 +6,20 @@ async function findAll(filters = {}) {
   const { search, status, business_id, department_id, page = 1, limit = 50 } = filters;
   const offset = (page - 1) * limit;
 
-  let sql = `
-    SELECT d.*, 
-           m.full_name AS head_name,
-           b.business_name,
-           (SELECT COUNT(*) FROM users u WHERE u.department_id = d.id AND u.is_active = TRUE) AS user_count
-    FROM departments d
-    LEFT JOIN users m ON d.head_user_id = m.id
-    LEFT JOIN businesses b ON d.business_id = b.id
-    WHERE 1 = 1
-  `;
+let sql = `
+     SELECT d.*, 
+            m.full_name AS head_name,
+            b.business_name,
+            (SELECT GROUP_CONCAT(b2.business_name ORDER BY b2.business_name ASC SEPARATOR ', ')
+             FROM department_business_assignments dba
+             INNER JOIN businesses b2 ON b2.id = dba.business_id
+             WHERE dba.department_id = d.id) AS business_names,
+            (SELECT COUNT(*) FROM users u WHERE u.department_id = d.id AND u.is_active = TRUE) AS user_count
+     FROM departments d
+     LEFT JOIN users m ON d.head_user_id = m.id
+     LEFT JOIN businesses b ON d.business_id = b.id
+     WHERE 1 = 1
+   `;
   const params = [];
 
   if (search) {
@@ -267,8 +271,10 @@ async function getDepartmentLeaderboard(filters = {}) {
   const params = [];
 
   if (business_id) {
-    scopeCondition = ' AND (d.business_id = ? OR d.business_id IS NULL)';
-    params.push(business_id);
+    // Departments assigned to this business either as their primary
+    // (departments.business_id) or via the junction table.
+    scopeCondition = ' AND (d.business_id = ? OR EXISTS (SELECT 1 FROM department_business_assignments dba WHERE dba.department_id = d.id AND dba.business_id = ?))';
+    params.push(business_id, business_id);
   }
 
   const [rows] = await db.query(
@@ -297,6 +303,59 @@ async function getDepartmentLeaderboard(filters = {}) {
   return rows;
 }
 
+// --- Department <-> Business assignments (many-to-many) ---------------------
+
+// Returns the businesses a department is assigned to (primary + junction).
+// The primary business (departments.business_id) is always included first so
+// callers can keep displaying it as the "primary" assignment.
+async function getBusinessAssignments(departmentId) {
+  const [rows] = await db.query(
+    `SELECT b.id, b.business_code, b.business_name, b.status,
+            dba.assigned_at, dba.assigned_by
+     FROM (
+       SELECT ? AS department_id, business_id, 0 AS sort_order, NULL AS assigned_at, NULL AS assigned_by
+       FROM departments d
+       WHERE d.id = ? AND d.business_id IS NOT NULL
+       UNION
+       SELECT ? AS department_id, dba.business_id, 1 AS sort_order, dba.assigned_at, dba.assigned_by
+       FROM department_business_assignments dba
+       WHERE dba.department_id = ?
+     ) s
+     INNER JOIN businesses b ON b.id = s.business_id
+     ORDER BY s.sort_order ASC, b.business_name ASC`,
+    [departmentId, departmentId, departmentId, departmentId]
+  );
+  return rows;
+}
+
+// Replaces the junction-table assignments for a department. The primary
+// business (departments.business_id) is managed separately by the update
+// route and is NOT touched here — this only manages the additional
+// many-to-many assignments.
+async function setBusinessAssignments(departmentId, businessIds, assignedBy) {
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    await conn.query('DELETE FROM department_business_assignments WHERE department_id = ?', [departmentId]);
+    const ids = (businessIds || []).map((id) => parseInt(id, 10)).filter((id) => Number.isFinite(id) && id > 0);
+    if (ids.length > 0) {
+      const placeholders = ids.map(() => '(?, ?, ?)').join(',');
+      const values = [];
+      ids.forEach((bid) => values.push(departmentId, bid, assignedBy ?? null));
+      await conn.query(
+        `INSERT INTO department_business_assignments (department_id, business_id, assigned_by) VALUES ${placeholders}`,
+        values
+      );
+    }
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+}
+
 module.exports = {
   findAll,
   findById,
@@ -309,5 +368,7 @@ module.exports = {
   getChildren,
   getUsers,
   getDepartmentLeaderboard,
+  getBusinessAssignments,
+  setBusinessAssignments,
   DEPARTMENT_STATUSES,
 };

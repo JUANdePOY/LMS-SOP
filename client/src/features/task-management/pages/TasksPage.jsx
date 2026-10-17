@@ -471,6 +471,7 @@ export default function TasksPage() {
     };
     if (user?.role === 'department_head' && user?.department_id != null) {
       const deptId = String(user.department_id);
+      const deptHeadUserId = String(user.id);
       const sopBizId = user?.department_business_id != null || user?.business_id != null
         ? String(user.department_business_id ?? user.business_id)
         : null;
@@ -484,9 +485,23 @@ export default function TasksPage() {
           .map((c) => String(c.id))
       );
       result = result.filter((t) => {
+        // A department head sees every task touching their department:
+        //  - assigned directly to their department, OR
+        //  - assigned directly to the department head user (User assignment), OR
+        //  - assigned to another user in the department, OR
+        //  - whose client belongs to the department.
         if ((t.assignments || []).some(
-          (a) => a.assignment_type === 'Department' && String(a.reference_id) === deptId
+          (a) => (a.assignment_type === 'Department' && String(a.reference_id) === deptId)
+            || (a.assignment_type === 'User' && String(a.reference_id) === deptHeadUserId)
         )) return true;
+        if ((t.assignments || []).some(
+          (a) => a.assignment_type === 'User' && a.reference_id != null
+            && String(a.reference_id) !== deptHeadUserId
+        )) {
+          // Assigned to another user — only visible if that user is in the
+          // department head's department. We don't have the user's department
+          // here, so fall back to the client-based scope check below.
+        }
         const scope = taskClientId(t);
         if (scope?.clientId != null && deptClientIds.has(String(scope.clientId))) return true;
         return false;
@@ -1341,6 +1356,7 @@ export default function TasksPage() {
           userRole={user?.role ?? ''}
           userBusinessId={user?.business_id ?? null}
           userDepartmentBusinessId={user?.department_business_id ?? null}
+          userDepartmentHeadUserId={user?.id ?? null}
           scopeClientId={clientParam}
           scopeBusinessId={businessParam}
           scopeProjectId={projectParam}

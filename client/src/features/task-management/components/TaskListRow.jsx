@@ -1048,6 +1048,10 @@ export function BusinessAssigneePicker({ businessId, businessName, managers = []
 
   useEffect(() => {
     if (justSelected) { setJustSelected(false); return; }
+    // Only admins/super_admins can grant business managers or departments.
+    // A department head sees the read-only Assignees column without firing
+    // these admin-only endpoints (which their scope doesn't cover).
+    if (userRole !== 'super_admin' && userRole !== 'admin') return;
     let active = true;
     const timer = setTimeout(async () => {
       setLoading(true);
@@ -1070,7 +1074,7 @@ export function BusinessAssigneePicker({ businessId, businessName, managers = []
       }
     }, 200);
     return () => { active = false; clearTimeout(timer); };
-  }, [businessId, tab, query, justSelected]);
+  }, [businessId, tab, query, justSelected, userRole]);
 
   const grantedUserIds = new Set((managers || []).map((m) => String(m.user_id)));
   const grantedDeptIds = new Set((departments || []).map((d) => String(d.department_id)));

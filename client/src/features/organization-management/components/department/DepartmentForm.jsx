@@ -6,6 +6,7 @@ const defaultForm = {
   code: '',
   description: '',
   business_id: '',
+  business_ids: [],
   head_user_id: '',
   status: 'active',
 };
@@ -29,11 +30,21 @@ export default function DepartmentForm({
 
   useEffect(() => {
     if (initialData) {
+      const primaryId = initialData.business_id ? String(initialData.business_id) : '';
+      // assigned_business_ids comes from the department business assignments
+      // endpoint; the primary business is always included in the list.
+      const assigned = Array.isArray(initialData.assigned_business_ids)
+        ? initialData.assigned_business_ids.map((id) => String(id))
+        : [];
+      const allIds = primaryId
+        ? (assigned.includes(primaryId) ? assigned : [primaryId, ...assigned])
+        : assigned;
       setForm({
         name: initialData.name || '',
         code: initialData.code || '',
         description: initialData.description || '',
-        business_id: initialData.business_id || '',
+        business_id: primaryId,
+        business_ids: allIds,
         head_user_id: initialData.head_user_id || '',
         status: initialData.status || 'active',
       });
@@ -48,7 +59,7 @@ export default function DepartmentForm({
     if (form.name.trim().length > 100) errs.name = 'Department name must be at most 100 characters';
     if (!form.code.trim()) errs.code = 'Department code is required';
     if (form.code.trim().length > 20) errs.code = 'Department code must be at most 20 characters';
-    if (!form.business_id) errs.business_id = 'Business is required';
+    if (!form.business_id) errs.business_id = 'Primary business is required';
     if (form.head_user_id && !/^\d+$/.test(String(form.head_user_id))) {
       errs.head_user_id = 'Department head must be a valid user ID';
     }
@@ -65,6 +76,15 @@ export default function DepartmentForm({
     const data = { ...form };
     if (!data.head_user_id) data.head_user_id = null;
     if (!data.business_id) data.business_id = null;
+    // business_ids always includes the primary business so the junction table
+    // stays in sync with the primary assignment.
+    const primaryId = data.business_id ? String(data.business_id) : null;
+    const ids = (data.business_ids || [])
+      .map((id) => String(id))
+      .filter((id) => id && id !== 'null' && id !== 'undefined');
+    data.business_ids = primaryId
+      ? Array.from(new Set([primaryId, ...ids]))
+      : ids;
     onSubmit(data);
   };
 
@@ -76,6 +96,28 @@ export default function DepartmentForm({
     }
     setForm(next);
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: null }));
+  };
+
+  const toggleBusinessId = (businessId) => {
+    const idStr = String(businessId);
+    setForm((prev) => {
+      const next = { ...prev };
+      const ids = (prev.business_ids || []).map((id) => String(id));
+      const idx = ids.indexOf(idStr);
+      const updated = idx >= 0
+        ? ids.filter((_, i) => i !== idx)
+        : [...ids, idStr];
+      next.business_ids = updated;
+      // The primary business is the first selected business. If the user
+      // unselected the current primary, promote the next selection (or clear).
+      if (prev.business_id && String(prev.business_id) === idStr) {
+        next.business_id = updated.length ? updated[0] : '';
+      } else if (!prev.business_id && updated.length) {
+        next.business_id = updated[0];
+      }
+      if (errors.business_id) setErrors((prevErr) => ({ ...prevErr, business_id: null }));
+      return next;
+    });
   };
 
   return (
@@ -110,18 +152,42 @@ export default function DepartmentForm({
 
       <div>
         <label className="block text-sm font-medium text-[var(--text-primary)] mb-1">
-          Business <span className="text-red-500">*</span>
+          Businesses <span className="text-red-500">*</span>
         </label>
-        <select
-          value={form.business_id}
-          onChange={handleChange('business_id')}
-          className={`w-full rounded-lg border ${errors.business_id ? 'border-red-500' : 'border-[var(--border)]'} bg-[var(--bg-page)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none`}
-        >
-          <option value="">Select a business</option>
-          {businesses.map((b) => (
-            <option key={b.id} value={b.id}>{b.business_name}</option>
-          ))}
-        </select>
+        <p className="mt-0.5 mb-2 text-xs text-[var(--text-muted)]">
+          Select one or more businesses. The first selected business is the department's primary business.
+        </p>
+        <div className={`max-h-52 overflow-y-auto rounded-lg border ${errors.business_id ? 'border-red-500' : 'border-[var(--border)]'} bg-[var(--bg-page)]`}>
+          {businesses.length === 0 ? (
+            <p className="px-3 py-4 text-sm text-[var(--text-muted)]">No businesses available.</p>
+          ) : (
+            businesses.map((b) => {
+              const idStr = String(b.id);
+              const checked = (form.business_ids || []).map((id) => String(id)).includes(idStr);
+              return (
+                <label
+                  key={b.id}
+                  className={`flex cursor-pointer items-center gap-2 border-b border-[var(--border)] px-3 py-2 text-sm transition-colors last:border-b-0 hover:bg-[var(--bg-hover)] ${
+                    checked ? 'bg-indigo-50 dark:bg-indigo-500/10' : ''
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-[var(--border)] text-indigo-600 focus:ring-2 focus:ring-indigo-500/40"
+                    checked={checked}
+                    onChange={() => toggleBusinessId(b.id)}
+                  />
+                  <span className="flex-1 truncate text-[var(--text-primary)]">{b.business_name}</span>
+                  {checked && form.business_id && String(form.business_id) === idStr && (
+                    <span className="shrink-0 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                      Primary
+                    </span>
+                  )}
+                </label>
+              );
+            })
+          )}
+        </div>
         {errors.business_id && <p className="mt-1 text-xs text-red-500">{errors.business_id}</p>}
       </div>
 

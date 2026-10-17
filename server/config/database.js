@@ -895,6 +895,22 @@ const MIGRATIONS = [
       UNIQUE KEY uk_role_entity_perm (role_name, permission_name, entity_type, entity_id),
       INDEX idx_role_entity (role_name, entity_type, entity_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+    // Department business assignments: a department can be assigned to multiple
+    // SOP businesses (many-to-many). departments.business_id remains the
+    // *primary* business; this junction table holds the additional assignments.
+    `CREATE TABLE IF NOT EXISTS department_business_assignments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      department_id INT NOT NULL,
+      business_id INT NOT NULL,
+      assigned_by INT DEFAULT NULL,
+      assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE,
+      FOREIGN KEY (business_id) REFERENCES businesses(id) ON DELETE CASCADE,
+      FOREIGN KEY (assigned_by) REFERENCES users(id) ON DELETE SET NULL,
+      UNIQUE KEY uk_dept_business (department_id, business_id),
+      INDEX idx_dba_department (department_id),
+      INDEX idx_dba_business (business_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   ];
 
 async function runMigrations() {

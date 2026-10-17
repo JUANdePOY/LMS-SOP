@@ -63,16 +63,17 @@ export default function ProjectTaskViews({
   onCreateClient,
   canManageTask,
   search,
-  scopeClientId,
+scopeClientId,
   scopeBusinessId,
   scopeProjectId,
   newTaskIds,
- hideTabs = false,
-    userDepartmentId = null,
-    userRole = '',
-    userBusinessId = null,
-    userDepartmentBusinessId = null,
-    autoExpand,
+  hideTabs = false,
+  userDepartmentId = null,
+  userRole = '',
+  userBusinessId = null,
+  userDepartmentBusinessId = null,
+  userDepartmentHeadUserId = null,
+  autoExpand,
   onOpenBulkUpload,
   onDuplicateBusiness,
   onSelectBusinessTasks,
@@ -137,10 +138,11 @@ export default function ProjectTaskViews({
                   canManageClients={canManageClients}
                   scopeClientId={scopeClientId}
                   scopeBusinessId={scopeBusinessId}
-                   scopeProjectId={scopeProjectId}
-                   userDepartmentId={userDepartmentId}
-                 onAddProjectTask={onAddProjectTask}
-                onEditProject={onEditProject}
+scopeProjectId={scopeProjectId}
+                    userDepartmentId={userDepartmentId}
+                    userDepartmentHeadUserId={userDepartmentHeadUserId}
+                    userRole={userRole}
+                    onAddProjectTask={onAddProjectTask}
                 onDeleteImmediate={onDeleteImmediate}
                 onDuplicated={onDuplicated}
                 onQuickAddTask={onQuickAddTask}

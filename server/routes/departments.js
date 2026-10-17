@@ -207,6 +207,71 @@ router.get('/:id/users', async (req, res) => {
   }
 });
 
+// GET /api/departments/:id/businesses
+// Returns every business this department is assigned to: its primary business
+// (departments.business_id) plus any additional assignments from the junction
+// table. Used by the Departments management UI to render a multi-select.
+router.get('/:id/businesses', requireAdmin, async (req, res) => {
+  try {
+    const departmentId = parseInt(req.params.id);
+    const targetDept = await departmentModel.findById(departmentId);
+    if (!targetDept) {
+      return res.status(404).json({ status: 'error', message: 'Department not found', code: 'NOT_FOUND' });
+    }
+    if (!['super_admin', 'admin'].includes(req.user.role) && req.user.business_id !== targetDept.business_id) {
+      return res.status(403).json({ status: 'error', message: 'You don\'t have access to this department.', code: 'BUSINESS_SCOPE_DENIED' });
+    }
+    const assignments = await departmentModel.getBusinessAssignments(departmentId);
+    res.json({ status: 'success', data: assignments });
+  } catch (err) {
+    console.error('Department business assignments error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to fetch department business assignments', code: 'DB_ERROR' });
+  }
+});
+
+// PUT /api/departments/:id/businesses
+// Replaces the junction-table assignments for a department. The primary
+// business (departments.business_id) is managed separately by PUT
+// /api/departments/:id and is NOT touched here — this endpoint only manages
+// the additional many-to-many assignments.
+router.put('/:id/businesses', requireAdmin, [
+  body('business_ids').optional().isArray().withMessage('business_ids must be an array'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ status: 'error', message: 'Validation failed', code: 'VALIDATION_ERROR', errors: errors.array() });
+    }
+
+    const departmentId = parseInt(req.params.id);
+    const targetDept = await departmentModel.findById(departmentId);
+    if (!targetDept) {
+      return res.status(404).json({ status: 'error', message: 'Department not found', code: 'NOT_FOUND' });
+    }
+
+    if (!['super_admin', 'admin'].includes(req.user.role) && req.user.business_id !== targetDept.business_id) {
+      return res.status(403).json({ status: 'error', message: 'Cannot manage assignments for another business', code: 'BUSINESS_SCOPE_DENIED' });
+    }
+
+    const businessIds = (req.body.business_ids || []).map((id) => parseInt(id, 10)).filter((id) => Number.isFinite(id) && id > 0);
+
+    await departmentModel.setBusinessAssignments(departmentId, businessIds, req.user.id);
+
+    logAudit({
+      user_id: req.user.id,
+      action: 'department.business_assignments_updated',
+      entity_type: 'department',
+      entity_id: departmentId,
+      new_values: { assigned_business_ids: businessIds }
+    });
+
+    res.json({ status: 'success', message: 'Department business assignments updated' });
+  } catch (err) {
+    console.error('Department business assignments update error:', err);
+    res.status(500).json({ status: 'error', message: 'Failed to update department business assignments', code: 'DB_ERROR' });
+  }
+});
+
 // GET /api/departments/:id/scope-grants
 router.get('/:id/scope-grants', requireAdmin, async (req, res) => {
   try {

@@ -2249,7 +2249,14 @@ async function getDepartmentScopedTaskIdsForDeptHead(userId) {
      LEFT JOIN task_assignments ta ON ta.task_id = t.id
      LEFT JOIN clients c ON t.client_id = c.id
      WHERE (
-       (ta.assignment_type = 'Department' AND ta.reference_id = ?)
+       -- Tasks assigned directly to this department head (User assignment).
+       -- A department head can be assigned a task personally (not just to
+       -- their department), so those tasks must appear in their scope too.
+       (ta.assignment_type = 'User' AND ta.reference_id = ?)
+       OR (
+         ta.assignment_type = 'Department'
+         AND ta.reference_id = ?
+       )
        OR (
          ta.assignment_type = 'User'
          AND ta.reference_id IN (
@@ -2258,7 +2265,7 @@ async function getDepartmentScopedTaskIdsForDeptHead(userId) {
        )
        OR (c.department_id = ?)
      )`,
-    [deptId, deptId, deptId]
+    [userId, deptId, deptId, deptId]
   );
 
   return rows.map(r => r.task_id);

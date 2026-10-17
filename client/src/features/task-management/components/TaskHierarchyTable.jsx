@@ -838,6 +838,7 @@ export default function TaskHierarchyTable({
   userRole = '',
   userBusinessId = null,
   userDepartmentBusinessId = null,
+  userDepartmentHeadUserId = null,
   autoExpand,
   onOpenBulkUpload,
   onDuplicateBusiness,
@@ -871,11 +872,31 @@ export default function TaskHierarchyTable({
    // This is a defense-in-depth filter; the parent (TasksPage) already passes
    // a scoped clientTree, but filtering here keeps the component correct when
    // used in other contexts.
+   // A department head may also be assigned a task personally (User
+   // assignment) whose client belongs to another department — those clients
+   // must stay visible too, otherwise the task renders under nothing.
+   const deptHeadAssignedClientIds = useMemo(() => {
+     if (userDepartmentId == null || userRole !== 'department_head' || !tasks) return null;
+     const ids = new Set();
+     for (const t of tasks) {
+       const assignedToMe = (t.assignments || []).some(
+         (a) => a.assignment_type === 'User' && a.reference_id != null
+           && String(a.reference_id) === String(userDepartmentHeadUserId ?? '')
+       );
+       if (assignedToMe && t.client_id != null) ids.add(String(t.client_id));
+     }
+     return ids;
+   }, [tasks, userDepartmentId, userRole, userDepartmentHeadUserId]);
+
    const filteredClientTree = useMemo(() => {
      if (userDepartmentId == null) return clientTree;
      if (userRole !== 'department_head') return clientTree;
-     return (clientTree || []).filter((c) => String(c.department_id) === String(userDepartmentId));
-   }, [clientTree, userDepartmentId, userRole]);
+     return (clientTree || []).filter((c) => {
+       if (String(c.department_id) === String(userDepartmentId)) return true;
+       if (deptHeadAssignedClientIds && deptHeadAssignedClientIds.has(String(c.id))) return true;
+       return false;
+     });
+   }, [clientTree, userDepartmentId, userRole, deptHeadAssignedClientIds]);
 
      const clients = useHierarchy(tasks, projectsById, filteredClientTree, tasksById);
 
@@ -1033,25 +1054,30 @@ export default function TaskHierarchyTable({
     }
   }, [toast, onDuplicateBusiness]);
 
-  // Load the granted-manager list for every business in the hierarchy once.
-  // Each business row reads from this map; without it the picker would always
-  // start empty and the read-only view would never render.
-  useEffect(() => {
-    if (!canManage) return;
-    const ids = new Set();
-    for (const client of clients) {
-      for (const business of client.businesses) {
-        if (business.id != null) ids.add(String(business.id));
-      }
-    }
-    for (const id of ids) {
-      loadBusinessManagers(id);
-      loadBusinessDepartments(id);
-    }
-    // Intentionally keyed on the business-id set only — re-running on every
-    // `clients` reference change (e.g. after creating a task) would re-fetch
-    // managers/ departments for rows the admin is actively working in.
-  }, [canManage, clients, loadBusinessManagers, loadBusinessDepartments]);
+// Load the granted-manager list for every business in the hierarchy once.
+   // Each business row reads from this map; without it the picker would always
+   // start empty and the read-only view would never render.
+   // Only admins/super_admins can grant or revoke business managers and
+   // departments, so only they trigger these requests. A department head still
+   // sees the read-only Assignees column (the map stays empty) without firing
+   // admin-only endpoints that their scope doesn't cover.
+   useEffect(() => {
+     if (!canManage) return;
+     if (userRole !== 'super_admin' && userRole !== 'admin') return;
+     const ids = new Set();
+     for (const client of clients) {
+       for (const business of client.businesses) {
+         if (business.id != null) ids.add(String(business.id));
+       }
+     }
+     for (const id of ids) {
+       loadBusinessManagers(id);
+       loadBusinessDepartments(id);
+     }
+     // Intentionally keyed on the business-id set only — re-running on every
+     // `clients` reference change (e.g. after creating a task) would re-fetch
+     // managers/ departments for rows the admin is actively working in.
+   }, [canManage, clients, loadBusinessManagers, loadBusinessDepartments, userRole]);
 
   // Opens an inline "add" row directly under the clicked parent (no modal):
   // a client reveals a business row, a business reveals a task row.

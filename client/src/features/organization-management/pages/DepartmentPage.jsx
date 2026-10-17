@@ -11,6 +11,7 @@ import ConfirmationDialog from '@/shared/components/ui/ConfirmationDialog';
 import ErrorBoundary from '@/shared/components/ErrorBoundary';
 import KPICards from '../components/KPICards';
 import { sanitizeSearchQuery, validateSearchQuery } from '../utils/validation';
+import { getDepartmentBusinessAssignments, setDepartmentBusinessAssignments } from '../api/department.api';
 
 export default function DepartmentPage() {
   const { departments, loading, error, create, update, remove, refresh } = useDepartments();
@@ -66,7 +67,12 @@ export default function DepartmentPage() {
   const handleCreate = async (data) => {
     setSubmitting(true);
     try {
-      await create(data);
+      const { business_ids, ...deptData } = data;
+      const created = await create(deptData);
+      // Persist the many-to-many assignments after the department row exists.
+      if (created?.id && Array.isArray(business_ids)) {
+        await setDepartmentBusinessAssignments(created.id, business_ids);
+      }
       toast.success('Department created successfully');
       setModalOpen(false);
       setEditData(null);
@@ -82,7 +88,11 @@ export default function DepartmentPage() {
     if (!editData) return;
     setSubmitting(true);
     try {
-      await update(editData.id, data);
+      const { business_ids, ...deptData } = data;
+      await update(editData.id, deptData);
+      if (Array.isArray(business_ids)) {
+        await setDepartmentBusinessAssignments(editData.id, business_ids);
+      }
       toast.success('Department updated successfully');
       setModalOpen(false);
       setEditData(null);
@@ -94,7 +104,14 @@ export default function DepartmentPage() {
     }
   };
 
-  const handleEdit = (dept) => {
+  const handleEdit = async (dept) => {
+    try {
+      const res = await getDepartmentBusinessAssignments(dept.id);
+      const list = Array.isArray(res.data?.data) ? res.data.data : [];
+      dept.assigned_business_ids = list.map((b) => b.id);
+    } catch {
+      dept.assigned_business_ids = [];
+    }
     setEditData(dept);
     setModalOpen(true);
   };

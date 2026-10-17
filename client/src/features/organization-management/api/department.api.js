@@ -31,3 +31,22 @@ export const deleteDepartment = (id, { force = false } = {}) => {
 
 export const getDepartmentTree = () => api.get('/departments/tree');
 
+// Returns every business this department is assigned to: its primary business
+// (departments.business_id) plus any additional assignments from the
+// department_business_assignments junction table.
+export const getDepartmentBusinessAssignments = (id) => {
+  const err = validateId(id, 'Department ID');
+  if (err) return Promise.reject(new Error(err));
+  return api.get(`/departments/${id}/businesses`);
+};
+
+// Replaces the junction-table assignments for a department. The primary
+// business (departments.business_id) is managed separately by updateDepartment
+// and is NOT touched here — this only manages the additional many-to-many
+// assignments.
+export const setDepartmentBusinessAssignments = (id, businessIds = []) => {
+  const err = validateId(id, 'Department ID');
+  if (err) return Promise.reject(new Error(err));
+  return api.put(`/departments/${id}/businesses`, { business_ids: businessIds });
+};
+
