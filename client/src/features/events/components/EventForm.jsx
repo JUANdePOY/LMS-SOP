@@ -22,6 +22,19 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
+function toLocalInputValue(value) {
+  if (!value) return '';
+  if (value instanceof Date) {
+    const d = value;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return String(value).slice(0, 16);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function parseJsonField(value, fallback) {
   if (Array.isArray(value)) return value;
   if (!value) return fallback;
@@ -39,8 +52,8 @@ export default function EventForm({ initialData, onSubmit, onCancel, saving }) {
   const [eventType, setEventType] = useState(initialData?.event_type || "Training");
   const [priority, setPriority] = useState(initialData?.priority || "medium");
   const [status, setStatus] = useState(initialData?.status || "active");
-  const [eventDate, setEventDate] = useState(initialData?.event_date ? initialData.event_date.slice(0, 16) : "");
-  const [endDate, setEndDate] = useState(initialData?.end_date ? initialData.end_date.slice(0, 16) : "");
+  const [eventDate, setEventDate] = useState(toLocalInputValue(initialData?.event_date));
+  const [endDate, setEndDate] = useState(toLocalInputValue(initialData?.end_date));
   const [location, setLocation] = useState(initialData?.location || "");
   const [targetRoles, setTargetRoles] = useState(() => parseJsonField(initialData?.target_roles, []));
   const [targetDepartments, setTargetDepartments] = useState(() => parseJsonField(initialData?.target_departments, []));
@@ -52,8 +65,8 @@ export default function EventForm({ initialData, onSubmit, onCancel, saving }) {
       setEventType(initialData.event_type || "Training");
       setPriority(initialData.priority || "medium");
       setStatus(initialData.status || "active");
-      setEventDate(initialData.event_date ? initialData.event_date.slice(0, 16) : "");
-      setEndDate(initialData.end_date ? initialData.end_date.slice(0, 16) : "");
+      setEventDate(toLocalInputValue(initialData.event_date));
+      setEndDate(toLocalInputValue(initialData.end_date));
       setLocation(initialData.location || "");
       setTargetRoles(parseJsonField(initialData.target_roles, []));
       setTargetDepartments(parseJsonField(initialData.target_departments, []));
@@ -69,8 +82,8 @@ export default function EventForm({ initialData, onSubmit, onCancel, saving }) {
       event_type: eventType,
       priority,
       status,
-      event_date: eventDate,
-      end_date: endDate || null,
+      event_date: eventDate ? new Date(eventDate).toISOString() : "",
+      end_date: endDate ? new Date(endDate).toISOString() : null,
       location: location || null,
       target_roles: targetRoles,
       target_departments: targetDepartments,

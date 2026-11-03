@@ -13,8 +13,8 @@ import { Modal } from "@/shared/components/ui/modal";
 import { useNotifications } from "@/shared/stores/notificationStore.js";
 
 export default function EventsPage() {
-  const { isSuperAdmin } = useAuth();
-  const canManage = isSuperAdmin;
+  const { isSuperAdmin, isAdmin } = useAuth();
+  const canManage = isSuperAdmin || isAdmin;
   const { toast } = useToast();
   const { markEntityTypeRead } = useNotifications();
   const { items, error, refresh, create, update, remove } = useEvents({ status: "active" });
@@ -27,6 +27,7 @@ export default function EventsPage() {
   const [showForm, setShowForm] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [creatingForDate, setCreatingForDate] = useState(null);
   const [saving, setSaving] = useState(false);
   const [syncPhase, setSyncPhase] = useState("pending");
   const [syncResult, setSyncResult] = useState({ synced: 0, failed: 0 });
@@ -96,12 +97,14 @@ export default function EventsPage() {
     setSelectedDate(date);
   };
 
-  const handleCreate = () => {
+  const handleCreate = (date) => {
     setEditingItem(null);
+    setCreatingForDate(date || null);
     setShowForm(true);
   };
 
   const handleEdit = (item) => {
+    setCreatingForDate(null);
     setEditingItem(item);
     setShowForm(true);
   };
@@ -118,6 +121,7 @@ export default function EventsPage() {
       }
       setShowForm(false);
       setEditingItem(null);
+      setCreatingForDate(null);
       refresh();
     } catch (err) {
       toast.error(err.message || "Failed to save event");
@@ -186,13 +190,13 @@ export default function EventsPage() {
 
       {canManage && (
         <Modal
-          open={showForm}
-          onClose={() => { setShowForm(false); setEditingItem(null); }}
-          title={editingItem ? "Edit Event" : "New Events"}
-        >
-          <EventForm
-            initialData={editingItem}
-            onSubmit={handleSubmit}
+           open={showForm}
+           onClose={() => { setShowForm(false); setEditingItem(null); setCreatingForDate(null); }}
+           title={editingItem ? "Edit Event" : "New Events"}
+         >
+           <EventForm
+             initialData={editingItem || (creatingForDate ? { event_date: creatingForDate } : null)}
+             onSubmit={handleSubmit}
             onCancel={() => { setShowForm(false); setEditingItem(null); }}
             saving={saving}
           />

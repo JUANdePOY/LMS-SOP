@@ -254,7 +254,7 @@ const router = createBrowserRouter([
       { path: "assessments/quiz/:quizId/take/:attemptId?", element: LMSProtectedWrapper(TakeQuizPage), handle: { title: "Take Quiz" } },
       { path: "assessments/quiz/:quizId", element: DeptHeadProtectedWrapper(QuizBuilderPage), handle: { title: "Quiz Builder" } },
       { path: "announcements", element: LMSProtectedWrapper(AnnouncementsPage), handle: { title: "Announcements" } },
-      { path: "events", element: SuperAdminProtectedWrapper(EventsPage), handle: { title: "Events" } },
+      { path: "events", element: AdminProtectedWrapper(EventsPage), handle: { title: "Events" } },
       { path: "messaging", element: LMSProtectedWrapper(MessagingPage), handle: { title: "Messaging" } },
       { path: "people", element: LMSProtectedWrapper(EmployeeDirectoryPage), handle: { title: "People" } },
       { path: "tasks", element: LMSProtectedWrapper(TasksPage), handle: { title: "Tasks & Projects" } },
