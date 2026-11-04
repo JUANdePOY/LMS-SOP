@@ -29,6 +29,7 @@ const Profile       = lazy(() => import("@/pages/Profile"));
 const UserProfilePage = lazy(() => import("@/features/profile/pages/UserProfilePage"));
 const DigitalIDPage = lazy(() => import("@/features/digital-id/pages/DigitalIDPage"));
 const Login         = lazy(() => import("@/pages/Login"));
+const HomePage      = lazy(() => import("@/pages/HomePage"));
 const Settings      = lazy(() => import("@/pages/Settings"));
 const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("@/pages/TermsOfService"));
@@ -293,7 +294,11 @@ function AuthRoute({ children }) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <HomePage />
+      </Suspense>
+    );
   }
 
   return children;
