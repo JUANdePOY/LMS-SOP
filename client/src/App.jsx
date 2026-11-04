@@ -170,6 +170,11 @@ const router = createBrowserRouter([
     element: wrap(Login),
   },
   {
+    path: "/homepage",
+    element: wrap(HomePage),
+    handle: { title: "Home" },
+  },
+  {
     path: "/privacy",
     element: wrap(PrivacyPolicy),
     handle: { title: "Privacy Policy" },
@@ -294,11 +299,7 @@ function AuthRoute({ children }) {
   }
 
   if (!isAuthenticated) {
-    return (
-      <Suspense fallback={<PageLoader />}>
-        <HomePage />
-      </Suspense>
-    );
+    return <Navigate to="/login" replace />;
   }
 
   return children;
