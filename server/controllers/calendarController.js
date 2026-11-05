@@ -143,8 +143,7 @@ function unsyncEvent(req, res) {
 
 function disconnect(req, res) {
   const userId = req.user.id;
-  calendarModel.deleteToken(userId)
-    .then(() => calendarModel.deleteMapByUser(userId))
+  calendarService.disconnectUser(userId)
     .then(() => {
       logAudit && logAudit('calendar.disconnect', userId, {});
       res.json({ success: true, message: 'Google Calendar disconnected' });

@@ -158,7 +158,7 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
         )}
 
         <p className="text-[10px] text-neutral-400 dark:text-neutral-500">
-          We store your Google tokens encrypted. Revoking access from your Google account also disconnects this integration.
+          We store your Google tokens encrypted. Disconnecting removes the events we synced and revokes access. Revoking access from your Google account also disconnects this integration.
         </p>
       </div>
     </Modal>

@@ -68,6 +68,11 @@ export default function SecondarySidebar({ collapsed = false }) {
   const [employeeBusinessIds, setEmployeeBusinessIds] = useState(null);
   const [employeeSopBusinessIds, setEmployeeSopBusinessIds] = useState(null);
   const [employeeClientTree, setEmployeeClientTree] = useState([]);
+  // Department-head task-assignment scope: clients/businesses that have tasks
+  // assigned to this department_head (possibly in foreign businesses/departments).
+  const [dhClientIds, setDhClientIds] = useState(null);
+  const [dhBusinessIds, setDhBusinessIds] = useState(null);
+  const [dhSopBusinessIds, setDhSopBusinessIds] = useState(null);
   useEffect(() => {
     if (isAnyAdmin) {
       setEmployeeClientIds(null);
@@ -103,6 +108,39 @@ export default function SecondarySidebar({ collapsed = false }) {
     return () => { active = false; };
   }, [isAnyAdmin, employeeBusinessId]);
 
+  // Department heads also fetch their task-assignment hierarchy so SOP businesses
+  // from tasks assigned to them (even in foreign departments) show up in the
+  // sidebar, but only the clients assigned to them are displayed.
+  useEffect(() => {
+    if (!isDepartmentHead) {
+      setDhClientIds(null);
+      setDhBusinessIds(null);
+      setDhSopBusinessIds(null);
+      return;
+    }
+    let active = true;
+    getMyTaskHierarchy()
+      .then((data) => {
+        if (!active) return;
+        const clientIds = new Set((data?.clientTree || []).map((c) => Number(c.id)));
+        const bizIds = new Set();
+        const sopBizIds = new Set();
+        for (const c of data?.clientTree || []) {
+          if (c.business_id != null) sopBizIds.add(Number(c.business_id));
+          for (const b of c.businesses || []) {
+            bizIds.add(Number(b.id));
+          }
+        }
+        setDhClientIds(clientIds);
+        setDhBusinessIds(bizIds);
+        setDhSopBusinessIds(sopBizIds);
+      })
+      .catch(() => {
+        if (active) { setDhClientIds(new Set()); setDhBusinessIds(new Set()); setDhSopBusinessIds(new Set()); }
+      });
+    return () => { active = false; };
+  }, [isDepartmentHead]);
+
   useEffect(() => {
     if (!isAnyAdmin) {
       setHasUnassignedTasks(false);
@@ -122,17 +160,35 @@ export default function SecondarySidebar({ collapsed = false }) {
   }, [isAnyAdmin, orgVersion]);
 
   const visibleBusinesses = useMemo(() => {
-    if (isDepartmentHead && (user?.department_business_id != null || user?.business_id != null)) {
-      const sopBizId = Number(user.department_business_id ?? user.business_id);
-      const deptId = user?.department_id != null ? Number(user.department_id) : null;
-      return businesses
-        .filter((b) => Number(b.id) === sopBizId && b.status !== 'archived')
-        .map((b) => ({
-          ...b,
-          clients: deptId != null
-            ? (b.clients || []).filter((c) => Number(c.department_id) === deptId)
-            : (b.clients || []),
-        }));
+    if (isDepartmentHead) {
+      const ownSopBizId = (user?.department_business_id != null || user?.business_id != null)
+        ? Number(user.department_business_id ?? user.business_id) : null;
+      const assignedSopBizIds = dhSopBusinessIds ? Array.from(dhSopBusinessIds) : [];
+      const allBizIds = new Set();
+      if (ownSopBizId != null) allBizIds.add(ownSopBizId);
+      for (const id of assignedSopBizIds) allBizIds.add(Number(id));
+
+      const assignedClientIds = dhClientIds || new Set();
+      const assignedUnitIds = dhBusinessIds || new Set();
+
+      const result = [];
+      for (const bizId of allBizIds) {
+        const biz = businesses.find((b) => Number(b.id) === Number(bizId) && b.status !== 'archived');
+        if (!biz) continue;
+        const clients = (biz.clients || [])
+          .filter((c) => assignedClientIds.has(Number(c.id)))
+          .map((c) => ({
+            ...c,
+            businesses: (c.businesses || []).filter((u) => assignedUnitIds.has(Number(u.id)) && u.status !== 'archived'),
+          }));
+        const isOwn = ownSopBizId != null && Number(biz.id) === ownSopBizId;
+        // Keep the department head's own business tree visible even if it has
+        // no assigned clients; assigned businesses with no assigned clients are
+        // dropped.
+        if (!isOwn && clients.length === 0) continue;
+        result.push({ ...biz, clients });
+      }
+      return result;
     }
     if (isAnyAdmin) return businesses.filter((b) => b.status !== 'archived');
     if (employeeSopBusinessIds != null && employeeClientIds != null && employeeBusinessIds != null) {
@@ -161,7 +217,7 @@ export default function SecondarySidebar({ collapsed = false }) {
       return businesses.filter((b) => Number(b.id) === Number(employeeBusinessId) && b.status !== 'archived');
     }
     return [];
-  }, [businesses, employeeBusinessId, isAnyAdmin, isDepartmentHead, user, employeeClientIds, employeeBusinessIds, employeeSopBusinessIds, employeeClientTree]);
+  }, [businesses, employeeBusinessId, isAnyAdmin, isDepartmentHead, user, employeeClientIds, employeeBusinessIds, employeeSopBusinessIds, employeeClientTree, dhClientIds, dhBusinessIds, dhSopBusinessIds]);
   const showUnassigned = isAnyAdmin && hasUnassignedTasks;
   const { toast } = useToast();
   const [query, setQuery] = useState("");
@@ -331,6 +387,17 @@ export default function SecondarySidebar({ collapsed = false }) {
   // Employees only have one business, so reveal it by default (clients stay
   // collapsed until the user opens the business) so the panel isn't blank.
   useEffect(() => {
+    if (isDepartmentHead && dhSopBusinessIds != null && dhSopBusinessIds.size > 0 && visibleBusinesses.length) {
+      const updates = {};
+      for (const bizId of dhSopBusinessIds) {
+        const key = String(bizId);
+        if (!expandedBiz[key]) updates[key] = true;
+      }
+      if (Object.keys(updates).length > 0) {
+        setExpandedBiz((prev) => ({ ...prev, ...updates }));
+      }
+      return;
+    }
     if (!isAnyAdmin && employeeSopBusinessIds != null && employeeSopBusinessIds.size > 0 && visibleBusinesses.length) {
       const updates = {};
       for (const bizId of employeeSopBusinessIds) {
@@ -347,7 +414,7 @@ export default function SecondarySidebar({ collapsed = false }) {
     if (visibleBusinesses.length && !expandedBiz[key]) {
       setExpandedBiz((prev) => (prev[key] ? prev : { ...prev, [key]: true }));
     }
-  }, [employeeBusinessId, employeeSopBusinessIds, visibleBusinesses, expandedBiz, isAnyAdmin]);
+  }, [employeeBusinessId, employeeSopBusinessIds, visibleBusinesses, expandedBiz, isAnyAdmin, dhSopBusinessIds, isDepartmentHead]);
 
   // Expand the branch that matches an active Tasks scope (client/business
   // chosen in the panel) so the selected row is visible. Keyed on the scope

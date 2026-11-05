@@ -178,6 +178,14 @@ const calendarModel = {
     return { eventId };
   },
 
+  async findMapsByUser(userId) {
+    const [rows] = await db.query(
+      'SELECT * FROM calendar_event_map WHERE user_id = ?',
+      [userId]
+    );
+    return rows;
+  },
+
   async deleteMapByUser(userId) {
     await db.query('DELETE FROM calendar_event_map WHERE user_id = ?', [userId]);
     return { userId };

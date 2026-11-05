@@ -271,6 +271,56 @@ async function handleCallback(code, userId) {
     return synced;
   }
 
+// Fully disconnect a user: remove synced events from Google Calendar, revoke the
+// OAuth token, and delete all stored tokens/mappings locally.
+async function disconnectUser(userId) {
+  const token = await calendarModel.getToken(userId, PROVIDER).catch(() => null);
+
+  // Best-effort: remove events we created from the user's Google Calendar.
+  if (token && token.access_token) {
+    try {
+      const client = buildOAuthClient();
+      client.setCredentials({
+        access_token: token.access_token,
+        refresh_token: token.refresh_token,
+        expiry_date: token.expiry_date,
+      });
+      const calendar = getGoogle().calendar({ version: 'v3', auth: client });
+      const maps = await calendarModel.findMapsByUser(userId);
+      for (const map of maps) {
+        if (map.sync_status === 'deleted') continue;
+        try {
+          await calendar.events.delete({
+            calendarId: map.google_calendar_id || 'primary',
+            eventId: map.google_event_id,
+          });
+        } catch {
+          // already gone or no permission; continue
+        }
+      }
+    } catch {
+      // best effort
+    }
+
+    // Best-effort: revoke the token at Google.
+    try {
+      const client = buildOAuthClient();
+      client.setCredentials({
+        access_token: token.access_token,
+        refresh_token: token.refresh_token,
+        expiry_date: token.expiry_date,
+      });
+      await client.revokeToken(token.refresh_token || token.access_token);
+    } catch {
+      // best effort
+    }
+  }
+
+  await calendarModel.deleteToken(userId, PROVIDER);
+  await calendarModel.deleteMapByUser(userId);
+  return { userId, provider: PROVIDER };
+}
+
 module.exports = {
   SCOPES,
   buildAuthUrl,
@@ -279,6 +329,7 @@ module.exports = {
   deleteEventForUser,
   propagateEventChange,
   syncAllEventsForUser,
+  disconnectUser,
   calendarModel,
   logAudit,
 };
