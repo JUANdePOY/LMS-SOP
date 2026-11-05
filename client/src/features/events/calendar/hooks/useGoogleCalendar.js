@@ -37,64 +37,30 @@ export function useGoogleCalendar() {
     const res = await getCalendarAuthUrl();
     if (!res.data?.success) throw new Error(res.data?.message || "Failed to start connection");
     const url = res.data.data.url;
-    return new Promise((resolve, reject) => {
-      const popup = window.open(url, "google-calendar-auth", "width=520,height=640");
-      if (!popup) {
-        reject(new Error("Popup blocked. Please allow popups and try again."));
-        return;
-      }
+    const popup = window.open(url, "google-calendar-auth", "width=520,height=640");
+    if (!popup) throw new Error("Popup blocked. Please allow popups and try again.");
 
-      let onMessage = null;
-      let resolved = false;
-      const finish = async (success) => {
-        if (resolved) return;
-        resolved = true;
-        clearInterval(poll);
-        if (onMessage) window.removeEventListener('message', onMessage);
-        try { popup.close(); } catch { /* ignore */ }
-        if (success) {
-          await loadStatus(true);
-          resolve(true);
-        } else {
-          reject(new Error("Google Calendar connection timed out. Please try again."));
-        }
-      };
-
-      onMessage = (event) => {
-        if (event.origin !== window.location.origin) return;
-        if (event.data && event.data.type === 'google-calendar-connected') {
-          finish(true);
-        }
-      };
-      window.addEventListener('message', onMessage);
-
-      // Fallback polling in case postMessage is blocked.
-      let attempts = 0;
-      const MAX_ATTEMPTS = 90;
-      const poll = setInterval(async () => {
-        if (resolved) return;
-        attempts += 1;
+    // Wait for the OAuth popup to complete (it auto-closes after the callback).
+    await new Promise((resolve) => {
+      const check = setInterval(() => {
         try {
-          const statusRes = await getCalendarStatus(true);
-          if (statusRes.data?.success && statusRes.data.data?.connected) {
-            finish(true);
-            return;
+          if (popup.closed) {
+            clearInterval(check);
+            resolve();
           }
         } catch {
-          // ignore transient errors
+          // ignore
         }
-        if (attempts >= MAX_ATTEMPTS) {
-          finish(false);
-        }
-      }, 1000);
-
-      // Cleanup listener on timeout
+      }, 500);
+      // Safety timeout
       setTimeout(() => {
-        if (!resolved) {
-          window.removeEventListener('message', onMessage);
-        }
-      }, MAX_ATTEMPTS * 1000 + 1000);
+        clearInterval(check);
+        resolve();
+      }, 30000);
     });
+
+    await loadStatus(true);
+    return true;
   }, [loadStatus]);
 
   const disconnect = useCallback(async () => {

@@ -260,7 +260,9 @@ async function handleCallback(code, userId) {
   let syncedEvents = 0;
   try {
     syncedEvents = await syncAllEventsForUser(userId, client);
-  } catch {
+    console.log('[Calendar] Synced events for user', userId, ':', syncedEvents);
+  } catch (err) {
+    console.error('[Calendar] syncAllEventsForUser failed:', err && err.message ? err.message : err);
     // silent fallback
   }
 
@@ -278,7 +280,8 @@ async function handleCallback(code, userId) {
       try {
         await upsertEventForUser(userId, event.id, authClient);
         synced += 1;
-      } catch {
+      } catch (err) {
+        console.error('[Calendar] Failed to sync event', event.id, ':', err && err.message ? err.message : err);
         try {
           await calendarModel.updateMapStatus(userId, event.id, 'failed');
         } catch { /* best effort */ }
