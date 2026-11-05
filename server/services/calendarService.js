@@ -220,7 +220,23 @@ async function propagateEventChange(eventId, action) {
 // Exchange the OAuth code, persist tokens, return connected email.
 async function handleCallback(code, userId) {
   const client = buildOAuthClient();
-  const { tokens } = await client.getToken(code);
+  let tokens;
+  try {
+    const res = await client.getToken(code);
+    tokens = res.tokens;
+  } catch (err) {
+    // If the code was already used (e.g. callback invoked twice), but the user
+    // is already connected, treat as success instead of failing.
+    try {
+      const existing = await calendarModel.getToken(userId, PROVIDER);
+      if (existing && existing.access_token) {
+        return { ...existing, syncedEvents: 0 };
+      }
+    } catch {
+      // ignore
+    }
+    throw err;
+  }
   client.setCredentials(tokens);
 
   let googleEmail = null;

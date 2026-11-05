@@ -1,4 +1,5 @@
 const express = require('express');
+console.log('=== SERVER STARTED (calendar callback fix v3) ===');
 const { permissionErrorHandler } = require('./middleware/permissionErrorHandler');
 const cors = require('cors');
 const path = require('path');
@@ -161,6 +162,42 @@ app.use('/api/grades', gradesRoutes);
 app.use('/api/discussions', discussionsRoutes);
 app.use('/api/announcements', announcementsRoutes);
 app.use('/api/events', eventsRoutes);
+// Direct handler for the Google Calendar OAuth callback. Registered before the
+// calendar router so it always runs the latest code regardless of module cache.
+app.get('/api/calendar/callback', (req, res) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'unsafe-none');
+  res.setHeader('Cross-Origin-Embedder-Policy', 'unsafe-none');
+  const { code, state, error, error_description } = req.query;
+  console.log('[Calendar] direct callback invoked, state:', state);
+  const renderHtml = (success, message) => `<!doctype html><html><head><meta charset="utf-8"><title>Google Calendar</title></head><body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#f5f5f5"><div style="text-align:center;padding:24px;background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08)"><h3 style="margin:0 0 8px;color:${success ? '#16a34a' : '#dc2626'}">${success ? 'Connected' : 'Error'}</h3><p style="margin:0;color:#555">${message}</p><p style="margin:12px 0 0;font-size:12px;color:#999">You can close this window.</p></div></body></html>`;
+  if (error) {
+    return res.status(400).send(renderHtml(false, `Google error: ${error}${error_description ? ` (${error_description})` : ''}`));
+  }
+  if (!state || !code) {
+    return res.status(400).send(renderHtml(false, 'Missing parameters'));
+  }
+  let userId = null;
+  try {
+    const data = String(state).split('.')[0];
+    const payload = JSON.parse(Buffer.from(data, 'base64url').toString());
+    userId = payload && payload.u;
+  } catch {
+    userId = null;
+  }
+  if (!userId) {
+    return res.status(400).send(renderHtml(false, 'State verification failed'));
+  }
+  const calendarService = require('./services/calendarService');
+  calendarService.handleCallback(code, userId)
+    .then((result) => {
+      res.status(200).send(renderHtml(true, 'Calendar connected'));
+    })
+    .catch((err) => {
+      console.error('[Calendar] direct callback error:', err);
+      res.status(500).send(renderHtml(false, err && err.message ? err.message : 'Failed to connect calendar'));
+    });
+});
+
 app.use('/api/calendar', calendarRoutes);
 // Public HMAC-scoped attachment routers MUST be mounted before the authenticated
 // /api/messages and /api/tasks routers so requests like

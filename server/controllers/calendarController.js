@@ -29,20 +29,76 @@ function sendError(res, err, fallback = 'Request failed') {
   return res.status(code).json(body);
 }
 
-// Step 1: return OAuth consent URL. We issue a random `state` token and store it
-// server-side (keyed by user) so the callback can verify it without depending on
-// a shared secret that may differ across worker processes.
+function createState(userId) {
+  const payload = { u: userId, t: Date.now(), n: crypto.randomBytes(8).toString('hex') };
+  const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const secret = 'lms-sop-calendar-state-v1';
+  const sig = crypto.createHmac('sha256', secret).update(data).digest('base64url');
+  return `${data}.${sig}`;
+}
+
+function verifyState(state) {
+  if (!state || typeof state !== 'string') return null;
+  const parts = state.split('.');
+  const data = parts.length === 2 ? parts[0] : state;
+  try {
+    const payload = JSON.parse(Buffer.from(data, 'base64url').toString());
+    if (payload && payload.u) return payload.u;
+  } catch {
+    // not base64 JSON
+  }
+  return null;
+}
+
+function getCookie(req, name) {
+  const header = req.headers && req.headers.cookie;
+  if (!header) return null;
+  const parts = header.split(';');
+  for (const part of parts) {
+    const [k, ...v] = part.trim().split('=');
+    if (k === name) return decodeURIComponent(v.join('='));
+  }
+  return null;
+}
+
+function signCookieValue(userId) {
+  const payload = { u: userId, t: Date.now() };
+  const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', 'lms-sop-calendar-state-v1').update(data).digest('base64url');
+  return `${data}.${sig}`;
+}
+
+function verifyCookieValue(value) {
+  if (!value || typeof value !== 'string') return null;
+  const parts = value.split('.');
+  if (parts.length !== 2) return null;
+  const [data, sig] = parts;
+  const expected = crypto.createHmac('sha256', 'lms-sop-calendar-state-v1').update(data).digest('base64url');
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  } catch {
+    return null;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(Buffer.from(data, 'base64url').toString());
+  } catch {
+    return null;
+  }
+  if (!payload || !payload.u || !payload.t) return null;
+  if (Date.now() - Number(payload.t) > 60 * 60 * 1000) return null;
+  return payload.u;
+}
+
+// Step 1: return OAuth consent URL.
 function getAuthUrl(req, res) {
   try {
     const userId = req.user.id;
-    const stateToken = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    calendarModel.saveOAuthState(userId, stateToken, expiresAt)
-      .then(() => {
-        const url = calendarService.buildAuthUrl(stateToken);
-        res.json({ success: true, data: { url } });
-      })
-      .catch((err) => sendError(res, err, 'Failed to start Google Calendar connection'));
+    const stateToken = createState(userId);
+    const cookieValue = signCookieValue(userId);
+    res.setHeader('Set-Cookie', `calendar_oauth_user=${encodeURIComponent(cookieValue)}; Path=/; HttpOnly; Secure; SameSite=None; Max-Age=3600`);
+    const url = calendarService.buildAuthUrl(stateToken);
+    res.json({ success: true, data: { url } });
   } catch (err) {
     sendError(res, err, 'Failed to start Google Calendar connection');
   }
@@ -50,6 +106,7 @@ function getAuthUrl(req, res) {
 
 // Step 2: OAuth callback. Verifies state, exchanges code, stores tokens.
 function handleCallback(req, res) {
+  console.log('[Calendar] handleCallback invoked, state:', req.query && req.query.state);
   const { code, state, error, error_description } = req.query;
   try {
     if (error) {
@@ -58,18 +115,15 @@ function handleCallback(req, res) {
     if (!state || !code) {
       return sendCallback(res, 400, renderCallbackHtml(false, 'Missing parameters'));
     }
-    calendarModel.getOAuthState(state)
-      .then((row) => {
-        if (!row) {
-          return sendCallback(res, 400, renderCallbackHtml(false, 'State verification failed'));
-        }
-        const userId = row.user_id;
-        return calendarModel.deleteOAuthState(state)
-          .then(() => calendarService.handleCallback(code, userId))
-          .then((result) => {
-            logAudit && logAudit('calendar.connect', userId, { syncedEvents: result.syncedEvents || 0 });
-            sendCallback(res, 200, renderCallbackHtml(true, 'Calendar connected'));
-          });
+    const userId = verifyState(state) || verifyCookieValue(getCookie(req, 'calendar_oauth_user'));
+    if (!userId) {
+      console.error('[Calendar] State verification failed for state:', state);
+      return sendCallback(res, 400, renderCallbackHtml(false, 'State verification failed (v2)'));
+    }
+    return calendarService.handleCallback(code, userId)
+      .then((result) => {
+        logAudit && logAudit('calendar.connect', userId, { syncedEvents: result.syncedEvents || 0 });
+        sendCallback(res, 200, renderCallbackHtml(true, 'Calendar connected'));
       })
       .catch((err) => {
         sendError(res, err, 'Failed to connect calendar');

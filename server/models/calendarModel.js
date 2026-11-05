@@ -203,8 +203,8 @@ const calendarModel = {
   async saveOAuthState(userId, stateToken, expiresAt) {
     await db.query(
       `INSERT INTO calendar_oauth_states (user_id, state_token, expires_at)
-       VALUES (?, ?, ?)`,
-      [userId, stateToken, expiresAt]
+       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))`,
+      [userId, stateToken]
     );
     return stateToken;
   },
@@ -212,12 +212,11 @@ const calendarModel = {
   // Returns the matching row if the state exists and is unexpired, else null.
   async getOAuthState(stateToken) {
     const [rows] = await db.query(
-      'SELECT * FROM calendar_oauth_states WHERE state_token = ?',
+      'SELECT * FROM calendar_oauth_states WHERE state_token = ? AND expires_at > NOW()',
       [stateToken]
     );
     const row = rows[0];
     if (!row) return null;
-    if (new Date(row.expires_at).getTime() < Date.now()) return null;
     return row;
   },
 
