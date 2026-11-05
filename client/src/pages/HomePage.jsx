@@ -4,6 +4,7 @@ import {
   ArrowRight, CheckCircle2, Shield, Zap, GraduationCap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom';
 
 const FEATURES = [
   {
@@ -80,6 +81,12 @@ export default function HomePage() {
           </nav>
 
           <div className="flex items-center gap-2">
+            <Link
+              to="/login"
+              className="hidden items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-orange-600 sm:inline-flex"
+            >
+              Login
+            </Link>
             <button
               onClick={() => setMobileMenu((v) => !v)}
               className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-600 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-800 md:hidden"
@@ -100,6 +107,7 @@ export default function HomePage() {
               <a href="#features" onClick={() => setMobileMenu(false)} className="rounded-lg px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800">Features</a>
               <a href="#modules" onClick={() => setMobileMenu(false)} className="rounded-lg px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800">Modules</a>
               <a href="#about" onClick={() => setMobileMenu(false)} className="rounded-lg px-3 py-2 hover:bg-neutral-100 dark:hover:bg-neutral-800">About</a>
+              <Link to="/login" onClick={() => setMobileMenu(false)} className="rounded-lg bg-orange-500 px-3 py-2 text-center font-semibold text-white hover:bg-orange-600">Login</Link>
             </div>
           </div>
         )}
