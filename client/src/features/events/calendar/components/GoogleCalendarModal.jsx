@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Calendar, Check, Loader2, Unlink, AlertCircle } from "lucide-react";
 import { Modal } from "@/shared/components/ui/modal";
-import { getCalendarStatus } from "../api/calendar.api";
 import CalendarSyncSummary from "./CalendarSyncSummary";
 
 export default function GoogleCalendarModal({ open, onClose, calendar, onConnect, onDisconnect, onConnectStart, eventsCount = 0, syncPhase = "unavailable", syncedCount = 0, failedCount = 0 }) {
@@ -29,45 +28,16 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
     onConnectStart && onConnectStart();
 
     try {
-      let connectError = null;
-      try {
-        await connect();
-      } catch (err) {
-        connectError = err;
-      }
-
-      let verified = false;
-      try {
-        const MAX_CHECKS = 6;
-        const DELAY_MS = 500;
-        for (let i = 0; i < MAX_CHECKS; i++) {
-          try {
-            const statusRes = await getCalendarStatus(true);
-            if (statusRes.data?.success && statusRes.data.data?.connected) {
-              verified = true;
-              break;
-            }
-          } catch {
-            // ignore transient network errors and continue retrying
-          }
-          await new Promise((res) => setTimeout(res, DELAY_MS));
-        }
-      } catch {
-        // fall through to show the error message below
-      }
-
-      if (verified) {
-        onConnect && onConnect().catch(() => {
-          // ignore onConnect errors so the modal still stops loading
-        });
-        onClose && onClose();
+      await connect();
+      await calendar.loadStatus(true);
+      onConnect && onConnect().catch(() => {});
+      onClose && onClose();
+    } catch (err) {
+      const code = err?.response?.data?.code;
+      if (code === 'CALENDAR_DISABLED') {
+        setError("Google Calendar isn't enabled on this server. Ask an admin to configure the Google OAuth credentials.");
       } else {
-        const code = connectError?.response?.data?.code;
-        if (code === "CALENDAR_DISABLED") {
-          setError("Google Calendar isn't enabled on this server. Ask an admin to configure the Google OAuth credentials.");
-        } else {
-          setError(connectError?.message || "Failed to connect Google Calendar");
-        }
+        setError(err?.message || 'Failed to connect Google Calendar');
       }
     } finally {
       setBusy(false);
