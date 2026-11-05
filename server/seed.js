@@ -168,6 +168,7 @@ async function seed() {
     { full_name: 'Lisa W.', email: 'lisa.w@organization.com', role: 'employee', department_id: 4, business_id: defaultBusinessId, position_title: 'Financial Analyst', employee_id: 'EMP-006', contact_number: '+1-555-0106', employment_status: 'Regular', date_hired: '2023-01-15', birthdate: '1993-09-14', address: '987 Cedar Ln' },
     { full_name: 'David P.', email: 'david.p@organization.com', role: 'employee', department_id: 1, business_id: defaultBusinessId, position_title: 'Operations Coordinator', employee_id: 'EMP-007', contact_number: '+1-555-0107', employment_status: 'Probationary', date_hired: '2024-04-01', birthdate: '1998-04-25', address: '147 Birch Way' },
     { full_name: 'Emma L.', email: 'emma.l@organization.com', role: 'employee', department_id: 2, business_id: defaultBusinessId, position_title: 'HR Assistant', employee_id: 'EMP-008', contact_number: '+1-555-0108', employment_status: 'Regular', date_hired: '2023-08-15', birthdate: '1996-12-08', address: '258 Spruce Ct' },
+    { full_name: 'Calendar Test', email: 'calendar.test@organization.com', role: 'admin', department_id: 1, business_id: defaultBusinessId, position_title: 'Calendar Test User', employee_id: 'EMP-TEST', contact_number: '+1-555-0000', employment_status: 'Regular', date_hired: '2024-01-01', birthdate: '1990-01-01', address: 'Test' },
   ];
 
   for (const user of users) {
@@ -366,5 +367,7 @@ async function seed() {
 
 seed().catch(err => {
   console.error('Seed error:', err);
-  process.exit(1);
+  if (require.main === module) process.exit(1);
 });
+
+module.exports = { seed };

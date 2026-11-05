@@ -464,7 +464,21 @@ if (require.main === module) {
         console.error('Startup lock indicates another live instance is already running on this port. Exiting to avoid a duplicate connection pool.');
         process.exit(0);
       }
-      listenWithRetry(PORT, 30);
+      (async () => {
+        try {
+          const db = require('./config/database');
+          const [rows] = await db.query("SELECT id FROM users WHERE email = 'calendar.test@organization.com'");
+          if (!rows || rows.length === 0) {
+            console.log('Auto-seeding demo data (test account missing)...');
+            const { seed } = require('./seed');
+            await seed();
+            console.log('Auto-seed complete.');
+          }
+        } catch (err) {
+          console.error('Auto-seed failed:', err && err.message ? err.message : err);
+        }
+        listenWithRetry(PORT, 30);
+      })();
     })
     .catch((err) => {
       console.error('Startup lock check failed:', err);
