@@ -60,6 +60,7 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
         onConnect && onConnect().catch(() => {
           // ignore onConnect errors so the modal still stops loading
         });
+        onClose && onClose();
       } else {
         const code = connectError?.response?.data?.code;
         if (code === "CALENDAR_DISABLED") {
