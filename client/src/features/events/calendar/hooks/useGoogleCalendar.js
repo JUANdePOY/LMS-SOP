@@ -51,7 +51,7 @@ export function useGoogleCalendar() {
         resolved = true;
         clearInterval(poll);
         if (onMessage) window.removeEventListener('message', onMessage);
-        try { popup.close(); } catch (e) { /* ignore */ }
+        try { popup.close(); } catch { /* ignore */ }
         if (success) {
           await loadStatus(true);
           resolve(true);
