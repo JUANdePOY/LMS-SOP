@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Calendar } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
@@ -32,6 +32,16 @@ export default function EventsPage() {
   const [syncPhase, setSyncPhase] = useState("pending");
   const [syncResult, setSyncResult] = useState({ synced: 0, failed: 0 });
   const hasMarkedSyncedRef = useRef(false);
+
+  // Memoize the form's initial data so its reference stays stable while the
+  // same create/edit context is open. Without this, a new object literal is
+  // created on every render, which resets the form (wiping title/description)
+  // whenever the parent re-renders (e.g. selecting another day).
+  const formInitialData = useMemo(() => {
+    if (editingItem) return editingItem;
+    if (creatingForDate) return { event_date: creatingForDate };
+    return null;
+  }, [editingItem, creatingForDate]);
 
   // Once the calendar reports connected, the server has already finished the
   // initial bulk sync — force the summary to "done" so the spinner can never
@@ -194,12 +204,12 @@ export default function EventsPage() {
            onClose={() => { setShowForm(false); setEditingItem(null); setCreatingForDate(null); }}
            title={editingItem ? "Edit Event" : "New Events"}
          >
-           <EventForm
-             initialData={editingItem || (creatingForDate ? { event_date: creatingForDate } : null)}
-             onSubmit={handleSubmit}
-            onCancel={() => { setShowForm(false); setEditingItem(null); }}
-            saving={saving}
-          />
+            <EventForm
+              initialData={formInitialData}
+              onSubmit={handleSubmit}
+             onCancel={() => { setShowForm(false); setEditingItem(null); }}
+             saving={saving}
+           />
         </Modal>
       )}
 
