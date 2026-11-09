@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Calendar } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/shared/components/ui/Toast";
@@ -6,6 +6,7 @@ import { useEvents } from "../hooks/useEvents";
 import { useGoogleCalendar } from "../calendar/hooks/useGoogleCalendar";
 import CalendarGrid from "../components/CalendarGrid";
 import EventDayDetail from "../components/EventDayDetail";
+import EventDetail from "../components/EventDetail";
 import EventForm from "../components/EventForm";
 import GoogleCalendarModal from "../calendar/components/GoogleCalendarModal";
 import EventSyncButton from "../calendar/components/EventSyncButton";
@@ -25,13 +26,14 @@ export default function EventsPage() {
   }, [markEntityTypeRead]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [viewingItem, setViewingItem] = useState(null);
   const [creatingForDate, setCreatingForDate] = useState(null);
   const [saving, setSaving] = useState(false);
   const [syncPhase, setSyncPhase] = useState("pending");
   const [syncResult, setSyncResult] = useState({ synced: 0, failed: 0 });
-  const hasMarkedSyncedRef = useRef(false);
 
   // Memoize the form's initial data so its reference stays stable while the
   // same create/edit context is open. Without this, a new object literal is
@@ -42,26 +44,6 @@ export default function EventsPage() {
     if (creatingForDate) return { event_date: creatingForDate };
     return null;
   }, [editingItem, creatingForDate]);
-
-  // Once the calendar reports connected, the server has already finished the
-  // initial bulk sync — force the summary to "done" so the spinner can never
-  // get stuck if the connect promise/callback is delayed, missed, or blocked
-  // by Cross-Origin-Opener-Policy (which severs the popup<->opener link and
-  // can prevent the connect() promise from resolving in some browsers).
-  // Transition from ANY active phase ("syncing"/"pending"), not just "idle",
-  // otherwise the summary stays stuck on "Adding your events…".
-  useEffect(() => {
-    if (calendar.status.connected) {
-      if (!hasMarkedSyncedRef.current) {
-        hasMarkedSyncedRef.current = true;
-        setSyncPhase((prev) => (prev === "done" ? prev : "done"));
-        setSyncResult((prev) => (prev.synced === 0 ? { synced: items.length, failed: 0 } : prev));
-        calendar.markEventsSynced(items.map((i) => i.id));
-      }
-    } else {
-      hasMarkedSyncedRef.current = false;
-    }
-  }, [calendar.status.connected, items, items.length, calendar]);
 
   // Reset the sync summary whenever the modal is closed.
   useEffect(() => {
@@ -84,18 +66,12 @@ export default function EventsPage() {
       }
       setShowCalendarModal(true);
       setSyncPhase('done');
-      setSyncResult({ synced: items.length, failed: 0 });
-      calendar.markEventsSynced(items.map((i) => i.id));
-      toast.success(
-        items.length > 0
-          ? `${items.length} event${items.length === 1 ? '' : 's'} added to your Google Calendar`
-          : 'Google Calendar connected'
-      );
+      toast.success('Google Calendar connected');
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [calendar, items, toast]);
+  }, [calendar, toast]);
 
   const selectedDayEvents = items.filter((item) => {
     if (!item.event_date || !selectedDate) return false;
@@ -117,6 +93,11 @@ export default function EventsPage() {
     setCreatingForDate(null);
     setEditingItem(item);
     setShowForm(true);
+  };
+
+  const handleView = (item) => {
+    setViewingItem(item);
+    setShowDetail(true);
   };
 
   const handleSubmit = async (payload) => {
@@ -183,6 +164,7 @@ export default function EventsPage() {
             events={selectedDayEvents}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onView={handleView}
             onCreate={handleCreate}
             canManage={canManage}
             renderSync={(evt) => (
@@ -210,16 +192,26 @@ export default function EventsPage() {
              onCancel={() => { setShowForm(false); setEditingItem(null); }}
              saving={saving}
            />
-        </Modal>
-      )}
+         </Modal>
+       )}
 
-      <GoogleCalendarModal
+       {viewingItem && (
+         <Modal
+           open={showDetail}
+           onClose={() => { setShowDetail(false); setViewingItem(null); }}
+           title="Event Details"
+         >
+           <EventDetail event={viewingItem} onClose={() => { setShowDetail(false); setViewingItem(null); }} />
+         </Modal>
+       )}
+
+       <GoogleCalendarModal
         open={showCalendarModal}
         onClose={() => setShowCalendarModal(false)}
         calendar={{ ...calendar, onOpenManage: () => setShowCalendarModal(true) }}
         eventsCount={items.length}
         syncPhase={calendar.status.connected ? syncPhase : "unavailable"}
-        syncedCount={syncResult.synced}
+        syncedCount={Object.values(calendar.syncingIds).filter((s) => s === "synced").length}
         failedCount={syncResult.failed}
         onConnectStart={() => setSyncPhase("syncing")}
         onConnect={async () => {
@@ -231,18 +223,11 @@ export default function EventsPage() {
             }
           }
           setSyncPhase("done");
-          setSyncResult({ synced: items.length, failed: 0 });
-          calendar.markEventsSynced(items.map((i) => i.id));
-          toast.success(
-            items.length > 0
-              ? `${items.length} event${items.length === 1 ? "" : "s"} added to your Google Calendar`
-              : "Google Calendar connected"
-          );
+          toast.success("Google Calendar connected");
         }}
         onDisconnect={() => {
-            setSyncPhase("pending");
+          setSyncPhase("pending");
           setSyncResult({ synced: 0, failed: 0 });
-          calendar.markEventsSynced([]);
           toast.success("Google Calendar disconnected");
         }}
       />

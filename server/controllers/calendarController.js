@@ -198,9 +198,9 @@ function unsyncEvent(req, res) {
 function disconnect(req, res) {
   const userId = req.user.id;
   calendarService.disconnectUser(userId)
-    .then(() => {
-      logAudit && logAudit('calendar.disconnect', userId, {});
-      res.json({ success: true, message: 'Google Calendar disconnected' });
+    .then(({ removedEvents = 0 }) => {
+      logAudit && logAudit('calendar.disconnect', userId, { removedEvents });
+      res.json({ success: true, message: `Google Calendar disconnected. Removed ${removedEvents} event${removedEvents === 1 ? '' : 's'} from your calendar.`, data: { removedEvents } });
     })
     .catch((err) => sendError(res, err, 'Failed to disconnect calendar'));
 }

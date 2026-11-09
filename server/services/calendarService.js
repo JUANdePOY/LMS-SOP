@@ -140,35 +140,59 @@ async function upsertEventForUser(userId, eventId, authClient) {
   let googleEventId;
   let action;
 
-  if (existing && existing.sync_status !== 'deleted') {
-    // Try to update; if the event was manually deleted on Google, re-create it.
+  // --- Deduplication: check Google Calendar directly for an event already
+  // --- carrying this LMS event id as a private extended property. This
+  // --- prevents duplicates even if the local mapping row is missing or stale.
+  const mappedGoogleEventId = await findExistingGoogleEventId(calendar, eventId);
+  if (mappedGoogleEventId) {
     try {
       const res = await calendar.events.update({
-        calendarId: existing.google_calendar_id,
-        eventId: existing.google_event_id,
+        calendarId: 'primary',
+        eventId: mappedGoogleEventId,
         requestBody: payload,
       });
       googleEventId = res.data.id;
       action = 'updated';
     } catch (updateErr) {
       if (updateErr.code === 404 || updateErr.response?.status === 404) {
-        const res = await calendar.events.insert({
-          calendarId: 'primary',
-          requestBody: payload,
-        });
-        googleEventId = res.data.id;
-        action = 'created';
+        // Event vanished from Google mid-flight; fall through to create below.
       } else {
         throw updateErr;
       }
     }
-  } else {
-    const res = await calendar.events.insert({
-      calendarId: 'primary',
-      requestBody: payload,
-    });
-    googleEventId = res.data.id;
-    action = 'created';
+  }
+
+  if (!googleEventId) {
+    if (existing && existing.sync_status !== 'deleted') {
+      // Try to update the mapped event; if manually deleted on Google, re-create.
+      try {
+        const res = await calendar.events.update({
+          calendarId: existing.google_calendar_id,
+          eventId: existing.google_event_id,
+          requestBody: payload,
+        });
+        googleEventId = res.data.id;
+        action = 'updated';
+      } catch (updateErr) {
+        if (updateErr.code === 404 || updateErr.response?.status === 404) {
+          const res = await calendar.events.insert({
+            calendarId: 'primary',
+            requestBody: payload,
+          });
+          googleEventId = res.data.id;
+          action = 'created';
+        } else {
+          throw updateErr;
+        }
+      }
+    } else {
+      const res = await calendar.events.insert({
+        calendarId: 'primary',
+        requestBody: payload,
+      });
+      googleEventId = res.data.id;
+      action = 'created';
+    }
   }
 
   await calendarModel.saveMap({
@@ -180,6 +204,26 @@ async function upsertEventForUser(userId, eventId, authClient) {
   });
 
   return { googleEventId, action };
+}
+
+// Search Google Calendar for an event whose private extended property
+// `lmsEventId` matches the given LMS event id. Returns the Google event id
+// or null when none is found. Uses page tokens to scan all matching events.
+async function findExistingGoogleEventId(calendar, lmsEventId) {
+  let pageToken = null;
+  do {
+    const res = await calendar.events.list({
+      calendarId: 'primary',
+      extendedPropertiesPrivate: `lmsEventId=${String(lmsEventId)},source=lms-sop`,
+      maxResults: 250,
+      pageToken,
+      singleEvents: true,
+    });
+    const items = res.data.items || [];
+    if (items.length > 0) return items[0].id;
+    pageToken = res.data.nextPageToken || null;
+  } while (pageToken);
+  return null;
 }
 
 async function deleteEventForUser(userId, eventId) {
@@ -257,16 +301,10 @@ async function handleCallback(code, userId) {
     provider: PROVIDER,
   });
 
-  let syncedEvents = 0;
-  try {
-    syncedEvents = await syncAllEventsForUser(userId, client);
-    console.log('[Calendar] Synced events for user', userId, ':', syncedEvents);
-  } catch (err) {
-    console.error('[Calendar] syncAllEventsForUser failed:', err && err.message ? err.message : err);
-    // silent fallback
-  }
-
-  return { ...result, syncedEvents };
+  // NOTE: We intentionally do NOT auto-sync all events on connect. Sync is
+  // per-event (user picks which events to push to Google Calendar) so no
+  // events are created in the user's calendar without explicit action.
+  return { ...result, syncedEvents: 0 };
 }
 
   // Push every active LMS event to the user's connected Google Calendar.
@@ -292,8 +330,10 @@ async function handleCallback(code, userId) {
 
 // Fully disconnect a user: remove synced events from Google Calendar, revoke the
 // OAuth token, and delete all stored tokens/mappings locally.
+// Returns { userId, provider, removedEvents }.
 async function disconnectUser(userId) {
   const token = await calendarModel.getToken(userId, PROVIDER).catch(() => null);
+  let removedEvents = 0;
 
   // Best-effort: remove events we created from the user's Google Calendar.
   if (token && token.access_token) {
@@ -313,6 +353,7 @@ async function disconnectUser(userId) {
             calendarId: map.google_calendar_id || 'primary',
             eventId: map.google_event_id,
           });
+          removedEvents += 1;
         } catch {
           // already gone or no permission; continue
         }
@@ -337,7 +378,7 @@ async function disconnectUser(userId) {
 
   await calendarModel.deleteToken(userId, PROVIDER);
   await calendarModel.deleteMapByUser(userId);
-  return { userId, provider: PROVIDER };
+  return { userId, provider: PROVIDER, removedEvents };
 }
 
 module.exports = {

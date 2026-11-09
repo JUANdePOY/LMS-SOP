@@ -3,10 +3,13 @@ import { Calendar, Check, Loader2, Unlink, AlertCircle } from "lucide-react";
 import { Modal } from "@/shared/components/ui/modal";
 import CalendarSyncSummary from "./CalendarSyncSummary";
 
-export default function GoogleCalendarModal({ open, onClose, calendar, onConnect, onDisconnect, onConnectStart, eventsCount = 0, syncPhase = "unavailable", syncedCount = 0, failedCount = 0 }) {
+export default function GoogleCalendarModal({ open, onClose, calendar, onConnect, onDisconnect, onConnectStart, eventsCount = 0, syncPhase = "unavailable" }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const { status, connect, disconnect } = calendar;
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const { status, connect, disconnect, syncingIds } = calendar;
+
+  const syncedEventCount = Object.values(syncingIds).filter((s) => s === "synced").length;
 
   // The connect() promise can occasionally lag (slow Google API / bulk sync).
   // Once the backend reports connected, stop the button spinner immediately so
@@ -54,6 +57,7 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
       setError(err.message || "Failed to disconnect");
     } finally {
       setBusy(false);
+      setConfirmDisconnect(false);
     }
   };
 
@@ -61,11 +65,38 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
     <div className="flex justify-end gap-2">
       <button
         onClick={onClose}
-        disabled={busy}
-        className="rounded-lg px-3 py-1.5 text-xs border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+        disabled={busy || confirmDisconnect}
+        className="rounded-lg px-3 py-1.5 text-xs border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-50"
       >
         Close
       </button>
+    </div>
+  );
+
+  const disconnectConfirm = (
+    <div className="space-y-3">
+      <p className="text-sm text-neutral-900 dark:text-neutral-100">
+        Removing this integration will delete <span className="font-semibold">{syncedEventCount}</span> event{syncedEventCount === 1 ? "" : "s"} from your Google Calendar and revoke access.
+      </p>
+      <p className="text-xs text-neutral-500 dark:text-neutral-400">
+        This cannot be undone. You can re-connect and re-sync events later.
+      </p>
+      <div className="flex justify-end gap-2 pt-2">
+        <button
+          onClick={() => setConfirmDisconnect(false)}
+          className="rounded-lg px-3 py-1.5 text-xs border border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleDisconnect}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 dark:border-red-500/40 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-50"
+        >
+          {busy ? <Loader2 size={14} className="animate-spin" /> : <Unlink size={14} />}
+          Remove
+        </button>
+      </div>
     </div>
   );
 
@@ -81,8 +112,7 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
               Sync LMS events to your calendar
             </p>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-              Connect your Google account to add events to your personal Google Calendar.
-              LMS events are the source of truth; updates here sync automatically.
+              Connect your Google account, then choose which events to add to your personal Google Calendar.
             </p>
           </div>
         </div>
@@ -98,11 +128,10 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
             <CalendarSyncSummary
               phase={syncPhase}
               totalEvents={eventsCount}
-              syncedCount={syncedCount}
-              failedCount={failedCount}
+              syncedCount={syncedEventCount}
             />
             <button
-              onClick={handleDisconnect}
+              onClick={() => setConfirmDisconnect(true)}
               disabled={busy}
               className="inline-flex items-center gap-1.5 rounded-lg border border-red-300 dark:border-red-500/40 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 disabled:opacity-50"
             >
@@ -120,6 +149,8 @@ export default function GoogleCalendarModal({ open, onClose, calendar, onConnect
             Connect Google Calendar
           </button>
         )}
+
+        {confirmDisconnect && disconnectConfirm}
 
         {error && (
           <div className="flex items-center gap-2 rounded-md bg-red-50 dark:bg-red-500/10 px-3 py-2">
