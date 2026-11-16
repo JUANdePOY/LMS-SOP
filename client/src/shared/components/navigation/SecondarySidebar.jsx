@@ -209,9 +209,11 @@ export default function SecondarySidebar({ collapsed = false }) {
             businesses: (c.businesses || []).filter((u) => employeeBusinessIds.has(Number(u.id))),
           });
         }
-        return Array.from(bizMap.values());
+        const result = Array.from(bizMap.values());
+        if (result.length > 0) return result;
       }
-      return [];
+      // No task-assigned clients found (e.g. newly assigned, or tasks without
+      // a client link). Fall through to show the employee's own SOP business.
     }
     if (employeeBusinessId != null) {
       return businesses.filter((b) => Number(b.id) === Number(employeeBusinessId) && b.status !== 'archived');

@@ -16,6 +16,27 @@ function getProjectId(task) {
   return task?.project_id ?? task?.projectId ?? task?.project?.id ?? null;
 }
 
+const getAssigneeFilterKey = (assignment) =>
+  `${assignment.assignment_type || 'Unknown'}:${assignment.reference_id ?? assignment.reference_name ?? ''}`;
+
+const BUSINESS_CATEGORIES = [
+  { key: 'all', label: 'All' },
+  { key: 'orders', label: 'Orders' },
+  { key: 'va', label: 'VA Clients' },
+  { key: 'local_seo', label: 'Local SEO Clients' },
+  { key: 'full_seo', label: 'Full SEO Clients' },
+  { key: 'archived', label: 'Archived' },
+];
+
+const BUSINESS_STATUSES = [
+  { key: 'all', label: 'Business Statuses' },
+  { key: 'active', label: 'Active' },
+  { key: 'inactive', label: 'Inactive' },
+  { key: 'paused', label: 'Paused' },
+  { key: 'stopped', label: 'Stopped' },
+  { key: 'cancelled', label: 'Cancelled' },
+];
+
 export default function MyTasksPage() {
   const { isDepartmentHead, user, hasPermission } = useAuth();
   const { toast } = useToast();
@@ -25,6 +46,9 @@ export default function MyTasksPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [businessCategory, setBusinessCategory] = useState('all');
+  const [businessStatusFilter, setBusinessStatusFilter] = useState('all');
   const [hierarchy, setHierarchy] = useState({ tasks: [], projectsById: {}, clientTree: [] });
   const hierarchyRef = useRef(hierarchy);
   useEffect(() => { hierarchyRef.current = hierarchy; }, [hierarchy]);
@@ -91,6 +115,23 @@ export default function MyTasksPage() {
     [unreadTaskNotifications]
   );
 
+  const assigneeOptions = useMemo(() => {
+    const options = new Map([
+      ['__me__', { value: '__me__', label: 'Assigned to me' }],
+    ]);
+    (tasks || []).forEach((t) => (t.assignments || []).forEach((a) => {
+      if (a.reference_name) {
+        const value = getAssigneeFilterKey(a);
+        if (!options.has(value)) options.set(value, { value, label: a.reference_name });
+      }
+    }));
+    return [...options.values()].sort((a, b) => {
+      if (a.value === '__me__') return -1;
+      if (b.value === '__me__') return 1;
+      return a.label.localeCompare(b.label);
+    });
+  }, [tasks]);
+
   const scopedProjectsById = useMemo(() => {
     if (!scope || !scope.projectId) return hierarchy.projectsById;
     const p = hierarchy.projectsById[String(scope.projectId)];
@@ -105,18 +146,29 @@ export default function MyTasksPage() {
       if (statusFilter === 'Overdue') {
         result = result.filter((t) => isOverdue(t));
       } else {
-        result = result.filter((t) => (t.status || '') === statusFilter && !isOverdue(t));
+        const terminalStatuses = ['Completed', 'Cancelled', 'Archived'];
+        result = result.filter(
+          (t) => (t.status || '') === statusFilter && (terminalStatuses.includes(statusFilter) || !isOverdue(t))
+        );
       }
     }
     if (priorityFilter) {
       result = result.filter((t) => (t.priority || '') === priorityFilter);
+    }
+    if (assigneeFilter) {
+      if (assigneeFilter === '__me__') {
+        const uid = String(user?.id);
+        result = result.filter((t) => (t.assignments || []).some((a) => a.reference_id != null && String(a.reference_id) === uid));
+      } else {
+        result = result.filter((t) => (t.assignments || []).some((a) => getAssigneeFilterKey(a) === assigneeFilter));
+      }
     }
     const q = search.trim().toLowerCase();
     if (q) {
       result = result.filter((t) => (t.title || '').toLowerCase().includes(q));
     }
     return result;
-  }, [tasks, statusFilter, priorityFilter, search]);
+  }, [tasks, statusFilter, priorityFilter, assigneeFilter, search, user]);
 
   const scopedTasks = useMemo(() => {
     let result = displayedTasks;
@@ -154,7 +206,19 @@ export default function MyTasksPage() {
     if (sopBusinessScope) {
       tree = tree.filter((c) => String(c.business_id) === String(sopBusinessScope));
     }
-    const filtersActive = search || statusFilter || priorityFilter;
+    const filtersActive = search || statusFilter || priorityFilter || assigneeFilter || businessCategory !== 'all' || businessStatusFilter !== 'all';
+    const categoryOnly = businessCategory && businessCategory !== 'all' && businessCategory !== 'archived';
+    const statusOnly = businessStatusFilter && businessStatusFilter !== 'all';
+
+    const matchBusiness = (b) => {
+      let match = true;
+      if (businessCategory === 'archived') match = b.status === 'archived';
+      else if (categoryOnly) match = b.category === businessCategory && b.status !== 'archived';
+      else match = b.status !== 'archived';
+      if (match && statusOnly) match = b.status === businessStatusFilter;
+      return match;
+    };
+
     if (scope) {
       const base = tree
         .filter((c) => !scope.clientId || String(c.id) === String(scope.clientId))
@@ -164,26 +228,44 @@ export default function MyTasksPage() {
             (b) => !scope.businessId || String(b.id) === String(scope.businessId)
           ),
         }));
-      if (filtersActive && matchingBusinessIds.size > 0) {
+      if (filtersActive) {
         return base
           .map((c) => ({
             ...c,
-            businesses: (c.businesses || []).filter((b) => matchingBusinessIds.has(String(b.id))),
+            businesses: (c.businesses || []).filter((b) => matchingBusinessIds.has(String(b.id)) && matchBusiness(b)),
           }))
-          .filter((c) => c.businesses.length > 0);
+          .filter((c) => c.businesses.length > 0 || c.business_id != null);
       }
       return base;
     }
-    if (filtersActive && matchingBusinessIds.size > 0) {
+    if (filtersActive) {
       return tree
         .map((c) => ({
           ...c,
-          businesses: (c.businesses || []).filter((b) => matchingBusinessIds.has(String(b.id))),
+          businesses: (c.businesses || []).filter((b) => matchingBusinessIds.has(String(b.id)) && matchBusiness(b)),
         }))
-        .filter((c) => c.businesses.length > 0);
+        .filter((c) => c.businesses.length > 0 || c.business_id != null);
     }
     return tree;
-  }, [hierarchy.clientTree, scope, sopBusinessScope, matchingBusinessIds, search, statusFilter, priorityFilter]);
+  }, [hierarchy.clientTree, scope, sopBusinessScope, matchingBusinessIds, search, statusFilter, priorityFilter, assigneeFilter, businessCategory, businessStatusFilter]);
+
+  const clearFilters = useCallback(() => {
+    setSearch('');
+    setStatusFilter('');
+    setPriorityFilter('');
+    setAssigneeFilter('');
+    setBusinessCategory('all');
+    setBusinessStatusFilter('all');
+  }, []);
+
+  const hasActiveFilters = Boolean(
+    search.trim() ||
+    statusFilter ||
+    priorityFilter ||
+    assigneeFilter ||
+    businessCategory !== 'all' ||
+    businessStatusFilter !== 'all'
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -289,7 +371,7 @@ export default function MyTasksPage() {
   useEffect(() => {
     const timeout = setTimeout(() => load(), 300);
     return () => clearTimeout(timeout);
-  }, [search, statusFilter, priorityFilter, load]);
+  }, [search, statusFilter, priorityFilter, assigneeFilter, businessCategory, businessStatusFilter, load]);
 
   const statItems = useMemo(() => {
     const list = scopedTasks || [];
@@ -297,19 +379,19 @@ export default function MyTasksPage() {
     const overdue = list.filter((t) => isOverdue(t)).length;
     const completed = list.filter((t) => t.status === 'Completed').length;
     const pending = list.filter((t) => t.status === 'Pending' || t.status === 'In Progress').length;
+    const archived = list.filter((t) => t.status === 'Archived').length;
     return [
       { label: 'Total', value: total, icon: ClipboardList },
       { label: 'Active', value: pending, icon: Clock },
       { label: 'Completed', value: completed, icon: CheckCircle },
       { label: 'Overdue', value: overdue, icon: AlertTriangle },
+      { label: 'Archived', value: archived, icon: X },
     ];
   }, [scopedTasks]);
 
   if (canManageTasks) {
     return <div className="text-sm text-[var(--ppm-text-muted)]">Use the Tasks page to manage all tasks.</div>;
   }
-
-  const hasActiveFilters = search || statusFilter || priorityFilter;
 
   return (
     <div className="ppm max-w-6xl mx-auto">
@@ -351,6 +433,17 @@ export default function MyTasksPage() {
         priorityFilter={priorityFilter}
         onPriority={setPriorityFilter}
         priorityOptions={TASK_PRIORITIES}
+        assigneeFilter={assigneeFilter}
+        onAssignee={setAssigneeFilter}
+        assigneeOptions={assigneeOptions}
+        categories={BUSINESS_CATEGORIES}
+        onCategory={setBusinessCategory}
+        activeCategory={businessCategory}
+        businessStatusFilter={businessStatusFilter}
+        onBusinessStatus={setBusinessStatusFilter}
+        businessStatusOptions={BUSINESS_STATUSES}
+        hasActiveFilters={hasActiveFilters}
+        onClear={clearFilters}
       />
 
       {error && (

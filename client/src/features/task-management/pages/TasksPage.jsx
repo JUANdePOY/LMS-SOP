@@ -575,22 +575,11 @@ export default function TasksPage() {
   }, [tasks, search, statusFilter, priorityFilter, assigneeFilter, user, clientParam, businessParam, projectsById, scopedClientIdsForBusiness, isDepartmentHead, clientTree]);
 
   const selectableTasks = useMemo(() => {
-    const archivedBizIds = new Set();
-    for (const client of clientTree || []) {
-      for (const business of client.businesses || []) {
-        if (String(business?.status).toLowerCase() === 'archived') {
-          archivedBizIds.add(String(business.id));
-        }
-      }
-    }
     return (displayedTasks || []).filter((t) => {
       const isParent = t.parent_task_id == null || t.parent_task_id === '';
-      const isTaskArchived = String(t.status || '').toLowerCase() === 'archived';
-      const bizId = t.client_business_id != null ? String(t.client_business_id) : (projectsById[String(t.project_id ?? t.projectId ?? t.project?.id)]?.client_business_id != null ? String(projectsById[String(t.project_id ?? t.projectId ?? t.project?.id)]?.client_business_id) : null);
-      const isBizArchived = bizId != null && archivedBizIds.has(bizId);
-      return isParent && !isTaskArchived && !isBizArchived;
+      return isParent;
     });
-  }, [displayedTasks, clientTree, projectsById]);
+  }, [displayedTasks]);
 
   const matchingBusinessIds = useMemo(() => {
     const ids = new Set();
@@ -669,22 +658,7 @@ export default function TasksPage() {
     const statusOnly = businessStatusFilter && businessStatusFilter !== 'all';
 
     if (!archivedOnly && !categoryOnly && !statusOnly) {
-      const archivedBizIds = new Set();
-      for (const client of scopedClientTree || []) {
-        for (const business of client.businesses || []) {
-          if (business.status === 'archived') {
-            archivedBizIds.add(String(business.id));
-          }
-        }
-      }
-      if (archivedBizIds.size === 0) return displayedTasks;
-      return displayedTasks.filter((t) => {
-        const pid = t.project_id ?? t.projectId ?? t.project?.id;
-        const proj = pid != null ? projectsById[String(pid)] : null;
-        const bid = t.client_business_id != null ? String(t.client_business_id) : (proj?.client_business_id != null ? String(proj.client_business_id) : null);
-        if (bid == null) return true;
-        return !archivedBizIds.has(bid);
-      });
+      return displayedTasks;
     }
 
     const businessMatch = new Map();
@@ -717,19 +691,18 @@ export default function TasksPage() {
     const tree = (businessCategory && businessCategory !== 'all') ? categoryFilteredClientTree : clientTree;
     if (!tree || tree.length === 0) return new Set();
     const ids = new Set();
-    const isArchived = (b) => String(b?.status).toLowerCase() === 'archived';
     if (clientParam) {
       for (const client of tree) {
         if (String(client.id) === String(clientParam)) {
           for (const business of client.businesses || []) {
-            if (!isArchived(business)) ids.add(String(business.id));
+            ids.add(String(business.id));
           }
         }
       }
     } else if (businessParam) {
       for (const client of tree) {
         for (const business of client.businesses || []) {
-          if (String(business.id) === String(businessParam) && !isArchived(business)) {
+          if (String(business.id) === String(businessParam)) {
             ids.add(String(business.id));
           }
         }
@@ -738,7 +711,7 @@ export default function TasksPage() {
       for (const client of tree) {
         for (const business of client.businesses || []) {
           for (const task of business.tasks || []) {
-            if (String(task.project_id ?? task.projectId ?? task.project?.id) === String(projectParam) && !isArchived(business)) {
+            if (String(task.project_id ?? task.projectId ?? task.project?.id) === String(projectParam)) {
               ids.add(String(business.id));
             }
           }
@@ -747,7 +720,7 @@ export default function TasksPage() {
     } else {
       for (const client of tree) {
         for (const business of client.businesses || []) {
-          if (!isArchived(business)) ids.add(String(business.id));
+          ids.add(String(business.id));
         }
       }
     }
@@ -1010,18 +983,7 @@ export default function TasksPage() {
     const task = (tasks || []).find((t) => String(t.id) === String(taskId));
     if (task) {
       const isParent = task.parent_task_id == null || task.parent_task_id === '';
-      const isTaskArchived = String(task.status || '').toLowerCase() === 'archived';
-      const bizId = task.client_business_id != null ? String(task.client_business_id) : (projectsById[String(task.project_id ?? task.projectId ?? task.project?.id)]?.client_business_id != null ? String(projectsById[String(task.project_id ?? task.projectId ?? task.project?.id)]?.client_business_id) : null);
-      const archivedBizIds = new Set();
-      for (const client of clientTree || []) {
-        for (const business of client.businesses || []) {
-          if (String(business?.status).toLowerCase() === 'archived') {
-            archivedBizIds.add(String(business.id));
-          }
-        }
-      }
-      const isBizArchived = bizId != null && archivedBizIds.has(bizId);
-      if (!isParent || isTaskArchived || isBizArchived) return;
+      if (!isParent) return;
     }
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -1030,7 +992,7 @@ export default function TasksPage() {
       else next.delete(key);
       return next;
     });
-  }, [tasks, clientTree, projectsById]);
+  }, [tasks]);
 
   const handleSelectAllBusinesses = useCallback((businessIds) => {
     let ids = Array.isArray(businessIds) ? businessIds : [];
@@ -1038,9 +1000,7 @@ export default function TasksPage() {
       const fallback = [];
       for (const client of scopedClientTree || []) {
         for (const business of client.businesses || []) {
-          if (String(business?.status).toLowerCase() !== 'archived') {
-            fallback.push(String(business.id));
-          }
+          fallback.push(String(business.id));
         }
       }
       ids = fallback;
