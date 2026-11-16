@@ -27,7 +27,9 @@ const envOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
   : [];
 
-const allowedOrigins = [...defaultOrigins, ...envOrigins];
+const appUrl = process.env.APP_URL ? process.env.APP_URL.trim() : '';
+
+const allowedOrigins = [...defaultOrigins, ...envOrigins, ...(appUrl ? [appUrl] : [])];
 
 app.use(cors({
   origin: function (origin, callback) {
