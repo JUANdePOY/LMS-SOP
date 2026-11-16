@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -25,12 +25,14 @@ export default function FilterBar({
   businessStatusFilter,
   onBusinessStatus,
   businessStatusOptions = [],
+  hasActiveFilters = false,
+  onClear,
   children,
   className,
   hideSearch = false,
 }) {
   const showSearch = !hideSearch;
-  const showFilters = statusOptions.length > 0 || onStatus || priorityOptions.length > 0 || onPriority || assigneeOptions.length > 0 || onAssignee || (Array.isArray(categories) && categories.length > 0) || children;
+  const showFilters = statusOptions.length > 0 || onStatus || priorityOptions.length > 0 || onPriority || assigneeOptions.length > 0 || onAssignee || businessStatusOptions.length > 0 || onBusinessStatus || (Array.isArray(categories) && categories.length > 0) || children || (onClear && hasActiveFilters);
 
   return (
     <div
@@ -114,11 +116,15 @@ export default function FilterBar({
               aria-label="Filter by assignee"
             >
               <option value="">All Assignees</option>
-              {assigneeOptions.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
+              {assigneeOptions.map((assignee) => {
+                const value = typeof assignee === 'string' ? assignee : assignee.value;
+                const label = typeof assignee === 'string' ? assignee : assignee.label;
+                return (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                );
+              })}
             </select>
           )}
 
@@ -138,6 +144,18 @@ export default function FilterBar({
           )}
 
           {children && <div className="flex items-center gap-2">{children}</div>}
+
+          {onClear && hasActiveFilters && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-[var(--ppm-border)] bg-[var(--bg-surface)] px-2.5 text-sm text-[var(--ppm-text-muted)] transition-colors hover:text-[var(--ppm-text)]"
+              aria-label="Clear all filters"
+            >
+              <X size={14} />
+              Clear filters
+            </button>
+          )}
         </div>
       )}
     </div>

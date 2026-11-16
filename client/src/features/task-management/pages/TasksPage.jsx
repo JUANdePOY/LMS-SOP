@@ -39,6 +39,9 @@ const BUSINESS_CATEGORIES = [
   { key: 'archived', label: 'Archived' },
 ];
 
+const getAssigneeFilterKey = (assignment) =>
+  `${assignment.assignment_type || 'Unknown'}:${assignment.reference_id ?? assignment.reference_name ?? ''}`;
+
 
 export default function TasksPage() {
   const { isDepartmentHead, user, hasPermission } = useAuth();
@@ -61,7 +64,7 @@ export default function TasksPage() {
   const canManageClients = hasPermission('manage_clients');
 
   const BUSINESS_STATUSES = [
-    { key: 'all', label: 'All Statuses' },
+    { key: 'all', label: 'Business Statuses' },
     { key: 'active', label: 'Active' },
     { key: 'inactive', label: 'Inactive' },
     { key: 'paused', label: 'Paused' },
@@ -74,7 +77,7 @@ export default function TasksPage() {
   }, [markEntityTypeRead]);
 
   const filters = useMemo(
-    () => ({ search, priority: priorityFilter, assignee: assigneeFilter }),
+    () => ({ search: search.trim(), priority: priorityFilter, assignee: assigneeFilter }),
     [search, priorityFilter, assigneeFilter]
   );
 
@@ -93,6 +96,15 @@ export default function TasksPage() {
   const [selectedBusinessIds, setSelectedBusinessIds] = useState(() => new Set());
   const [showAddClient, setShowAddClient] = useState(false);
   const [bulkUploadContext, setBulkUploadContext] = useState(null);
+
+  const clearFilters = useCallback(() => {
+    setSearch('');
+    setStatusFilter('');
+    setPriorityFilter('');
+    setAssigneeFilter('');
+    setBusinessCategory('all');
+    setBusinessStatusFilter('all');
+  }, []);
 
   const handleOpenBulkUpload = useCallback((ctx) => {
     setBulkUploadContext(ctx);
@@ -442,11 +454,20 @@ export default function TasksPage() {
   }, [filters, canManageTasks, refreshTasks, statusFilter]);
 
   const assigneeOptions = useMemo(() => {
-    const seen = new Set();
+    const options = new Map([
+      ['__me__', { value: '__me__', label: 'Assigned to me' }],
+    ]);
     (tasks || []).forEach((t) => (t.assignments || []).forEach((a) => {
-      if (a.reference_name) seen.add(a.reference_name);
+      if (a.reference_name) {
+        const value = getAssigneeFilterKey(a);
+        if (!options.has(value)) options.set(value, { value, label: a.reference_name });
+      }
     }));
-    return [...seen].sort();
+    return [...options.values()].sort((a, b) => {
+      if (a.value === '__me__') return -1;
+      if (b.value === '__me__') return 1;
+      return a.label.localeCompare(b.label);
+    });
   }, [tasks]);
 
   const scopedClientIdsForBusiness = useMemo(() => {
@@ -523,11 +544,11 @@ export default function TasksPage() {
     if (projectParam) {
       result = result.filter((t) => String(t.project_id ?? t.projectId ?? t.project?.id) === String(projectParam));
     }
-    if (search) {
-      const q = search.toLowerCase();
+    const query = search.trim().toLowerCase();
+    if (query) {
       result = result.filter((t) =>
-        (t.title || '').toLowerCase().includes(q) ||
-        (t.description || '').replace(/<[^>]*>/g, '').toLowerCase().includes(q)
+        (t.title || '').toLowerCase().includes(query) ||
+        (t.description || '').replace(/<[^>]*>/g, '').toLowerCase().includes(query)
       );
     }
     if (statusFilter) {
@@ -547,7 +568,7 @@ export default function TasksPage() {
         const uid = String(user?.id);
         result = result.filter((t) => (t.assignments || []).some((a) => a.reference_id != null && String(a.reference_id) === uid));
       } else {
-        result = result.filter((t) => (t.assignments || []).some((a) => a.reference_name === assigneeFilter));
+        result = result.filter((t) => (t.assignments || []).some((a) => getAssigneeFilterKey(a) === assigneeFilter));
       }
     }
     return result;
@@ -733,7 +754,14 @@ export default function TasksPage() {
     return ids;
   }, [clientTree, categoryFilteredClientTree, businessCategory, clientParam, businessParam, projectParam]);
 
-  const hasActiveFilters = search || statusFilter || priorityFilter || assigneeFilter || businessStatusFilter && businessStatusFilter !== 'all';
+  const hasActiveFilters = Boolean(
+    search.trim() ||
+    statusFilter ||
+    priorityFilter ||
+    assigneeFilter ||
+    businessCategory !== 'all' ||
+    businessStatusFilter !== 'all'
+  );
 
   const filteredClientName = useMemo(() => {
     if (!clientParam) return null;
@@ -1327,6 +1355,8 @@ export default function TasksPage() {
         businessStatusFilter={businessStatusFilter}
         onBusinessStatus={setBusinessStatusFilter}
         businessStatusOptions={BUSINESS_STATUSES}
+        hasActiveFilters={hasActiveFilters}
+        onClear={clearFilters}
       />
 
       {error && (
