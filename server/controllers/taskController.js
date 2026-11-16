@@ -147,7 +147,8 @@ const taskController = {
         return res.status(400).json({ success: false, message: 'Invalid task ID', code: 'VALIDATION_ERROR' });
       }
       // Only assignees (or admins) may update a task's progress.
-      const allowed = await taskService.isUserAssignedToTask(taskId, req.user).catch(() => false);
+      const allowed = await taskService.isUserAssignedToTask(taskId, req.user).catch(() => false)
+        || await taskService.isTaskEditableByManager(req.user.id, taskId).catch(() => false);
       if (!allowed) {
         return res.status(403).json({ success: false, code: 'FORBIDDEN', message: "You don't have access to this task." });
       }
@@ -272,7 +273,8 @@ const taskController = {
       const payload = { task_id: req.params.taskId, ...req.body };
       const taskId = parseInt(req.params.taskId, 10);
       // Only assignees (or admins) may comment on a task.
-      const allowed = await taskService.isUserAssignedToTask(taskId, req.user).catch(() => false);
+      const allowed = await taskService.isUserAssignedToTask(taskId, req.user).catch(() => false)
+        || await taskService.isTaskEditableByManager(req.user.id, taskId).catch(() => false);
       if (!allowed) {
         return res.status(403).json({ success: false, code: 'FORBIDDEN', message: "You don't have access to this task." });
       }
@@ -327,7 +329,8 @@ const taskController = {
         return res.status(400).json({ success: false, message: 'Invalid task ID', code: 'VALIDATION_ERROR' });
       }
       // Only assignees (or admins) may attach files to a task.
-      const allowed = await taskService.isUserAssignedToTask(taskId, req.user).catch(() => false);
+      const allowed = await taskService.isUserAssignedToTask(taskId, req.user).catch(() => false)
+        || await taskService.isTaskEditableByManager(req.user.id, taskId).catch(() => false);
       if (!allowed) {
         return res.status(403).json({ success: false, code: 'FORBIDDEN', message: "You don't have access to this task." });
       }

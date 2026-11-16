@@ -53,12 +53,15 @@ export default function TasksPage() {
   const clientParam = searchParams.get('client');
   const businessParam = searchParams.get('business');
   const projectParam = searchParams.get('project');
+  const statusParam = searchParams.get('status') || '';
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(statusParam);
   const [priorityFilter, setPriorityFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [businessCategory, setBusinessCategory] = useState('all');
   const [businessStatusFilter, setBusinessStatusFilter] = useState('all');
+  const taskParam = searchParams.get('task');
+  const [taskFilter] = useState(taskParam || '');
 
   const canManageTasks = hasPermission('manage_tasks');
   const canManageClients = hasPermission('manage_clients');
@@ -81,7 +84,7 @@ export default function TasksPage() {
     [search, priorityFilter, assigneeFilter]
   );
 
-  const { tasks, loading, error, stats, refreshTasks, refreshStats, patchTask, create, update, remove } = useTasks(filters);
+  const { tasks, loading, error, stats, refreshTasks, refreshStats, refresh, patchTask, create, update, remove } = useTasks(filters);
   const [showForm, setShowForm] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -105,6 +108,19 @@ export default function TasksPage() {
     setBusinessCategory('all');
     setBusinessStatusFilter('all');
   }, []);
+
+  useEffect(() => {
+    setStatusFilter(statusParam);
+  }, [statusParam]);
+
+  // Open the task detail panel when a notification link brings the user here
+  // with a ?task=<id> query parameter.
+  useEffect(() => {
+    const taskParam = searchParams.get('task');
+    if (taskParam && !viewingTaskId) {
+      setViewingTaskId(taskParam);
+    }
+  }, [searchParams, viewingTaskId]);
 
   const handleOpenBulkUpload = useCallback((ctx) => {
     setBulkUploadContext(ctx);
@@ -453,6 +469,14 @@ export default function TasksPage() {
     return () => clearTimeout(timeout);
   }, [filters, canManageTasks, refreshTasks, statusFilter]);
 
+  // Auto-refresh task data every 30 seconds so stat cards and task lists stay
+  // in sync with changes made by other users or in other tabs.
+  useEffect(() => {
+    if (!canManageTasks) return;
+    const interval = setInterval(() => refresh(), 30000);
+    return () => clearInterval(interval);
+  }, [canManageTasks, refresh]);
+
   const assigneeOptions = useMemo(() => {
     const options = new Map([
       ['__me__', { value: '__me__', label: 'Assigned to me' }],
@@ -553,7 +577,7 @@ export default function TasksPage() {
     }
     if (statusFilter) {
       if (statusFilter === 'Overdue') {
-        result = result.filter((t) => isOverdue(t));
+        result = result.filter((t) => isOverdue(t) || t.status === 'Overdue');
       } else if (statusFilter === 'Archived') {
         result = result.filter((t) => (t.status || '') === 'Archived');
       } else {
@@ -562,6 +586,9 @@ export default function TasksPage() {
     }
     if (priorityFilter) {
       result = result.filter((t) => t.priority === priorityFilter);
+    }
+    if (taskFilter) {
+      result = result.filter((t) => String(t.id) === String(taskFilter));
     }
     if (assigneeFilter) {
       if (assigneeFilter === '__me__') {
@@ -572,7 +599,7 @@ export default function TasksPage() {
       }
     }
     return result;
-  }, [tasks, search, statusFilter, priorityFilter, assigneeFilter, user, clientParam, businessParam, projectsById, scopedClientIdsForBusiness, isDepartmentHead, clientTree]);
+  }, [tasks, search, statusFilter, priorityFilter, taskFilter, assigneeFilter, user, clientParam, businessParam, projectsById, scopedClientIdsForBusiness, isDepartmentHead, clientTree]);
 
   const selectableTasks = useMemo(() => {
     return (displayedTasks || []).filter((t) => {
@@ -625,7 +652,7 @@ export default function TasksPage() {
       });
     }
     const filtersActive = search || statusFilter || priorityFilter || assigneeFilter;
-    if (!clientParam && !businessParam && !projectParam && filtersActive && matchingBusinessIds.size > 0) {
+    if (!clientParam && !businessParam && !projectParam && filtersActive) {
       result = result.map((c) => {
         if (!c.businesses || c.businesses.length === 0) return c;
         const businesses = c.businesses.filter((b) => matchingBusinessIds.has(String(b.id)));
@@ -809,7 +836,7 @@ export default function TasksPage() {
     const pending = list.filter((t) => t.status === 'Pending').length;
     const inProgress = list.filter((t) => t.status === 'In Progress').length;
     const completed = list.filter((t) => t.status === 'Completed').length;
-    const overdue = list.filter((t) => isOverdue(t)).length;
+    const overdue = list.filter((t) => isOverdue(t) || t.status === 'Overdue').length;
     const cancelled = list.filter((t) => t.status === 'Cancelled').length;
     return [
       { label: 'Total', value: total, icon: ClipboardList },

@@ -10,6 +10,7 @@
 const SESSION_PREFIX = 'lms_session_';
 const REGISTRY_KEY = 'lms_sessions';
 const ACTIVE_KEY = 'lms_active_session';
+const LAST_SESSION_KEY = 'lms_last_session';
 
 function getTabId() {
   let tabId = sessionStorage.getItem('lms_tab_id');
@@ -98,12 +99,12 @@ export function saveCurrentSession(token, user, refreshToken) {
   };
   writeSession(tabId, session);
   setActiveSessionId(tabId);
+  localStorage.setItem(LAST_SESSION_KEY, tabId);
   return tabId;
 }
 
-// Read the session owned by THIS tab. Each tab is fully isolated, so a new
-// tab always starts unauthenticated (showing the login page) even if another
-// tab is already logged in — letting you log in a different account there.
+// Prefer this tab's session, then resume the most recently used session when
+// the browser has discarded its per-tab sessionStorage.
 export function getCurrentSession() {
   const tabId = getTabId();
   const ownSession = readSession(tabId);
@@ -116,6 +117,17 @@ export function getCurrentSession() {
     const session = readSession(activeId);
     if (session) return session;
   }
+
+  const lastSessionId = localStorage.getItem(LAST_SESSION_KEY);
+  if (lastSessionId) {
+    const session = readSession(lastSessionId);
+    if (session) {
+      setActiveSessionId(lastSessionId);
+      return session;
+    }
+    localStorage.removeItem(LAST_SESSION_KEY);
+  }
+
   return null;
 }
 
@@ -142,8 +154,11 @@ export function switchSession(tabId) {
 // This logs the current tab out without promoting another tab's session
 // as active — each tab keeps its own isolated session.
 export function clearCurrentSession(tabId) {
-  const id = tabId || getTabId();
+  const id = tabId || getActiveSessionId() || getTabId();
   removeSession(id);
+  if (localStorage.getItem(LAST_SESSION_KEY) === id) {
+    localStorage.removeItem(LAST_SESSION_KEY);
+  }
   if (getActiveSessionId() === id) {
     setActiveSessionId(null);
   }
@@ -154,5 +169,6 @@ export function clearAllSessions() {
   const registry = readRegistry();
   Object.keys(registry).forEach((id) => localStorage.removeItem(sessionKey(id)));
   localStorage.removeItem(REGISTRY_KEY);
+  localStorage.removeItem(LAST_SESSION_KEY);
   sessionStorage.removeItem(ACTIVE_KEY);
 }

@@ -9,7 +9,7 @@ const REMINDER_WINDOWS = {
   almost_due_1d: { days: 1, flag: 'reminder_1d_sent', priority: 3, type: 'warning' },
 };
 
-const OVERDUE_GRACE_MS = 5 * 60 * 60 * 1000; // 5 min grace before flagging overdue
+const OVERDUE_GRACE_MS = 5 * 60 * 1000; // 5 min grace before flagging overdue
 
 function isExpiredNotification(notification) {
   return Boolean(notification && notification.expires_at && new Date() > new Date(notification.expires_at));

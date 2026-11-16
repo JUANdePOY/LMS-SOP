@@ -44,11 +44,12 @@ export function AuthProvider({ children }) {
 
     if (currentSession?.token && currentSession?.user) {
       try {
-        api.get('/auth/profile', { skipAuthRedirect: true })
+        api.get('/auth/profile')
           .then(response => {
             if (response.data?.status === 'success' && response.data?.data) {
               const verifiedUser = normalizeUser(response.data.data);
-              session.saveCurrentSession(currentSession.token, verifiedUser);
+              const latestSession = session.getCurrentSession() || currentSession;
+              session.saveCurrentSession(latestSession.token, verifiedUser, latestSession.refreshToken);
               setUser(verifiedUser);
             } else {
               throw new Error('Invalid response');
@@ -190,7 +191,7 @@ export function AuthProvider({ children }) {
       const updated = { ...prev, ...updates };
       const currentSession = session.getCurrentSession();
       if (currentSession?.token) {
-        session.saveCurrentSession(currentSession.token, updated);
+        session.saveCurrentSession(currentSession.token, updated, currentSession.refreshToken);
       }
       return updated;
     });

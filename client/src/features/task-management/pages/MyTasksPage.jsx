@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/shared/components/ui/Toast';
-import { useNotifications } from '@/shared/stores/notificationStore.js';
+import { useNotifications, useNotificationPoller } from '@/shared/stores/notificationStore.js';
 import { getMyTaskHierarchy, updateProgress, updateTask } from '../services/taskService';
 import { TASK_STATUSES, TASK_PRIORITIES } from '../constants/taskConstants';
 import Breadcrumb from '../components/Breadcrumb';
@@ -40,11 +40,12 @@ const BUSINESS_STATUSES = [
 export default function MyTasksPage() {
   const { isDepartmentHead, user, hasPermission } = useAuth();
   const { toast } = useToast();
-  const { notifications, markRead } = useNotifications();
+  const { notifications, markRead, refresh } = useNotifications();
   const [searchParams, setSearchParams] = useSearchParams();
   const focusTaskId = searchParams.get('task');
+  const statusParam = searchParams.get('status') || '';
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(statusParam);
   const [priorityFilter, setPriorityFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [businessCategory, setBusinessCategory] = useState('all');
@@ -63,6 +64,11 @@ export default function MyTasksPage() {
   // table to the single project tree that contains that task.
   const [scope, setScope] = useState(null);
   const [sopBusinessScope, setSopBusinessScope] = useState(null);
+  const taskParam = searchParams.get('task');
+  const [taskFilter] = useState(taskParam || '');
+  useEffect(() => {
+    setStatusFilter(statusParam);
+  }, [statusParam]);
   useEffect(() => {
     if (!focusTaskId) {
       setScope(null);
@@ -90,7 +96,10 @@ export default function MyTasksPage() {
   useEffect(() => {
     const clientId = searchParams.get('client');
     const businessId = searchParams.get('business');
-    if (focusTaskId) return;
+    if (focusTaskId) {
+      setViewingTaskId(focusTaskId);
+      return;
+    }
     if (clientId || businessId) {
       setScope({
         clientId: clientId || null,
@@ -100,7 +109,15 @@ export default function MyTasksPage() {
     } else {
       setScope(null);
     }
-  }, [searchParams, focusTaskId]);
+  }, [searchParams, focusTaskId, setViewingTaskId]);
+
+  // Poll for new notifications so assignment banners and unread counts stay
+  // current while the employee is on their My Tasks page.
+  useNotificationPoller();
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   // Identify tasks that still have an unread assignment notification so we can
   // surface a red "New" badge on each task row. The badge clears for a task once
@@ -114,6 +131,8 @@ export default function MyTasksPage() {
     () => new Set(unreadTaskNotifications.map((n) => String(n.entity_id))),
     [unreadTaskNotifications]
   );
+
+  const tasks = hierarchy.tasks;
 
   const assigneeOptions = useMemo(() => {
     const options = new Map([
@@ -138,13 +157,11 @@ export default function MyTasksPage() {
     return p ? { [scope.projectId]: p } : {};
   }, [hierarchy.projectsById, scope]);
 
-  const tasks = hierarchy.tasks;
-
   const displayedTasks = useMemo(() => {
     let result = tasks || [];
     if (statusFilter) {
       if (statusFilter === 'Overdue') {
-        result = result.filter((t) => isOverdue(t));
+        result = result.filter((t) => isOverdue(t) || t.status === 'Overdue');
       } else {
         const terminalStatuses = ['Completed', 'Cancelled', 'Archived'];
         result = result.filter(
@@ -183,8 +200,11 @@ export default function MyTasksPage() {
     if (scope && scope.projectId) {
       result = result.filter((t) => String(getProjectId(t)) === String(scope.projectId));
     }
+    if (taskFilter) {
+      result = result.filter((t) => String(t.id) === String(taskFilter));
+    }
     return result;
-  }, [displayedTasks, scope, sopBusinessScope, hierarchy.clientTree]);
+  }, [displayedTasks, scope, sopBusinessScope, hierarchy.clientTree, taskFilter]);
 
   const matchingBusinessIds = useMemo(() => {
     const ids = new Set();
@@ -234,7 +254,7 @@ export default function MyTasksPage() {
             ...c,
             businesses: (c.businesses || []).filter((b) => matchingBusinessIds.has(String(b.id)) && matchBusiness(b)),
           }))
-          .filter((c) => c.businesses.length > 0 || c.business_id != null);
+          .filter((c) => c.businesses.length > 0);
       }
       return base;
     }
@@ -244,7 +264,7 @@ export default function MyTasksPage() {
           ...c,
           businesses: (c.businesses || []).filter((b) => matchingBusinessIds.has(String(b.id)) && matchBusiness(b)),
         }))
-        .filter((c) => c.businesses.length > 0 || c.business_id != null);
+        .filter((c) => c.businesses.length > 0);
     }
     return tree;
   }, [hierarchy.clientTree, scope, sopBusinessScope, matchingBusinessIds, search, statusFilter, priorityFilter, assigneeFilter, businessCategory, businessStatusFilter]);
@@ -373,10 +393,18 @@ export default function MyTasksPage() {
     return () => clearTimeout(timeout);
   }, [search, statusFilter, priorityFilter, assigneeFilter, businessCategory, businessStatusFilter, load]);
 
+  // Auto-refresh task data every 30 seconds so stat cards and task lists stay
+  // in sync with changes made by other users or in other tabs.
+  useEffect(() => {
+    if (canManageTasks) return;
+    const interval = setInterval(() => load(), 30000);
+    return () => clearInterval(interval);
+  }, [canManageTasks, load]);
+
   const statItems = useMemo(() => {
     const list = scopedTasks || [];
     const total = list.length;
-    const overdue = list.filter((t) => isOverdue(t)).length;
+    const overdue = list.filter((t) => isOverdue(t) || t.status === 'Overdue').length;
     const completed = list.filter((t) => t.status === 'Completed').length;
     const pending = list.filter((t) => t.status === 'Pending' || t.status === 'In Progress').length;
     const archived = list.filter((t) => t.status === 'Archived').length;

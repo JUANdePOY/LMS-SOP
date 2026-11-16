@@ -121,7 +121,7 @@ export function useContextualBanners({ enabled = true } = {}) {
           variant: "critical",
           title: "Overdue task assigned to you",
           message: `“${task.title}” was assigned to you and is now overdue.`,
-          link: "/tasks/my",
+          link: "/tasks/my?status=Overdue",
           ctaLabel: "View task",
           priority: 20,
         });
@@ -142,7 +142,7 @@ export function useContextualBanners({ enabled = true } = {}) {
         variant: "critical",
         title: "Overdue tasks in the system",
         message: `${overdueCount} task${overdueCount !== 1 ? "s" : ""} ${overdueCount !== 1 ? "are" : "is"} currently overdue.`,
-        link: "/tasks",
+        link: "/tasks?status=Overdue",
         ctaLabel: "View tasks",
         priority: 20,
       },

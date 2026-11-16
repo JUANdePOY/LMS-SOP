@@ -336,8 +336,10 @@ async function getTask(id, actorId) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  let directlyAssigned = isAdmin;
-  if (!isAdmin) {
+  // Task creator can always view their own task (e.g. after creating a sub-task).
+  const isCreator = task.created_by === actorId;
+  let directlyAssigned = isAdmin || isCreator;
+  if (!isAdmin && !isCreator) {
     directlyAssigned = await isUserAssignedToTaskById(actorId, id);
     if (!directlyAssigned) {
       // Allow viewing any task that belongs to a project the user is assigned to,
@@ -349,21 +351,46 @@ async function getTask(id, actorId) {
       if (pid != null && assignedProjectIds.map(String).includes(String(pid))) {
         // allowed via project
       } else {
-        // Check if the user has any assignment in the same business as this task
+        // Check if the user has any direct assignment on this task, or is a
+        // business manager / department member for this task's business.
+        // Uses EXISTS (not scalar subqueries) so NULL department_id /
+        // position_title on the actor row never causes a missed match, and does
+        // not require client_business_id to be non-NULL so tasks without a
+        // business link are still viewable by their assignees.
         const actor = await getUser(actorId);
         const [bizCheck] = await db.query(
           `SELECT 1
            FROM tasks t
-           INNER JOIN task_assignments ta ON ta.task_id = t.id
-           WHERE t.client_business_id = ?
-             AND t.client_business_id IS NOT NULL
+           WHERE t.id = ?
              AND (
-               (ta.assignment_type = 'User' AND ta.reference_id = ?)
-               OR (ta.assignment_type = 'Department' AND ta.reference_id = ?)
-               OR (ta.assignment_type = 'Position' AND ta.reference_id = ?)
+               -- Direct assignment on this task (User / Department / Position)
+               EXISTS (
+                 SELECT 1 FROM task_assignments ta
+                 WHERE ta.task_id = t.id
+                 AND (
+                   ta.assignment_type = 'User' AND ta.reference_id = ?
+                   OR ta.assignment_type = 'Department' AND EXISTS (
+                     SELECT 1 FROM users u WHERE u.id = ? AND u.department_id = ta.reference_id
+                   )
+                   OR ta.assignment_type = 'Position' AND EXISTS (
+                     SELECT 1 FROM users u WHERE u.id = ? AND u.position_title = ta.reference_id
+                   )
+                 )
+               )
+               OR -- Business manager grant
+               EXISTS (
+                 SELECT 1 FROM business_managers bm
+                 WHERE bm.business_id = t.client_business_id AND bm.user_id = ?
+               )
+               OR -- Department membership grant
+               EXISTS (
+                 SELECT 1 FROM business_departments bd
+                 INNER JOIN department_members dm ON dm.department_id = bd.department_id AND dm.user_id = ?
+                 WHERE bd.business_id = t.client_business_id
+               )
              )
            LIMIT 1`,
-          [task.client_business_id, actorId, actor?.department_id, actor?.position_title]
+          [id, actorId, actorId, actorId, actorId, actorId]
         );
         if (!bizCheck.length) {
           const error = new Error('You are not authorized to view this task');
@@ -456,8 +483,8 @@ async function getTask(id, actorId) {
   //                  (User/Department/Position) assignee, or a granted business
   //                  manager of this task's business.
   const isAssigned = await isUserAssignedToTaskById(actorId, id);
-  const canEdit = isAdmin || task.created_by === actorId || await isTaskEditableByManager(actorId, id) || (effectiveAssigned && task.parent_task_id != null);
-  const canInteract = isAdmin || effectiveAssigned;
+  const canEdit = isAdmin || task.created_by === actorId || (effectiveAssigned && task.parent_task_id != null);
+  const canInteract = isAdmin || effectiveAssigned || await isTaskEditableByManager(actorId, id);
 
   return {
     ...task,
@@ -505,7 +532,7 @@ async function createTask(payload, actorId) {
       throw error;
     }
     const isAdmin = await isUserAdmin(actorId);
-    const canCreateSubtask = isAdmin || await isUserAssignedToTaskOrAncestor(actorId, parent_task_id);
+    const canCreateSubtask = isAdmin || await isUserAssignedToTaskOrAncestor(actorId, parent_task_id) || await isTaskEditableByManager(actorId, parent_task_id);
     if (!canCreateSubtask) {
       const error = new Error('You are not authorized to create a sub-task for this task');
       error.code = 'FORBIDDEN';
@@ -904,16 +931,30 @@ const MANAGER_ALLOWED_FIELDS = new Set([
 ]);
 
 async function isTaskEditableByManager(actorId, taskId) {
+  // A granted business manager or department member may edit any task in their
+  // business. Uses EXISTS (not scalar subqueries / LEFT JOINs) so NULL
+  // department_id or position_title on the actor row never causes a missed
+  // match, and the task's client_business_id just needs to match a business the
+  // actor manages or whose departments include them.
   const [rows] = await db.query(
     `SELECT 1
      FROM tasks t
-     LEFT JOIN business_managers bm ON bm.business_id = t.client_business_id AND bm.user_id = ?
-     LEFT JOIN business_departments bd ON bd.business_id = t.client_business_id
-       INNER JOIN department_members dm ON dm.department_id = bd.department_id AND dm.user_id = ?
-     WHERE t.id = ? AND t.client_business_id IS NOT NULL
-       AND (bm.user_id IS NOT NULL OR dm.user_id IS NOT NULL)
+     WHERE t.id = ?
+       AND (
+         -- Direct business manager grant
+         EXISTS (
+           SELECT 1 FROM business_managers bm
+           WHERE bm.business_id = t.client_business_id AND bm.user_id = ?
+         )
+         OR -- Department membership grant (any member of a granted department)
+         EXISTS (
+           SELECT 1 FROM business_departments bd
+           INNER JOIN department_members dm ON dm.department_id = bd.department_id AND dm.user_id = ?
+           WHERE bd.business_id = t.client_business_id
+         )
+       )
      LIMIT 1`,
-    [actorId, actorId, taskId]
+    [taskId, actorId, actorId]
   );
   return rows.length > 0;
 }
@@ -927,27 +968,12 @@ async function updateTask(id, payload, actorId) {
   }
 
   const isAdmin = await isUserAdmin(actorId);
-  // A granted business manager may edit any task in their business, even
-  // tasks created by other users — that's the whole point of the grant. They
-  // are restricted to the MANAGER_ALLOWED_FIELDS set below.
-  const isManager = !isAdmin && await isTaskEditableByManager(actorId, id);
-  const isAssigned = !isAdmin && !isManager ? await isUserAssignedToTaskOrAncestor(actorId, id) : false;
+  const isAssigned = !isAdmin ? await isUserAssignedToTaskOrAncestor(actorId, id) : false;
   const canEditSubtask = isAssigned && task.parent_task_id != null;
-  if (task.created_by !== actorId && !isAdmin && !isManager && !canEditSubtask) {
+  if (task.created_by !== actorId && !isAdmin && !canEditSubtask) {
     const error = new Error('You are not authorized to update this task');
     error.code = 'FORBIDDEN';
     throw error;
-  }
-  if (isManager) {
-    const attempted = Object.keys(payload).filter((k) => payload[k] !== undefined);
-    const disallowed = attempted.filter((k) => !MANAGER_ALLOWED_FIELDS.has(k));
-    if (disallowed.length) {
-      const error = new Error(
-        `Business managers can only edit title, description, status, priority, start date, and due date. Cannot modify: ${disallowed.join(', ')}`
-      );
-      error.code = 'FORBIDDEN';
-      throw error;
-    }
   }
   if (canEditSubtask) {
     const attempted = Object.keys(payload).filter((k) => payload[k] !== undefined);
@@ -1058,6 +1084,13 @@ async function updateTask(id, payload, actorId) {
 
   logAudit('task.update', actorId, { task_id: id, changes: validation.value });
 
+  // Reset the one-time overdue reminder flag when the deadline or status
+  // changes so a still-overdue task can re-notify on the next scheduler scan
+  // instead of being permanently silenced by reminder_overdue_sent = 1.
+  if (payload.deadline_datetime !== undefined || payload.status !== undefined) {
+    await db.query('UPDATE tasks SET reminder_overdue_sent = 0 WHERE id = ?', [id]);
+  }
+
   const updated = await getTask(id, actorId);
   // If the deadline was moved up into an imminent window (or the task was
   // re-dated past its deadline), notify the relevant recipients right away
@@ -1077,10 +1110,11 @@ async function deleteTask(id, actorId) {
 
   const isAdmin = await isUserAdmin(actorId);
   const isCreator = task.created_by === actorId;
+  const canDelete = isCreator || isAdmin || await isTaskEditableByManager(actorId, id);
   const canDeleteSubtask = !isCreator && !isAdmin && task.parent_task_id != null
     ? await isUserAssignedToTaskOrAncestor(actorId, id)
     : false;
-  if (!isCreator && !isAdmin && !canDeleteSubtask) {
+  if (!canDelete && !canDeleteSubtask) {
     const error = new Error('You are not authorized to delete this task');
     error.code = 'FORBIDDEN';
     throw error;
@@ -1291,6 +1325,10 @@ async function updateProgress(payload, actorId) {
 
   await taskModel.update(task_id, { status: finalStatus });
 
+  // Reset the one-time overdue reminder flag so a still-overdue task can
+  // re-notify on the next scheduler scan after a progress update.
+  await db.query('UPDATE tasks SET reminder_overdue_sent = 0 WHERE id = ?', [task_id]);
+
   logAudit('task.progress.update', actorId, {
     task_id,
     completion_rate: completion_rate ?? 0,
@@ -1450,7 +1488,7 @@ async function deleteAttachment(attachmentId, actorId) {
 
   const isAdmin = await isUserAdmin(actorId);
   const isAssigned = await isUserAssignedToTaskOrAncestor(actorId, attachment.task_id);
-  if (!isAdmin && !isAssigned) {
+  if (!isAdmin && !isAssigned && !(await isTaskEditableByManager(actorId, attachment.task_id))) {
     const error = new Error('You are not authorized to delete this attachment');
     error.code = 'FORBIDDEN';
     throw error;
@@ -2071,17 +2109,19 @@ async function isUserAssignedToTaskOrAncestor(userId, taskId, seen = new Set()) 
 }
 
 async function isUserAssignedToTaskById(userId, taskId) {
-  // 1. Direct assignment on this task (User / Department / Position)
+  // 1. Direct assignment on this task (User / Department / Position).
+  // Uses EXISTS instead of scalar subqueries so that NULL department_id or
+  // position_title on the actor row never causes a missed match.
   const [direct] = await db.query(
     `SELECT ta.id FROM task_assignments ta
      WHERE ta.task_id = ?
      AND (
        ta.assignment_type = 'User' AND ta.reference_id = ?
-       OR ta.assignment_type = 'Department' AND ta.reference_id = (
-         SELECT u.department_id FROM users u WHERE u.id = ?
+       OR ta.assignment_type = 'Department' AND EXISTS (
+         SELECT 1 FROM users u WHERE u.id = ? AND u.department_id = ta.reference_id
        )
-       OR ta.assignment_type = 'Position' AND ta.reference_id = (
-         SELECT u.position_title FROM users u WHERE u.id = ?
+       OR ta.assignment_type = 'Position' AND EXISTS (
+         SELECT 1 FROM users u WHERE u.id = ? AND u.position_title = ta.reference_id
        )
      )
      LIMIT 1`,
@@ -2090,17 +2130,28 @@ async function isUserAssignedToTaskById(userId, taskId) {
   if (direct.length > 0) return true;
 
   // 2. Business manager or department grant: a user (or any member of a granted
-  //    department) can manage every task in that business.
+  //    department) can view every task in that business.
+  // Uses EXISTS (not LEFT JOINs / scalar subqueries) so NULL department_id /
+  // position_title on the actor row never causes a missed match.
   const [biz] = await db.query(
     `SELECT 1
      FROM tasks t
-     LEFT JOIN business_managers bm ON bm.business_id = t.client_business_id AND bm.user_id = ?
-     LEFT JOIN business_departments bd ON bd.business_id = t.client_business_id
-       INNER JOIN department_members dm ON dm.department_id = bd.department_id AND dm.user_id = ?
-     WHERE t.id = ? AND t.client_business_id IS NOT NULL
-       AND (bm.user_id IS NOT NULL OR dm.user_id IS NOT NULL)
+     WHERE t.id = ?
+       AND (
+         -- Direct business manager grant
+         EXISTS (
+           SELECT 1 FROM business_managers bm
+           WHERE bm.business_id = t.client_business_id AND bm.user_id = ?
+         )
+         OR -- Department membership grant (any member of a granted department)
+         EXISTS (
+           SELECT 1 FROM business_departments bd
+           INNER JOIN department_members dm ON dm.department_id = bd.department_id AND dm.user_id = ?
+           WHERE bd.business_id = t.client_business_id
+         )
+       )
      LIMIT 1`,
-    [userId, userId, taskId]
+    [taskId, userId, userId]
   );
   return biz.length > 0;
 }
@@ -2424,6 +2475,7 @@ module.exports = {
   isUserAssignedToTask,
   isUserAssignedToTaskById,
   isUserAssignedToTaskOrAncestor,
+  isTaskEditableByManager,
   grantBusinessManager,
   listBusinessManagers,
   revokeBusinessManager,
@@ -2443,7 +2495,8 @@ const ADMIN_ROLES = ['super_admin', 'admin', 'department_head'];
 async function isUserAssignedToTask(taskId, user) {
   if (!user) return false;
   if (ADMIN_ROLES.includes(user.role)) return true;
-  return await isUserAssignedToTaskOrAncestor(user.id, taskId);
+  if (await isUserAssignedToTaskOrAncestor(user.id, taskId)) return true;
+  return await isTaskEditableByManager(user.id, taskId);
 }
 
 // Grant/revoke management access to every task in a business. A business
@@ -2492,13 +2545,22 @@ async function isUserBusinessManagerOfTask(userId, taskId) {
   const [rows] = await db.query(
     `SELECT 1
      FROM tasks t
-     LEFT JOIN business_managers bm ON bm.business_id = t.client_business_id AND bm.user_id = ?
-     LEFT JOIN business_departments bd ON bd.business_id = t.client_business_id
-       INNER JOIN department_members dm ON dm.department_id = bd.department_id AND dm.user_id = ?
-     WHERE t.id = ? AND t.client_business_id IS NOT NULL
-       AND (bm.user_id IS NOT NULL OR dm.user_id IS NOT NULL)
+     WHERE t.id = ?
+       AND (
+         -- Direct business manager grant
+         EXISTS (
+           SELECT 1 FROM business_managers bm
+           WHERE bm.business_id = t.client_business_id AND bm.user_id = ?
+         )
+         OR -- Department membership grant (any member of a granted department)
+         EXISTS (
+           SELECT 1 FROM business_departments bd
+           INNER JOIN department_members dm ON dm.department_id = bd.department_id AND dm.user_id = ?
+           WHERE bd.business_id = t.client_business_id
+         )
+       )
      LIMIT 1`,
-    [userId, userId, taskId]
+    [taskId, userId, userId]
   );
   return rows.length > 0;
 }

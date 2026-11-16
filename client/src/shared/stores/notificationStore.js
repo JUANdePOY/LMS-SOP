@@ -168,7 +168,9 @@ export const NotificationStore = {
               message: n.body || '',
               link: n.link && (n.link.includes('client=') && n.link.includes('business='))
                 ? n.link
-                : (n.entity_id ? `/tasks/my?task=${n.entity_id}` : (n.link || null)),
+                : (n.entity_id ? (n.title && n.title.toLowerCase().includes('overdue')
+                    ? `/tasks/my?status=Overdue`
+                    : `/tasks/my?task=${n.entity_id}`) : (n.link || null)),
               ctaLabel: 'View',
               priority: 2,
             });

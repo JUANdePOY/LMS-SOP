@@ -3,6 +3,7 @@ const multer = require('multer');
 const { authenticateToken } = require('../middleware/auth');
 const { requirePermissionAction } = require('../middleware/scope');
 const { taskController } = require('../controllers/taskController');
+const { isTaskEditableByManager, isUserAssignedToTaskOrAncestor } = require('../services/taskService');
 const { taskAttachmentModel } = require('../models/taskAttachmentModel');
 const { getMaxUploadBytes, safeExtFromOriginal } = require('../config/uploads');
 
@@ -86,7 +87,27 @@ const router = express.Router();
 router.get('/', authenticateToken, requirePermissionAction('manage_tasks', 'view'), taskController.listTasks);
 
 // Admin: create task
-router.post('/', authenticateToken, requirePermissionAction('manage_tasks', 'create'), taskController.createTask);
+router.post('/', authenticateToken, async (req, res, next) => {
+  // Sub-task creation: allow business managers / department members / assignees
+  // of the parent task without requiring the full manage_tasks -> create permission.
+  if (req.body && req.body.parent_task_id) {
+    const parentId = parseInt(req.body.parent_task_id, 10);
+    if (Number.isFinite(parentId) && parentId > 0) {
+      try {
+        const allowed =
+          req.user?.role === 'super_admin' ||
+          req.user?.role === 'admin' ||
+          (await isTaskEditableByManager(req.user.id, parentId)) ||
+          (await isUserAssignedToTaskOrAncestor(req.user.id, parentId));
+        if (allowed) return next();
+      } catch {
+        // fall through to permission check
+      }
+    }
+    return res.status(403).json({ success: false, message: "You don't have permission to create a sub-task.", code: 'PERMISSION_ACTION_DENIED' });
+  }
+  return requirePermissionAction('manage_tasks', 'create')(req, res, next);
+}, taskController.createTask);
 
 // Admin: assign task
 router.post('/assign', authenticateToken, requirePermissionAction('manage_tasks', 'assign'), taskController.assignTask);
@@ -152,7 +173,23 @@ router.get('/:id', authenticateToken, taskController.getTask);
 router.put('/:id', authenticateToken, requirePermissionAction('manage_tasks', 'edit'), taskController.updateTask);
 
 // Admin: delete task
-router.delete('/:id', authenticateToken, requirePermissionAction('manage_tasks', 'delete'), taskController.deleteTask);
+router.delete('/:id', authenticateToken, async (req, res, next) => {
+  // Business managers / department members / assignees may delete tasks.
+  const taskId = parseInt(req.params.id, 10);
+  if (Number.isFinite(taskId) && taskId > 0) {
+    try {
+      const allowed =
+        req.user?.role === 'super_admin' ||
+        req.user?.role === 'admin' ||
+        (await isTaskEditableByManager(req.user.id, taskId)) ||
+        (await isUserAssignedToTaskOrAncestor(req.user.id, taskId));
+      if (allowed) return next();
+    } catch {
+      // fall through to permission check
+    }
+  }
+  return requirePermissionAction('manage_tasks', 'delete')(req, res, next);
+}, taskController.deleteTask);
 
 // Admin: duplicate task
 router.post('/:id/duplicate', authenticateToken, requirePermissionAction('manage_tasks', 'create'), taskController.duplicateTask);
