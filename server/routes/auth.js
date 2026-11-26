@@ -456,6 +456,7 @@ router.post('/refresh-token', [
 
     const permissions = await resolveUserPermissions(user.id, user.role);
     const permissionDetails = await resolveUserPermissionDetails(user.id, user.role);
+    const roleEntityPermissions = await resolveRoleEntityPermissions(user.role);
 
     const newAccessToken = generateToken({
       userId: user.id,
